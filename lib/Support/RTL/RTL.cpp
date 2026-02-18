@@ -525,12 +525,14 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
 
 LogicalResult RTLMatch::concretize(const RTLRequest &request,
                                    StringRef dynamaticPath,
-                                   StringRef outputDir) const {
+                                   StringRef outputDir,
+                                   LSQ_Type lsqType) const {
   // Consolidate reserved and regular parameters in a single map to perform
   // text substitutions
   ParameterMappings allParams(serializedParams);
   allParams[RTLParameter::DYNAMATIC] = dynamaticPath;
   allParams[RTLParameter::OUTPUT_DIR] = outputDir;
+  allParams[RTLParameter::LSQ_TYPE] = lsqType;
 
   if (component->isGeneric()) {
     std::string inputFile = substituteParams(component->generic, allParams);

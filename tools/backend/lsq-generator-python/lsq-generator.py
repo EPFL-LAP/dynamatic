@@ -22,12 +22,16 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("--output-dir", "-o",
                     dest="output_path", default=".", type=str)
+parser.add_argument("--lsq-type", "-t",
+                    dest="lsq_type", default="full", type=str)
 parser.add_argument(
     "--config-file", "-c", required=True, dest="config_files", default="", type=str
 )
 
 # Build the target
 args = parser.parse_args()
+
+print("Using LSQ type of:", args.lsq_type)
 
 # ===----------------------------------------------------------------------===#
 # Wrapper Generation

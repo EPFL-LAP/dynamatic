@@ -31,6 +31,9 @@ namespace dynamatic {
 /// Hardware description languages.
 enum class HDL { VHDL, VERILOG, SMV };
 
+/// LSQ Types.
+enum class LSQ_TYPE { FULL, SEQUENTIAL };
+
 /// Returns the file extension (without a leading '.') for files of the HDL.
 StringRef getHDLExtension(HDL hdl);
 
@@ -70,7 +73,9 @@ public:
   static constexpr llvm::StringLiteral DYNAMATIC = StringLiteral("DYNAMATIC"),
                                        OUTPUT_DIR = StringLiteral("OUTPUT_DIR"),
                                        MODULE_NAME =
-                                           StringLiteral("MODULE_NAME");
+                                           StringLiteral("MODULE_NAME"),
+                                       LSQ_TYPE =
+                                           StringLiteral("LSQ_TYPE");
 
   /// Default constructor.
   RTLParameter() = default;

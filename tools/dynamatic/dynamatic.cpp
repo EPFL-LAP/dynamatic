@@ -327,6 +327,7 @@ public:
 class WriteHDL : public Command {
 public:
   static constexpr llvm::StringLiteral HDL = "hdl";
+  static constexpr llvm::StringLiteral LSQ_TYPE = "lsq-type";
 
   WriteHDL(FrontendState &state)
       : Command(
@@ -335,6 +336,8 @@ public:
             "export-dot tool",
             state) {
     addOption({HDL, "HDL to use for design's top-level"});
+    addOption({LSQ_TYPE, "Type of Load-Store Queue to use. "
+              "Possible values are 'full' and 'sequential"});
   }
 
   CommandResult execute(CommandArguments &args) override;

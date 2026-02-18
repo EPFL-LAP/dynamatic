@@ -87,6 +87,14 @@ static cl::opt<HDL>
                    clEnumValN(HDL::SMV, "smv", "SMV")),
         cl::cat(mainCategory));
 
+static cl::opt<LSQ_TYPE>
+hdl("lsq-type", cl::Optional, cl::desc("<lsq type>"), cl::init(LSQ_TYPE::FULL),
+    cl::values(clEnumValN(LSQ_TYPE::FULL, "full", "Use a full LSQ with dependency evaluation"),
+                clEnumValN(LSQ_TYPE::SEQUENTIAL, "sequential", "Use a LSQ with no dependency"
+                " evaluation but instead sequentializes memory operations.")
+              ),
+    cl::cat(mainCategory));
+
 static cl::list<std::string>
     rtlConfigs(cl::Positional, cl::OneOrMore,
                cl::desc("<RTL configuration files...>"), cl::cat(mainCategory));
@@ -213,7 +221,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
       }
 
     // ...then generate the component itself
-    return match->concretize(request, dynamaticPath, outputPath);
+    return match->concretize(request, dynamaticPath, outputPath, lsq_type);
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {

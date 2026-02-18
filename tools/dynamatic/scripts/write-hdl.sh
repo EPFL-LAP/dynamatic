@@ -11,6 +11,7 @@ DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
 HDL=$4
+LSQ_TYPE="${5:-full}"
 
 # Generated directories/files
 HDL_DIR="$OUTPUT_DIR/hdl"
@@ -40,7 +41,7 @@ elif [ "$HDL" == "verilog-beta" ]; then
 fi
 
 "$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" $RTL_CONFIG \
-  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL
+  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL --lsq-type $LSQ
 exit_on_fail "Failed to export RTL ($HDL)" "Exported RTL ($HDL)"
 
 echo_info "HDL generation succeeded"
