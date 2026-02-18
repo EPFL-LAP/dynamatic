@@ -1,5 +1,5 @@
 from verilog_gen.emitters import Emitter
-from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit
+from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit, WhenElse
 from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
@@ -89,9 +89,10 @@ class VHDLEmitter(Emitter):
         if instance_name is None: instance_name = module_name
 
         self.inst_started = True
+        self.first_map = True
         self.inst_str = f'{self.get_current_indent()}{instance_name} : entity work.{module_name}\n'
         self.increase_indent()
-        self.inst_str += f'{self.get_current_indent()}port map(\n'
+        self.inst_str += f'{self.get_current_indent()}port map('
         self.increase_indent()
 
     def add_map(self, port_name: str, signal_name: str) -> str:
@@ -100,12 +101,17 @@ class VHDLEmitter(Emitter):
         
         assert isinstance(port_name, str) and isinstance(signal_name, str), "port name and signal name must be strings"
 
-        self.inst_str += f'{self.get_current_indent()}{port_name} => {signal_name},\n'
+        if not self.first_map:
+            self.inst_str += ','
+        else:
+            self.first_map = False
+
+        self.inst_str += f'\n{self.get_current_indent()}{port_name} => {signal_name}'
 
     def complete_instantiation(self) -> str:
         self.inst_started = False
         self.decrease_indent()
-        self.inst_str += self.get_current_indent() + ');\n'
+        self.inst_str += f'\n{self.get_current_indent()});\n'
         self.decrease_indent()
         self.statementString += self.inst_str
         self.inst_str = ''
@@ -194,8 +200,10 @@ class VHDLEmitter(Emitter):
         true_str = self.fix_type('logic', when_else.true_statement.get_type(), true_str)
         false_str = self.fix_type('logic', when_else.false_statement.get_type(), false_str)
         cond_str = self.fix_type('bool', when_else.condition.get_type(), cond_str)
-
-        return f'{true_str} when {cond_str} else {false_str}'
+        
+        # add a linebreak if the "else" statement is a when-else themselves
+        enter = f'\n{self.get_current_indent()}\t' if isinstance(when_else.false_statement, WhenElse) else ' '
+        return f'{true_str} when {cond_str} else{enter}{false_str}'
 
     def logic_signal_init(self, signal: Logic, sufix: str):
         """
