@@ -748,8 +748,8 @@ CommandResult Compile::execute(CommandArguments &args) {
       lsqType = it->second;
     } else{
       llvm::errs()
-        << "Unknown LSQ tyoe " << it->second
-        << "! Possible options are 'full' or 'sequential'";
+        << "Unknown LSQ type " << it->second
+        << "! Possible options are 'full' or 'sequential'\n";
       return CommandResult::FAIL;
     }
   }
