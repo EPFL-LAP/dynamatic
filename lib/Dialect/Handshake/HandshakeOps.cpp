@@ -998,7 +998,7 @@ ParseResult LSQOp::parse(OpAsmParser &parser, OperationState &result) {
 
   result.addAttribute(
       LSQOp::getLsqTypeAttrName(result.name).strref(),
-      Handshake_LSQTypeAttr::get(parser.getContext(), *type));
+      LSQTypeAttr::get(parser.getContext(), *type));
 
   // Parse group sizes and other attributes
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -1041,7 +1041,7 @@ void LSQOp::print(OpAsmPrinter &p) {
   p << inputs.back() << ") ";
 
   // Print lsqType explicitly
-  p << " type=" << stringifyHandshake_LSQType(getLsqType()) << " ";
+  p << " type=" << stringifyLSQType(getLsqType()) << " ";
 
   // Print remaining attrs (exclude lsqType) such as group size
   SmallVector<StringRef> elided = {
