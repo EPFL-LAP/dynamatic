@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
@@ -164,8 +165,9 @@ private:
 // details.
 class EagerForkNotAllOutputSent : public FormalProperty {
 public:
-  std::string getOwner() { return ownerOp; }
-  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+  std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
+    return sentStateNamers;
+  }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -182,10 +184,10 @@ public:
   }
 
 private:
-  std::string ownerOp;
-  unsigned numEagerForkOutputs;
+  // The `sent` states that cannot be active at the same time
+  std::vector<handshake::EagerForkSentNamer> sentStateNamers;
   inline static const StringLiteral OWNER_OP_LIT = "owner_op";
-  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral CHANNELS_LIT = "channels";
 };
 
 // When an eager fork is `sent` state for at least one of its outputs, it is
@@ -197,10 +199,10 @@ private:
 // https://ieeexplore.ieee.org/document/10323796 for more details
 class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
 public:
-  std::string getForkOp() { return forkOp; }
-  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
-  std::string getBufferOp() { return bufferOp; }
-  unsigned getBufferSlot() { return bufferSlot; }
+  std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
+    return sentStateNamers;
+  }
+  handshake::BufferSlotFullNamer getCopiedSlot() { return copiedSlot; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -218,12 +220,10 @@ public:
   }
 
 private:
-  std::string forkOp;
-  unsigned numEagerForkOutputs;
-  std::string bufferOp;
-  unsigned bufferSlot;
+  std::vector<handshake::EagerForkSentNamer> sentStateNamers;
+  handshake::BufferSlotFullNamer copiedSlot;
   inline static const StringLiteral FORK_OP_LIT = "fork_op";
-  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral FORK_CHANNELS_LIT = "channels";
   inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };

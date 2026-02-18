@@ -1257,11 +1257,11 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                                      propertyTag};
     } else if (auto *p =
                    llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
-      unsigned numOut = p->getNumEagerForkOutputs();
-      std::string opName = p->getOwner();
+      auto sentStates = p->getSentStateNamers();
+      unsigned numOut = sentStates.size();
       std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
-        outNames[i] = llvm::formatv("{0}.sent_{1}", opName, i);
+        outNames[i] = sentStates[i].getSMVName();
       }
       std::string propertyString =
           llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
@@ -1271,16 +1271,12 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
                    property.get())) {
-      unsigned numOut = p->getNumEagerForkOutputs();
-      std::string forkName = p->getForkOp();
-      std::string bufferName = p->getBufferOp();
-      int bufferSlot = p->getBufferSlot();
-      std::vector<std::string> forkOutNames{numOut};
-      for (unsigned i = 0; i < numOut; ++i) {
-        forkOutNames[i] = llvm::formatv("{0}.sent_{1}", forkName, i).str();
+      std::vector<std::string> forkOutNames(0);
+      for (auto [i, sentState] : llvm::enumerate(p->getSentStateNamers())) {
+        forkOutNames.push_back(sentState.getSMVName());
       }
-      std::string bufferFull =
-          llvm::formatv("{0}.full_{1}", bufferName, bufferSlot).str();
+      auto copiedSlot = p->getCopiedSlot();
+      std::string bufferFull = copiedSlot.getSMVName();
       std::string propertyString =
           llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
                         bufferFull)
