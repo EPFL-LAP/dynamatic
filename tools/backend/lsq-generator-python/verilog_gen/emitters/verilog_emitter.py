@@ -259,7 +259,7 @@ class VerilogEmitter(Emitter):
 
         if (enable != None):
             for i in range(0, array.length):
-                self.add_reg_str(f'if ({enable.getNameRead()})')
+                self.add_reg_str(f'if ({enable.getNameRead(i)})')
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {array.getNameWrite(i)};')
                 self.add_reg_str('end')
         else:
@@ -286,7 +286,7 @@ class VerilogEmitter(Emitter):
 
         if (enable != None):
             for i in range(0, array.length):
-                self.add_reg_str(f'if ({enable.getNameRead()})')
+                self.add_reg_str(f'if ({enable.getNameRead(i)})')
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {array.getNameWrite(i)};')
                 self.add_reg_str('end')
         else:
