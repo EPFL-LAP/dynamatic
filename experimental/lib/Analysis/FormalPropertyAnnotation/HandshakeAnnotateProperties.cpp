@@ -234,7 +234,7 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
 // 3. No name is necessary, as a variable is uniquely defined by the metadata
 // 4. Dedicated conversion function to a matrix, as this is necessary anyway
 struct FlowVariable {
-  enum TYPE { full, sent, inputLambda, outputLambda, internalLambda };
+  enum TYPE { internalState, inputLambda, outputLambda, internalLambda };
   TYPE type;
   // `typeIndex` has a different meaning depending on `type`:
   // `full` => index of slot that is full
@@ -242,28 +242,36 @@ struct FlowVariable {
   // `inputLambda` => index of operand channel
   // `outputLambda` => index of result channel
   // `internalLambda` => index of internal channel
-  unsigned typeIndex;
+  unsigned lambdaIndex;
   Operation *op;
+  std::shared_ptr<InternalStateNamer> state;
+
+  FlowVariable(std::shared_ptr<InternalStateNamer> state)
+      : type(TYPE::internalState), state(std::move(state)) {}
+  FlowVariable(TYPE t, Operation *op, unsigned lambdaIndex)
+      : type(t), lambdaIndex(lambdaIndex), op(op) {
+    assert(
+        t != TYPE::internalState &&
+        "internal states should be initialized with the according constructor");
+  }
 
   // utility functions for initializing variables
   static FlowVariable internalChannel(Operation *op, unsigned index) {
-    return (FlowVariable){FlowVariable::TYPE::internalLambda, index, op};
+    return FlowVariable(TYPE::internalLambda, op, index);
   }
   static FlowVariable inputChannel(Operation *op, unsigned index) {
-    return (FlowVariable){FlowVariable::TYPE::inputLambda, index, op};
+    return FlowVariable(TYPE::inputLambda, op, index);
   }
   static FlowVariable outputChannel(Operation *op, unsigned index) {
-    return (FlowVariable){FlowVariable::TYPE::outputLambda, index, op};
+    return FlowVariable(TYPE::outputLambda, op, index);
   }
-  static FlowVariable slot(Operation *op, unsigned index) {
-    return (FlowVariable){FlowVariable::TYPE::full, index, op};
-  }
-  static FlowVariable sentOutput(Operation *op, unsigned index) {
-    return (FlowVariable){FlowVariable::TYPE::sent, index, op};
-  }
-
   bool operator==(const FlowVariable &other) const {
-    return type == other.type && typeIndex == other.typeIndex && op == other.op;
+    if (type == TYPE::internalState && other.type == TYPE::internalState) {
+      return state.get() == other.state.get();
+    }
+
+    return type == other.type && lambdaIndex == other.lambdaIndex &&
+           op == other.op;
   }
 
   bool isLambda() const {
@@ -274,16 +282,14 @@ struct FlowVariable {
 
   std::string getName() const {
     switch (type) {
-    case full:
-      return llvm::formatv("{0}.full_{1}", getUniqueName(op), typeIndex).str();
-    case sent:
-      return llvm::formatv("{0}.sent_{1}", getUniqueName(op), typeIndex).str();
+    case internalState:
+      return state->getSMVName();
     case inputLambda:
-      return llvm::formatv("{0}.in_{1}", getUniqueName(op), typeIndex).str();
+      return llvm::formatv("{0}.in_{1}", getUniqueName(op), lambdaIndex).str();
     case outputLambda:
-      return llvm::formatv("{0}.out_{1}", getUniqueName(op), typeIndex).str();
+      return llvm::formatv("{0}.out_{1}", getUniqueName(op), lambdaIndex).str();
     case internalLambda:
-      return llvm::formatv("{0}.#{1}", getUniqueName(op), typeIndex).str();
+      return llvm::formatv("{0}.#{1}", getUniqueName(op), lambdaIndex).str();
     };
   }
 };
@@ -295,7 +301,7 @@ struct std::hash<FlowVariable> {
   size_t operator()(const FlowVariable &var) const {
     using std::hash;
     return (hash<FlowVariable::TYPE>()(var.type) ^
-            hash<unsigned>()(var.typeIndex) ^ hash<Operation *>()(var.op));
+            hash<unsigned>()(var.lambdaIndex) ^ hash<Operation *>()(var.op));
   }
 };
 
@@ -308,7 +314,7 @@ struct FlowExpression {
   void debug() {
     std::string txt = "0 = ";
     bool first = true;
-    for (auto [key, value] : terms) {
+    for (auto &[key, value] : terms) {
       if (!first) {
         if (value > 0) {
           txt += " + ";
@@ -336,13 +342,13 @@ FlowExpression operator-(FlowVariable v) {
   f.terms[v] = -1;
   return f;
 }
-FlowExpression operator-(FlowVariable left, FlowVariable right) {
+FlowExpression operator-(const FlowVariable &left, FlowVariable right) {
   FlowExpression f{};
   f.terms[left] = 1;
   f.terms[right] -= 1;
   return f;
 }
-FlowExpression operator+(FlowVariable left, FlowVariable right) {
+FlowExpression operator+(const FlowVariable &left, FlowVariable right) {
   FlowExpression f{};
   f.terms[left] = 1;
   f.terms[right] += 1;
@@ -369,15 +375,15 @@ public:
   size_t getNLambdas() { return nLambdas; }
   size_t size() { return variables.size(); }
   size_t getIndex(FlowVariable v) { return map[v]; }
-  FlowVariable getVariable(size_t index) { return variables[index]; }
+  FlowVariable &getVariable(size_t index) { return variables[index]; }
   void verify() {
     assert(map.size() == variables.size());
     for (size_t i = 0; i < variables.size(); ++i) {
-      FlowVariable a = variables[i];
+      FlowVariable &a = variables[i];
       size_t j = map[a];
       assert(i == j);
     }
-    for (auto [key, value] : map) {
+    for (auto &[key, value] : map) {
       assert(variables[value] == key);
     }
   }
@@ -387,7 +393,7 @@ public:
     size_t index = 0;
     // annotate lambdas first
     for (auto &expr : exprs) {
-      for (auto [key, value] : expr.terms) {
+      for (auto &[key, value] : expr.terms) {
         if (!key.isLambda())
           continue;
         if (map.count(key) == 0) {
@@ -400,7 +406,7 @@ public:
     nLambdas = index;
     // annotate remaining variables
     for (auto &expr : exprs) {
-      for (auto [key, value] : expr.terms) {
+      for (auto &[key, value] : expr.terms) {
         if (map.count(key) == 0) {
           map[key] = index;
           ++index;
@@ -517,7 +523,9 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
           //
           // As the structure of the slot variables will soon change, I did not
           // yet implement the latency-slot variable
-          FlowVariable full = FlowVariable::slot(&op, exitIndex);
+          FlowVariable full =
+              FlowVariable(std::make_shared<LatencyInducedSlotNamer>(
+                  LatencyInducedSlotNamer(getUniqueName(&op).str(), i)));
 
           FlowVariable before = FlowVariable::internalChannel(&op, exitIndex);
           FlowVariable after =
@@ -528,8 +536,9 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       }
       // Annotate buffer slots
       if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
-        for (int i = 0; i < bufferOp.getNumSlots(); ++i) {
-          FlowVariable full = FlowVariable::slot(&op, i);
+        for (auto &slotFull : bufferOp.getInternalSlotStateNamers()) {
+          FlowVariable full =
+              FlowVariable(std::make_shared<BufferSlotFullNamer>(slotFull));
 
           FlowVariable before = FlowVariable::internalChannel(&op, exitIndex);
           FlowVariable after =
@@ -543,8 +552,10 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         // eagerfork: for every channel, either same tokens in as out, or in
         // `sent` state and in = out - 1
-        for (auto [i, channel] : llvm::enumerate(op.getResults())) {
-          FlowVariable sent = FlowVariable::sentOutput(&op, i);
+        for (auto [i, sentVariable] :
+             llvm::enumerate(forkOp.getInternalSentStateNamers())) {
+          FlowVariable sent =
+              FlowVariable(std::make_shared<EagerForkSentNamer>(sentVariable));
           FlowVariable result = FlowVariable::outputChannel(&op, i);
           equations.push_back(exit + sent - result);
         }
@@ -577,7 +588,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 
   // insert equations into the matrix
   for (auto [row, expr] : llvm::enumerate(equations)) {
-    for (auto [key, value] : expr.terms) {
+    for (auto &[key, value] : expr.terms) {
       unsigned index = indices.getIndex(key);
       matrix(row, index) = (int)value;
     }

@@ -24,8 +24,6 @@ MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_read
   dataFromMem_ready := inner_data_one_slot_break_r.ins_ready;
   dataOut := inner_data_one_slot_break_r.outs;
   dataOut_valid := inner_data_one_slot_break_r.outs_valid;
-  full_0 := inner_addr_one_slot_break_r.full_0;
-  full_1 := inner_data_one_slot_break_r.full_0;
 
   addr_full := inner_addr_one_slot_break_r.slot_0_full;
   data_full := inner_data_one_slot_break_r.slot_0_full;
