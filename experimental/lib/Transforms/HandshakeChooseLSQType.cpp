@@ -27,12 +27,12 @@ namespace experimental {
 }; // namespace dynamatic
 
 struct HandshakeChooseLSQTypePass
-    : public dynamatic::experimental::impl::HandshakeChooseLSQTypePassBase<
+    : public dynamatic::experimental::impl::HandshakeChooseLSQTypeBase<
           HandshakeChooseLSQTypePass> {
-  using HandshakeChooseLSQTypePassBase<HandshakeChooseLSQTypePass>::HandshakeChooseLSQTypePassBase;
+  using HandshakeChooseLSQTypeBase<HandshakeChooseLSQTypePass>::HandshakeChooseLSQTypeBase;
   void runDynamaticPass() override;
 };
 
-void PreSpecV2Pass::runDynamaticPass() {
+void HandshakeChooseLSQTypePass::runDynamaticPass() {
   return;
 }
