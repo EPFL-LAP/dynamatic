@@ -232,7 +232,6 @@ if [[ $DISABLE_LSQ -ne 0 ]]; then
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
     --mark-memory-interfaces \
-    --handshake-choose-lsq-type="lsq-type=$LSQ_TYPE" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
     "Marked memory accesses with the corresponding interfaces in cf"
@@ -282,6 +281,7 @@ else
     --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
+    --handshake-choose-lsq-type="lsq-type=$LSQ_TYPE" \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
