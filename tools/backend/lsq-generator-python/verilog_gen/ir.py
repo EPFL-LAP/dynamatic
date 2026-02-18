@@ -80,10 +80,14 @@ class Val(Statement):
     """
     Represents a variable statement
     """
-    def __init__(self, *var):
+    def __init__(self, *var, size=None):
         self.var = var
+        self.size = size
 
     def _to_str(self, em: 'Emitter', size):
+        if self.size is not None:
+            size = self.size
+
         arg = self.var[0] if len(self.var) == 1 else tuple(self.var)
         if type(arg) == str:
             str_ret = arg
