@@ -803,7 +803,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addType("DATA_TYPE", ChannelType::get(dataType));
         addType("ADDR_TYPE", ChannelType::get(addrType));
       })
-      .Case<handshake::LSQOp>([&](auto) {
+      .Case<handshake::LSQOp>([&](handshake::LSQOp lsqOp) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
         modName = getOpName() + "_" + genInfo.name;
 
@@ -863,6 +863,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addUnsigned("pipe1En", genInfo.pipe1En);
         addUnsigned("pipeCompEn", genInfo.pipeCompEn);
         addUnsigned("headLagEn", genInfo.headLagEn);
+        addString("type", stringifyLSQType(lsqOp.getLSQType().getValue()));
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
