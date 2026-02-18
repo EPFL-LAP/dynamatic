@@ -103,8 +103,9 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
             em.add_assignment(double_out, double_in & ~(double_in - (Val(0, size).concat(base))))
             if isinstance(dout, LogicVec):
                 # TODO: Have indexing function
-                em.add_assignment(Op(em, dout, f'{double_out.getNameRead()}({size-1} downto 0) or ' + \
-                    f'{double_out.getNameRead()}({2*size-1} downto {size})'))
+                em.add_assignment(dout, 
+                                    Val(em.slice_var(f'{double_out.getNameRead()}', size - 1, 0)) 
+                                    | Val(em.slice_var(f'{double_out.getNameRead()}', 2*size - 1, size)))
             else:
                 for i in range(0, size):
                     em.add_assignment((dout, i), Val(double_out, i) | Val(double_out, i+size))
