@@ -3,6 +3,7 @@
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Operation.h"
+#include "llvm/Support/FormatVariadic.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -29,6 +30,8 @@ struct InternalStateNamer {
     }
   }
 
+  virtual std::string getSMVName() = 0;
+
   InternalStateNamer() = default;
   InternalStateNamer(TYPE type) : type(type) {}
   virtual ~InternalStateNamer() = default;
@@ -47,6 +50,10 @@ struct EagerForkSentNamer : public InternalStateNamer {
       : opName(opName), channelName(channelName) {}
   ~EagerForkSentNamer() = default;
 
+  inline std::string getSMVName() override {
+    return llvm::formatv("{0}.{1}_sent", opName, channelName).str();
+  }
+
   std::string opName;
   std::string channelName;
 };
@@ -58,6 +65,9 @@ struct BufferSlotFullNamer : public InternalStateNamer {
         slotName(slotName) {}
   ~BufferSlotFullNamer() = default;
 
+  inline std::string getSMVName() override {
+    return llvm::formatv("{0}.{1}_full", opName, slotName).str();
+  }
   std::string opName;
   std::string slotName;
 };

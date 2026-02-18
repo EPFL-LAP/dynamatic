@@ -920,6 +920,10 @@ def LoadOp : Handshake_MemPortOp<"load", [
     ```
   }];
 
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral ADDR_SLOT_LIT = "addr";
+    static constexpr ::llvm::StringLiteral DATA_SLOT_LIT = "data";
+  }];
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");

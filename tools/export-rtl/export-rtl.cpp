@@ -1261,8 +1261,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       unsigned numOut = sentStates.size();
       std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
-        outNames[i] = llvm::formatv("{0}.{1}_sent", sentStates[i].opName,
-                                    sentStates[i].channelName);
+        outNames[i] = sentStates[i].getSMVName();
       }
       std::string propertyString =
           llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
@@ -1274,9 +1273,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                    property.get())) {
       std::vector<std::string> forkOutNames(0);
       for (auto [i, sentState] : llvm::enumerate(p->getSentStateNamers())) {
-        forkOutNames.push_back(llvm::formatv("{0}.{1}_sent", sentState.opName,
-                                             sentState.channelName)
-                                   .str());
+        forkOutNames.push_back(sentState.getSMVName());
       }
       auto copiedSlot = p->getCopiedSlot();
       std::string bufferFull =

@@ -416,8 +416,8 @@ std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStateNamers() {
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
-  ret[0] = BufferSlotFullNamer(nameAttr.str(), "addr");
-  ret[1] = BufferSlotFullNamer(nameAttr.str(), "data");
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str());
+  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str());
   return ret;
 }
 
