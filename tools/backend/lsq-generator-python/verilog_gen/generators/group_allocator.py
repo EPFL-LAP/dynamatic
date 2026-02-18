@@ -78,11 +78,6 @@ class GroupAllocator:
             end architecture;
 
         """
-
-        em.tabLevel = 1
-        em.tempCount = 0
-        em.signalInitString = ''
-
         # IOs
         group_init_valid_i = LogicArray(
             em, 'group_init_valid', 'i', self.configs.numGroups)
@@ -328,7 +323,7 @@ class GroupAllocator:
 
         em.add_map('ldq_tail_i', ldq_tail_i.getNameRead())
         em.add_map('ldq_head_i', ldq_head_i.getNameRead())
-        em.add_map('ldq_empty_', ldq_empty_i.getNameRead())
+        em.add_map('ldq_empty_i', ldq_empty_i.getNameRead())
 
         em.add_map('stq_tail_i', stq_tail_i.getNameRead())
         em.add_map('stq_head_i', stq_head_i.getNameRead())
