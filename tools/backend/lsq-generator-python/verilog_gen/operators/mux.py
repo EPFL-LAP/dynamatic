@@ -1,6 +1,6 @@
 from verilog_gen.emitters import Emitter
 from verilog_gen.utils import *
-from verilog_gen.signals import LogicVecArray, LogicArray, Logic
+from verilog_gen.signals import LogicVecArray, LogicArray, Logic, LogicVec
 from verilog_gen.operators import *
 from verilog_gen.ir import Val, BinOp, WhenElse, Bit
 
@@ -10,7 +10,6 @@ from verilog_gen.ir import Val, BinOp, WhenElse, Bit
 # ===----------------------------------------------------------------------===#
 # Mux1H    : One-hot select elements of `din` using `sel`
 # Mux1HROM : Special multiplexer for the Group Allocator ROM.
-# MuxIndex : Generate a VHDL array-index expression for selecting an element.
 # MuxLookUp: Generate a conditional "when/else" lookup multiplexer in VHDL.
 
 def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
@@ -160,12 +159,6 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     em.add_comment('Mux1H For Rom End\n')
 
 
-# TODO: Fix this
-def MuxIndex(din, sel) -> str:
-    """
-    Generate a VHDL array-index expression for selecting an element
-    """
-    return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'
 
 
 # TODO: Properly test this
@@ -211,15 +204,10 @@ def MuxLookUp(em: Emitter, dout, din, sel) -> str:
     else:
         last = Bit(0)
 
-    if length > 0:
-        top = WhenElse(Val(din, 0), sel == Val(em.int_to_bits(0, size)), None)
-        cur_whenelse = top
-        for i in range(1, length):
-            curr_whenelse.false_statement = WhenElse(Val(din, i), sel == Val(em.int_to_bits(i, size)), None)
-            curr_whenelse = curr_whenelse.false_statement
-        curr_whenelse.false_statement = last
-        em.add_assignment(dout, top)
-    else:
-        em.add_assignment(dout, last)
+    whenelses = [WhenElse(Val(din, i), sel == Val(em.int_to_bits(i, size)), None) for i in range(0,length)]
+    whenelses.append(last)
+    for i, op in enumerate(whenelses[:-1]):
+        op.false_statement = whenelses[i + 1]
 
+    em.add_assignment(dout, whenelses[0])
     em.add_comment('MuxLookUp End\n')

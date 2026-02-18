@@ -348,3 +348,10 @@ class VHDLEmitter(Emitter):
     @staticmethod
     def new() -> Emitter:
         return VHDLEmitter()
+    
+    @staticmethod
+    def mux_index(din, sel) -> str:
+        """
+        Generate a VHDL array-index expression for selecting an element
+        """
+        return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'

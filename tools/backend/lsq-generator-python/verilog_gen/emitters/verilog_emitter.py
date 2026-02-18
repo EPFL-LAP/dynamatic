@@ -331,3 +331,9 @@ class VerilogEmitter(Emitter):
     @staticmethod
     def new() -> Emitter:
         return VerilogEmitter()
+    
+    def mux_index(self, din, sel) -> str:
+        """
+        Generate a Verilog array-index expression for selecting an element
+        """
+        return f'{din.getNameRead()}[{sel.getNameRead()}]'
