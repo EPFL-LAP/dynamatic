@@ -20,12 +20,15 @@ struct InternalStateNamer {
   enum class TYPE {
     EagerForkSent,
     BufferSlotFull,
+    LatencyInducedSlot,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s) {
     if (s == EAGER_FORK_SENT)
       return TYPE::EagerForkSent;
     if (s == BUFFER_SLOT_FULL)
       return TYPE::BufferSlotFull;
+    if (s == LATENCY_INDUCED_SLOT)
+      return TYPE::LatencyInducedSlot;
     return std::nullopt;
   }
 
@@ -35,6 +38,8 @@ struct InternalStateNamer {
       return EAGER_FORK_SENT.str();
     case TYPE::BufferSlotFull:
       return BUFFER_SLOT_FULL.str();
+    case TYPE::LatencyInducedSlot:
+      return LATENCY_INDUCED_SLOT.str();
     }
   }
 
@@ -49,6 +54,8 @@ struct InternalStateNamer {
   std::string opName;
   static constexpr llvm::StringLiteral EAGER_FORK_SENT = "EagerForkSent";
   static constexpr llvm::StringLiteral BUFFER_SLOT_FULL = "BufferSlotFull";
+  static constexpr llvm::StringLiteral LATENCY_INDUCED_SLOT =
+      "LatencyInducedSlot";
 };
 
 // To define a `sent` state of an eager fork, the exact channel that contains
@@ -79,6 +86,20 @@ struct BufferSlotFullNamer : public InternalStateNamer {
     return llvm::formatv("{0}.{1}_full", opName, slotName).str();
   }
   std::string slotName;
+};
+
+struct LatencyInducedSlotNamer : public InternalStateNamer {
+  LatencyInducedSlotNamer() = default;
+  LatencyInducedSlotNamer(const std::string &opName, unsigned slotIndex)
+      : InternalStateNamer(TYPE::BufferSlotFull, opName), slotIndex(slotIndex) {
+  }
+  ~LatencyInducedSlotNamer() = default;
+
+  inline std::string getSMVName() override {
+    return llvm::formatv("{0}.v{1}", opName, slotIndex).str();
+  }
+
+  unsigned slotIndex;
 };
 
 } // namespace handshake
