@@ -984,7 +984,7 @@ ParseResult LSQOp::parse(OpAsmParser &parser, OperationState &result) {
       parser.parseRParen())
     return failure();
 
-  if (parser.parseKeyword("type") || parser.parseEqual())
+  if (parser.parseKeyword("handshake.lsqType") || parser.parseEqual())
     return failure();
 
   StringRef typeStr;
@@ -1041,7 +1041,7 @@ void LSQOp::print(OpAsmPrinter &p) {
   p << inputs.back() << ") ";
 
   // Print lsqType explicitly
-  p << "type = " << stringifyLSQType(getLsqType());
+  p << "handshake.lsqType = " << stringifyLSQType(getLsqType());
 
   // Print remaining attrs (exclude lsqType) such as group size
   SmallVector<StringRef> elided = {
