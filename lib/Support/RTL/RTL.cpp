@@ -326,7 +326,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.divui" ||
       handshakeOp == "handshake.shrui" ||
       handshakeOp == "handshake.remsi" ||
-      handshakeOp == "handshake.not" ||
+      handshakeOp == "handshake.noti" ||
       handshakeOp == "handshake.ready_remover" ||
       handshakeOp == "handshake.maxsi" ||
       handshakeOp == "handshake.maxui" ||
@@ -461,6 +461,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.trunci" ||
       handshakeOp == "handshake.mux" ||
       handshakeOp == "handshake.control_merge" ||
+<<<<<<< HEAD
       handshakeOp == "handshake.blocker" ||
       handshakeOp == "handshake.uitofp" ||
       handshakeOp == "handshake.sitofp" ||
@@ -488,6 +489,19 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.maxui" ||
       handshakeOp == "handshake.minsi" ||
       handshakeOp == "handshake.minui" ||
+=======
+      handshakeOp == "handshake.blocker" || handshakeOp == "handshake.uitofp" ||
+      handshakeOp == "handshake.sitofp" || handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.lazy_fork" || handshakeOp == "handshake.divf" ||
+      handshakeOp == "handshake.ori" || handshakeOp == "handshake.shrsi" ||
+      handshakeOp == "handshake.xori" || handshakeOp == "handshake.negf" ||
+      handshakeOp == "handshake.truncf" || handshakeOp == "handshake.divsi" ||
+      handshakeOp == "handshake.absf" || handshakeOp == "handshake.divui" ||
+      handshakeOp == "handshake.extf" || handshakeOp == "handshake.maximumf" ||
+      handshakeOp == "handshake.minimumf" || handshakeOp == "handshake.shrui" ||
+      handshakeOp == "handshake.join" || handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.noti" ||
+>>>>>>> 83fa6260fb8112567713dccb2f38c7a3756a2c97
       // the first input has extra signals
       handshakeOp == "handshake.load" ||
       handshakeOp == "handshake.store" ||
