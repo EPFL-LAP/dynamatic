@@ -128,12 +128,6 @@ class LSQWrapper:
         self.module_suffix = suffix
         self.lsq_config = configs
 
-        # Define information needed for file generation
-        # This part is inherited from the design of the original lsq_generator
-        self.library_header = (
-            "library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n"
-        )
-
         # Define the final output string
         self.lsq_wrapper_str = "\n\n"
 
@@ -149,8 +143,8 @@ class LSQWrapper:
         arch = ''
 
 
-        # PART 1: Add library information to the module
-        self.lsq_wrapper_str += self.library_header
+        # PART 1: Add library information to the VHDL module
+        self.lsq_wrapper_str += ctx.library
 
         # PART 2: Define the entity
         self.lsq_wrapper_str += f"entity {self.lsq_name} is\n"
