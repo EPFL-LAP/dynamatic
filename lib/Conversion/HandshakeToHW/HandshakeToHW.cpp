@@ -863,7 +863,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addUnsigned("pipe1En", genInfo.pipe1En);
         addUnsigned("pipeCompEn", genInfo.pipeCompEn);
         addUnsigned("headLagEn", genInfo.headLagEn);
-        addString("type", stringifyLSQType(lsqOp.getLsqType().getValue()));
+        addString("type", stringifyLSQType(lsqOp.getLsqType()));
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
