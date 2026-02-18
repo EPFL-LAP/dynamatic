@@ -10,7 +10,7 @@ class VHDLEmitter(Emitter):
     Holds indentation level, temporary name counter, and initialization strings.
     """
 
-    def __init__(self):
+    def __init__(self, reset_name='rst', clock_name='clk'):
         # Indentation level for generated code
         self.tabLevel = 1
 
@@ -19,12 +19,14 @@ class VHDLEmitter(Emitter):
 
         # Accumulated initialization code sections
         self.signalInitString = ''
+        self.reset_name = reset_name
+        self.clock_name = clock_name
 
-        self.PORT_INIT_STR = '\tport(\n\t\trst : in std_logic;\n\t\tclk : in std_logic'
+        self.PORT_INIT_STR = f'\tport(\n\t\t{self.reset_name} : in std_logic;\n\t\t{self.clock_name} : in std_logic'
         self.PORT_END_STR = '\n\t);'
         self.portInitString = ''
 
-        self.REG_INIT_STR = '\tprocess (clk, rst) is\n\tbegin\n'
+        self.REG_INIT_STR = f'\tprocess ({self.clock_name}, {self.reset_name}) is\n\tbegin\n'
         self.REG_END_STR = '\tend process;\n'
         self.regInitString = ''
         self.statementString = ''
@@ -210,30 +212,30 @@ class VHDLEmitter(Emitter):
         Appends the appropriate declaration or port line for this signal to a global buffer.
         """
         if (signal.type == 'w'):
-            self.add_signal_str(f'\tsignal {signal.name + sufix} : std_logic;\n')
+            self.add_signal_str(f'\tsignal {signal.get_base_name(sufix)} : std_logic;\n')
         elif (signal.type == 'r'):
-            self.add_signal_str(f'\tsignal {signal.name + sufix}_d : std_logic;\n')
-            self.add_signal_str(f'\tsignal {signal.name + sufix}_q : std_logic;\n')
+            self.add_signal_str(f'\tsignal {signal.get_base_name(sufix)}_d : std_logic;\n')
+            self.add_signal_str(f'\tsignal {signal.get_base_name(sufix)}_q : std_logic;\n')
         elif (signal.type == 'i'):
             self.add_port_str(';\n')
-            self.add_port_str(f'\t\t{signal.name + sufix}_i : in std_logic')
+            self.add_port_str(f'\t\t{signal.get_base_name(sufix)}{"_i" if not signal.dyn_comp else ""} : in std_logic')
         elif (signal.type == 'o'):
             self.add_port_str(';\n')
-            self.add_port_str(f'\t\t{signal.name + sufix}_o : out std_logic')
+            self.add_port_str(f'\t\t{signal.get_base_name(sufix)}{"_o" if not signal.dyn_comp else ""} : out std_logic')
 
 
     def logicvec_signal_init(self, vec: LogicVec, sufix: str):
         if (vec.type == 'w'):
-            self.add_signal_str(f'\tsignal {vec.name + sufix} : std_logic_vector({vec.size-1} downto 0);\n')
+            self.add_signal_str(f'\tsignal {vec.get_base_name(sufix)} : std_logic_vector({vec.size-1} downto 0);\n')
         elif (vec.type == 'r'):
-            self.add_signal_str(f'\tsignal {vec.name + sufix}_d : std_logic_vector({vec.size-1} downto 0);\n')
-            self.add_signal_str(f'\tsignal {vec.name + sufix}_q : std_logic_vector({vec.size-1} downto 0);\n')
+            self.add_signal_str(f'\tsignal {vec.get_base_name(sufix)}_d : std_logic_vector({vec.size-1} downto 0);\n')
+            self.add_signal_str(f'\tsignal {vec.get_base_name(sufix)}_q : std_logic_vector({vec.size-1} downto 0);\n')
         elif (vec.type == 'i'):
             self.add_port_str(';\n')
-            self.add_port_str(f'\t\t{vec.name + sufix}_i : in std_logic_vector({vec.size-1} downto 0)')
+            self.add_port_str(f'\t\t{vec.get_base_name(sufix)}{'_i' if not vec.dyn_comp else ""} : in std_logic_vector({vec.size-1} downto 0)')
         elif (vec.type == 'o'):
             self.add_port_str(';\n')
-            self.add_port_str(f'\t\t{vec.name + sufix}_o : out std_logic_vector({vec.size-1} downto 0)')
+            self.add_port_str(f'\t\t{vec.get_base_name(sufix)}{'_o' if not vec.dyn_comp else ""} : out std_logic_vector({vec.size-1} downto 0)')
 
     def logic_reg_init(self, logic: Logic, enable=None, init=None) -> None:
         """
@@ -248,11 +250,11 @@ class VHDLEmitter(Emitter):
         """
         assert (logic.type == 'r')
         if (init != None):
-            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             self.add_reg_str(f'\t\t\t{logic.getNameRead()} <= {self.in_to_bits(init)};\n')
-            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\telsif (rising_edge({self.clock_name})) then\n')
         else:
-            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\tif (rising_edge({self.clock_name})) then\n')
         if (enable != None):
             self.add_reg_str(f'\t\t\tif ({enable.getNameRead()} = \'1\') then\n')
             self.add_reg_str(f'\t\t\t\t{logic.getNameRead()} <= {logic.getNameWrite()};\n')
@@ -264,11 +266,11 @@ class VHDLEmitter(Emitter):
     def logicvec_reg_init(self, vec: LogicVec, enable=None, init=None) -> None:
         assert (vec.type == 'r')
         if (init != None):
-            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {self.int_to_bits(init, vec.size)};\n')
-            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\telsif (rising_edge({self.clock_name})) then\n')
         else:
-            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\tif (rising_edge({self.clock_name})) then\n')
         if (enable != None):
             self.add_reg_str(f'\t\t\tif ({enable.getNameRead()} = \'1\') then\n')
             self.add_reg_str(f'\t\t\t\t{vec.getNameRead()} <= {vec.getNameWrite()};\n')
@@ -281,12 +283,12 @@ class VHDLEmitter(Emitter):
     def logicarray_reg_init(self, array: LogicArray, enable=None, init=None) -> None:
         assert (array.type == 'r')
         if (init != None):
-            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             for i in range(0, array.length):
                 self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_bits(init[i])};\n')
-            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\telsif (rising_edge({self.clock_name})) then\n')
         else:
-            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\tif (rising_edge({self.clock_name})) then\n')
         if (enable != None):
             for i in range(0, array.length):
                 self.add_reg_str(f'\t\t\tif ({enable.getNameRead(i)} = \'1\') then\n')
@@ -301,12 +303,12 @@ class VHDLEmitter(Emitter):
     def logicvecarray_reg_init(self, array: LogicVecArray, enable=None, init=None) -> None:
         assert (array.type == 'r')
         if (init != None):
-            self.add_reg_str('\t\tif (rst = \'1\') then\n')
+            self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             for i in range(0, array.length):
                 self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_bits(init[i], array.size)};\n')
-            self.add_reg_str('\t\telsif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\telsif (rising_edge({self.clock_name})) then\n')
         else:
-            self.add_reg_str('\t\tif (rising_edge(clk)) then\n')
+            self.add_reg_str(f'\t\tif (rising_edge({self.clock_name})) then\n')
         if (enable != None):
             for i in range(0, array.length):
                 self.add_reg_str(f'\t\t\tif ({enable.getNameRead(i)} = \'1\') then\n')

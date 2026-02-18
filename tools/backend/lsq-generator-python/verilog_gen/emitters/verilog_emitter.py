@@ -161,30 +161,30 @@ class VerilogEmitter(Emitter):
         Appends the appropriate declaration or port line for this signal to a global buffer.
         """
         if (signal.type == 'w'):
-            self.add_signal_str(f'\twire {signal.name + sufix};\n')
+            self.add_signal_str(f'\twire {signal.get_base_name(sufix)};\n')
         elif (signal.type == 'r'):
-            self.add_signal_str(f'\treg {signal.name + sufix}_d;\n')
-            self.add_signal_str(f'\treg {signal.name + sufix}_q;\n')
+            self.add_signal_str(f'\treg {signal.get_base_name(sufix)}_d;\n')
+            self.add_signal_str(f'\treg {signal.get_base_name(sufix)}_q;\n')
         elif (signal.type == 'i'):
             self.add_port_str(',\n')
-            self.add_port_str(f'\t\tinput {signal.name + sufix}_i')
+            self.add_port_str(f'\t\tinput {signal.get_base_name(sufix)}{'_i' if not signal.dyn_comp else ""}')
         elif (signal.type == 'o'):
             self.add_port_str(',\n')
-            self.add_port_str(f'\t\toutput {signal.name + sufix}_o')
+            self.add_port_str(f'\t\toutput {signal.get_base_name(sufix)}{'_o' if not signal.dyn_comp else ""}')
 
 
     def logicvec_signal_init(self, vec: LogicVec, sufix: str):
         if (vec.type == 'w'):
-            self.add_signal_str(f'\twire [{vec.size-1}:0] {vec.name + sufix};\n')
+            self.add_signal_str(f'\twire [{vec.size-1}:0] {vec.get_base_name(sufix)};\n')
         elif (vec.type == 'r'):
-            self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.name + sufix}_d;\n')
-            self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.name + sufix}_q;\n')
+            self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.get_base_name(sufix)}_d;\n')
+            self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.get_base_name(sufix)}_q;\n')
         elif (vec.type == 'i'):
             self.add_port_str(',\n')
-            self.add_port_str(f'\t\tinput [{vec.size-1}:0] {vec.name + sufix}_i')
+            self.add_port_str(f'\t\tinput [{vec.size-1}:0] {vec.get_base_name(sufix)}{'_i' if not vec.dyn_comp else ""}')
         elif (vec.type == 'o'):
             self.add_port_str(',\n')
-            self.add_port_str(f'\t\toutput [{vec.size-1}:0] {vec.name + sufix}_o')
+            self.add_port_str(f'\t\toutput [{vec.size-1}:0] {vec.get_base_name(sufix)}{'_o' if not vec.dyn_comp else ""}')
     
 
     def logic_reg_init(self, logic: Logic, enable=None, init=None) -> None:
