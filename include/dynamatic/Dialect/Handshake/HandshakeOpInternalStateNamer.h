@@ -33,42 +33,43 @@ struct InternalStateNamer {
   virtual std::string getSMVName() = 0;
 
   InternalStateNamer() = default;
-  InternalStateNamer(TYPE type) : type(type) {}
+  InternalStateNamer(TYPE type, const std::string &opName)
+      : type(type), opName(opName) {}
   virtual ~InternalStateNamer() = default;
+
   TYPE type;
+  std::string opName;
   static constexpr llvm::StringLiteral EAGER_FORK_SENT = "EagerForkSent";
   static constexpr llvm::StringLiteral BUFFER_SLOT_FULL = "BufferSlotFull";
 };
 
 // To define a `sent` state of an eager fork, the exact channel that contains
-// this `sent` state needs to be identified. For this, the operation is
-// identified through `opName` (e.g. "fork1"), and the output of this operations
-// is defined by `channelName` (e.g. "out1")
+// this `sent` state needs to be identified. The base class defines the
+// operation by its name, and the eager fork class identifies the output by its
+// port name (see NamedIOInterface)
 struct EagerForkSentNamer : public InternalStateNamer {
   EagerForkSentNamer() = default;
   EagerForkSentNamer(const std::string &opName, const std::string &channelName)
-      : opName(opName), channelName(channelName) {}
+      : InternalStateNamer(TYPE::EagerForkSent, opName),
+        channelName(channelName) {}
   ~EagerForkSentNamer() = default;
 
   inline std::string getSMVName() override {
     return llvm::formatv("{0}.{1}_sent", opName, channelName).str();
   }
 
-  std::string opName;
   std::string channelName;
 };
 
 struct BufferSlotFullNamer : public InternalStateNamer {
   BufferSlotFullNamer() = default;
   BufferSlotFullNamer(const std::string &opName, const std::string &slotName)
-      : InternalStateNamer(TYPE::BufferSlotFull), opName(opName),
-        slotName(slotName) {}
+      : InternalStateNamer(TYPE::BufferSlotFull, opName), slotName(slotName) {}
   ~BufferSlotFullNamer() = default;
 
   inline std::string getSMVName() override {
     return llvm::formatv("{0}.{1}_full", opName, slotName).str();
   }
-  std::string opName;
   std::string slotName;
 };
 
