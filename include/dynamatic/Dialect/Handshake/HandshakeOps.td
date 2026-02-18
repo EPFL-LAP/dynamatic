@@ -797,7 +797,7 @@ def LSQOp : Handshake_Op<"lsq", [
     3. Control signal indicating completion.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes);
+  let arguments = (ins Variadic<AnyType>:$inputs, I32ArrayAttr:$groupSizes, Handshake_LSQTypeAttr:$lsqType);
   let results = (outs Variadic<HandshakeType>:$outputs);
 
   let builders = [

@@ -114,6 +114,21 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       "Target clock period for the LSQ pass">];
 }
 
+def HandshakeChooseLSQType : DynamaticPass<"handshake-choose-lsq-type"> {
+  let summary = "Set the type of LSQ to use (first implementation: applies to all LSQs in the circuit).";
+  let description = [{
+    Specify which type of Load-Store Queue to use in the circuit.
+    A full LSQ uses address-comparison logic to evaluate memory dependencies.
+    A sequential LSQ has no address comparison logic, and simply issues queue entries in order.
+  }];
+
+  let options = [
+    Option<"lsq-type", "lsq-type", "std::string", "\"full\"",
+      "Type of LSQ to use. Choices are: 'full' (default, with address comparison) "
+      "or 'sequential' (no address comparison, in-order issue).">
+  ];
+}
+
 def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
   let summary = "Simplifies handshake logic";
   let description = [{

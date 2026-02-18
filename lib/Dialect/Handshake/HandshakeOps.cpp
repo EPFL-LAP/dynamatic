@@ -924,6 +924,10 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
   MLIRContext *ctx = odsBuilder.getContext();
   odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
   odsState.types.push_back(handshake::ControlType::get(ctx));
+
+  odsState.addAttribute(LSQOp::getLsqTypeAttrName(odsState.name).strref(),
+    Handshake_LSQTypeAttr::get(ctx, Handshake_LSQType::FULL));
+
   buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
 }
 
@@ -943,6 +947,9 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   Type addrType = handshake::ChannelType::getAddrChannel(ctx);
   odsState.types.append(2, addrType);
   odsState.types.push_back(dataType);
+
+  odsState.addAttribute(LSQOp::getLsqTypeAttrName(odsState.name).strref(),
+    Handshake_LSQTypeAttr::get(ctx, Handshake_LSQType::FULL));
 
   // The LSQ is a slave interface in this case (the MC is the master), so it
   // doesn't produce a completion signal
@@ -975,6 +982,22 @@ ParseResult LSQOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseLParen() || parser.parseOperandList(operands) ||
       parser.parseRParen())
     return failure();
+
+  if (parser.parseKeyword("type") || parser.parseEqual())
+    return failure();
+
+  StringRef typeStr;
+  if (parser.parseKeyword(&typeStr))
+    return failure();
+
+  auto type = symbolizeHandshake_LSQType(typeStr);
+  if (!type)
+    return parser.emitError(parser.getCurrentLocation(),
+                            "invalid LSQ type");
+
+  result.addAttribute(
+      LSQOp::getLsqTypeAttrName(result.name).strref(),
+      Handshake_LSQTypeAttr::get(parser.getContext(), *type));
 
   // Parse group sizes and other attributes
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -1016,8 +1039,14 @@ void LSQOp::print(OpAsmPrinter &p) {
     p << oprd << ", ";
   p << inputs.back() << ") ";
 
-  // Print group sizes and other attributes
-  p.printOptionalAttrDict((*this)->getAttrs());
+  // Print lsqType explicitly
+  p << " type=" << stringifyHandshake_LSQType(getLsqType()) << " ";
+
+  // Print remaining attrs (exclude lsqType) such as group size
+  SmallVector<StringRef> elided = {
+      LSQOp::getLsqTypeAttrName().strref()
+  };
+  p.printOptionalAttrDict((*this)->getAttrs(), elided);
 
   // Print result types
   p << " : ";

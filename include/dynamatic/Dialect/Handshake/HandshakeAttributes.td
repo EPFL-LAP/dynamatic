@@ -261,6 +261,29 @@ def Handshake_BufferTypeAttr : I64EnumAttr<
   let cppNamespace = "::dynamatic::handshake";
 }
 
+
+//===----------------------------------------------------------------------===//
+// LSQ annotations
+//===----------------------------------------------------------------------===//
+
+
+def Handshake_LSQTypeAttr : I64EnumAttr<
+    "LSQType", "",
+    [
+      /// FULL: Load-Store Queue with address-comparison logic.
+      /// Performs dynamic memory-dependence checking by comparing
+      /// load and store addresses before issuing memory operations.
+      I64EnumAttrCase<"FULL", 0, "full">,
+
+      /// SEQUENTIAL: Load-Store Queue without address comparison.
+      /// Issues memory operations strictly in program order,
+      /// conservatively preserving dependencies.
+      I64EnumAttrCase<"SEQUENTIAL", 1, "sequential">
+    ]> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+
 def ChannelBufPropsAttr : Handshake_Attr<"ChannelBufProps", "channelBufProps"> {
   let summary = "Buffering properties of a single channel";
   let description = [{

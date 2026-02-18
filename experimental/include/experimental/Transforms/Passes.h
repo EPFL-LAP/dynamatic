@@ -22,6 +22,7 @@
 #include "experimental/Transforms/ResourceSharing/Crush.h"
 #include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
 #include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
+#include "experimental/Transforms/HandshakeChooseLSQType.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
