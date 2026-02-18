@@ -1276,9 +1276,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
         forkOutNames.push_back(sentState.getSMVName());
       }
       auto copiedSlot = p->getCopiedSlot();
-      std::string bufferFull =
-          llvm::formatv("{0}.{1}_full", copiedSlot.opName, copiedSlot.slotName)
-              .str();
+      std::string bufferFull = copiedSlot.getSMVName();
       std::string propertyString =
           llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
                         bufferFull)
