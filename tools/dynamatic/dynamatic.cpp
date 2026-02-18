@@ -321,7 +321,7 @@ public:
                           "accesses, use with caution!"});
     addFlag({STRAIGHT_TO_QUEUE,
              "Use straight to queue to connect the circuit to the LSQ"});
-    addFlag({LSQ_TYPE,
+    addOption({LSQ_TYPE,
              "Specify type of memory-dependency analysis LSQs should perform"});
   }
 
