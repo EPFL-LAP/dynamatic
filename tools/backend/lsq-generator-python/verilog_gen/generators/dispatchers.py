@@ -255,7 +255,10 @@ class PortToQueueDispatcher:
 
         """
 
-        em.start_instantiation(self, self.module_name, f'{self.module_name}_dispatcher')
+        em.start_instantiation(self.module_name, f'{self.module_name}_dispatcher')
+
+        em.add_map('rst', 'rst')
+        em.add_map('clk', 'clk')
 
         for i in range(0, self.numPorts):
             em.add_map(f'port_payload_{i}_i', port_payload_i.getNameRead(i))
@@ -533,7 +536,10 @@ class QueueToPortDispatcher:
             end architecture;
         """
 
-        em.start_instatiation(self.module_name, f'{self.module_name}_dispatcher')
+        em.start_instantiation(self.module_name, f'{self.module_name}_dispatcher')
+
+        em.add_map('rst', 'rst')
+        em.add_map('clk', 'clk')
 
         for i in range(0, self.numPorts):
             if (port_payload_o != None):
