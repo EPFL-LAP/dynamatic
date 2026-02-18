@@ -165,8 +165,8 @@ private:
 // details.
 class EagerForkNotAllOutputSent : public FormalProperty {
 public:
-  std::vector<handshake::EagerForkSentNamer> getSentStates() {
-    return sentStates;
+  std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
+    return sentStateNamers;
   }
 
   llvm::json::Value extraInfoToJSON() const override;
@@ -185,7 +185,7 @@ public:
 
 private:
   // The `sent` states that cannot be active at the same time
-  std::vector<handshake::EagerForkSentNamer> sentStates;
+  std::vector<handshake::EagerForkSentNamer> sentStateNamers;
   inline static const StringLiteral OWNER_OP_LIT = "owner_op";
   inline static const StringLiteral CHANNELS_LIT = "channels";
 };
@@ -199,8 +199,8 @@ private:
 // https://ieeexplore.ieee.org/document/10323796 for more details
 class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
 public:
-  std::vector<handshake::EagerForkSentNamer> getSentStates() {
-    return sentStates;
+  std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
+    return sentStateNamers;
   }
   handshake::BufferSlotFullNamer getCopiedSlot() { return copiedSlot; }
 
@@ -220,7 +220,7 @@ public:
   }
 
 private:
-  std::vector<handshake::EagerForkSentNamer> sentStates;
+  std::vector<handshake::EagerForkSentNamer> sentStateNamers;
   handshake::BufferSlotFullNamer copiedSlot;
   inline static const StringLiteral FORK_OP_LIT = "fork_op";
   inline static const StringLiteral FORK_CHANNELS_LIT = "channels";

@@ -369,7 +369,7 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
 //===----------------------------------------------------------------------===//
 
 int ForkOp::getNumEagerOutputs() { return getNumResults(); }
-std::vector<EagerForkSentNamer> ForkOp::getInternalSentStates() {
+std::vector<EagerForkSentNamer> ForkOp::getInternalSentStateNamers() {
   std::vector<EagerForkSentNamer> ret;
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
@@ -383,7 +383,7 @@ std::vector<EagerForkSentNamer> ForkOp::getInternalSentStates() {
 }
 
 int ControlMergeOp::getNumEagerOutputs() { return 2; }
-std::vector<EagerForkSentNamer> ControlMergeOp::getInternalSentStates() {
+std::vector<EagerForkSentNamer> ControlMergeOp::getInternalSentStateNamers() {
   std::vector<EagerForkSentNamer> ret;
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
@@ -400,7 +400,7 @@ std::vector<EagerForkSentNamer> ControlMergeOp::getInternalSentStates() {
 // BufferLikeOpInterface
 //===----------------------------------------------------------------------===//
 
-std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStates() {
+std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStateNamers() {
   std::vector<BufferSlotFullNamer> ret(1);
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
@@ -410,7 +410,7 @@ std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStates() {
   return ret;
 }
 
-std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStates() {
+std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStateNamers() {
   std::vector<BufferSlotFullNamer> ret(2);
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
@@ -421,7 +421,7 @@ std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStates() {
   return ret;
 }
 
-std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStates() {
+std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
   std::vector<BufferSlotFullNamer> ret(getNumSlots());
   StringAttr nameAttr =
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);

@@ -70,7 +70,7 @@ def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
    InterfaceMethod<[{
        Get the internal state of each slot.
      }],
-     "std::vector<BufferSlotFullNamer>", "getInternalSlotStates", (ins)
+     "std::vector<BufferSlotFullNamer>", "getInternalSlotStateNamers", (ins)
    >,
   ];
 }
@@ -92,7 +92,7 @@ def EagerForkLikeOpInterface : OpInterface<"EagerForkLikeOpInterface"> {
    InterfaceMethod<[{
        Get all the states as std::vector<EagerForkSentNamer>
      }],
-     "std::vector<EagerForkSentNamer>", "getInternalSentStates", (ins)
+     "std::vector<EagerForkSentNamer>", "getInternalSentStateNamers", (ins)
    >,
   ];
 }

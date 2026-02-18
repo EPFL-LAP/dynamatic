@@ -1257,7 +1257,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                                      propertyTag};
     } else if (auto *p =
                    llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
-      auto sentStates = p->getSentStates();
+      auto sentStates = p->getSentStateNamers();
       unsigned numOut = sentStates.size();
       std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
@@ -1273,7 +1273,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
     } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
                    property.get())) {
       std::vector<std::string> forkOutNames(0);
-      for (auto [i, sentState] : llvm::enumerate(p->getSentStates())) {
+      for (auto [i, sentState] : llvm::enumerate(p->getSentStateNamers())) {
         forkOutNames.push_back(llvm::formatv("{0}.{1}_sent", sentState.opName,
                                              sentState.channelName)
                                    .str());
