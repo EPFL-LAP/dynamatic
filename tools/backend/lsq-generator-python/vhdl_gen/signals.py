@@ -45,7 +45,7 @@ class Logic:
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
     type = ''
 
-    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', init: bool = True) -> None:
+    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', init: bool = True, dyn_comp=False) -> None:
         """
         init: If True, immediately generates the corresponding std_logic in VHDL.
               True when we instantiate Logic.
@@ -56,6 +56,7 @@ class Logic:
         self.ctx = ctx
         self.name = name
         self.type = type
+        self.dyn_comp = dyn_comp
         if (init):
             self.signalInit()
 
@@ -84,11 +85,11 @@ class Logic:
             -> getNameWrite(a) = getNameRead(b) + getNameRead(c)
         """
         if (self.type == 'w'):
-            return self.name + sufix
+            return self.add_sufix(sufix)
         elif (self.type == 'r'):
-            return self.name + sufix + '_q'
+            return self.add_sufix(sufix) + '_q'
         elif (self.type == 'i'):
-            return self.name + sufix + '_i'
+            return self.add_sufix(sufix) + ('_i' if not self.dyn_comp else '')
         elif (self.type == 'o'):
             raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
 
@@ -99,29 +100,30 @@ class Logic:
         Example in the getNameRead() method.
         """
         if (self.type == 'w'):
-            return self.name + sufix
+            return self.add_sufix(sufix)
         elif (self.type == 'r'):
-            return self.name + sufix + '_d'
+            return self.add_sufix(sufix) + '_d'
         elif (self.type == 'i'):
             raise TypeError(f'Cannot write to the input signal \"{self.name}\"!')
         elif (self.type == 'o'):
-            return self.name + sufix + '_o'
+            return self.add_sufix(sufix) + ('_o' if not self.dyn_comp else '')
+
 
     def signalInit(self, sufix='') -> None:
         """
         Appends the appropriate declaration or port line for this signal to a global buffer.
         """
         if (self.type == 'w'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix} : std_logic;\n')
+            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)} : std_logic;\n')
         elif (self.type == 'r'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_d : std_logic;\n')
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_q : std_logic;\n')
+            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_d : std_logic;\n')
+            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_q : std_logic;\n')
         elif (self.type == 'i'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_i : in std_logic')
+            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)}{'_i' if not self.dyn_comp else ''} : in std_logic')
         elif (self.type == 'o'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic')
+            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)}{'_o' if not self.dyn_comp else ''} : out std_logic')
 
     def regInit(self, enable=None, init=None) -> None:
         """
@@ -148,6 +150,15 @@ class Logic:
         else:
             self.ctx.add_reg_str(f'\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n')
         self.ctx.add_reg_str('\t\tend if;\n')
+    
+    def add_sufix(self, sufix):
+        if not self.dyn_comp or sufix == '':
+            return self.name + sufix
+        
+        name_list = self.name.split('_')
+        name_list = name_list[:-1] + [sufix, name_list[-1]]
+        name = '_'.join(name_list)
+        return name.replace('__', '_')
 
 #
 # std_logic_vec
@@ -181,8 +192,8 @@ class LogicVec(Logic):
     type = ''
     size = 1
 
-    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', size: int = 1, init: bool = True) -> None:
-        Logic.__init__(self, ctx, name, type, False)
+    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', size: int = 1, init: bool = True, dyn_comp=False) -> None:
+        Logic.__init__(self, ctx, name, type, False, dyn_comp)
         assert (size > 0)
         self.size = size
         if (init):
@@ -217,16 +228,16 @@ class LogicVec(Logic):
 
     def signalInit(self, sufix=''):
         if (self.type == 'w'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix} : std_logic_vector({self.size-1} downto 0);\n')
+            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)} : std_logic_vector({self.size-1} downto 0);\n')
         elif (self.type == 'r'):
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_d : std_logic_vector({self.size-1} downto 0);\n')
-            self.ctx.add_signal_str(f'\tsignal {self.name + sufix}_q : std_logic_vector({self.size-1} downto 0);\n')
+            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_d : std_logic_vector({self.size-1} downto 0);\n')
+            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_q : std_logic_vector({self.size-1} downto 0);\n')
         elif (self.type == 'i'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_i : in std_logic_vector({self.size-1} downto 0)')
+            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)}{'_i' if not self.dyn_comp else ''} : in std_logic_vector({self.size-1} downto 0)')
         elif (self.type == 'o'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.name + sufix}_o : out std_logic_vector({self.size-1} downto 0)')
+            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)}{'_o' if not self.dyn_comp else ''} : out std_logic_vector({self.size-1} downto 0)')
 
     def regInit(self, enable=None, init=None) -> None:
         assert (self.type == 'r')
@@ -270,9 +281,9 @@ class LogicArray(Logic):
     """
     length = 1
 
-    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', length: int = 1):
+    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', length: int = 1, dyn_comp=False):
         self.length = length
-        Logic.__init__(self, ctx, name, type, False)
+        Logic.__init__(self, ctx, name, type, False, dyn_comp)
         self.signalInit()
 
     def __repr__(self) -> str:
@@ -280,10 +291,15 @@ class LogicArray(Logic):
 
     def getNameRead(self, i) -> str:
         assert i in range(0, self.length)
-        return Logic.getNameRead(self, f'_{i}')
+        if self.dyn_comp and i == 0: suffix = ''
+        else: suffix = f'_{i}'
+
+        return Logic.getNameRead(self, suffix)
 
     def getNameWrite(self, i) -> str:
         assert i in range(0, self.length)
+        if self.dyn_comp and i == 0: suffix = ''
+        else: suffix = f'_{i}'
         return Logic.getNameWrite(self, f'_{i}')
 
     def signalInit(self) -> None:
@@ -292,7 +308,7 @@ class LogicArray(Logic):
 
     def __getitem__(self, i) -> Logic:
         assert i in range(0, self.length)
-        return Logic(self.ctx, self.name + f'_{i}', self.type, False)
+        return Logic(self.ctx, self.add_sufix(f'_{i}'), self.type, False, self.dyn_comp)
 
     def regInit(self, enable=None, init=None) -> None:
         assert (self.type == 'r')
@@ -340,9 +356,9 @@ class LogicVecArray(LogicVec):
     """
     length = 1
 
-    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', length: int = 1, size: int = 1):
+    def __init__(self, ctx: VHDLContext, name: str, type: str = 'w', length: int = 1, size: int = 1, dyn_comp=False):
         self.length = length
-        LogicVec.__init__(self, ctx, name, type, size, False)
+        LogicVec.__init__(self, ctx, name, type, size, False, dyn_comp)
         self.signalInit()
 
     def __repr__(self) -> str:
@@ -350,11 +366,15 @@ class LogicVecArray(LogicVec):
 
     def getNameRead(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        return LogicVec.getNameRead(self, j, f'_{i}')
+        if self.dyn_comp and i == 0: suffix = ''
+        else: suffix = f'_{i}'
+        return LogicVec.getNameRead(self, j, suffix)
 
     def getNameWrite(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        return LogicVec.getNameWrite(self, j, f'_{i}')
+        if self.dyn_comp and i == 0: suffix = ''
+        else: suffix = f'_{i}'
+        return LogicVec.getNameWrite(self, j, suffix)
 
     def signalInit(self) -> None:
         for i in range(0, self.length):
@@ -362,7 +382,7 @@ class LogicVecArray(LogicVec):
 
     def __getitem__(self, i) -> LogicVec:
         assert i in range(0, self.length)
-        return LogicVec(self.ctx, self.name + f'_{i}', self.type, self.size, False)
+        return LogicVec(self.ctx, self.add_sufix(f'_{i}'), self.type, self.size, False, self.dyn_comp)
 
     def regInit(self, enable=None, init=None) -> None:
         assert (self.type == 'r')

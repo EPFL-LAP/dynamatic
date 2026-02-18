@@ -12,7 +12,10 @@ import argparse
 import os
 import sys
 
-from vhdl_gen import *
+from vhdl_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
+from vhdl_gen.configs import Configs, GetConfigs
+from vhdl_gen.codegen import codeGen
+from vhdl_gen.operators import Op
 from vhdl_gen.context import VHDLContext
 
 # ===----------------------------------------------------------------------===#
@@ -149,153 +152,125 @@ class LSQWrapper:
         # PART 2: Define the entity
         self.lsq_wrapper_str += f"entity {self.lsq_name} is\n"
 
-        # PART 3: Add the module port definition
-        self.lsq_wrapper_str += ctx.portInitString
 
         ##
         # Define all the IOs, details can be found in the table above
         # ! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
         # io_storeData: output
-        io_storeData = VHDLLogicVecType("io_storeData", "o", self.lsq_config.dataW)
+        io_storeData = LogicVec(ctx, "io_storeData", 'o', self.lsq_config.dataW, dyn_comp=True)
 
-        self.lsq_wrapper_str += io_storeData.signalInit()
 
         # io_storeAddr: output
-        io_storeAddr = VHDLLogicVecType("io_storeAddr", "o", self.lsq_config.addrW)
+        io_storeAddr = LogicVec(ctx, "io_storeAddr", 'o', self.lsq_config.addrW, dyn_comp=True)
 
-        self.lsq_wrapper_str += io_storeAddr.signalInit()
 
         # io_storeEn: output
-        io_storeEn = VHDLLogicType("io_storeEn", "o")
+        io_storeEn = Logic(ctx, "io_storeEn", 'o', dyn_comp=True)
 
-        self.lsq_wrapper_str += io_storeEn.signalInit()
 
         # io_loadData: input
-        io_loadData = VHDLLogicVecType("io_loadData", "i", self.lsq_config.dataW)
-
-        self.lsq_wrapper_str += io_loadData.signalInit()
+        io_loadData = LogicVec(ctx, "io_loadData", 'i', self.lsq_config.dataW, dyn_comp=True)
 
         # io_loadAddr: output
-        io_loadAddr = VHDLLogicVecType("io_loadAddr", "o", self.lsq_config.addrW)
+        io_loadAddr = LogicVec(ctx, "io_loadAddr", 'o', self.lsq_config.addrW, dyn_comp=True)
 
-        self.lsq_wrapper_str += io_loadAddr.signalInit()
 
         # io_loadEn: output
-        io_loadEn = VHDLLogicType("io_loadEn", "o")
+        io_loadEn = Logic(ctx, "io_loadEn", 'o', dyn_comp=True)
 
-        self.lsq_wrapper_str += io_loadEn.signalInit()
 
         # io_ctrl_*_ready: output
-        io_ctrl_ready = VHDLLogicTypeArray(
-            "io_ctrl_ready", "o", self.lsq_config.numGroups
+        io_ctrl_ready = LogicArray(ctx, 
+            "io_ctrl_ready", 'o', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_ready.signalInit()
 
         # io_ctrl_*_valid: input
-        io_ctrl_valid = VHDLLogicTypeArray(
-            "io_ctrl_valid", "i", self.lsq_config.numGroups
+        io_ctrl_valid = LogicArray(ctx, 
+            "io_ctrl_valid", 'i', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_valid.signalInit()
 
         # io_ldAddr_*_ready: output
-        io_ldAddr_ready = VHDLLogicTypeArray(
-            "io_ldAddr_ready", "o", self.lsq_config.numLdPorts
+        io_ldAddr_ready = LogicArray(ctx, 
+            "io_ldAddr_ready", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_ready.signalInit()
 
         # io_ldAddr_*_valid: input
-        io_ldAddr_valid = VHDLLogicTypeArray(
-            "io_ldAddr_valid", "i", self.lsq_config.numLdPorts
+        io_ldAddr_valid = LogicArray(ctx, 
+            "io_ldAddr_valid", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_valid.signalInit()
 
         # io_ldAddr_*_bits: input
-        io_ldAddr_bits = VHDLLogicVecTypeArray(
-            "io_ldAddr_bits", "i", self.lsq_config.numLdPorts, self.lsq_config.addrW
+        io_ldAddr_bits = LogicVecArray(ctx, 
+            "io_ldAddr_bits", 'i', self.lsq_config.numLdPorts, self.lsq_config.addrW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_bits.signalInit()
 
         # io_ldData_*_ready: input
-        io_ldData_ready = VHDLLogicTypeArray(
-            "io_ldData_ready", "i", self.lsq_config.numLdPorts
+        io_ldData_ready = LogicArray(ctx, 
+            "io_ldData_ready", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_ready.signalInit()
 
         # io_ldData_*_valid: output
-        io_ldData_valid = VHDLLogicTypeArray(
-            "io_ldData_valid", "o", self.lsq_config.numLdPorts
+        io_ldData_valid = LogicArray(ctx, 
+            "io_ldData_valid", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_valid.signalInit()
 
         # io_ldData_*_bits: output
-        io_ldData_bits = VHDLLogicVecTypeArray(
-            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.dataW
+        io_ldData_bits = LogicVecArray(ctx, 
+            "io_ldData_bits", 'o', self.lsq_config.numLdPorts, self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_bits.signalInit()
 
         # io_stAddr_ready: output
-        io_stAddr_ready = VHDLLogicTypeArray(
-            "io_stAddr_ready", "o", self.lsq_config.numStPorts
+        io_stAddr_ready = LogicArray(ctx, 
+            "io_stAddr_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_ready.signalInit()
 
         # io_stAddr_valid: input
-        io_stAddr_valid = VHDLLogicTypeArray(
-            "io_stAddr_valid", "i", self.lsq_config.numStPorts
+        io_stAddr_valid = LogicArray(ctx, 
+            "io_stAddr_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_valid.signalInit()
 
         # io_stAddr_bits: input
-        io_stAddr_bits = VHDLLogicVecTypeArray(
-            "io_stAddr_bits", "i", self.lsq_config.numStPorts, self.lsq_config.addrW
+        io_stAddr_bits = LogicVecArray(ctx, 
+            "io_stAddr_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.addrW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_bits.signalInit()
 
         # io_stData_ready: output
-        io_stData_ready = VHDLLogicTypeArray(
-            "io_stData_ready", "o", self.lsq_config.numStPorts
+        io_stData_ready = LogicArray(ctx, 
+            "io_stData_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_ready.signalInit()
 
         # io_stData_valid: input
-        io_stData_valid = VHDLLogicTypeArray(
-            "io_stData_valid", "i", self.lsq_config.numStPorts
+        io_stData_valid = LogicArray(ctx, 
+            "io_stData_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_valid.signalInit()
 
         # io_stData_bits: input
-        io_stData_bits = VHDLLogicVecTypeArray(
-            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.dataW
+        io_stData_bits = LogicVecArray(ctx, 
+            "io_stData_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_bits.signalInit()
 
         # io_memStart_ready: output
-        io_memStart_ready = VHDLLogicType("io_memStart_ready", "o")
-        self.lsq_wrapper_str += io_memStart_ready.signalInit()
+        io_memStart_ready = Logic(ctx, "io_memStart_ready", 'o', dyn_comp=True)
 
         # io_memStart_valid: input
-        io_memStart_valid = VHDLLogicType("io_memStart_valid", "i")
-        self.lsq_wrapper_str += io_memStart_valid.signalInit()
+        io_memStart_valid = Logic(ctx, "io_memStart_valid", 'i', dyn_comp=True)
 
         # io_ctrlEnd_ready: output
-        io_ctrlEnd_ready = VHDLLogicType("io_ctrlEnd_ready", "o")
-        self.lsq_wrapper_str += io_ctrlEnd_ready.signalInit()
+        io_ctrlEnd_ready = Logic(ctx, "io_ctrlEnd_ready", 'o', dyn_comp=True)
 
         # io_ctrlEnd_valid: input
-        io_ctrlEnd_valid = VHDLLogicType("io_ctrlEnd_valid", "i")
-        self.lsq_wrapper_str += io_ctrlEnd_valid.signalInit()
+        io_ctrlEnd_valid = Logic(ctx, "io_ctrlEnd_valid", 'i', dyn_comp=True)
 
         # io_memEnd_ready: input
-        io_memEnd_ready = VHDLLogicType("io_memEnd_ready", "i")
-        self.lsq_wrapper_str += io_memEnd_ready.signalInit()
+        io_memEnd_ready = Logic(ctx, "io_memEnd_ready", 'i', dyn_comp=True)
 
         # io_memEnd_valid: output
-        io_memEnd_valid = VHDLLogicType("io_memEnd_valid", "o")
-        self.lsq_wrapper_str += io_memEnd_valid.signalInit()
+        io_memEnd_valid = Logic(ctx, "io_memEnd_valid", 'o', dyn_comp=True)
 
         ##
         # IO Definition finished
         ##
+        self.lsq_wrapper_str += ctx.portInitString
         self.lsq_wrapper_str += "\n\t);"
         self.lsq_wrapper_str += "\nend entity;\n\n"
 
@@ -305,41 +280,39 @@ class LSQWrapper:
         self.lsq_wrapper_str += f"architecture arch of {self.lsq_name} is\n"
 
         # Define internal signals
-        rreq_ready = VHDLLogicTypeArray(
-            "rreq_ready", "w", self.lsq_config.numLdMem)
-        self.lsq_wrapper_str += rreq_ready.signalInit()
-
-        rresp_valid = VHDLLogicTypeArray(
-            "rresp_valid", "w", self.lsq_config.numLdMem)
-        self.lsq_wrapper_str += rresp_valid.signalInit()
-
-        rresp_id = VHDLLogicVecTypeArray(
-            "rresp_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        rreq_ready = LogicArray(ctx,
+            "rreq_ready", "w", self.lsq_config.numLdMem, dyn_comp=True
         )
-        self.lsq_wrapper_str += rresp_id.signalInit()
 
-        wreq_ready = VHDLLogicTypeArray(
-            "wreq_ready", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wreq_ready.signalInit()
-
-        wresp_valid = VHDLLogicTypeArray(
-            "wresp_valid", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wresp_valid.signalInit()
-
-        wresp_id = VHDLLogicVecTypeArray(
-            "wresp_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        rresp_valid = LogicArray(ctx, 
+            "rresp_valid", 'w', self.lsq_config.numLdMem, dyn_comp=True
         )
-        self.lsq_wrapper_str += wresp_id.signalInit()
 
-        rreq_id = VHDLLogicVecTypeArray(
-            "rreq_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        rresp_id = LogicVecArray(ctx, 
+            "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True
         )
-        self.lsq_wrapper_str += rreq_id.signalInit()
 
-        wreq_id = VHDLLogicVecTypeArray(
-            "wreq_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        wreq_ready = LogicArray(ctx, 
+            "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True
         )
-        self.lsq_wrapper_str += wreq_id.signalInit()
+
+        wresp_valid = LogicArray(ctx, 
+            "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True
+        )
+
+        wresp_id = LogicVecArray(ctx, 
+            "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True
+        )
+
+        rreq_id = LogicVecArray(ctx, 
+            "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True
+        )
+
+        wreq_id = LogicVecArray(ctx, 
+            "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True
+        )
+        
+        self.lsq_wrapper_str += ctx.signalInitString
 
         # Begin actual arch logic definition
         self.lsq_wrapper_str += "begin\n"
@@ -355,19 +328,16 @@ class LSQWrapper:
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], (ctx.tabLevel + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(rresp_valid[i],
-                                          (ctx.tabLevel + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(
-                rresp_id[i], (ctx.tabLevel + 2), "(", "others", "=>", "'0'", ")"
-            )
+            self.lsq_wrapper_str += Op(ctx, rreq_ready[i], "'0'")
+            self.lsq_wrapper_str += Op(ctx, rresp_valid[i], "'0'")
+            self.lsq_wrapper_str += Op(ctx, rresp_id[i], "(", "others", "=>", "'0'", ")")
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
         )
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], (ctx.tabLevel + 2), "'1'")
+            self.lsq_wrapper_str += Op(ctx, rreq_ready[i], "'1'")
 
         self.lsq_wrapper_str += (
             "\n"
@@ -378,16 +348,13 @@ class LSQWrapper:
         )
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_valid[i],
-                                          (ctx.tabLevel + 3), "'1'")
-            self.lsq_wrapper_str += OpTab(rresp_id[i],
-                                          (ctx.tabLevel + 3), rreq_id[i])
+            self.lsq_wrapper_str += Op(ctx, rresp_valid[i], "'1'")
+            self.lsq_wrapper_str += Op(ctx, rresp_id[i], rreq_id[i])
 
         self.lsq_wrapper_str += "\t" * (ctx.tabLevel + 2) + "else\n"
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_valid[i],
-                                          (ctx.tabLevel + 3), "'0'")
+            self.lsq_wrapper_str += Op(ctx, rresp_valid[i], "'0'")
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
@@ -410,19 +377,16 @@ class LSQWrapper:
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], (ctx.tabLevel + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (ctx.tabLevel + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(
-                wresp_id[i], (ctx.tabLevel + 2), "(", "others", "=>", "'0'", ")"
-            )
+            self.lsq_wrapper_str += Op(ctx, wreq_ready[i], "'0'")
+            self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
+            self.lsq_wrapper_str += Op(ctx, wresp_id[i], "(", "others", "=>", "'0'", ")")
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
         )
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], (ctx.tabLevel + 2), "'1'")
+            self.lsq_wrapper_str += Op(ctx, wreq_ready[i], "'1'")
 
         self.lsq_wrapper_str += (
             "\n"
@@ -433,16 +397,13 @@ class LSQWrapper:
         )
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (ctx.tabLevel + 3), "'1'")
-            self.lsq_wrapper_str += OpTab(wresp_id[i],
-                                          (ctx.tabLevel + 3), rreq_id[i])
+            self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'1'")
+            self.lsq_wrapper_str += Op(ctx, wresp_id[i], rreq_id[i])
 
         self.lsq_wrapper_str += "\t" * (ctx.tabLevel + 2) + "else\n"
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (ctx.tabLevel + 3), "'0'")
+            self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
@@ -625,7 +586,7 @@ class LSQWrapper:
         self.lsq_wrapper_str += "end architecture;\n"
 
         # Write to the file
-        with open(f"{self.output_folder}/{self.lsq_name}.vhd", "w") as file:
+        with open(f"{self.output_folder}/{self.lsq_name}.vhd", 'w') as file:
             file.write(self.lsq_wrapper_str)
 
         return self.lsq_wrapper_str
@@ -634,7 +595,7 @@ class LSQWrapper:
         """This function generates the desired wrapper for the LSQ"""
 
         # PART 1: Add library information to the VHDL module
-        self.lsq_wrapper_str += self.library_header
+        self.lsq_wrapper_str += ctx.library
 
         # PART 2: Define the entity
         self.lsq_wrapper_str += f"entity {self.lsq_name} is\n"
@@ -646,143 +607,118 @@ class LSQWrapper:
         # Define all the IOs
 
         # io_stDataToMC_bits: output
-        io_storeData = VHDLLogicVecType(
-            "io_stDataToMC_bits", "o", self.lsq_config.dataW
+        io_storeData = LogicVec(ctx, 
+            "io_stDataToMC_bits", 'o', self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_storeData.signalInit()
 
         # io_stAddrToMC_bits: output
-        io_storeAddr = VHDLLogicVecType(
-            "io_stAddrToMC_bits", "o", self.lsq_config.addrW
+        io_storeAddr = LogicVec(ctx, 
+            "io_stAddrToMC_bits", 'o', self.lsq_config.addrW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_storeAddr.signalInit()
 
         # io_ldDataFromMC_bits: input
-        io_loadData = VHDLLogicVecType(
-            "io_ldDataFromMC_bits", "i", self.lsq_config.dataW
+        io_loadData = LogicVec(ctx, 
+            "io_ldDataFromMC_bits", 'i', self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_loadData.signalInit()
 
         # io_ldAddrToMC_bits: output
-        io_loadAddr = VHDLLogicVecType(
-            "io_ldAddrToMC_bits", "o", self.lsq_config.addrW)
-        self.lsq_wrapper_str += io_loadAddr.signalInit()
+        io_loadAddr = LogicVec(ctx, 
+            "io_ldAddrToMC_bits", 'o', self.lsq_config.addrW, dyn_comp=True
+        )
 
         # io_ctrl_*_ready: output
-        io_ctrl_ready = VHDLLogicTypeArray(
-            "io_ctrl_ready", "o", self.lsq_config.numGroups
+        io_ctrl_ready = LogicArray(ctx, 
+            "io_ctrl_ready", 'o', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_ready.signalInit()
 
         # io_ctrl_*_valid: input
-        io_ctrl_valid = VHDLLogicTypeArray(
-            "io_ctrl_valid", "i", self.lsq_config.numGroups
+        io_ctrl_valid = LogicArray(ctx, 
+            "io_ctrl_valid", 'i', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_valid.signalInit()
 
         # io_ldAddr_*_ready: output
-        io_ldAddr_ready = VHDLLogicTypeArray(
-            "io_ldAddr_ready", "o", self.lsq_config.numLdPorts
+        io_ldAddr_ready = LogicArray(ctx, 
+            "io_ldAddr_ready", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_ready.signalInit()
 
         # io_ldAddr_*_valid: input
-        io_ldAddr_valid = VHDLLogicTypeArray(
-            "io_ldAddr_valid", "i", self.lsq_config.numLdPorts
+        io_ldAddr_valid = LogicArray(ctx, 
+            "io_ldAddr_valid", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_valid.signalInit()
 
         # io_ldAddr_*_bits: input
-        io_ldAddr_bits = VHDLLogicVecTypeArray(
-            "io_ldAddr_bits", "i", self.lsq_config.numLdPorts, self.lsq_config.addrW
+        io_ldAddr_bits = LogicVecArray(ctx, 
+            "io_ldAddr_bits", 'i', self.lsq_config.numLdPorts, self.lsq_config.addrW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_bits.signalInit()
 
         # io_ldData_*_ready: input
-        io_ldData_ready = VHDLLogicTypeArray(
-            "io_ldData_ready", "i", self.lsq_config.numLdPorts
+        io_ldData_ready = LogicArray(ctx, 
+            "io_ldData_ready", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_ready.signalInit()
 
         # io_ldData_*_valid: output
-        io_ldData_valid = VHDLLogicTypeArray(
-            "io_ldData_valid", "o", self.lsq_config.numLdPorts
+        io_ldData_valid = LogicArray(ctx, 
+            "io_ldData_valid", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_valid.signalInit()
 
         # io_ldData_*_bits: output
-        io_ldData_bits = VHDLLogicVecTypeArray(
-            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.dataW
+        io_ldData_bits = LogicVecArray(ctx, 
+            "io_ldData_bits", 'o', self.lsq_config.numLdPorts, self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_bits.signalInit()
 
         # io_stAddr_ready: output
-        io_stAddr_ready = VHDLLogicTypeArray(
-            "io_stAddr_ready", "o", self.lsq_config.numStPorts
+        io_stAddr_ready = LogicArray(ctx, 
+            "io_stAddr_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_ready.signalInit()
 
         # io_stAddr_valid: input
-        io_stAddr_valid = VHDLLogicTypeArray(
-            "io_stAddr_valid", "i", self.lsq_config.numStPorts
+        io_stAddr_valid = LogicArray(ctx, 
+            "io_stAddr_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_valid.signalInit()
 
         # io_stAddr_bits: input
-        io_stAddr_bits = VHDLLogicVecTypeArray(
-            "io_stAddr_bits", "i", self.lsq_config.numStPorts, self.lsq_config.addrW
+        io_stAddr_bits = LogicVecArray(ctx, 
+            "io_stAddr_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.addrW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_bits.signalInit()
 
         # io_stData_ready: output
-        io_stData_ready = VHDLLogicTypeArray(
-            "io_stData_ready", "o", self.lsq_config.numStPorts
+        io_stData_ready = LogicArray(ctx, 
+            "io_stData_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_ready.signalInit()
 
         # io_stData_valid: input
-        io_stData_valid = VHDLLogicTypeArray(
-            "io_stData_valid", "i", self.lsq_config.numStPorts
+        io_stData_valid = LogicArray(ctx, 
+            "io_stData_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_valid.signalInit()
 
         # io_stData_bits: input
-        io_stData_bits = VHDLLogicVecTypeArray(
-            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.dataW
+        io_stData_bits = LogicVecArray(ctx, 
+            "io_stData_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_bits.signalInit()
 
         # io_ldAddrToMC_ready: input
-        io_ldAddrToMC_ready = VHDLLogicType("io_ldAddrToMC_ready", "i")
-        self.lsq_wrapper_str += io_ldAddrToMC_ready.signalInit()
+        io_ldAddrToMC_ready = Logic(ctx, "io_ldAddrToMC_ready", 'i', dyn_comp=True)
 
         # io_ldAddrToMC_valid
-        io_ldAddrToMC_valid = VHDLLogicType("io_ldAddrToMC_valid", "o")
-        self.lsq_wrapper_str += io_ldAddrToMC_valid.signalInit()
+        io_ldAddrToMC_valid = Logic(ctx, "io_ldAddrToMC_valid", 'o', dyn_comp=True)
 
         # io_ldDataFromMC_ready
-        io_ldDataFromMC_ready = VHDLLogicType("io_ldDataFromMC_ready", "o")
-        self.lsq_wrapper_str += io_ldDataFromMC_ready.signalInit()
+        io_ldDataFromMC_ready = Logic(ctx, "io_ldDataFromMC_ready", 'o', dyn_comp=True)
 
         # io_ldDataFromMC_valid
-        io_ldDataFromMC_valid = VHDLLogicType("io_ldDataFromMC_valid", "i")
-        self.lsq_wrapper_str += io_ldDataFromMC_valid.signalInit()
+        io_ldDataFromMC_valid = Logic(ctx, "io_ldDataFromMC_valid", 'i', dyn_comp=True)
 
         # io_stAddrToMC_ready
-        io_stAddrToMC_ready = VHDLLogicType("io_stAddrToMC_ready", "i")
-        self.lsq_wrapper_str += io_stAddrToMC_ready.signalInit()
+        io_stAddrToMC_ready = Logic(ctx, "io_stAddrToMC_ready", 'i', dyn_comp=True)
 
         # io_stAddrToMC_valid
-        io_stAddrToMC_valid = VHDLLogicType("io_stAddrToMC_valid", "o")
-        self.lsq_wrapper_str += io_stAddrToMC_valid.signalInit()
+        io_stAddrToMC_valid = Logic(ctx, "io_stAddrToMC_valid", 'o', dyn_comp=True)
 
         # io_stDataToMC_ready
-        io_stDataToMC_ready = VHDLLogicType("io_stDataToMC_ready", "i")
-        self.lsq_wrapper_str += io_stDataToMC_ready.signalInit()
+        io_stDataToMC_ready = Logic(ctx, "io_stDataToMC_ready", 'i', dyn_comp=True)
 
         # io_stDataToMC_valid
-        io_stDataToMC_valid = VHDLLogicType("io_stDataToMC_valid", "o")
-        self.lsq_wrapper_str += io_stDataToMC_valid.signalInit()
+        io_stDataToMC_valid = Logic(ctx, "io_stDataToMC_valid", 'o', dyn_comp=True)
 
         ##
         # IO Definition finished
@@ -796,39 +732,33 @@ class LSQWrapper:
         self.lsq_wrapper_str += f"architecture arch of {self.lsq_name} is\n"
 
         # Define internal signals
-        io_loadEn = VHDLLogicType("io_loadEn", "w")
-        self.lsq_wrapper_str += io_loadEn.signalInit()
+        io_loadEn = Logic(ctx, "io_loadEn", 'w', dyn_comp=True)
 
-        io_storeEn = VHDLLogicType("io_storeEn", "w")
-        self.lsq_wrapper_str += io_storeEn.signalInit()
+        io_storeEn = Logic(ctx, "io_storeEn", 'w', dyn_comp=True)
 
-        rresp_id = VHDLLogicVecTypeArray(
-            "rresp_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        rresp_id = LogicVecArray(ctx, 
+            "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True
         )
-        self.lsq_wrapper_str += rresp_id.signalInit()
 
-        wreq_ready = VHDLLogicTypeArray(
-            "wreq_ready", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wreq_ready.signalInit()
-
-        wresp_valid = VHDLLogicTypeArray(
-            "wresp_valid", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wresp_valid.signalInit()
-
-        wresp_id = VHDLLogicVecTypeArray(
-            "wresp_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        wreq_ready = LogicArray(ctx, 
+            "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True
         )
-        self.lsq_wrapper_str += wresp_id.signalInit()
 
-        rreq_id = VHDLLogicVecTypeArray(
-            "rreq_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        wresp_valid = LogicArray(ctx, 
+            "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True
         )
-        self.lsq_wrapper_str += rreq_id.signalInit()
 
-        wreq_id = VHDLLogicVecTypeArray(
-            "wreq_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        wresp_id = LogicVecArray(ctx, 
+            "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True
         )
-        self.lsq_wrapper_str += wreq_id.signalInit()
+
+        rreq_id = LogicVecArray(ctx, 
+            "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True
+        )
+
+        wreq_id = LogicVecArray(ctx, 
+            "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True
+        )
 
         # Begin actual arch logic definition
         self.lsq_wrapper_str += "begin\n"
@@ -842,9 +772,7 @@ class LSQWrapper:
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(
-                rresp_id[i], (ctx.tabLevel + 2), "(", "others", "=>", "'0'", ")"
-            )
+            self.lsq_wrapper_str += Op(ctx, rresp_id[i], "(", "others", "=>", "'0'", ")")
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
@@ -858,8 +786,7 @@ class LSQWrapper:
         )
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_id[i],
-                                          (ctx.tabLevel + 3), rreq_id[i])
+            self.lsq_wrapper_str += Op(ctx, rresp_id[i], rreq_id[i])
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
@@ -882,12 +809,8 @@ class LSQWrapper:
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (ctx.tabLevel + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(
-                wresp_id[i], (ctx.tabLevel + 2), "(", "others", "=>", "'0'", ")"
-            )
-
+            self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
+            self.lsq_wrapper_str += Op(ctx, wresp_id[i], "(", "others", "=>", "'0'", ")")
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
         )
@@ -901,16 +824,13 @@ class LSQWrapper:
         )
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (ctx.tabLevel + 3), "'1'")
-            self.lsq_wrapper_str += OpTab(wresp_id[i],
-                                          (ctx.tabLevel + 3), rreq_id[i])
+            self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'1'")
+            self.lsq_wrapper_str += Op(ctx, wresp_id[i], rreq_id[i])
 
         self.lsq_wrapper_str += "\t" * (ctx.tabLevel + 2) + "else\n"
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (ctx.tabLevel + 3), "'0'")
+            self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
@@ -926,15 +846,12 @@ class LSQWrapper:
         # Signal Assignment
         ###
         self.lsq_wrapper_str += "\t-- Signal Assignment\n"
-        self.lsq_wrapper_str += OpTab(io_ldAddrToMC_valid,
-                                      ctx.tabLevel, io_loadEn)
-        self.lsq_wrapper_str += OpTab(io_stAddrToMC_valid,
-                                      ctx.tabLevel, io_storeEn)
-        self.lsq_wrapper_str += OpTab(io_stDataToMC_valid,
-                                      ctx.tabLevel, io_storeEn)
-        self.lsq_wrapper_str += OpTab(
+        self.lsq_wrapper_str += Op(ctx, io_ldAddrToMC_valid, io_loadEn)
+        self.lsq_wrapper_str += Op(ctx, io_stAddrToMC_valid, io_storeEn)
+        self.lsq_wrapper_str += Op(ctx, io_stDataToMC_valid, io_storeEn)
+        self.lsq_wrapper_str += Op(
+            ctx,
             wreq_ready[0],
-            ctx.tabLevel,
             io_stAddrToMC_ready,
             "and",
             io_stDataToMC_ready,
@@ -1088,7 +1005,7 @@ class LSQWrapper:
         self.lsq_wrapper_str += "end architecture;\n"
 
         # Write to the file
-        with open(f"{self.output_folder}/{self.lsq_name}.vhd", "w") as file:
+        with open(f"{self.output_folder}/{self.lsq_name}.vhd", 'w') as file:
             file.write(self.lsq_wrapper_str)
 
         return self.lsq_wrapper_str
