@@ -991,7 +991,7 @@ ParseResult LSQOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseKeyword(&typeStr))
     return failure();
 
-  auto type = symbolizeHandshake_LSQType(typeStr);
+  auto type = symbolizeLSQType(typeStr);
   if (!type)
     return parser.emitError(parser.getCurrentLocation(),
                             "invalid LSQ type");
