@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "experimental/Transforms/HandshakeChooseLSQType.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
 
