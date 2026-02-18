@@ -322,8 +322,8 @@ public:
     addFlag({STRAIGHT_TO_QUEUE,
              "Use straight to queue to connect the circuit to the LSQ"});
     addOption({LSQ_TYPE,
-             "Specify type of memory-dependency analysis LSQs should perform."
-             "Options are 'full' or 'sequential'"});
+             "Specify type of memory-dependency analysis LSQs should perform. "
+             "Options are 'full' or 'sequential', with 'full' as the default."});
   }
 
   CommandResult execute(CommandArguments &args) override;
