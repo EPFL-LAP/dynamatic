@@ -123,7 +123,7 @@ def HandshakeChooseLSQType : DynamaticPass<"handshake-choose-lsq-type"> {
   }];
 
   let options = [
-    Option<"lsq-type", "lsq-type", "std::string", "\"full\"",
+    Option<"lsqType", "lsq-type", "std::string", "\"full\"",
       "Type of LSQ to use. Choices are: 'full' (default, with address comparison) "
       "or 'sequential' (no address comparison, in-order issue).">
   ];
