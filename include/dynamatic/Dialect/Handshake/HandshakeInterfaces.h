@@ -19,7 +19,7 @@
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOpInternalState.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/OpDefinition.h"

@@ -1,5 +1,5 @@
-#ifndef DYNAMATIC_DIALECT_HANDSHAKE_OP_INTERNAL_STATE_H
-#define DYNAMATIC_DIALECT_HANDSHAKE_OP_INTERNAL_STATE_H
+#ifndef DYNAMATIC_DIALECT_HANDSHAKE_OP_INTERNAL_STATE_NAMER_H
+#define DYNAMATIC_DIALECT_HANDSHAKE_OP_INTERNAL_STATE_NAMER_H
 
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Operation.h"
@@ -65,4 +65,4 @@ struct BufferSlotFullNamer : public InternalStateNamer {
 } // namespace handshake
 } // namespace dynamatic
 
-#endif // DYNAMATIC_DIALECT_HANDSHAKE_OP_INTERNAL_STATE_H
+#endif // DYNAMATIC_DIALECT_HANDSHAKE_OP_INTERNAL_STATE_NAMER_H
