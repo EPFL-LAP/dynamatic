@@ -8,6 +8,14 @@
 namespace dynamatic {
 namespace handshake {
 
+// A general structure for an operation is assumed:
+// in1, in2, ... -> Join/Merge/Mux
+// -> Latency Slots
+// -> Slots
+// -> Fork/Branch -> out1, out2, ...
+//
+// Some operations do not follow this structure, and should be handled
+// separately to avoid making false assumptions.
 struct InternalStateNamer {
   enum class TYPE {
     EagerForkSent,
