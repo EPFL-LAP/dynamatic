@@ -1041,7 +1041,7 @@ void LSQOp::print(OpAsmPrinter &p) {
   p << inputs.back() << ") ";
 
   // Print lsqType explicitly
-  p << " type=" << stringifyLSQType(getLsqType()) << " ";
+  p << "type = " << stringifyLSQType(getLsqType());
 
   // Print remaining attrs (exclude lsqType) such as group size
   SmallVector<StringRef> elided = {
