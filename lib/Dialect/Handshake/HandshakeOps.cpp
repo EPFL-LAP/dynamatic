@@ -18,6 +18,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
@@ -926,7 +927,7 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
   odsState.types.push_back(handshake::ControlType::get(ctx));
 
   odsState.addAttribute(LSQOp::getLsqTypeAttrName(odsState.name).strref(),
-    Handshake_LSQTypeAttr::get(ctx, Handshake_LSQType::FULL));
+    LSQTypeAttr::get(ctx, LSQType::FULL));
 
   buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
 }
@@ -949,7 +950,7 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   odsState.types.push_back(dataType);
 
   odsState.addAttribute(LSQOp::getLsqTypeAttrName(odsState.name).strref(),
-    Handshake_LSQTypeAttr::get(ctx, Handshake_LSQType::FULL));
+    LSQTypeAttr::get(ctx, LSQType::FULL));
 
   // The LSQ is a slave interface in this case (the MC is the master), so it
   // doesn't produce a completion signal
