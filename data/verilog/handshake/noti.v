@@ -1,17 +1,15 @@
-def generate_not(name, params):
-    bitwidth = params["bitwidth"]
-
-    return f"""
-// Module of not
-module {name}(
+`timescale 1ns/1ps
+module noti #(
+  parameter DATA_TYPE = 32
+)(
   input  clk,
   input  rst,
   // Input channel
-  input  [{bitwidth} - 1 : 0] ins,
+  input  [DATA_TYPE - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output [{bitwidth} - 1 : 0] outs,
+  output [DATA_TYPE - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
@@ -20,4 +18,3 @@ module {name}(
   assign ins_ready = outs_ready;
 
 endmodule
-"""
