@@ -20,6 +20,7 @@ DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
+SIZE_LSQ=${14}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -52,6 +53,7 @@ F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
+F_HANDSHAKE_LSQ_SIZED="$COMP_DIR/handshake_lsq_sized.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
@@ -335,8 +337,19 @@ else
   cd - > /dev/null
 fi
 
+# LSQ sizing
+if [[ $SIZE_LSQ -ne 0 ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+    --handshake-size-lsqs="timing-models=$DYNAMATIC_DIR/data/components-$FPUNITS_GEN.json collisions=full" \
+    > "$F_HANDSHAKE_LSQ_SIZED"
+  exit_on_fail "Failed to size LSQs" "Sized LSQs"
+else
+  cp $F_HANDSHAKE_BUFFERED $F_HANDSHAKE_LSQ_SIZED
+  echo_info "Skipped LSQ sizing"
+fi
+
 # handshake canonicalization
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_LSQ_SIZED" \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
