@@ -285,6 +285,13 @@ void scalarPrinter<uint8_t>(const uint8_t &arg, OS &os) {
      << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
 }
 
+/// Specialization of the scalar printer for int16_t.
+template <>
+void scalarPrinter<int16_t>(const int16_t &arg, OS &os) {
+  os << "0x" << std::hex << std::setfill('0') << std::setw(4)
+     << arg << std::endl;
+}
+
 template <>
 void scalarPrinter<float>(const float &arg, OS &os) {
   uint32_t bits;
