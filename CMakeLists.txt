@@ -82,7 +82,11 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${CLANG_INCLUDE_DIRS})
 include_directories(${Polly_INCLUDE_DIRS})
+# Explicitly add the path resolved by CMake so that Boost includes are
+# found reliably everywhere.
+include_directories(${Boost_INCLUDE_DIRS})
 message(STATUS "Including from ${Polly_INCLUDE_DIRS}")
+message(STATUS "Including from ${Boost_INCLUDE_DIRS}")
 
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
@@ -280,4 +284,3 @@ add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)
-

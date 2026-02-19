@@ -83,7 +83,7 @@ create_symlink() {
     local src=$1
     local dst="bin/$(basename $1)"
     echo "$dst -> $src"
-    ln -f --symbolic $src $dst
+    ln -sf "$src" "$dst"
 }
 
 # Same as create_symlink but creates the symbolic link inside the bin/generators
@@ -92,14 +92,14 @@ create_generator_symlink() {
     local src=$1
     local dst="bin/generators/$(basename $1)"
     echo "$dst -> $src"
-    ln -f --symbolic ../../$src $dst
+    ln -sf "../../$src" "$dst"
 }
 
 create_include_symlink() {
     local src=$1
     local dst="build/include/clang_headers"
     echo "$dst -> $src"
-    ln -fT --symbolic "$src" "$dst"
+    ln -sf "$src" "$dst"
 }
 
 # Determine whether cmake should be re-configured by looking for a
@@ -224,7 +224,6 @@ if [[ $PARSE_ARG != "" ]]; then
   print_help_and_exit
 fi
 
-
 #### Build the project (submodules, superproject, and tools) ####
 
 # Print header
@@ -264,6 +263,11 @@ else
   #### llvm-project (prebuilt) ####
   prepare_to_build_project "Dynamatic (prebuilt-llvm)" "build"
 
+  if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+    echo "Prebuilt LLVM is currently configured only for Linux/X86 in this script."
+    echo "Please configure the LLVM submodule and run without --use-prebuilt-llvm."
+    exit 1
+  fi
   URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
   PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
 
@@ -404,6 +408,11 @@ fi
 #### Godot ####
 
 if [[ $GODOT_PATH != "" ]]; then
+  # TODO: Support this for other configurations as well.
+  if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+    echo "Godot export preset can only be configured for Linux/X11 by this script."
+    exit 1
+  fi
   # Go to the visualizer's subfolder and build it using godot
   cd "$SCRIPT_CWD/visual-dataflow"
   "$GODOT_PATH" --headless --export-debug "Linux/X11"
