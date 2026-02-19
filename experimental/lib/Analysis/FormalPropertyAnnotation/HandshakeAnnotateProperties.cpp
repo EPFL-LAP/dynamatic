@@ -513,19 +513,9 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       // Annotate latency-induced slots
       int exitIndex = 0;
       if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
-        for (int i = 0; i < latencyOp.getLatency(); ++i) {
-          // TODO: This should not actually be a slot variable, but rather a
-          // special latency-slot variable, as it latency-induced slots have a
-          // (rightfully) different naming scheme. For now, I manually changed
-          // the names to match what is expected (i.e. "full_{i}" -> "v{i}"),
-          // and verified that these latency induced slots do actually solve
-          // issues that caused the properties to be provably incorrect.
-          //
-          // As the structure of the slot variables will soon change, I did not
-          // yet implement the latency-slot variable
-          FlowVariable full =
-              FlowVariable(std::make_shared<LatencyInducedSlotNamer>(
-                  LatencyInducedSlotNamer(getUniqueName(&op).str(), i)));
+        for (auto &latencySlot : latencyOp.getLatencyInducedSlots()) {
+          FlowVariable full = FlowVariable(
+              std::make_shared<LatencyInducedSlotNamer>(latencySlot));
 
           FlowVariable before = FlowVariable::internalChannel(&op, exitIndex);
           FlowVariable after =
