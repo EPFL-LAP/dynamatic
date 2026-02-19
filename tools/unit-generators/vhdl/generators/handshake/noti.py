@@ -1,7 +1,7 @@
 from generators.support.unary import generate_unary
 
 
-def generate_logical_not(name, params):
+def generate_noti(name, params):
     bitwidth = params["bitwidth"]
 
     body = f"""
@@ -10,7 +10,7 @@ def generate_logical_not(name, params):
 
     return generate_unary(
         name=name,
-        modType="not",
+        handshake_op="noti",
         bitwidth=bitwidth,
         body=body,
         extra_signals=params.get("extra_signals", None),

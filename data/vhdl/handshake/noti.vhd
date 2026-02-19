@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity logic_not is
+entity noti is
   generic (
     DATA_TYPE : integer
   );
@@ -19,7 +19,7 @@ entity logic_not is
   );
 end entity;
 
-architecture arch of logic_not is
+architecture arch of noti is
 begin
   outs       <= not ins;
   outs_valid <= ins_valid;

@@ -296,7 +296,7 @@ struct CombineBranchesOppositeSign
     Value dataOperand = condBranchOp.getDataOperand();
     Value condOperand = condBranchOp.getConditionOperand();
 
-    if (!isa_and_nonnull<handshake::NotOp>(condOperand.getDefiningOp()))
+    if (!isa_and_nonnull<handshake::NotIOp>(condOperand.getDefiningOp()))
       return failure();
 
     condOperand = condOperand.getDefiningOp()->getOperand(0);
@@ -331,10 +331,10 @@ struct RemoveNotCondition
     Value condValue = condBranchOp.getConditionOperand();
     Operation *condOp = condValue.getDefiningOp();
 
-    if (!llvm::isa_and_nonnull<handshake::NotOp>(condOp))
+    if (!llvm::isa_and_nonnull<handshake::NotIOp>(condOp))
       return failure();
 
-    auto drivingNot = llvm::dyn_cast<handshake::NotOp>(condOp);
+    auto drivingNot = llvm::dyn_cast<handshake::NotIOp>(condOp);
 
     rewriter.setInsertionPointAfter(condBranchOp);
 

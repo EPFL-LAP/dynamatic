@@ -1,15 +1,17 @@
-`timescale 1ns/1ps
-module logic_not #(
-  parameter DATA_TYPE = 32
-)(
+def generate_noti(name, params):
+    bitwidth = params["bitwidth"]
+
+    return f"""
+// Module of noti
+module {name}(
   input  clk,
   input  rst,
   // Input channel
-  input  [DATA_TYPE - 1 : 0] ins,
+  input  [{bitwidth} - 1 : 0] ins,
   input  ins_valid,
   output ins_ready,
   // Output channel
-  output [DATA_TYPE - 1 : 0] outs,
+  output [{bitwidth} - 1 : 0] outs,
   output outs_valid,
   input  outs_ready
 );
@@ -18,3 +20,4 @@ module logic_not #(
   assign ins_ready = outs_ready;
 
 endmodule
+"""
