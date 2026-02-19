@@ -135,7 +135,7 @@ FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
 
 // Absence of Backpressure
 
-AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
+AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
                                              const OpResult &res)
     : FormalProperty(id, tag, TYPE::AOB) {
   Operation *ownerOp = res.getOwner();
@@ -192,8 +192,8 @@ AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
 
 // Valid Equivalence
 
-ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
-                                   const OpResult &res1, const OpResult &res2)
+ValidEquivalence::ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
+                                   const OpResult &res2)
     : FormalProperty(id, tag, TYPE::VEQ) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
@@ -242,7 +242,7 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 // Invariant 1 -- see https://ieeexplore.ieee.org/document/10323796
 
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
-    unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
+    uint64_t id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
     : FormalProperty(id, tag, TYPE::EFNAO) {
   sentStateNamers = forkOp.getInternalSentStateNamers();
 }
@@ -293,7 +293,7 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
 // Invariant 2 -- see https://ieeexplore.ieee.org/document/10323796
 
 CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
-    unsigned long id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
+    uint64_t id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
     handshake::EagerForkLikeOpInterface &forkOpI)
     : FormalProperty(id, tag, TYPE::CSOAFAF) {
   sentStateNamers = forkOpI.getInternalSentStateNamers();
