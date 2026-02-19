@@ -96,7 +96,9 @@ struct LatencyInducedSlotNamer : public InternalStateNamer {
   ~LatencyInducedSlotNamer() = default;
 
   inline std::string getSMVName() override {
-    return llvm::formatv("{0}.v{1}", opName, slotIndex).str();
+    return llvm::formatv("{0}.inner_handshake_manager.inner_delay_buffer.v{1}",
+                         opName, slotIndex)
+        .str();
   }
 
   unsigned slotIndex;
