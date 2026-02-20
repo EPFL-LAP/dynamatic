@@ -1,9 +1,9 @@
-add_dynamatic_library(DynamaticExperimentalResourceSharing
+add_dynamatic_library(DynamaticResourceSharing
   Crush.cpp
   SharingSupport.cpp
 
   DEPENDS
-  DynamaticExperimentalTransformsPassIncGen
+  DynamaticTransformsPassIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR
@@ -13,5 +13,4 @@ add_dynamatic_library(DynamaticExperimentalResourceSharing
   MLIRTransformUtils
   DynamaticHandshake
   DynamaticSupport
-  DynamaticExperimentalSupport
   )
