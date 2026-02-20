@@ -84,7 +84,7 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
 
       - name: build
-        run: ./build.sh --release --force
+        run: ./build.sh --release --enable-cbc --force 
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
@@ -93,6 +93,10 @@ jobs:
       - name: check-dynamatic-experimental
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic-experimental
+
+      - name: check-constraint-programming-library
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build run-constraint-programming-test
 
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
