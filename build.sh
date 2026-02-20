@@ -275,10 +275,14 @@ else
   fi
 
   # untar the file 
-  mkdir -p "$SCRIPT_CWD/build/llvm-project/"
-  echo "Unzipping the prebuilt llvm-project!"
-  tar -xf "$PREBUILT_LLVM_TARBALL" -C "$SCRIPT_CWD/build/llvm-project/"
-  exit_on_fail "Failed to untar the prebuilt llvm-project!"
+  if [ ! -f "$LLVM_DIR/lib/cmake/llvm/AddLLVM.cmake" ]; then
+    mkdir -p "$LLVM_DIR"
+    echo "Prebuilt LLVM not found. Unzipping the prebuilt llvm-project!"
+    tar -xf "$PREBUILT_LLVM_TARBALL" -C "$LLVM_DIR"
+    exit_on_fail "Failed to untar the prebuilt llvm-project!"
+  else
+    echo "Found Prebuilt LLVM! Skipping untaring the llvm-project!"
+  fi
 
 fi
 
