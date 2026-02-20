@@ -39,4 +39,5 @@ add_dynamatic_library(DynamaticTransforms
 )
 
 add_subdirectory(BufferPlacement)
+add_subdirectory(ResourceSharing)
 add_subdirectory(LLVMIR)

@@ -293,6 +293,24 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
   let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
+def CreditBasedSharing : Pass<"credit-based-sharing"> {
+  let summary = "Credit-based sharing of functional units.";
+  let description = [{ Share functional units for better resource utilization.
+  The behavior of this pass depends on whether the buffer placement pass was ran
+  in the same pass pipeline before:
+  - If yes, this pass share functional units as much as possible without
+  penalizing the performance.
+  - Otherwise, it simply shares all units of the same type.}];
+
+  let options = [
+      Option<"timingModels", "timing-models", "std::string", "",
+      "Path to JSON-formatted file containing timing models for dataflow "
+      "components.">,
+      Option<"targetCP", "target-period", "double", "",
+      "Target clock period for the buffer placement CFDFC">];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
+}
 
 def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
   let summary = "Sets the floating point arithmetic unit 'vendor'.";
