@@ -235,43 +235,107 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
 // 4. Dedicated conversion function to a matrix, as this is necessary anyway
 struct FlowVariable {
   enum TYPE { internalState, inputLambda, outputLambda, internalLambda };
+  enum PLUSMINUS { notApplicable, plusAndMinus, plus, minus };
+  // A Lambda variable is defined by type, lambdaIndex, and op.
+  // An internal state is defined by type, state
   TYPE type;
-  // `typeIndex` has a different meaning depending on `type`:
-  // `full` => index of slot that is full
-  // `sent` => index of output that is sent
-  // `inputLambda` => index of operand channel
-  // `outputLambda` => index of result channel
-  // `internalLambda` => index of internal channel
   unsigned lambdaIndex;
   Operation *op;
+  PLUSMINUS pm;
   std::shared_ptr<InternalStateNamer> state;
 
   FlowVariable(std::shared_ptr<InternalStateNamer> state)
       : type(TYPE::internalState), state(std::move(state)) {}
   FlowVariable(TYPE t, Operation *op, unsigned lambdaIndex)
-      : type(t), lambdaIndex(lambdaIndex), op(op) {
+      : type(t), lambdaIndex(lambdaIndex), op(op),
+        pm(PLUSMINUS::notApplicable) {
     assert(
         t != TYPE::internalState &&
         "internal states should be initialized with the according constructor");
+  }
+
+  FlowVariable(const OpResult &channel) {
+    op = channel.getDefiningOp();
+    assert(op && "cannot get FlowVariable from channel without owner");
+    type = outputLambda;
+    lambdaIndex = channel.getResultNumber();
+
+    pm = PLUSMINUS::notApplicable;
+    if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
+      if (ct.getDataBitWidth() == 1) {
+        pm = PLUSMINUS::plusAndMinus;
+      }
+    }
+  }
+
+  FlowVariable(OpOperand &back, Operation &resOp) {
+    Value channel = back.get();
+    op = channel.getDefiningOp();
+    pm = PLUSMINUS::notApplicable;
+    if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
+      if (ct.getDataBitWidth() == 1) {
+        pm = PLUSMINUS::plusAndMinus;
+      }
+    }
+    if (op == nullptr) {
+      type = inputLambda;
+      op = &resOp;
+      lambdaIndex = back.getOperandNumber();
+    } else {
+      type = outputLambda;
+      bool found = false;
+      for (auto res : op->getResults()) {
+        if (res == channel) {
+          assert(!found && "found multiple matches");
+          found = true;
+          lambdaIndex = res.getResultNumber();
+        }
+      }
+      assert(found && "did not find matching OpResult");
+    }
   }
 
   // utility functions for initializing variables
   static FlowVariable internalChannel(Operation *op, unsigned index) {
     return FlowVariable(TYPE::internalLambda, op, index);
   }
-  static FlowVariable inputChannel(Operation *op, unsigned index) {
-    return FlowVariable(TYPE::inputLambda, op, index);
+
+  FlowVariable nextInternal() const {
+    assert(type == TYPE::internalLambda);
+    FlowVariable next = *this;
+    next.lambdaIndex = lambdaIndex + 1;
+    return next;
   }
-  static FlowVariable outputChannel(Operation *op, unsigned index) {
-    return FlowVariable(TYPE::outputLambda, op, index);
-  }
+
   bool operator==(const FlowVariable &other) const {
     if (type == TYPE::internalState && other.type == TYPE::internalState) {
       return state.get() == other.state.get();
     }
 
     return type == other.type && lambdaIndex == other.lambdaIndex &&
+           op == other.op && pm == other.pm;
+  }
+
+  bool sameChannel(const FlowVariable &other) const {
+    assert(isLambda());
+    assert(other.isLambda());
+    return type == other.type && lambdaIndex == other.lambdaIndex &&
            op == other.op;
+  }
+
+  inline bool isPlusMinus() const { return pm == plusAndMinus; }
+  inline FlowVariable getPlus() const {
+    assert(isPlusMinus());
+    FlowVariable p = *this;
+    p.pm = plus;
+    return p;
+  }
+
+  inline FlowVariable getMinus() const {
+    assert(isPlusMinus());
+    FlowVariable p = *this;
+    p.pm = minus;
+    return p;
   }
 
   bool isLambda() const {
@@ -281,15 +345,35 @@ struct FlowVariable {
   }
 
   std::string getName() const {
+    std::string sign;
+    switch (pm) {
+    case notApplicable:
+      sign = "";
+      break;
+    case plus:
+      sign = "+";
+      break;
+    case minus:
+      sign = "-";
+      break;
+    case plusAndMinus:
+      sign = "+-";
+      break;
+    }
     switch (type) {
     case internalState:
       return state->getSMVName();
     case inputLambda:
-      return llvm::formatv("{0}.in_{1}", getUniqueName(op), lambdaIndex).str();
+      return llvm::formatv("{0}.in_{1}{2}", getUniqueName(op), lambdaIndex,
+                           sign)
+          .str();
     case outputLambda:
-      return llvm::formatv("{0}.out_{1}", getUniqueName(op), lambdaIndex).str();
+      return llvm::formatv("{0}.out_{1}{2}", getUniqueName(op), lambdaIndex,
+                           sign)
+          .str();
     case internalLambda:
-      return llvm::formatv("{0}.#{1}", getUniqueName(op), lambdaIndex).str();
+      return llvm::formatv("{0}.#{1}{2}", getUniqueName(op), lambdaIndex, sign)
+          .str();
     };
   }
 };
@@ -300,6 +384,10 @@ template <>
 struct std::hash<FlowVariable> {
   size_t operator()(const FlowVariable &var) const {
     using std::hash;
+    if (var.type == FlowVariable::TYPE::internalState) {
+      return hash<FlowVariable::TYPE>()(var.type) ^
+             hash<std::string>()(var.state->getSMVName());
+    }
     return (hash<FlowVariable::TYPE>()(var.type) ^
             hash<unsigned>()(var.lambdaIndex) ^ hash<Operation *>()(var.op));
   }
@@ -310,7 +398,15 @@ namespace {
 struct FlowExpression {
   std::unordered_map<FlowVariable, int> terms;
   FlowExpression() = default;
-  FlowExpression(const FlowVariable &v) { terms[v] = 1; };
+  FlowExpression(const FlowVariable &v) {
+    if (v.isPlusMinus()) {
+      // If plusAndMinus, separate into plus and minus parts
+      terms[v.getPlus()] = 1;
+      terms[v.getMinus()] = 1;
+    } else {
+      terms[v] = 1;
+    }
+  };
   void debug() {
     std::string txt = "0 = ";
     bool first = true;
@@ -337,44 +433,53 @@ struct FlowExpression {
   }
 };
 
-FlowExpression operator-(FlowVariable v) {
-  FlowExpression f{};
-  f.terms[v] = -1;
-  return f;
+FlowExpression operator-(FlowExpression expr) {
+  for (auto &[key, value] : expr.terms) {
+    expr.terms[key] = -value;
+  }
+  return expr;
 }
-FlowExpression operator-(const FlowVariable &left, FlowVariable right) {
-  FlowExpression f{};
-  f.terms[left] = 1;
-  f.terms[right] -= 1;
-  return f;
-}
-FlowExpression operator+(const FlowVariable &left, FlowVariable right) {
-  FlowExpression f{};
-  f.terms[left] = 1;
-  f.terms[right] += 1;
-  return f;
-}
-FlowExpression operator-(FlowExpression left, FlowVariable right) {
-  left.terms[right] -= 1;
+
+FlowExpression operator+(FlowExpression left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] += value;
+  }
   return left;
 }
-void operator+=(FlowExpression &left, const FlowVariable &right) {
-  left.terms[right] += 1;
+
+FlowExpression operator-(FlowExpression left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] -= value;
+  }
+  return left;
+}
+
+void operator+=(FlowExpression &left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] += value;
+  }
+}
+
+void operator-=(FlowExpression &left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] -= value;
+  }
 }
 
 // Used to assign dense indices to FlowVariables based on a list of
 // FlowExpression, i.e. indices 0 to n-1 are used for n variables, while keeping
 // lambda variables with low indices to ensure they are eliminated first within
 // the row-echelon form
-class IndexMap {
+class FlowEquationsMatrix {
   std::unordered_map<FlowVariable, size_t> map;
   std::vector<FlowVariable> variables;
   size_t nLambdas;
 
 public:
+  MatIntType matrix;
   size_t getNLambdas() { return nLambdas; }
   size_t size() { return variables.size(); }
-  size_t getIndex(FlowVariable v) { return map[v]; }
+  size_t getIndex(const FlowVariable &v) { return map[v]; }
   FlowVariable &getVariable(size_t index) { return variables[index]; }
   void verify() {
     assert(map.size() == variables.size());
@@ -388,14 +493,17 @@ public:
     }
   }
 
-  IndexMap() = default;
-  IndexMap(const std::vector<FlowExpression> &exprs) {
+  FlowEquationsMatrix() = default;
+  FlowEquationsMatrix(const std::vector<FlowExpression> &exprs) {
     size_t index = 0;
     // annotate lambdas first
     for (auto &expr : exprs) {
       for (auto &[key, value] : expr.terms) {
         if (!key.isLambda())
           continue;
+        // PlusAndMinus variables should never be inserted, as the DSL will
+        // insert them as two separate variables
+        assert(!key.isPlusMinus());
         if (map.count(key) == 0) {
           map[key] = index;
           ++index;
@@ -414,6 +522,17 @@ public:
         }
       }
     }
+
+    // matrix with one row per equation, and column per variable
+    matrix = MatIntZero(exprs.size(), size());
+
+    // insert equations into the matrix
+    for (auto [row, expr] : llvm::enumerate(exprs)) {
+      for (auto &[key, value] : expr.terms) {
+        unsigned index = getIndex(key);
+        matrix(row, index) = (int)value;
+      }
+    }
   }
 };
 
@@ -423,25 +542,52 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       // Annotate channel equations
+#if false
       for (auto [i, res] : llvm::enumerate(op.getResults())) {
+        bool bitChannel = false;
+        if (auto ct = dyn_cast<handshake::ChannelType>(res.getType())) {
+          //llvm::errs() << llvm::formatv("{0}.{1} is {2} bits wide\n", getUniqueName(&op), i, ct.getDataBitWidth());
+          if (ct.getDataBitWidth() == 1) {
+            bitChannel = true;
+          }
+        }
         if (!isChannelToBeChecked(res))
           continue;
+
         for (auto &use : res.getUses()) {
           unsigned j = use.getOperandNumber();
           Operation &nextOp = *use.getOwner();
           assert(nextOp.getOperands().size() > j);
-          FlowVariable forward = FlowVariable::outputChannel(&op, i);
-          FlowVariable back = FlowVariable::inputChannel(&nextOp, j);
-          // forward and back represent the same channel but from different
-          // sides, so their lambdas have to be equal
-          equations.push_back(forward - back);
+          if (bitChannel) {
+            // + and - are both forwarded without change
+            // This equation will be expanded into 2 equations later
+            // lambda_forward+ = lambda_backward+
+            // lambda_forward- = lambda_backward-
+            FlowVariable forward(res);
+            FlowVariable back(use, nextOp);
+            llvm::errs() << llvm::formatv("from {0} to {1}\n", forward.getName(), back.getName());
+            /*
+            FlowVariable forward = FlowVariable::outputChannel(&op, i);
+            forward.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+            FlowVariable back = FlowVariable::inputChannel(&nextOp, j);
+            back.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+            */
+            equations.push_back(forward - back);
+          } else {
+            FlowVariable forward = FlowVariable::outputChannel(&op, i);
+            FlowVariable back = FlowVariable::inputChannel(&nextOp, j);
+            // forward and back represent the same channel but from different
+            // sides, so their lambdas have to be equal
+            equations.push_back(forward - back);
+          }
         }
       }
+#endif
 
       // A general structure for an operation is assumed:
-      // in1, in2, ... -> Join/Merge/Mux -> internal channel 1
-      // internal channel 1 -> slots? -> internal channel 2
-      // internal channel 2 -> fork -> out1, out2, ...
+      // in1, in2, ... -> Join/Merge/Mux -> entry channel
+      // entry channel -> slots? -> exit channel
+      // exit channel 2 -> Fork/Branch -> out1, out2, ...
       //
       // Some operations do not follow this structure, and should be handled
       // separately to avoid making false assumptions.
@@ -476,68 +622,99 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
         if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
           // mux : select input has same as output lambda, data inputs act like
-          // merge
           Value a = muxOp.getSelectOperand();
           unsigned selectIndex = -1;
           for (auto &use : a.getUses()) {
             selectIndex = use.getOperandNumber();
           }
-          assert(selectIndex != (unsigned)-1);
-          FlowExpression dataEq = -entry;
-          for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
-            FlowVariable chVar = FlowVariable::inputChannel(&op, i);
-            if (i == selectIndex) {
-              // select channel
-              equations.push_back(chVar - entry);
-            } else {
-              // dataEq : sum(dataChannelLambda) = outputChannelLambda
-              dataEq += chVar;
+          assert(selectIndex == 0);
+
+          OpOperand &selectChannel = op.getOpOperands()[0];
+          FlowVariable selectVar(selectChannel, op);
+          if (selectVar.isPlusMinus()) {
+            // two inputs! can do +- analysis
+            assert(muxOp.getDataOperands().size() == 2);
+            FlowVariable falseVar = FlowVariable(op.getOpOperands()[1], op);
+            FlowVariable trueVar = FlowVariable(op.getOpOperands()[2], op);
+            equations.push_back(selectVar.getPlus() - trueVar);
+            equations.push_back(selectVar.getMinus() - falseVar);
+          } else {
+            FlowExpression dataEq = -entry;
+            for (OpOperand &channel : op.getOpOperands()) {
+              FlowVariable chVar(channel, op);
+              // FlowVariable chVar = FlowVariable::inputChannel(&op, i);
+              if (channel.getOperandNumber() == selectIndex) {
+                // select channel
+                equations.push_back(chVar - entry);
+              } else {
+                // dataEq : sum(dataChannelLambda) = outputChannelLambda
+                dataEq += chVar;
+              }
             }
+            equations.push_back(dataEq);
           }
-          equations.push_back(dataEq);
         } else {
           // merge : the sum of input lambdas is the output lambda
           FlowExpression mergeEq = -entry;
-          for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
-            mergeEq += FlowVariable::inputChannel(&op, i);
+          FlowExpression plusEq;
+          FlowExpression minusEq;
+          bool allPM = true;
+          bool nonePM = true;
+          for (auto &channel : op.getOpOperands()) {
+            FlowVariable ch(channel, op);
+            if (ch.isPlusMinus()) {
+              nonePM = false;
+              plusEq += ch.getPlus();
+              minusEq += ch.getMinus();
+            } else {
+              allPM = false;
+              mergeEq += ch;
+            }
           }
-          equations.push_back(mergeEq);
+          assert((allPM || nonePM) && "why are merge inputs not all the same?");
+          if (allPM) {
+            entry.pm = FlowVariable::plusAndMinus;
+            plusEq -= entry.getPlus();
+            minusEq -= entry.getMinus();
+            equations.push_back(plusEq);
+            equations.push_back(minusEq);
+          } else {
+            equations.push_back(mergeEq);
+          }
         }
       } else {
         // join : for every input, lambda_in = lambda_out
-        for (auto [i, channel] : llvm::enumerate(op.getOperands())) {
-          equations.push_back(FlowVariable::inputChannel(&op, i) - entry);
+        for (auto &channel : op.getOpOperands()) {
+          equations.push_back(FlowVariable(channel, op) - entry);
         }
       }
 
       // Annotate latency-induced slots
-      int exitIndex = 0;
+      FlowVariable exit = entry.nextInternal();
       if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
         for (auto &latencySlot : latencyOp.getLatencyInducedSlots()) {
           FlowVariable full = FlowVariable(
               std::make_shared<LatencyInducedSlotNamer>(latencySlot));
 
-          FlowVariable before = FlowVariable::internalChannel(&op, exitIndex);
-          FlowVariable after =
-              FlowVariable::internalChannel(&op, exitIndex + 1);
-          ++exitIndex;
+          FlowVariable before = exit;
+          FlowVariable after = before.nextInternal();
           equations.push_back(before - full - after);
+          exit = after;
         }
       }
+
       // Annotate buffer slots
       if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
         for (auto &slotFull : bufferOp.getInternalSlotStateNamers()) {
           FlowVariable full =
               FlowVariable(std::make_shared<BufferSlotFullNamer>(slotFull));
 
-          FlowVariable before = FlowVariable::internalChannel(&op, exitIndex);
-          FlowVariable after =
-              FlowVariable::internalChannel(&op, exitIndex + 1);
-          ++exitIndex;
+          FlowVariable before = exit;
+          FlowVariable after = before.nextInternal();
           equations.push_back(before - full - after);
+          exit = after;
         }
       }
-      FlowVariable exit = FlowVariable::internalChannel(&op, exitIndex);
 
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         // eagerfork: for every channel, either same tokens in as out, or in
@@ -546,7 +723,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
              llvm::enumerate(forkOp.getInternalSentStateNamers())) {
           FlowVariable sent =
               FlowVariable(std::make_shared<EagerForkSentNamer>(sentVariable));
-          FlowVariable result = FlowVariable::outputChannel(&op, i);
+          FlowVariable result = FlowVariable(op.getResults()[i]);
           equations.push_back(exit + sent - result);
         }
       } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
@@ -554,7 +731,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       } else {
         // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
-          FlowVariable result = FlowVariable::outputChannel(&op, i);
+          FlowVariable result = FlowVariable(channel);
           equations.push_back(exit - result);
         }
       }
@@ -570,19 +747,9 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   std::vector<FlowExpression> equations = extractLocalEquations(modOp);
 
   // Map all variables used in `equations` to an index in the matrix
-  IndexMap indices(equations);
+  FlowEquationsMatrix indices(equations);
+  MatIntType &matrix = indices.matrix;
   indices.verify();
-
-  // matrix with one row per equation, and column per variable
-  MatIntType matrix(MatIntZero(equations.size(), indices.size()));
-
-  // insert equations into the matrix
-  for (auto [row, expr] : llvm::enumerate(equations)) {
-    for (auto &[key, value] : expr.terms) {
-      unsigned index = indices.getIndex(key);
-      matrix(row, index) = (int)value;
-    }
-  }
 
   // bring to row-echelon form
   gaussianElimination(matrix);
