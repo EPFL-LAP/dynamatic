@@ -34,8 +34,8 @@ RUN \
   apt-get install -y \
   --option APT::Immediate-Configure=false \
   sudo vim clang lld ccache cmake wget \
-  ninja-build python3 openjdk-21-jdk \
-  graphviz git curl gzip libreadline-dev \
+  ninja-build python3 graphviz git curl \
+  gzip libreadline-dev \
   libboost-all-dev pkg-config python3-venv  \
   ghdl verilator
 # [END Installing the dependency]
