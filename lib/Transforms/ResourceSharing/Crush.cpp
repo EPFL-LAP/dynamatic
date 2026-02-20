@@ -18,7 +18,7 @@
 //   wrapper around it to manage access to the share operation.
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/ResourceSharing/Crush.h"
+#include "dynamatic/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -28,7 +28,7 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "experimental/Transforms/ResourceSharing/SharingSupport.h"
+#include "dynamatic/Transforms/ResourceSharing/SharingSupport.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
 #include <algorithm>
@@ -46,14 +46,11 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::sharing;
 using namespace dynamatic::buffer;
 
 namespace dynamatic {
-namespace experimental {
 #define GEN_PASS_DEF_CREDITBASEDSHARING
-#include "experimental/Transforms/Passes.h.inc"
-}; // namespace experimental
+#include "dynamatic/Transforms/Passes.h.inc"
 }; // namespace dynamatic
 
 static constexpr unsigned MAX_GROUP_SIZE = 20;
@@ -300,8 +297,7 @@ void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
 } // namespace
 
 struct CreditBasedSharingPass
-    : public dynamatic::experimental::impl::CreditBasedSharingBase<
-          CreditBasedSharingPass> {
+    : public dynamatic::impl::CreditBasedSharingBase<CreditBasedSharingPass> {
 
   using CreditBasedSharingBase::CreditBasedSharingBase;
   void runOnOperation() override;

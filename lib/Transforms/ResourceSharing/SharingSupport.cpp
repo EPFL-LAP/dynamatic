@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/ResourceSharing/SharingSupport.h"
+#include "dynamatic/Transforms/ResourceSharing/SharingSupport.h"
 
 using namespace dynamatic;
 using namespace dynamatic::buffer;
@@ -61,9 +61,9 @@ void recursiveDfsAssignSCCId(Operation *op,
 
 // For a given CFC (specified as the set of units and channels), find the list
 // of SCCs.
-std::map<Operation *, size_t> dynamatic::experimental::sharing::getSccsInCfc(
-    const std::set<Operation *> &cfUnits,
-    const std::set<Channel *> &cfChannels) {
+std::map<Operation *, size_t>
+dynamatic::getSccsInCfc(const std::set<Operation *> &cfUnits,
+                        const std::set<Channel *> &cfChannels) {
   std::map<Operation *, bool> visited;
 
   // DFS post-order of the CFC (see description above).
