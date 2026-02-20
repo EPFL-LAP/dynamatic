@@ -166,6 +166,25 @@ sudo apt-get install coinor-cbc
 ./build.sh --enable-cbc
 ```
 
+### Enable Legacy Chisel-Based LSQ Generator
+
+Dynamatic previously uses RTL generators written in Chisel (a hardware
+construction language embedded in the high-level programming language Scala) to
+produce synthesizable RTL designs. You can install JDK and Scala using the
+recommended way with the following commands:
+
+```sh
+sudo apt-get install -y openjdk-21-jdk
+curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
+```
+
+To build dynamatic with legacy LSQ enabled, append the following flag when
+calling the `build.sh` script:
+
+```sh
+./build.sh --build-legacy-lsq
+```
+
 ## 4. Interactive Dataflow Circuit Visualizer
 
 The repository contains an optionally built tool that allows you to visualize the dataflow circuits produced by Dynamatic and interact with them as they are simulated on test inputs. This is a very useful tool for debugging and for better understanding dataflow circuits in general. It is built on top of the open-source [Godot game engine](https://godotengine.org/) and of its [C++ bindings](https://github.com/godotengine/godot-cpp), the latter of which Dynamatic depends on as a submodule rooted at visual-dataflow/godot-cpp (relative to Dynamatic's top-level folder). To build and/or modify this tool (which is only supported on Linux at this point), one must therefore download the Godot engine (a single executable file) from the Internet manually.
