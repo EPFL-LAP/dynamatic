@@ -22,12 +22,7 @@ class VHDLEmitter(Emitter):
         self.reset_name = reset_name
         self.clock_name = clock_name
 
-        self.PORT_INIT_STR = f'\tport(\n\t\t{self.reset_name} : in std_logic;\n\t\t{self.clock_name} : in std_logic'
-        self.PORT_END_STR = '\n\t);'
         self.portInitString = ''
-
-        self.REG_INIT_STR = f'\tprocess ({self.clock_name}, {self.reset_name}) is\n\tbegin\n'
-        self.REG_END_STR = '\tend process;\n'
         self.regInitString = ''
         self.statementString = ''
 
@@ -35,6 +30,18 @@ class VHDLEmitter(Emitter):
 
         # Default library imports for VHDL
         self.library = 'library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n'
+        
+    def get_port_init_str(self) -> str:
+        return f'port(\n\t\t{self.reset_name} : in std_logic;\n\t\t{self.clock_name} : in std_logic'
+    
+    def get_port_end_str(self) -> str:
+        return f'\n{self.get_current_indent()});'
+
+    def get_reg_init_str(self) -> str:
+        return f'process ({self.clock_name}, {self.reset_name}) is\n{self.get_current_indent()}begin\n'
+    
+    def get_reg_end_str(self) -> str:
+        return f'end process;\n'
 
     def get_current_indent(self) -> str:
         return '\t' * self.tabLevel
@@ -66,7 +73,7 @@ class VHDLEmitter(Emitter):
     def add_comment(self, comment: str):
         self.statementString += self.get_current_indent() + f'-- {comment}\n'
 
-    def add_assignment(self, out, statement: Statement):
+    def add_assignment(self, out, statement: Statement, in_process=False):
         out_str, size = self.assigned_var_to_str(out)
         statement_str = statement.to_str(self, size, -1)
         # Assume we only write to logic types
@@ -76,12 +83,12 @@ class VHDLEmitter(Emitter):
     def get_definition_str(self, module_name: str, write_regs=True) -> str:
         return self.library + \
                 f'entity {module_name} is\n' + \
-                self.PORT_INIT_STR + self.portInitString + self.PORT_END_STR + \
+                self.get_current_indent() + self.get_port_init_str() + self.portInitString + self.get_port_end_str() + \
                 '\nend entity;\n\n' + \
                 f'architecture arch of {module_name} is\n' + \
                 self.signalInitString + \
                 'begin\n' + self.statementString + '\n' + \
-                ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs and self.regInitString != '' else '') \
+                ((self.get_current_indent() + self.get_reg_init_str() + self.regInitString + self.get_reg_end_str()) if write_regs and self.regInitString != '' else '') \
                 + 'end architecture;\n'
     
     def start_instantiation(self, module_name:str, instance_name: str = None) -> str:
@@ -339,6 +346,9 @@ class VHDLEmitter(Emitter):
                 return "'1'"
             else:
                 return "'0'"
+        if size == 1:
+            assert din in (0, 1), "Value must be 0 or 1 for size 1"
+            return f"'{din}'"
         else:
             return f'"{Emitter._int_to_bin(din, size)}"'
 

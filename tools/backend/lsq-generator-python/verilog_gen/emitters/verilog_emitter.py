@@ -10,7 +10,7 @@ class VerilogEmitter(Emitter):
     Holds indentation level, temporary name counter, and initialization strings.
     """
 
-    def __init__(self):
+    def __init__(self, clock_name='clk', reset_name='rst'):
         # Indentation level for generated code
         self.tabLevel = 1
 
@@ -20,16 +20,27 @@ class VerilogEmitter(Emitter):
         # Accumulated initialization code sections
         self.signalInitString = ''
 
-        self.PORT_INIT_STR = '(\n\t\tinput rst,\n\t\tinput clk'
-        self.PORT_END_STR = '\n\t);'
         self.portInitString = ''
 
-        self.REG_INIT_STR = '\talways @(posedge clk) begin\n'
-        self.REG_END_STR = '\tend\n'
         self.regInitString = ''
         self.statementString = ''
         
+        self.clock_name = clock_name
+        self.reset_name = reset_name
+        
         self.inst_started = False
+
+    def get_reg_init_str(self) -> str:
+        return f'always @(posedge {self.clock_name}) begin\n'
+    
+    def get_reg_end_str(self) -> str:
+        return 'end\n'
+    
+    def get_port_init_str(self) -> str:
+        return f'(\n\t\tinput {self.reset_name},\n\t\tinput {self.clock_name}'
+    
+    def get_port_end_str(self) -> str:
+        return '\n\t);'
 
     def get_current_indent(self) -> str:
         return '\t' * self.tabLevel
@@ -61,18 +72,19 @@ class VerilogEmitter(Emitter):
     def add_comment(self, comment: str):
         self.statementString += self.get_current_indent() + f'// {comment}\n'
 
-    def add_assignment(self, out, statement: Statement):
+    def add_assignment(self, out, statement: Statement, in_process=False):
         out_str, size = self.assigned_var_to_str(out)
         statement_str = statement.to_str(self, size, -1)
         # Assume we only write to logic types
-        self.statementString += self.get_current_indent() + f'assign {out_str} = {statement_str};\n'
+        assign_op = '<=' if in_process else '='
+        self.statementString += self.get_current_indent() + f'assign {out_str} {assign_op} {statement_str};\n'
 
     def get_definition_str(self, module_name: str, write_regs=True) -> str:
         return f'module {module_name} ' + \
-                self.PORT_INIT_STR + self.portInitString + self.PORT_END_STR + '\n' + \
+                self.get_current_indent() + self.get_port_init_str() + self.portInitString + self.get_port_end_str() + '\n' + \
                 '// SIGNAL INIT\n' + self.signalInitString + '\n' + \
                 '// STATEMENTS\n' + self.statementString + '\n' + \
-                ((self.REG_INIT_STR + self.regInitString + self.REG_END_STR) if write_regs and self.regInitString != '' else '') \
+                (self.get_current_indent() + self.get_reg_init_str() + self.regInitString + self.get_reg_end_str() if write_regs and self.regInitString != '' else '') \
                 + 'endmodule\n'
 
     def start_instantiation(self, module_name:str, instance_name: str = None) -> str:
@@ -209,7 +221,7 @@ class VerilogEmitter(Emitter):
         self.increase_indent()
         in_else = False
         if (init != None):
-            self.add_reg_str('if (rst)')
+            self.add_reg_str(f'if ({self.reset_name})')
             self.add_reg_str(f'\t{logic.getNameRead()} <= {self.int_to_bits(init)};')
             self.add_reg_str('else begin')
             in_else = True
@@ -231,7 +243,7 @@ class VerilogEmitter(Emitter):
         self.increase_indent()
         in_else = False
         if (init != None):
-            self.add_reg_str('if (rst)')
+            self.add_reg_str(f'if ({self.reset_name})')
             self.add_reg_str(f'\t{vec.getNameRead()} <= {self.int_to_bits(init, vec.size)};')
             self.add_reg_str('else begin')
             in_else = True
@@ -255,7 +267,7 @@ class VerilogEmitter(Emitter):
         self.increase_indent()
         in_else = False
         if (init != None):
-            self.add_reg_str('if (rst) begin')
+            self.add_reg_str(f'if ({self.reset_name}) begin')
             for i in range(0, array.length):
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_bits(init[i])};')
             self.add_reg_str('end')
@@ -282,7 +294,7 @@ class VerilogEmitter(Emitter):
         self.increase_indent()
         in_else = False
         if (init != None):
-            self.add_reg_str('if (rst) begin')
+            self.add_reg_str(f'if ({self.reset_name}) begin')
             for i in range(0, array.length):
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_bits(init[i], array.size)};')
             self.add_reg_str('end')
