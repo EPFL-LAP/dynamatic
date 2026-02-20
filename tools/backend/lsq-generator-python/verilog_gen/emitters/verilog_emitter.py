@@ -82,6 +82,7 @@ class VerilogEmitter(Emitter):
         if instance_name is None: instance_name = module_name
 
         self.inst_started = True
+        self.first_map = True
         self.inst_str = f'{self.get_current_indent()}{module_name} {instance_name} (\n'
         self.increase_indent()
 
@@ -91,7 +92,12 @@ class VerilogEmitter(Emitter):
         
         assert isinstance(port_name, str) and isinstance(signal_name, str), "port name and signal name must be strings"
 
-        self.inst_str += f'{self.get_current_indent()}.{port_name}({signal_name}),\n'
+        if not self.first_map:
+            self.inst_str += ',\n'
+        else:
+            self.first_map = False
+
+        self.inst_str += f'{self.get_current_indent()}.{port_name}({signal_name})'
 
     def complete_instantiation(self) -> str:
         self.inst_started = False
@@ -205,14 +211,13 @@ class VerilogEmitter(Emitter):
         if (init != None):
             self.add_reg_str('if (rst)')
             self.add_reg_str(f'\t{logic.getNameRead()} <= {self.int_to_bits(init)};')
-            self.add_reg_str('else')
+            self.add_reg_str('else begin')
             in_else = True
             self.increase_indent()
 
         if (enable != None):
             self.add_reg_str(f'if ({enable.getNameRead()})')
             self.add_reg_str(f'\t{logic.getNameRead()} <= {logic.getNameWrite()};')
-            self.add_reg_str('end')
         else:
             self.add_reg_str(f'{logic.getNameRead()} <= {logic.getNameWrite()};')
 
@@ -228,14 +233,13 @@ class VerilogEmitter(Emitter):
         if (init != None):
             self.add_reg_str('if (rst)')
             self.add_reg_str(f'\t{vec.getNameRead()} <= {self.int_to_bits(init, vec.size)};')
-            self.add_reg_str('else')
+            self.add_reg_str('else begin')
             in_else = True
             self.increase_indent()
 
         if (enable != None):
             self.add_reg_str(f'if ({enable.getNameRead()})')
             self.add_reg_str(f'\t{vec.getNameRead()} <= {vec.getNameWrite()};')
-            self.add_reg_str('end')
         else:
             self.add_reg_str(f'{vec.getNameRead()} <= {vec.getNameWrite()};')
 
@@ -251,10 +255,11 @@ class VerilogEmitter(Emitter):
         self.increase_indent()
         in_else = False
         if (init != None):
-            self.add_reg_str('if (rst)')
+            self.add_reg_str('if (rst) begin')
             for i in range(0, array.length):
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_bits(init[i])};')
-            self.add_reg_str('else')
+            self.add_reg_str('end')
+            self.add_reg_str('else begin')
             in_else = True
             self.increase_indent()
 
@@ -262,7 +267,6 @@ class VerilogEmitter(Emitter):
             for i in range(0, array.length):
                 self.add_reg_str(f'if ({enable.getNameRead(i)})')
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {array.getNameWrite(i)};')
-                self.add_reg_str('end')
         else:
             for i in range(0, array.length):
                 self.add_reg_str(f'{array.getNameRead(i)} <= {array.getNameWrite(i)};')
@@ -278,10 +282,11 @@ class VerilogEmitter(Emitter):
         self.increase_indent()
         in_else = False
         if (init != None):
-            self.add_reg_str('if (rst)')
+            self.add_reg_str('if (rst) begin')
             for i in range(0, array.length):
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_bits(init[i], array.size)};')
-            self.add_reg_str('else')
+            self.add_reg_str('end')
+            self.add_reg_str('else begin')
             in_else = True
             self.increase_indent()
 
@@ -289,7 +294,6 @@ class VerilogEmitter(Emitter):
             for i in range(0, array.length):
                 self.add_reg_str(f'if ({enable.getNameRead(i)})')
                 self.add_reg_str(f'\t{array.getNameRead(i)} <= {array.getNameWrite(i)};')
-                self.add_reg_str('end')
         else:
             for i in range(0, array.length):
                 self.add_reg_str(f'{array.getNameRead(i)} <= {array.getNameWrite(i)};')
