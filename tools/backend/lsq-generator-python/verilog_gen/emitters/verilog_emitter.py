@@ -161,7 +161,8 @@ class VerilogEmitter(Emitter):
         Appends the appropriate declaration or port line for this signal to a global buffer.
         """
         if (signal.type == 'w'):
-            self.add_signal_str(f'\twire {signal.get_base_name(sufix)};\n')
+            prefix = 'reg' if signal.force_reg else 'wire'
+            self.add_signal_str(f'\t{prefix} {signal.get_base_name(sufix)};\n')
         elif (signal.type == 'r'):
             self.add_signal_str(f'\treg {signal.get_base_name(sufix)}_d;\n')
             self.add_signal_str(f'\treg {signal.get_base_name(sufix)}_q;\n')

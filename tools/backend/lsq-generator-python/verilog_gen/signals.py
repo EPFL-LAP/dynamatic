@@ -45,7 +45,7 @@ class Logic(Statement):
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
     type = ''
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', init: bool = True, dyn_comp=False) -> None:
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', init: bool = True, dyn_comp=False, force_reg=False) -> None:
         """
         init: If True, immediately generates the corresponding std_logic in VHDL.
               True when we instantiate Logic.
@@ -57,6 +57,7 @@ class Logic(Statement):
         self.name = name
         self.type = type
         self.dyn_comp = dyn_comp
+        self.force_reg = force_reg
         if (init):
             self.signalInit()
 
