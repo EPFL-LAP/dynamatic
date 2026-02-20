@@ -184,7 +184,7 @@ class Bit(Statement):
     def _to_str(self, em: 'Emitter', size) -> str:
         return em.get_bit_str(self)
 
-class CustomStr(Statement):
+class CustomStatement(Statement):
     """
     Represents a custom string statement
     """

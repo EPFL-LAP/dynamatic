@@ -365,3 +365,7 @@ class VHDLEmitter(Emitter):
         Generate a VHDL array-index expression for selecting an element
         """
         return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'
+    
+    def add_custom_statement(self, custom_statement):
+        for line in custom_statement.vhdl_str.splitlines():
+            self.statementString += self.get_current_indent() + line + '\n'

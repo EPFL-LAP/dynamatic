@@ -337,3 +337,8 @@ class VerilogEmitter(Emitter):
         Generate a Verilog array-index expression for selecting an element
         """
         return f'{din.getNameRead()}[{sel.getNameRead()}]'
+    
+
+    def add_custom_statement(self, custom_statement):
+        for line in custom_statement.verilog_str.splitlines():
+            self.statementString += self.get_current_indent() + line + '\n'
