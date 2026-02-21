@@ -530,8 +530,6 @@ public:
 
     // insert equations into the matrix
     for (auto [row, expr] : llvm::enumerate(exprs)) {
-      llvm::errs() << "row " << row << ": ";
-      expr.debug();
       for (auto &[key, value] : expr.terms) {
         unsigned index = getIndex(key);
         matrix(row, index) = (int)value;
@@ -545,49 +543,6 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
   // annotate equations derived from operations
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
-      // Annotate channel equations
-#if false
-      for (auto [i, res] : llvm::enumerate(op.getResults())) {
-        bool bitChannel = false;
-        if (auto ct = dyn_cast<handshake::ChannelType>(res.getType())) {
-          //llvm::errs() << llvm::formatv("{0}.{1} is {2} bits wide\n", getUniqueName(&op), i, ct.getDataBitWidth());
-          if (ct.getDataBitWidth() == 1) {
-            bitChannel = true;
-          }
-        }
-        if (!isChannelToBeChecked(res))
-          continue;
-
-        for (auto &use : res.getUses()) {
-          unsigned j = use.getOperandNumber();
-          Operation &nextOp = *use.getOwner();
-          assert(nextOp.getOperands().size() > j);
-          if (bitChannel) {
-            // + and - are both forwarded without change
-            // This equation will be expanded into 2 equations later
-            // lambda_forward+ = lambda_backward+
-            // lambda_forward- = lambda_backward-
-            FlowVariable forward(res);
-            FlowVariable back(use, nextOp);
-            llvm::errs() << llvm::formatv("from {0} to {1}\n", forward.getName(), back.getName());
-            /*
-            FlowVariable forward = FlowVariable::outputChannel(&op, i);
-            forward.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-            FlowVariable back = FlowVariable::inputChannel(&nextOp, j);
-            back.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-            */
-            equations.push_back(forward - back);
-          } else {
-            FlowVariable forward = FlowVariable::outputChannel(&op, i);
-            FlowVariable back = FlowVariable::inputChannel(&nextOp, j);
-            // forward and back represent the same channel but from different
-            // sides, so their lambdas have to be equal
-            equations.push_back(forward - back);
-          }
-        }
-      }
-#endif
-
       // A general structure for an operation is assumed:
       // in1, in2, ... -> Join/Merge/Mux -> entry channel
       // entry channel -> slots? -> exit channel
@@ -596,22 +551,6 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       // Some operations do not follow this structure, and should be handled
       // separately to avoid making false assumptions.
       if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-        /*
-        // From inspecting .td declaration... probably a better way of doing
-        // this
-        int addressInputIndex = 0;
-        int dataOutputIndex = 1;
-        FlowVariable in = FlowVariable::inputChannel(&op, addressInputIndex);
-        FlowVariable out = FlowVariable::outputChannel(&op, dataOutputIndex);
-        FlowVariable addrSlot = FlowVariable::slot(&op, 0);
-        FlowVariable dataSlot = FlowVariable::slot(&op, 1);
-
-        FlowVariable i1 = FlowVariable::internalChannel(&op, 1);
-        FlowVariable i2 = FlowVariable::internalChannel(&op, 2);
-
-        equations.push_back(in - i1 - addrSlot);
-        equations.push_back(i2 - out - dataSlot);
-        */
         continue;
       }
       if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
@@ -830,10 +769,10 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
           FlowVariable result = FlowVariable(channel);
-          // TODO: What if this operator is a binary not-operator? This will
-          // yield true, but still map plus->plus and minus->minus.
-          // WRONG BEHAVIOUR!
-          // Similarly for any unary operator on bits (i.e. fixed 0 or fixed 1)
+          // TODO: What if this operator is a binary not-operator? This check
+          // will yield true, but still map plus->plus and minus->minus. WRONG
+          // BEHAVIOUR! Similarly for any unary operator on bits (i.e. fixed 0
+          // or fixed 1)
           if (exit.isPlusMinus() && result.isPlusMinus()) {
             equations.push_back(exit.getPlus() - result.getPlus());
             equations.push_back(exit.getMinus() - result.getMinus());
@@ -889,7 +828,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       }
     }
     if (coefs.size() > 0) {
-      ReconvergentPathFlow p(uid, FormalProperty::TAG::OPT);
+      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
       uid++;
       p.addEquation(coefs, names);
       if (p.getEquations().size() > 0) {
@@ -897,36 +836,16 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       }
     }
   }
-  /*
-  if (p.getEquations().size() > 0) {
-    propertyTable.push_back(p.toJSON());
-  }
-  for (auto &expr : equations) {
-    std::vector<int> coefs{};
-    std::vector<std::string> names{};
-    for (auto [key, value] : expr.terms) {
-      assert(metaData.count(key) == 1);
-      coefs.push_back((int)value);
-      names.push_back(key.getName());
-    }
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR, coefs, names);
-    propertyTable.push_back(p.toJSON());
-    uid++;
-  }
-  */
-
   return success();
 }
 
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-  if (false) {
-    if (failed(annotateAbsenceOfBackpressure(modOp)))
-      return signalPassFailure();
-    if (failed(annotateValidEquivalence(modOp)))
-      return signalPassFailure();
-  }
+  if (failed(annotateAbsenceOfBackpressure(modOp)))
+    return signalPassFailure();
+  if (failed(annotateValidEquivalence(modOp)))
+    return signalPassFailure();
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
