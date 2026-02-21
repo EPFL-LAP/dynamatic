@@ -1,4 +1,6 @@
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
+#include "llvm/Support/raw_ostream.h"
+#include <cmath>
 #include <gtest/gtest.h>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
@@ -115,6 +117,76 @@ TEST_P(ParamSolverTest, SimpleMaxLP) {
   EXPECT_LE(xVal + yVal, 10 + 1e-6); // Constraint check
 }
 
+TEST_P(ParamSolverTest, EqualityConstraintLP) {
+  auto solver = GetParam()();
+
+  auto x = solver->addVar("x", REAL, 0, std::nullopt);
+  auto y = solver->addVar("y", REAL, 0, std::nullopt);
+
+  solver->addConstr(x + y == 10);
+  solver->setMaximizeObjective(2 * x + y);
+  solver->optimize();
+
+  auto xVal = solver->getValue(x);
+  auto yVal = solver->getValue(y);
+
+  EXPECT_NEAR(xVal + yVal, 10, 1e-6);
+}
+
+TEST_P(ParamSolverTest, BoundedVariablesLP) {
+  auto solver = GetParam()();
+
+  auto x = solver->addVar("x", REAL, 0, 5);
+  auto y = solver->addVar("y", REAL, 0, 5);
+
+  solver->addConstr(x + y >= 6);
+  solver->setMaximizeObjective(-(x + y)); // Minimize
+  solver->optimize();
+
+  auto xVal = solver->getValue(x);
+  auto yVal = solver->getValue(y);
+
+  EXPECT_TRUE(xVal >= -1e-6 && xVal <= 5 + 1e-6);
+  EXPECT_TRUE(yVal >= -1e-6 && yVal <= 5 + 1e-6);
+  EXPECT_TRUE(xVal + yVal >= 6 - 1e-6);
+}
+
+TEST_P(ParamSolverTest, RedundantConstraintLP) {
+  auto solver = GetParam()();
+
+  auto x = solver->addVar("x", REAL, 0, std::nullopt);
+
+  solver->addConstr(x >= 2);
+  solver->addConstr(x >= 1); // Redundant
+
+  solver->setMaximizeObjective(-LinExpr(x)); // Minimize x
+  solver->optimize();
+
+  auto xVal = solver->getValue(x);
+
+  EXPECT_TRUE(xVal >= 2 - 1e-6);
+}
+
+TEST_P(ParamSolverTest, MixedIntegerLP) {
+  auto solver = GetParam()();
+
+  auto x = solver->addVar("x", INTEGER, 0, std::nullopt);
+  auto y = solver->addVar("y", REAL, 0, std::nullopt);
+
+  solver->addConstr(x + y >= 4);
+  solver->addConstr(2 * x + y <= 10);
+
+  solver->setMaximizeObjective(x + 2 * y);
+  solver->optimize();
+
+  auto xVal = solver->getValue(x);
+  auto yVal = solver->getValue(y);
+
+  EXPECT_NEAR(xVal, std::round(xVal), 1e-6); // integer check
+  EXPECT_TRUE(xVal + yVal >= 4 - 1e-6);
+  EXPECT_TRUE(2 * xVal + yVal <= 10 + 1e-6);
+}
+
 TEST_P(ParamSolverTest, SimpleMinLP) {
   auto solver = GetParam()();
 
@@ -185,15 +257,19 @@ TEST_P(ParamSolverTest, BigMConstraintCrossCheck) {
 
 TEST_P(ParamSolverTest, SimpleQuadraticConstraint) {
   auto solver = GetParam()();
+#if DYNAMATIC_ENABLE_CBC
+  if (llvm::isa<CbcSolver>(solver)) {
+    llvm::errs() << "Skip testing Cbc solver with quadratic constraints!\n";
+    return;
+  }
+#endif
 
   auto x = solver->addVar("x", REAL, 0, 1);
   auto y = solver->addVar("y", REAL, 0, 1);
 
   // Quadratic constraint: x^2 + y^2 <= 1
   //
-  std::cerr << "Before quadConstr!\n";
   auto quadConstr = 1.0 * x * x + 1.0 * y * y <= 1.0;
-  std::cerr << "After quadConstr!\n";
   solver->addQConstr(quadConstr, "quad constr");
 
   // Maximize x + y
@@ -369,15 +445,28 @@ TEST(LinExprOpTest, ChainedAddSub) {
 // [END AI-generated test cases]
 
 // Factories for both solvers
-// std::unique_ptr<CPSolver> makeCbc() { return std::make_unique<CbcSolver>(); }
+
+#ifdef DYNAMATIC_ENABLE_CBC
+std::unique_ptr<CPSolver> makeCbc() { return std::make_unique<CbcSolver>(); }
+#endif
 
 std::unique_ptr<CPSolver> makeGurobi() {
   return std::make_unique<GurobiSolver>();
 }
 
+// clang-format off
 // Runs all MILP test with two different solvers
-INSTANTIATE_TEST_SUITE_P(SolverImplementations, ParamSolverTest,
-                         ::testing::Values(makeGurobi));
+INSTANTIATE_TEST_SUITE_P(
+  SolverImplementations,
+  ParamSolverTest,
+  ::testing::Values(
+    makeGurobi
+#ifdef DYNAMATIC_ENABLE_CBC
+    , makeCbc
+#endif
+  )
+);
+// clang-format on
 
 #endif
 } // namespace

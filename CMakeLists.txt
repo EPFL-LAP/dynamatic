@@ -183,6 +183,7 @@ if(DYNAMATIC_ENABLE_CBC)
     )
 
     FetchContent_MakeAvailable(cbc)
+    add_compile_definitions(DYNAMATIC_ENABLE_CBC)
   else()
     message(FATAL_ERROR "Cbc integration is not tested on the OS you use!")
   endif()
