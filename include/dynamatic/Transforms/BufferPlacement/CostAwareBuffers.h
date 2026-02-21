@@ -48,10 +48,18 @@ protected:
   /// Interprets the MILP solution to derive buffer placement decisions.
   void extractResult(BufferPlacement &placement) override;
 
+  /// Chooses between the quadratic model and the two-stage linearized model.
+  bool linearize = true;
+
 private:
   /// Adds channel-specific buffering constraints that were parsed from IR
   /// annotations to the Gurobi model.
   void addCustomChannelConstraints(Value channel);
+
+  /// Adds throughput constraints for channels and units with the best
+  /// throughput as a parameter.
+  void addThroughputConstraintsWithBestThroughput(CFDFC &cfdfc,
+                                                  double bestThroughput);
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
