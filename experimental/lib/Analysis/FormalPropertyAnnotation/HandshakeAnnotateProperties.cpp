@@ -642,6 +642,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
             FlowVariable trueVar = FlowVariable(op.getOpOperands()[2], op);
             equations.push_back(selectVar.getPlus() - trueVar);
             equations.push_back(selectVar.getMinus() - falseVar);
+            equations.push_back(selectVar - entry);
           } else {
             FlowExpression dataEq = -entry;
             for (OpOperand &channel : op.getOpOperands()) {
@@ -829,6 +830,10 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
           FlowVariable result = FlowVariable(channel);
+          // TODO: What if this operator is a binary not-operator? This will
+          // yield true, but still map plus->plus and minus->minus.
+          // WRONG BEHAVIOUR!
+          // Similarly for any unary operator on bits (i.e. fixed 0 or fixed 1)
           if (exit.isPlusMinus() && result.isPlusMinus()) {
             equations.push_back(exit.getPlus() - result.getPlus());
             equations.push_back(exit.getMinus() - result.getMinus());
