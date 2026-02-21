@@ -87,12 +87,7 @@ create_symlink() {
     local src=$1
     local dst="bin/$(basename $1)"
     echo "$dst -> $src"
-    if [[ $ENABLE_ARM64_MACOS -eq 1 ]]; then
-      # BSD ln does not support GNU version's `symbolic`.
-      ln -sfn "$src" "$dst"
-    else
-      ln -f --symbolic "$src" "$dst"
-    fi
+    ln -sf "$src" "$dst"
 }
 
 # Same as create_symlink but creates the symbolic link inside the bin/generators
@@ -101,25 +96,14 @@ create_generator_symlink() {
     local src=$1
     local dst="bin/generators/$(basename $1)"
     echo "$dst -> $src"
-    if [[ $ENABLE_ARM64_MACOS -eq 1 ]]; then
-      # BSD ln does not support GNU version's `symbolic`.
-      ln -sfn "../../$src" "$dst"
-    else
-      ln -f --symbolic "../../$src" "$dst"
-    fi
+    ln -sf "../../$src" "$dst"
 }
 
 create_include_symlink() {
     local src=$1
     local dst="build/include/clang_headers"
     echo "$dst -> $src"
-    if [[ $ENABLE_ARM64_MACOS -eq 1 ]]; then
-      # BSD ln does not support GNU version's `T` and `symbolic`.
-      rm -rf "$dst"
-      ln -s "$src" "$dst"
-    else
-      ln -fT --symbolic "$src" "$dst"
-    fi
+    ln -sf "$src" "$dst"
 }
 
 # Determine whether cmake should be re-configured by looking for a
