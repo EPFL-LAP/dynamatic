@@ -31,6 +31,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::EFNAO;
   if (s == "CSOAFAF")
     return FormalProperty::TYPE::CSOAFAF;
+  if (s == "RPF")
+    return FormalProperty::TYPE::RPF;
 
   return std::nullopt;
 }
@@ -45,6 +47,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "EFNAO";
   case TYPE::CSOAFAF:
     return "CSOAFAF";
+  case TYPE::RPF:
+    return "RPF";
   }
 }
 
@@ -102,6 +106,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::CSOAFAF:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::RPF:
+    return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -341,6 +347,29 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
     return nullptr;
 
   prop->copiedSlot = handshake::BufferSlotFullNamer(bufferOpName, slotName);
+  return prop;
+}
+
+// Reconvergent path flow
+
+ReconvergentPathFlow::ReconvergentPathFlow(unsigned long id, TAG tag)
+    : FormalProperty(id, tag, TYPE::RPF) {}
+
+llvm::json::Value ReconvergentPathFlow::extraInfoToJSON() const {
+  return llvm::json::Object({{EQUATIONS_LIT, equations}});
+}
+
+std::unique_ptr<ReconvergentPathFlow>
+ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<ReconvergentPathFlow>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(EQUATIONS_LIT, prop->equations))
+    return nullptr;
+
   return prop;
 }
 

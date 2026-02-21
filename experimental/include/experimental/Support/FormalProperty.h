@@ -30,6 +30,7 @@ public:
     VEQ /* Valid EQuivalence */,
     EFNAO /* Eager Fork Not All Output sent */,
     CSOAFAF, /* Copied Slots Of Active Forks Are Full */
+    RPF,     /* Reconvergent Path Flow */
   };
 
   TAG getTag() const { return tag; }
@@ -226,6 +227,61 @@ private:
   inline static const StringLiteral FORK_CHANNELS_LIT = "channels";
   inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
+};
+
+struct PathEquation {
+  std::vector<int> coefficients;
+  std::vector<std::string> names;
+  inline static const StringLiteral COEFFICIENTS_LIT = "coefficients";
+  inline static const StringLiteral NAMES_LIT = "names";
+};
+
+inline bool fromJSON(const llvm::json::Value &value, PathEquation &out,
+                     llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  if (!mapper) {
+    return false;
+  }
+  if (!mapper.map(PathEquation::COEFFICIENTS_LIT, out.coefficients)) {
+    return false;
+  }
+  if (!mapper.map(PathEquation::NAMES_LIT, out.names)) {
+    return false;
+  }
+  return true;
+  /*
+  return (!mapper ||
+      !mapper.map(PathEquation::COEFFICIENTS_LIT, out.coefficients) ||
+      !mapper.map(PathEquation::NAMES_LIT, out.names));
+      */
+}
+
+inline llvm::json::Value toJSON(const PathEquation &out) {
+  return llvm::json::Object({{PathEquation::COEFFICIENTS_LIT, out.coefficients},
+                             {PathEquation::NAMES_LIT, out.names}});
+}
+
+class ReconvergentPathFlow : public FormalProperty {
+public:
+  std::vector<PathEquation> getEquations() { return equations; }
+  void addEquation(std::vector<int> coefs, std::vector<std::string> names) {
+    equations.push_back(PathEquation{std::move(coefs), std::move(names)});
+  }
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ReconvergentPathFlow>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  ReconvergentPathFlow() = default;
+  ReconvergentPathFlow(unsigned long id, TAG tag);
+  ~ReconvergentPathFlow() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::RPF;
+  }
+
+private:
+  std::vector<PathEquation> equations;
+  inline static const StringLiteral EQUATIONS_LIT = "equations";
 };
 
 class FormalPropertyTable {

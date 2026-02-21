@@ -1282,6 +1282,22 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                         bufferFull)
               .str();
       data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<ReconvergentPathFlow>(property.get())) {
+      std::vector<std::string> eqs{};
+      for (auto eq : p->getEquations()) {
+        std::vector<std::string> terms;
+        assert(eq.coefficients.size() == eq.names.size());
+        for (unsigned i = 0; i < eq.coefficients.size(); ++i) {
+          std::string t = llvm::formatv("toint({0}) * {1}", eq.names[i],
+                                        eq.coefficients[i]);
+          terms.push_back(t);
+        }
+        std::string equationString =
+            llvm::formatv("({0}) = 0", llvm::join(terms, " + ")).str();
+        eqs.push_back(equationString);
+      }
+      std::string propertyString = llvm::join(eqs, " & ");
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();

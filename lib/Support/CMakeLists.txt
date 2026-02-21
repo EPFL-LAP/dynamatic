@@ -11,6 +11,7 @@ add_dynamatic_library(DynamaticSupport
   LINK_LIBS PUBLIC
   DynamaticSupportJSON
   DynamaticHandshake
+  DynamaticLinearAlgebra
   DynamaticHW
   MLIRIR
   MLIRSupport
@@ -22,3 +23,4 @@ add_subdirectory(JSON)
 add_subdirectory(RTL)
 add_subdirectory(Utils)
 add_subdirectory(ConstraintProgramming)
+add_subdirectory(LinearAlgebra)

@@ -73,11 +73,10 @@ private:
                          Operation &curOp);
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
-  bool isChannelToBeChecked(OpResult res);
+  LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
 };
-} // namespace
 
-bool HandshakeAnnotatePropertiesPass::isChannelToBeChecked(OpResult res) {
+bool isChannelToBeChecked(OpResult res) {
   // The channel connected to EndOp, MemoryControllerOp, and LSQOp don't appear
   // in the properties database for the following reasons:
   // - EndOp: the operation doesn't exist in the output model; the property
@@ -96,6 +95,7 @@ bool HandshakeAnnotatePropertiesPass::isChannelToBeChecked(OpResult res) {
                     handshake::LSQOp>(*user);
       });
 }
+} // namespace
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
@@ -223,6 +223,622 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
+#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
+// The structs FlowVariable and FlowExpression together form a DSL that help
+// with writing flow equations. A similar DSL exists for constraint programming
+// in `ConstraintProgramming.h`, but it is not reused for the following reasons:
+// 1. FlowExpression uses integer coefficients, whereas CPVars have doubles as
+// coefficients
+// 2. Metadata that is necessary for FlowExpressions can easily be added (type,
+// operation, index)
+// 3. No name is necessary, as a variable is uniquely defined by the metadata
+// 4. Dedicated conversion function to a matrix, as this is necessary anyway
+struct FlowVariable {
+  enum TYPE { internalState, inputLambda, outputLambda, internalLambda };
+  enum PLUSMINUS { notApplicable, plusAndMinus, plus, minus };
+  // A Lambda variable is defined by type, lambdaIndex, and op.
+  // An internal state is defined by type, state
+  TYPE type;
+  unsigned lambdaIndex;
+  Operation *op;
+  PLUSMINUS pm;
+  std::shared_ptr<InternalStateNamer> state;
+
+  FlowVariable(std::shared_ptr<InternalStateNamer> state)
+      : type(TYPE::internalState), pm(PLUSMINUS::notApplicable),
+        state(std::move(state)) {}
+  FlowVariable(TYPE t, Operation *op, unsigned lambdaIndex)
+      : type(t), lambdaIndex(lambdaIndex), op(op),
+        pm(PLUSMINUS::notApplicable) {
+    assert(
+        t != TYPE::internalState &&
+        "internal states should be initialized with the according constructor");
+  }
+
+  FlowVariable(const OpResult &channel) {
+    op = channel.getDefiningOp();
+    assert(op && "cannot get FlowVariable from channel without owner");
+    type = outputLambda;
+    lambdaIndex = channel.getResultNumber();
+
+    pm = PLUSMINUS::notApplicable;
+    if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
+      if (ct.getDataBitWidth() == 1) {
+        pm = PLUSMINUS::plusAndMinus;
+      }
+    }
+  }
+
+  FlowVariable(OpOperand &back, Operation &resOp) {
+    Value channel = back.get();
+    op = channel.getDefiningOp();
+    pm = PLUSMINUS::notApplicable;
+    if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
+      if (ct.getDataBitWidth() == 1) {
+        pm = PLUSMINUS::plusAndMinus;
+      }
+    }
+    if (op == nullptr) {
+      type = inputLambda;
+      op = &resOp;
+      lambdaIndex = back.getOperandNumber();
+    } else {
+      type = outputLambda;
+      bool found = false;
+      for (auto res : op->getResults()) {
+        if (res == channel) {
+          assert(!found && "found multiple matches");
+          found = true;
+          lambdaIndex = res.getResultNumber();
+        }
+      }
+      assert(found && "did not find matching OpResult");
+    }
+  }
+
+  // utility functions for initializing variables
+  static FlowVariable internalChannel(Operation *op, unsigned index) {
+    return FlowVariable(TYPE::internalLambda, op, index);
+  }
+
+  FlowVariable nextInternal() const {
+    assert(type == TYPE::internalLambda);
+    FlowVariable next = *this;
+    next.lambdaIndex = lambdaIndex + 1;
+    return next;
+  }
+
+  bool operator==(const FlowVariable &other) const {
+    if (type == TYPE::internalState && other.type == TYPE::internalState) {
+      return pm == other.pm && state.get() == other.state.get();
+    }
+
+    return type == other.type && lambdaIndex == other.lambdaIndex &&
+           op == other.op && pm == other.pm;
+  }
+
+  bool sameChannel(const FlowVariable &other) const {
+    assert(isLambda());
+    assert(other.isLambda());
+    return type == other.type && lambdaIndex == other.lambdaIndex &&
+           op == other.op;
+  }
+
+  inline bool isPlusMinus() const { return pm == plusAndMinus; }
+  inline FlowVariable getPlus() const {
+    assert(isPlusMinus());
+    FlowVariable p = *this;
+    p.pm = plus;
+    return p;
+  }
+
+  inline FlowVariable getMinus() const {
+    assert(isPlusMinus());
+    FlowVariable p = *this;
+    p.pm = minus;
+    return p;
+  }
+
+  bool isLambda() const {
+    return type == FlowVariable::TYPE::inputLambda ||
+           type == FlowVariable::TYPE::outputLambda ||
+           type == FlowVariable::TYPE::internalLambda;
+  }
+
+  std::string getName() const {
+    std::string sign;
+    switch (pm) {
+    case notApplicable:
+      sign = "";
+      break;
+    case plus:
+      sign = "+";
+      break;
+    case minus:
+      sign = "-";
+      break;
+    case plusAndMinus:
+      sign = "+-";
+      break;
+    }
+    switch (type) {
+    case internalState:
+      return llvm::formatv("{0}{1}", state->getSMVName(), sign);
+    case inputLambda:
+      return llvm::formatv("{0}.in_{1}{2}", getUniqueName(op), lambdaIndex,
+                           sign)
+          .str();
+    case outputLambda:
+      return llvm::formatv("{0}.out_{1}{2}", getUniqueName(op), lambdaIndex,
+                           sign)
+          .str();
+    case internalLambda:
+      return llvm::formatv("{0}.#{1}{2}", getUniqueName(op), lambdaIndex, sign)
+          .str();
+    };
+  }
+};
+
+// Hash implementation required so that FlowVariable can be used in an
+// unordered_map
+template <>
+struct std::hash<FlowVariable> {
+  size_t operator()(const FlowVariable &var) const {
+    using std::hash;
+    if (var.type == FlowVariable::TYPE::internalState) {
+      return hash<FlowVariable::TYPE>()(var.type) ^
+             hash<std::string>()(var.state->getSMVName());
+    }
+    return (hash<FlowVariable::TYPE>()(var.type) ^
+            hash<unsigned>()(var.lambdaIndex) ^ hash<Operation *>()(var.op));
+  }
+};
+
+namespace {
+// Only the operators that are used have been implemented...
+struct FlowExpression {
+  std::unordered_map<FlowVariable, int> terms;
+  FlowExpression() = default;
+  FlowExpression(const FlowVariable &v) {
+    if (v.isPlusMinus()) {
+      // If plusAndMinus, separate into plus and minus parts
+      terms[v.getPlus()] = 1;
+      terms[v.getMinus()] = 1;
+    } else {
+      terms[v] = 1;
+    }
+  };
+  void debug() const {
+    std::string txt = "0 = ";
+    bool first = true;
+    for (auto &[key, value] : terms) {
+      if (!first) {
+        if (value > 0) {
+          txt += " + ";
+        } else if (value < 0) {
+          txt += " - ";
+        }
+      } else {
+        if (value < 0)
+          txt += "-";
+        first = false;
+      }
+      if (abs(value) == 1) {
+        txt += key.getName();
+
+      } else {
+        txt += llvm::formatv("{0} * {1}", value, key.getName()).str();
+      }
+    }
+    llvm::errs() << txt << "\n";
+  }
+};
+
+FlowExpression operator-(FlowExpression expr) {
+  for (auto &[key, value] : expr.terms) {
+    expr.terms[key] = -value;
+  }
+  return expr;
+}
+
+FlowExpression operator+(FlowExpression left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] += value;
+  }
+  return left;
+}
+
+FlowExpression operator-(FlowExpression left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] -= value;
+  }
+  return left;
+}
+
+void operator+=(FlowExpression &left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] += value;
+  }
+}
+
+void operator-=(FlowExpression &left, const FlowExpression &right) {
+  for (auto &[key, value] : right.terms) {
+    left.terms[key] -= value;
+  }
+}
+
+// Used to assign dense indices to FlowVariables based on a list of
+// FlowExpression, i.e. indices 0 to n-1 are used for n variables, while keeping
+// lambda variables with low indices to ensure they are eliminated first within
+// the row-echelon form
+class FlowEquationsMatrix {
+  std::unordered_map<FlowVariable, size_t> map;
+  std::vector<FlowVariable> variables;
+  size_t nLambdas;
+
+public:
+  MatIntType matrix;
+  size_t getNLambdas() { return nLambdas; }
+  size_t size() { return variables.size(); }
+  size_t getIndex(const FlowVariable &v) { return map[v]; }
+  FlowVariable &getVariable(size_t index) { return variables[index]; }
+  void verify() {
+    assert(map.size() == variables.size());
+    for (size_t i = 0; i < variables.size(); ++i) {
+      FlowVariable &a = variables[i];
+      size_t j = map[a];
+      assert(i == j);
+    }
+    for (auto &[key, value] : map) {
+      assert(variables[value] == key);
+    }
+  }
+
+  FlowEquationsMatrix() = default;
+  FlowEquationsMatrix(const std::vector<FlowExpression> &exprs) {
+    size_t index = 0;
+    // annotate lambdas/+- first
+    for (auto &expr : exprs) {
+      for (auto &[key, value] : expr.terms) {
+        // skip non-lambda variables that are not +-
+        if (!key.isLambda() && key.pm == FlowVariable::PLUSMINUS::notApplicable)
+          continue;
+        // PlusAndMinus variables should never be inserted, as the DSL will
+        // insert them as two separate variables
+        assert(!key.isPlusMinus());
+        if (map.count(key) == 0) {
+          map[key] = index;
+          ++index;
+          variables.push_back(key);
+        }
+      }
+    }
+    nLambdas = index;
+    // annotate remaining variables
+    for (auto &expr : exprs) {
+      for (auto &[key, value] : expr.terms) {
+        if (map.count(key) == 0) {
+          map[key] = index;
+          ++index;
+          variables.push_back(key);
+        }
+      }
+    }
+
+    // matrix with one row per equation, and column per variable
+    matrix = MatIntZero(exprs.size(), size());
+
+    // insert equations into the matrix
+    for (auto [row, expr] : llvm::enumerate(exprs)) {
+      for (auto &[key, value] : expr.terms) {
+        unsigned index = getIndex(key);
+        matrix(row, index) = (int)value;
+      }
+    }
+  }
+};
+
+std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
+  std::vector<FlowExpression> equations{};
+  // annotate equations derived from operations
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      // A general structure for an operation is assumed:
+      // in1, in2, ... -> Join/Merge/Mux -> entry channel
+      // entry channel -> slots? -> exit channel
+      // exit channel 2 -> Fork/Branch -> out1, out2, ...
+      //
+      // Some operations do not follow this structure, and should be handled
+      // separately to avoid making false assumptions.
+      if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+        continue;
+      }
+      if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
+        continue;
+      }
+      if (auto controllerOp = dyn_cast<handshake::MemoryControllerOp>(op)) {
+        continue;
+      }
+
+      FlowVariable entry = FlowVariable::internalChannel(&op, 0);
+      // Join operation, merge operation, or mux
+      if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
+        if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+          // mux : select input has same as output lambda, data inputs act like
+          Value a = muxOp.getSelectOperand();
+          unsigned selectIndex = -1;
+          for (auto &use : a.getUses()) {
+            selectIndex = use.getOperandNumber();
+          }
+          assert(selectIndex == 0);
+
+          OpOperand &selectChannel = op.getOpOperands()[0];
+          FlowVariable selectVar(selectChannel, op);
+          if (selectVar.isPlusMinus()) {
+            // two inputs! can do +- analysis
+            assert(muxOp.getDataOperands().size() == 2);
+            FlowVariable falseVar = FlowVariable(op.getOpOperands()[1], op);
+            FlowVariable trueVar = FlowVariable(op.getOpOperands()[2], op);
+            equations.push_back(selectVar.getPlus() - trueVar);
+            equations.push_back(selectVar.getMinus() - falseVar);
+            equations.push_back(selectVar - entry);
+          } else {
+            FlowExpression dataEq = -entry;
+            for (OpOperand &channel : op.getOpOperands()) {
+              FlowVariable chVar(channel, op);
+              // FlowVariable chVar = FlowVariable::inputChannel(&op, i);
+              if (channel.getOperandNumber() == selectIndex) {
+                // select channel
+                equations.push_back(chVar - entry);
+              } else {
+                // dataEq : sum(dataChannelLambda) = outputChannelLambda
+                dataEq += chVar;
+              }
+            }
+            equations.push_back(dataEq);
+          }
+        } else {
+          // merge : the sum of input lambdas is the output lambda
+          FlowExpression mergeEq = -entry;
+          FlowExpression plusEq;
+          FlowExpression minusEq;
+          bool allPM = true;
+          bool nonePM = true;
+          auto channels = op.getOpOperands();
+          for (auto &channel : channels) {
+            FlowVariable ch(channel, op);
+            if (ch.isPlusMinus()) {
+              nonePM = false;
+              plusEq += ch.getPlus();
+              minusEq += ch.getMinus();
+            } else {
+              allPM = false;
+              mergeEq += ch;
+            }
+          }
+          assert((allPM || nonePM) && "why are merge inputs not all the same?");
+          if (allPM) {
+            entry.pm = FlowVariable::plusAndMinus;
+            plusEq -= entry.getPlus();
+            minusEq -= entry.getMinus();
+            equations.push_back(plusEq);
+            equations.push_back(minusEq);
+          } else {
+            equations.push_back(mergeEq);
+          }
+        }
+      } else {
+        // join : for every input, lambda_in = lambda_out
+        auto channels = op.getOpOperands();
+        if (channels.size() == 1) {
+          // Only 1 input channel
+          auto &channel = channels[0];
+          FlowVariable chVar = FlowVariable(channel, op);
+          // If input is +-, then intermediate channel is as well
+          entry.pm = chVar.pm;
+          if (chVar.isPlusMinus()) {
+            equations.push_back(chVar.getPlus() - entry.getPlus());
+            equations.push_back(chVar.getMinus() - entry.getMinus());
+          } else {
+            equations.push_back(chVar - entry);
+          }
+        } else {
+          for (auto &channel : channels) {
+            equations.push_back(FlowVariable(channel, op) - entry);
+          }
+        }
+      }
+
+      // Annotate latency-induced slots
+      FlowVariable exit = entry;
+      if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
+        for (auto &latencySlot : latencyOp.getLatencyInducedSlots()) {
+          FlowVariable full = FlowVariable(
+              std::make_shared<LatencyInducedSlotNamer>(latencySlot));
+
+          FlowVariable before = exit;
+          FlowVariable after = before.nextInternal();
+          if (before.isPlusMinus()) {
+            assert(after.isPlusMinus());
+            FlowVariable fullPM = full;
+            fullPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+            equations.push_back(full - fullPM);
+            equations.push_back(before.getPlus() - fullPM.getPlus() -
+                                after.getPlus());
+            equations.push_back(before.getMinus() - fullPM.getMinus() -
+                                after.getMinus());
+          } else {
+            equations.push_back(before - full - after);
+          }
+          exit = after;
+        }
+      }
+
+      // Annotate buffer slots
+      if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
+        for (auto &slotFull : bufferOp.getInternalSlotStateNamers()) {
+          FlowVariable full =
+              FlowVariable(std::make_shared<BufferSlotFullNamer>(slotFull));
+
+          FlowVariable before = exit;
+          FlowVariable after = before.nextInternal();
+          if (before.isPlusMinus()) {
+            assert(after.isPlusMinus());
+            FlowVariable fullPM = full;
+            fullPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+            equations.push_back(full - fullPM);
+            equations.push_back(before.getPlus() - fullPM.getPlus() -
+                                after.getPlus());
+            equations.push_back(before.getMinus() - fullPM.getMinus() -
+                                after.getMinus());
+          } else {
+            equations.push_back(before - full - after);
+          }
+          exit = after;
+        }
+      }
+
+      auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op);
+      if (cmergeOp && op.getOpOperands().size() == 2) {
+        auto sentStates = cmergeOp.getInternalSentStateNamers();
+
+        FlowVariable dataChannel(cmergeOp.getDataResult());
+        FlowVariable dataSent(
+            std::make_shared<EagerForkSentNamer>(sentStates[0]));
+        // Handle case where the data is a bit
+        if (exit.isPlusMinus()) {
+          assert(dataChannel.isPlusMinus());
+          FlowVariable sentPM = dataSent;
+          sentPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+          equations.push_back(dataSent - sentPM);
+          equations.push_back(exit.getPlus() + sentPM.getPlus() -
+                              dataChannel.getPlus());
+          equations.push_back(exit.getMinus() + sentPM.getMinus() -
+                              dataChannel.getMinus());
+        } else {
+          equations.push_back(exit + dataSent - dataChannel);
+        }
+
+        FlowVariable indexChannel(cmergeOp.getResults()[1]);
+        FlowVariable indexSent(
+            std::make_shared<EagerForkSentNamer>(sentStates[1]));
+        assert(indexChannel.isPlusMinus() &&
+               "cmerge with 2 inputs should have 1 bit to determine index");
+
+        auto opops = op.getOpOperands();
+        FlowVariable inM(opops[0], op);
+        FlowVariable inP(opops[1], op);
+        auto slots = cmergeOp.getInternalSlotStateNamers();
+        FlowVariable slot(std::make_shared<BufferSlotFullNamer>(slots[0]));
+        FlowVariable slotPM = slot;
+        slotPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+        equations.push_back(slot - slotPM);
+        FlowVariable sentPM = indexSent;
+        sentPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+        equations.push_back(indexSent - sentPM);
+
+        equations.push_back(indexChannel.getMinus() + slotPM.getMinus() - inM -
+                            sentPM.getMinus());
+        equations.push_back(indexChannel.getPlus() + slotPM.getPlus() - inP -
+                            sentPM.getPlus());
+      } else if (auto forkOp =
+                     dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+        // eagerfork: for every channel, either same tokens in as out, or in
+        // `sent` state and in = out - 1
+        for (auto [i, sentVariable] :
+             llvm::enumerate(forkOp.getInternalSentStateNamers())) {
+          FlowVariable sent =
+              FlowVariable(std::make_shared<EagerForkSentNamer>(sentVariable));
+          FlowVariable result = FlowVariable(op.getResults()[i]);
+          if (exit.isPlusMinus()) {
+            assert(result.isPlusMinus());
+            FlowVariable sentPM = sent;
+            sentPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+            equations.push_back(sent - sentPM);
+            equations.push_back(exit.getPlus() + sentPM.getPlus() -
+                                result.getPlus());
+            equations.push_back(exit.getMinus() + sentPM.getMinus() -
+                                result.getMinus());
+          } else {
+            equations.push_back(exit + sent - result);
+          }
+        }
+      } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
+        continue;
+      } else {
+        // lazy fork: all outputs have same tokens in as out
+        for (auto [i, channel] : llvm::enumerate(op.getResults())) {
+          FlowVariable result = FlowVariable(channel);
+          // TODO: What if this operator is a binary not-operator? This check
+          // will yield true, but still map plus->plus and minus->minus. WRONG
+          // BEHAVIOUR! Similarly for any unary operator on bits (i.e. fixed 0
+          // or fixed 1)
+          if (exit.isPlusMinus() && result.isPlusMinus()) {
+            equations.push_back(exit.getPlus() - result.getPlus());
+            equations.push_back(exit.getMinus() - result.getMinus());
+          } else {
+            equations.push_back(exit - result);
+          }
+        }
+      }
+    }
+  }
+  return equations;
+}
+} // namespace
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
+  // The equations are represented by a FlowExpression that is equal to zero
+  std::vector<FlowExpression> equations = extractLocalEquations(modOp);
+
+  // Map all variables used in `equations` to an index in the matrix
+  FlowEquationsMatrix indices(equations);
+  MatIntType &matrix = indices.matrix;
+  indices.verify();
+
+  // bring to row-echelon form
+  gaussianElimination(matrix);
+
+  size_t rows = matrix.size1();
+  size_t cols = matrix.size2();
+  // ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+  // uid++;
+
+  for (size_t row = 0; row < rows; ++row) {
+    bool canAnnotate = true;
+    for (size_t col = 0; col < indices.getNLambdas(); ++col) {
+      if (matrix(row, col) != 0) {
+        canAnnotate = false;
+        break;
+      }
+    }
+
+    if (!canAnnotate) {
+      continue;
+    }
+
+    std::vector<int> coefs{};
+    std::vector<std::string> names{};
+
+    for (size_t col = indices.getNLambdas(); col < cols; ++col) {
+      if (matrix(row, col) != 0) {
+        coefs.push_back(matrix(row, col));
+        names.push_back(indices.getVariable(col).getName());
+      }
+    }
+    if (coefs.size() > 0) {
+      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+      uid++;
+      p.addEquation(coefs, names);
+      if (p.getEquations().size() > 0) {
+        propertyTable.push_back(p.toJSON());
+      }
+    }
+  }
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -234,6 +850,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return signalPassFailure();
+    if (failed(annotateReconvergentPathFlow(modOp)))
       return signalPassFailure();
   }
 
