@@ -104,6 +104,10 @@ public:
     case CPSolver::ERROR:
       llvm::errs() << "There is an error during the model solving!\n";
       return failure();
+    case CPSolver::OPTIMAL:
+    case CPSolver::NONOPTIMAL:
+      // No error handling
+      break;
     }
 
     // Optimize the model
