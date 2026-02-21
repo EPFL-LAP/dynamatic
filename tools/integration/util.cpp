@@ -13,6 +13,7 @@
 
 #include <regex>
 #include <set>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
