@@ -180,6 +180,7 @@ if(DYNAMATIC_ENABLE_CBC)
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
       SOURCE_DIR ${CMAKE_BINARY_DIR}/cbc
       URL https://github.com/coin-or/Cbc/releases/download/releases%2F2.10.12/Cbc-releases.2.10.12-x86_64-ubuntu22-gcc1140-static.tar.gz
+      SYSTEM
     )
 
     FetchContent_MakeAvailable(cbc)
@@ -260,6 +261,7 @@ FetchContent_Declare(
   googletest
   DOWNLOAD_EXTRACT_TIMESTAMP true
   URL https://github.com/google/googletest/archive/2ae29b52fdff88c52fef655fa0d245fc514ca35b.zip
+  SYSTEM
 )
 
 # For Windows: Prevent overriding the parent project's compiler/linker settings
@@ -267,7 +269,11 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # TODO: Use the JSON package from Boost instead.
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_Declare(
+  json
+  URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+  SYSTEM
+)
 FetchContent_MakeAvailable(json)
 
 #-------------------------------------------------------------------------------
