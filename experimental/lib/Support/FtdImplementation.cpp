@@ -49,18 +49,33 @@ constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 static Block *returnMuxConditionBlock(Value muxCondition, const ftd::BlockIndexing &bi) {
   Block *muxConditionBlock = nullptr;
 
-  for (auto &use : muxCondition.getUses()) {
-    Operation *userOp = use.getOwner();
-    Block *userBlock = userOp->getBlock();
+  while (!muxConditionBlock) {
+    for (auto &use : muxCondition.getUses()) {
+      Operation *userOp = use.getOwner();
+      Block *userBlock = userOp->getBlock();
 
-    if (isa_and_nonnull<cf::CondBranchOp>(userOp) &&
-        userOp->getOperand(0) == muxCondition &&
-        !(userOp->hasAttr(FTD_OP_TO_SKIP))) {
-      if (!muxConditionBlock || bi.isLess(userBlock, muxConditionBlock)) {
-        muxConditionBlock = userBlock;
+      if ((isa_and_nonnull<cf::CondBranchOp>(userOp) ||
+          isa_and_nonnull<handshake::ConditionalBranchOp>(userOp)) &&
+          !(userOp->hasAttr(FTD_OP_TO_SKIP))) {
+        if (!muxConditionBlock || bi.isLess(userBlock, muxConditionBlock)) {
+          muxConditionBlock = userBlock;
+        }
+      }
+    }
+
+    // If no valid target block was found among the users, attempt to trace 
+    // backward through the suppression branch, if it exists.
+    if (!muxConditionBlock) {
+      Operation *defOp = muxCondition.getDefiningOp();
+      if (defOp && isa_and_nonnull<handshake::ConditionalBranchOp>(defOp) &&
+          defOp->hasAttr(FTD_OP_TO_SKIP)) {
+          muxCondition = defOp->getOperand(1);
+      } else {
+        break; 
       }
     }
   }
+
   if (!muxConditionBlock) {
     llvm::errs() << "Warning: Could not find a block with a terminator ";
     llvm::errs() << "condition matching the mux condition. This may lead ";
