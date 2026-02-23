@@ -1,5 +1,5 @@
 from verilog_gen.emitters.emitter import Emitter, Meta
-from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit, WhenElse
+from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit, WhenElse, Type
 from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
@@ -75,10 +75,10 @@ class VHDLEmitter(Emitter):
 
     def add_assignment(self, out, statement: Statement, in_process=False):
         out_str, size = self.assigned_var_to_str(out)
-        meta = Meta(size, 'logic', -1)
+        meta = Meta(size, Type.LOGIC, -1)
         statement_str = statement.to_str(self, meta)
         # Assume we only write to logic types
-        statement_str = self.fix_type('logic', statement.get_type(), statement_str)
+        statement_str = self.fix_type(Type.LOGIC, statement.get_type(), statement_str)
         self.statementString += self.get_current_indent() + f'{out_str} <= {statement_str};\n'
 
     def get_definition_str(self, module_name: str, write_regs=True) -> str:
@@ -180,28 +180,28 @@ class VHDLEmitter(Emitter):
         else:
             raise ValueError('Invalid bit value')
 
-    def fix_type(self, own_type: str, child_type: str, child_str: str) -> str:
-        if own_type == 'arith' and child_type == 'logic':
+    def fix_type(self, super_type: Type, child_type: Type, child_str: str) -> str:
+        if super_type == Type.ARITH and child_type == Type.LOGIC:
             return f'unsigned{child_str}' if self.is_surrounded_by_parentheses(child_str) else f'unsigned({child_str})'
-        elif own_type == 'logic' and child_type == 'arith':
+        elif super_type == Type.LOGIC and child_type == Type.ARITH:
             return f'std_logic_vector{child_str}' if self.is_surrounded_by_parentheses(child_str) else f'std_logic_vector({child_str})'
         else:
             return child_str
 
     def bin_to_str(self, bin: Bin, meta: Meta) -> str:
-        meta = Meta(meta.size, bin.get_type(), bin.get_precedence())
+        meta = Meta(meta.size, bin.get_param_type(), bin.get_precedence())
         left_str = bin.left.to_str(self, meta)
         right_str = bin.right.to_str(self, meta)
 
-        left_str = self.fix_type(bin.get_type(), bin.left.get_type(), left_str)
-        right_str = self.fix_type(bin.get_type(), bin.right.get_type(), right_str)
+        left_str = self.fix_type(bin.get_param_type(), bin.left.get_type(), left_str)
+        right_str = self.fix_type(bin.get_param_type(), bin.right.get_type(), right_str)
 
         return f'{left_str} {self.get_binop_str(bin.op)} {right_str}'
 
     def un_to_str(self, un: Un, meta: Meta) -> str:
-        meta = Meta(meta.size, un.get_type(), un.get_precedence())
+        meta = Meta(meta.size, un.get_param_type(), un.get_precedence())
         val_str = un.val.to_str(self, meta)
-        val_str = self.fix_type(un.get_type(), un.val.get_type(), val_str)
+        val_str = self.fix_type(un.get_param_type(), un.val.get_type(), val_str)
         return f'{self.get_unop_str(un.op)} {val_str}'
 
     def when_else_to_str(self, when_else, meta: Meta) -> str:
@@ -228,10 +228,7 @@ class VHDLEmitter(Emitter):
         false_str = when_else.false_statement.to_str(self, Meta(meta.size, meta.type, self_precedence))
         cond_str = when_else.condition.to_str(self, meta)
 
-        true_str = self.fix_type('logic', when_else.true_statement.get_type(), true_str)
-        false_str = self.fix_type('logic', when_else.false_statement.get_type(), false_str)
-        cond_str = self.fix_type('bool', when_else.condition.get_type(), cond_str)
-
+        cond_str = self.fix_type(Type.BOOL, when_else.condition.get_type(), cond_str)
             
         return f'{true_str} when {cond_str} else{enter}{false_str}'
 
@@ -295,7 +292,7 @@ class VHDLEmitter(Emitter):
         assert (vec.type == 'r')
         if (init != None):
             self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
-            self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {self.int_to_bits(init, vec.size)};\n')
+            self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {self.int_to_str(init, vec.size)};\n')
             self.add_reg_str(f'\t\telsif (rising_edge({self.clock_name})) then\n')
         else:
             self.add_reg_str(f'\t\tif (rising_edge({self.clock_name})) then\n')
@@ -313,7 +310,7 @@ class VHDLEmitter(Emitter):
         if (init != None):
             self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             for i in range(0, array.length):
-                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_bits(init[i])};\n')
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_str(init[i])};\n')
             self.add_reg_str(f'\t\telsif (rising_edge({self.clock_name})) then\n')
         else:
             self.add_reg_str(f'\t\tif (rising_edge({self.clock_name})) then\n')
@@ -333,7 +330,7 @@ class VHDLEmitter(Emitter):
         if (init != None):
             self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             for i in range(0, array.length):
-                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_bits(init[i], array.size)};\n')
+                self.add_reg_str(f'\t\t\t{array.getNameRead(i)} <= {self.int_to_str(init[i], array.size)};\n')
             self.add_reg_str(f'\t\telsif (rising_edge({self.clock_name})) then\n')
         else:
             self.add_reg_str(f'\t\tif (rising_edge({self.clock_name})) then\n')
@@ -357,11 +354,11 @@ class VHDLEmitter(Emitter):
     def slice_var(self, var_name, high, low):
         return f'{var_name}({high} downto {low})'
 
-    def int_to_bits(self, value: int, meta: Meta) -> str:
-        return f'"{value:0{meta.size}b}"'
-
     @staticmethod
-    def int_to_bits(din, size=None) -> str:
+    def int_to_str(din: int, size=None, meta=None) -> str:
+        if meta is not None and meta.type == Type.ARITH:
+            return str(din)
+        
         if size == None:
             if din:
                 return "'1'"

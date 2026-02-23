@@ -65,7 +65,7 @@ def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
         size = None
         mux = LogicArray(em, em.get_temp('mux'), 'w', length)
 
-    str_zero = em.int_to_bits(0, size)
+    str_zero = em.int_to_str(0, size)
     if (j == None):
         for i in range(0, length):
             em.add_assignment((mux, i), Val(din, i).when(Val(sel, i) == Bit(1)).else_(Val(str_zero)))
@@ -126,7 +126,7 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
         This means that the currently allocated BB is BB1 (among BB0, BB1, and BB2)
         It has 1 load. that "dout" indicates 1.
     """
-    if func is None: func = em.int_to_bits
+    if func is None: func = em.int_to_str
 
     em.add_comment('Mux1H For Rom Begin')
     em.add_comment(f'Mux1H({dout.name}, {sel.name})')
@@ -204,7 +204,7 @@ def MuxLookUp(em: Emitter, dout, din, sel) -> str:
     else:
         last = Bit(0)
 
-    whenelses = [WhenElse(Val(din, i), sel == Val(em.int_to_bits(i, size)), None) for i in range(0,length)]
+    whenelses = [WhenElse(Val(din, i), sel == Val(i, size), None) for i in range(0,length)]
     whenelses.append(last)
     for i, op in enumerate(whenelses[:-1]):
         op.false_statement = whenelses[i + 1]

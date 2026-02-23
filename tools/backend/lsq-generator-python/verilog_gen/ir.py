@@ -70,11 +70,18 @@ class Statement:
         raise NotImplementedError('Subclasses must implement _to_str method')
 
     def get_type(self) -> str:
-        return 'logic'
+        return Type.LOGIC
 
     def get_precedence(self) -> int:
         # TODO: Cleaner way to handle precedence
         return 10000
+
+class Type(Enum):
+    LOGIC = 'logic'
+    ARITH = 'arith'
+    BOOL = 'bool'
+    ANY = 'any'
+
 
 class Val(Statement):
     """
@@ -94,10 +101,10 @@ class Val(Statement):
         if type(arg) == str:
             str_ret = arg
         elif type(arg) == int:
-            str_ret = em.int_to_bits(arg, size)
+            str_ret = em.int_to_str(arg, size, meta=meta)
         elif type(arg) == tuple:
             if type(arg[0]) == int:
-                str_ret = em.int_to_bits(arg[0], arg[1])
+                str_ret = em.int_to_str(arg[0], arg[1], meta=meta)
             elif len(arg) == 2:
                 str_ret = arg[0].getNameRead(arg[1])
             else:
@@ -106,29 +113,35 @@ class Val(Statement):
             str_ret = arg.getNameRead()
 
         return str_ret
+    
+    def get_type(self) -> str:
+        return Type.ANY if type(self.var[0]) == int else Type.LOGIC
 
 
 class BinOp(Enum):
-    ADD = ('+', 4, 'arith')
-    SUB = ('-', 4, 'arith')
-    AND = ('and', 3, 'logic')
-    OR = ('or', 3, 'logic')
-    XOR = ('xor', 3, 'logic')
-    CONCAT = ('&', 3, 'logic')
-    MUL = ('*', 5, 'arith')
-    GE = ('>=', 2, 'bool')
-    LE = ('<=', 2, 'bool')
-    GT = ('>', 2, 'bool')
-    LT = ('<', 2, 'bool')
-    EQ = ('=', 1, 'bool')
-    NEQ = ('!=', 1, 'bool')
+    ADD = ('+', 4, Type.ARITH, Type.ARITH)
+    SUB = ('-', 4, Type.ARITH, Type.ARITH)
+    AND = ('and', 3, Type.LOGIC, Type.LOGIC)
+    OR = ('or', 3, Type.LOGIC, Type.LOGIC)
+    XOR = ('xor', 3, Type.LOGIC, Type.LOGIC)
+    CONCAT = ('&', 3, Type.LOGIC, Type.LOGIC)
+    MUL = ('*', 5, Type.ARITH, Type.ARITH)
+    GE = ('>=', 2, Type.BOOL, Type.ARITH)
+    LE = ('<=', 2, Type.BOOL, Type.ARITH)
+    GT = ('>', 2, Type.BOOL, Type.ARITH)
+    LT = ('<', 2, Type.BOOL, Type.ARITH)
+    EQ = ('=', 1, Type.BOOL, Type.ANY)
+    NEQ = ('!=', 1, Type.BOOL, Type.ANY)
 
     def get_precedence(self) -> int:
         return self.value[1]
 
     def get_type(self) -> str:
         return self.value[2]
-
+    
+    def get_param_type(self) -> str:
+        return self.value[3]
+    
 class Bin(Statement):
     """
     Represents a binary statement
@@ -143,18 +156,24 @@ class Bin(Statement):
 
     def get_type(self) -> str:
         return self.op.get_type()
+    
+    def get_param_type(self) -> str:
+        return self.op.get_param_type()
 
     def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.bin_to_str(self, meta)
 
 class UnOp(Enum):
-    NOT = ('not', 10, 'logic')
+    NOT = ('not', 10, Type.LOGIC, Type.LOGIC)
 
     def get_precedence(self) -> int:
-        if self == UnOp.NOT:
-            return 10
-        else:
-            raise ValueError('Invalid unary operator')
+        return self.value[1]
+        
+    def get_type(self) -> str:
+        return self.value[2]
+
+    def get_param_type(self) -> str:
+        return self.value[3]
 
 class Un(Statement):
     """
@@ -167,6 +186,12 @@ class Un(Statement):
 
     def get_precedence(self) -> int:
         return self.op.get_precedence()
+    
+    def get_type(self) -> str:
+        return self.op.get_type()
+
+    def get_param_type(self) -> str:
+        return self.op.get_param_type()
 
     def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.un_to_str(self, meta)
@@ -213,8 +238,8 @@ class WhenElse(Statement):
         return em.when_else_to_str(self, meta)
 
     def get_type(self) -> str:
-        if self.true_statement.get_type() != self.false_statement.get_type():
-            raise ValueError('true_statement and false_statement must have the same type')
+        if self.true_statement.get_type() != self.false_statement.get_type() and self.true_statement.get_type() != Type.ANY and self.false_statement.get_type() != Type.ANY:
+            raise ValueError(f'true_statement and false_statement must have the same type, got {self.true_statement.get_type()} and {self.false_statement.get_type()}')
         return self.true_statement.get_type()
         
 def Op(ctx, *args):

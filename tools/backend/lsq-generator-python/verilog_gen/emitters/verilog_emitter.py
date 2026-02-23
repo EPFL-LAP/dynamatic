@@ -1,5 +1,5 @@
 from verilog_gen.emitters.emitter import Emitter, Meta
-from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit
+from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit, Type
 from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
@@ -74,7 +74,7 @@ class VerilogEmitter(Emitter):
 
     def add_assignment(self, out, statement: Statement, in_process=False):
         out_str, size = self.assigned_var_to_str(out)
-        meta = Meta(size, 'logic', -1)
+        meta = Meta(size, Type.LOGIC, -1)
         statement_str = statement.to_str(self, meta)
         # Assume we only write to logic types
         assign_op = '<=' if in_process else '='
@@ -155,7 +155,7 @@ class VerilogEmitter(Emitter):
             raise ValueError('Invalid bit value')
 
     def bin_to_str(self, bin: Bin, meta: Meta) -> str:
-        meta = Meta(meta.size, bin.get_type(), bin.get_precedence())
+        meta = Meta(meta.size, bin.get_operand_type(), bin.get_precedence())
         left_str = bin.left.to_str(self, meta)
         right_str = bin.right.to_str(self, meta)
 
@@ -226,7 +226,7 @@ class VerilogEmitter(Emitter):
         in_else = False
         if (init != None):
             self.add_reg_str(f'if ({self.reset_name})')
-            self.add_reg_str(f'\t{logic.getNameRead()} <= {self.int_to_bits(init)};')
+            self.add_reg_str(f'\t{logic.getNameRead()} <= {self.int_to_str(init)};')
             self.add_reg_str('else begin')
             in_else = True
             self.increase_indent()
@@ -248,7 +248,7 @@ class VerilogEmitter(Emitter):
         in_else = False
         if (init != None):
             self.add_reg_str(f'if ({self.reset_name})')
-            self.add_reg_str(f'\t{vec.getNameRead()} <= {self.int_to_bits(init, vec.size)};')
+            self.add_reg_str(f'\t{vec.getNameRead()} <= {self.int_to_str(init, vec.size)};')
             self.add_reg_str('else begin')
             in_else = True
             self.increase_indent()
@@ -273,7 +273,7 @@ class VerilogEmitter(Emitter):
         if (init != None):
             self.add_reg_str(f'if ({self.reset_name}) begin')
             for i in range(0, array.length):
-                self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_bits(init[i])};')
+                self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_str(init[i])};')
             self.add_reg_str('end')
             self.add_reg_str('else begin')
             in_else = True
@@ -300,7 +300,7 @@ class VerilogEmitter(Emitter):
         if (init != None):
             self.add_reg_str(f'if ({self.reset_name}) begin')
             for i in range(0, array.length):
-                self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_bits(init[i], array.size)};')
+                self.add_reg_str(f'\t{array.getNameRead(i)} <= {self.int_to_str(init[i], array.size)};')
             self.add_reg_str('end')
             self.add_reg_str('else begin')
             in_else = True
@@ -330,9 +330,11 @@ class VerilogEmitter(Emitter):
         return f'{var_name}[{high}:{low}]'
 
     @staticmethod
-    def int_to_bits(din, size=None) -> str:
+    def int_to_str(din, size=None, meta=None) -> str:
+        assert meta is None or size is None, "Cannot specify both size and meta in int_to_str"
         if size == None:
             size = 1
+            
 
         return f'{size}\'b{Emitter._int_to_bin(din, size)}'
         
