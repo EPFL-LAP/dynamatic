@@ -29,7 +29,7 @@ parser.add_argument("--output-dir", "-o",
 parser.add_argument(
     "--config-file", "-c", required=True, dest="config_files", default="", type=str
 )
-parser.add_argument("--language", "-l", dest="language", default="vhdl", type=str)
+parser.add_argument("--hdl", "-l", dest="hdl", default="vhdl", type=str)
 
 # Build the target
 args = parser.parse_args()
@@ -546,9 +546,9 @@ def main():
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
         
-    if args.language == "vhdl":
+    if args.hdl == "vhdl":
         emitter = VHDLEmitter()
-    elif args.language == "verilog":
+    elif args.hdl == "verilog":
         emitter = VerilogEmitter()
     else:
         raise ValueError("Unsupported language specified. Use 'vhdl' or 'verilog'.")
