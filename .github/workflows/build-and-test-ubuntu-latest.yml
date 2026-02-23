@@ -19,8 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
-  build-simple:
+  build:
     runs-on: ubuntu-latest
     env:
       DEBIAN_FRONTEND: noninteractive
@@ -51,7 +50,7 @@ jobs:
 
       - name: Build Dynamatic (release, prebuilt LLVM)
         run: |
-          bash ./build.sh --name: Docker Build Test
+          bash ./build.sh --release --use-prebuilt-llvm --enable-cbc
 
   build-docker-image:
     runs-on: ubuntu-latest
@@ -66,6 +65,6 @@ jobs:
       - name: Build Docker image
         run: docker build -t dynamatic-image . --build-arg UID=$(id -u) --build-arg GID=$(id -g)
 
+
       - name: Run container tests
-        run: docker run -u $(id -u):$(id -g) 
-          -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash build.sh --use-prebuilt-llvm --enable-cbc
+        run: docker run -u $(id -u):$(id -g) -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash build.sh --use-prebuilt-llvm
