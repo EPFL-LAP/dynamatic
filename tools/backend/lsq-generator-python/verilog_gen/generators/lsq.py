@@ -1450,7 +1450,7 @@ end
 
 
         # Write to the file
-        output_str = em.get_definition_str(self.module_name, write_regs=self.configs.gaMulti)
+        output_str = em.get_definition_str(self.module_name)
         with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
             file.write(output_str)
 
