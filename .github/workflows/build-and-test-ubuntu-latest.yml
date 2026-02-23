@@ -64,12 +64,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
-        run: docker build -t dynamatic-image . \
-          --build-arg UID=$(id -u) --build-arg GID=$(id -g)
+        run: docker build -t dynamatic-image . --build-arg UID=$(id -u) --build-arg GID=$(id -g)
 
       - name: Run container tests
-        run: docker run -u $(id -u):$(id -g) \
-          -v "$(pwd):/home/ubuntu/dynamatic" \
-          -w "/home/ubuntu/dynamatic" \
-          dynamatic-image \
-          /bin/bash build.sh --use-prebuilt-llvm --enable-cbc
+        run: docker run -u $(id -u):$(id -g) 
+          -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash build.sh --use-prebuilt-llvm --enable-cbc
