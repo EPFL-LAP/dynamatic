@@ -303,8 +303,10 @@ void scalarPrinter<float>(const float &arg, OS &os) {
 /// Specialization of the scalar printer for double.
 template <>
 void scalarPrinter<double>(const double &arg, OS &os) {
-  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
-     << *((const unsigned int *)(&arg)) << std::endl;
+  uint64_t bits;
+  std::memcpy(&bits, &arg, sizeof(bits));
+  os << "0x" << std::hex << std::setfill('0') << std::setw(16) << bits
+     << std::endl;
 }
 
 /// Specialization of the scalar printer for int.
