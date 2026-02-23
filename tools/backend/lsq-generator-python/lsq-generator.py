@@ -16,7 +16,7 @@ from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 from verilog_gen.configs import Configs, GetConfigs
 from verilog_gen.codegen import codeGen
 from verilog_gen.emitters import Emitter, VHDLEmitter, VerilogEmitter
-from verilog_gen.ir import Val, CustomStatement
+from verilog_gen.ir import Val, CustomStatement, Bit
 
 # ===----------------------------------------------------------------------===#
 # Parser Definition
@@ -197,8 +197,8 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            em.add_assignment(rreq_ready[i], Val(0), in_process=True)
-            em.add_assignment(rresp_valid[i], Val(0), in_process=True)
+            em.add_assignment(rreq_ready[i], Bit(0), in_process=True)
+            em.add_assignment(rresp_valid[i], Bit(0), in_process=True)
             em.add_assignment(rresp_id[i], Val(0), in_process=True)
 
     
@@ -207,13 +207,13 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            em.add_assignment(rreq_ready[i], Val(1), in_process=True)
+            em.add_assignment(rreq_ready[i], Bit(1), in_process=True)
 
         em.add_custom_statement(CustomStatement(f"if {io_loadEn.getNameWrite()} = '1' then", f"if ({io_loadEn.getNameWrite()}) begin"))
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            em.add_assignment(rresp_valid[i], Val(1), in_process=True)
+            em.add_assignment(rresp_valid[i], Bit(1), in_process=True)
             em.add_assignment(rresp_id[i], rreq_id[i], in_process=True)
 
         em.decrease_indent()
@@ -221,7 +221,7 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            em.add_assignment(rresp_valid[i], Val(0), in_process=True)
+            em.add_assignment(rresp_valid[i], Bit(0), in_process=True)
         
         em.decrease_indent()
         em.add_custom_statement(CustomStatement("end if;", "end"))
@@ -243,8 +243,8 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            em.add_assignment(wreq_ready[i], Val(0), in_process=True)
-            em.add_assignment(wresp_valid[i], Val(0), in_process=True)
+            em.add_assignment(wreq_ready[i], Bit(0), in_process=True)
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
             em.add_assignment(wresp_id[i], Val(0), in_process=True)
 
         em.decrease_indent()
@@ -252,13 +252,13 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            em.add_assignment(wreq_ready[i], Val(1), in_process=True)
+            em.add_assignment(wreq_ready[i], Bit(1), in_process=True)
 
         em.add_custom_statement(CustomStatement(f"if {io_storeEn.getNameWrite()} = '1' then", f"if ({io_storeEn.getNameWrite()}) begin"))
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            em.add_assignment(wresp_valid[i], Val(1), in_process=True)
+            em.add_assignment(wresp_valid[i], Bit(1), in_process=True)
             em.add_assignment(wresp_id[i], rreq_id[i], in_process=True)
 
         em.decrease_indent()
@@ -266,7 +266,7 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            em.add_assignment(wresp_valid[i], Val(0), in_process=True)
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
 
         em.decrease_indent()
         em.add_custom_statement(CustomStatement("end if;", "end"))
@@ -408,7 +408,7 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            em.add_assignment(rresp_id[i], Val(0), in_process=True)
+            em.add_assignment(rresp_id[i], Bit(0), in_process=True)
 
         em.decrease_indent()
         em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then", "end\nelse begin"))
@@ -437,21 +437,21 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            em.add_assignment(wresp_valid[i], Val(0), in_process=True)
-            em.add_assignment(wresp_id[i], Val(0), in_process=True)
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
+            em.add_assignment(wresp_id[i], Bit(0), in_process=True)
 
         em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then", "end\nelse begin"))
 
         em.add_custom_statement(CustomStatement(f"if {io_storeEn.getNameWrite()} = '1' then", f"if ({io_storeEn.getNameWrite()}) begin"))
 
         for i in range(self.lsq_config.numStMem):
-            em.add_assignment(wresp_valid[i], Val(1), in_process=True)
+            em.add_assignment(wresp_valid[i], Bit(1), in_process=True)
             em.add_assignment(wresp_id[i], rreq_id[i], in_process=True)
 
         em.add_custom_statement(CustomStatement("else", "end\nelse begin"))
 
         for i in range(self.lsq_config.numStMem):
-            em.add_assignment(wresp_valid[i], Val(0), in_process=True)
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
 
         em.decrease_indent()
         em.add_custom_statement(CustomStatement("end if;", "end"))
