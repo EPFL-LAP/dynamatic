@@ -5,7 +5,7 @@
 # 1. Creating a docker image:
 # 
 # ```bash 
-# $ docker build -t dynamatic-image .
+# $ docker build -t dynamatic-image . --build-arg UID=$(id -u) --build-arg GID=$(id -g)
 # ```
 #
 # 2. Running the docker image: 
@@ -26,6 +26,11 @@
 
 # [START Installing the dependency]
 FROM ubuntu:24.04
+RUN userdel -r ubuntu
+
+ARG UID=1000
+ARG GID=1000
+ARG UNAME=ubuntu
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN \
@@ -40,6 +45,12 @@ RUN \
   ghdl verilator
 # [END Installing the dependency]
 
+# Pass the UID of the host user to the container creation to make sure that we
+# don't have any permission problem when mounting a volume in the container
+RUN groupadd -g $GID -o $UNAME
+RUN useradd -m -u $UID -g $GID -o -s /bin/bash $UNAME
+
 # The user does not need a password to run sudo
 RUN echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
 USER ubuntu
