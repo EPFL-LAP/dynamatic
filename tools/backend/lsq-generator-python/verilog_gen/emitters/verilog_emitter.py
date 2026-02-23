@@ -198,7 +198,8 @@ class VerilogEmitter(Emitter):
 
     def logicvec_signal_init(self, vec: LogicVec, sufix: str):
         if (vec.type == 'w'):
-            self.add_signal_str(f'\twire [{vec.size-1}:0] {vec.get_base_name(sufix)};\n')
+            prefix = 'reg' if vec.force_reg else 'wire'
+            self.add_signal_str(f'\t{prefix} [{vec.size-1}:0] {vec.get_base_name(sufix)};\n')
         elif (vec.type == 'r'):
             self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.get_base_name(sufix)}_d;\n')
             self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.get_base_name(sufix)}_q;\n')

@@ -158,8 +158,8 @@ class LogicVec(Logic):
     type = ''
     size = 1
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', size: int = 1, init: bool = True, dyn_comp=False) -> None:
-        Logic.__init__(self, ctx, name, type, False, dyn_comp)
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', size: int = 1, init: bool = True, dyn_comp=False, force_reg=False) -> None:
+        Logic.__init__(self, ctx, name, type, False, dyn_comp, force_reg)
         assert (size > 0)
         self.size = size
         if (init):
@@ -224,9 +224,9 @@ class LogicArray(Logic):
     """
     length = 1
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1, dyn_comp=False):
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1, dyn_comp=False, force_reg=False):
         self.length = length
-        Logic.__init__(self, ctx, name, type, False, dyn_comp)
+        Logic.__init__(self, ctx, name, type, False, dyn_comp, force_reg)
         self.signalInit()
 
     def __repr__(self) -> str:
@@ -277,9 +277,9 @@ class LogicVecArray(LogicVec):
     """
     length = 1
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1, size: int = 1, dyn_comp=False):
+    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1, size: int = 1, dyn_comp=False, force_reg=False):
         self.length = length
-        LogicVec.__init__(self, ctx, name, type, size, False, dyn_comp)
+        LogicVec.__init__(self, ctx, name, type, size, False, dyn_comp, force_reg)
         self.signalInit()
 
     def __repr__(self) -> str:
