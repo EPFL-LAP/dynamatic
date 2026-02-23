@@ -176,14 +176,14 @@ class LSQWrapper:
         ##
 
         # Define internal signals
-        rreq_ready = LogicArray(em, "rreq_ready", "w", self.lsq_config.numLdMem, dyn_comp=True)
-        rresp_valid = LogicArray(em, "rresp_valid", 'w', self.lsq_config.numLdMem, dyn_comp=True)
-        rresp_id = LogicVecArray(em, "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True)
-        wreq_ready = LogicArray(em, "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True)
-        wresp_valid = LogicArray(em, "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True)
-        wresp_id = LogicVecArray(em, "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True)
-        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True)
-        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True)
+        rreq_ready = LogicArray(em, "rreq_ready", "w", self.lsq_config.numLdMem, dyn_comp=True, force_reg=True)
+        rresp_valid = LogicArray(em, "rresp_valid", 'w', self.lsq_config.numLdMem, dyn_comp=True, force_reg=True)
+        rresp_id = LogicVecArray(em, "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        wreq_ready = LogicArray(em, "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
+        wresp_valid = LogicArray(em, "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
+        wresp_id = LogicVecArray(em, "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
         
 
         # Define the process to update
@@ -390,14 +390,14 @@ class LSQWrapper:
         io_loadEn = Logic(em, "io_loadEn", 'w', dyn_comp=True)
         io_storeEn = Logic(em, "io_storeEn", 'w', dyn_comp=True)
 
-        rresp_id = LogicVecArray(em, "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True)
+        rresp_id = LogicVecArray(em, "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
 
-        wreq_ready = LogicArray(em, "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True)
-        wresp_valid = LogicArray(em, "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True)
-        wresp_id = LogicVecArray(em, "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True)
+        wreq_ready = LogicArray(em, "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
+        wresp_valid = LogicArray(em, "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
+        wresp_id = LogicVecArray(em, "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
 
-        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True)
-        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True)
+        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
 
         # Define the process to update
         # rresp_id
