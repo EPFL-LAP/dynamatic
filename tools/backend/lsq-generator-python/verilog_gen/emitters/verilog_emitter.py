@@ -77,8 +77,10 @@ class VerilogEmitter(Emitter):
         meta = Meta(size, Type.LOGIC, -1)
         statement_str = statement.to_str(self, meta)
         # Assume we only write to logic types
-        assign_op = '<=' if in_process else '='
-        self.statementString += self.get_current_indent() + f'assign {out_str} {assign_op} {statement_str};\n'
+        if in_process:
+            self.statementString += self.get_current_indent() + f'{out_str} <= {statement_str};\n'
+        else:
+            self.statementString += self.get_current_indent() + f'assign {out_str} = {statement_str};\n'
 
     def get_definition_str(self, module_name: str, write_regs=True) -> str:
         return f'module {module_name} ' + \
@@ -155,7 +157,7 @@ class VerilogEmitter(Emitter):
             raise ValueError('Invalid bit value')
 
     def bin_to_str(self, bin: Bin, meta: Meta) -> str:
-        meta = Meta(meta.size, bin.get_operand_type(), bin.get_precedence())
+        meta = Meta(meta.size, bin.get_param_type(), bin.get_precedence())
         left_str = bin.left.to_str(self, meta)
         right_str = bin.right.to_str(self, meta)
 
@@ -332,11 +334,9 @@ class VerilogEmitter(Emitter):
 
     @staticmethod
     def int_to_str(din, size=None, meta=None) -> str:
-        assert meta is None or size is None, "Cannot specify both size and meta in int_to_str"
         if size == None:
             size = 1
             
-
         return f'{size}\'b{Emitter._int_to_bin(din, size)}'
         
     @staticmethod
