@@ -122,7 +122,7 @@ class PortToQueueDispatcher:
             em, 'entry_port_idx_oh', 'w', self.numEntries, self.numPorts)
         for i in range(0, self.numEntries):
             if (self.numPorts == 1):
-                em.add_assignment(entry_port_idx_oh[i], 1)
+                em.add_assignment(entry_port_idx_oh[i], Val(1))
             else:
                 BitsToOH(em, entry_port_idx_oh[i], entry_port_idx_i[i])
 
