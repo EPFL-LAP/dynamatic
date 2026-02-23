@@ -202,16 +202,33 @@ class VHDLEmitter(Emitter):
         return f'{self.get_unop_str(un.op)} {val_str}'
 
     def when_else_to_str(self, when_else, size: int) -> str:
+        
+        # add a linebreak if the "else" statement is a when-else themselves
+        if isinstance(when_else.false_statement, WhenElse):
+            """
+            a bit of a hack to force the inner when-else to not add parenthesis and an enter when chained
+            So the resulting when else will look like:
+            [val 1] when [cond 1] else
+            [val 2] when [cond 2] else
+            [val 3] when [cond 3] else 
+            ...
+            """
+            
+            enter = f'\n{self.get_current_indent()}\t'
+            self_precedence = -1
+        else:
+            enter = ' '
+            self_precedence = 0
+
         true_str = when_else.true_statement.to_str(self, size, 0)
-        false_str = when_else.false_statement.to_str(self, size, 0)
+        false_str = when_else.false_statement.to_str(self, size, self_precedence)
         cond_str = when_else.condition.to_str(self, size, 0)
 
         true_str = self.fix_type('logic', when_else.true_statement.get_type(), true_str)
         false_str = self.fix_type('logic', when_else.false_statement.get_type(), false_str)
         cond_str = self.fix_type('bool', when_else.condition.get_type(), cond_str)
-        
-        # add a linebreak if the "else" statement is a when-else themselves
-        enter = f'\n{self.get_current_indent()}\t' if isinstance(when_else.false_statement, WhenElse) else ' '
+
+            
         return f'{true_str} when {cond_str} else{enter}{false_str}'
 
     def logic_signal_init(self, signal: Logic, sufix: str):
@@ -346,9 +363,6 @@ class VHDLEmitter(Emitter):
                 return "'1'"
             else:
                 return "'0'"
-        if size == 1:
-            assert din in (0, 1), "Value must be 0 or 1 for size 1"
-            return f"'{din}'"
         else:
             return f'"{Emitter._int_to_bin(din, size)}"'
 
