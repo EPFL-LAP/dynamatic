@@ -88,3 +88,13 @@ class Emitter:
             raise ValueError(f"Value {val} out of range for the specified size {size}")
 
         return f'{val:0{size}b}'
+    
+class Meta():
+    """
+    Contains the meta necessary to generate correct sub statements
+    """
+    
+    def __init__(self, size, statement_type, precedence):
+        self.size = size
+        self.type = statement_type
+        self.precedence = precedence

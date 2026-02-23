@@ -50,11 +50,11 @@ class Statement:
     def concat(self, other):
         return Bin(self, BinOp.CONCAT, other)
 
-    def to_str(self, em: 'Emitter', size, super_precedence: int) -> str:
-        if self.get_precedence() <= super_precedence:
-            return f'({self._to_str(em, size)})'
+    def to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+        if self.get_precedence() <= meta.precedence:
+            return f'({self._to_str(em, meta)})'
         else:
-            return self._to_str(em, size)
+            return self._to_str(em, meta)
 
     def when(self, condition):
         self.condition = condition
@@ -66,7 +66,7 @@ class Statement:
 
         return WhenElse(self, self.condition, statement)
 
-    def _to_str(self, em: 'Emitter', size) -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         raise NotImplementedError('Subclasses must implement _to_str method')
 
     def get_type(self) -> str:
@@ -84,9 +84,11 @@ class Val(Statement):
         self.var = var
         self.size = size
 
-    def _to_str(self, em: 'Emitter', size):
+    def _to_str(self, em: 'Emitter', meta: 'Meta'):
         if self.size is not None:
             size = self.size
+        else:
+            size = meta.size
 
         arg = self.var[0] if len(self.var) == 1 else tuple(self.var)
         if type(arg) == str:
@@ -142,8 +144,8 @@ class Bin(Statement):
     def get_type(self) -> str:
         return self.op.get_type()
 
-    def _to_str(self, em: 'Emitter', size: int) -> str:
-        return em.bin_to_str(self, size)
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+        return em.bin_to_str(self, meta)
 
 class UnOp(Enum):
     NOT = ('not', 10, 'logic')
@@ -166,8 +168,8 @@ class Un(Statement):
     def get_precedence(self) -> int:
         return self.op.get_precedence()
 
-    def _to_str(self, em: 'Emitter', size: int) -> str:
-        return em.un_to_str(self, size)
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+        return em.un_to_str(self, meta)
 
 class Bit(Statement):
     """
@@ -181,7 +183,7 @@ class Bit(Statement):
     def get_precedence(self) -> int:
         return 11
 
-    def _to_str(self, em: 'Emitter', size) -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.get_bit_str(self)
 
 class CustomStatement(Statement):
@@ -192,7 +194,7 @@ class CustomStatement(Statement):
         self.vhdl_str = vhdl_str
         self.verilog_str = verilog_str
 
-    def _to_str(self, em: 'Emitter', size) -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.print_custom_str(self)
 
 class WhenElse(Statement):
@@ -207,8 +209,8 @@ class WhenElse(Statement):
     def get_precedence(self) -> int:
         return 0
 
-    def _to_str(self, em: 'Emitter', size) -> str:
-        return em.when_else_to_str(self, size)
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+        return em.when_else_to_str(self, meta)
 
     def get_type(self) -> str:
         if self.true_statement.get_type() != self.false_statement.get_type():

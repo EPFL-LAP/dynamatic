@@ -1,4 +1,4 @@
-from verilog_gen.emitters import Emitter
+from verilog_gen.emitters.emitter import Emitter, Meta
 from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit
 from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
@@ -74,7 +74,8 @@ class VerilogEmitter(Emitter):
 
     def add_assignment(self, out, statement: Statement, in_process=False):
         out_str, size = self.assigned_var_to_str(out)
-        statement_str = statement.to_str(self, size, -1)
+        meta = Meta(size, 'logic', -1)
+        statement_str = statement.to_str(self, meta)
         # Assume we only write to logic types
         assign_op = '<=' if in_process else '='
         self.statementString += self.get_current_indent() + f'assign {out_str} {assign_op} {statement_str};\n'
@@ -153,23 +154,26 @@ class VerilogEmitter(Emitter):
         else:
             raise ValueError('Invalid bit value')
 
-    def bin_to_str(self, bin: Bin, size: int) -> str:
-        left_str = bin.left.to_str(self, size, bin.get_precedence())
-        right_str = bin.right.to_str(self, size, bin.get_precedence())
+    def bin_to_str(self, bin: Bin, meta: Meta) -> str:
+        meta = Meta(meta.size, bin.get_type(), bin.get_precedence())
+        left_str = bin.left.to_str(self, meta)
+        right_str = bin.right.to_str(self, meta)
 
         if bin.op == BinOp.CONCAT:
             return f'{{{left_str}, {right_str}}}'
 
         return f'{left_str} {self.get_binop_str(bin.op)} {right_str}'
 
-    def un_to_str(self, un: Un, size: int) -> str:
-        val_str = un.val.to_str(self, size, un.get_precedence())
+    def un_to_str(self, un: Un, meta: Meta) -> str:
+        meta = Meta(meta.size, un.get_type(), un.get_precedence())
+        val_str = un.val.to_str(self, meta)
         return f'{self.get_unop_str(un.op)} {val_str}'
 
-    def when_else_to_str(self, when_else, size: int) -> str:
-        true_str = when_else.true_statement.to_str(self, size, 0)
-        false_str = when_else.false_statement.to_str(self, size, 0)
-        cond_str = when_else.condition.to_str(self, size, 0)
+    def when_else_to_str(self, when_else, meta: Meta) -> str:
+        meta = Meta(meta.size, when_else.get_type(), when_else.get_precedence())
+        true_str = when_else.true_statement.to_str(self, meta)
+        false_str = when_else.false_statement.to_str(self, meta)
+        cond_str = when_else.condition.to_str(self, meta)
 
         return f'{cond_str} ? {true_str} : {false_str}'
 

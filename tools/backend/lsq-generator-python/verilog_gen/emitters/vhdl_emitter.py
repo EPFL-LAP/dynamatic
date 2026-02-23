@@ -1,4 +1,4 @@
-from verilog_gen.emitters import Emitter
+from verilog_gen.emitters.emitter import Emitter, Meta
 from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit, WhenElse
 from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
@@ -75,7 +75,8 @@ class VHDLEmitter(Emitter):
 
     def add_assignment(self, out, statement: Statement, in_process=False):
         out_str, size = self.assigned_var_to_str(out)
-        statement_str = statement.to_str(self, size, -1)
+        meta = Meta(size, 'logic', -1)
+        statement_str = statement.to_str(self, meta)
         # Assume we only write to logic types
         statement_str = self.fix_type('logic', statement.get_type(), statement_str)
         self.statementString += self.get_current_indent() + f'{out_str} <= {statement_str};\n'
@@ -187,21 +188,23 @@ class VHDLEmitter(Emitter):
         else:
             return child_str
 
-    def bin_to_str(self, bin: Bin, size: int) -> str:
-        left_str = bin.left.to_str(self, size, bin.get_precedence())
-        right_str = bin.right.to_str(self, size, bin.get_precedence())
+    def bin_to_str(self, bin: Bin, meta: Meta) -> str:
+        meta = Meta(meta.size, bin.get_type(), bin.get_precedence())
+        left_str = bin.left.to_str(self, meta)
+        right_str = bin.right.to_str(self, meta)
 
         left_str = self.fix_type(bin.get_type(), bin.left.get_type(), left_str)
         right_str = self.fix_type(bin.get_type(), bin.right.get_type(), right_str)
 
         return f'{left_str} {self.get_binop_str(bin.op)} {right_str}'
 
-    def un_to_str(self, un: Un, size: int) -> str:
-        val_str = un.val.to_str(self, size, un.get_precedence())
+    def un_to_str(self, un: Un, meta: Meta) -> str:
+        meta = Meta(meta.size, un.get_type(), un.get_precedence())
+        val_str = un.val.to_str(self, meta)
         val_str = self.fix_type(un.get_type(), un.val.get_type(), val_str)
         return f'{self.get_unop_str(un.op)} {val_str}'
 
-    def when_else_to_str(self, when_else, size: int) -> str:
+    def when_else_to_str(self, when_else, meta: Meta) -> str:
         
         # add a linebreak if the "else" statement is a when-else themselves
         if isinstance(when_else.false_statement, WhenElse):
@@ -219,10 +222,11 @@ class VHDLEmitter(Emitter):
         else:
             enter = ' '
             self_precedence = 0
-
-        true_str = when_else.true_statement.to_str(self, size, 0)
-        false_str = when_else.false_statement.to_str(self, size, self_precedence)
-        cond_str = when_else.condition.to_str(self, size, 0)
+            
+        meta = Meta(meta.size, when_else.get_type(), when_else.get_precedence())
+        true_str = when_else.true_statement.to_str(self, meta)
+        false_str = when_else.false_statement.to_str(self, Meta(meta.size, meta.type, self_precedence))
+        cond_str = when_else.condition.to_str(self, meta)
 
         true_str = self.fix_type('logic', when_else.true_statement.get_type(), true_str)
         false_str = self.fix_type('logic', when_else.false_statement.get_type(), false_str)
@@ -353,8 +357,8 @@ class VHDLEmitter(Emitter):
     def slice_var(self, var_name, high, low):
         return f'{var_name}({high} downto {low})'
 
-    def int_to_bits(self, value: int, size: int) -> str:
-        return f'"{value:0{size}b}"'
+    def int_to_bits(self, value: int, meta: Meta) -> str:
+        return f'"{value:0{meta.size}b}"'
 
     @staticmethod
     def int_to_bits(din, size=None) -> str:
