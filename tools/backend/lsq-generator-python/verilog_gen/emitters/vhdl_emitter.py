@@ -138,8 +138,7 @@ class VHDLEmitter(Emitter):
         BinOp.GT: '>',
         BinOp.LT: '<',
         BinOp.EQ: '=',
-        BinOp.NEQ: '!=',
-        BinOp.CONCAT: '&'
+        BinOp.NEQ: '/=',
     }
 
     @staticmethod
