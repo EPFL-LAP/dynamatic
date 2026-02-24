@@ -188,7 +188,7 @@ class VerilogEmitter(Emitter):
             prefix = 'reg' if signal.force_reg else 'wire'
             self.add_signal_str(f'\t{prefix} {signal.get_base_name(sufix)};\n')
         elif (signal.type == 'r'):
-            self.add_signal_str(f'\treg {signal.get_base_name(sufix)}_d;\n')
+            self.add_signal_str(f'\twire {signal.get_base_name(sufix)}_d;\n')
             self.add_signal_str(f'\treg {signal.get_base_name(sufix)}_q;\n')
         elif (signal.type == 'i'):
             self.add_port_str(',\n')
@@ -203,7 +203,7 @@ class VerilogEmitter(Emitter):
             prefix = 'reg' if vec.force_reg else 'wire'
             self.add_signal_str(f'\t{prefix} [{vec.size-1}:0] {vec.get_base_name(sufix)};\n')
         elif (vec.type == 'r'):
-            self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.get_base_name(sufix)}_d;\n')
+            self.add_signal_str(f'\twire [{vec.size-1}:0] {vec.get_base_name(sufix)}_d;\n')
             self.add_signal_str(f'\treg [{vec.size-1}:0] {vec.get_base_name(sufix)}_q;\n')
         elif (vec.type == 'i'):
             self.add_port_str(',\n')
