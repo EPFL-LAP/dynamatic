@@ -182,8 +182,9 @@ class LSQWrapper:
         wreq_ready = LogicArray(em, "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
         wresp_valid = LogicArray(em, "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
         wresp_id = LogicVecArray(em, "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
-        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
-        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True)
+
+        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True)
         
 
         # Define the process to update
