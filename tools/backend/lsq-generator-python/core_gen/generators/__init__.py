@@ -4,7 +4,8 @@ from core_gen.generators.group_allocator import GroupAllocator
 from core_gen.generators.lsq import LSQ
 
 __all__ = [
-    "PortToQueueDispatcher", "QueueToPortDispatcher",
+    "PortToQueueDispatcher",
+    "QueueToPortDispatcher",
     "GroupAllocator",
     "LSQ",
 ]

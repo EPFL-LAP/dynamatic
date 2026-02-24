@@ -6,7 +6,8 @@ from core_gen.codegen import codeGen
 # from vhdlgen import *
 __all__ = [
     # configs
-    "GetConfigs", "Configs",
+    "GetConfigs",
+    "Configs",
     # codegen
     "codeGen",
 ]

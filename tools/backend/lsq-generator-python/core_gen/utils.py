@@ -11,6 +11,7 @@ import math
 # Helper Function
 # ===----------------------------------------------------------------------===#
 
+
 def GetValue(row, i) -> int:
     if len(row) > i:
         return row[i]
@@ -19,7 +20,7 @@ def GetValue(row, i) -> int:
 
 
 def isPow2(value: int) -> bool:
-    return (value & (value-1) == 0) and value != 0
+    return (value & (value - 1) == 0) and value != 0
 
 
 def log2Ceil(value: int) -> int:

@@ -6,8 +6,8 @@ class LSQ_Submodules:
     """
     Save LSQ (Load-Store Queue) submodule instances.
 
-    This class acts as a simple struct to group together all the generator objects 
-    required to build a complete LSQ. An instance of this class is created by the 
+    This class acts as a simple struct to group together all the generator objects
+    required to build a complete LSQ. An instance of this class is created by the
     codegen.py script, and then passed to the LSQ generator.
 
     Attributes:

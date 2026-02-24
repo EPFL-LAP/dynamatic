@@ -25,7 +25,7 @@ class Logic(Statement):
     Attributes:
         ctx (VHDLContext): Context for code generation.
         name (str): The base name of the signal.
-        type (str): 
+        type (str):
             'i' input port      (<name>_i: in std_logic)
             'o' output port     (<name>_o: out std_logic)
             'w' internal wire   (signal <name>: std_logic)
@@ -40,24 +40,32 @@ class Logic(Statement):
     """
 
     # Signal name
-    name = ''
+    name = ""
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
-    type = ''
+    type = ""
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', init: bool = True, dyn_comp=False, force_reg=False) -> None:
+    def __init__(
+        self,
+        ctx: Statement,
+        name: str,
+        type: str = "w",
+        init: bool = True,
+        dyn_comp=False,
+        force_reg=False,
+    ) -> None:
         """
         init: If True, immediately generates the corresponding std_logic in VHDL.
               True when we instantiate Logic.
               False when we instantiate LogicVec, LogicArray, and LogicVecArray.
         """
         # Type should be one of the four types.
-        assert (type in ('i', 'o', 'w', 'r'))
+        assert type in ("i", "o", "w", "r")
         self.ctx = ctx
         self.name = name
         self.type = type
         self.dyn_comp = dyn_comp
         self.force_reg = force_reg
-        if (init):
+        if init:
             self.signalInit()
 
     def __repr__(self) -> str:
@@ -65,18 +73,22 @@ class Logic(Statement):
         Print Logic with useful information.
         """
         # Signal type
-        type = ''
-        if (self.type == 'w'):
-            type = 'wire'
-        elif (self.type == 'i'):
-            type = 'input'
-        elif (self.type == 'o'):
-            type = 'output'
-        elif (self.type == 'r'):
-            type = 'reg'
-        return f'name: {self.get_base_name()}\n' + f'type: {type}\n' + f'size: single bit\n'
+        type = ""
+        if self.type == "w":
+            type = "wire"
+        elif self.type == "i":
+            type = "input"
+        elif self.type == "o":
+            type = "output"
+        elif self.type == "r":
+            type = "reg"
+        return (
+            f"name: {self.get_base_name()}\n"
+            + f"type: {type}\n"
+            + f"size: single bit\n"
+        )
 
-    def getNameRead(self, sufix='') -> str:
+    def getNameRead(self, sufix="") -> str:
         """
         Returns the name we should use when reading the signal.
 
@@ -84,47 +96,53 @@ class Logic(Statement):
             If you want to do "Logic a = Logic b + Logic c"
             -> getNameWrite(a) = getNameRead(b) + getNameRead(c)
         """
-        if (self.type == 'w'):
+        if self.type == "w":
             return self.get_base_name(sufix)
-        elif (self.type == 'r'):
-            return self.get_base_name(sufix) + '_q'
-        elif (self.type == 'i'):
-            return self.get_base_name(sufix) + ('_i' if not self.dyn_comp else '')
-        elif (self.type == 'o'):
-            raise TypeError(f'Cannot read from the output signal \"{self.get_base_name(sufix)}\"!')
+        elif self.type == "r":
+            return self.get_base_name(sufix) + "_q"
+        elif self.type == "i":
+            return self.get_base_name(sufix) + ("_i" if not self.dyn_comp else "")
+        elif self.type == "o":
+            raise TypeError(
+                f'Cannot read from the output signal "{self.get_base_name(sufix)}"!'
+            )
 
     def _to_str(self, em: Statement, size) -> str:
         return self.getNameRead()
 
-    def getNameWrite(self, sufix='') -> str:
+    def getNameWrite(self, sufix="") -> str:
         """
-        Returns the name to write to. 
+        Returns the name to write to.
 
         Example in the getNameRead() method.
         """
-        if (self.type == 'w'):
+        if self.type == "w":
             return self.get_base_name(sufix)
-        elif (self.type == 'r'):
-            return self.get_base_name(sufix) + '_d'
-        elif (self.type == 'i'):
-            raise TypeError(f'Cannot write to the input signal \"{self.get_base_name(sufix)}\"!')
-        elif (self.type == 'o'):
-            return self.get_base_name(sufix) + ('_o' if not self.dyn_comp else '')
+        elif self.type == "r":
+            return self.get_base_name(sufix) + "_d"
+        elif self.type == "i":
+            raise TypeError(
+                f'Cannot write to the input signal "{self.get_base_name(sufix)}"!'
+            )
+        elif self.type == "o":
+            return self.get_base_name(sufix) + ("_o" if not self.dyn_comp else "")
 
-    def signalInit(self, sufix='') -> None:
+    def signalInit(self, sufix="") -> None:
         self.ctx.logic_signal_init(self, sufix)
 
     def regInit(self, enable=None, init=None) -> None:
         self.ctx.logic_reg_init(self, enable, init)
 
-    def get_base_name(self, sufix='') -> str:
-        if not self.dyn_comp or sufix == '':
+    def get_base_name(self, sufix="") -> str:
+        if not self.dyn_comp or sufix == "":
             return self.name + sufix
-        
-        name_list = self.name.split('_')
+
+        name_list = self.name.split("_")
         name_list = name_list[:-1] + [sufix, name_list[-1]]
-        name = '_'.join(name_list)
-        return name.replace('__', '_')
+        name = "_".join(name_list)
+        return name.replace("__", "_")
+
+
 #
 # std_logic_vec
 #
@@ -151,51 +169,66 @@ class LogicVec(Logic):
         LogicVecArray (size=3, length=2): [101,
                                            010]
     """
+
     # Signal name
-    name = ''
+    name = ""
     # Signal type, 'i' for input, 'o' for output, 'w' for wire, 'r' for register
-    type = ''
+    type = ""
     size = 1
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', size: int = 1, init: bool = True, dyn_comp=False, force_reg=False) -> None:
+    def __init__(
+        self,
+        ctx: Statement,
+        name: str,
+        type: str = "w",
+        size: int = 1,
+        init: bool = True,
+        dyn_comp=False,
+        force_reg=False,
+    ) -> None:
         Logic.__init__(self, ctx, name, type, False, dyn_comp, force_reg)
-        assert (size > 0)
+        assert size > 0
         self.size = size
-        if (init):
+        if init:
             self.signalInit()
 
     def __repr__(self) -> str:
         # Signal type
-        type = ''
-        if (self.type == 'w'):
-            type = 'wire'
-        elif (self.type == 'i'):
-            type = 'input'
-        elif (self.type == 'o'):
-            type = 'output'
-        elif (self.type == 'r'):
-            type = 'reg'
-        return f'name: {self.get_base_name()}\n' + f'type: {type}\n' + f'size: {self.size}\n'
+        type = ""
+        if self.type == "w":
+            type = "wire"
+        elif self.type == "i":
+            type = "input"
+        elif self.type == "o":
+            type = "output"
+        elif self.type == "r":
+            type = "reg"
+        return (
+            f"name: {self.get_base_name()}\n"
+            + f"type: {type}\n"
+            + f"size: {self.size}\n"
+        )
 
-    def getNameRead(self, i=None, sufix='') -> str:
-        if (i == None):
+    def getNameRead(self, i=None, sufix="") -> str:
+        if i == None:
             return Logic.getNameRead(self, sufix)
         else:
-            assert (i < self.size)
+            assert i < self.size
             return self.ctx.index_var(Logic.getNameRead(self, sufix), i)
 
-    def getNameWrite(self, i=None, sufix='') -> str:
-        if (i == None):
+    def getNameWrite(self, i=None, sufix="") -> str:
+        if i == None:
             return Logic.getNameWrite(self, sufix)
         else:
-            assert (i < self.size)
+            assert i < self.size
             return self.ctx.index_var(Logic.getNameWrite(self, sufix), i)
 
-    def signalInit(self, sufix=''):
+    def signalInit(self, sufix=""):
         self.ctx.logicvec_signal_init(self, sufix)
 
     def regInit(self, enable=None, init=None) -> None:
         self.ctx.logicvec_reg_init(self, enable, init)
+
 
 #
 # An array of std_logic
@@ -221,34 +254,47 @@ class LogicArray(Logic):
         Indexable reads/writes of LogicArray components
         Access a certain i-th element of LogicArray via getNameRead(i), getNameWrite(i)
     """
+
     length = 1
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1, dyn_comp=False, force_reg=False):
+    def __init__(
+        self,
+        ctx: Statement,
+        name: str,
+        type: str = "w",
+        length: int = 1,
+        dyn_comp=False,
+        force_reg=False,
+    ):
         self.length = length
         Logic.__init__(self, ctx, name, type, False, dyn_comp, force_reg)
         self.signalInit()
 
     def __repr__(self) -> str:
-        return Logic.__repr__(self) + f'array length: {self.length}'
+        return Logic.__repr__(self) + f"array length: {self.length}"
 
     def getNameRead(self, i) -> str:
         assert i in range(0, self.length)
-        return Logic.getNameRead(self, f'_{i}')
+        return Logic.getNameRead(self, f"_{i}")
 
     def getNameWrite(self, i) -> str:
         assert i in range(0, self.length)
-        return Logic.getNameWrite(self, f'_{i}')
+        return Logic.getNameWrite(self, f"_{i}")
 
     def signalInit(self) -> None:
         for i in range(0, self.length):
-            Logic.signalInit(self, f'_{i}')
+            Logic.signalInit(self, f"_{i}")
 
     def __getitem__(self, i) -> Logic:
         assert i in range(0, self.length)
-        return Logic(self.ctx, self.get_base_name(f'_{i}'), self.type, False, self.dyn_comp)
+        return Logic(
+            self.ctx, self.get_base_name(f"_{i}"), self.type, False, self.dyn_comp
+        )
 
     def regInit(self, enable=None, init=None) -> None:
         self.ctx.logicarray_reg_init(self, enable, init)
+
+
 #
 # An array of std_logic vector
 #
@@ -274,31 +320,48 @@ class LogicVecArray(LogicVec):
         Indexable reads/writes of LogicVecArray components
         Access a certain i-th LogicVec of LogicVecArray via getNameRead(i), getNameWrite(i)
     """
+
     length = 1
 
-    def __init__(self, ctx: Statement, name: str, type: str = 'w', length: int = 1, size: int = 1, dyn_comp=False, force_reg=False):
+    def __init__(
+        self,
+        ctx: Statement,
+        name: str,
+        type: str = "w",
+        length: int = 1,
+        size: int = 1,
+        dyn_comp=False,
+        force_reg=False,
+    ):
         self.length = length
         LogicVec.__init__(self, ctx, name, type, size, False, dyn_comp, force_reg)
         self.signalInit()
 
     def __repr__(self) -> str:
-        return LogicVec.__repr__(self) + f'array length: {self.length}'
+        return LogicVec.__repr__(self) + f"array length: {self.length}"
 
     def getNameRead(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        return LogicVec.getNameRead(self, j, f'_{i}')
+        return LogicVec.getNameRead(self, j, f"_{i}")
 
     def getNameWrite(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        return LogicVec.getNameWrite(self, j, f'_{i}')
+        return LogicVec.getNameWrite(self, j, f"_{i}")
 
     def signalInit(self) -> None:
         for i in range(0, self.length):
-            LogicVec.signalInit(self, f'_{i}')
+            LogicVec.signalInit(self, f"_{i}")
 
     def __getitem__(self, i) -> LogicVec:
         assert i in range(0, self.length)
-        return LogicVec(self.ctx, self.get_base_name(f'_{i}'), self.type, self.size, False, self.dyn_comp)
+        return LogicVec(
+            self.ctx,
+            self.get_base_name(f"_{i}"),
+            self.type,
+            self.size,
+            False,
+            self.dyn_comp,
+        )
 
     def regInit(self, enable=None, init=None) -> None:
         self.ctx.logicvecarray_reg_init(self, enable, init)

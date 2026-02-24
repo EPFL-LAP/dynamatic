@@ -8,14 +8,17 @@ class Emitter:
     """
 
     def __init__(self):
-        raise NotImplementedError("Emitter is an abstract class and cannot be instantiated directly.")
+        raise NotImplementedError(
+            "Emitter is an abstract class and cannot be instantiated directly."
+        )
 
     def get_current_indent(self) -> str:
-        raise NotImplementedError("Emitter subclasses must implement get_current_indent()")
+        raise NotImplementedError(
+            "Emitter subclasses must implement get_current_indent()"
+        )
 
     def increase_indent(self):
         raise NotImplementedError("Emitter subclasses must implement increase_indent()")
-
 
     def decrease_indent(self):
         raise NotImplementedError("Emitter subclasses must implement decrease_indent()")
@@ -61,15 +64,16 @@ class Emitter:
 
     def assigned_var_to_str(self, var):
         from core_gen.signals import Logic
+
         size = 1
         if type(var) == tuple:
             if len(var) == 2:
-                str_ret = f'{var[0].getNameWrite(var[1])}'
+                str_ret = f"{var[0].getNameWrite(var[1])}"
             else:
-                str_ret = f'{var[0].getNameWrite(var[1], var[2])}'
+                str_ret = f"{var[0].getNameWrite(var[1], var[2])}"
         else:
-            str_ret = f'{var.getNameWrite()}'
-            if (type(var) != Logic):
+            str_ret = f"{var.getNameWrite()}"
+            if type(var) != Logic:
                 size = var.size
 
         return str_ret, size
@@ -87,13 +91,14 @@ class Emitter:
         if val < 0 or val >= (1 << size):
             raise ValueError(f"Value {val} out of range for the specified size {size}")
 
-        return f'{val:0{size}b}'
-    
-class Meta():
+        return f"{val:0{size}b}"
+
+
+class Meta:
     """
     Contains the meta necessary to generate correct sub statements
     """
-    
+
     def __init__(self, size, statement_type, precedence):
         self.size = size
         self.type = statement_type

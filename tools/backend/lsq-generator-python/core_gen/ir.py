@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class Statement:
     """
     Represents a statement base class.
@@ -8,6 +9,7 @@ class Statement:
     generator. Extracted into its own module to avoid circular imports when
     `signals.py` needs to reference the type.
     """
+
     def __add__(self, other):
         return Bin(self, BinOp.ADD, other)
 
@@ -50,9 +52,9 @@ class Statement:
     def concat(self, other):
         return Bin(self, BinOp.CONCAT, other)
 
-    def to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+    def to_str(self, em: "Emitter", meta: "Meta") -> str:
         if self.get_precedence() <= meta.precedence:
-            return f'({self._to_str(em, meta)})'
+            return f"({self._to_str(em, meta)})"
         else:
             return self._to_str(em, meta)
 
@@ -61,13 +63,13 @@ class Statement:
         return self
 
     def else_(self, statement):
-        if getattr(self, 'condition', None) is None:
-            raise ValueError('else_ can only be called after when')
+        if getattr(self, "condition", None) is None:
+            raise ValueError("else_ can only be called after when")
 
         return WhenElse(self, self.condition, statement)
 
-    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
-        raise NotImplementedError('Subclasses must implement _to_str method')
+    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
+        raise NotImplementedError("Subclasses must implement _to_str method")
 
     def get_type(self) -> str:
         return Type.LOGIC
@@ -76,22 +78,24 @@ class Statement:
         # TODO: Cleaner way to handle precedence
         return 10000
 
+
 class Type(Enum):
-    LOGIC = 'logic'
-    ARITH = 'arith'
-    BOOL = 'bool'
-    ANY = 'any'
+    LOGIC = "logic"
+    ARITH = "arith"
+    BOOL = "bool"
+    ANY = "any"
 
 
 class Val(Statement):
     """
     Represents a variable statement
     """
+
     def __init__(self, *var, size=None):
         self.var = var
         self.size = size
 
-    def _to_str(self, em: 'Emitter', meta: 'Meta'):
+    def _to_str(self, em: "Emitter", meta: "Meta"):
         if self.size is not None:
             size = self.size
         else:
@@ -113,120 +117,135 @@ class Val(Statement):
             str_ret = arg.getNameRead()
 
         return str_ret
-    
+
     def get_type(self) -> str:
         return Type.ANY if type(self.var[0]) == int else Type.LOGIC
 
 
 class BinOp(Enum):
-    ADD = ('+', 4, Type.ARITH, Type.ARITH)
-    SUB = ('-', 4, Type.ARITH, Type.ARITH)
-    AND = ('and', 3, Type.LOGIC, Type.LOGIC)
-    OR = ('or', 3, Type.LOGIC, Type.LOGIC)
-    XOR = ('xor', 3, Type.LOGIC, Type.LOGIC)
-    CONCAT = ('&', 3, Type.LOGIC, Type.LOGIC)
-    MUL = ('*', 5, Type.ARITH, Type.ARITH)
-    GE = ('>=', 2, Type.BOOL, Type.ARITH)
-    LE = ('<=', 2, Type.BOOL, Type.ARITH)
-    GT = ('>', 2, Type.BOOL, Type.ARITH)
-    LT = ('<', 2, Type.BOOL, Type.ARITH)
-    EQ = ('=', 1, Type.BOOL, Type.ANY)
-    NEQ = ('!=', 1, Type.BOOL, Type.ANY)
+    ADD = ("+", 4, Type.ARITH, Type.ARITH)
+    SUB = ("-", 4, Type.ARITH, Type.ARITH)
+    AND = ("and", 3, Type.LOGIC, Type.LOGIC)
+    OR = ("or", 3, Type.LOGIC, Type.LOGIC)
+    XOR = ("xor", 3, Type.LOGIC, Type.LOGIC)
+    CONCAT = ("&", 3, Type.LOGIC, Type.LOGIC)
+    MUL = ("*", 5, Type.ARITH, Type.ARITH)
+    GE = (">=", 2, Type.BOOL, Type.ARITH)
+    LE = ("<=", 2, Type.BOOL, Type.ARITH)
+    GT = (">", 2, Type.BOOL, Type.ARITH)
+    LT = ("<", 2, Type.BOOL, Type.ARITH)
+    EQ = ("=", 1, Type.BOOL, Type.ANY)
+    NEQ = ("!=", 1, Type.BOOL, Type.ANY)
 
     def get_precedence(self) -> int:
         return self.value[1]
 
     def get_type(self) -> str:
         return self.value[2]
-    
+
     def get_param_type(self) -> str:
         return self.value[3]
-    
+
+
 class Bin(Statement):
     """
     Represents a binary statement
     """
+
     def __init__(self, left, op, right):
         self.left = left
         self.op = op
         self.right = right
-    
+
     def get_precedence(self) -> int:
         return self.op.get_precedence()
 
     def get_type(self) -> str:
         return self.op.get_type()
-    
+
     def get_param_type(self) -> str:
         return self.op.get_param_type()
 
-    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
         return em.bin_to_str(self, meta)
 
+
 class UnOp(Enum):
-    NOT = ('not', 10, Type.LOGIC, Type.LOGIC)
+    NOT = ("not", 10, Type.LOGIC, Type.LOGIC)
 
     def get_precedence(self) -> int:
         return self.value[1]
-        
+
     def get_type(self) -> str:
         return self.value[2]
 
     def get_param_type(self) -> str:
         return self.value[3]
+
 
 class Un(Statement):
     """
     Represents a unary statement
     """
+
     def __init__(self, op: UnOp, val: Statement):
         self.op = op
         self.val = val
 
-
     def get_precedence(self) -> int:
         return self.op.get_precedence()
-    
+
     def get_type(self) -> str:
         return self.op.get_type()
 
     def get_param_type(self) -> str:
         return self.op.get_param_type()
 
-    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
         return em.un_to_str(self, meta)
+
 
 class Bit(Statement):
     """
     Represents a bit statement
     """
+
     def __init__(self, value: int):
         if value not in (0, 1):
-            raise ValueError('Bit value must be 0 or 1')
+            raise ValueError("Bit value must be 0 or 1")
         self.value = value
 
     def get_precedence(self) -> int:
         return 11
 
-    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
         return em.get_bit_str(self)
+
 
 class CustomStatement(Statement):
     """
     Represents a custom string statement
     """
+
     def __init__(self, vhdl_str, verilog_str):
         self.vhdl_str = vhdl_str
         self.verilog_str = verilog_str
 
-    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
         return em.print_custom_str(self)
+
 
 class WhenElse(Statement):
     """
     Represents a when-else statement
     """
-    def __init__(self, true_statement: Statement, condition: Statement,  false_statement: Statement):
+
+    def __init__(
+        self,
+        true_statement: Statement,
+        condition: Statement,
+        false_statement: Statement,
+    ):
         self.condition = condition
         self.true_statement = true_statement
         self.false_statement = false_statement
@@ -234,13 +253,22 @@ class WhenElse(Statement):
     def get_precedence(self) -> int:
         return 0
 
-    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
         return em.when_else_to_str(self, meta)
 
     def get_type(self) -> str:
-        if self.true_statement.get_type() != self.false_statement.get_type() and self.true_statement.get_type() != Type.ANY and self.false_statement.get_type() != Type.ANY:
-            raise ValueError(f'true_statement and false_statement must have the same type, got {self.true_statement.get_type()} and {self.false_statement.get_type()}')
+        if (
+            self.true_statement.get_type() != self.false_statement.get_type()
+            and self.true_statement.get_type() != Type.ANY
+            and self.false_statement.get_type() != Type.ANY
+        ):
+            raise ValueError(
+                f"true_statement and false_statement must have the same type, got {self.true_statement.get_type()} and {self.false_statement.get_type()}"
+            )
         return self.true_statement.get_type()
-        
+
+
 def Op(ctx, *args):
-    raise ValueError('Op is deprecated, please use Val, Bin, Un, WhenElse, or CustomStr instead')
+    raise ValueError(
+        "Op is deprecated, please use Val, Bin, Un, WhenElse, or CustomStr instead"
+    )

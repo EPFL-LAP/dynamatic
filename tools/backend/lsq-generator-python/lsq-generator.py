@@ -24,8 +24,7 @@ from core_gen.ir import Val, CustomStatement, Bit
 parser = argparse.ArgumentParser(
     description="Please specify the output path and lsq config file"
 )
-parser.add_argument("--output-dir", "-o",
-                    dest="output_path", default=".", type=str)
+parser.add_argument("--output-dir", "-o", dest="output_path", default=".", type=str)
 parser.add_argument(
     "--config-file", "-c", required=True, dest="config_files", default="", type=str
 )
@@ -137,64 +136,181 @@ class LSQWrapper:
 
     def genWrapper(self, em: Emitter):
         """This function generates the desired wrapper for the LSQ"""
-        
+
         em.clock_name = "clock"
         em.reset_name = "reset"
 
         ##
         # Define all the IOs, details can be found in the table above
         # ! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
-        io_storeData = LogicVec(em, "io_storeData", 'o', self.lsq_config.dataW, dyn_comp=True)
-        io_storeAddr = LogicVec(em, "io_storeAddr", 'o', self.lsq_config.addrW, dyn_comp=True)
-        io_storeEn = Logic(em, "io_storeEn", 'o', dyn_comp=True)
-        io_loadData = LogicVec(em, "io_loadData", 'i', self.lsq_config.dataW, dyn_comp=True)
-        io_loadAddr = LogicVec(em, "io_loadAddr", 'o', self.lsq_config.addrW, dyn_comp=True)
-        io_loadEn = Logic(em, "io_loadEn", 'o', dyn_comp=True)
-        io_ctrl_ready = LogicArray(em, "io_ctrl_ready", 'o', self.lsq_config.numGroups, dyn_comp=True)
-        io_ctrl_valid = LogicArray(em, "io_ctrl_valid", 'i', self.lsq_config.numGroups, dyn_comp=True)
-        io_ldAddr_ready = LogicArray(em, "io_ldAddr_ready", 'o', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldAddr_valid = LogicArray(em, "io_ldAddr_valid", 'i', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldAddr_bits = LogicVecArray(em, "io_ldAddr_bits", 'i', self.lsq_config.numLdPorts, self.lsq_config.addrW, dyn_comp=True)
-        io_ldData_ready = LogicArray(em, "io_ldData_ready", 'i', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldData_valid = LogicArray(em, "io_ldData_valid", 'o', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldData_bits = LogicVecArray(em, "io_ldData_bits", 'o', self.lsq_config.numLdPorts, self.lsq_config.dataW, dyn_comp=True)
-        io_stAddr_ready = LogicArray(em, "io_stAddr_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stAddr_valid = LogicArray(em, "io_stAddr_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stAddr_bits = LogicVecArray(em, "io_stAddr_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.addrW, dyn_comp=True)
-        io_stData_ready = LogicArray(em, "io_stData_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stData_valid = LogicArray(em, "io_stData_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stData_bits = LogicVecArray(em, "io_stData_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.dataW, dyn_comp=True)
-        io_memStart_ready = Logic(em, "io_memStart_ready", 'o', dyn_comp=True)
-        io_memStart_valid = Logic(em, "io_memStart_valid", 'i', dyn_comp=True)
-        io_ctrlEnd_ready = Logic(em, "io_ctrlEnd_ready", 'o', dyn_comp=True)
-        io_ctrlEnd_valid = Logic(em, "io_ctrlEnd_valid", 'i', dyn_comp=True)
-        io_memEnd_ready = Logic(em, "io_memEnd_ready", 'i', dyn_comp=True)
-        io_memEnd_valid = Logic(em, "io_memEnd_valid", 'o', dyn_comp=True)
+        io_storeData = LogicVec(
+            em, "io_storeData", "o", self.lsq_config.dataW, dyn_comp=True
+        )
+        io_storeAddr = LogicVec(
+            em, "io_storeAddr", "o", self.lsq_config.addrW, dyn_comp=True
+        )
+        io_storeEn = Logic(em, "io_storeEn", "o", dyn_comp=True)
+        io_loadData = LogicVec(
+            em, "io_loadData", "i", self.lsq_config.dataW, dyn_comp=True
+        )
+        io_loadAddr = LogicVec(
+            em, "io_loadAddr", "o", self.lsq_config.addrW, dyn_comp=True
+        )
+        io_loadEn = Logic(em, "io_loadEn", "o", dyn_comp=True)
+        io_ctrl_ready = LogicArray(
+            em, "io_ctrl_ready", "o", self.lsq_config.numGroups, dyn_comp=True
+        )
+        io_ctrl_valid = LogicArray(
+            em, "io_ctrl_valid", "i", self.lsq_config.numGroups, dyn_comp=True
+        )
+        io_ldAddr_ready = LogicArray(
+            em, "io_ldAddr_ready", "o", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldAddr_valid = LogicArray(
+            em, "io_ldAddr_valid", "i", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldAddr_bits = LogicVecArray(
+            em,
+            "io_ldAddr_bits",
+            "i",
+            self.lsq_config.numLdPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
+        )
+        io_ldData_ready = LogicArray(
+            em, "io_ldData_ready", "i", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldData_valid = LogicArray(
+            em, "io_ldData_valid", "o", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldData_bits = LogicVecArray(
+            em,
+            "io_ldData_bits",
+            "o",
+            self.lsq_config.numLdPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
+        )
+        io_stAddr_ready = LogicArray(
+            em, "io_stAddr_ready", "o", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stAddr_valid = LogicArray(
+            em, "io_stAddr_valid", "i", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stAddr_bits = LogicVecArray(
+            em,
+            "io_stAddr_bits",
+            "i",
+            self.lsq_config.numStPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
+        )
+        io_stData_ready = LogicArray(
+            em, "io_stData_ready", "o", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stData_valid = LogicArray(
+            em, "io_stData_valid", "i", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stData_bits = LogicVecArray(
+            em,
+            "io_stData_bits",
+            "i",
+            self.lsq_config.numStPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
+        )
+        io_memStart_ready = Logic(em, "io_memStart_ready", "o", dyn_comp=True)
+        io_memStart_valid = Logic(em, "io_memStart_valid", "i", dyn_comp=True)
+        io_ctrlEnd_ready = Logic(em, "io_ctrlEnd_ready", "o", dyn_comp=True)
+        io_ctrlEnd_valid = Logic(em, "io_ctrlEnd_valid", "i", dyn_comp=True)
+        io_memEnd_ready = Logic(em, "io_memEnd_ready", "i", dyn_comp=True)
+        io_memEnd_valid = Logic(em, "io_memEnd_valid", "o", dyn_comp=True)
 
         ##
         # Architecture definition start
         ##
 
         # Define internal signals
-        rreq_ready = LogicArray(em, "rreq_ready", "w", self.lsq_config.numLdMem, dyn_comp=True, force_reg=True)
-        rresp_valid = LogicArray(em, "rresp_valid", 'w', self.lsq_config.numLdMem, dyn_comp=True, force_reg=True)
-        rresp_id = LogicVecArray(em, "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
-        wreq_ready = LogicArray(em, "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
-        wresp_valid = LogicArray(em, "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
-        wresp_id = LogicVecArray(em, "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
-        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True)
+        rreq_ready = LogicArray(
+            em,
+            "rreq_ready",
+            "w",
+            self.lsq_config.numLdMem,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        rresp_valid = LogicArray(
+            em,
+            "rresp_valid",
+            "w",
+            self.lsq_config.numLdMem,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        rresp_id = LogicVecArray(
+            em,
+            "rresp_id",
+            "w",
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        wreq_ready = LogicArray(
+            em,
+            "wreq_ready",
+            "w",
+            self.lsq_config.numStMem,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        wresp_valid = LogicArray(
+            em,
+            "wresp_valid",
+            "w",
+            self.lsq_config.numStMem,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        wresp_id = LogicVecArray(
+            em,
+            "wresp_id",
+            "w",
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        rreq_id = LogicVecArray(
+            em,
+            "rreq_id",
+            "w",
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+        )
 
-        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True)
-        
+        wreq_id = LogicVecArray(
+            em,
+            "wreq_id",
+            "w",
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+        )
 
         # Define the process to update
         # rreq_ready, rresp_valid
-        em.add_comment('--------------------------------------------------------------------------')
-        em.add_comment('Process for rreq_ready, rresp_valid and rresp_id')
-        
+        em.add_comment(
+            "--------------------------------------------------------------------------"
+        )
+        em.add_comment("Process for rreq_ready, rresp_valid and rresp_id")
+
         em.add_statement(em.get_reg_init_str())
         em.increase_indent()
-        em.add_custom_statement(CustomStatement("if reset = '1' then", "if (reset) begin"))
+        em.add_custom_statement(
+            CustomStatement("if reset = '1' then", "if (reset) begin")
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
@@ -202,15 +318,21 @@ class LSQWrapper:
             em.add_assignment(rresp_valid[i], Bit(0), in_process=True)
             em.add_assignment(rresp_id[i], Val(0), in_process=True)
 
-    
         em.decrease_indent()
-        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then", "end\nelse begin"))
+        em.add_custom_statement(
+            CustomStatement("elsif rising_edge(clock) then", "end\nelse begin")
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
             em.add_assignment(rreq_ready[i], Bit(1), in_process=True)
 
-        em.add_custom_statement(CustomStatement(f"if {io_loadEn.getNameWrite()} = '1' then", f"if ({io_loadEn.getNameWrite()}) begin"))
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_loadEn.getNameWrite()} = '1' then",
+                f"if ({io_loadEn.getNameWrite()}) begin",
+            )
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
@@ -223,7 +345,7 @@ class LSQWrapper:
 
         for i in range(self.lsq_config.numLdMem):
             em.add_assignment(rresp_valid[i], Bit(0), in_process=True)
-        
+
         em.decrease_indent()
         em.add_custom_statement(CustomStatement("end if;", "end"))
         em.decrease_indent()
@@ -231,16 +353,22 @@ class LSQWrapper:
         em.decrease_indent()
         em.add_custom_statement(CustomStatement("end process;", "end"))
 
-        em.add_comment('--------------------------------------------------------------------------')
+        em.add_comment(
+            "--------------------------------------------------------------------------"
+        )
 
         # Define the process to update
         # wreq_ready, wresp_valid, wresp_id
-        em.add_comment('--------------------------------------------------------------------------')
-        em.add_comment('Process for wreq_ready, wresp_valid and wresp_id')
+        em.add_comment(
+            "--------------------------------------------------------------------------"
+        )
+        em.add_comment("Process for wreq_ready, wresp_valid and wresp_id")
 
         em.add_statement(em.get_reg_init_str())
         em.increase_indent()
-        em.add_custom_statement(CustomStatement("if reset = '1' then", "if (reset) begin"))
+        em.add_custom_statement(
+            CustomStatement("if reset = '1' then", "if (reset) begin")
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
@@ -249,13 +377,20 @@ class LSQWrapper:
             em.add_assignment(wresp_id[i], Val(0), in_process=True)
 
         em.decrease_indent()
-        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then", "end\nelse begin"))
+        em.add_custom_statement(
+            CustomStatement("elsif rising_edge(clock) then", "end\nelse begin")
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
             em.add_assignment(wreq_ready[i], Bit(1), in_process=True)
 
-        em.add_custom_statement(CustomStatement(f"if {io_storeEn.getNameWrite()} = '1' then", f"if ({io_storeEn.getNameWrite()}) begin"))
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_storeEn.getNameWrite()} = '1' then",
+                f"if ({io_storeEn.getNameWrite()}) begin",
+            )
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
@@ -281,7 +416,7 @@ class LSQWrapper:
         ###
         # Instantiate the LSQ_core module
         ###
-        em.add_comment('Instantiate the core LSQ logic')
+        em.add_comment("Instantiate the core LSQ logic")
         em.start_instantiation(self.lsq_name + "_core")
 
         em.add_map("rst", "reset")
@@ -342,7 +477,9 @@ class LSQWrapper:
 
         # Write to the file
         output_str = em.get_definition_str(self.lsq_name)
-        with open(f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", 'w') as file:
+        with open(
+            f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", "w"
+        ) as file:
             file.write(output_str)
 
         return self.lsq_wrapper_str
@@ -355,32 +492,88 @@ class LSQWrapper:
         em.clock_name = "clock"
         em.reset_name = "reset"
 
-        io_storeData = LogicVec(em, "io_stDataToMC_bits", 'o', self.lsq_config.dataW, dyn_comp=True)
-        io_storeAddr = LogicVec(em, "io_stAddrToMC_bits", 'o', self.lsq_config.addrW, dyn_comp=True)
-        io_loadData = LogicVec(em, "io_ldDataFromMC_bits", 'i', self.lsq_config.dataW, dyn_comp=True)
-        io_loadAddr = LogicVec(em, "io_ldAddrToMC_bits", 'o', self.lsq_config.addrW, dyn_comp=True)
-        io_ctrl_ready = LogicArray(em, "io_ctrl_ready", 'o', self.lsq_config.numGroups, dyn_comp=True)
-        io_ctrl_valid = LogicArray(em, "io_ctrl_valid", 'i', self.lsq_config.numGroups, dyn_comp=True)
-        io_ldAddr_ready = LogicArray(em, "io_ldAddr_ready", 'o', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldAddr_valid = LogicArray(em, "io_ldAddr_valid", 'i', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldAddr_bits = LogicVecArray(em, "io_ldAddr_bits", 'i', self.lsq_config.numLdPorts, self.lsq_config.addrW, dyn_comp=True)
-        io_ldData_ready = LogicArray(em, "io_ldData_ready", 'i', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldData_valid = LogicArray(em, "io_ldData_valid", 'o', self.lsq_config.numLdPorts, dyn_comp=True)
-        io_ldData_bits = LogicVecArray(em, "io_ldData_bits", 'o', self.lsq_config.numLdPorts, self.lsq_config.dataW, dyn_comp=True)
-        io_stAddr_ready = LogicArray(em, "io_stAddr_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stAddr_valid = LogicArray(em, "io_stAddr_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stAddr_bits = LogicVecArray(em, "io_stAddr_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.addrW, dyn_comp=True)
-        io_stData_ready = LogicArray(em, "io_stData_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stData_valid = LogicArray(em, "io_stData_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True)
-        io_stData_bits = LogicVecArray(em, "io_stData_bits", 'i', self.lsq_config.numStPorts, self.lsq_config.dataW, dyn_comp=True)
-        io_ldAddrToMC_ready = Logic(em, "io_ldAddrToMC_ready", 'i', dyn_comp=True)
-        io_ldAddrToMC_valid = Logic(em, "io_ldAddrToMC_valid", 'o', dyn_comp=True)
-        io_ldDataFromMC_ready = Logic(em, "io_ldDataFromMC_ready", 'o', dyn_comp=True)
-        io_ldDataFromMC_valid = Logic(em, "io_ldDataFromMC_valid", 'i', dyn_comp=True)
-        io_stAddrToMC_ready = Logic(em, "io_stAddrToMC_ready", 'i', dyn_comp=True)
-        io_stAddrToMC_valid = Logic(em, "io_stAddrToMC_valid", 'o', dyn_comp=True)
-        io_stDataToMC_ready = Logic(em, "io_stDataToMC_ready", 'i', dyn_comp=True)
-        io_stDataToMC_valid = Logic(em, "io_stDataToMC_valid", 'o', dyn_comp=True)
+        io_storeData = LogicVec(
+            em, "io_stDataToMC_bits", "o", self.lsq_config.dataW, dyn_comp=True
+        )
+        io_storeAddr = LogicVec(
+            em, "io_stAddrToMC_bits", "o", self.lsq_config.addrW, dyn_comp=True
+        )
+        io_loadData = LogicVec(
+            em, "io_ldDataFromMC_bits", "i", self.lsq_config.dataW, dyn_comp=True
+        )
+        io_loadAddr = LogicVec(
+            em, "io_ldAddrToMC_bits", "o", self.lsq_config.addrW, dyn_comp=True
+        )
+        io_ctrl_ready = LogicArray(
+            em, "io_ctrl_ready", "o", self.lsq_config.numGroups, dyn_comp=True
+        )
+        io_ctrl_valid = LogicArray(
+            em, "io_ctrl_valid", "i", self.lsq_config.numGroups, dyn_comp=True
+        )
+        io_ldAddr_ready = LogicArray(
+            em, "io_ldAddr_ready", "o", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldAddr_valid = LogicArray(
+            em, "io_ldAddr_valid", "i", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldAddr_bits = LogicVecArray(
+            em,
+            "io_ldAddr_bits",
+            "i",
+            self.lsq_config.numLdPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
+        )
+        io_ldData_ready = LogicArray(
+            em, "io_ldData_ready", "i", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldData_valid = LogicArray(
+            em, "io_ldData_valid", "o", self.lsq_config.numLdPorts, dyn_comp=True
+        )
+        io_ldData_bits = LogicVecArray(
+            em,
+            "io_ldData_bits",
+            "o",
+            self.lsq_config.numLdPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
+        )
+        io_stAddr_ready = LogicArray(
+            em, "io_stAddr_ready", "o", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stAddr_valid = LogicArray(
+            em, "io_stAddr_valid", "i", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stAddr_bits = LogicVecArray(
+            em,
+            "io_stAddr_bits",
+            "i",
+            self.lsq_config.numStPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
+        )
+        io_stData_ready = LogicArray(
+            em, "io_stData_ready", "o", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stData_valid = LogicArray(
+            em, "io_stData_valid", "i", self.lsq_config.numStPorts, dyn_comp=True
+        )
+        io_stData_bits = LogicVecArray(
+            em,
+            "io_stData_bits",
+            "i",
+            self.lsq_config.numStPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
+        )
+        io_ldAddrToMC_ready = Logic(em, "io_ldAddrToMC_ready", "i", dyn_comp=True)
+        io_ldAddrToMC_valid = Logic(em, "io_ldAddrToMC_valid", "o", dyn_comp=True)
+        io_ldDataFromMC_ready = Logic(em, "io_ldDataFromMC_ready", "o", dyn_comp=True)
+        io_ldDataFromMC_valid = Logic(em, "io_ldDataFromMC_valid", "i", dyn_comp=True)
+        io_stAddrToMC_ready = Logic(em, "io_stAddrToMC_ready", "i", dyn_comp=True)
+        io_stAddrToMC_valid = Logic(em, "io_stAddrToMC_valid", "o", dyn_comp=True)
+        io_stDataToMC_ready = Logic(em, "io_stDataToMC_ready", "i", dyn_comp=True)
+        io_stDataToMC_valid = Logic(em, "io_stDataToMC_valid", "o", dyn_comp=True)
 
         ##
         # IO Definition finished
@@ -391,34 +584,91 @@ class LSQWrapper:
         ##
 
         # Define internal signals
-        io_loadEn = Logic(em, "io_loadEn", 'w', dyn_comp=True)
-        io_storeEn = Logic(em, "io_storeEn", 'w', dyn_comp=True)
+        io_loadEn = Logic(em, "io_loadEn", "w", dyn_comp=True)
+        io_storeEn = Logic(em, "io_storeEn", "w", dyn_comp=True)
 
-        rresp_id = LogicVecArray(em, "rresp_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        rresp_id = LogicVecArray(
+            em,
+            "rresp_id",
+            "w",
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
+        )
 
-        wreq_ready = LogicArray(em, "wreq_ready", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
-        wresp_valid = LogicArray(em, "wresp_valid", 'w', self.lsq_config.numStMem, dyn_comp=True, force_reg=True)
-        wresp_id = LogicVecArray(em, "wresp_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        wreq_ready = LogicArray(
+            em,
+            "wreq_ready",
+            "w",
+            self.lsq_config.numStMem,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        wresp_valid = LogicArray(
+            em,
+            "wresp_valid",
+            "w",
+            self.lsq_config.numStMem,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        wresp_id = LogicVecArray(
+            em,
+            "wresp_id",
+            "w",
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
+        )
 
-        rreq_id = LogicVecArray(em, "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
-        wreq_id = LogicVecArray(em, "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True, force_reg=True)
+        rreq_id = LogicVecArray(
+            em,
+            "rreq_id",
+            "w",
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        wreq_id = LogicVecArray(
+            em,
+            "wreq_id",
+            "w",
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
+        )
 
         # Define the process to update
         # rresp_id
-        em.add_comment("----------------------------------------------------------------------------\n")
+        em.add_comment(
+            "----------------------------------------------------------------------------\n"
+        )
         em.add_comment("Process for rresp_id\n")
         em.add_statement(em.get_reg_init_str())
-        em.add_custom_statement(CustomStatement("if reset = '1' then", "if (reset) begin"))
+        em.add_custom_statement(
+            CustomStatement("if reset = '1' then", "if (reset) begin")
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
             em.add_assignment(rresp_id[i], Bit(0), in_process=True)
 
         em.decrease_indent()
-        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then", "end\nelse begin"))
+        em.add_custom_statement(
+            CustomStatement("elsif rising_edge(clock) then", "end\nelse begin")
+        )
         em.increase_indent()
 
-        em.add_custom_statement(CustomStatement(f"if {io_loadEn.getNameWrite()} = '1' then", f"if ({io_loadEn.getNameWrite()}) begin"))
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_loadEn.getNameWrite()} = '1' then",
+                f"if ({io_loadEn.getNameWrite()}) begin",
+            )
+        )
 
         for i in range(self.lsq_config.numLdMem):
             em.add_assignment(rresp_id[i], rreq_id[i], in_process=True)
@@ -430,23 +680,36 @@ class LSQWrapper:
         em.decrease_indent()
         em.add_custom_statement(CustomStatement("end process;", "end"))
 
-        em.add_comment("--------------------------------------------------------------------------\n")
+        em.add_comment(
+            "--------------------------------------------------------------------------\n"
+        )
 
         # Define the process to update
         # wresp_valid, wresp_id
-        em.add_comment("----------------------------------------------------------------------------\n")
+        em.add_comment(
+            "----------------------------------------------------------------------------\n"
+        )
         em.add_comment("Process for wreq_ready, wresp_valid and wresp_id\n")
         em.add_statement(em.get_reg_init_str())
-        em.add_custom_statement(CustomStatement("if reset = '1' then", "if (reset) begin"))
+        em.add_custom_statement(
+            CustomStatement("if reset = '1' then", "if (reset) begin")
+        )
         em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
             em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
             em.add_assignment(wresp_id[i], Bit(0), in_process=True)
 
-        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then", "end\nelse begin"))
+        em.add_custom_statement(
+            CustomStatement("elsif rising_edge(clock) then", "end\nelse begin")
+        )
 
-        em.add_custom_statement(CustomStatement(f"if {io_storeEn.getNameWrite()} = '1' then", f"if ({io_storeEn.getNameWrite()}) begin"))
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_storeEn.getNameWrite()} = '1' then",
+                f"if ({io_storeEn.getNameWrite()}) begin",
+            )
+        )
 
         for i in range(self.lsq_config.numStMem):
             em.add_assignment(wresp_valid[i], Bit(1), in_process=True)
@@ -480,10 +743,10 @@ class LSQWrapper:
         ###
         em.add_comment("Instantiate the core LSQ logic\n")
         em.start_instantiation(self.lsq_name + "_core")
-        
+
         em.add_map("rst", "reset")
         em.add_map("clk", "clock")
-        
+
         em.add_map("wreq_data_0_o", io_storeData.getNameWrite())
         em.add_map("wreq_addr_0_o", io_storeAddr.getNameWrite())
         em.add_map("wreq_valid_0_o", io_storeEn.getNameWrite())
@@ -526,15 +789,17 @@ class LSQWrapper:
             em.add_map(f"wresp_id_{i}_i", wresp_id[i].getNameRead())
             em.add_map(f"wreq_id_{i}_o", wreq_id[i].getNameWrite())
 
-
         em.complete_instantiation()
 
         # Write to the file
         output_str = em.get_definition_str(self.lsq_name)
-        with open(f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", 'w') as file:
+        with open(
+            f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", "w"
+        ) as file:
             file.write(output_str)
 
         return output_str
+
 
 # ===----------------------------------------------------------------------===#
 # Main Function
@@ -549,7 +814,7 @@ def main():
     # Check the existence of the output folder
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
-        
+
     if args.hdl == "vhdl":
         emitter = VHDLEmitter()
     elif args.hdl == "verilog":

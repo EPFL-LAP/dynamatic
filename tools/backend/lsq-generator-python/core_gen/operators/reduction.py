@@ -16,6 +16,7 @@ from core_gen.ir import Val, Bin
 # Reduce():
 #   Detects the type of `din` and dispatches to the appropriate implementation.
 
+
 def ReduceLogicVec(em: Emitter, dout, din, operator, length) -> str:
     """
     Recursively reduce the vector "din" by "operator" and add this to "em".
@@ -38,27 +39,29 @@ def ReduceLogicVec(em: Emitter, dout, din, operator, length) -> str:
         "length" is just for an recursive action.
 
 
-    Example: 
+    Example:
         1. din = "01110010", operator = 'and' -> dout = '0'
         2. din = "01100111", operator = 'or'  -> dout = '1'
         3. din = "abcdefghijklmnop"
            dout = "a" operator "b" operator "c" operator "d" operator "e" operator "f"
                       operator "g" operator "h" operator "i" operator "j" operator "k"
-                      operator "l" operator "m" operator "n" operator "o" operator "p" 
+                      operator "l" operator "m" operator "n" operator "o" operator "p"
     """
     from core_gen.signals import LogicVec
 
-    if (length == 1):
+    if length == 1:
         em.add_assignment(dout, Bin(Val(din, 0), operator, Val(din, 1)))
     else:
         em.use_temp()
-        res = LogicVec(em, em.get_temp('res'), 'w', length)
+        res = LogicVec(em, em.get_temp("res"), "w", length)
         for i in range(0, din.size - length):
-            em.add_assignment((res, i), Bin(Val(din, i), operator, Val(din, i+length)))
+            em.add_assignment(
+                (res, i), Bin(Val(din, i), operator, Val(din, i + length))
+            )
         for i in range(din.size - length, length):
             em.add_assignment((res, i), Val(din, i))
-        em.add_comment('Layer End')
-        ReduceLogicVec(em, dout, res, operator, length//2)
+        em.add_comment("Layer End")
+        ReduceLogicVec(em, dout, res, operator, length // 2)
 
 
 def ReduceLogicArray(em: Emitter, dout, din, operator, length) -> str:
@@ -70,17 +73,17 @@ def ReduceLogicArray(em: Emitter, dout, din, operator, length) -> str:
     """
     from core_gen.signals import LogicArray
 
-    if (length == 1):
+    if length == 1:
         em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
         em.use_temp()
-        res = LogicArray(em, em.get_temp('res'), 'w', length)
+        res = LogicArray(em, em.get_temp("res"), "w", length)
         for i in range(0, din.length - length):
-            em.add_assignment(res[i], Bin(din[i], operator, din[i+length]))
+            em.add_assignment(res[i], Bin(din[i], operator, din[i + length]))
         for i in range(din.length - length, length):
             em.add_assignment(res[i], din[i])
-        em.add_comment('Layer End')
-        ReduceLogicArray(em, dout, res, operator, length//2)
+        em.add_comment("Layer End")
+        ReduceLogicArray(em, dout, res, operator, length // 2)
 
 
 def ReduceLogicVecArray(em: Emitter, dout, din, operator, length) -> str:
@@ -119,17 +122,18 @@ def ReduceLogicVecArray(em: Emitter, dout, din, operator, length) -> str:
         Therefore, dout is LogicVec.
     """
     from core_gen.signals import LogicVecArray, LogicArray
-    if (length == 1):
+
+    if length == 1:
         em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
         em.use_temp()
-        res = LogicVecArray(em, em.get_temp('res'), 'w', length, dout.size)
+        res = LogicVecArray(em, em.get_temp("res"), "w", length, dout.size)
         for i in range(0, din.length - length):
-            em.add_assignment(res[i], Bin(din[i], operator, din[i+length]))
+            em.add_assignment(res[i], Bin(din[i], operator, din[i + length]))
         for i in range(din.length - length, length):
             em.add_assignment(res[i], din[i])
-        em.add_comment('Layer End')
-        ReduceLogicVecArray(em, dout, res, operator, length//2)
+        em.add_comment("Layer End")
+        ReduceLogicVecArray(em, dout, res, operator, length // 2)
 
 
 def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
@@ -149,23 +153,23 @@ def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
     """
     from core_gen.signals import LogicVec, LogicArray, LogicVecArray
 
-    if (comment):
-        em.add_comment('Reduction Begin')
-        em.add_comment(f'Reduce({dout.name}, {din.name}, {em.get_binop_str(operator)})')
-    if (type(din) == LogicVec):
-        if (din.size == 1):
+    if comment:
+        em.add_comment("Reduction Begin")
+        em.add_comment(f"Reduce({dout.name}, {din.name}, {em.get_binop_str(operator)})")
+    if type(din) == LogicVec:
+        if din.size == 1:
             em.add_assignment(dout, Val(din, 0))
         else:
-            length = 2**(log2Ceil(din.size) - 1)
+            length = 2 ** (log2Ceil(din.size) - 1)
             ReduceLogicVec(em, dout, din, operator, length)
     else:
-        if (din.length == 1):
+        if din.length == 1:
             em.add_assignment(dout, Val(din[0]))
         else:
-            length = 2**(log2Ceil(din.length) - 1)
-            if (type(din) == LogicArray):
+            length = 2 ** (log2Ceil(din.length) - 1)
+            if type(din) == LogicArray:
                 ReduceLogicArray(em, dout, din, operator, length)
             else:
                 ReduceLogicVecArray(em, dout, din, operator, length)
-    if (comment):
-        em.add_comment('Reduction End\n')
+    if comment:
+        em.add_comment("Reduction End\n")

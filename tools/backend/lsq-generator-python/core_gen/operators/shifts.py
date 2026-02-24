@@ -15,9 +15,10 @@ from core_gen.ir import Op, Val
 # CyclicLeftShift():
 #   Detects the type of `din` and dispatches to the appropriate implementation.
 
+
 def RotateLogicVec(em: Emitter, dout, din, distance, layer) -> str:
     """
-    Recursively perform a cyclic left shift of the vector "din" by the amount 
+    Recursively perform a cyclic left shift of the vector "din" by the amount
     specified in "distance".
 
     Parameters:
@@ -40,28 +41,38 @@ def RotateLogicVec(em: Emitter, dout, din, distance, layer) -> str:
         "layer" is just for an recursive action.
 
 
-    Example: 
+    Example:
         Input:  din  = "01110010", distance = 3
         Output: dout = "10010011"
     """
 
     length = din.size
-    if (layer == 0):
+    if layer == 0:
         for i in range(0, length):
-            em.add_assignment((dout, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
+            em.add_assignment(
+                (dout, i),
+                Val(din, (i - 2**layer) % length)
+                .when(Val(distance, layer))
+                .else_(Val(din, i)),
+            )
     else:
         em.use_temp()
-        res = LogicVec(em, em.get_temp('res'), 'w', length)
+        res = LogicVec(em, em.get_temp("res"), "w", length)
         for i in range(0, length):
-            em.add_assignment((res, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
+            em.add_assignment(
+                (res, i),
+                Val(din, (i - 2**layer) % length)
+                .when(Val(distance, layer))
+                .else_(Val(din, i)),
+            )
 
-        em.add_comment('Layer End')
-        RotateLogicVec(em, dout, res, distance, layer-1)
+        em.add_comment("Layer End")
+        RotateLogicVec(em, dout, res, distance, layer - 1)
 
 
 def RotateLogicArray(em: Emitter, dout, din, distance, layer) -> str:
     """
-    Recursively perform a cyclic left shift of LogicArray "din" by the amount 
+    Recursively perform a cyclic left shift of LogicArray "din" by the amount
     specified in "distance".
 
     Identical in behavior to RotateLogicVec, but operates on multiple VHDL single-bit std_logic
@@ -70,21 +81,31 @@ def RotateLogicArray(em: Emitter, dout, din, distance, layer) -> str:
     """
 
     length = din.length
-    if (layer == 0):
+    if layer == 0:
         for i in range(0, length):
-            em.add_assignment((dout, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
+            em.add_assignment(
+                (dout, i),
+                Val(din, (i - 2**layer) % length)
+                .when(Val(distance, layer))
+                .else_(Val(din, i)),
+            )
     else:
         em.use_temp()
-        res = LogicArray(em, em.get_temp('res'), 'w', length)
+        res = LogicArray(em, em.get_temp("res"), "w", length)
         for i in range(0, length):
-            em.add_assignment((res, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
-        em.add_comment('Layer End')
-        RotateLogicArray(em, dout, res, distance, layer-1)
+            em.add_assignment(
+                (res, i),
+                Val(din, (i - 2**layer) % length)
+                .when(Val(distance, layer))
+                .else_(Val(din, i)),
+            )
+        em.add_comment("Layer End")
+        RotateLogicArray(em, dout, res, distance, layer - 1)
 
 
 def RotateLogicVecArray(em: Emitter, dout, din, distance, layer) -> str:
     """
-    Recursively perform a cyclic left shift of the LogicVecArray "din" by the amount 
+    Recursively perform a cyclic left shift of the LogicVecArray "din" by the amount
     specified in "distance".
 
     Identical in behavior to RotateLogicVec, but operates on multiple VHDL vectors std_logic_vector.
@@ -100,16 +121,26 @@ def RotateLogicVecArray(em: Emitter, dout, din, distance, layer) -> str:
     """
 
     length = din.length
-    if (layer == 0):
+    if layer == 0:
         for i in range(0, length):
-            em.add_assignment((dout, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
+            em.add_assignment(
+                (dout, i),
+                Val(din, (i - 2**layer) % length)
+                .when(Val(distance, layer))
+                .else_(Val(din, i)),
+            )
     else:
         em.use_temp()
-        res = LogicVecArray(em, em.get_temp('res'), 'w', length, dout.size)
+        res = LogicVecArray(em, em.get_temp("res"), "w", length, dout.size)
         for i in range(0, length):
-            em.add_assignment((res, i), Val(din, (i-2**layer) % length).when(Val(distance, layer)).else_(Val(din, i)))
-        em.add_comment('Layer End')
-        RotateLogicVecArray(em, dout, res, distance, layer-1)
+            em.add_assignment(
+                (res, i),
+                Val(din, (i - 2**layer) % length)
+                .when(Val(distance, layer))
+                .else_(Val(din, i)),
+            )
+        em.add_comment("Layer End")
+        RotateLogicVecArray(em, dout, res, distance, layer - 1)
 
 
 def CyclicLeftShift(em: Emitter, dout, din, distance) -> str:
@@ -130,12 +161,12 @@ def CyclicLeftShift(em: Emitter, dout, din, distance) -> str:
         str_ret : A VHDL code snippet (with indentation) implementing the cyclic left shift.
     """
 
-    em.add_comment('Shifter Begin')
-    em.add_comment(f'CyclicLeftShift({dout.name}, {din.name}, {distance.name})')
-    if (type(din) == LogicArray):
-        RotateLogicArray(em, dout, din, distance, distance.size-1)
-    elif (type(din) == LogicVecArray):
-        RotateLogicVecArray(em, dout, din, distance, distance.size-1)
+    em.add_comment("Shifter Begin")
+    em.add_comment(f"CyclicLeftShift({dout.name}, {din.name}, {distance.name})")
+    if type(din) == LogicArray:
+        RotateLogicArray(em, dout, din, distance, distance.size - 1)
+    elif type(din) == LogicVecArray:
+        RotateLogicVecArray(em, dout, din, distance, distance.size - 1)
     else:
-        RotateLogicVec(em, dout, din, distance, distance.size-1)
-    em.add_comment('Shifter End\n')
+        RotateLogicVec(em, dout, din, distance, distance.size - 1)
+    em.add_comment("Shifter End\n")

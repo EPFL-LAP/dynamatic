@@ -12,18 +12,19 @@ from core_gen.ir import Val, BinOp, WhenElse, Bit
 # Mux1HROM : Special multiplexer for the Group Allocator ROM.
 # MuxLookUp: Generate a conditional "when/else" lookup multiplexer in VHDL.
 
+
 def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
     """
-    Generate a one-hot multiplexer: for each element of "din", 
+    Generate a one-hot multiplexer: for each element of "din",
     write that bit/vector into a temporary and then OR-reduce into "dout".
 
     Parameters:
         dout (LogicVec or Logic):
             Destination for the multiplexed data, chosen by "sel".
         din (LogicVecArray or LogicArray or LogicVec):
-            Source data.  
-            - If LogicVecArray: 2D array of vectors.  
-            - If LogicArray: 1D array of bits.  
+            Source data.
+            - If LogicVecArray: 2D array of vectors.
+            - If LogicArray: 1D array of bits.
             - If LogicVec: single vector.
         sel (LogicVec or LogicArray or LogicVecArray):
             One-hot select signals.
@@ -47,34 +48,39 @@ def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
           -> selects the third bit: dout = '1'
     """
 
-    em.add_comment('Mux1H Begin')
-    em.add_comment(f'Mux1H({dout.name}, {din.name}, {sel.name})')
+    em.add_comment("Mux1H Begin")
+    em.add_comment(f"Mux1H({dout.name}, {din.name}, {sel.name})")
     em.use_temp()
 
     # din is always LogicVecArray
     if isinstance(din, LogicVecArray):
         length = din.length
         size = din.size
-        mux = LogicVecArray(em, em.get_temp('mux'), 'w', length, din.size)
+        mux = LogicVecArray(em, em.get_temp("mux"), "w", length, din.size)
     elif isinstance(din, LogicArray):
         length = din.length
         size = None
-        mux = LogicArray(em, em.get_temp('mux'), 'w', length)
+        mux = LogicArray(em, em.get_temp("mux"), "w", length)
     else:
         length = din.size
         size = None
-        mux = LogicArray(em, em.get_temp('mux'), 'w', length)
+        mux = LogicArray(em, em.get_temp("mux"), "w", length)
 
     str_zero = em.int_to_str(0, size)
-    if (j == None):
+    if j == None:
         for i in range(0, length):
-            em.add_assignment((mux, i), Val(din, i).when(Val(sel, i) == Bit(1)).else_(Val(str_zero)))
+            em.add_assignment(
+                (mux, i), Val(din, i).when(Val(sel, i) == Bit(1)).else_(Val(str_zero))
+            )
     else:
         for i in range(0, length):
-            em.add_assignment((mux, i), Val(din, i).when(Val(sel, i, j) == Bit(1)).else_(Val(str_zero)))
+            em.add_assignment(
+                (mux, i),
+                Val(din, i).when(Val(sel, i, j) == Bit(1)).else_(Val(str_zero)),
+            )
 
     Reduce(em, dout, mux, BinOp.OR, False)
-    em.add_comment('Mux1H End\n')
+    em.add_comment("Mux1H End\n")
 
 
 def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
@@ -92,7 +98,7 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
                 - num_loads
                 - num_stores
 
-        din (list or list of lists): 
+        din (list or list of lists):
             ROM contents. (configs.gaLdPortIdx, configs.gaStPortIdx, configs.gaLdOrder
                            configs.gaNumLoads, configs. gaNumStores)
 
@@ -105,9 +111,9 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
 
     Behavior:
         - type(dout) == LogicVec:
-            1. Build a temporary vector "mux" of width M.  
-            2. For each group j, if sel[j] = '1', assign mux[j] <= func(din[j]);  
-                else mux[j] <= Zero.  
+            1. Build a temporary vector "mux" of width M.
+            2. For each group j, if sel[j] = '1', assign mux[j] <= func(din[j]);
+                else mux[j] <= Zero.
             3. OR-reduce "mux" into the single "dout".
 
         - type(dout) == LogicVecArray:
@@ -126,10 +132,11 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
         This means that the currently allocated BB is BB1 (among BB0, BB1, and BB2)
         It has 1 load. that "dout" indicates 1.
     """
-    if func is None: func = em.int_to_str
+    if func is None:
+        func = em.int_to_str
 
-    em.add_comment('Mux1H For Rom Begin')
-    em.add_comment(f'Mux1H({dout.name}, {sel.name})')
+    em.add_comment("Mux1H For Rom Begin")
+    em.add_comment(f"Mux1H({dout.name}, {sel.name})")
     em.use_temp()
     mlen = sel.length
     size = dout.size
@@ -138,27 +145,29 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     if isinstance(dout, LogicVecArray):
         length = dout.length
         for i in range(0, length):
-            em.add_comment(f'Loop {i}')
-            mux = LogicVecArray(em, em.get_temp(f'mux_{i}'), 'w', mlen, size)
+            em.add_comment(f"Loop {i}")
+            mux = LogicVecArray(em, em.get_temp(f"mux_{i}"), "w", mlen, size)
             for j in range(0, mlen):
                 str_value = func(GetValue(din[j], i), size)
-                if (str_value == str_zero):
+                if str_value == str_zero:
                     em.add_assignment((mux, j), Val(str_zero))
                 else:
-                    em.add_assignment((mux, j), Val(str_value).when(Val(sel, j)).else_(Val(str_zero)))
+                    em.add_assignment(
+                        (mux, j), Val(str_value).when(Val(sel, j)).else_(Val(str_zero))
+                    )
             Reduce(em, dout[i], mux, BinOp.OR, False)
-    else:   # type(dout) == LogicVec
-        mux = LogicVecArray(em, em.get_temp(f'mux'), 'w', mlen, size)
+    else:  # type(dout) == LogicVec
+        mux = LogicVecArray(em, em.get_temp(f"mux"), "w", mlen, size)
         for j in range(0, mlen):
             str_value = func(din[j], size)
-            if (str_value == str_zero):
+            if str_value == str_zero:
                 em.add_assignment((mux, j), Val(str_zero))
             else:
-                em.add_assignment((mux, j), Val(str_value).when(Val(sel, j)).else_(Val(str_zero)))
+                em.add_assignment(
+                    (mux, j), Val(str_value).when(Val(sel, j)).else_(Val(str_zero))
+                )
         Reduce(em, dout, mux, BinOp.OR, False)
-    em.add_comment('Mux1H For Rom End\n')
-
-
+    em.add_comment("Mux1H For Rom End\n")
 
 
 # TODO: Properly test this
@@ -175,7 +184,7 @@ def MuxLookUp(em: Emitter, dout, din, sel) -> str:
             Binary select vector; compared against each index using IntToBits.
 
     Example:
-        dout <= 
+        dout <=
         din_0 when (sel = "0000") else
         din_1 when (sel = "0001") else
         din_2 when (sel = "0010") else
@@ -193,21 +202,23 @@ def MuxLookUp(em: Emitter, dout, din, sel) -> str:
 
     """
 
-    em.add_comment('MuxLookUp Begin')
-    em.add_comment(f'MuxLookUp({dout.name}, {din.name}, {sel.name})')
+    em.add_comment("MuxLookUp Begin")
+    em.add_comment(f"MuxLookUp({dout.name}, {din.name}, {sel.name})")
 
     length = din.length
     size = sel.size
 
-    if (type(dout) == LogicVec):
+    if type(dout) == LogicVec:
         last = Val(0)
     else:
         last = Bit(0)
 
-    whenelses = [WhenElse(Val(din, i), sel == Val(i, size), None) for i in range(0,length)]
+    whenelses = [
+        WhenElse(Val(din, i), sel == Val(i, size), None) for i in range(0, length)
+    ]
     whenelses.append(last)
     for i, op in enumerate(whenelses[:-1]):
         op.false_statement = whenelses[i + 1]
 
     em.add_assignment(dout, whenelses[0])
-    em.add_comment('MuxLookUp End\n')
+    em.add_comment("MuxLookUp End\n")

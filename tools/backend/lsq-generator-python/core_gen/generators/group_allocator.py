@@ -6,19 +6,14 @@ from core_gen.emitters import Emitter
 
 
 class GroupAllocator:
-    def __init__(
-        self,
-        name: str,
-        suffix: str,
-        configs: Configs
-    ):
+    def __init__(self, name: str, suffix: str, configs: Configs):
         """
         Group Allocator
 
         Models a group allocator for a Load-Store Queue (LSQ) system.
 
         This class encapsulates the logic for generating a VHDL module that allocates
-        space for groups of memory operations (loads and stores) in the load queue and 
+        space for groups of memory operations (loads and stores) in the load queue and
         the store queue.
 
         Parameters:
@@ -31,8 +26,8 @@ class GroupAllocator:
 
         Example:
             ga = GroupAllocator(
-                    name="config_0_core", 
-                    suffix="_ga", 
+                    name="config_0_core",
+                    suffix="_ga",
                     configs=configs
                 )
 
@@ -80,154 +75,222 @@ class GroupAllocator:
         """
         # IOs
         group_init_valid_i = LogicArray(
-            em, 'group_init_valid', 'i', self.configs.numGroups)
+            em, "group_init_valid", "i", self.configs.numGroups
+        )
         group_init_ready_o = LogicArray(
-            em, 'group_init_ready', 'o', self.configs.numGroups)
+            em, "group_init_ready", "o", self.configs.numGroups
+        )
 
-        ldq_tail_i = LogicVec(em, 'ldq_tail', 'i', self.configs.ldqAddrW)
-        ldq_head_i = LogicVec(em, 'ldq_head', 'i', self.configs.ldqAddrW)
-        ldq_empty_i = Logic(em, 'ldq_empty', 'i')
+        ldq_tail_i = LogicVec(em, "ldq_tail", "i", self.configs.ldqAddrW)
+        ldq_head_i = LogicVec(em, "ldq_head", "i", self.configs.ldqAddrW)
+        ldq_empty_i = Logic(em, "ldq_empty", "i")
 
-        stq_tail_i = LogicVec(em, 'stq_tail', 'i', self.configs.stqAddrW)
-        stq_head_i = LogicVec(em, 'stq_head', 'i', self.configs.stqAddrW)
-        stq_empty_i = Logic(em, 'stq_empty', 'i')
+        stq_tail_i = LogicVec(em, "stq_tail", "i", self.configs.stqAddrW)
+        stq_head_i = LogicVec(em, "stq_head", "i", self.configs.stqAddrW)
+        stq_empty_i = Logic(em, "stq_empty", "i")
 
-        ldq_wen_o = LogicArray(em, 'ldq_wen', 'o', self.configs.numLdqEntries)
-        num_loads_o = LogicVec(em, 'num_loads', 'o', self.configs.ldqAddrW)
-        num_loads = LogicVec(em, 'num_loads', 'w', self.configs.ldqAddrW)
-        if (self.configs.ldpAddrW > 0):
+        ldq_wen_o = LogicArray(em, "ldq_wen", "o", self.configs.numLdqEntries)
+        num_loads_o = LogicVec(em, "num_loads", "o", self.configs.ldqAddrW)
+        num_loads = LogicVec(em, "num_loads", "w", self.configs.ldqAddrW)
+        if self.configs.ldpAddrW > 0:
             ldq_port_idx_o = LogicVecArray(
-                em, 'ldq_port_idx', 'o', self.configs.numLdqEntries, self.configs.ldpAddrW)
+                em,
+                "ldq_port_idx",
+                "o",
+                self.configs.numLdqEntries,
+                self.configs.ldpAddrW,
+            )
 
-        stq_wen_o = LogicArray(em, 'stq_wen', 'o', self.configs.numStqEntries)
-        num_stores_o = LogicVec(em, 'num_stores', 'o', self.configs.stqAddrW)
-        num_stores = LogicVec(em, 'num_stores', 'w', self.configs.stqAddrW)
-        if (self.configs.stpAddrW > 0):
+        stq_wen_o = LogicArray(em, "stq_wen", "o", self.configs.numStqEntries)
+        num_stores_o = LogicVec(em, "num_stores", "o", self.configs.stqAddrW)
+        num_stores = LogicVec(em, "num_stores", "w", self.configs.stqAddrW)
+        if self.configs.stpAddrW > 0:
             stq_port_idx_o = LogicVecArray(
-                em, 'stq_port_idx', 'o', self.configs.numStqEntries, self.configs.stpAddrW)
+                em,
+                "stq_port_idx",
+                "o",
+                self.configs.numStqEntries,
+                self.configs.stpAddrW,
+            )
 
         ga_ls_order_o = LogicVecArray(
-            em, 'ga_ls_order', 'o', self.configs.numLdqEntries, self.configs.numStqEntries)
+            em,
+            "ga_ls_order",
+            "o",
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
 
         # The number of empty load and store is calculated with cyclic subtraction.
         # If the empty signal is high, then set the number to max value.
-        loads_sub = LogicVec(em, 'loads_sub', 'w', self.configs.ldqAddrW)
-        stores_sub = LogicVec(em, 'stores_sub', 'w', self.configs.stqAddrW)
-        empty_loads = LogicVec(em, 'empty_loads', 'w',
-                               self.configs.emptyLdAddrW)
-        empty_stores = LogicVec(em, 'empty_stores', 'w',
-                                self.configs.emptyStAddrW)
+        loads_sub = LogicVec(em, "loads_sub", "w", self.configs.ldqAddrW)
+        stores_sub = LogicVec(em, "stores_sub", "w", self.configs.stqAddrW)
+        empty_loads = LogicVec(em, "empty_loads", "w", self.configs.emptyLdAddrW)
+        empty_stores = LogicVec(em, "empty_stores", "w", self.configs.emptyStAddrW)
 
-        WrapSub(em, loads_sub, ldq_head_i,
-                        ldq_tail_i, self.configs.numLdqEntries)
-        WrapSub(em, stores_sub, stq_head_i,
-                        stq_tail_i, self.configs.numStqEntries)
+        WrapSub(em, loads_sub, ldq_head_i, ldq_tail_i, self.configs.numLdqEntries)
+        WrapSub(em, stores_sub, stq_head_i, stq_tail_i, self.configs.numStqEntries)
 
-        em.add_assignment(empty_loads, Val(self.configs.numLdqEntries).when(ldq_empty_i).else_(Bit(0).concat(loads_sub)))
-        em.add_assignment(empty_stores, Val(self.configs.numStqEntries).when(stq_empty_i).else_(Bit(0).concat(stores_sub)))
+        em.add_assignment(
+            empty_loads,
+            Val(self.configs.numLdqEntries)
+            .when(ldq_empty_i)
+            .else_(Bit(0).concat(loads_sub)),
+        )
+        em.add_assignment(
+            empty_stores,
+            Val(self.configs.numStqEntries)
+            .when(stq_empty_i)
+            .else_(Bit(0).concat(stores_sub)),
+        )
 
         # Generate handshake signals
         group_init_ready = LogicArray(
-            em, 'group_init_ready', 'w', self.configs.numGroups)
-        group_init_hs = LogicArray(
-            em, 'group_init_hs', 'w', self.configs.numGroups)
+            em, "group_init_ready", "w", self.configs.numGroups
+        )
+        group_init_hs = LogicArray(em, "group_init_hs", "w", self.configs.numGroups)
 
         for i in range(0, self.configs.numGroups):
-            em.add_assignment(group_init_ready[i], Bit(1)
-                .when((empty_loads >= Val(self.configs.gaNumLoads[i], self.configs.emptyLdAddrW)) & (empty_stores >= Val(self.configs.gaNumStores[i], self.configs.emptyStAddrW)))
-                .else_(Bit(0)))
+            em.add_assignment(
+                group_init_ready[i],
+                Bit(1)
+                .when(
+                    (
+                        empty_loads
+                        >= Val(self.configs.gaNumLoads[i], self.configs.emptyLdAddrW)
+                    )
+                    & (
+                        empty_stores
+                        >= Val(self.configs.gaNumStores[i], self.configs.emptyStAddrW)
+                    )
+                )
+                .else_(Bit(0)),
+            )
 
-        if (self.configs.gaMulti):
+        if self.configs.gaMulti:
             group_init_and = LogicArray(
-                em, 'group_init_and', 'w', self.configs.numGroups)
-            ga_rr_mask = LogicVec(em, 'ga_rr_mask', 'r',
-                                  self.configs.numGroups)
+                em, "group_init_and", "w", self.configs.numGroups
+            )
+            ga_rr_mask = LogicVec(em, "ga_rr_mask", "r", self.configs.numGroups)
             ga_rr_mask.regInit()
             for i in range(0, self.configs.numGroups):
-                em.add_assignment(group_init_and[i], group_init_ready[i] & group_init_valid_i[i])
+                em.add_assignment(
+                    group_init_and[i], group_init_ready[i] & group_init_valid_i[i]
+                )
                 em.add_assignment(group_init_ready_o[i], group_init_hs[i])
-            CyclicPriorityMasking(em, group_init_hs,
-                                          group_init_and, ga_rr_mask)
+            CyclicPriorityMasking(em, group_init_hs, group_init_and, ga_rr_mask)
             for i in range(0, self.configs.numGroups):
-                em.add_assignment((ga_rr_mask, (i+1) % self.configs.numGroups), Val(group_init_hs, i))
+                em.add_assignment(
+                    (ga_rr_mask, (i + 1) % self.configs.numGroups),
+                    Val(group_init_hs, i),
+                )
         else:
             for i in range(0, self.configs.numGroups):
                 em.add_assignment(group_init_ready_o[i], group_init_ready[i])
-                em.add_assignment(group_init_hs[i], group_init_ready[i] & group_init_valid_i[i])
+                em.add_assignment(
+                    group_init_hs[i], group_init_ready[i] & group_init_valid_i[i]
+                )
 
         # ROM value
-        if (self.configs.ldpAddrW > 0):
+        if self.configs.ldpAddrW > 0:
             ldq_port_idx_rom = LogicVecArray(
-                em, 'ldq_port_idx_rom', 'w', self.configs.numLdqEntries, self.configs.ldpAddrW)
-        if (self.configs.stpAddrW > 0):
+                em,
+                "ldq_port_idx_rom",
+                "w",
+                self.configs.numLdqEntries,
+                self.configs.ldpAddrW,
+            )
+        if self.configs.stpAddrW > 0:
             stq_port_idx_rom = LogicVecArray(
-                em, 'stq_port_idx_rom', 'w', self.configs.numStqEntries, self.configs.stpAddrW)
+                em,
+                "stq_port_idx_rom",
+                "w",
+                self.configs.numStqEntries,
+                self.configs.stpAddrW,
+            )
         ga_ls_order_rom = LogicVecArray(
-            em, 'ga_ls_order_rom', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
+            em,
+            "ga_ls_order_rom",
+            "w",
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
         ga_ls_order_temp = LogicVecArray(
-            em, 'ga_ls_order_temp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-        if (self.configs.ldpAddrW > 0):
-            Mux1HROM(em, ldq_port_idx_rom,
-                             self.configs.gaLdPortIdx, group_init_hs)
-        if (self.configs.stpAddrW > 0):
-            Mux1HROM(em, stq_port_idx_rom,
-                             self.configs.gaStPortIdx, group_init_hs)
-        Mux1HROM(em, ga_ls_order_rom, self.configs.gaLdOrder,
-                 group_init_hs, em.mask_less)
-        Mux1HROM(em, num_loads,
-                 self.configs.gaNumLoads, group_init_hs)
-        Mux1HROM(em, num_stores,
-                         self.configs.gaNumStores, group_init_hs)
+            em,
+            "ga_ls_order_temp",
+            "w",
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
+        if self.configs.ldpAddrW > 0:
+            Mux1HROM(em, ldq_port_idx_rom, self.configs.gaLdPortIdx, group_init_hs)
+        if self.configs.stpAddrW > 0:
+            Mux1HROM(em, stq_port_idx_rom, self.configs.gaStPortIdx, group_init_hs)
+        Mux1HROM(
+            em, ga_ls_order_rom, self.configs.gaLdOrder, group_init_hs, em.mask_less
+        )
+        Mux1HROM(em, num_loads, self.configs.gaNumLoads, group_init_hs)
+        Mux1HROM(em, num_stores, self.configs.gaNumStores, group_init_hs)
         em.add_assignment(num_loads_o, num_loads)
         em.add_assignment(num_stores_o, num_stores)
 
         ldq_wen_unshifted = LogicArray(
-            em, 'ldq_wen_unshifted', 'w', self.configs.numLdqEntries)
+            em, "ldq_wen_unshifted", "w", self.configs.numLdqEntries
+        )
         stq_wen_unshifted = LogicArray(
-            em, 'stq_wen_unshifted', 'w', self.configs.numStqEntries)
+            em, "stq_wen_unshifted", "w", self.configs.numStqEntries
+        )
         for i in range(0, self.configs.numLdqEntries):
-            em.add_assignment(ldq_wen_unshifted[i], Bit(1).when(Val(num_loads) > Val(i, self.configs.ldqAddrW)).else_(Bit(0)))
+            em.add_assignment(
+                ldq_wen_unshifted[i],
+                Bit(1)
+                .when(Val(num_loads) > Val(i, self.configs.ldqAddrW))
+                .else_(Bit(0)),
+            )
         for i in range(0, self.configs.numStqEntries):
-            em.add_assignment(stq_wen_unshifted[i], Bit(1).when(Val(num_stores) > Val(i, self.configs.stqAddrW)).else_(Bit(0)))
+            em.add_assignment(
+                stq_wen_unshifted[i],
+                Bit(1)
+                .when(Val(num_stores) > Val(i, self.configs.stqAddrW))
+                .else_(Bit(0)),
+            )
 
         # Shift the arrays
-        if (self.configs.ldpAddrW > 0):
-            CyclicLeftShift(em, ldq_port_idx_o,
-                                    ldq_port_idx_rom, ldq_tail_i)
-        if (self.configs.stpAddrW > 0):
-            CyclicLeftShift(em, stq_port_idx_o,
-                                    stq_port_idx_rom, stq_tail_i)
+        if self.configs.ldpAddrW > 0:
+            CyclicLeftShift(em, ldq_port_idx_o, ldq_port_idx_rom, ldq_tail_i)
+        if self.configs.stpAddrW > 0:
+            CyclicLeftShift(em, stq_port_idx_o, stq_port_idx_rom, stq_tail_i)
         CyclicLeftShift(em, ldq_wen_o, ldq_wen_unshifted, ldq_tail_i)
         CyclicLeftShift(em, stq_wen_o, stq_wen_unshifted, stq_tail_i)
         for i in range(0, self.configs.numLdqEntries):
-            CyclicLeftShift(em,
-                                    ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
-        CyclicLeftShift(em, ga_ls_order_o,
-                                ga_ls_order_temp, ldq_tail_i)
+            CyclicLeftShift(em, ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
+        CyclicLeftShift(em, ga_ls_order_o, ga_ls_order_temp, ldq_tail_i)
 
         # Write to the file
-        output_str = em.get_definition_str(self.module_name, write_regs=self.configs.gaMulti)
-        with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
+        output_str = em.get_definition_str(
+            self.module_name, write_regs=self.configs.gaMulti
+        )
+        with open(f"{path_rtl}/{self.name}.{em.get_file_suffix()}", "a") as file:
             file.write(output_str)
 
     def instantiate(
         self,
-        em:                 Emitter,
+        em: Emitter,
         group_init_valid_i: LogicArray,
         group_init_ready_o: LogicArray,
-        ldq_tail_i:         LogicVec,
-        ldq_head_i:         LogicVec,
-        ldq_empty_i:        Logic,
-        stq_tail_i:         LogicVec,
-        stq_head_i:         LogicVec,
-        stq_empty_i:        Logic,
-        ldq_wen_o:          LogicArray,
-        num_loads_o:        LogicVec,
-        ldq_port_idx_o:     LogicVecArray,
-        stq_wen_o:          LogicArray,
-        num_stores_o:       LogicVec,
-        stq_port_idx_o:     LogicVecArray,
-        ga_ls_order_o:      LogicVecArray
+        ldq_tail_i: LogicVec,
+        ldq_head_i: LogicVec,
+        ldq_empty_i: Logic,
+        stq_tail_i: LogicVec,
+        stq_head_i: LogicVec,
+        stq_empty_i: Logic,
+        ldq_wen_o: LogicArray,
+        num_loads_o: LogicVec,
+        ldq_port_idx_o: LogicVecArray,
+        stq_wen_o: LogicArray,
+        num_stores_o: LogicVec,
+        stq_port_idx_o: LogicVecArray,
+        ga_ls_order_o: LogicVecArray,
     ) -> str:
         """
         Group Allocator Instantiation
@@ -312,41 +375,41 @@ class GroupAllocator:
 
         em.start_instantiation(self.module_name)
 
-        em.add_map('rst', 'rst')
-        em.add_map('clk', 'clk')
+        em.add_map("rst", "rst")
+        em.add_map("clk", "clk")
 
         for i in range(0, self.configs.numGroups):
-            em.add_map(f'group_init_valid_{i}_i', group_init_valid_i.getNameRead(i))
-        
+            em.add_map(f"group_init_valid_{i}_i", group_init_valid_i.getNameRead(i))
+
         for i in range(0, self.configs.numGroups):
-            em.add_map(f'group_init_ready_{i}_o', group_init_ready_o.getNameWrite(i))
+            em.add_map(f"group_init_ready_{i}_o", group_init_ready_o.getNameWrite(i))
 
-        em.add_map('ldq_tail_i', ldq_tail_i.getNameRead())
-        em.add_map('ldq_head_i', ldq_head_i.getNameRead())
-        em.add_map('ldq_empty_i', ldq_empty_i.getNameRead())
+        em.add_map("ldq_tail_i", ldq_tail_i.getNameRead())
+        em.add_map("ldq_head_i", ldq_head_i.getNameRead())
+        em.add_map("ldq_empty_i", ldq_empty_i.getNameRead())
 
-        em.add_map('stq_tail_i', stq_tail_i.getNameRead())
-        em.add_map('stq_head_i', stq_head_i.getNameRead())
-        em.add_map('stq_empty_i', stq_empty_i.getNameRead())
+        em.add_map("stq_tail_i", stq_tail_i.getNameRead())
+        em.add_map("stq_head_i", stq_head_i.getNameRead())
+        em.add_map("stq_empty_i", stq_empty_i.getNameRead())
 
         for i in range(0, self.configs.numLdqEntries):
-            em.add_map(f'ldq_wen_{i}_o', ldq_wen_o.getNameWrite(i))
+            em.add_map(f"ldq_wen_{i}_o", ldq_wen_o.getNameWrite(i))
 
-        em.add_map(f'num_loads_o', num_loads_o.getNameWrite())
+        em.add_map(f"num_loads_o", num_loads_o.getNameWrite())
 
-        if (self.configs.ldpAddrW > 0):
+        if self.configs.ldpAddrW > 0:
             for i in range(0, self.configs.numLdqEntries):
-                em.add_map(f'ldq_port_idx_{i}_o', ldq_port_idx_o.getNameWrite(i))
+                em.add_map(f"ldq_port_idx_{i}_o", ldq_port_idx_o.getNameWrite(i))
 
         for i in range(0, self.configs.numStqEntries):
-            em.add_map(f'stq_wen_{i}_o', stq_wen_o.getNameWrite(i))
-        if (self.configs.stpAddrW > 0):
+            em.add_map(f"stq_wen_{i}_o", stq_wen_o.getNameWrite(i))
+        if self.configs.stpAddrW > 0:
             for i in range(0, self.configs.numStqEntries):
-                em.add_map(f'stq_port_idx_{i}_o', stq_port_idx_o.getNameWrite(i))
+                em.add_map(f"stq_port_idx_{i}_o", stq_port_idx_o.getNameWrite(i))
 
         for i in range(0, self.configs.numLdqEntries):
-            em.add_map(f'ga_ls_order_{i}_o', ga_ls_order_o.getNameWrite(i))
+            em.add_map(f"ga_ls_order_{i}_o", ga_ls_order_o.getNameWrite(i))
 
-        em.add_map('num_stores_o', num_stores_o.getNameWrite())
+        em.add_map("num_stores_o", num_stores_o.getNameWrite())
         em.complete_instantiation()
         return em
