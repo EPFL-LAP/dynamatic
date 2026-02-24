@@ -1,4 +1,3 @@
-from core_gen.utils import *
 from core_gen.signals import *
 from core_gen.ir import Val, Bit, BinOp
 from core_gen.emitters import Emitter

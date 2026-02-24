@@ -1,5 +1,5 @@
 from core_gen.emitters import Emitter
-from core_gen.utils import *
+from core_gen.utils import GetValue
 from core_gen.signals import LogicVecArray, LogicArray, Logic, LogicVec
 from core_gen.operators import *
 from core_gen.ir import Val, BinOp, WhenElse, Bit
@@ -133,7 +133,7 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     em.use_temp()
     mlen = sel.length
     size = dout.size
-    str_zero = Zero(size)
+    str_zero = em.int_to_str(0, size)
 
     if isinstance(dout, LogicVecArray):
         length = dout.length

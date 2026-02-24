@@ -12,7 +12,6 @@
 # std_logic bit
 #
 
-from core_gen.utils import *
 from core_gen.ir import Statement
 
 

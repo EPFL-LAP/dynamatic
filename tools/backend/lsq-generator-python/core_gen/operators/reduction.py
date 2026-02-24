@@ -1,5 +1,5 @@
 from core_gen.emitters import Emitter
-from core_gen.utils import *
+from core_gen.utils import log2Ceil
 from core_gen.operators import *
 from core_gen.ir import Val, Bin
 
