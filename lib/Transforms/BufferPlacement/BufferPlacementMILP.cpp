@@ -148,9 +148,8 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   chVars.bufNumSlots = createVar("bufNumSlots", INTEGER);
   chVars.dataLatency = createVar("dataLatency", INTEGER);
   chVars.shiftReg = createVar("shiftReg", BOOLEAN);
-  chVars.isBackedge = createVar("backedge", GRB_BINARY);
+  chVars.isBackedge = createVar("backedge", BOOLEAN);
 }
-
 
 void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   // Create a set of variables for each CFDFC
@@ -497,14 +496,14 @@ void BufferPlacementMILP::addBackedgeConstraints() {
     // }
     // llvm::errs() << "-------------------\n";
 
-    GRBLinExpr sumOfBackedges;
+    LinExpr sumOfBackedges;
     for (Value channel : cycle) {
       ChannelVars &chVars = vars.channelVars[channel];
       sumOfBackedges += chVars.isBackedge;
     }
 
     // Exactly one channel in the cycle must be marked as a backedge
-    model.addConstr(sumOfBackedges == 1, "cycle_has_backedge");
+    model->addConstr(sumOfBackedges == 1, "cycle_has_backedge");
   }
 }
 
@@ -513,17 +512,15 @@ void BufferPlacementMILP::addDataBufConstraint() {
   ChannelCycleList channelCycles = graph.findAllChannelCycles();
 
   for (ChannelCycle cycle : channelCycles) {
-    GRBLinExpr sumOfDataBufs;
+    LinExpr sumOfDataBufs;
     for (Value channel : cycle) {
       ChannelVars &chVars = vars.channelVars[channel];
       auto dataVars = chVars.signalVars.find(SignalType::DATA);
-      GRBVar &dataBuf = dataVars->second.bufPresent;
-
-      sumOfDataBufs += dataBuf;
+      sumOfDataBufs += dataVars->second.bufPresent;
     }
 
     // at least one channel in the cycle must have a data buffer
-    model.addConstr(sumOfDataBufs >= 1, "cycle_has_buffer");
+    model->addConstr(sumOfDataBufs >= 1, "cycle_has_buffer");
   }
 }
 
@@ -1066,8 +1063,8 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   return numExec;
 }
 
-GRBLinExpr BufferPlacementMILP::addBackedgeObjective(ValueRange allChannels) {
-  GRBLinExpr objective;
+LinExpr BufferPlacementMILP::addBackedgeObjective(ValueRange allChannels) {
+  LinExpr objective;
 
   for (Value channel : allChannels) {
     ChannelVars &chVars = vars.channelVars[channel];
@@ -1078,7 +1075,7 @@ GRBLinExpr BufferPlacementMILP::addBackedgeObjective(ValueRange allChannels) {
 }
 
 void BufferPlacementMILP::addMinBufferAreaObjective(ValueRange channels) {
-  GRBLinExpr objective = 0;
+  LinExpr objective = 0;
 
   for (Value channel : channels) {
     ChannelVars &chVars = vars.channelVars[channel];
@@ -1091,12 +1088,12 @@ void BufferPlacementMILP::addMinBufferAreaObjective(ValueRange channels) {
 
   // model.write("model.ilp");
   // llvm::errs() << "wrote IIS" << "\n";
-  model.setObjective(objective, GRB_MAXIMIZE);
+  model->setMaximizeObjective(objective);
 }
 
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
                                                     ArrayRef<CFDFC *> cfdfcs,
-                                                    GRBLinExpr objective) {
+                                                    LinExpr objective) {
   // Compute the total number of executions over channels that are part of any
   // CFDFC
   unsigned totalExecs = 0;
@@ -1241,7 +1238,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
           !isa<handshake::ControlType>(value.getType())) {
         continue;
       }
-    if (chVars.bufPresent.get(GRB_DoubleAttr_X) == 0)
+    if (model->getValue(chVars.bufPresent) == 0)
       continue;
 
     // Extract number and type of slots
@@ -1291,7 +1288,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os.indent();
     for (auto &[val, channelTh] : cfVars.channelThroughputs) {
       os << getUniqueName(*val.getUses().begin()) << ": "
-         << channelTh.get(GRB_DoubleAttr_X) << "\n";
+         << model->getValue(channelTh) << "\n";
     }
     os.unindent();
     os << "\n";
@@ -1310,89 +1307,91 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
       os << getUniqueName(op) << ": (in: " << model->getValue(unitVars.retIn)
          << ", out: " << model->getValue(unitVars.retOut) << ")\n";
 
-  os << "\n# =================== #\n";
-  os << "# Unit Retimings #\n";
-  os << "# =================== #\n\n";
+      os << "\n# =================== #\n";
+      os << "# Unit Retimings #\n";
+      os << "# =================== #\n\n";
 
-  // Log retimings of all units in all CFDFCs
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-    auto [cf, cfVars] = cfdfcWithVars;
-    os << "Unit retimings of CFDFC #" << idx << ":\n";
-    os.indent();
-    for (auto &[op, unitVars] : cfVars.unitVars) {
-      os << getUniqueName(op) << ": (in: " << model->getValue(unitVars.retIn)
-         << ", out: " << model->getValue(unitVars.retOut) << ")\n";
-    }
-    os.unindent();
-    os << "\n";
-  }
-
-  // print backedge decisions
-  os << "# ========================= #\n";
-  os << "# Backedge Buffering Decisions #\n";
-  os << "# ========================= #\n\n";
-  for (auto &[value, chVars] : vars.channelVars) {
-    if (auto op = value.getDefiningOp(); op)
-      if (isa<handshake::UnbundleOp>(op) &&
-          !isa<handshake::ControlType>(value.getType())) {
-        continue;
+      // Log retimings of all units in all CFDFCs
+      for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+        auto [cf, cfVars] = cfdfcWithVars;
+        os << "Unit retimings of CFDFC #" << idx << ":\n";
+        os.indent();
+        for (auto &[op, unitVars] : cfVars.unitVars) {
+          os << getUniqueName(op)
+             << ": (in: " << model->getValue(unitVars.retIn)
+             << ", out: " << model->getValue(unitVars.retOut) << ")\n";
+        }
+        os.unindent();
+        os << "\n";
       }
 
-    if (chVars.isBackedge.get(GRB_DoubleAttr_X) == 0)
-      continue;
+      // print backedge decisions
+      os << "# ========================= #\n";
+      os << "# Backedge Buffering Decisions #\n";
+      os << "# ========================= #\n\n";
+      for (auto &[value, chVars] : vars.channelVars) {
+        if (auto op = value.getDefiningOp(); op)
+          if (isa<handshake::UnbundleOp>(op) &&
+              !isa<handshake::ControlType>(value.getType())) {
+            continue;
+          }
 
-    os << getUniqueName(*value.getUses().begin()) << " is a backedge\n";
-  }
+        if (model->getValue(chVars.isBackedge) == 0)
+          continue;
 
-  // print retiming decisions where they are non-zero
-  os << "\n# ========================= #\n";
-  os << "# Retiming Decisions #\n";
-  os << "# ========================= #\n\n";
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-    auto [cf, cfVars] = cfdfcWithVars;
-    for (auto &[unit, unitVars] : cfVars.unitVars) {
-      os << "CFDFC #" << idx << " unit " << getUniqueName(unit)
-         << " retiming: in " << unitVars.retIn.get(GRB_DoubleAttr_X) << ", out "
-         << unitVars.retOut.get(GRB_DoubleAttr_X) << "\n";
-    }
-  }
-
-  // print ready/data buffer decisions
-  os << "\n# ========================= #\n";
-  os << "# Ready/Data Buffering Decisions #\n";
-  os << "# ========================= #\n\n";
-  for (auto &[value, chVars] : vars.channelVars) {
-    if (auto op = value.getDefiningOp(); op)
-      if (isa<handshake::UnbundleOp>(op) &&
-          !isa<handshake::ControlType>(value.getType())) {
-        continue;
+        os << getUniqueName(*value.getUses().begin()) << " is a backedge\n";
       }
-    if (chVars.signalVars.count(SignalType::READY)) {
-      os << "Channel " << getUniqueName(*value.getUses().begin())
-         << " ready buffer present: "
-         << chVars.signalVars[SignalType::READY].bufPresent.get(
-                GRB_DoubleAttr_X)
-         << "\n";
-    }
-    if (chVars.signalVars.count(SignalType::DATA)) {
-      os << "Channel " << getUniqueName(*value.getUses().begin())
-         << " data buffer present: "
-         << chVars.signalVars[SignalType::DATA].bufPresent.get(GRB_DoubleAttr_X)
-         << "\n";
-    }
-  }
 
-  // for (auto &[value, chVars] : vars.channelVars) {
-  //   os << "Channel " << getUniqueName(*value.getUses().begin())
-  //      << " buffer present: " << chVars.bufPresent.get(GRB_DoubleAttr_X)
-  //      << "\n";
-  // }
+      // print retiming decisions where they are non-zero
+      os << "\n# ========================= #\n";
+      os << "# Retiming Decisions #\n";
+      os << "# ========================= #\n\n";
+      for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+        auto [cf, cfVars] = cfdfcWithVars;
+        for (auto &[unit, unitVars] : cfVars.unitVars) {
+          os << "CFDFC #" << idx << " unit " << getUniqueName(unit)
+             << " retiming: in " << model->getValue(unitVars.retIn) << ", out "
+             << model->getValue(unitVars.retOut) << "\n";
+        }
+      }
 
-  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-    auto [cf, cfVars] = cfdfcWithVars;
-    for (auto backedge : cf->backedges) {
-      os << "CFDFC #" << idx << " backedge "
-         << getUniqueName(*backedge.getUses().begin()) << "\n";
+      // print ready/data buffer decisions
+      os << "\n# ========================= #\n";
+      os << "# Ready/Data Buffering Decisions #\n";
+      os << "# ========================= #\n\n";
+      for (auto &[value, chVars] : vars.channelVars) {
+        if (auto op = value.getDefiningOp(); op)
+          if (isa<handshake::UnbundleOp>(op) &&
+              !isa<handshake::ControlType>(value.getType())) {
+            continue;
+          }
+        if (chVars.signalVars.count(SignalType::READY)) {
+          os << "Channel " << getUniqueName(*value.getUses().begin())
+             << " ready buffer present: "
+             << model->getValue(chVars.signalVars[SignalType::READY].bufPresent)
+             << "\n";
+        }
+        if (chVars.signalVars.count(SignalType::DATA)) {
+          os << "Channel " << getUniqueName(*value.getUses().begin())
+             << " data buffer present: "
+             << model->getValue(chVars.signalVars[SignalType::DATA].bufPresent)
+             << "\n";
+        }
+      }
+
+      // for (auto &[value, chVars] : vars.channelVars) {
+      //   os << "Channel " << getUniqueName(*value.getUses().begin())
+      //      << " buffer present: " << chVars.bufPresent.get(GRB_DoubleAttr_X)
+      //      << "\n";
+      // }
+
+      for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+        auto [cf, cfVars] = cfdfcWithVars;
+        for (auto backedge : cf->backedges) {
+          os << "CFDFC #" << idx << " backedge "
+             << getUniqueName(*backedge.getUses().begin()) << "\n";
+        }
+      }
     }
   }
 }

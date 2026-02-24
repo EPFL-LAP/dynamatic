@@ -79,7 +79,7 @@ struct ChannelVars {
   /// Usage of a shift register on the channel (binary).
   CPVar shiftReg;
   /// Whether the channel is a backedge or not (binary).
-  GRBVar isBackedge;
+  CPVar isBackedge;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -363,7 +363,7 @@ protected:
   /// extracted CFDFCs.
   unsigned getChannelNumExecs(Value channel);
 
-  GRBLinExpr addBackedgeObjective(ValueRange allChannels);
+  LinExpr addBackedgeObjective(ValueRange allChannels);
 
   void addMinBufferAreaObjective(ValueRange channels);
 
@@ -379,7 +379,7 @@ protected:
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
   void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs,
-                                 GRBLinExpr objective);
+                                 LinExpr objective);
 
   /// Adds the MILP model's objective. The objective maximizes throughput while
   /// minimizing buffer area, with throughput prioritized. It has a positive
