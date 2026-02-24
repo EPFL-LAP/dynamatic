@@ -273,6 +273,8 @@ class VHDLEmitter(Emitter):
         end if;
         """
         assert (logic.type == 'r')
+        if init is None:
+            init = 0
         if (init != None):
             self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             self.add_reg_str(f'\t\t\t{logic.getNameRead()} <= {self.in_to_bits(init)};\n')
@@ -289,6 +291,8 @@ class VHDLEmitter(Emitter):
 
     def logicvec_reg_init(self, vec: LogicVec, enable=None, init=None) -> None:
         assert (vec.type == 'r')
+        if init is None:
+            init = [0] * vec.size
         if (init != None):
             self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {self.int_to_str(init, vec.size)};\n')
@@ -299,13 +303,15 @@ class VHDLEmitter(Emitter):
             self.add_reg_str(f'\t\t\tif ({enable.getNameRead()} = \'1\') then\n')
             self.add_reg_str(f'\t\t\t\t{vec.getNameRead()} <= {vec.getNameWrite()};\n')
             self.add_reg_str('\t\t\tend if;\n')
-        else:
+        else:    
             self.add_reg_str(f'\t\t\t{vec.getNameRead()} <= {vec.getNameWrite()};\n')
         self.add_reg_str('\t\tend if;\n')
 
 
     def logicarray_reg_init(self, array: LogicArray, enable=None, init=None) -> None:
         assert (array.type == 'r')
+        if init is None:
+            init = [0] * array.length
         if (init != None):
             self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             for i in range(0, array.length):
@@ -326,6 +332,8 @@ class VHDLEmitter(Emitter):
 
     def logicvecarray_reg_init(self, array: LogicVecArray, enable=None, init=None) -> None:
         assert (array.type == 'r')
+        if init is None:
+            init = [0] * array.length
         if (init != None):
             self.add_reg_str(f'\t\tif ({self.reset_name} = \'1\') then\n')
             for i in range(0, array.length):

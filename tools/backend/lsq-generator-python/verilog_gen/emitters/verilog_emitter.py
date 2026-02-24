@@ -144,7 +144,7 @@ class VerilogEmitter(Emitter):
             
     def get_unop_str(self, unop: UnOp) -> str:
         if unop == UnOp.NOT:
-            return '!'
+            return '~'
         else:
             raise ValueError('Invalid unary operator')
 
@@ -225,6 +225,8 @@ class VerilogEmitter(Emitter):
         end if;
         """
         assert (logic.type == 'r')
+        if init is None:
+            init = 0
         self.increase_indent()
         in_else = False
         if (init != None):
@@ -247,6 +249,8 @@ class VerilogEmitter(Emitter):
 
     def logicvec_reg_init(self, vec: LogicVec, enable=None, init=None) -> None:
         assert (vec.type == 'r')
+        if init is None:
+            init = [0] * vec.size
         self.increase_indent()
         in_else = False
         if (init != None):
@@ -272,6 +276,8 @@ class VerilogEmitter(Emitter):
     def logicarray_reg_init(self, array: LogicArray, enable=None, init=None) -> None:
         assert (array.type == 'r')
         self.increase_indent()
+        if init is None:
+            init = [0] * array.length
         in_else = False
         if (init != None):
             self.add_reg_str(f'if ({self.reset_name}) begin')
@@ -299,6 +305,8 @@ class VerilogEmitter(Emitter):
     def logicvecarray_reg_init(self, array: LogicVecArray, enable=None, init=None) -> None:
         assert (array.type == 'r')
         self.increase_indent()
+        if init is None:
+            init = [0] * array.length
         in_else = False
         if (init != None):
             self.add_reg_str(f'if ({self.reset_name}) begin')
