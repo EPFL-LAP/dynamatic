@@ -101,7 +101,7 @@ class VerilogEmitter(Emitter):
         self.inst_str = f'{self.get_current_indent()}{module_name} {instance_name} (\n'
         self.increase_indent()
 
-    def add_map(self, port_name: str, signal_name: str) -> str:
+    def add_map(self, port_name: str, signal_name: str='') -> str:
         if not self.inst_started:
             raise ValueError('add_map can only be called after start_instantiation')
         
@@ -113,7 +113,7 @@ class VerilogEmitter(Emitter):
             self.first_map = False
 
         self.inst_str += f'{self.get_current_indent()}.{port_name}({signal_name})'
-
+        
     def complete_instantiation(self) -> str:
         self.inst_started = False
         self.decrease_indent()

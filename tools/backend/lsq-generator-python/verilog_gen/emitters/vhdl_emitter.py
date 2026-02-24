@@ -105,7 +105,7 @@ class VHDLEmitter(Emitter):
         self.inst_str += f'{self.get_current_indent()}port map('
         self.increase_indent()
 
-    def add_map(self, port_name: str, signal_name: str) -> str:
+    def add_map(self, port_name: str, signal_name: str='open') -> str:
         if not self.inst_started:
             raise ValueError('add_map can only be called after start_instantiation')
         

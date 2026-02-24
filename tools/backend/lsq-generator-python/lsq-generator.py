@@ -286,6 +286,7 @@ class LSQWrapper:
         em.add_map("rst", "reset")
         em.add_map("clk", "clock")
 
+        em.add_map("empty_o")
         em.add_map("wreq_data_0_o", io_storeData.getNameWrite())
         em.add_map("wreq_addr_0_o", io_storeAddr.getNameWrite())
         em.add_map("wreq_valid_0_o", io_storeEn.getNameWrite())
@@ -325,12 +326,14 @@ class LSQWrapper:
         for i in range(self.lsq_config.numLdMem):
             em.add_map(f"rreq_ready_{i}_i", rreq_ready[i].getNameRead())
             em.add_map(f"rresp_valid_{i}_i", rresp_valid[i].getNameRead())
+            em.add_map(f"rresp_ready_{i}_o")
             em.add_map(f"rresp_id_{i}_i", rresp_id[i].getNameRead())
             em.add_map(f"rreq_id_0_o", rreq_id[i].getNameWrite())
 
         for i in range(self.lsq_config.numStMem):
             em.add_map(f"wreq_ready_{i}_i", wreq_ready[i].getNameRead())
             em.add_map(f"wresp_valid_{i}_i", wresp_valid[i].getNameRead())
+            em.add_map(f"wresp_ready_{i}_o")
             em.add_map(f"wresp_id_{i}_i", wresp_id[i].getNameRead())
             em.add_map(f"wreq_id_{i}_o", wreq_id[i].getNameWrite())
 
@@ -479,7 +482,7 @@ class LSQWrapper:
         
         em.add_map("rst", "reset")
         em.add_map("clk", "clock")
-
+        
         em.add_map("wreq_data_0_o", io_storeData.getNameWrite())
         em.add_map("wreq_addr_0_o", io_storeAddr.getNameWrite())
         em.add_map("wreq_valid_0_o", io_storeEn.getNameWrite())
