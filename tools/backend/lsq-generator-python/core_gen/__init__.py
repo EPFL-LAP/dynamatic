@@ -1,10 +1,10 @@
-# verilog_gen/__init__.py
-from verilog_gen.utils import (
+# core_gen/__init__.py
+from core_gen.utils import (
     VHDLLogicType, VHDLLogicVecType, VHDLLogicTypeArray, VHDLLogicVecTypeArray,
     OpTab,
 )
-from verilog_gen.configs import GetConfigs, Configs
-from verilog_gen.codegen import codeGen
+from core_gen.configs import GetConfigs, Configs
+from core_gen.codegen import codeGen
 
 
 # from vhdlgen import *

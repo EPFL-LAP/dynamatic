@@ -1,11 +1,11 @@
-from verilog_gen.context import Context
-from verilog_gen.emitters import Emitter
-from verilog_gen.signals import *
-from verilog_gen.operators import *
-from verilog_gen.configs import Configs
-from verilog_gen.ir import BinOp, Bin, Val, Bit, CustomStatement
+from core_gen.context import Context
+from core_gen.emitters import Emitter
+from core_gen.signals import *
+from core_gen.operators import *
+from core_gen.configs import Configs
+from core_gen.ir import BinOp, Bin, Val, Bit, CustomStatement
 
-import verilog_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
+import core_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 class LSQ:

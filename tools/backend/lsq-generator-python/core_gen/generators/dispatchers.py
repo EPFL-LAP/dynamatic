@@ -1,8 +1,8 @@
-from verilog_gen.context import Context
-from verilog_gen.signals import LogicArray, LogicVec, LogicVecArray
-from verilog_gen.ir import Op, BinOp, Val, Bit
-from verilog_gen.emitters import Emitter
-from verilog_gen.operators import BitsToOH, Mux1H, Reduce, VecToArray, CyclicPriorityMasking
+from core_gen.context import Context
+from core_gen.signals import LogicArray, LogicVec, LogicVecArray
+from core_gen.ir import Op, BinOp, Val, Bit
+from core_gen.emitters import Emitter
+from core_gen.operators import BitsToOH, Mux1H, Reduce, VecToArray, CyclicPriorityMasking
 
 
 class PortToQueueDispatcher:

@@ -1,8 +1,8 @@
-from verilog_gen.utils import *
-from verilog_gen.signals import *
-from verilog_gen.ir import Val, Bit, BinOp
-from verilog_gen.emitters import Emitter
-from verilog_gen.operators import Reduce
+from core_gen.utils import *
+from core_gen.signals import *
+from core_gen.ir import Val, Bit, BinOp
+from core_gen.emitters import Emitter
+from core_gen.operators import Reduce
 
 
 def VecToArray(em: Emitter, dout, din) -> str:

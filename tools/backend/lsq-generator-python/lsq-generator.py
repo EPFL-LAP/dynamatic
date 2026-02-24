@@ -12,11 +12,11 @@ import argparse
 import os
 import sys
 
-from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
-from verilog_gen.configs import Configs, GetConfigs
-from verilog_gen.codegen import codeGen
-from verilog_gen.emitters import Emitter, VHDLEmitter, VerilogEmitter
-from verilog_gen.ir import Val, CustomStatement, Bit
+from core_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
+from core_gen.configs import Configs, GetConfigs
+from core_gen.codegen import codeGen
+from core_gen.emitters import Emitter, VHDLEmitter, VerilogEmitter
+from core_gen.ir import Val, CustomStatement, Bit
 
 # ===----------------------------------------------------------------------===#
 # Parser Definition

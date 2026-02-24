@@ -12,8 +12,8 @@
 # std_logic bit
 #
 
-from verilog_gen.utils import *
-from verilog_gen.ir import Statement
+from core_gen.utils import *
+from core_gen.ir import Statement
 
 
 class Logic(Statement):

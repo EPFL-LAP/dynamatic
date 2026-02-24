@@ -1,6 +1,6 @@
-from verilog_gen.emitters.emitter import Emitter, Meta
-from verilog_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit, WhenElse, Type
-from verilog_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
+from core_gen.emitters.emitter import Emitter, Meta
+from core_gen.ir import Statement, Bin, Un, BinOp, UnOp, Bit, WhenElse, Type
+from core_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
 # ===----------------------------------------------------------------------===#
 # Global Parameter Initialization
 # ===----------------------------------------------------------------------===#

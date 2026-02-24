@@ -1,8 +1,8 @@
-from verilog_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
-from verilog_gen.ir import Val, WhenElse, Bit
-from verilog_gen.operators import WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
-from verilog_gen.configs import Configs
-from verilog_gen.emitters import Emitter
+from core_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
+from core_gen.ir import Val, WhenElse, Bit
+from core_gen.operators import WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
+from core_gen.configs import Configs
+from core_gen.emitters import Emitter
 
 
 class GroupAllocator:

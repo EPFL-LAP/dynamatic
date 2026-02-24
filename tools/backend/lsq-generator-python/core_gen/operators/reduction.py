@@ -1,7 +1,7 @@
-from verilog_gen.emitters import Emitter
-from verilog_gen.utils import *
-from verilog_gen.operators import *
-from verilog_gen.ir import Val, Bin
+from core_gen.emitters import Emitter
+from core_gen.utils import *
+from core_gen.operators import *
+from core_gen.ir import Val, Bin
 
 
 # ===----------------------------------------------------------------------===#
@@ -46,7 +46,7 @@ def ReduceLogicVec(em: Emitter, dout, din, operator, length) -> str:
                       operator "g" operator "h" operator "i" operator "j" operator "k"
                       operator "l" operator "m" operator "n" operator "o" operator "p" 
     """
-    from verilog_gen.signals import LogicVec
+    from core_gen.signals import LogicVec
 
     if (length == 1):
         em.add_assignment(dout, Bin(Val(din, 0), operator, Val(din, 1)))
@@ -68,7 +68,7 @@ def ReduceLogicArray(em: Emitter, dout, din, operator, length) -> str:
     Identical in behavior to ReduceLogicVec, but operates on multiple VHDL single-bit std_logic
     instead of std_logic_vector.
     """
-    from verilog_gen.signals import LogicArray
+    from core_gen.signals import LogicArray
 
     if (length == 1):
         em.add_assignment(dout, Bin(din[0], operator, din[1]))
@@ -118,7 +118,7 @@ def ReduceLogicVecArray(em: Emitter, dout, din, operator, length) -> str:
 
         Therefore, dout is LogicVec.
     """
-    from verilog_gen.signals import LogicVecArray, LogicArray
+    from core_gen.signals import LogicVecArray, LogicArray
     if (length == 1):
         em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
@@ -147,7 +147,7 @@ def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
         operator: types of operator for the reduction
         comment : Turn on/off adding VHDL comment lines.
     """
-    from verilog_gen.signals import LogicVec, LogicArray, LogicVecArray
+    from core_gen.signals import LogicVec, LogicArray, LogicVecArray
 
     if (comment):
         em.add_comment('Reduction Begin')

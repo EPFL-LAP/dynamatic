@@ -1,5 +1,5 @@
-import verilog_gen.generators.group_allocator as group_allocator
-import verilog_gen.generators.dispatchers as dispatchers
+import core_gen.generators.group_allocator as group_allocator
+import core_gen.generators.dispatchers as dispatchers
 
 
 class LSQ_Submodules:

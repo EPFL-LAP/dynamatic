@@ -1,7 +1,7 @@
-from verilog_gen.emitters import Emitter
-from verilog_gen.ir import Op, Val, Bit
-from verilog_gen.utils import *
-from verilog_gen.signals import *
+from core_gen.emitters import Emitter
+from core_gen.ir import Op, Val, Bit
+from core_gen.utils import *
+from core_gen.signals import *
 
 
 def WrapAdd(em: Emitter, out, in_a, in_b, max: int) -> str:

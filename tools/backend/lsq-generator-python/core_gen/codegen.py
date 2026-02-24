@@ -1,9 +1,9 @@
-from verilog_gen.emitters import Emitter
-import verilog_gen.generators.group_allocator as group_allocator
-import verilog_gen.generators.dispatchers as dispatchers
-import verilog_gen.generators.lsq as lsq
+from core_gen.emitters import Emitter
+import core_gen.generators.group_allocator as group_allocator
+import core_gen.generators.dispatchers as dispatchers
+import core_gen.generators.lsq as lsq
 
-import verilog_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
+import core_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 def codeGen(emitter: Emitter, path_rtl, configs):

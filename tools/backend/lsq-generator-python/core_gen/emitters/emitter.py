@@ -60,7 +60,7 @@ class Emitter:
         raise NotImplementedError("Emitter subclasses must implement un_to_str()")
 
     def assigned_var_to_str(self, var):
-        from verilog_gen.signals import Logic
+        from core_gen.signals import Logic
         size = 1
         if type(var) == tuple:
             if len(var) == 2:

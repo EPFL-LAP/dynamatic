@@ -1,6 +1,6 @@
-from verilog_gen.emitters import Emitter
-from verilog_gen.utils import isPow2
-from verilog_gen.ir import Op, Val
+from core_gen.emitters import Emitter
+from core_gen.utils import isPow2
+from core_gen.ir import Op, Val
 
 
 def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
@@ -57,7 +57,7 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
     em.add_comment('Priority Masking Begin')
     em.add_comment(f'CyclicPriorityMask({dout.name}, {din.name}, {base.name})')
     em.use_temp()
-    from verilog_gen.signals import LogicVecArray, LogicVec, LogicArray
+    from core_gen.signals import LogicVecArray, LogicVec, LogicArray
     if isinstance(din, LogicVecArray):
         assert (reverse == False)
         for i in range(0, din.size):
