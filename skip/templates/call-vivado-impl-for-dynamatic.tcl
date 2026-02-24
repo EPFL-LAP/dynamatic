@@ -14,6 +14,7 @@ if {[catch {
   route_design
   report_utilization > PATH_TO_PLACE_AND_ROUTE/utilization_post_pr.rpt
   report_timing > PATH_TO_PLACE_AND_ROUTE/timing_post_pr.rpt
+  report_timing -max_paths 5 -path_type full -input_pins > PATH_TO_PLACE_AND_ROUTE/critical_path.rpt
 } result]} {
   puts "Error during tcl script execution: $result"
   exit
