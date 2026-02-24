@@ -342,7 +342,7 @@ class LSQWrapper:
 
         # Write to the file
         output_str = em.get_definition_str(self.lsq_name)
-        with open(f"{self.output_folder}/{self.lsq_name}.vhd", 'w') as file:
+        with open(f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", 'w') as file:
             file.write(output_str)
 
         return self.lsq_wrapper_str
@@ -531,7 +531,7 @@ class LSQWrapper:
 
         # Write to the file
         output_str = em.get_definition_str(self.lsq_name)
-        with open(f"{self.output_folder}/{self.lsq_name}.vhd", 'w') as file:
+        with open(f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", 'w') as file:
             file.write(output_str)
 
         return output_str
