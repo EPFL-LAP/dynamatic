@@ -1015,107 +1015,87 @@ class LSQ:
             arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
 
         # Pipeline Stage 1
-        # bypass signals
+
+        # load registers (w/ backpressure)
+        load_idx_oh_p1 = LogicVecArray(
+            ctx, 'load_idx_oh_p1', pipe1_type, self.configs.numLdMem, self.configs.numLdqEntries)
+        load_en_p1 = LogicArray(
+            ctx, 'load_en_p1', pipe1_type, self.configs.numLdMem)
+        # store registers (w/ backpressure)
+        store_idx_p1 = LogicVec(
+            ctx, 'store_idx_p1', pipe1_type, self.configs.stqAddrW)
+        store_en_p1 = Logic(
+            ctx, 'store_en_p1', pipe1_type)
+        # bypass registers (w/o backpressure)
         bypass_idx_oh_p1 = LogicVecArray(
             ctx, 'bypass_idx_oh_p1', pipe1_type, self.configs.numLdqEntries, self.configs.numStqEntries)
         bypass_en_p1 = LogicArray(
             ctx, 'bypass_en_p1', pipe1_type, self.configs.numLdqEntries)
+
         if self.configs.pipe1:
+            # load_*_p1 control signals
+            load_hs = LogicArray(ctx, 'load_hs', 'w', self.configs.numLdMem)
+            load_p1_ready = LogicArray(ctx, 'load_p1_ready', 'w', self.configs.numLdMem)
+            for w in range(0, self.configs.numLdMem):
+                arch += Op(ctx, load_hs[w], load_en_p1[w], 'and', rreq_ready_i[w])
+                arch += Op(ctx, load_p1_ready[w], load_hs[w], 'or', 'not', load_en_p1[w])
+            # store_*_p1 control signals
+            store_hs = Logic(ctx, 'store_hs', 'w')
+            store_p1_ready = Logic(ctx, 'store_p1_ready', 'w')
+            arch += Op(ctx, store_hs, store_en_p1, 'and', wreq_ready_i[0])
+            arch += Op(ctx, store_p1_ready, store_hs, 'or', 'not', store_en_p1)
+            # register init
+            load_idx_oh_p1.regInit(enable=load_p1_ready)
+            load_en_p1.regInit(init=[0]*self.configs.numLdMem, enable=load_p1_ready)
+            store_idx_p1.regInit(enable=store_p1_ready)
+            store_en_p1.regInit(init=0, enable=store_p1_ready)
             bypass_idx_oh_p1.regInit()
             bypass_en_p1.regInit(init=[0]*self.configs.numLdqEntries)
+
+        # pipeline register assignments
+        for w in range(0, self.configs.numLdMem):
+            arch += Op(ctx, load_idx_oh_p1[w], load_idx_oh[w])
+            arch += Op(ctx, load_en_p1[w], load_en[w])
+        arch += Op(ctx, store_idx_p1, store_idx)
+        arch += Op(ctx, store_en_p1, store_en)
         for i in range(0, self.configs.numLdqEntries):
             arch += Op(ctx, bypass_idx_oh_p1[i], bypass_idx_oh_p0[i])
             arch += Op(ctx, bypass_en_p1[i], bypass_en[i])
 
-        if self.configs.pipe1:
-            load_idx_oh_p1 = LogicVecArray(
-                ctx, 'load_idx_oh_p1', 'r', self.configs.numLdMem, self.configs.numLdqEntries)
-            load_en_p1 = LogicArray(
-                ctx, 'load_en_p1', 'r', self.configs.numLdMem)
+        ######    Read/Write    ######
+        # Read Request
+        for w in range(0, self.configs.numLdMem):
+            arch += Op(ctx, rreq_valid_o[w], load_en_p1[w])
+            arch += OHToBits(ctx, rreq_id_o[w], load_idx_oh_p1[w])
+            arch += Mux1H(ctx, rreq_addr_o[w], ldq_addr, load_idx_oh_p1[w])
 
-            load_hs = LogicArray(ctx, 'load_hs', 'w', self.configs.numLdMem)
-            load_p1_ready = LogicArray(
-                ctx, 'load_p1_ready', 'w', self.configs.numLdMem)
-
-            store_idx_p1 = LogicVec(
-                ctx, 'store_idx_p1', 'r', self.configs.stqAddrW)
-            store_en_p1 = Logic(ctx, 'store_en_p1', 'r')
-
-            store_hs = Logic(ctx, 'store_hs', 'w')
-            store_p1_ready = Logic(ctx, 'store_p1_ready', 'w')
-
-            load_idx_oh_p1.regInit(enable=load_p1_ready)
-            load_en_p1.regInit(
-                init=[0]*self.configs.numLdMem, enable=load_p1_ready)
-
-            store_idx_p1.regInit(enable=store_p1_ready)
-            store_en_p1.regInit(init=0, enable=store_p1_ready)
-
+        for i in range(0, self.configs.numLdqEntries):
+            ldq_issue_set_vec = LogicVec(
+                ctx, f'ldq_issue_set_vec_{i}', 'w', self.configs.numLdMem)
             for w in range(0, self.configs.numLdMem):
-                arch += Op(ctx, load_hs[w], load_en_p1[w],
-                           'and', rreq_ready_i[w])
-                arch += Op(ctx, load_p1_ready[w],
-                           load_hs[w], 'or', 'not', load_en_p1[w])
-
-            for w in range(0, self.configs.numLdMem):
-                arch += Op(ctx, load_idx_oh_p1[w], load_idx_oh[w])
-                arch += Op(ctx, load_en_p1[w], load_en[w])
-
-            arch += Op(ctx, store_hs, store_en_p1, 'and', wreq_ready_i[0])
-            arch += Op(ctx, store_p1_ready, store_hs, 'or', 'not', store_en_p1)
-
-            arch += Op(ctx, store_idx_p1, store_idx)
-            arch += Op(ctx, store_en_p1, store_en)
-
-            ######    Read/Write    ######
-            # Read Request
-            for w in range(0, self.configs.numLdMem):
-                arch += Op(ctx, rreq_valid_o[w], load_en_p1[w])
-                arch += OHToBits(ctx, rreq_id_o[w], load_idx_oh_p1[w])
-                arch += Mux1H(ctx, rreq_addr_o[w], ldq_addr, load_idx_oh_p1[w])
-
-            for i in range(0, self.configs.numLdqEntries):
-                ldq_issue_set_vec = LogicVec(
-                    ctx, f'ldq_issue_set_vec_{i}', 'w', self.configs.numLdMem)
-                for w in range(0, self.configs.numLdMem):
+                if self.configs.pipe1:
                     arch += Op(ctx, (ldq_issue_set_vec, w),
                                '(', (load_idx_oh, w, i), 'and',
                                (load_p1_ready, w), ')', 'or',
                                (bypass_en, i)
                                )
-                arch += Reduce(ctx, ldq_issue_set[i], ldq_issue_set_vec, 'or')
-
-            # Write Request
-            arch += Op(ctx, wreq_valid_o[0], store_en_p1)
-            arch += Op(ctx, wreq_id_o[0], 0)
-            arch += MuxLookUp(ctx, wreq_addr_o[0], stq_addr, store_idx_p1)
-            arch += MuxLookUp(ctx, wreq_data_o[0], stq_data, store_idx_p1)
-            arch += Op(ctx, stq_issue_en, store_en, 'and', store_p1_ready)
-        else:
-            ######    Read/Write    ######
-            # Read Request
-            for w in range(0, self.configs.numLdMem):
-                arch += Op(ctx, rreq_valid_o[w], load_en[w])
-                arch += OHToBits(ctx, rreq_id_o[w], load_idx_oh[w])
-                arch += Mux1H(ctx, rreq_addr_o[w], ldq_addr, load_idx_oh[w])
-
-            for i in range(0, self.configs.numLdqEntries):
-                ldq_issue_set_vec = LogicVec(
-                    ctx, f'ldq_issue_set_vec_{i}', 'w', self.configs.numLdMem)
-                for w in range(0, self.configs.numLdMem):
+                else:
                     arch += Op(ctx, (ldq_issue_set_vec, w),
                                '(', (load_idx_oh, w, i), 'and',
                                (rreq_ready_i, w), 'and',
                                (load_en, w), ')', 'or',
                                (bypass_en, i)
                                )
-                arch += Reduce(ctx, ldq_issue_set[i], ldq_issue_set_vec, 'or')
+            arch += Reduce(ctx, ldq_issue_set[i], ldq_issue_set_vec, 'or')
 
-            # Write Request
-            arch += Op(ctx, wreq_valid_o[0], store_en)
-            arch += Op(ctx, wreq_id_o[0], 0)
-            arch += MuxLookUp(ctx, wreq_addr_o[0], stq_addr, store_idx)
-            arch += MuxLookUp(ctx, wreq_data_o[0], stq_data, store_idx)
+        # Write Request
+        arch += Op(ctx, wreq_valid_o[0], store_en_p1)
+        arch += Op(ctx, wreq_id_o[0], 0)
+        arch += MuxLookUp(ctx, wreq_addr_o[0], stq_addr, store_idx_p1)
+        arch += MuxLookUp(ctx, wreq_data_o[0], stq_data, store_idx_p1)
+        if self.configs.pipe1:
+            arch += Op(ctx, stq_issue_en, store_en, 'and', store_p1_ready)
+        else:
             arch += Op(ctx, stq_issue_en, store_en, 'and', wreq_ready_i[0])
 
         # Read Response and Bypass
