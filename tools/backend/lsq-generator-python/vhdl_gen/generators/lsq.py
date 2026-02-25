@@ -331,18 +331,22 @@ class LSQ:
         arch += BitsToOH(ctx, ldq_head_oh, ldq_head)
         arch += BitsToOH(ctx, stq_head_oh, stq_head)
 
+        pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
+        pipe0_type = 'r' if self.configs.pipe0 else 'w'
+
         # update queue entries
         # load queue
-        if self.configs.pipe0 or self.configs.pipeComp:
-            ldq_wen_p0 = LogicArray(
-                ctx, 'ldq_wen_p0', 'r', self.configs.numLdqEntries)
-            ldq_wen_p0.regInit()
-            if self.configs.pipe0 and self.configs.pipeComp:
-                ldq_wen_p1 = LogicArray(
-                    ctx, 'ldq_wen_p1', 'r', self.configs.numLdqEntries)
-                ldq_wen_p1.regInit()
+        ldq_wen_pcomp = LogicArray(
+            ctx, 'ldq_wen_pcomp', pipe_comp_type, self.configs.numLdqEntries)
+        ldq_wen_p0 = LogicArray(
+            ctx, 'ldq_wen_p0', pipe0_type, self.configs.numLdqEntries)
         ldq_alloc_next = LogicArray(
             ctx, 'ldq_alloc_next', 'w', self.configs.numLdqEntries)
+        if self.configs.pipeComp:
+            ldq_wen_pcomp.regInit()
+        if self.configs.pipe0:
+            ldq_wen_p0.regInit()
+
         for i in range(0, self.configs.numLdqEntries):
             arch += Op(ctx, ldq_alloc_next[i],
                        'not', ldq_reset[i], 'and', ldq_alloc[i]
@@ -350,24 +354,12 @@ class LSQ:
             arch += Op(ctx, ldq_alloc[i],
                        ldq_wen[i], 'or', ldq_alloc_next[i]
                        )
-            if self.configs.pipe0 or self.configs.pipeComp:
-                arch += Op(ctx, ldq_wen_p0[i], ldq_wen[i])
-                if self.configs.pipe0 and self.configs.pipeComp:
-                    arch += Op(ctx, ldq_wen_p1[i], ldq_wen[i])
-                    arch += Op(ctx, ldq_issue[i],
-                               'not', ldq_wen_p1[i], 'and',
-                               '(', ldq_issue_set[i], 'or', ldq_issue[i], ')'
-                               )
-                else:
-                    arch += Op(ctx, ldq_issue[i],
-                               'not', ldq_wen_p0[i], 'and',
-                               '(', ldq_issue_set[i], 'or', ldq_issue[i], ')'
-                               )
-            else:
-                arch += Op(ctx, ldq_issue[i],
-                           'not', ldq_wen[i], 'and',
-                           '(', ldq_issue_set[i], 'or', ldq_issue[i], ')'
-                           )
+            arch += Op(ctx, ldq_wen_pcomp[i], ldq_wen[i])
+            arch += Op(ctx, ldq_wen_p0[i], ldq_wen_pcomp[i])
+            arch += Op(ctx, ldq_issue[i],
+                       'not', ldq_wen_p0[i], 'and',
+                       '(', ldq_issue_set[i], 'or', ldq_issue[i], ')'
+                       )
             arch += Op(ctx, ldq_addr_valid[i],
                        'not', ldq_wen[i], 'and',
                        '(', ldq_addr_wen[i], 'or', ldq_addr_valid[i], ')'
@@ -599,8 +591,6 @@ class LSQ:
             can_bypass_p0 = LogicVecArray(
                 ctx, 'can_bypass_p0', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
             can_bypass_p0.regInit(init=[0]*self.configs.numLdqEntries)
-
-            pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
 
             ldq_alloc_pcomp = LogicArray(
                 ctx, 'ldq_alloc_pcomp', pipe_comp_type, self.configs.numLdqEntries)
@@ -869,8 +859,6 @@ class LSQ:
                 ctx, 'ld_st_conflict', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
             can_bypass = LogicVecArray(
                 ctx, 'can_bypass', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-
-            pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
 
             ldq_alloc_pcomp = LogicArray(
                 ctx, 'ldq_alloc_pcomp', pipe_comp_type, self.configs.numLdqEntries)
