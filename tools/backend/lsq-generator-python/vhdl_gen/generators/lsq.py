@@ -68,8 +68,8 @@ class LSQ:
                 - (Optionally) Store Backward Port Dispatcher
 
         Parameters:
-            lsq_submodules  : A collection of objects representing submodules whose VHDL entity 
-                              definitions are already generated. This parameter is used to 
+            lsq_submodules  : A collection of objects representing submodules whose VHDL entity
+                              definitions are already generated. This parameter is used to
                               generate their port map instantiations.
             path_rtl        : Output directory for VHDL files.
 
