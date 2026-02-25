@@ -333,6 +333,7 @@ class LSQ:
 
         pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
         pipe0_type = 'r' if self.configs.pipe0 else 'w'
+        pipe1_type = 'r' if self.configs.pipe1 else 'w'
 
         # update queue entries
         # load queue
@@ -1013,8 +1014,20 @@ class LSQ:
                         bypass_idx_oh_p0[i], 'and', can_bypass[i])
             arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
 
+        # Pipeline Stage 1
+        # bypass signals
+        bypass_idx_oh_p1 = LogicVecArray(
+            ctx, 'bypass_idx_oh_p1', pipe1_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+        bypass_en_p1 = LogicArray(
+            ctx, 'bypass_en_p1', pipe1_type, self.configs.numLdqEntries)
         if self.configs.pipe1:
-            # Pipeline Stage 1
+            bypass_idx_oh_p1.regInit()
+            bypass_en_p1.regInit(init=[0]*self.configs.numLdqEntries)
+        for i in range(0, self.configs.numLdqEntries):
+            arch += Op(ctx, bypass_idx_oh_p1[i], bypass_idx_oh_p0[i])
+            arch += Op(ctx, bypass_en_p1[i], bypass_en[i])
+
+        if self.configs.pipe1:
             load_idx_oh_p1 = LogicVecArray(
                 ctx, 'load_idx_oh_p1', 'r', self.configs.numLdMem, self.configs.numLdqEntries)
             load_en_p1 = LogicArray(
@@ -1031,20 +1044,12 @@ class LSQ:
             store_hs = Logic(ctx, 'store_hs', 'w')
             store_p1_ready = Logic(ctx, 'store_p1_ready', 'w')
 
-            bypass_idx_oh_p1 = LogicVecArray(
-                ctx, 'bypass_idx_oh_p1', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
-            bypass_en_p1 = LogicArray(
-                ctx, 'bypass_en_p1', 'r', self.configs.numLdqEntries)
-
             load_idx_oh_p1.regInit(enable=load_p1_ready)
             load_en_p1.regInit(
                 init=[0]*self.configs.numLdMem, enable=load_p1_ready)
 
             store_idx_p1.regInit(enable=store_p1_ready)
             store_en_p1.regInit(init=0, enable=store_p1_ready)
-
-            bypass_idx_oh_p1.regInit()
-            bypass_en_p1.regInit(init=[0]*self.configs.numLdqEntries)
 
             for w in range(0, self.configs.numLdMem):
                 arch += Op(ctx, load_hs[w], load_en_p1[w],
@@ -1061,12 +1066,6 @@ class LSQ:
 
             arch += Op(ctx, store_idx_p1, store_idx)
             arch += Op(ctx, store_en_p1, store_en)
-
-            for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, bypass_idx_oh_p1[i], bypass_idx_oh_p0[i])
-
-            for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, bypass_en_p1[i], bypass_en[i])
 
             ######    Read/Write    ######
             # Read Request
@@ -1092,48 +1091,6 @@ class LSQ:
             arch += MuxLookUp(ctx, wreq_addr_o[0], stq_addr, store_idx_p1)
             arch += MuxLookUp(ctx, wreq_data_o[0], stq_data, store_idx_p1)
             arch += Op(ctx, stq_issue_en, store_en, 'and', store_p1_ready)
-
-            # Read Response and Bypass
-            for i in range(0, self.configs.numLdqEntries):
-                # check each read response channel for each load
-                read_idx_oh = LogicArray(
-                    ctx, f'read_idx_oh_{i}', 'w', self.configs.numLdMem)
-                read_valid = Logic(ctx, f'read_valid_{i}', 'w')
-                read_data = LogicVec(
-                    ctx, f'read_data_{i}', 'w', self.configs.dataW)
-                for w in range(0, self.configs.numLdMem):
-                    arch += Op(ctx, read_idx_oh[w], rresp_valid_i[w], 'when',
-                               '(', rresp_id_i[w], '=', (i, self.configs.idW), ')', 'else', '\'0\'')
-                arch += Mux1H(ctx, read_data, rresp_data_i, read_idx_oh)
-                arch += Reduce(ctx, read_valid, read_idx_oh, 'or')
-                # multiplex from store queue data
-                bypass_data = LogicVec(
-                    ctx, f'bypass_data_{i}', 'w', self.configs.dataW)
-                arch += Mux1H(ctx, bypass_data, stq_data, bypass_idx_oh_p1[i])
-                # multiplex from read and bypass data
-                arch += Op(ctx, ldq_data[i], read_data, 'or', bypass_data)
-                arch += Op(ctx, ldq_data_wen[i],
-                           bypass_en_p1[i], 'or', read_valid)
-            for w in range(0, self.configs.numLdMem):
-                arch += Op(ctx, rresp_ready_o[w], '\'1\'')
-
-            # Write Response
-            if self.configs.stResp:
-                for i in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, stq_exec_set[i],
-                               wresp_valid_i[0], 'when',
-                               '(', stq_resp, '=', (i, self.configs.stqAddrW), ')',
-                               'else', '\'0\''
-                               )
-            else:
-                for i in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, stq_reset[i],
-                               wresp_valid_i[0], 'when',
-                               '(', stq_resp, '=', (i, self.configs.stqAddrW), ')',
-                               'else', '\'0\''
-                               )
-            arch += Op(ctx, stq_resp_en, wresp_valid_i[0])
-            arch += Op(ctx, wresp_ready_o[0], '\'1\'')
         else:
             ######    Read/Write    ######
             # Read Request
@@ -1161,47 +1118,47 @@ class LSQ:
             arch += MuxLookUp(ctx, wreq_data_o[0], stq_data, store_idx)
             arch += Op(ctx, stq_issue_en, store_en, 'and', wreq_ready_i[0])
 
-            # Read Response and Bypass
-            for i in range(0, self.configs.numLdqEntries):
-                # check each read response channel for each load
-                read_idx_oh = LogicArray(
-                    ctx, f'read_idx_oh_{i}', 'w', self.configs.numLdMem)
-                read_valid = Logic(ctx, f'read_valid_{i}', 'w')
-                read_data = LogicVec(
-                    ctx, f'read_data_{i}', 'w', self.configs.dataW)
-                for w in range(0, self.configs.numLdMem):
-                    arch += Op(ctx, read_idx_oh[w], rresp_valid_i[w], 'when',
-                               '(', rresp_id_i[w], '=', (i, self.configs.idW), ')', 'else', '\'0\'')
-                arch += Mux1H(ctx, read_data, rresp_data_i, read_idx_oh)
-                arch += Reduce(ctx, read_valid, read_idx_oh, 'or')
-                # multiplex from store queue data
-                bypass_data = LogicVec(
-                    ctx, f'bypass_data_{i}', 'w', self.configs.dataW)
-                arch += Mux1H(ctx, bypass_data, stq_data, bypass_idx_oh_p0[i])
-                # multiplex from read and bypass data
-                arch += Op(ctx, ldq_data[i], read_data, 'or', bypass_data)
-                arch += Op(ctx, ldq_data_wen[i],
-                           bypass_en[i], 'or', read_valid)
+        # Read Response and Bypass
+        for i in range(0, self.configs.numLdqEntries):
+            # check each read response channel for each load
+            read_idx_oh = LogicArray(
+                ctx, f'read_idx_oh_{i}', 'w', self.configs.numLdMem)
+            read_valid = Logic(ctx, f'read_valid_{i}', 'w')
+            read_data = LogicVec(
+                ctx, f'read_data_{i}', 'w', self.configs.dataW)
             for w in range(0, self.configs.numLdMem):
-                arch += Op(ctx, rresp_ready_o[w], '\'1\'')
+                arch += Op(ctx, read_idx_oh[w], rresp_valid_i[w], 'when',
+                           '(', rresp_id_i[w], '=', (i, self.configs.idW), ')', 'else', '\'0\'')
+            arch += Mux1H(ctx, read_data, rresp_data_i, read_idx_oh)
+            arch += Reduce(ctx, read_valid, read_idx_oh, 'or')
+            # multiplex from store queue data
+            bypass_data = LogicVec(
+                ctx, f'bypass_data_{i}', 'w', self.configs.dataW)
+            arch += Mux1H(ctx, bypass_data, stq_data, bypass_idx_oh_p1[i])
+            # multiplex from read and bypass data
+            arch += Op(ctx, ldq_data[i], read_data, 'or', bypass_data)
+            arch += Op(ctx, ldq_data_wen[i],
+                       bypass_en_p1[i], 'or', read_valid)
+        for w in range(0, self.configs.numLdMem):
+            arch += Op(ctx, rresp_ready_o[w], '\'1\'')
 
-            # Write Response
-            if self.configs.stResp:
-                for i in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, stq_exec_set[i],
-                               wresp_valid_i[0], 'when',
-                               '(', stq_resp, '=', (i, self.configs.stqAddrW), ')',
-                               'else', '\'0\''
-                               )
-            else:
-                for i in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, stq_reset[i],
-                               wresp_valid_i[0], 'when',
-                               '(', stq_resp, '=', (i, self.configs.stqAddrW), ')',
-                               'else', '\'0\''
-                               )
-            arch += Op(ctx, stq_resp_en, wresp_valid_i[0])
-            arch += Op(ctx, wresp_ready_o[0], '\'1\'')
+        # Write Response
+        if self.configs.stResp:
+            for i in range(0, self.configs.numStqEntries):
+                arch += Op(ctx, stq_exec_set[i],
+                           wresp_valid_i[0], 'when',
+                           '(', stq_resp, '=', (i, self.configs.stqAddrW), ')',
+                           'else', '\'0\''
+                           )
+        else:
+            for i in range(0, self.configs.numStqEntries):
+                arch += Op(ctx, stq_reset[i],
+                           wresp_valid_i[0], 'when',
+                           '(', stq_resp, '=', (i, self.configs.stqAddrW), ')',
+                           'else', '\'0\''
+                           )
+        arch += Op(ctx, stq_resp_en, wresp_valid_i[0])
+        arch += Op(ctx, wresp_ready_o[0], '\'1\'')
 
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
