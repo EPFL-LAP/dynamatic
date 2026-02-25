@@ -877,7 +877,7 @@ class LSQ:
                 ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
             # Check if the youngest conflict store can bypass with the load
             arch += Op(ctx, bypass_en_vec,
-                        bypass_idx_oh_p0[i], 'and', can_bypass[i])
+                       bypass_idx_oh_p0[i], 'and', can_bypass[i])
             arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
 
         # Pipeline Stage 1
@@ -946,10 +946,10 @@ class LSQ:
                 ctx, f'ldq_issue_set_vec_{i}', 'w', self.configs.numLdMem)
             for w in range(0, self.configs.numLdMem):
                 arch += Op(ctx, (ldq_issue_set_vec, w),
-                            '(', (load_idx_oh, w, i), 'and',
-                            (load_p1_ready, w), ')', 'or',
-                            (bypass_en, i)
-                            )
+                           '(', (load_idx_oh, w, i), 'and',
+                           (load_p1_ready, w), ')', 'or',
+                           (bypass_en, i)
+                           )
             arch += Reduce(ctx, ldq_issue_set[i], ldq_issue_set_vec, 'or')
 
         # Write Request
