@@ -600,24 +600,26 @@ class LSQ:
                 ctx, 'can_bypass_p0', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
             can_bypass_p0.regInit(init=[0]*self.configs.numLdqEntries)
 
-            if self.configs.pipeComp:
-                ldq_alloc_pcomp = LogicArray(
-                    ctx, 'ldq_alloc_pcomp', 'r', self.configs.numLdqEntries)
-                ldq_addr_valid_pcomp = LogicArray(
-                    ctx, 'ldq_addr_valid_pcomp', 'r', self.configs.numLdqEntries)
-                stq_alloc_pcomp = LogicArray(
-                    ctx, 'stq_alloc_pcomp', 'r', self.configs.numStqEntries)
-                stq_addr_valid_pcomp = LogicArray(
-                    ctx, 'stq_addr_valid_pcomp', 'r', self.configs.numStqEntries)
-                stq_data_valid_pcomp = LogicArray(
-                    ctx, 'stq_data_valid_pcomp', 'r', self.configs.numStqEntries)
-                addr_valid_pcomp = LogicVecArray(
-                    ctx, 'addr_valid_pcomp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-                addr_same_pcomp = LogicVecArray(
-                    ctx, 'addr_same_pcomp', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
-                store_is_older_pcomp = LogicVecArray(
-                    ctx, 'store_is_older_pcomp', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
+            pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
 
+            ldq_alloc_pcomp = LogicArray(
+                ctx, 'ldq_alloc_pcomp', pipe_comp_type, self.configs.numLdqEntries)
+            ldq_addr_valid_pcomp = LogicArray(
+                ctx, 'ldq_addr_valid_pcomp', pipe_comp_type, self.configs.numLdqEntries)
+            stq_alloc_pcomp = LogicArray(
+                ctx, 'stq_alloc_pcomp', pipe_comp_type, self.configs.numStqEntries)
+            stq_addr_valid_pcomp = LogicArray(
+                ctx, 'stq_addr_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
+            stq_data_valid_pcomp = LogicArray(
+                ctx, 'stq_data_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
+            addr_valid_pcomp = LogicVecArray(
+                ctx, 'addr_valid_pcomp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
+            addr_same_pcomp = LogicVecArray(
+                ctx, 'addr_same_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+            store_is_older_pcomp = LogicVecArray(
+                ctx, 'store_is_older_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+
+            if self.configs.pipeComp:
                 ldq_alloc_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
                 ldq_addr_valid_pcomp.regInit()
                 stq_alloc_pcomp.regInit(init=[0]*self.configs.numStqEntries)
@@ -626,435 +628,225 @@ class LSQ:
                 addr_same_pcomp.regInit()
                 store_is_older_pcomp.regInit()
 
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, (ldq_alloc_pcomp, i), (ldq_alloc, i))
-                    arch += Op(ctx, (ldq_addr_valid_pcomp, i),
-                               (ldq_addr_valid, i))
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, (ldq_alloc_pcomp, i), (ldq_alloc, i))
+                arch += Op(ctx, (ldq_addr_valid_pcomp, i),
+                           (ldq_addr_valid, i))
+            for j in range(0, self.configs.numStqEntries):
+                arch += Op(ctx, (stq_alloc_pcomp, j), (stq_alloc, j))
+                arch += Op(ctx, (stq_addr_valid_pcomp, j),
+                           (stq_addr_valid, j))
+                arch += Op(ctx, (stq_data_valid_pcomp, j),
+                           (stq_data_valid, j))
+            for i in range(0, self.configs.numLdqEntries):
                 for j in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, (stq_alloc_pcomp, j), (stq_alloc, j))
-                    arch += Op(ctx, (stq_addr_valid_pcomp, j),
-                               (stq_addr_valid, j))
-                    arch += Op(ctx, (stq_data_valid_pcomp, j),
-                               (stq_data_valid, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (store_is_older_pcomp, i, j),
-                                   (store_is_older, i, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_valid_pcomp, i, j),
-                                   (ldq_addr_valid_pcomp, i), 'and', (stq_addr_valid_pcomp, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_same_pcomp, i, j), '\'1\'', 'when',
-                                   (ldq_addr, i), '=', (stq_addr, j), 'else', '\'0\'')
+                    arch += Op(ctx, (store_is_older_pcomp, i, j),
+                               (store_is_older, i, j))
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
+                    arch += Op(ctx, (addr_valid_pcomp, i, j),
+                               (ldq_addr_valid_pcomp, i), 'and', (stq_addr_valid_pcomp, j))
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
+                    arch += Op(ctx, (addr_same_pcomp, i, j), '\'1\'', 'when',
+                               (ldq_addr, i), '=', (stq_addr, j), 'else', '\'0\'')
 
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (ld_st_conflict, i, j),
-                                   (stq_alloc_pcomp, j),   'and',
-                                   (store_is_older_pcomp, i, j), 'and',
-                                   '(', (addr_same_pcomp, i,
-                                         j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
-                                   )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (can_bypass_p0, i, j),
-                                   (ldq_alloc_pcomp, i),        'and',
-                                   (stq_data_valid_pcomp, j),   'and',
-                                   (addr_same_pcomp, i, j),     'and',
-                                   (addr_valid_pcomp, i, j)
-                                   )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (can_bypass, i, j),
-                                   'not', (ldq_issue, i), 'and',
-                                   (can_bypass_p0, i, j)
-                                   )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
-                load_req_valid = LogicArray(
-                    ctx, 'load_req_valid', 'w', self.configs.numLdqEntries)
-                can_load = LogicArray(
-                    ctx, 'can_load', 'w', self.configs.numLdqEntries)
-                can_load_p0 = LogicArray(
-                    ctx, 'can_load_p0', 'r', self.configs.numLdqEntries)
-                can_load_p0.regInit(init=[0]*self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Reduce(ctx,
-                                   load_conflict[i], ld_st_conflict[i], 'or')
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i],
-                               'and', ldq_addr_valid_pcomp[i])
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load_p0[i], 'not',
-                               load_conflict[i], 'and', load_req_valid[i])
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load[i], 'not',
-                               ldq_issue[i], 'and', can_load_p0[i])
-
-                ldq_head_oh_p0 = LogicVec(
-                    ctx, 'ldq_head_oh_p0', 'r', self.configs.numLdqEntries)
-                ldq_head_oh_p0.regInit()
-                arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    arch += CyclicPriorityMasking(
-                        ctx, load_idx_oh[w], can_load_list[w], ldq_head_oh_p0)
-                    arch += Reduce(ctx, load_en[w], can_load_list[w], 'or')
-                    if (w+1 != self.configs.numLdMem):
-                        load_idx_oh_LogicArray = LogicArray(
-                            ctx, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries)
-                        arch += VecToArray(ctx,
-                                           load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(LogicArray(
-                            ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
-                        for i in range(0, self.configs.numLdqEntries):
-                            arch += Op(ctx, can_load_list[w+1][i], 'not',
-                                       load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
-
-                # Store
-                stq_issue_en_p0 = Logic(ctx, 'stq_issue_en_p0', 'r')
-                stq_issue_next = LogicVec(
-                    ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
-
-                store_conflict = Logic(ctx, 'store_conflict', 'w')
-
-                can_store_curr = Logic(ctx, 'can_store_curr', 'w')
-                st_ld_conflict_curr = LogicVec(
-                    ctx, 'st_ld_conflict_curr', 'w', self.configs.numLdqEntries)
-                store_valid_curr = Logic(ctx, 'store_valid_curr', 'w')
-                store_data_valid_curr = Logic(
-                    ctx, 'store_data_valid_curr', 'w')
-                store_addr_valid_curr = Logic(
-                    ctx, 'store_addr_valid_curr', 'w')
-
-                can_store_next = Logic(ctx, 'can_store_next', 'w')
-                st_ld_conflict_next = LogicVec(
-                    ctx, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries)
-                store_valid_next = Logic(ctx, 'store_valid_next', 'w')
-                store_data_valid_next = Logic(
-                    ctx, 'store_data_valid_next', 'w')
-                store_addr_valid_next = Logic(
-                    ctx, 'store_addr_valid_next', 'w')
-
-                can_store_p0 = Logic(ctx, 'can_store_p0', 'r')
-                st_ld_conflict_p0 = LogicVec(
-                    ctx, 'st_ld_conflict_p0', 'r', self.configs.numLdqEntries)
-
-                stq_issue_en_p0.regInit(init=0)
-                can_store_p0.regInit(init=0)
-                st_ld_conflict_p0.regInit()
-
-                arch += Op(ctx, stq_issue_en_p0, stq_issue_en)
-                arch += WrapAddConst(ctx, stq_issue_next,
-                                     stq_issue, 1, self.configs.numStqEntries)
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
+            # A load conflicts with a store when:
+            # 1. The store entry is valid, and
+            # 2. The store is older than the load, and
+            # 3. The address conflicts(same or invalid store address).
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
                     arch += Op(ctx,
-                               (st_ld_conflict_curr, i),
-                               (ldq_alloc_pcomp, i), 'and',
-                               'not', MuxIndex(
-                                   store_is_older_pcomp[i], stq_issue), 'and',
-                               '(', MuxIndex(
-                                   addr_same_pcomp[i], stq_issue), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
+                               (ld_st_conflict, i, j),
+                               (stq_alloc_pcomp, j),   'and',
+                               (store_is_older_pcomp, i, j), 'and',
+                               '(', (addr_same_pcomp, i,
+                                     j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
                                )
-                for i in range(0, self.configs.numLdqEntries):
+
+            # A conflicting store entry can be bypassed to a load entry when:
+            # 1. The load entry is valid, and
+            # 2. The load entry is not issued yet, and
+            # 3. The address of the load-store pair are both valid and values the same.
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
                     arch += Op(ctx,
-                               (st_ld_conflict_next, i),
-                               (ldq_alloc_pcomp, i), 'and',
-                               'not', MuxIndex(
-                                   store_is_older_pcomp[i], stq_issue_next), 'and',
-                               '(', MuxIndex(
-                                   addr_same_pcomp[i], stq_issue_next), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
+                               (can_bypass_p0, i, j),
+                               (ldq_alloc_pcomp, i),        'and',
+                               (stq_data_valid_pcomp, j),   'and',
+                               (addr_same_pcomp, i, j),     'and',
+                               (addr_valid_pcomp, i, j)
                                )
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                arch += MuxLookUp(ctx, store_valid_curr,
-                                  stq_alloc_pcomp, stq_issue)
-                arch += MuxLookUp(ctx, store_data_valid_curr,
-                                  stq_data_valid_pcomp, stq_issue)
-                arch += MuxLookUp(ctx, store_addr_valid_curr,
-                                  stq_addr_valid_pcomp, stq_issue)
-                arch += Op(ctx, can_store_curr,
-                           store_valid_curr, 'and',
-                           store_data_valid_curr, 'and',
-                           store_addr_valid_curr
-                           )
-                arch += MuxLookUp(ctx, store_valid_next,
-                                  stq_alloc_pcomp, stq_issue_next)
-                arch += MuxLookUp(ctx, store_data_valid_next,
-                                  stq_data_valid_pcomp, stq_issue_next)
-                arch += MuxLookUp(ctx, store_addr_valid_next,
-                                  stq_addr_valid_pcomp, stq_issue_next)
-                arch += Op(ctx, can_store_next,
-                           store_valid_next, 'and',
-                           store_data_valid_next, 'and',
-                           store_addr_valid_next
-                           )
-                # Multiplex from current and next
-                arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_next,
-                           'when', stq_issue_en, 'else', st_ld_conflict_curr)
-                arch += Op(ctx, can_store_p0, can_store_next, 'when',
-                           stq_issue_en, 'else', can_store_curr)
-                # The store conflicts with any load
-                arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
-                arch += Op(ctx, store_en, 'not',
-                           store_conflict, 'and', can_store_p0)
-
-                arch += Op(ctx, store_idx, stq_issue)
-
-                # Bypass
-                stq_last_oh = LogicVec(
-                    ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
-                arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
-                for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
-                    # Search for the youngest store that is older than the load and conflicts
-                    arch += CyclicPriorityMasking(
-                        ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
-                    # Check if the youngest conflict store can bypass with the load
-                    arch += Op(ctx, bypass_en_vec,
-                               bypass_idx_oh_p0[i], 'and', can_bypass[i])
-                    arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
-            else:
-                addr_valid = LogicVecArray(
-                    ctx, 'addr_valid', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-                addr_same = LogicVecArray(
-                    ctx, 'addr_same', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_valid, i, j),
-                                   (ldq_addr_valid, i), 'and', (stq_addr_valid, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_same, i, j), '\'1\'', 'when',
-                                   (ldq_addr, i), '=', (stq_addr, j), 'else', '\'0\'')
-
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (ld_st_conflict, i, j),
-                                   (stq_alloc, j),         'and',
-                                   (store_is_older, i, j), 'and',
-                                   '(', (addr_same, i,
-                                         j), 'or', 'not', (stq_addr_valid, j), ')'
-                                   )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (can_bypass_p0, i, j),
-                                   (ldq_alloc, i),        'and',
-                                   (stq_data_valid, j),   'and',
-                                   (addr_same, i, j),     'and',
-                                   (addr_valid, i, j)
-                                   )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (can_bypass, i, j),
-                                   'not', (ldq_issue, i), 'and',
-                                   (can_bypass_p0, i, j)
-                                   )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
-                load_req_valid = LogicArray(
-                    ctx, 'load_req_valid', 'w', self.configs.numLdqEntries)
-                can_load = LogicArray(
-                    ctx, 'can_load', 'w', self.configs.numLdqEntries)
-                can_load_p0 = LogicArray(
-                    ctx, 'can_load_p0', 'r', self.configs.numLdqEntries)
-                can_load_p0.regInit(init=[0]*self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Reduce(ctx,
-                                   load_conflict[i], ld_st_conflict[i], 'or')
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, load_req_valid[i],
-                               ldq_alloc[i], 'and', ldq_addr_valid[i])
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load_p0[i], 'not',
-                               load_conflict[i], 'and', load_req_valid[i])
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load[i], 'not',
-                               ldq_issue[i], 'and', can_load_p0[i])
-
-                ldq_head_oh_p0 = LogicVec(
-                    ctx, 'ldq_head_oh_p0', 'r', self.configs.numLdqEntries)
-                ldq_head_oh_p0.regInit()
-                arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    arch += CyclicPriorityMasking(
-                        ctx, load_idx_oh[w], can_load_list[w], ldq_head_oh_p0)
-                    arch += Reduce(ctx, load_en[w], can_load_list[w], 'or')
-                    if (w+1 != self.configs.numLdMem):
-                        load_idx_oh_LogicArray = LogicArray(
-                            ctx, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries)
-                        arch += VecToArray(ctx,
-                                           load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(LogicArray(
-                            ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
-                        for i in range(0, self.configs.numLdqEntries):
-                            arch += Op(ctx, can_load_list[w+1][i], 'not',
-                                       load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
-
-                # Store
-                stq_issue_en_p0 = Logic(ctx, 'stq_issue_en_p0', 'r')
-                stq_issue_next = LogicVec(
-                    ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
-
-                store_conflict = Logic(ctx, 'store_conflict', 'w')
-
-                can_store_curr = Logic(ctx, 'can_store_curr', 'w')
-                st_ld_conflict_curr = LogicVec(
-                    ctx, 'st_ld_conflict_curr', 'w', self.configs.numLdqEntries)
-                store_valid_curr = Logic(ctx, 'store_valid_curr', 'w')
-                store_data_valid_curr = Logic(
-                    ctx, 'store_data_valid_curr', 'w')
-                store_addr_valid_curr = Logic(
-                    ctx, 'store_addr_valid_curr', 'w')
-
-                can_store_next = Logic(ctx, 'can_store_next', 'w')
-                st_ld_conflict_next = LogicVec(
-                    ctx, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries)
-                store_valid_next = Logic(ctx, 'store_valid_next', 'w')
-                store_data_valid_next = Logic(
-                    ctx, 'store_data_valid_next', 'w')
-                store_addr_valid_next = Logic(
-                    ctx, 'store_addr_valid_next', 'w')
-
-                can_store_p0 = Logic(ctx, 'can_store_p0', 'r')
-                st_ld_conflict_p0 = LogicVec(
-                    ctx, 'st_ld_conflict_p0', 'r', self.configs.numLdqEntries)
-
-                stq_issue_en_p0.regInit(init=0)
-                can_store_p0.regInit(init=0)
-                st_ld_conflict_p0.regInit()
-
-                arch += Op(ctx, stq_issue_en_p0, stq_issue_en)
-                arch += WrapAddConst(ctx, stq_issue_next,
-                                     stq_issue, 1, self.configs.numStqEntries)
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
                     arch += Op(ctx,
-                               (st_ld_conflict_curr, i),
-                               (ldq_alloc, i), 'and',
-                               'not', MuxIndex(
-                                   store_is_older[i], stq_issue), 'and',
-                               '(', MuxIndex(
-                                   addr_same[i], stq_issue), 'or', 'not', (ldq_addr_valid, i), ')'
+                               (can_bypass, i, j),
+                               'not', (ldq_issue, i), 'and',
+                               (can_bypass_p0, i, j)
                                )
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx,
-                               (st_ld_conflict_next, i),
-                               (ldq_alloc, i), 'and',
-                               'not', MuxIndex(
-                                   store_is_older[i], stq_issue_next), 'and',
-                               '(', MuxIndex(
-                                   addr_same[i], stq_issue_next), 'or', 'not', (ldq_addr_valid, i), ')'
-                               )
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                arch += MuxLookUp(ctx, store_valid_curr, stq_alloc, stq_issue)
-                arch += MuxLookUp(ctx, store_data_valid_curr,
-                                  stq_data_valid, stq_issue)
-                arch += MuxLookUp(ctx, store_addr_valid_curr,
-                                  stq_addr_valid, stq_issue)
-                arch += Op(ctx, can_store_curr,
-                           store_valid_curr, 'and',
-                           store_data_valid_curr, 'and',
-                           store_addr_valid_curr
-                           )
-                arch += MuxLookUp(ctx, store_valid_next,
-                                  stq_alloc, stq_issue_next)
-                arch += MuxLookUp(ctx, store_data_valid_next,
-                                  stq_data_valid, stq_issue_next)
-                arch += MuxLookUp(ctx, store_addr_valid_next,
-                                  stq_addr_valid, stq_issue_next)
-                arch += Op(ctx, can_store_next,
-                           store_valid_next, 'and',
-                           store_data_valid_next, 'and',
-                           store_addr_valid_next
-                           )
-                # Multiplex from current and next
-                arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_next,
-                           'when', stq_issue_en, 'else', st_ld_conflict_curr)
-                arch += Op(ctx, can_store_p0, can_store_next, 'when',
-                           stq_issue_en, 'else', can_store_curr)
-                # The store conflicts with any load
-                arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
-                arch += Op(ctx, store_en, 'not',
-                           store_conflict, 'and', can_store_p0)
 
-                arch += Op(ctx, store_idx, stq_issue)
+            # Load
 
-                # Bypass
-                stq_last_oh = LogicVec(
-                    ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
-                arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
-                for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
-                    # Search for the youngest store that is older than the load and conflicts
-                    arch += CyclicPriorityMasking(
-                        ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
-                    # Check if the youngest conflict store can bypass with the load
-                    arch += Op(ctx, bypass_en_vec,
-                               bypass_idx_oh_p0[i], 'and', can_bypass[i])
-                    arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
+            load_conflict = LogicArray(
+                ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
+            load_req_valid = LogicArray(
+                ctx, 'load_req_valid', 'w', self.configs.numLdqEntries)
+            can_load = LogicArray(
+                ctx, 'can_load', 'w', self.configs.numLdqEntries)
+            can_load_p0 = LogicArray(
+                ctx, 'can_load_p0', 'r', self.configs.numLdqEntries)
+            can_load_p0.regInit(init=[0]*self.configs.numLdqEntries)
+
+            # The load conflicts with any store
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Reduce(ctx,
+                               load_conflict[i], ld_st_conflict[i], 'or')
+            # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
+            # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i],
+                           'and', ldq_addr_valid_pcomp[i])
+            # Generate list for loads that does not face dependency issue
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, can_load_p0[i], 'not',
+                           load_conflict[i], 'and', load_req_valid[i])
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, can_load[i], 'not',
+                           ldq_issue[i], 'and', can_load_p0[i])
+
+            ldq_head_oh_p0 = LogicVec(
+                ctx, 'ldq_head_oh_p0', 'r', self.configs.numLdqEntries)
+            ldq_head_oh_p0.regInit()
+            arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
+
+            can_load_list = []
+            can_load_list.append(can_load)
+            for w in range(0, self.configs.numLdMem):
+                arch += CyclicPriorityMasking(
+                    ctx, load_idx_oh[w], can_load_list[w], ldq_head_oh_p0)
+                arch += Reduce(ctx, load_en[w], can_load_list[w], 'or')
+                if (w+1 != self.configs.numLdMem):
+                    load_idx_oh_LogicArray = LogicArray(
+                        ctx, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries)
+                    arch += VecToArray(ctx,
+                                       load_idx_oh_LogicArray, load_idx_oh[w])
+                    can_load_list.append(LogicArray(
+                        ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
+                    for i in range(0, self.configs.numLdqEntries):
+                        arch += Op(ctx, can_load_list[w+1][i], 'not',
+                                   load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
+
+            # Store
+            stq_issue_en_p0 = Logic(ctx, 'stq_issue_en_p0', 'r')
+            stq_issue_next = LogicVec(
+                ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
+
+            store_conflict = Logic(ctx, 'store_conflict', 'w')
+
+            can_store_curr = Logic(ctx, 'can_store_curr', 'w')
+            st_ld_conflict_curr = LogicVec(
+                ctx, 'st_ld_conflict_curr', 'w', self.configs.numLdqEntries)
+            store_valid_curr = Logic(ctx, 'store_valid_curr', 'w')
+            store_data_valid_curr = Logic(
+                ctx, 'store_data_valid_curr', 'w')
+            store_addr_valid_curr = Logic(
+                ctx, 'store_addr_valid_curr', 'w')
+
+            can_store_next = Logic(ctx, 'can_store_next', 'w')
+            st_ld_conflict_next = LogicVec(
+                ctx, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries)
+            store_valid_next = Logic(ctx, 'store_valid_next', 'w')
+            store_data_valid_next = Logic(
+                ctx, 'store_data_valid_next', 'w')
+            store_addr_valid_next = Logic(
+                ctx, 'store_addr_valid_next', 'w')
+
+            can_store_p0 = Logic(ctx, 'can_store_p0', 'r')
+            st_ld_conflict_p0 = LogicVec(
+                ctx, 'st_ld_conflict_p0', 'r', self.configs.numLdqEntries)
+
+            stq_issue_en_p0.regInit(init=0)
+            can_store_p0.regInit(init=0)
+            st_ld_conflict_p0.regInit()
+
+            arch += Op(ctx, stq_issue_en_p0, stq_issue_en)
+            arch += WrapAddConst(ctx, stq_issue_next,
+                                 stq_issue, 1, self.configs.numStqEntries)
+
+            # A store conflicts with a load when:
+            # 1. The load entry is valid, and
+            # 2. The load is older than the store, and
+            # 3. The address conflicts(same or invalid store address).
+            # Index order are reversed for store matrix.
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx,
+                           (st_ld_conflict_curr, i),
+                           (ldq_alloc_pcomp, i), 'and',
+                           'not', MuxIndex(
+                               store_is_older_pcomp[i], stq_issue), 'and',
+                           '(', MuxIndex(
+                               addr_same_pcomp[i], stq_issue), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
+                           )
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx,
+                           (st_ld_conflict_next, i),
+                           (ldq_alloc_pcomp, i), 'and',
+                           'not', MuxIndex(
+                               store_is_older_pcomp[i], stq_issue_next), 'and',
+                           '(', MuxIndex(
+                               addr_same_pcomp[i], stq_issue_next), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
+                           )
+            # The store is valid whe the entry is valid and the data is also valid,
+            # the store address should also be valid
+            arch += MuxLookUp(ctx, store_valid_curr,
+                              stq_alloc_pcomp, stq_issue)
+            arch += MuxLookUp(ctx, store_data_valid_curr,
+                              stq_data_valid_pcomp, stq_issue)
+            arch += MuxLookUp(ctx, store_addr_valid_curr,
+                              stq_addr_valid_pcomp, stq_issue)
+            arch += Op(ctx, can_store_curr,
+                       store_valid_curr, 'and',
+                       store_data_valid_curr, 'and',
+                       store_addr_valid_curr
+                       )
+            arch += MuxLookUp(ctx, store_valid_next,
+                              stq_alloc_pcomp, stq_issue_next)
+            arch += MuxLookUp(ctx, store_data_valid_next,
+                              stq_data_valid_pcomp, stq_issue_next)
+            arch += MuxLookUp(ctx, store_addr_valid_next,
+                              stq_addr_valid_pcomp, stq_issue_next)
+            arch += Op(ctx, can_store_next,
+                       store_valid_next, 'and',
+                       store_data_valid_next, 'and',
+                       store_addr_valid_next
+                       )
+            # Multiplex from current and next
+            arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_next,
+                       'when', stq_issue_en, 'else', st_ld_conflict_curr)
+            arch += Op(ctx, can_store_p0, can_store_next, 'when',
+                       stq_issue_en, 'else', can_store_curr)
+            # The store conflicts with any load
+            arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
+            arch += Op(ctx, store_en, 'not',
+                       store_conflict, 'and', can_store_p0)
+
+            arch += Op(ctx, store_idx, stq_issue)
+
+            # Bypass
+            stq_last_oh = LogicVec(
+                ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
+            arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
+            for i in range(0, self.configs.numLdqEntries):
+                bypass_en_vec = LogicVec(
+                    ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
+                # Search for the youngest store that is older than the load and conflicts
+                arch += CyclicPriorityMasking(
+                    ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
+                # Check if the youngest conflict store can bypass with the load
+                arch += Op(ctx, bypass_en_vec,
+                           bypass_idx_oh_p0[i], 'and', can_bypass[i])
+                arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
         else:
             ###### Dependency Check ######
 
@@ -1078,24 +870,26 @@ class LSQ:
             can_bypass = LogicVecArray(
                 ctx, 'can_bypass', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
 
-            if self.configs.pipeComp:
-                ldq_alloc_pcomp = LogicArray(
-                    ctx, 'ldq_alloc_pcomp', 'r', self.configs.numLdqEntries)
-                ldq_addr_valid_pcomp = LogicArray(
-                    ctx, 'ldq_addr_valid_pcomp', 'r', self.configs.numLdqEntries)
-                stq_alloc_pcomp = LogicArray(
-                    ctx, 'stq_alloc_pcomp', 'r', self.configs.numStqEntries)
-                stq_addr_valid_pcomp = LogicArray(
-                    ctx, 'stq_addr_valid_pcomp', 'r', self.configs.numStqEntries)
-                stq_data_valid_pcomp = LogicArray(
-                    ctx, 'stq_data_valid_pcomp', 'r', self.configs.numStqEntries)
-                addr_valid_pcomp = LogicVecArray(
-                    ctx, 'addr_valid_pcomp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-                addr_same_pcomp = LogicVecArray(
-                    ctx, 'addr_same_pcomp', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
-                store_is_older_pcomp = LogicVecArray(
-                    ctx, 'store_is_older_pcomp', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
+            pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
 
+            ldq_alloc_pcomp = LogicArray(
+                ctx, 'ldq_alloc_pcomp', pipe_comp_type, self.configs.numLdqEntries)
+            ldq_addr_valid_pcomp = LogicArray(
+                ctx, 'ldq_addr_valid_pcomp', pipe_comp_type, self.configs.numLdqEntries)
+            stq_alloc_pcomp = LogicArray(
+                ctx, 'stq_alloc_pcomp', pipe_comp_type, self.configs.numStqEntries)
+            stq_addr_valid_pcomp = LogicArray(
+                ctx, 'stq_addr_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
+            stq_data_valid_pcomp = LogicArray(
+                ctx, 'stq_data_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
+            addr_valid_pcomp = LogicVecArray(
+                ctx, 'addr_valid_pcomp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
+            addr_same_pcomp = LogicVecArray(
+                ctx, 'addr_same_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+            store_is_older_pcomp = LogicVecArray(
+                ctx, 'store_is_older_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+
+            if self.configs.pipeComp:
                 ldq_alloc_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
                 ldq_addr_valid_pcomp.regInit()
                 stq_alloc_pcomp.regInit(init=[0]*self.configs.numStqEntries)
@@ -1104,287 +898,151 @@ class LSQ:
                 addr_same_pcomp.regInit()
                 store_is_older_pcomp.regInit()
 
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, (ldq_alloc_pcomp, i), (ldq_alloc, i))
-                    arch += Op(ctx, (ldq_addr_valid_pcomp, i),
-                               (ldq_addr_valid, i))
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, (ldq_alloc_pcomp, i), (ldq_alloc, i))
+                arch += Op(ctx, (ldq_addr_valid_pcomp, i),
+                           (ldq_addr_valid, i))
+            for j in range(0, self.configs.numStqEntries):
+                arch += Op(ctx, (stq_alloc_pcomp, j), (stq_alloc, j))
+                arch += Op(ctx, (stq_addr_valid_pcomp, j),
+                           (stq_addr_valid, j))
+                arch += Op(ctx, (stq_data_valid_pcomp, j),
+                           (stq_data_valid, j))
+            for i in range(0, self.configs.numLdqEntries):
                 for j in range(0, self.configs.numStqEntries):
-                    arch += Op(ctx, (stq_alloc_pcomp, j), (stq_alloc, j))
-                    arch += Op(ctx, (stq_addr_valid_pcomp, j),
-                               (stq_addr_valid, j))
-                    arch += Op(ctx, (stq_data_valid_pcomp, j),
-                               (stq_data_valid, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (store_is_older_pcomp, i, j),
-                                   (store_is_older, i, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_valid_pcomp, i, j),
-                                   (ldq_addr_valid_pcomp, i), 'and', (stq_addr_valid_pcomp, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_same_pcomp, i, j), '\'1\'', 'when',
-                                   (ldq_addr, i), '=', (stq_addr, j), 'else', '\'0\'')
+                    arch += Op(ctx, (store_is_older_pcomp, i, j),
+                               (store_is_older, i, j))
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
+                    arch += Op(ctx, (addr_valid_pcomp, i, j),
+                               (ldq_addr_valid_pcomp, i), 'and', (stq_addr_valid_pcomp, j))
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
+                    arch += Op(ctx, (addr_same_pcomp, i, j), '\'1\'', 'when',
+                               (ldq_addr, i), '=', (stq_addr, j), 'else', '\'0\'')
 
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (ld_st_conflict, i, j),
-                                   (stq_alloc_pcomp, j),         'and',
-                                   (store_is_older_pcomp, i, j), 'and',
-                                   '(', (addr_same_pcomp, i,
-                                         j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
-                                   )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (can_bypass, i, j),
-                                   (ldq_alloc_pcomp, i),        'and',
-                                   'not', (ldq_issue, i),       'and',
-                                   (stq_data_valid_pcomp, j),   'and',
-                                   (addr_same_pcomp, i, j),     'and',
-                                   (addr_valid_pcomp, i, j)
-                                   )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
-                load_req_valid = LogicArray(
-                    ctx, 'load_req_valid', 'w', self.configs.numLdqEntries)
-                can_load = LogicArray(
-                    ctx, 'can_load', 'w', self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Reduce(ctx,
-                                   load_conflict[i], ld_st_conflict[i], 'or')
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i], 'and',
-                               'not', ldq_issue[i], 'and', ldq_addr_valid_pcomp[i])
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load[i], 'not',
-                               load_conflict[i], 'and', load_req_valid[i])
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    arch += CyclicPriorityMasking(ctx,
-                                                  load_idx_oh[w], can_load_list[w], ldq_head_oh)
-                    arch += Reduce(ctx, load_en[w], can_load_list[w], 'or')
-                    if (w+1 != self.configs.numLdMem):
-                        load_idx_oh_LogicArray = LogicArray(
-                            ctx, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries)
-                        arch += VecToArray(ctx,
-                                           load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(LogicArray(
-                            ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
-                        for i in range(0, self.configs.numLdqEntries):
-                            arch += Op(ctx, can_load_list[w+1][i], 'not',
-                                       load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
-
-                # Store
-
-                st_ld_conflict = LogicVec(
-                    ctx, 'st_ld_conflict', 'w', self.configs.numLdqEntries)
-                store_conflict = Logic(ctx, 'store_conflict', 'w')
-                store_valid = Logic(ctx, 'store_valid', 'w')
-                store_data_valid = Logic(ctx, 'store_data_valid', 'w')
-                store_addr_valid = Logic(ctx, 'store_addr_valid', 'w')
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
+            # A load conflicts with a store when:
+            # 1. The store entry is valid, and
+            # 2. The store is older than the load, and
+            # 3. The address conflicts(same or invalid store address).
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
                     arch += Op(ctx,
-                               (st_ld_conflict, i),
-                               (ldq_alloc_pcomp, i), 'and',
-                               'not', MuxIndex(
-                                   store_is_older_pcomp[i], stq_issue), 'and',
-                               '(', MuxIndex(
-                                   addr_same_pcomp[i], stq_issue), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
+                               (ld_st_conflict, i, j),
+                               (stq_alloc_pcomp, j),         'and',
+                               (store_is_older_pcomp, i, j), 'and',
+                               '(', (addr_same_pcomp, i,
+                                     j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
                                )
-                # The store conflicts with any load
-                arch += Reduce(ctx, store_conflict, st_ld_conflict, 'or')
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                arch += MuxLookUp(ctx, store_valid, stq_alloc_pcomp, stq_issue)
-                arch += MuxLookUp(ctx, store_data_valid,
-                                  stq_data_valid_pcomp, stq_issue)
-                arch += MuxLookUp(ctx, store_addr_valid,
-                                  stq_addr_valid_pcomp, stq_issue)
-                arch += Op(ctx, store_en,
-                           'not', store_conflict, 'and',
-                           store_valid, 'and',
-                           store_data_valid, 'and',
-                           store_addr_valid
-                           )
-                arch += Op(ctx, store_idx, stq_issue)
 
-                stq_last_oh = LogicVec(
-                    ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
-                arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
-                for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
-                    # Search for the youngest store that is older than the load and conflicts
-                    arch += CyclicPriorityMasking(
-                        ctx, bypass_idx_oh[i], ld_st_conflict[i], stq_last_oh, True)
-                    # Check if the youngest conflict store can bypass with the load
-                    arch += Op(ctx, bypass_en_vec,
-                               bypass_idx_oh[i], 'and', can_bypass[i])
-                    arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
-            else:
-                addr_valid = LogicVecArray(
-                    ctx, 'addr_valid', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-                addr_same = LogicVecArray(
-                    ctx, 'addr_same', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_valid, i, j),
-                                   (ldq_addr_valid, i), 'and', (stq_addr_valid, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx, (addr_same, i, j), '\'1\'', 'when',
-                                   (ldq_addr, i), '=', (stq_addr, j), 'else', '\'0\'')
-
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (ld_st_conflict, i, j),
-                                   (stq_alloc, j),         'and',
-                                   (store_is_older, i, j), 'and',
-                                   '(', (addr_same, i,
-                                         j), 'or', 'not', (stq_addr_valid, j), ')'
-                                   )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        arch += Op(ctx,
-                                   (can_bypass, i, j),
-                                   (ldq_alloc, i),        'and',
-                                   'not', (ldq_issue, i), 'and',
-                                   (stq_data_valid, j),   'and',
-                                   (addr_same, i, j),     'and',
-                                   (addr_valid, i, j)
-                                   )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
-                load_req_valid = LogicArray(
-                    ctx, 'load_req_valid', 'w', self.configs.numLdqEntries)
-                can_load = LogicArray(
-                    ctx, 'can_load', 'w', self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Reduce(ctx,
-                                   load_conflict[i], ld_st_conflict[i], 'or')
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, load_req_valid[i], ldq_alloc[i], 'and',
-                               'not', ldq_issue[i], 'and', ldq_addr_valid[i])
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load[i], 'not',
-                               load_conflict[i], 'and', load_req_valid[i])
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    arch += CyclicPriorityMasking(ctx,
-                                                  load_idx_oh[w], can_load_list[w], ldq_head_oh)
-                    arch += Reduce(ctx, load_en[w], can_load_list[w], 'or')
-                    if (w+1 != self.configs.numLdMem):
-                        load_idx_oh_LogicArray = LogicArray(
-                            ctx, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries)
-                        arch += VecToArray(ctx,
-                                           load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(LogicArray(
-                            ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
-                        for i in range(0, self.configs.numLdqEntries):
-                            arch += Op(ctx, can_load_list[w+1][i], 'not',
-                                       load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
-                # Store
-
-                st_ld_conflict = LogicVec(
-                    ctx, 'st_ld_conflict', 'w', self.configs.numLdqEntries)
-                store_conflict = Logic(ctx, 'store_conflict', 'w')
-                store_valid = Logic(ctx, 'store_valid', 'w')
-                store_data_valid = Logic(ctx, 'store_data_valid', 'w')
-                store_addr_valid = Logic(ctx, 'store_addr_valid', 'w')
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
+            # A conflicting store entry can be bypassed to a load entry when:
+            # 1. The load entry is valid, and
+            # 2. The load entry is not issued yet, and
+            # 3. The address of the load-store pair are both valid and values the same.
+            for i in range(0, self.configs.numLdqEntries):
+                for j in range(0, self.configs.numStqEntries):
                     arch += Op(ctx,
-                               (st_ld_conflict, i),
-                               (ldq_alloc, i), 'and',
-                               'not', MuxIndex(
-                                   store_is_older[i], stq_issue), 'and',
-                               '(', MuxIndex(
-                                   addr_same[i], stq_issue), 'or', 'not', (ldq_addr_valid, i), ')'
+                               (can_bypass, i, j),
+                               (ldq_alloc_pcomp, i),        'and',
+                               'not', (ldq_issue, i),       'and',
+                               (stq_data_valid_pcomp, j),   'and',
+                               (addr_same_pcomp, i, j),     'and',
+                               (addr_valid_pcomp, i, j)
                                )
-                # The store conflicts with any load
-                arch += Reduce(ctx, store_conflict, st_ld_conflict, 'or')
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                arch += MuxLookUp(ctx, store_valid, stq_alloc, stq_issue)
-                arch += MuxLookUp(ctx, store_data_valid,
-                                  stq_data_valid, stq_issue)
-                arch += MuxLookUp(ctx, store_addr_valid,
-                                  stq_addr_valid, stq_issue)
-                arch += Op(ctx, store_en,
-                           'not', store_conflict, 'and',
-                           store_valid, 'and',
-                           store_data_valid, 'and',
-                           store_addr_valid
-                           )
-                arch += Op(ctx, store_idx, stq_issue)
 
-                stq_last_oh = LogicVec(
-                    ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
-                arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
-                for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
-                    # Search for the youngest store that is older than the load and conflicts
-                    arch += CyclicPriorityMasking(
-                        ctx, bypass_idx_oh[i], ld_st_conflict[i], stq_last_oh, True)
-                    # Check if the youngest conflict store can bypass with the load
-                    arch += Op(ctx, bypass_en_vec,
-                               bypass_idx_oh[i], 'and', can_bypass[i])
-                    arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
+            # Load
+
+            load_conflict = LogicArray(
+                ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
+            load_req_valid = LogicArray(
+                ctx, 'load_req_valid', 'w', self.configs.numLdqEntries)
+            can_load = LogicArray(
+                ctx, 'can_load', 'w', self.configs.numLdqEntries)
+
+            # The load conflicts with any store
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Reduce(ctx,
+                               load_conflict[i], ld_st_conflict[i], 'or')
+            # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
+            # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i], 'and',
+                           'not', ldq_issue[i], 'and', ldq_addr_valid_pcomp[i])
+            # Generate list for loads that does not face dependency issue
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, can_load[i], 'not',
+                           load_conflict[i], 'and', load_req_valid[i])
+
+            can_load_list = []
+            can_load_list.append(can_load)
+            for w in range(0, self.configs.numLdMem):
+                arch += CyclicPriorityMasking(ctx,
+                                              load_idx_oh[w], can_load_list[w], ldq_head_oh)
+                arch += Reduce(ctx, load_en[w], can_load_list[w], 'or')
+                if (w+1 != self.configs.numLdMem):
+                    load_idx_oh_LogicArray = LogicArray(
+                        ctx, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries)
+                    arch += VecToArray(ctx,
+                                       load_idx_oh_LogicArray, load_idx_oh[w])
+                    can_load_list.append(LogicArray(
+                        ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
+                    for i in range(0, self.configs.numLdqEntries):
+                        arch += Op(ctx, can_load_list[w+1][i], 'not',
+                                   load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
+
+            # Store
+
+            st_ld_conflict = LogicVec(
+                ctx, 'st_ld_conflict', 'w', self.configs.numLdqEntries)
+            store_conflict = Logic(ctx, 'store_conflict', 'w')
+            store_valid = Logic(ctx, 'store_valid', 'w')
+            store_data_valid = Logic(ctx, 'store_data_valid', 'w')
+            store_addr_valid = Logic(ctx, 'store_addr_valid', 'w')
+
+            # A store conflicts with a load when:
+            # 1. The load entry is valid, and
+            # 2. The load is older than the store, and
+            # 3. The address conflicts(same or invalid store address).
+            # Index order are reversed for store matrix.
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx,
+                           (st_ld_conflict, i),
+                           (ldq_alloc_pcomp, i), 'and',
+                           'not', MuxIndex(
+                               store_is_older_pcomp[i], stq_issue), 'and',
+                           '(', MuxIndex(
+                               addr_same_pcomp[i], stq_issue), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
+                           )
+            # The store conflicts with any load
+            arch += Reduce(ctx, store_conflict, st_ld_conflict, 'or')
+            # The store is valid whe the entry is valid and the data is also valid,
+            # the store address should also be valid
+            arch += MuxLookUp(ctx, store_valid, stq_alloc_pcomp, stq_issue)
+            arch += MuxLookUp(ctx, store_data_valid,
+                              stq_data_valid_pcomp, stq_issue)
+            arch += MuxLookUp(ctx, store_addr_valid,
+                              stq_addr_valid_pcomp, stq_issue)
+            arch += Op(ctx, store_en,
+                       'not', store_conflict, 'and',
+                       store_valid, 'and',
+                       store_data_valid, 'and',
+                       store_addr_valid
+                       )
+            arch += Op(ctx, store_idx, stq_issue)
+
+            stq_last_oh = LogicVec(
+                ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
+            arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
+            for i in range(0, self.configs.numLdqEntries):
+                bypass_en_vec = LogicVec(
+                    ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
+                # Search for the youngest store that is older than the load and conflicts
+                arch += CyclicPriorityMasking(
+                    ctx, bypass_idx_oh[i], ld_st_conflict[i], stq_last_oh, True)
+                # Check if the youngest conflict store can bypass with the load
+                arch += Op(ctx, bypass_en_vec,
+                           bypass_idx_oh[i], 'and', can_bypass[i])
+                arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
 
         if self.configs.pipe1:
             # Pipeline Stage 1
