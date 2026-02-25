@@ -1032,16 +1032,17 @@ class LSQ:
         bypass_en_p1 = LogicArray(
             ctx, 'bypass_en_p1', pipe1_type, self.configs.numLdqEntries)
 
+        load_p1_ready = LogicArray(ctx, 'load_p1_ready', 'w', self.configs.numLdMem)
+        store_p1_ready = Logic(ctx, 'store_p1_ready', 'w')
+
         if self.configs.pipe1:
             # load_*_p1 control signals
             load_hs = LogicArray(ctx, 'load_hs', 'w', self.configs.numLdMem)
-            load_p1_ready = LogicArray(ctx, 'load_p1_ready', 'w', self.configs.numLdMem)
             for w in range(0, self.configs.numLdMem):
                 arch += Op(ctx, load_hs[w], load_en_p1[w], 'and', rreq_ready_i[w])
                 arch += Op(ctx, load_p1_ready[w], load_hs[w], 'or', 'not', load_en_p1[w])
             # store_*_p1 control signals
             store_hs = Logic(ctx, 'store_hs', 'w')
-            store_p1_ready = Logic(ctx, 'store_p1_ready', 'w')
             arch += Op(ctx, store_hs, store_en_p1, 'and', wreq_ready_i[0])
             arch += Op(ctx, store_p1_ready, store_hs, 'or', 'not', store_en_p1)
             # register init
@@ -1051,6 +1052,11 @@ class LSQ:
             store_en_p1.regInit(init=0, enable=store_p1_ready)
             bypass_idx_oh_p1.regInit()
             bypass_en_p1.regInit(init=[0]*self.configs.numLdqEntries)
+        else:
+            # non-pipelined "pseudo-control" signals
+            for w in range(0, self.configs.numLdMem):
+                arch += Op(ctx, load_p1_ready[w], rreq_ready_i[w], 'and', load_en[w])
+            arch += Op(ctx, store_p1_ready, wreq_ready_i[0])
 
         # pipeline register assignments
         for w in range(0, self.configs.numLdMem):
@@ -1073,19 +1079,11 @@ class LSQ:
             ldq_issue_set_vec = LogicVec(
                 ctx, f'ldq_issue_set_vec_{i}', 'w', self.configs.numLdMem)
             for w in range(0, self.configs.numLdMem):
-                if self.configs.pipe1:
-                    arch += Op(ctx, (ldq_issue_set_vec, w),
-                               '(', (load_idx_oh, w, i), 'and',
-                               (load_p1_ready, w), ')', 'or',
-                               (bypass_en, i)
-                               )
-                else:
-                    arch += Op(ctx, (ldq_issue_set_vec, w),
-                               '(', (load_idx_oh, w, i), 'and',
-                               (rreq_ready_i, w), 'and',
-                               (load_en, w), ')', 'or',
-                               (bypass_en, i)
-                               )
+                arch += Op(ctx, (ldq_issue_set_vec, w),
+                            '(', (load_idx_oh, w, i), 'and',
+                            (load_p1_ready, w), ')', 'or',
+                            (bypass_en, i)
+                            )
             arch += Reduce(ctx, ldq_issue_set[i], ldq_issue_set_vec, 'or')
 
         # Write Request
@@ -1093,10 +1091,7 @@ class LSQ:
         arch += Op(ctx, wreq_id_o[0], 0)
         arch += MuxLookUp(ctx, wreq_addr_o[0], stq_addr, store_idx_p1)
         arch += MuxLookUp(ctx, wreq_data_o[0], stq_data, store_idx_p1)
-        if self.configs.pipe1:
-            arch += Op(ctx, stq_issue_en, store_en, 'and', store_p1_ready)
-        else:
-            arch += Op(ctx, stq_issue_en, store_en, 'and', wreq_ready_i[0])
+        arch += Op(ctx, stq_issue_en, store_en, 'and', store_p1_ready)
 
         # Read Response and Bypass
         for i in range(0, self.configs.numLdqEntries):
