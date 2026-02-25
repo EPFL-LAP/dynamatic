@@ -577,12 +577,6 @@ class LSQ:
             store_idx = LogicVec(ctx, 'store_idx', 'w', self.configs.stqAddrW)
             store_en = Logic(ctx, 'store_en', 'w')
 
-            bypass_idx_oh_p0 = LogicVecArray(
-                ctx, 'bypass_idx_oh_p0', 'r', self.configs.numLdqEntries, self.configs.numStqEntries)
-            bypass_idx_oh_p0.regInit()
-            bypass_en = LogicArray(ctx, 'bypass_en', 'w',
-                                   self.configs.numLdqEntries)
-
             # Matrix Generation
             ld_st_conflict = LogicVecArray(
                 ctx, 'ld_st_conflict', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
@@ -822,21 +816,6 @@ class LSQ:
                        store_conflict, 'and', can_store_p0)
 
             arch += Op(ctx, store_idx, stq_issue)
-
-            # Bypass
-            stq_last_oh = LogicVec(
-                ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
-            arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
-            for i in range(0, self.configs.numLdqEntries):
-                bypass_en_vec = LogicVec(
-                    ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
-                # Search for the youngest store that is older than the load and conflicts
-                arch += CyclicPriorityMasking(
-                    ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
-                # Check if the youngest conflict store can bypass with the load
-                arch += Op(ctx, bypass_en_vec,
-                           bypass_idx_oh_p0[i], 'and', can_bypass[i])
-                arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
         else:
             ###### Dependency Check ######
 
@@ -848,11 +827,6 @@ class LSQ:
             assert (self.configs.numStMem == 1)
             store_idx = LogicVec(ctx, 'store_idx', 'w', self.configs.stqAddrW)
             store_en = Logic(ctx, 'store_en', 'w')
-
-            bypass_idx_oh = LogicVecArray(
-                ctx, 'bypass_idx_oh', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
-            bypass_en = LogicArray(ctx, 'bypass_en', 'w',
-                                   self.configs.numLdqEntries)
 
             # Matrix Generation
             ld_st_conflict = LogicVecArray(
@@ -1018,19 +992,26 @@ class LSQ:
                        )
             arch += Op(ctx, store_idx, stq_issue)
 
-            stq_last_oh = LogicVec(
-                ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
-            arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
-            for i in range(0, self.configs.numLdqEntries):
-                bypass_en_vec = LogicVec(
-                    ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
-                # Search for the youngest store that is older than the load and conflicts
-                arch += CyclicPriorityMasking(
-                    ctx, bypass_idx_oh[i], ld_st_conflict[i], stq_last_oh, True)
-                # Check if the youngest conflict store can bypass with the load
-                arch += Op(ctx, bypass_en_vec,
-                           bypass_idx_oh[i], 'and', can_bypass[i])
-                arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
+        # Bypass
+        stq_last_oh = LogicVec(
+            ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
+        bypass_idx_oh_p0 = LogicVecArray(
+            ctx, 'bypass_idx_oh_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+        bypass_en = LogicArray(ctx, 'bypass_en', 'w',
+                               self.configs.numLdqEntries)
+        if self.configs.pipe0:
+            bypass_idx_oh_p0.regInit()
+        arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
+        for i in range(0, self.configs.numLdqEntries):
+            bypass_en_vec = LogicVec(
+                ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
+            # Search for the youngest store that is older than the load and conflicts
+            arch += CyclicPriorityMasking(
+                ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
+            # Check if the youngest conflict store can bypass with the load
+            arch += Op(ctx, bypass_en_vec,
+                        bypass_idx_oh_p0[i], 'and', can_bypass[i])
+            arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
 
         if self.configs.pipe1:
             # Pipeline Stage 1
@@ -1081,12 +1062,8 @@ class LSQ:
             arch += Op(ctx, store_idx_p1, store_idx)
             arch += Op(ctx, store_en_p1, store_en)
 
-            if self.configs.pipe0:
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, bypass_idx_oh_p1[i], bypass_idx_oh_p0[i])
-            else:
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, bypass_idx_oh_p1[i], bypass_idx_oh[i])
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, bypass_idx_oh_p1[i], bypass_idx_oh_p0[i])
 
             for i in range(0, self.configs.numLdqEntries):
                 arch += Op(ctx, bypass_en_p1[i], bypass_en[i])
@@ -1200,11 +1177,7 @@ class LSQ:
                 # multiplex from store queue data
                 bypass_data = LogicVec(
                     ctx, f'bypass_data_{i}', 'w', self.configs.dataW)
-                if self.configs.pipe0:
-                    arch += Mux1H(ctx, bypass_data, stq_data,
-                                  bypass_idx_oh_p0[i])
-                else:
-                    arch += Mux1H(ctx, bypass_data, stq_data, bypass_idx_oh[i])
+                arch += Mux1H(ctx, bypass_data, stq_data, bypass_idx_oh_p0[i])
                 # multiplex from read and bypass data
                 arch += Op(ctx, ldq_data[i], read_data, 'or', bypass_data)
                 arch += Op(ctx, ldq_data_wen[i],
