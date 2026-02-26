@@ -425,15 +425,16 @@ void getConstantDeclaration(mlir::raw_indented_ostream &os,
 
   // The files and configuration of the single_argument model of the data input
   // channels
-  for (auto &[value, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    StartToChannelConnector c(value.getType(), argName);
+
+    StartToChannelConnector c(type, argName);
     c.declareConstants(os, ctx, inputVectorPath, outputFilePath);
   }
 
   // The files and configuration of the two port RAM model of the arrays
-  for (auto &[value, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    MemRefToDualPortRAM m(value.getType(), argName);
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+    MemRefToDualPortRAM m(type, argName);
     m.declareConstants(os, ctx, inputVectorPath, outputFilePath);
   }
 
@@ -474,22 +475,23 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
   declareReg(ctx, os, "tb_stop");
 
   // Signals of data input channels
-  for (auto &[value, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    StartToChannelConnector c(value.getType(), argName);
+    StartToChannelConnector c(type, argName);
     c.declareSignals(os, ctx);
   }
 
   // Signals of control input channels
-  for (auto &[value, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
-    StartToControlConnector c(value.getType(), argName);
+    StartToControlConnector c(type, argName);
     c.declareSignals(os);
   }
 
   // Signals of the memory reference signals
-  for (auto &[value, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    MemRefToDualPortRAM m(value.getType(), argName);
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+
+    MemRefToDualPortRAM m(type, argName);
     m.declareSignals(os, ctx);
   }
 
@@ -526,15 +528,15 @@ void getMemoryInstanceGeneration(mlir::raw_indented_ostream &os,
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   // Instantiate argument generator for the input channels
-  for (auto &[value, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    StartToChannelConnector c(value.getType(), argName);
+    StartToChannelConnector c(type, argName);
     c.instantiateSingleArgumentModel(os, ctx);
   }
 
   // Instantiate dual port RAMs for the memory interfaces
-  for (auto &[value, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    MemRefToDualPortRAM m(value.getType(), argName);
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+    MemRefToDualPortRAM m(type, argName);
     m.instantiateRAMModel(os, ctx);
   }
 
@@ -558,26 +560,23 @@ void getDuvInstanceGeneration(mlir::raw_indented_ostream &os,
   handshake::FuncOp *funcOp = ctx.funcOp;
 
   // Connect the input data channels to the DUV
-  for (auto &[value, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ChannelType>(funcOp)) {
-    StartToChannelConnector c(value.getType(), argName);
+    StartToChannelConnector c(type, argName);
     c.connectToDuv(duvInst);
   }
 
   // Connect the input control channels to the DUV
   // @Jiahui17: TODO: create a new argument for dataless input channels
-  for (auto &[value, argName] :
+  for (auto &[type, argName] :
        getInputArguments<handshake::ControlType>(funcOp)) {
-    StartToControlConnector c(value.getType(), argName);
+    StartToControlConnector c(type, argName);
     c.connectToDuv(duvInst);
   }
 
   // Connect the memory elements to the DUV
-  for (auto &[value, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
-    if (value.use_empty())
-      continue;
-
-    MemRefToDualPortRAM m(value.getType(), argName);
+  for (auto &[type, argName] : getInputArguments<mlir::MemRefType>(funcOp)) {
+    MemRefToDualPortRAM m(type, argName);
     m.connectToDuv(duvInst);
   }
 

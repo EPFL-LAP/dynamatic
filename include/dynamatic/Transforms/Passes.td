@@ -212,7 +212,7 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
   let description = [{
     Replaces existing memory interfaces and memory ports in Handshake functions
     following the `handshake::MemInterfaceAttr` attribute on each memory port.
-    
+
     In general the pass needs to identify new control signals to appropriately
     trigger group allocations in newly created memory interfaces. It will fail
     when its heuristic does not manage to find the control signal of a "basic
@@ -223,6 +223,16 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
     operations are uniquely named.
   }];
   let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
+}
+
+def HandshakeRemoveUnusedMemRefs : DynamaticPass<
+  "handshake-remove-unused-memrefs"
+> {
+  let summary = "Removes unused MemRef parameters from `handshake.func`.";
+  let description = [{
+    Removes unused `memref` arguments from `handshake.func`.
+    The final circuit will not have a corresponding memory interface.
+  }];
 }
 
 def HandshakeSetBufferingProperties :

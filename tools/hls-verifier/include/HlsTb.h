@@ -335,14 +335,14 @@ std::string toBinaryString(int initialValue, unsigned int bitwidth);
 
 // Get input argument of type Ty and their associated names
 template <typename Ty>
-llvm::SmallVector<std::pair<mlir::TypedValue<Ty>, std::string>>
+llvm::SmallVector<std::pair<Ty, std::string>>
 getInputArguments(handshake::FuncOp *funcOp) {
-  llvm::SmallVector<std::pair<mlir::TypedValue<Ty>, std::string>> interfaces;
+  llvm::SmallVector<std::pair<Ty, std::string>> interfaces;
   for (auto [arg, portAttr] : llvm::zip_equal(
            funcOp->getBodyBlock()->getArguments(), funcOp->getArgNames())) {
-    if (auto value = dyn_cast<mlir::TypedValue<Ty>>(arg)) {
+    if (Ty type = dyn_cast<Ty>(arg.getType())) {
       std::string argName = portAttr.dyn_cast<StringAttr>().data();
-      interfaces.emplace_back(value, argName);
+      interfaces.emplace_back(type, argName);
     }
   }
   return interfaces;

@@ -1286,22 +1286,8 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   Block *funcBlock = funcOp.getBodyBlock();
   Block *modBlock = modOp.getBodyBlock();
   Operation *termOp = modBlock->getTerminator();
-
-  // MemRef arguments may be unused in which case no memory interface and
-  // therefore corresponding inputs exist in the module.
-  // We manually replace the used block arguments and drop unused arguments
-  // entirely.
-  for (auto &&[modArg, funcArg] : llvm::zip_equal(
-           modBlock->getArguments().drop_back(2),
-           llvm::make_filter_range(funcBlock->getArguments(), [](Value value) {
-             return !value.use_empty();
-           }))) {
-    rewriter.replaceUsesOfBlockArgument(funcArg, modArg);
-  }
-  Block *newFunc = rewriter.splitBlock(funcBlock, funcBlock->begin());
-  // Note: 'newFunc' has no block arguments. The used block arguments in
-  // 'funcBlock' have been replaced already.
-  rewriter.inlineBlockBefore(newFunc, termOp);
+  ValueRange modBlockArgs = modBlock->getArguments().drop_back(2);
+  rewriter.inlineBlockBefore(funcBlock, termOp, modBlockArgs);
   rewriter.eraseOp(funcOp);
 
   // Operands for the module's terminators; they are the module's outputs

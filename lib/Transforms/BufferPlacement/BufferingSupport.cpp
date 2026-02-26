@@ -141,11 +141,6 @@ LogicalResult dynamatic::buffer::mapChannelsToProperties(
 
   // Add channels originating from function arguments to the channel map
   for (auto [idx, arg] : llvm::enumerate(funcOp.getArguments())) {
-    if (arg.use_empty()) {
-      assert(isa<MemRefType>(arg.getType()) && "only memrefs may be unused");
-      continue;
-    }
-
     Channel channel(arg, funcOp, *arg.getUsers().begin());
     if (failed(deriveBufferingProperties(channel)))
       return failure();
