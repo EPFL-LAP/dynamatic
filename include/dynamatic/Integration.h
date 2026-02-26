@@ -147,7 +147,8 @@ std::string formatElement(const T &element) {
   } else if constexpr (std::is_same_v<T, int8_t> ||
                        std::is_same_v<T, uint8_t> ||
                        std::is_same_v<T, int16_t> ||
-                       std::is_same_v<T, uint16_t>) {
+                       std::is_same_v<T, uint16_t> ||
+                       std::is_same_v<T, bool>) {
     // C++ can correctly print the value of int, float, double, etc..  However,
     // int8_t might be interpreted and printed as a char, so we need to convert
     // it to an int before printing it to stdout.
@@ -257,6 +258,15 @@ static unsigned _transactionID_ = 0;
 static std::string _outPrefix_;
 
 // NOLINTEND(readability-identifier-naming)
+
+/// Specialization of the scalar printer for bool.
+template <>
+void scalarPrinter<bool>(const bool &arg, OS &os) {
+  // Print the char as a 2-digit hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(1)
+     << (static_cast<unsigned int>(arg))
+     << std::endl;
+}
 
 /// Specialization of the scalar printer for char.
 template <>
