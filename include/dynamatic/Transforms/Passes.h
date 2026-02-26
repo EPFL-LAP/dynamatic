@@ -31,6 +31,7 @@
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
+#include "dynamatic/Transforms/HandshakeRemoveUnusedMemRefs.h"
 #include "dynamatic/Transforms/HandshakeReplaceMemoryInterfaces.h"
 #include "dynamatic/Transforms/HandshakeTreeHeightReduction.h"
 #include "dynamatic/Transforms/MarkMemoryDependencies.h"
@@ -47,7 +48,6 @@ namespace dynamatic {
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
-#define GEN_PASS_DECL_HANDSHAKEREMOVEUNUSEDMEMREFS
 #include "dynamatic/Transforms/Passes.h.inc"
 
 } // namespace dynamatic
