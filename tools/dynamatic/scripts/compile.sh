@@ -266,6 +266,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-remove-unused-memrefs \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
@@ -277,6 +278,7 @@ else
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-remove-unused-memrefs \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"

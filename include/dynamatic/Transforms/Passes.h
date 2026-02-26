@@ -47,6 +47,7 @@ namespace dynamatic {
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
+#define GEN_PASS_DECL_HANDSHAKEREMOVEUNUSEDMEMREFS
 #include "dynamatic/Transforms/Passes.h.inc"
 
 } // namespace dynamatic
