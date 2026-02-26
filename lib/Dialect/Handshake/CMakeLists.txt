@@ -6,6 +6,7 @@ add_dynamatic_dialect_library(DynamaticHandshake
   HandshakeAttributes.cpp
   HandshakeCanonicalize.cpp
   HandshakeOps.cpp
+  HandshakeOpInternalStateNamer.cpp
   HandshakeDialect.cpp
   HandshakeInterfaces.cpp
   HandshakeTypes.cpp
