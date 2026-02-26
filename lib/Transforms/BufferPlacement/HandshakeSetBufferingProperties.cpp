@@ -38,8 +38,10 @@ static const llvm::StringLiteral
 
 /// Makes the channel unbufferizable.
 static void makeUnbufferizable(Value val) {
-  assert(!val.use_empty() &&
-         "Cannot treat a value without a use as a channel!");
+  if (val.use_empty()) {
+    assert(isa<MemRefType>(val.getType()) && "only memrefs may be unused");
+    return;
+  }
 
   Channel channel(val, true);
   channel.props->maxOpaque = 0;
