@@ -1,8 +1,6 @@
 #include <dynamatic/Integration.h>
 
-int unused_arg(int a[1], int used[1], int b) {
-  return used[0];
-}
+int unused_arg(int a[1], int used[1], int b) { return used[0]; }
 
 int main() {
   int a[1];
