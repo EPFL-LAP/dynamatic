@@ -868,25 +868,31 @@ class LSQ:
         arch += Op(ctx, store_idx, stq_issue)
 
         # Bypass
-        stq_last_oh = LogicVec(
-            ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
+        bypass_en = LogicArray(ctx, 'bypass_en', 'w', self.configs.numLdqEntries)
         bypass_idx_oh_p0 = LogicVecArray(
             ctx, 'bypass_idx_oh_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
-        bypass_en = LogicArray(ctx, 'bypass_en', 'w',
-                               self.configs.numLdqEntries)
-        if self.configs.pipe0:
-            bypass_idx_oh_p0.regInit()
-        arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
-        for i in range(0, self.configs.numLdqEntries):
-            bypass_en_vec = LogicVec(
-                ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
-            # Search for the youngest store that is older than the load and conflicts
-            arch += CyclicPriorityMasking(
-                ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
-            # Check if the youngest conflict store can bypass with the load
-            arch += Op(ctx, bypass_en_vec,
-                       bypass_idx_oh_p0[i], 'and', can_bypass[i])
-            arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
+        if self.configs.bypass:
+            stq_last_oh = LogicVec(
+                ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
+            if self.configs.pipe0:
+                bypass_idx_oh_p0.regInit()
+            arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
+            for i in range(0, self.configs.numLdqEntries):
+                bypass_en_vec = LogicVec(
+                    ctx, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries)
+                # Search for the youngest store that is older than the load and conflicts
+                arch += CyclicPriorityMasking(
+                    ctx, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True)
+                # Check if the youngest conflict store can bypass with the load
+                arch += Op(ctx, bypass_en_vec,
+                           bypass_idx_oh_p0[i], 'and', can_bypass[i])
+                arch += Reduce(ctx, bypass_en[i], bypass_en_vec, 'or')
+        else:
+            # bypass disabled: tie bypass signals low
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, bypass_en[i], "'0'")
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, bypass_idx_oh_p0[i], "'0'")
 
         # Pipeline Stage 1
 

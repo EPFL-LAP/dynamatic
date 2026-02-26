@@ -64,6 +64,7 @@ class Configs:
     # one cycle later than the valid bits of entries
     stResp:        bool = False     # Whether store response channel in store access port is enabled
     gaMulti:       bool = False     # Whether multiple groups are allowed to request an allocation at the same cycle
+    bypass:        bool = False     # Whether bypassing (store-to-load forwarding) is enabled
 
     def __init__(self, config: dict) -> None:
         self.name = config["name"]
@@ -81,6 +82,7 @@ class Configs:
 
         self.stResp = bool(config["stResp"])
         self.gaMulti = bool(config["groupMulti"])
+        self.bypass = False # FIXME: pass through from JSON
 
         self.gaNumLoads = config["numLoads"]
         self.gaNumStores = config["numStores"]
@@ -90,13 +92,13 @@ class Configs:
 
         self.ldqAddrW = math.ceil(math.log2(self.numLdqEntries))
         self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
-        
+
         # Original empty assignment assumes the size of load or store queue to be always a multiple of 2
         if (self.numLdqEntries & (self.numLdqEntries % 2 == 0)):
             self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
         else:
             self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries)) + 1
-        
+
         if (self.numStqEntries & (self.numStqEntries % 2 == 0)):
             self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
         else:
