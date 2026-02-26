@@ -225,8 +225,9 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
   let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
 }
 
-def HandshakeRemoveUnusedMemRefs : DynamaticPass<
-  "handshake-remove-unused-memrefs"
+def HandshakeRemoveUnusedMemRefs : Pass<
+  "handshake-remove-unused-memrefs",
+  "handshake::FuncOp"
 > {
   let summary = "Removes unused MemRef parameters from `handshake.func`.";
   let description = [{
