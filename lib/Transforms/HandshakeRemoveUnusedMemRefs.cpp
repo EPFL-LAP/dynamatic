@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/Passes.h"
+#include "dynamatic/Transforms/HandshakeRemoveUnusedMemRefs.h"
 
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEREMOVEUNUSEDMEMREFS
@@ -19,7 +19,7 @@ namespace dynamatic {
 
 using namespace dynamatic;
 
-namespace {
+namespace dynamatic {
 
 struct HandshakeRemoveUnusedMemRefsPass
     : dynamatic::impl::HandshakeRemoveUnusedMemRefsBase<
@@ -44,4 +44,4 @@ struct HandshakeRemoveUnusedMemRefsPass
     func->setAttr("argNames", ArrayAttr::get(&getContext(), argNames));
   }
 };
-} // namespace
+} // namespace dynamatic
