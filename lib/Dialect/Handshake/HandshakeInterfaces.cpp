@@ -375,8 +375,12 @@ std::vector<EagerForkSentNamer> ForkOp::getInternalSentStateNamers() {
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of sent states for operation without name");
-  for (size_t i = 0; i < getNumResults(); ++i) {
-    EagerForkSentNamer state(nameAttr.str(), getResultName(i));
+  for (auto [i, res] : llvm::enumerate(getResults())) {
+    unsigned width = 0;
+    if (auto ct = dyn_cast<handshake::ChannelType>(res.getType())) {
+      width = ct.getDataBitWidth();
+    }
+    EagerForkSentNamer state(nameAttr.str(), getResultName(i), width);
     ret.push_back(state);
   }
   return ret;
@@ -389,8 +393,14 @@ std::vector<EagerForkSentNamer> ControlMergeOp::getInternalSentStateNamers() {
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of sent states for operation without name");
-  for (size_t i = 0; i < getNumResults(); ++i) {
-    EagerForkSentNamer state(nameAttr.str(), getResultName(i));
+
+  for (auto [i, res] : llvm::enumerate(getResults())) {
+    unsigned width = 0;
+    if (auto ct = dyn_cast<handshake::ChannelType>(res.getType())) {
+      width = ct.getDataBitWidth();
+    }
+
+    EagerForkSentNamer state(nameAttr.str(), getResultName(i), width);
     ret.push_back(state);
   }
   return ret;
@@ -406,7 +416,9 @@ std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStateNamers() {
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
-  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot");
+  handshake::ChannelType ct = getIndex().getType();
+
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot", ct.getDataBitWidth());
   return ret;
 }
 
@@ -416,8 +428,11 @@ std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStateNamers() {
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
-  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str());
-  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str());
+
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str(),
+                               getAddress().getType().getDataBitWidth());
+  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str(),
+                               getData().getType().getDataBitWidth());
   return ret;
 }
 
@@ -427,8 +442,21 @@ std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
       getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
+  unsigned width = 0;
+  getBufferType();
+  if (auto ct = dyn_cast<handshake::ChannelType>(getOperand().getType())) {
+    width = ct.getDataBitWidth();
+  } else if (auto ct =
+                 dyn_cast<handshake::ControlType>(getOperand().getType())) {
+    width = 0;
+  } else {
+    llvm::errs() << nameAttr << getOperand().getType() << "\n";
+    assert(false && "Operand of BufferOp is not a channel");
+  }
+
   for (size_t i = 0; i < getNumSlots(); ++i) {
-    ret[i] = BufferSlotFullNamer(nameAttr.str(), "slot_" + std::to_string(i));
+    ret[i] =
+        BufferSlotFullNamer(nameAttr.str(), "slot_" + std::to_string(i), width);
   }
   return ret;
 }

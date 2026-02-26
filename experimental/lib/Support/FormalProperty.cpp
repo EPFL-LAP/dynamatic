@@ -291,7 +291,7 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
       std::vector<handshake::EagerForkSentNamer>(channelNames.size());
   for (auto [i, channelName] : llvm::enumerate(channelNames)) {
     prop->sentStateNamers[i] =
-        handshake::EagerForkSentNamer(opName, channelName);
+        handshake::EagerForkSentNamer(opName, channelName, 0);
   }
   return prop;
 }
@@ -338,7 +338,7 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
       std::vector<handshake::EagerForkSentNamer>(channelNames.size());
   for (auto [i, channelName] : llvm::enumerate(channelNames)) {
     prop->sentStateNamers[i] =
-        handshake::EagerForkSentNamer(forkOpName, channelName);
+        handshake::EagerForkSentNamer(forkOpName, channelName, 0);
   }
   std::string bufferOpName;
   std::string slotName;
@@ -346,7 +346,7 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
       !mapper.map(BUFFER_SLOT_LIT, slotName))
     return nullptr;
 
-  prop->copiedSlot = handshake::BufferSlotFullNamer(bufferOpName, slotName);
+  prop->copiedSlot = handshake::BufferSlotFullNamer(bufferOpName, slotName, 0);
   return prop;
 }
 
