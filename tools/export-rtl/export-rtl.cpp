@@ -1284,12 +1284,11 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<ReconvergentPathFlow>(property.get())) {
       std::vector<std::string> eqs{};
-      for (auto eq : p->getEquations()) {
+      for (auto &eq : p->getEquations()) {
         std::vector<std::string> terms;
-        assert(eq.coefficients.size() == eq.names.size());
-        for (unsigned i = 0; i < eq.coefficients.size(); ++i) {
-          std::string t = llvm::formatv("toint({0}) * {1}", eq.names[i],
-                                        eq.coefficients[i]);
+        for (auto &[key, value] : eq.terms) {
+          std::string t =
+              llvm::formatv("toint({0}) * {1}", key.getName(), value);
           terms.push_back(t);
         }
         std::string equationString =

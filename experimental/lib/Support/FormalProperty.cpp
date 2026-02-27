@@ -347,7 +347,13 @@ ReconvergentPathFlow::ReconvergentPathFlow(unsigned long id, TAG tag)
     : FormalProperty(id, tag, TYPE::RPF) {}
 
 llvm::json::Value ReconvergentPathFlow::extraInfoToJSON() const {
-  return llvm::json::Object({{EQUATIONS_LIT, equations}});
+  std::vector<llvm::json::Value> jsonEqs{};
+  jsonEqs.reserve(equations.size());
+
+  for (auto &eq : equations) {
+    jsonEqs.push_back(eq.toJSON());
+  }
+  return llvm::json::Array(jsonEqs);
 }
 
 std::unique_ptr<ReconvergentPathFlow>
@@ -355,11 +361,14 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
                                llvm::json::Path path) {
   auto prop = std::make_unique<ReconvergentPathFlow>();
 
-  auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::ObjectMapper mapper(info, path);
-
-  if (!mapper || !mapper.map(EQUATIONS_LIT, prop->equations))
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  const llvm::json::Array *arr = info.getAsArray();
+  if (!arr)
     return nullptr;
+
+  for (const llvm::json::Value &eq : *arr) {
+    prop->equations.push_back(FlowExpression::fromJSON(eq, path));
+  }
 
   return prop;
 }

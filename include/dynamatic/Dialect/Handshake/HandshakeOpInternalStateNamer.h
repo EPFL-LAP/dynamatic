@@ -8,6 +8,7 @@
 
 namespace dynamatic {
 namespace handshake {
+struct ConstrainedNamer;
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
@@ -22,6 +23,7 @@ struct InternalStateNamer {
     EagerForkSent,
     BufferSlotFull,
     LatencyInducedSlot,
+    Constrained,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -43,13 +45,46 @@ struct InternalStateNamer {
   InternalStateNamer(TYPE type) : type(type) {}
   virtual ~InternalStateNamer() = default;
 
+  static inline bool classof(const InternalStateNamer *fp) { return true; }
+
+  std::unique_ptr<ConstrainedNamer> tryConstrain(int64_t value);
+
   TYPE type;
   static constexpr llvm::StringLiteral TYPE_LIT = "type";
   static constexpr llvm::StringLiteral EAGER_FORK_SENT = "EagerForkSent";
   static constexpr llvm::StringLiteral BUFFER_SLOT_FULL = "BufferSlotFull";
+  static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
   static constexpr llvm::StringLiteral LATENCY_INDUCED_SLOT =
       "LatencyInducedSlot";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
+};
+
+struct ConstrainedNamer : public virtual InternalStateNamer {
+  ConstrainedNamer() = default;
+  ConstrainedNamer(TYPE type, int64_t value)
+      : InternalStateNamer(TYPE::Constrained), value(value) {}
+  virtual ~ConstrainedNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::Constrained;
+  }
+
+  virtual std::unique_ptr<InternalStateNamer> getUnconstrained() const = 0;
+
+  inline llvm::json::Value toInnerJSON() const override {
+    llvm::json::Object *objP = getUnconstrained()->toJSON().getAsObject();
+    assert(objP && "internal state namer is a json object");
+    llvm::json::Object &obj = *objP;
+    obj[CONSTRAINT_VALUE] = value;
+
+    return llvm::json::Object(obj);
+  }
+
+  std::unique_ptr<InternalStateNamer> static fromInnerJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
+
+  int64_t value;
+  static constexpr llvm::StringLiteral CONSTRAINT_VALUE = "value";
 };
 
 struct ConstrainedEagerForkSentNamer;
@@ -65,13 +100,18 @@ struct EagerForkSentNamer : public InternalStateNamer {
         channelName(channelName), channelSize(channelSize) {}
   ~EagerForkSentNamer() = default;
 
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::EagerForkSent;
+  }
+
   inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}_sent", opName, channelName).str();
   }
 
   inline llvm::json::Value toInnerJSON() const override {
-    return llvm::json::Object(
-        {{OPERATION_LIT, opName}, {CHANNEL_NAME_LIT, channelName}});
+    return llvm::json::Object({{OPERATION_LIT, opName},
+                               {CHANNEL_NAME_LIT, channelName},
+                               {CHANNEL_SIZE_LIT, channelSize}});
   }
 
   std::unique_ptr<EagerForkSentNamer> static fromInnerJSON(
@@ -81,7 +121,7 @@ struct EagerForkSentNamer : public InternalStateNamer {
   std::string channelName;
   size_t channelSize;
 
-  ConstrainedEagerForkSentNamer constrained(int32_t value);
+  ConstrainedEagerForkSentNamer constrain(int32_t value);
 
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral CHANNEL_NAME_LIT = "channel_name";
@@ -104,11 +144,12 @@ inline std::string smvValue(size_t channelSize, size_t value) {
   }
 }
 
-struct ConstrainedEagerForkSentNamer : public InternalStateNamer {
+struct ConstrainedEagerForkSentNamer : public ConstrainedNamer {
   ConstrainedEagerForkSentNamer() = default;
   ConstrainedEagerForkSentNamer(const EagerForkSentNamer &base, int32_t value)
-      : InternalStateNamer(TYPE::EagerForkSent), base(base), value(value) {}
+      : ConstrainedNamer(), base(base), value(value) {}
   ~ConstrainedEagerForkSentNamer() = default;
+
   inline std::string getSMVName() const override {
     return llvm::formatv("{0} & ({1}.ins = {2})", base.getSMVName(),
                          base.opName, smvValue(base.channelSize, value))
@@ -118,6 +159,10 @@ struct ConstrainedEagerForkSentNamer : public InternalStateNamer {
   inline llvm::json::Value toInnerJSON() const override {
     llvm::json::Value obj = base.toInnerJSON();
     return llvm::json::Object({{BASE_LIT, obj}, {VALUE_LIT, value}});
+  }
+
+  inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
+    return std::make_unique<EagerForkSentNamer>(base);
   }
 
   EagerForkSentNamer base;
@@ -134,6 +179,10 @@ struct BufferSlotFullNamer : public InternalStateNamer {
       : InternalStateNamer(TYPE::BufferSlotFull), opName(opName),
         slotName(slotName), slotSize(slotSize) {}
   ~BufferSlotFullNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::BufferSlotFull;
+  }
 
   inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}_full", opName, slotName).str();
@@ -160,9 +209,13 @@ struct BufferSlotFullNamer : public InternalStateNamer {
 struct LatencyInducedSlotNamer : public InternalStateNamer {
   LatencyInducedSlotNamer() = default;
   LatencyInducedSlotNamer(const std::string &opName, unsigned slotIndex)
-      : InternalStateNamer(TYPE::BufferSlotFull), opName(opName),
+      : InternalStateNamer(TYPE::LatencyInducedSlot), opName(opName),
         slotIndex(slotIndex) {}
   ~LatencyInducedSlotNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::LatencyInducedSlot;
+  }
 
   inline std::string getSMVName() const override {
     return llvm::formatv("{0}.inner_handshake_manager.inner_delay_buffer.v{1}",
@@ -171,11 +224,16 @@ struct LatencyInducedSlotNamer : public InternalStateNamer {
   }
 
   inline llvm::json::Value toInnerJSON() const override {
-    return llvm::json::Object({{SLOT_INDEX_LIT, slotIndex}});
+    return llvm::json::Object(
+        {{OPERATION_LIT, opName}, {SLOT_INDEX_LIT, slotIndex}});
   }
+
+  std::unique_ptr<LatencyInducedSlotNamer> static fromInnerJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
   std::string opName;
   unsigned slotIndex;
-  static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "slot_index";
+  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
+  static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "pipeline_index";
 };
 } // namespace handshake
 } // namespace dynamatic
