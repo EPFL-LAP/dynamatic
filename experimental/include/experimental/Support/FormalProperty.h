@@ -13,6 +13,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Support/FlowExpression.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
 #include <cstdint>
@@ -231,6 +232,7 @@ private:
   inline static const StringLiteral COPIED_SLOT_LIT = "copied_slot";
 };
 
+#ifdef false
 struct PathEquation {
   std::vector<int> coefficients;
   std::vector<std::string> names;
@@ -262,13 +264,12 @@ inline llvm::json::Value toJSON(const PathEquation &out) {
   return llvm::json::Object({{PathEquation::COEFFICIENTS_LIT, out.coefficients},
                              {PathEquation::NAMES_LIT, out.names}});
 }
+#endif
 
 class ReconvergentPathFlow : public FormalProperty {
 public:
-  std::vector<PathEquation> getEquations() { return equations; }
-  void addEquation(std::vector<int> coefs, std::vector<std::string> names) {
-    equations.push_back(PathEquation{std::move(coefs), std::move(names)});
-  }
+  std::vector<FlowExpression> getEquations() { return equations; }
+  void addEquation(const FlowExpression &expr) { equations.push_back(expr); }
   llvm::json::Value extraInfoToJSON() const override;
   static std::unique_ptr<ReconvergentPathFlow>
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
@@ -282,7 +283,7 @@ public:
   }
 
 private:
-  std::vector<PathEquation> equations;
+  std::vector<FlowExpression> equations;
   inline static const StringLiteral EQUATIONS_LIT = "equations";
 };
 

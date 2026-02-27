@@ -229,6 +229,8 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
 }
 
 #include "dynamatic/Support/LinearAlgebra/Gaussian.h"
+namespace dynamatic {
+#ifdef false
 // The structs FlowVariable and FlowExpression together form a DSL that help
 // with writing flow equations. A similar DSL exists for constraint programming
 // in `ConstraintProgramming.h`, but it is not reused for the following reasons:
@@ -399,8 +401,6 @@ struct std::hash<FlowVariable> {
   }
 };
 
-namespace {
-// Only the operators that are used have been implemented...
 struct FlowExpression {
   std::unordered_map<FlowVariable, int> terms;
   FlowExpression() = default;
@@ -437,6 +437,8 @@ struct FlowExpression {
     }
     llvm::errs() << txt << "\n";
   }
+  inline static const StringLiteral COEFFICIENT_LIT = "coef";
+  inline static const StringLiteral INNER_LIT = "inner";
 };
 
 FlowExpression operator-(FlowExpression expr) {
@@ -451,6 +453,13 @@ FlowExpression operator+(FlowExpression left, const FlowExpression &right) {
     left.terms[key] += value;
   }
   return left;
+}
+
+FlowExpression operator*(int coef, FlowExpression expr) {
+  for (auto &[key, value] : expr.terms) {
+    expr.terms[key] *= coef;
+  }
+  return expr;
 }
 
 FlowExpression operator-(FlowExpression left, const FlowExpression &right) {
@@ -471,32 +480,39 @@ void operator-=(FlowExpression &left, const FlowExpression &right) {
     left.terms[key] -= value;
   }
 }
-
+#endif
 // Used to assign dense indices to FlowVariables based on a list of
 // FlowExpression, i.e. indices 0 to n-1 are used for n variables, while keeping
 // lambda variables with low indices to ensure they are eliminated first within
 // the row-echelon form
-class FlowEquationsMatrix {
-  std::unordered_map<FlowVariable, size_t> map;
-  std::vector<FlowVariable> variables;
+struct FlowEquationsMatrix {
+  std::unordered_map<FlowVariable, size_t> varToIndex;
+  std::vector<FlowVariable> indexToVar;
   size_t nLambdas;
-
-public:
   MatIntType matrix;
-  size_t getNLambdas() { return nLambdas; }
-  size_t size() { return variables.size(); }
-  size_t getIndex(const FlowVariable &v) { return map[v]; }
-  FlowVariable &getVariable(size_t index) { return variables[index]; }
+
+  size_t size() const { return indexToVar.size(); }
   void verify() {
-    assert(map.size() == variables.size());
-    for (size_t i = 0; i < variables.size(); ++i) {
-      FlowVariable &a = variables[i];
-      size_t j = map[a];
+    assert(varToIndex.size() == indexToVar.size());
+    for (size_t i = 0; i < indexToVar.size(); ++i) {
+      FlowVariable &a = indexToVar[i];
+      size_t j = varToIndex[a];
       assert(i == j);
     }
-    for (auto &[key, value] : map) {
-      assert(variables[value] == key);
+    for (auto &[key, value] : varToIndex) {
+      assert(indexToVar[value] == key);
     }
+  }
+
+  FlowExpression getRowAsExpression(size_t row) const {
+    FlowExpression ret;
+    for (size_t col = 0; col < indexToVar.size(); ++col) {
+      int coef = matrix(row, col);
+      if (coef != 0) {
+        ret += coef * indexToVar[col];
+      }
+    }
+    return ret;
   }
 
   FlowEquationsMatrix() = default;
@@ -511,10 +527,10 @@ public:
         // PlusAndMinus variables should never be inserted, as the DSL will
         // insert them as two separate variables
         assert(!key.isPlusMinus());
-        if (map.count(key) == 0) {
-          map[key] = index;
+        if (varToIndex.count(key) == 0) {
+          varToIndex[key] = index;
           ++index;
-          variables.push_back(key);
+          indexToVar.push_back(key);
         }
       }
     }
@@ -522,10 +538,10 @@ public:
     // annotate remaining variables
     for (auto &expr : exprs) {
       for (auto &[key, value] : expr.terms) {
-        if (map.count(key) == 0) {
-          map[key] = index;
+        if (varToIndex.count(key) == 0) {
+          varToIndex[key] = index;
           ++index;
-          variables.push_back(key);
+          indexToVar.push_back(key);
         }
       }
     }
@@ -536,7 +552,7 @@ public:
     // insert equations into the matrix
     for (auto [row, expr] : llvm::enumerate(exprs)) {
       for (auto &[key, value] : expr.terms) {
-        unsigned index = getIndex(key);
+        unsigned index = varToIndex[key];
         matrix(row, index) = (int)value;
       }
     }
@@ -790,7 +806,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
   }
   return equations;
 }
-} // namespace
+} // namespace dynamatic
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
@@ -806,13 +822,12 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   gaussianElimination(matrix);
 
   size_t rows = matrix.size1();
-  size_t cols = matrix.size2();
   // ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
   // uid++;
 
   for (size_t row = 0; row < rows; ++row) {
     bool canAnnotate = true;
-    for (size_t col = 0; col < indices.getNLambdas(); ++col) {
+    for (size_t col = 0; col < indices.nLambdas; ++col) {
       if (matrix(row, col) != 0) {
         canAnnotate = false;
         break;
@@ -823,13 +838,21 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       continue;
     }
 
+    FlowExpression expr = indices.getRowAsExpression(row);
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+    p.addEquation(expr);
+    if (p.getEquations().size() > 0) {
+      uid++;
+      propertyTable.push_back(p.toJSON());
+    }
+    /*
     std::vector<int> coefs{};
     std::vector<std::string> names{};
 
-    for (size_t col = indices.getNLambdas(); col < cols; ++col) {
+    for (size_t col = indices.nLambdas; col < cols; ++col) {
       if (matrix(row, col) != 0) {
         coefs.push_back(matrix(row, col));
-        names.push_back(indices.getVariable(col).getName());
+        names.push_back(indices.indexToVar[col].getName());
       }
     }
     if (coefs.size() > 0) {
@@ -840,6 +863,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
         propertyTable.push_back(p.toJSON());
       }
     }
+    */
   }
   return success();
 }

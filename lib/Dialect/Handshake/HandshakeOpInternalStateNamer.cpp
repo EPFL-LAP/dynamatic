@@ -10,6 +10,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::BufferSlotFull;
   if (s == LATENCY_INDUCED_SLOT)
     return TYPE::LatencyInducedSlot;
+  if (s == CONSTRAINED)
+    return TYPE::Constrained;
   return std::nullopt;
 }
 
@@ -21,6 +23,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return BUFFER_SLOT_FULL.str();
   case TYPE::LatencyInducedSlot:
     return LATENCY_INDUCED_SLOT.str();
+  case TYPE::Constrained:
+    return CONSTRAINED.str();
   }
 }
 
@@ -46,15 +50,31 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
   switch (type) {
   case TYPE::EagerForkSent:
     prop = EagerForkSentNamer::fromInnerJSON(inner, path);
+    assert(prop && "inner eager fork failed");
     break;
   case TYPE::BufferSlotFull:
     prop = BufferSlotFullNamer::fromInnerJSON(inner, path);
+    assert(prop && "inner buffer slot failed");
     break;
   case TYPE::LatencyInducedSlot:
-    assert(false && "not yet implemented");
+    prop = LatencyInducedSlotNamer::fromInnerJSON(inner, path);
+    assert(prop && "inner latency slot failed");
+    break;
+  case TYPE::Constrained:
+    assert(false && "todo");
   }
   prop->type = type;
   return prop;
+}
+
+std::unique_ptr<ConstrainedNamer>
+InternalStateNamer::tryConstrain(int64_t value) {
+  if (auto *namer = dyn_cast<EagerForkSentNamer>(this)) {
+    return std::make_unique<ConstrainedEagerForkSentNamer>(
+        namer->constrain(value));
+  }
+
+  return nullptr;
 }
 
 std::unique_ptr<EagerForkSentNamer>
@@ -68,7 +88,7 @@ EagerForkSentNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
-ConstrainedEagerForkSentNamer EagerForkSentNamer::constrained(int32_t value) {
+ConstrainedEagerForkSentNamer EagerForkSentNamer::constrain(int32_t value) {
   ConstrainedEagerForkSentNamer p(*this, value);
   return p;
 }
@@ -85,5 +105,34 @@ BufferSlotFullNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
+std::unique_ptr<LatencyInducedSlotNamer>
+LatencyInducedSlotNamer::fromInnerJSON(const llvm::json::Value &value,
+                                       llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  auto prop = std::make_unique<LatencyInducedSlotNamer>();
+  int index;
+  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
+      !mapper.map(SLOT_INDEX_LIT, index))
+    return nullptr;
+  prop->slotIndex = index;
+  return prop;
+}
+
+std::unique_ptr<InternalStateNamer>
+ConstrainedNamer::fromInnerJSON(const llvm::json::Value &value,
+                                llvm::json::Path path) {
+  auto namer = InternalStateNamer::fromJSON(value, path);
+  assert(namer && "inner json must be an internal state");
+  auto mapper = llvm::json::ObjectMapper(value, path);
+  int64_t val;
+  if (!mapper || !mapper.map(CONSTRAINT_VALUE, val))
+    return nullptr;
+
+  if (auto eagerFork = dyn_cast<EagerForkSentNamer>(namer)) {
+    return std::make_unique<ConstrainedEagerForkSentNamer>(
+        eagerFork->constrain(val));
+  }
+  return nullptr;
+}
 } // namespace handshake
 } // namespace dynamatic
