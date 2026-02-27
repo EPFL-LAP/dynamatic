@@ -14,22 +14,16 @@
 #ifndef EXPERIMENTAL_TRANSFORMS_PASSES_H
 #define EXPERIMENTAL_TRANSFORMS_PASSES_H
 
+#include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
-#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
-#include "experimental/Transforms/HandshakeStraightToQueue.h"
-#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
-#include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
-#include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 namespace experimental {
-
 /// Generate the code for registering passes.
+#define GEN_PASS_DECL
 #define GEN_PASS_REGISTRATION
 #include "experimental/Transforms/Passes.h.inc"
-
 } // namespace experimental
 } // namespace dynamatic
 

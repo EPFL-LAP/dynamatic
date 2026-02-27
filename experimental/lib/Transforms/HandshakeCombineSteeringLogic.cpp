@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/AsmState.h"
@@ -24,6 +23,16 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 #include <cassert>
+
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKECOMBINESTEERINGLOGIC
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
@@ -138,7 +147,7 @@ Operation *returnMuxAtSameDepth(Operation *op,
 
   // Otherwise, explore all users in DFS-like traversal until you hit a match
   Operation *finalOp = nullptr;
-  for (auto cons : cast<handshake::MuxOp>(op).getResult().getUsers()) {
+  for (auto *cons : cast<handshake::MuxOp>(op).getResult().getUsers()) {
     Operation *potentialOp = returnMuxAtSameDepth(cons, referenceMuxOp);
     if (potentialOp != nullptr) {
       finalOp = potentialOp;
@@ -385,8 +394,8 @@ struct CombineBranchesSameSign
 /// Simple driver for the Handshake Combine Branches Merges pass, based on a
 /// greedy pattern rewriter.
 struct HandshakeCombineSteeringLogicPass
-    : public dynamatic::experimental::ftd::impl::
-          HandshakeCombineSteeringLogicBase<HandshakeCombineSteeringLogicPass> {
+    : public dynamatic::experimental::impl::HandshakeCombineSteeringLogicBase<
+          HandshakeCombineSteeringLogicPass> {
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     ModuleOp mod = getOperation();
@@ -402,8 +411,3 @@ struct HandshakeCombineSteeringLogicPass
   };
 };
 }; // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::ftd::combineSteeringLogic() {
-  return std::make_unique<HandshakeCombineSteeringLogicPass>();
-}

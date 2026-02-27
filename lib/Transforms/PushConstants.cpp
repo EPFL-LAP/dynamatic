@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/PushConstants.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -20,6 +20,14 @@
 
 using namespace mlir;
 using namespace dynamatic;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_PUSHCONSTANTS
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 /// Pushes all of a function's constants in blocks using them.
 static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
@@ -33,7 +41,7 @@ static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
     // Determine blocks where the constant is used
     DenseMap<Block *, SmallVector<Operation *, 4>> usingBlocks;
     for (auto *user : constantOp.getResult().getUsers())
-      if (auto block = user->getBlock(); block != defBlock)
+      if (auto *block = user->getBlock(); block != defBlock)
         usingBlocks[block].push_back(user);
       else
         usedByDefiningBlock = true;
@@ -43,7 +51,7 @@ static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {
       builder.setInsertionPointToStart(block);
       auto newCstOp = builder.create<arith::ConstantOp>(constantOp->getLoc(),
                                                         constantOp.getValue());
-      for (auto user : users)
+      for (auto *user : users)
         user->replaceUsesOfWith(constantOp.getResult(), newCstOp.getResult());
     }
 
@@ -63,6 +71,7 @@ namespace {
 struct PushConstantsPass
     : public dynamatic::impl::PushConstantsBase<PushConstantsPass> {
 
+  using PushConstantsBase::PushConstantsBase;
   void runDynamaticPass() override {
     ModuleOp m = getOperation();
     // Process every function individually
@@ -72,7 +81,3 @@ struct PushConstantsPass
   };
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createPushConstantsPass() {
-  return std::make_unique<PushConstantsPass>();
-}

@@ -15,16 +15,14 @@
 #define EXPERIMENTAL_ANALYSIS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Analysis/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 namespace experimental {
-
 /// Generate the code for registering passes.
+#define GEN_PASS_DECL
 #define GEN_PASS_REGISTRATION
 #include "experimental/Analysis/Passes.h.inc"
-
 } // namespace experimental
 } // namespace dynamatic
 

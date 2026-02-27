@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -50,12 +49,13 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
     FPGA24("fpga24"), COST_AWARE("costaware"), MAPBUF("mapbuf");
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
-namespace buffer {
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
 #include "dynamatic/Transforms/Passes.h.inc"
-} // namespace buffer
 } // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
@@ -106,7 +106,7 @@ namespace buffer {
 /// exposes most of its behavior in protected virtual methods which may be
 /// overriden by sub-types of the pass.
 struct HandshakePlaceBuffersPass
-    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
+    : public dynamatic::impl::HandshakePlaceBuffersBase<
           HandshakePlaceBuffersPass> {
 
   /// Trivial field-by-field constructor.
@@ -270,8 +270,8 @@ void HandshakePlaceBuffersPass::runOnOperation() {
       if (!failed(
               timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
 
-        int64_t latency_int = static_cast<int64_t>(latency);
-        latencyInterface.setLatency(latency_int);
+        int64_t latencyInt = static_cast<int64_t>(latency);
+        latencyInterface.setLatency(latencyInt);
       } else {
         op->emitError("Failed to get latency from timing model");
         return signalPassFailure();

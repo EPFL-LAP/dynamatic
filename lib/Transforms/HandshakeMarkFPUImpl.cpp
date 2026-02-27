@@ -13,27 +13,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeMarkFPUImpl.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
-
 // include tblgen base class definition
 #define GEN_PASS_DEF_HANDSHAKEMARKFPUIMPL
 #include "dynamatic/Transforms/Passes.h.inc"
-
 } // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
 struct HandshakeMarkFPUImplPass
     : public dynamatic::impl::HandshakeMarkFPUImplBase<
           HandshakeMarkFPUImplPass> {
-public:
   // use tblgen constructors from base class
   using HandshakeMarkFPUImplBase::HandshakeMarkFPUImplBase;
 
@@ -45,7 +44,7 @@ public:
 
 } // namespace
 
-std::optional<FPUImpl> symbolizeFPUImplOrEmitError(StringRef implStr) {
+static std::optional<FPUImpl> symbolizeFPUImplOrEmitError(StringRef implStr) {
   if (auto parsed = symbolizeFPUImpl(implStr))
     return parsed;
 

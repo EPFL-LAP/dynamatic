@@ -22,6 +22,14 @@
 
 #define DEBUG_TYPE "BITWIDTH"
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEMINIMIZECSTWIDTH
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 STATISTIC(savedBits, "Number of saved bits");
 
 using namespace mlir;
@@ -179,9 +187,7 @@ struct HandshakeMinimizeCstWidthPass
     : public dynamatic::impl::HandshakeMinimizeCstWidthBase<
           HandshakeMinimizeCstWidthPass> {
 
-  HandshakeMinimizeCstWidthPass(bool optNegatives) {
-    this->optNegatives = optNegatives;
-  }
+  using HandshakeMinimizeCstWidthBase::HandshakeMinimizeCstWidthBase;
 
   void runDynamaticPass() override {
     auto *ctx = &getContext();
@@ -200,8 +206,3 @@ struct HandshakeMinimizeCstWidthPass
 };
 
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeMinimizeCstWidth(bool optNegatives) {
-  return std::make_unique<HandshakeMinimizeCstWidthPass>(optNegatives);
-}

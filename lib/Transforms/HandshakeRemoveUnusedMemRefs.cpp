@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeRemoveUnusedMemRefs.h"
-
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEREMOVEUNUSEDMEMREFS
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace dynamatic;
 
@@ -24,6 +25,8 @@ namespace dynamatic {
 struct HandshakeRemoveUnusedMemRefsPass
     : dynamatic::impl::HandshakeRemoveUnusedMemRefsBase<
           HandshakeRemoveUnusedMemRefsPass> {
+
+  using HandshakeRemoveUnusedMemRefsBase::HandshakeRemoveUnusedMemRefsBase;
 
   void runOnOperation() override {
     handshake::FuncOp func = getOperation();
