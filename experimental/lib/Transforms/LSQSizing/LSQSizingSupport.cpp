@@ -22,7 +22,6 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 
 #include <set>
 #include <stack>

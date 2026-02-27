@@ -24,7 +24,6 @@ def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-l
       outputs. This is a simplification which comes immediately after the FTD 
       logic.
   }];
-  let constructor = "dynamatic::experimental::ftd::combineSteeringLogic()";
 }
 def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
   let summary = "Use the FPGA'23 technique to allocate the basic blocks in the LSQs";
@@ -33,7 +32,6 @@ def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
     according to an ASAP approach rather than by following the control flow
     relationships coming from the network of cmerges.
   }];
-  let constructor = "dynamatic::experimental::ftd::createStraightToQueue()";
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
@@ -52,7 +50,6 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
       The pass needs to specify the position of the Speculation Units by 
       means of an input JSON file.
   }];
-  let constructor = "dynamatic::experimental::speculation::createHandshakeSpeculation()";
   let options = [
     Option<"jsonPath", "json-path", "std::string", "",
            "Path to JSON-formatted file containing the positions for speculative "
@@ -68,7 +65,6 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   let description = [{ Placing a single buffer on a specific output channel of
   a specfiic unit, this pass is useful for prototyping a custom placing pass
   externally, e.g., written in python. }];
-  let constructor = "dynamatic::experimental::buffer::createHandshakePlaceBuffersCustom()";
   let options = [
   	Option<"pred", "pred", "std::string", "", "the predecessor unit of the channel">,
   	Option<"outid", "outid", "unsigned", "", "output id of the predecessor, range: from 0 to number of outputs - 1">,
@@ -84,7 +80,6 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
     to ensure that the memory accesses are not restricting the circuits troughput, while 
     trying to keep the area as low as possible.  
   }];
-  let constructor = "dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs()";
   
   let options = [Option<"timingModels", "timing-models", "std::string", "",
       "Path to JSON-formatted file containing timing models for dataflow "
@@ -102,7 +97,6 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     to rigidify some channels and remove the redundant logic associated with them. To do so
     we place ReadyRemoverOps and ValidMergerOps, that manipulate valid and ready signals.
   }];
-  let constructor = "dynamatic::experimental::rigidification::createRigidification()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
     "Path to JSON-formatted file where the properties' information is stored.">];
 }

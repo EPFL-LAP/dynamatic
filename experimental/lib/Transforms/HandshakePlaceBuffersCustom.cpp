@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Buffer placement pass in Handshake functions, it takes the location (i.e.,
-// the predecessor, and which output channel of it), type, and slots of the 
+// the predecessor, and which output channel of it), type, and slots of the
 // buffer that should be placed.
 //
 // This pass facilitates externally prototyping a custom buffer placement
@@ -21,7 +21,6 @@
 // supply the producer--consumer pair as arguments
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -31,23 +30,24 @@
 
 using namespace llvm;
 using namespace dynamatic;
-using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::buffer;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERSCUSTOM
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 namespace {
 
 struct HandshakePlaceBuffersCustomPass
-    : public dynamatic::experimental::buffer::impl::
-          HandshakePlaceBuffersCustomBase<HandshakePlaceBuffersCustomPass> {
+    : public dynamatic::experimental::impl::HandshakePlaceBuffersCustomBase<
+          HandshakePlaceBuffersCustomPass> {
 
-  /// Trivial field-by-field constructor.
-  HandshakePlaceBuffersCustomPass(const std::string &pred, const int &outid,
-                                  const int &slots, const std::string &type) {
-    this->pred = pred;
-    this->outid = outid;
-    this->slots = slots;
-    this->type = type;
-  }
+  using HandshakePlaceBuffersCustomBase::HandshakePlaceBuffersCustomBase;
 
   /// Called on the MLIR module provided as input.
   void runDynamaticPass() override {
@@ -97,11 +97,3 @@ struct HandshakePlaceBuffersCustomPass
   }
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::buffer::createHandshakePlaceBuffersCustom(
-    const std::string &pred, const unsigned &outid, const unsigned &slots,
-    const std::string &type) {
-  return std::make_unique<HandshakePlaceBuffersCustomPass>(pred, outid, slots,
-                                                           type);
-}

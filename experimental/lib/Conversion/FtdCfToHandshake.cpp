@@ -30,6 +30,16 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include <utility>
 
+// [START Boiler-plate code for the MLIR pass]
+#include "experimental/Conversion/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_FTDCFTOHANDSHAKE
+#include "experimental/Conversion/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
+
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
@@ -39,7 +49,7 @@ using namespace dynamatic::experimental::ftd;
 namespace {
 
 struct FtdCfToHandshakePass
-    : public dynamatic::experimental::ftd::impl::FtdCfToHandshakeBase<
+    : public dynamatic::experimental::impl::FtdCfToHandshakeBase<
           FtdCfToHandshakePass> {
 
   void runDynamaticPass() override {
@@ -372,8 +382,4 @@ LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
   // in FtdOneToOneConversion.
   castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass> ftd::createFtdCfToHandshake() {
-  return std::make_unique<FtdCfToHandshakePass>();
 }

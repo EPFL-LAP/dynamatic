@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -28,6 +27,16 @@
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "handshake-size-lsqs"
+
+// [START Boiler-plate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKESIZELSQS
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 using namespace llvm;
 using namespace mlir;
@@ -51,15 +60,10 @@ using AllocDeallocTimesPerII =
 namespace {
 
 struct HandshakeSizeLSQsPass
-    : public dynamatic::experimental::lsqsizing::impl::HandshakeSizeLSQsBase<
+    : public dynamatic::experimental::impl::HandshakeSizeLSQsBase<
           HandshakeSizeLSQsPass> {
 
-  HandshakeSizeLSQsPass(StringRef timingModels, StringRef collisions,
-                        double targetCP) {
-    this->targetCP = targetCP;
-    this->timingModels = timingModels.str();
-    this->collisions = collisions.str();
-  }
+  using HandshakeSizeLSQsBase::HandshakeSizeLSQsBase;
 
   void runDynamaticPass() override;
 
@@ -659,11 +663,4 @@ void HandshakeSizeLSQsPass::insertAllocPrecedesMemoryAccessEdges(
     mlir::Operation *phiNode = phiNodes[*bb];
     graph.addEdge(phiNode, op);
   }
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::lsqsizing::createHandshakeSizeLSQs(
-    StringRef timingModels, StringRef collisions, double targetCP) {
-  return std::make_unique<HandshakeSizeLSQsPass>(timingModels, collisions,
-                                                 targetCP);
 }

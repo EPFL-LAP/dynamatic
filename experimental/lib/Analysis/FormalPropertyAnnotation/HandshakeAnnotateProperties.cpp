@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Analysis/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -43,18 +42,24 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::formalprop;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "experimental/Analysis/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKEANNOTATEPROPERTIES
+#include "experimental/Analysis/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 namespace {
 
 struct HandshakeAnnotatePropertiesPass
-    : public dynamatic::experimental::formalprop::impl::
-          HandshakeAnnotatePropertiesBase<HandshakeAnnotatePropertiesPass> {
+    : public dynamatic::experimental::impl::HandshakeAnnotatePropertiesBase<
+          HandshakeAnnotatePropertiesPass> {
 
-  HandshakeAnnotatePropertiesPass(const std::string &jsonPath = "") {
-    this->jsonPath = jsonPath;
-    this->uid = 0;
-  }
+  using HandshakeAnnotatePropertiesBase::HandshakeAnnotatePropertiesBase;
 
   void runDynamaticPass() override;
 
@@ -245,10 +250,4 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     return;
 
   jsonOut << formatv("{0:2}", jsonVal);
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::formalprop::createAnnotateProperties(
-    const std::string &jsonPath) {
-  return std::make_unique<HandshakeAnnotatePropertiesPass>(jsonPath);
 }
