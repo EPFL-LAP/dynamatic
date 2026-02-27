@@ -17,7 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Support/LogicalResult.h"
@@ -40,25 +39,7 @@ static bool isLegalForInference(Operation *op) {
   return !isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
 }
 
-/// Iterates over all operations legal for inference that do not have a "bb"
-/// attribute and tries to infer it.
-static bool inferBasicBlocks(Operation *op, PatternRewriter &rewriter) {
-  // Check whether we even need to run inference for the operation
-  if (!isLegalForInference(op))
-    return false;
-  if (std::optional<unsigned> bb = getLogicBB(op); bb.has_value())
-    return false;
-
-  // Run the inference logic
-  unsigned infBB;
-  if (succeeded(inferLogicBB(op, infBB))) {
-    op->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(infBB));
-    return true;
-  }
-  return false;
-}
-
-LogicalResult dynamatic::inferLogicBB(Operation *op, unsigned &logicBB) {
+static LogicalResult inferLogicBB(Operation *op, unsigned &logicBB) {
   std::optional<unsigned> infBB;
 
   auto mergeInferredBB = [&](std::optional<unsigned> otherBB) -> LogicalResult {
@@ -109,6 +90,24 @@ LogicalResult dynamatic::inferLogicBB(Operation *op, unsigned &logicBB) {
     return success();
   }
   return failure();
+}
+
+/// Iterates over all operations legal for inference that do not have a "bb"
+/// attribute and tries to infer it.
+static bool inferBasicBlocks(Operation *op, PatternRewriter &rewriter) {
+  // Check whether we even need to run inference for the operation
+  if (!isLegalForInference(op))
+    return false;
+  if (std::optional<unsigned> bb = getLogicBB(op); bb.has_value())
+    return false;
+
+  // Run the inference logic
+  unsigned infBB;
+  if (succeeded(inferLogicBB(op, infBB))) {
+    op->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(infBB));
+    return true;
+  }
+  return false;
 }
 
 namespace {

@@ -1,4 +1,3 @@
-#include "dynamatic/Transforms/HandshakeTreeHeightReduction.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"

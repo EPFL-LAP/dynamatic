@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -49,10 +48,13 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
     COST_AWARE("costaware"), MAPBUF("mapbuf");
 
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 namespace {
 
