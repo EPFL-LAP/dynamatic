@@ -174,11 +174,15 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
 
       if (origSucc == scope->header) {
         // Current level back-edge redirects to Sink (False).
-        if (scope->level == 0)
-          llvm::errs() << "[FTD Warning] Level 0 scope has back-edge to its "
-                          "own header.\n";
-        validSuccessors.push_back(falseTerm);
-        keepSuccessor.push_back(true);
+        if (scope->level == 0) {
+          // At Level 0, back-edges to the header are considered to come from
+          // inner loops and are dropped.
+          validSuccessors.push_back(nullptr);
+          keepSuccessor.push_back(false);
+        } else {
+          validSuccessors.push_back(falseTerm);
+          keepSuccessor.push_back(true);
+        }
       } else if (scope->allBackEdges.contains({origBlock, origSucc})) {
         // Deep back-edge (from inner loops) is pruned/dropped.
         validSuccessors.push_back(nullptr);
