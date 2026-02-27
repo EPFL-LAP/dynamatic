@@ -223,16 +223,7 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
       ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value(),
       BoolExpression::boolVar(conditionToUse),
       {conditionToUse}); // since condition is one block boolvar is enough
-
-  // If the Gamma is a result of the expansion of a Mu that has more than two
-  // inputs, force its placement in the block of its condition because placing
-  // it in the block of the Mu, which is always a loop header, will mess up the
-  // control dependence analysis betweem the newly inserted Gamma and its
-  // producers that are in the loop body in this case
-  if (originalPhi->muGenerated)
-    newGate->gateBlock = newGate->conditionBlock;
-
-  gatesPerBlock[newGate->getBlock()].push_back(newGate);
+  gatesPerBlock[originalPhi->getBlock()].push_back(newGate);
 
   return newGate;
 }

@@ -1509,6 +1509,7 @@ static void insertDirectSuppression(
   Block *entryBlock = &funcOp.getBody().front();
   Block *producerBlock = connection.getParentBlock();
   Block *consumerBlock = consumer->getBlock();
+  Block *dominatorBlock = producerBlock;
 
   bool debuglog = false;
   bool debuglogCFG = false;
@@ -1525,7 +1526,8 @@ static void insertDirectSuppression(
   // gate and the producer is one of its data inputs
   bool deliverToGamma = llvm::isa<handshake::MuxOp>(consumer) &&
                         consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
-                        (producerBlock != consumerBlock);
+                        (producerBlock != consumerBlock ||
+                        connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_MU));
 
   if (debuglog) {
     out << "[FTD] Producer block: ";
@@ -1587,15 +1589,15 @@ static void insertDirectSuppression(
       }
     }
 
-    // 2. Update producerBlock to be the block defining the condition of the last Mux
+    // 2. Update dominatorBlock to be the block defining the condition of the last Mux
     Value finalCondition = lastMuxInChain->getOperand(0);
-    producerBlock = returnMuxConditionBlock(finalCondition, bi);
+    dominatorBlock = returnMuxConditionBlock(finalCondition, bi);
   }
 
   if (debuglog && deliverToGamma) {
-    out << "[FTD] New Producer block: ";
-    if (producerBlock)
-      producerBlock->printAsOperand(out);
+    out << "[FTD] Another Dominator block: ";
+    if (dominatorBlock)
+      dominatorBlock->printAsOperand(out);
     out << "\n";
   }
   // Create a temporary builder to isolate the LocalCFG creation from the
@@ -1603,70 +1605,14 @@ static void insertDirectSuppression(
   // temporary operations which are later erased manually.
   OpBuilder tmpBuilder(funcOp.getContext());
   auto locGraph =
-      buildLocalCFGRegion(tmpBuilder, producerBlock, consumerBlock, bi);
+      buildLocalCFGRegion(tmpBuilder, dominatorBlock, consumerBlock, bi);
 
-  if (debuglogCFG && deliverToGamma) {
-    out << "\n>>> Local Graph <<<\n";
-    out << "NewProd: ";
-    if (locGraph->newProd)
-      locGraph->newProd->printAsOperand(out);
-    else
-      out << "null";
-    out << "\nNewCons: ";
-    if (locGraph->newCons)
-      locGraph->newCons->printAsOperand(out);
-    else
-      out << "null";
-    out << "\nSink:    ";
-    if (locGraph->sinkBB)
-      locGraph->sinkBB->printAsOperand(out);
-    else
-      out << "null";
-    out << "\n\nStructure:\n";
-
-    for (Block &b : locGraph->region->getBlocks()) {
-      out << "  ";
-      b.printAsOperand(out);
-
-      if (locGraph->origMap.count(&b)) {
-        Block *orig = locGraph->origMap[&b];
-        if (orig) {
-          out << " (orig: ";
-          orig->printAsOperand(out);
-          out << ")";
-        }
-      }
-
-      out << " terminates with ";
-      if (auto *term = b.getTerminator()) {
-        out << term->getName() << " -> { ";
-        for (auto it = term->successor_begin(); it != term->successor_end();
-              ++it) {
-          (*it)->printAsOperand(out);
-          out << " ";
-        }
-        out << "}";
-
-        if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
-          out << " [T: ";
-          condBr.getTrueDest()->printAsOperand(out);
-          out << ", F: ";
-          condBr.getFalseDest()->printAsOperand(out);
-          out << "]";
-        }
-      } else {
-        out << "NO_TERMINATOR (Deadlock Risk!)";
-      }
-      out << "\n";
-    }
-    out << "\n-------------------------------------------------\n";
-  }
   ControlDependenceAnalysis locCDA(*locGraph->region);
   DenseSet<Block *> locConsControlDepsTmp =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
 
   // Map to store specific requirements for Mux Conditions (LocalBlock -> RequiredValue)
-  DenseMap<Block *, bool> muxRequirements;
+  DenseMap<Block *, bool> muxConstraints;
   SignalRegistry registry;
   rewriter.setInsertionPointToStart(consumer->getBlock());
 
@@ -1747,7 +1693,7 @@ static void insertDirectSuppression(
           locConsControlDepsTmp.insert(condBlockLocal);
           
           // Record the specific value required (True/False) to pass this Mux
-          muxRequirements[condBlockLocal] = requiredVal;
+          muxConstraints[condBlockLocal] = requiredVal;
         }
       }
 
@@ -1793,9 +1739,9 @@ static void insertDirectSuppression(
 
   // --- Common Logic for Building Suppression ---
   // If deliverToGamma is true, we use the empty constraints to build the distribution
-  // network (so it covers all paths), but we use the muxRequirements to calculate
+  // network (so it covers all paths), but we use the muxConstraints to calculate
   // the specific suppression condition for this path.
-  // If deliverToGamma is false, muxRequirements will be empty, so both graphs are identical.
+  // If deliverToGamma is false, muxConstraints will be empty, so both graphs are identical.
 
   DenseMap<Block *, bool> emptyConstraints;
   auto fullDecisionGraph = buildDecisionGraph(*locGraph, locConsControlDepsTmp, emptyConstraints);
@@ -1817,8 +1763,8 @@ static void insertDirectSuppression(
     }
     out << " }\n";
 
-    out << "[MUX] Mux Requirements:\n";
-    for (auto &entry : muxRequirements) {
+    out << "[MUX] Mux Constraints:\n";
+    for (auto &entry : muxConstraints) {
       out << "      Block: ";
       if (entry.first)
         entry.first->printAsOperand(out);
@@ -1829,66 +1775,11 @@ static void insertDirectSuppression(
   }
 
   // Build the constrained graph for logic calculation
-  auto decisionGraph = buildDecisionGraph(*locGraph, locConsControlDepsTmp, muxRequirements);
-  if (debuglogCFG && deliverToGamma) {
-    out << "\n>>> Decision Graph <<<\n";
-    out << "NewProd: ";
-    if (decisionGraph->newProd)
-      decisionGraph->newProd->printAsOperand(out);
-    else
-      out << "null";
-    out << "\nNewCons: ";
-    if (decisionGraph->newCons)
-      decisionGraph->newCons->printAsOperand(out);
-    else
-      out << "null";
-    out << "\nSink:    ";
-    if (decisionGraph->sinkBB)
-      decisionGraph->sinkBB->printAsOperand(out);
-    else
-      out << "null";
-    out << "\n\nStructure:\n";
+  auto decisionGraph = buildDecisionGraph(*fullDecisionGraph, locConsControlDepsTmp, muxConstraints);
 
-    for (Block &b : decisionGraph->region->getBlocks()) {
-      out << "  ";
-      b.printAsOperand(out);
-
-      if (decisionGraph->origMap.count(&b)) {
-        Block *orig = decisionGraph->origMap[&b];
-        if (orig) {
-          out << " (orig: ";
-          orig->printAsOperand(out);
-          out << ")";
-        }
-      }
-
-      out << " terminates with ";
-      if (auto *term = b.getTerminator()) {
-        out << term->getName() << " -> { ";
-        for (auto it = term->successor_begin(); it != term->successor_end();
-              ++it) {
-          (*it)->printAsOperand(out);
-          out << " ";
-        }
-        out << "}";
-
-        if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
-          out << " [T: ";
-          condBr.getTrueDest()->printAsOperand(out);
-          out << ", F: ";
-          condBr.getFalseDest()->printAsOperand(out);
-          out << "]";
-        }
-      } else {
-        out << "NO_TERMINATOR (Deadlock Risk!)";
-      }
-      out << "\n";
-    }
-    out << "\n-------------------------------------------------\n";
-  }
-  ControlDependenceAnalysis locCDA2(*decisionGraph->region);
+  ControlDependenceAnalysis decCDA(*decisionGraph->region);
   DenseSet<Block *> locConsControlDeps =
-      locCDA2.getAllBlockDeps()[decisionGraph->newCons].allControlDeps;
+      decCDA.getAllBlockDeps()[decisionGraph->newCons].allControlDeps;
 
   BoolExpression *fCons =
       enumeratePaths(*decisionGraph, bi, locConsControlDeps);
@@ -1908,115 +1799,116 @@ static void insertDirectSuppression(
   decisionGraph->containerOp->erase();
   locGraph->containerOp->erase();
 
-  // --- [NEW] Upstream Suppression Logic ---
-  BoolExpression *fSupUp = BoolExpression::boolZero();
+  // Suppression Logic between Dominator and Producer
+  BoolExpression *fSupDP = BoolExpression::boolZero();
 
   // If deliverToGamma is true, we must also ensure the path from Gamma Root to Data Source is valid.
-  if (deliverToGamma) {
-    // This was updated earlier to be the Gamma Root
-    Block *upstreamProd = producerBlock;
-    // Original Data Source
-    Block *upstreamCons = connection.getParentBlock();
+  if (dominatorBlock != producerBlock) {  
+    OpBuilder tmpBuilder2(funcOp.getContext());
+    auto locGraphDP = bi.isLess(producerBlock, dominatorBlock) 
+        ? buildLocalCFGRegion(tmpBuilder2, producerBlock, dominatorBlock, bi)
+        : buildLocalCFGRegion(tmpBuilder2, dominatorBlock, producerBlock, bi);
 
-    if (upstreamProd && upstreamCons && upstreamProd != upstreamCons &&
-        isReachable(entryBlock, upstreamProd)) {
+    if (locGraphDP->newCons) {
+      // 1. Get dependencies for upstream graph
+      ControlDependenceAnalysis dpCDA(*locGraphUp->region);
+      auto dpDepsTmp = dpCDA.getAllBlockDeps()[locGraphUp->newCons].allControlDeps;
+
+      // 2. Build Upstream Decision Graph (No constraints needed)
+      DenseMap<Block *, bool> noConstraints;
+      auto decisionGraphDP = buildDecisionGraph(*locGraphDP, dpDepsTmp, noConstraints);
+
+      // 3. Calculate Upstream Logic
+      ControlDependenceAnalysis finalDpCDA(*decisionGraphDP->region);
+      auto dpDeps = finalDpCDA.getAllBlockDeps()[decisionGraphDP->newCons].allControlDeps;
       
-      OpBuilder tmpBuilder2(funcOp.getContext());
-      auto locGraphUp = bi.isLess(upstreamCons, upstreamProd) 
-          ? buildLocalCFGRegion(tmpBuilder2, upstreamCons, upstreamProd, bi)
-          : buildLocalCFGRegion(tmpBuilder2, upstreamProd, upstreamCons, bi);
+      BoolExpression *fConsDP = enumeratePaths(*decisionGraphDP, bi, dpDeps);
+      // Calculate Upstream Suppress Condition (stored separately)
+      fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
 
-      if (locGraphUp->newCons) {
-        // 1. Get dependencies for upstream graph
-        ControlDependenceAnalysis upCDA(*locGraphUp->region);
-        auto upDepsTmp = upCDA.getAllBlockDeps()[locGraphUp->newCons].allControlDeps;
-
-        // 2. Build Upstream Decision Graph (No constraints needed)
-        DenseMap<Block *, bool> noConstraints;
-        auto decisionGraphUp = buildDecisionGraph(*locGraphUp, upDepsTmp, noConstraints);
-
-        // 3. Calculate Upstream Logic
-        ControlDependenceAnalysis finalUpCDA(*decisionGraphUp->region);
-        auto upDeps = finalUpCDA.getAllBlockDeps()[decisionGraphUp->newCons].allControlDeps;
-        
-        BoolExpression *fConsUp = enumeratePaths(*decisionGraphUp, bi, upDeps);
-        // Calculate Upstream Suppress Condition (stored separately)
-        fSupUp = fConsUp->boolMinimize()->boolNegate()->boolMinimize();
-
-        if (debuglog) {
-          out << "fSupUp   = " << fSupUp->toString() << "\n\n\n";
-        }
-
-        decisionGraphUp->containerOp->erase();
+      if (debuglog) {
+        out << "fSupDP   = " << fSupDP->toString() << "\n\n\n";
       }
-      locGraphUp->containerOp->erase();
+
+      decisionGraphDP->containerOp->erase();
     }
+    locGraphDP->containerOp->erase();
   }
+
+  bool hasFSup = (fSup->type != experimental::boolean::ExpressionType::Zero);
+  bool hasFSupDP = (fSupDP->type != experimental::boolean::ExpressionType::Zero);
+  bool earlyDef = bi.isLess(producerBlock, dominatorBlock);
 
   // If the activation function is not zero, then a suppress block is to be
   // inserted
-  if (fSup->type != experimental::boolean::ExpressionType::Zero) {
-    std::set<std::string> blocks = fSup->getVariables();
-
-    std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
-    if (debuglog) {
-      llvm::errs() << "[CofactorList] ";
-      for (const auto &s : cofactorList)
-        llvm::errs() << s << " ";
-      llvm::errs() << "\n";
-    }
-    BDD *bdd = buildBDD(fSup, cofactorList);
-    Value branchCond =
-        bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
+  if (hasFSup || (hasFSupDP && earlyDef)) {
     // We use a separate variable so we don't lose track of the 
     // original 'connection' value needed for the use-replacement later.
-    Value finalDataInput = connection;
+    Value supDataIn = connection;
+    Value branchCond = nullptr;
 
-    // 2. Cascaded Upstream Filter
-    if (fSupUp->type != experimental::boolean::ExpressionType::Zero) {
-      std::set<std::string> blocksUp = fSupUp->getVariables();
-      std::vector<std::string> cofactorListUp(blocksUp.begin(), blocksUp.end());
-      BDD *bddUp = buildBDD(fSupUp, cofactorListUp);
+    if (hasFSup) {
+      std::set<std::string> blocks = fSup->getVariables();
+      std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
+      if (debuglog) {
+        llvm::errs() << "[CofactorList] ";
+        for (const auto &s : cofactorList)
+          llvm::errs() << s << " ";
+        llvm::errs() << "\n";
+      }
+      BDD *bdd = buildBDD(fSup, cofactorList);
+      branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
+    }
+
+    // Cascaded Upstream Filter
+    if (hasFSupDP) {
+      std::set<std::string> blocksDP = fSupDP->getVariables();
+      std::vector<std::string> cofactorListDP(blocksDP.begin(), blocksDP.end());
+      BDD *bddDP = buildBDD(fSupDP, cofactorListDP);
       
       // Build the Upstream Condition Circuit
-      Value upBranchCond = bddToCircuit(rewriter, bddUp, consumer->getBlock(), registry, {}, bi);
+      Value dpBranchCond = bddToCircuit(rewriter, bddDP, consumer->getBlock(), registry, {}, bi);
 
-      if (bi.isLess(connection.getParentBlock(), producerBlock)) {
+      if (earlyDef) {
         // [Case A] Upstream logic filters the DATA path directly.
         // Create an Intermediate Branch on the 'connection' wire.
-        // Data Input: finalDataInput (The data itself)
-        // Condition: upBranchCond (from Upstream logic)
-        auto upBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(finalDataInput.getType()), 
-          upBranchCond, finalDataInput);
+        // Data Input: supDataIn (The data itself)
+        // Condition: dpBranchCond (from Upstream logic)
+        auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          consumer->getLoc(), ftd::getListTypes(supDataIn.getType()), 
+          dpBranchCond, supDataIn);
         
-        upBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+        dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
         // Update: The data feeding the next stage is now the filtered data
-        finalDataInput = upBranchOp.getFalseResult();
+        supDataIn = dpBranchOp.getFalseResult();
 
       } else {
         // [Case B] Upstream logic filters the SUPPRESSION SIGNAL.
         // Create an Intermediate Branch on the 'branchCond' wire.
         // Data Input: branchCond (The Downstream suppression signal)
-        // Condition: upBranchCond (from Upstream logic)
-        auto upBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
+        // Condition: dpBranchCond (from Upstream logic)
+        auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
           consumer->getLoc(), ftd::getListTypes(branchCond.getType()), 
-          upBranchCond, branchCond);
+          dpBranchCond, branchCond);
         
-        upBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+        dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
         // Update 'branchCond': The effective suppression signal is now the result 
         // of this cascade.
-        branchCond = upBranchOp.getFalseResult();
+        branchCond = dpBranchOp.getFalseResult();
       }
     }
 
-    // 3. Final Data Branch
-    auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-        consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
-        finalDataInput);
-    branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+    // Final Data Branch
+    Value supDataOut = supDataIn;
+    if (branchCond) {
+      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
+          supDataIn);
+      branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+      supDataOut = branchOp.getFalseResult();
+    }
 
     // Take into account the possibility of a mux to get the condition input
     // also as data input. In this case, the data input can be optimized to
@@ -2037,7 +1929,7 @@ static void insertDirectSuppression(
         use.set(cst.getResult());
         continue;
       }
-      use.set(branchOp.getFalseResult());
+      use.set(supDataOut); 
     }
   }
 }
