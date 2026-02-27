@@ -1787,7 +1787,7 @@ static void insertDirectSuppression(
 
   // Build the constrained graph for logic calculation
   auto decisionGraph = buildDecisionGraph(
-      *fullDecisionGraph, locConsControlDepsTmp, muxConstraints);
+      *locGraph, locConsControlDepsTmp, muxConstraints);
 
   ControlDependenceAnalysis decCDA(*decisionGraph->region);
   DenseSet<Block *> locConsControlDeps =
@@ -1826,9 +1826,9 @@ static void insertDirectSuppression(
 
     if (locGraphDP->newCons) {
       // 1. Get dependencies for upstream graph
-      ControlDependenceAnalysis dpCDA(*locGraphUp->region);
+      ControlDependenceAnalysis dpCDA(*locGraphDP->region);
       auto dpDepsTmp =
-          dpCDA.getAllBlockDeps()[locGraphUp->newCons].allControlDeps;
+          dpCDA.getAllBlockDeps()[locGraphDP->newCons].allControlDeps;
 
       // 2. Build Upstream Decision Graph (No constraints needed)
       DenseMap<Block *, bool> noConstraints;
