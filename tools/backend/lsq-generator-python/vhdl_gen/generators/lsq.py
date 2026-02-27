@@ -331,6 +331,13 @@ class LSQ:
         arch += BitsToOH(ctx, ldq_head_oh, ldq_head)
         arch += BitsToOH(ctx, stq_head_oh, stq_head)
 
+        # Pipelining Strategy:
+        # The signals are always passed through the pipeline stages (*_pcomp,
+        # *_p0, *_p1). If the pipeline stage is enabled, the signal will be
+        # registered (the signal type is 'r' for register). Otherwise, the
+        # signal type is 'w' for wire, and the pipeline stage is effectively
+        # bypassed. If the signals are registers, we need to conditionally call
+        # regInit().
         pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
         pipe0_type = 'r' if self.configs.pipe0 else 'w'
         pipe1_type = 'r' if self.configs.pipe1 else 'w'
@@ -597,6 +604,7 @@ class LSQ:
             ctx, 'stq_addr_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
         stq_data_valid_pcomp = LogicArray(
             ctx, 'stq_data_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
+        # addr_valid_pcomp is always a wire: combines other registers signals
         addr_valid_pcomp = LogicVecArray(
             ctx, 'addr_valid_pcomp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         addr_same_pcomp = LogicVecArray(
@@ -882,17 +890,17 @@ class LSQ:
 
         # Pipeline Stage 1
 
-        # load registers (w/ backpressure)
+        # load registers (if enabled, w/ backpressure)
         load_idx_oh_p1 = LogicVecArray(
             ctx, 'load_idx_oh_p1', pipe1_type, self.configs.numLdMem, self.configs.numLdqEntries)
         load_en_p1 = LogicArray(
             ctx, 'load_en_p1', pipe1_type, self.configs.numLdMem)
-        # store registers (w/ backpressure)
+        # store registers (if enabled, w/ backpressure)
         store_idx_p1 = LogicVec(
             ctx, 'store_idx_p1', pipe1_type, self.configs.stqAddrW)
         store_en_p1 = Logic(
             ctx, 'store_en_p1', pipe1_type)
-        # bypass registers (w/o backpressure)
+        # bypass registers (if enabled, w/o backpressure)
         bypass_idx_oh_p1 = LogicVecArray(
             ctx, 'bypass_idx_oh_p1', pipe1_type, self.configs.numLdqEntries, self.configs.numStqEntries)
         bypass_en_p1 = LogicArray(
