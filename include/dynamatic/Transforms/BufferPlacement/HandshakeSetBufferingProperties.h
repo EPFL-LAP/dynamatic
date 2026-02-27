@@ -35,19 +35,10 @@
 
 namespace dynamatic {
 namespace buffer {
-
 /// Updates the channel's buffering properties in the same way as it was done in
 /// legacy Dynamatic's implementation of the initial smart buffer placement pass
 /// (described in https://dl.acm.org/doi/full/10.1145/3477053).
 void setFPGA20Properties(handshake::FuncOp funcOp);
-
-std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeSetBufferingProperties(const std::string &version = "fpga20");
-
-#define GEN_PASS_DECL_HANDSHAKESETBUFFERINGPROPERTIES
-#define GEN_PASS_DEF_HANDSHAKESETBUFFERINGPROPERTIES
-#include "dynamatic/Transforms/Passes.h.inc"
-
 } // namespace buffer
 } // namespace dynamatic
 

@@ -17,7 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -29,6 +28,14 @@
 
 using namespace dynamatic;
 using namespace dynamatic::buffer;
+// [START Boiler-plate code for the MLIR pass]
+
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKESETBUFFERINGPROPERTIES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 /// End of error message when there is a conflict between the constraint-setting
 /// logic and already existing buffering constraints.
@@ -111,7 +118,7 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
   }
 }
 
-void dynamatic::buffer::setFPGA20Properties(handshake::FuncOp funcOp) {
+static void setFPGA20Properties(handshake::FuncOp funcOp) {
   // See docs/Specs/Buffering.md
   // A merge with more than one input should have at least one
   // buffer slot at its output, and this is necessary only if
@@ -194,12 +201,11 @@ namespace {
 /// Simple pass driver that runs a specific buffering properties setting
 /// policy on each Handshake function in the IR.
 struct HandshakeSetBufferingPropertiesPass
-    : public dynamatic::buffer::impl::HandshakeSetBufferingPropertiesBase<
+    : public dynamatic::impl::HandshakeSetBufferingPropertiesBase<
           HandshakeSetBufferingPropertiesPass> {
 
-  HandshakeSetBufferingPropertiesPass(const std::string &version) {
-    this->version = version;
-  }
+  using HandshakeSetBufferingPropertiesBase::
+      HandshakeSetBufferingPropertiesBase;
 
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
@@ -223,9 +229,3 @@ struct HandshakeSetBufferingPropertiesPass
 };
 
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::buffer::createHandshakeSetBufferingProperties(
-    const std::string &version) {
-  return std::make_unique<HandshakeSetBufferingPropertiesPass>(version);
-}

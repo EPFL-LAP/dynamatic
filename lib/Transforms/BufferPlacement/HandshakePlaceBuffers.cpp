@@ -50,10 +50,8 @@ static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
     COST_AWARE("costaware"), MAPBUF("mapbuf");
 
 namespace dynamatic {
-namespace buffer {
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
 #include "dynamatic/Transforms/Passes.h.inc"
-} // namespace buffer
 } // namespace dynamatic
 
 namespace {
@@ -105,7 +103,7 @@ namespace buffer {
 /// exposes most of its behavior in protected virtual methods which may be
 /// overriden by sub-types of the pass.
 struct HandshakePlaceBuffersPass
-    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
+    : public dynamatic::impl::HandshakePlaceBuffersBase<
           HandshakePlaceBuffersPass> {
 
   /// Trivial field-by-field constructor.
