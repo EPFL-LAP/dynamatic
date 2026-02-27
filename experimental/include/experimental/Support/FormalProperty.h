@@ -15,6 +15,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
+#include <cstdint>
 #include <fstream>
 #include <memory>
 #include <optional>
@@ -34,7 +35,7 @@ public:
 
   TAG getTag() const { return tag; }
   TYPE getType() const { return type; }
-  unsigned long getId() const { return id; }
+  uint64_t getId() const { return id; }
   std::optional<bool> getCheck() const { return check; }
 
   static std::optional<TYPE> typeFromStr(const std::string &s);
@@ -55,14 +56,17 @@ public:
       const llvm::json::Value &value, llvm::json::Path path);
 
   FormalProperty() = default;
-  FormalProperty(unsigned long id, TAG tag, TYPE type)
+  // Use uint64_t instead of unsigned long because LLVM JSON provides
+  // fromJSON(uint64_t&) but not fromJSON(unsigned long&) on some platforms
+  // (ex. arm64 macos).
+  FormalProperty(uint64_t id, TAG tag, TYPE type)
       : id(id), tag(tag), type(type), check(std::nullopt) {}
   virtual ~FormalProperty() = default;
 
   static bool classof(const FormalProperty *fp) { return true; }
 
 protected:
-  unsigned long id;
+  uint64_t id;
   TAG tag;
   TYPE type;
   std::optional<bool> check;
@@ -101,7 +105,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   AbsenceOfBackpressure() = default;
-  AbsenceOfBackpressure(unsigned long id, TAG tag, const OpResult &res);
+  AbsenceOfBackpressure(uint64_t id, TAG tag, const OpResult &res);
   ~AbsenceOfBackpressure() = default;
 
   static bool classof(const FormalProperty *fp) {
@@ -136,7 +140,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   ValidEquivalence() = default;
-  ValidEquivalence(unsigned long id, TAG tag, const OpResult &res1,
+  ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
                    const OpResult &res2);
   ~ValidEquivalence() = default;
 
@@ -175,7 +179,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   EagerForkNotAllOutputSent() = default;
-  EagerForkNotAllOutputSent(unsigned long id, TAG tag,
+  EagerForkNotAllOutputSent(uint64_t id, TAG tag,
                             handshake::EagerForkLikeOpInterface &op);
   ~EagerForkNotAllOutputSent() = default;
 
@@ -210,7 +214,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   CopiedSlotsOfActiveForkAreFull() = default;
-  CopiedSlotsOfActiveForkAreFull(unsigned long id, TAG tag,
+  CopiedSlotsOfActiveForkAreFull(uint64_t id, TAG tag,
                                  handshake::BufferLikeOpInterface &bufferOp,
                                  handshake::EagerForkLikeOpInterface &forkOp);
   ~CopiedSlotsOfActiveForkAreFull() = default;
