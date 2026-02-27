@@ -1308,7 +1308,6 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       // e.g. count(fork0.sent_0, fork0.sent_1) < 2
       // for operation "fork0" with 2 eager outputs
       data.properties[p->getId()] = {propertyString, propertyTag};
-<<<<<<< HEAD
     } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
                    property.get())) {
       std::vector<std::string> forkOutNames(0);
@@ -1322,8 +1321,6 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                         bufferFull)
               .str();
       data.properties[p->getId()] = {propertyString, propertyTag};
-=======
->>>>>>> feat/ziad/milp
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();
