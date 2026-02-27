@@ -243,6 +243,7 @@ if [[ $PREBUILT_LLVM -eq 0 ]]; then
         -DLLVM_ENABLE_PROJECTS="mlir;clang;polly" \
         -DLLVM_TARGETS_TO_BUILD="host" \
         -DLLVM_ENABLE_RTTI=ON \
+        -DLLVM_ENABLE_EH=ON \
         -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
         -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
@@ -263,6 +264,7 @@ else
   #### llvm-project (prebuilt) ####
   prepare_to_build_project "Dynamatic (prebuilt-llvm)" "build"
 
+<<<<<<< HEAD
   if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
     echo "Prebuilt LLVM is currently configured only for Linux/X86 in this script."
     echo "Please configure the LLVM submodule and run without --use-prebuilt-llvm."
@@ -277,6 +279,17 @@ else
       wget -O "$PREBUILT_LLVM_TARBALL" "$URL"
       exit_on_fail "Failed to download the prebuilt llvm-project!"
   fi
+=======
+  URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
+  PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
+
+  # Download only if the file doesn't exist
+  if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
+      echo "Downloading $PREBUILT_LLVM_TARBALL..."
+      wget -O "$PREBUILT_LLVM_TARBALL" "$URL"
+      exit_on_fail "Failed to download the prebuilt llvm-project!"
+  fi
+>>>>>>> feat/ziad/milp
 
   # untar the file 
   if [ ! -f "$LLVM_DIR/lib/cmake/llvm/AddLLVM.cmake" ]; then

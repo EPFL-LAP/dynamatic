@@ -24,6 +24,12 @@ namespace handshake {
 class FuncOp;
 } // namespace handshake
 
+<<<<<<< HEAD
+=======
+#define GEN_PASS_DECL_HANDSHAKEMATERIALIZE
+#include "dynamatic/Transforms/Passes.h.inc"
+
+>>>>>>> feat/ziad/milp
 /// Error message to display when the Handshake function is not materialized.
 constexpr llvm::StringLiteral ERR_NON_MATERIALIZED_FUNC(
     "This step requires that all values in the Handshake functions are used "

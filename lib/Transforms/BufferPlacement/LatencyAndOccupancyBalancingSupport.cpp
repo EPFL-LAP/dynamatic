@@ -13,8 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/LLVM.h"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graph_utility.hpp>
@@ -27,7 +29,7 @@
 #include <numeric>
 #include <queue>
 
-#define DEBUG_TYPE "latency-and-occupancy-balancing"
+#define DEBUG_TYPE "latency-and-occupancy-balancing-support"
 
 // Make the graph boost analyzable.
 // NOTE: Moving this to the header file will cause linking errors.
@@ -44,8 +46,8 @@ namespace dynamatic {
 ///=== RECONVERGENT PATH FINDER ===///
 
 std::string ReconvergentPathFinderGraph::getNodeLabel(NodeIdType nodeId) const {
-  std::string opName = nodes[nodeId].op->getName().getStringRef().str();
-  return opName + "\\nStep: " + std::to_string(getNodeStep(nodeId));
+  auto opName = nodes[nodeId].op->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  return opName.str() + "\\nStep: " + std::to_string(getNodeStep(nodeId));
 }
 
 std::string ReconvergentPathFinderGraph::getNodeDotId(NodeIdType nodeId) const {
@@ -496,6 +498,10 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
   file << "  bgcolor=white;\n";
   file << "  compound=true;\n\n";
 
+  size_t totalPaths = 0;
+  for (const auto &entry : graphPaths)
+    totalPaths += entry.paths.size();
+
   for (const auto &[graphIdx, entry] : llvm::enumerate(graphPaths)) {
     const ReconvergentPathFinderGraph *graph = entry.graph;
     const std::vector<ReconvergentPath> &paths = entry.paths;
@@ -554,6 +560,9 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
   file << "}\n";
   file.close();
+  LLVM_DEBUG(llvm::errs() << "Dumped " << totalPaths
+                          << " reconvergent paths from " << graphPaths.size()
+                          << " graphs to " << fullPath << "\n";);
 }
 
 // [END AI-generated code]
