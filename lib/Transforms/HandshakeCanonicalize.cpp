@@ -14,12 +14,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKECANONICALIZE
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
@@ -157,6 +164,8 @@ struct HandshakeCanonicalizePass
     : public dynamatic::impl::HandshakeCanonicalizeBase<
           HandshakeCanonicalizePass> {
 
+  using HandshakeCanonicalizeBase::HandshakeCanonicalizeBase;
+
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     mlir::ModuleOp mod = getOperation();
@@ -173,8 +182,3 @@ struct HandshakeCanonicalizePass
   };
 };
 }; // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeCanonicalize() {
-  return std::make_unique<HandshakeCanonicalizePass>();
-}

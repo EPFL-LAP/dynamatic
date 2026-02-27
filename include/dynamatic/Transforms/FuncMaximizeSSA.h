@@ -21,10 +21,6 @@
 
 namespace dynamatic {
 
-#define GEN_PASS_DECL_FUNCMAXIMIZESSA
-#define GEN_PASS_DEF_FUNCMAXIMIZESSA
-#include "dynamatic/Transforms/Passes.h.inc"
-
 /// Strategy class to control the behavior of SSA maximization. The class
 /// exposes overridable filter functions to dynamically select which blocks,
 /// block arguments, operations, and operation results should be put into
@@ -81,9 +77,6 @@ LogicalResult maximizeSSA(Block &block, SSAMaximizationStrategy &strategy);
 /// Succeeds when it was possible to convert all of the values defined by
 /// selected blocks into maximal SSA form.
 LogicalResult maximizeSSA(Region &region, SSAMaximizationStrategy &strategy);
-
-std::unique_ptr<mlir::OperationPass<mlir::func::FuncOp>>
-createFuncMaximizeSSA();
 
 } // namespace dynamatic
 

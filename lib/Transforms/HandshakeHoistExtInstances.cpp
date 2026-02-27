@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
@@ -31,6 +30,14 @@
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEHOISTEXTINSTANCES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 static bool isIntrinsic(handshake::FuncOp funcOp) {
   return funcOp.getNameAttr().strref().starts_with("__");
 }
@@ -41,6 +48,8 @@ namespace {
 struct HandshakeHoistExtInstancesPass
     : public dynamatic::impl::HandshakeHoistExtInstancesBase<
           HandshakeHoistExtInstancesPass> {
+
+  using HandshakeHoistExtInstancesBase::HandshakeHoistExtInstancesBase;
 
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
@@ -169,9 +178,4 @@ void HandshakeHoistExtInstancesPass::eraseIfUnused(handshake::FuncOp funcOp) {
           ->empty()) {
     funcOp->erase();
   }
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeHoistExtInstances() {
-  return std::make_unique<HandshakeHoistExtInstancesPass>();
 }

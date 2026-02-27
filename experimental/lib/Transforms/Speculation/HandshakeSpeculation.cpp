@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -38,16 +37,23 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKESPECULATION
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 namespace {
 
 struct HandshakeSpeculationPass
-    : public dynamatic::experimental::speculation::impl::
-          HandshakeSpeculationBase<HandshakeSpeculationPass> {
-  HandshakeSpeculationPass(const std::string &jsonPath = "",
-                           bool automatic = true) {
-    this->jsonPath = jsonPath;
-    this->automatic = automatic;
-  }
+    : public dynamatic::experimental::impl::HandshakeSpeculationBase<
+          HandshakeSpeculationPass> {
+
+  using HandshakeSpeculationBase::HandshakeSpeculationBase;
 
   void runDynamaticPass() override;
 
@@ -875,10 +881,4 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::speculation::createHandshakeSpeculation(
-    const std::string &jsonPath, bool automatic) {
-  return std::make_unique<HandshakeSpeculationPass>(jsonPath, automatic);
 }

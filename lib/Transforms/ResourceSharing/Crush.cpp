@@ -18,7 +18,6 @@
 //   wrapper around it to manage access to the share operation.
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -48,10 +47,13 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::buffer;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_CREDITBASEDSHARING
 #include "dynamatic/Transforms/Passes.h.inc"
 }; // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 static constexpr unsigned MAX_GROUP_SIZE = 20;
 
