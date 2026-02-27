@@ -14,7 +14,6 @@
 
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "dynamatic/Analysis/NumericAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -22,7 +21,6 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include <variant>
 
 #define DEBUG_TYPE "arith-reduce-strength"
