@@ -223,10 +223,8 @@ public:
 private:
   std::vector<handshake::EagerForkSentNamer> sentStateNamers;
   handshake::BufferSlotFullNamer copiedSlot;
-  inline static const StringLiteral FORK_OP_LIT = "fork_op";
-  inline static const StringLiteral FORK_CHANNELS_LIT = "channels";
-  inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
-  inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
+  inline static const StringLiteral FORK_CHANNELS_LIT = "fork_channels";
+  inline static const StringLiteral COPIED_SLOT_LIT = "copied_slot";
 };
 
 struct PathEquation {

@@ -26,10 +26,10 @@ struct InternalStateNamer {
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
 
-  virtual std::string getSMVName() = 0;
-  virtual llvm::json::Value toInnerJSON() = 0;
+  virtual std::string getSMVName() const = 0;
+  virtual llvm::json::Value toInnerJSON() const = 0;
 
-  inline llvm::json::Value getJSON() {
+  inline llvm::json::Value toJSON() const {
     return llvm::json::Object({
         {TYPE_LIT, typeToStr(type)},
         {INNER_LIT, toInnerJSON()},
@@ -65,11 +65,11 @@ struct EagerForkSentNamer : public InternalStateNamer {
         channelName(channelName), channelSize(channelSize) {}
   ~EagerForkSentNamer() = default;
 
-  inline std::string getSMVName() override {
+  inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}_sent", opName, channelName).str();
   }
 
-  inline llvm::json::Value toInnerJSON() override {
+  inline llvm::json::Value toInnerJSON() const override {
     return llvm::json::Object(
         {{OPERATION_LIT, opName}, {CHANNEL_NAME_LIT, channelName}});
   }
@@ -109,13 +109,13 @@ struct ConstrainedEagerForkSentNamer : public InternalStateNamer {
   ConstrainedEagerForkSentNamer(const EagerForkSentNamer &base, int32_t value)
       : InternalStateNamer(TYPE::EagerForkSent), base(base), value(value) {}
   ~ConstrainedEagerForkSentNamer() = default;
-  inline std::string getSMVName() override {
+  inline std::string getSMVName() const override {
     return llvm::formatv("{0} & ({1}.ins = {2})", base.getSMVName(),
                          base.opName, smvValue(base.channelSize, value))
         .str();
   }
 
-  inline llvm::json::Value toInnerJSON() override {
+  inline llvm::json::Value toInnerJSON() const override {
     llvm::json::Value obj = base.toInnerJSON();
     return llvm::json::Object({{BASE_LIT, obj}, {VALUE_LIT, value}});
   }
@@ -135,10 +135,10 @@ struct BufferSlotFullNamer : public InternalStateNamer {
         slotName(slotName), slotSize(slotSize) {}
   ~BufferSlotFullNamer() = default;
 
-  inline std::string getSMVName() override {
+  inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}_full", opName, slotName).str();
   }
-  inline llvm::json::Value toInnerJSON() override {
+  inline llvm::json::Value toInnerJSON() const override {
     return llvm::json::Object({
         {OPERATION_LIT, opName},
         {SLOT_NAME_LIT, slotName},
@@ -164,13 +164,13 @@ struct LatencyInducedSlotNamer : public InternalStateNamer {
         slotIndex(slotIndex) {}
   ~LatencyInducedSlotNamer() = default;
 
-  inline std::string getSMVName() override {
+  inline std::string getSMVName() const override {
     return llvm::formatv("{0}.inner_handshake_manager.inner_delay_buffer.v{1}",
                          opName, slotIndex)
         .str();
   }
 
-  inline llvm::json::Value toInnerJSON() override {
+  inline llvm::json::Value toInnerJSON() const override {
     return llvm::json::Object({{SLOT_INDEX_LIT, slotIndex}});
   }
   std::string opName;
