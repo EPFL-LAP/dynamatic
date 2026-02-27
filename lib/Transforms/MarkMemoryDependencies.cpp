@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/MarkMemoryDependencies.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
@@ -32,6 +31,14 @@ using namespace mlir;
 using namespace mlir::affine;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_MARKMEMORYDEPENDENCIES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 /// Maps values representing memory regions to load/store operations to it
 using MemAccesses = llvm::MapVector<Value, SmallVector<Operation *>>;
@@ -59,6 +66,8 @@ namespace {
 struct MarkMemoryDependenciesPass
     : public dynamatic::impl::MarkMemoryDependenciesBase<
           MarkMemoryDependenciesPass> {
+
+  using MarkMemoryDependenciesBase::MarkMemoryDependenciesBase;
 
   void runDynamaticPass() override {
     for (func::FuncOp funcOp : getOperation().getOps<func::FuncOp>())
@@ -190,9 +199,4 @@ LogicalResult MarkMemoryDependenciesPass::checkNonAffineAccessPair(
       &getContext(), mlir::StringAttr::get(srcOp->getContext(), dstName), 0));
 
   return success();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createMarkMemoryDependencies() {
-  return std::make_unique<MarkMemoryDependenciesPass>();
 }

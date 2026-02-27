@@ -10,13 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/FuncSetArgNames.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "clang-c/Index.h"
+
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_FUNCSETARGNAMES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
@@ -67,7 +74,7 @@ namespace {
 struct FuncSetArgNamesPass
     : public dynamatic::impl::FuncSetArgNamesBase<FuncSetArgNamesPass> {
 
-  FuncSetArgNamesPass(StringRef source) { this->source = source.str(); }
+  using FuncSetArgNamesBase::FuncSetArgNamesBase;
 
   void runDynamaticPass() override {
     // Open the source file with clang
@@ -113,8 +120,3 @@ struct FuncSetArgNamesPass
 };
 
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createFuncSetArgNames(StringRef source) {
-  return std::make_unique<FuncSetArgNamesPass>(source);
-}

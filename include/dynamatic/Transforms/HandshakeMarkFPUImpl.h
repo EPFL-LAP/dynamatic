@@ -15,14 +15,4 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 
-namespace dynamatic {
-
-// include tblgen base class declaration,
-// options struct
-// and pass create function
-#define GEN_PASS_DECL_HANDSHAKEMARKFPUIMPL
-#include "dynamatic/Transforms/Passes.h.inc"
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_HANDSHAKEREMARKFPUIMPL_H

@@ -16,15 +16,4 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
-namespace dynamatic {
-
-std::unique_ptr<dynamatic::DynamaticPass>
-createFuncSetArgNames(StringRef source = {});
-
-#define GEN_PASS_DECL_FUNCSETARGNAMES
-#define GEN_PASS_DEF_FUNCSETARGNAMES
-#include "dynamatic/Transforms/Passes.h.inc"
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_FUNCSETARGNAMES_H

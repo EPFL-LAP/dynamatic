@@ -20,14 +20,4 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_HANDSHAKECANONICALIZE
-#define GEN_PASS_DEF_HANDSHAKECANONICALIZE
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeCanonicalize();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_HANDSHAKECANONICALIZE_H

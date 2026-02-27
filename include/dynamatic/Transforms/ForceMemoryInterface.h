@@ -19,15 +19,4 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_FORCEMEMORYINTERFACE
-#define GEN_PASS_DEF_FORCEMEMORYINTERFACE
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createForceMemoryInterface(bool forceLSQ = false, bool forceMC = false);
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_FORCEMEMORYINTERFACE_H

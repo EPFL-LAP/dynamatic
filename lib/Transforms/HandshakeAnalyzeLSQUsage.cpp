@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeAnalyzeLSQUsage.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -28,6 +27,14 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEANALYZELSQUSAGE
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 namespace {
 
@@ -305,9 +312,4 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
   // which may be different from the one they currently connect to
   markLSQPorts(lsqLoadOps, dependentLoads, groupMap, ctx);
   markLSQPorts(lsqStoreOps, dependentStores, groupMap, ctx);
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeAnalyzeLSQUsage() {
-  return std::make_unique<HandshakeAnalyzeLSQUsagePass>();
 }

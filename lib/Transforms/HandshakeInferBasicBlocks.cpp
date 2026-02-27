@@ -26,6 +26,14 @@
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEINFERBASICBLOCKS
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
+
 /// Determines if the pass should attempt to infer the basic block of the
 /// operation if it is missing.
 static bool isLegalForInference(Operation *op) {
@@ -132,6 +140,8 @@ struct HandshakeInferBasicBlocksPass
     : public dynamatic::impl::HandshakeInferBasicBlocksBase<
           HandshakeInferBasicBlocksPass> {
 
+  using HandshakeInferBasicBlocksBase::HandshakeInferBasicBlocksBase;
+
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns{ctx};
@@ -144,8 +154,3 @@ struct HandshakeInferBasicBlocksPass
   };
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeInferBasicBlocksPass() {
-  return std::make_unique<HandshakeInferBasicBlocksPass>();
-}

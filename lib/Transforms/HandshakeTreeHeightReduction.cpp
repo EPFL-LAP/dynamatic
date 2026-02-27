@@ -7,6 +7,8 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 // Boilerplate: Include this for the pass option defintitions
 namespace dynamatic {
 // import auto-generated base class definition
@@ -14,6 +16,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKETREEHEIGHTREDUCTION
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 namespace {
 

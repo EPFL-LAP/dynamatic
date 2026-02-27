@@ -30,6 +30,14 @@
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_ARITHREDUCESTRENGTH
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
+
 //===----------------------------------------------------------------------===//
 // OpTree implementation
 //===----------------------------------------------------------------------===//
@@ -440,9 +448,7 @@ namespace {
 struct ArithReduceStrengthPass
     : public dynamatic::impl::ArithReduceStrengthBase<ArithReduceStrengthPass> {
 
-  ArithReduceStrengthPass(unsigned maxAdderDepthMul) {
-    this->maxAdderDepthMul = maxAdderDepthMul;
-  }
+  using ArithReduceStrengthBase::ArithReduceStrengthBase;
 
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
@@ -469,8 +475,3 @@ struct ArithReduceStrengthPass
   };
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createArithReduceStrength(unsigned maxAdderDepthMul) {
-  return std::make_unique<ArithReduceStrengthPass>(maxAdderDepthMul);
-}

@@ -26,7 +26,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -44,6 +43,14 @@
 
 using namespace mlir;
 using namespace dynamatic;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEOPTIMIZEBITWIDTHS
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 namespace {
 /// Extension type. When backtracing through extension operations, serves to
@@ -389,7 +396,7 @@ class OptDataConfig {
 public:
   /// Constructs the configuration from the specific operation being
   /// transformed.
-  OptDataConfig(Op op) : op(op){};
+  OptDataConfig(Op op) : op(op) {};
 
   /// Returns the list of operands that carry data. The method must return at
   /// least one operand. If multiple operands are returned, they must all have
@@ -461,7 +468,7 @@ protected:
 /// result which does not carry data.
 class CMergeDataConfig : public OptDataConfig<handshake::ControlMergeOp> {
 public:
-  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op){};
+  CMergeDataConfig(handshake::ControlMergeOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataResults() override {
     return SmallVector<Value>{op.getResult()};
@@ -487,7 +494,7 @@ public:
 /// which does not carry data.
 class MuxDataConfig : public OptDataConfig<handshake::MuxOp> {
 public:
-  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op){};
+  MuxDataConfig(handshake::MuxOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataOperands() override { return op.getDataOperands(); }
 
@@ -507,7 +514,7 @@ public:
 /// condition operand which does not carry data.
 class CBranchDataConfig : public OptDataConfig<handshake::ConditionalBranchOp> {
 public:
-  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op){};
+  CBranchDataConfig(handshake::ConditionalBranchOp op) : OptDataConfig(op) {};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{op.getDataOperand()};
@@ -528,7 +535,7 @@ public:
 class BufferDataConfig : public OptDataConfig<handshake::BufferOp> {
 public:
   BufferDataConfig(handshake::BufferOp op)
-      : OptDataConfig<handshake::BufferOp>(op){};
+      : OptDataConfig<handshake::BufferOp>(op) {};
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{this->op.getOperand()};
@@ -1530,6 +1537,7 @@ namespace {
 struct HandshakeOptimizeBitwidthsPass
     : public dynamatic::impl::HandshakeOptimizeBitwidthsBase<
           HandshakeOptimizeBitwidthsPass> {
+  using HandshakeOptimizeBitwidthsBase::HandshakeOptimizeBitwidthsBase;
 
   void runDynamaticPass() override {
     auto *ctx = &getContext();
@@ -1672,8 +1680,3 @@ void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(
 }
 
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeOptimizeBitwidths() {
-  return std::make_unique<HandshakeOptimizeBitwidthsPass>();
-}

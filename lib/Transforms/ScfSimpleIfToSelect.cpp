@@ -13,11 +13,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/ScfSimpleIfToSelect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_SCFSIMPLEIFTOSELECT
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 /// If the block is made up of two operations (op + yield), determines whether
 /// it has the right structure and whether the first operation is supported by
@@ -236,6 +243,8 @@ namespace {
 struct ScfSimpleIfToSelectPass
     : public dynamatic::impl::ScfSimpleIfToSelectBase<ScfSimpleIfToSelectPass> {
 
+  using ScfSimpleIfToSelectBase::ScfSimpleIfToSelectBase;
+
   void runDynamaticPass() override {
     auto *ctx = &getContext();
     mlir::GreedyRewriteConfig config;
@@ -251,8 +260,3 @@ struct ScfSimpleIfToSelectPass
   };
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createScfSimpleIfToSelect() {
-  return std::make_unique<ScfSimpleIfToSelectPass>();
-}

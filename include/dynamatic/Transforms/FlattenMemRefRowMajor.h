@@ -20,14 +20,4 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/DialectRegistry.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_FLATTENMEMREFROWMAJOR
-#define GEN_PASS_DEF_FLATTENMEMREFROWMAJOR
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createFlattenMemRefRowMajorPass();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_FLATTENMEMREFROWMAJOR_H

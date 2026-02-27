@@ -19,14 +19,4 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
-namespace dynamatic {
-
-std::unique_ptr<dynamatic::DynamaticPass> createScfSimpleIfToSelect();
-
-#define GEN_PASS_DECL_SCFSIMPLEIFTOSELECT
-#define GEN_PASS_DEF_SCFSIMPLEIFTOSELECT
-#include "dynamatic/Transforms/Passes.h.inc"
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_SCFSIMPLEIFTOSELECT_H

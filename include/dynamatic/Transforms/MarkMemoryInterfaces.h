@@ -18,13 +18,4 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_MARKMEMORYINTERFACES
-#define GEN_PASS_DEF_MARKMEMORYINTERFACES
-#include "dynamatic/Transforms/Passes.h.inc"
-std::unique_ptr<dynamatic::DynamaticPass> createMarkMemoryInterfaces();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_MARK_MEMORY_INTERFACES

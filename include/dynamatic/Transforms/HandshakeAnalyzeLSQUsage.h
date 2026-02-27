@@ -15,14 +15,4 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_HANDSHAKEANALYZELSQUSAGE
-#define GEN_PASS_DEF_HANDSHAKEANALYZELSQUSAGE
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeAnalyzeLSQUsage();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_HANDSHAKEANALYZELSQUSAGE_H

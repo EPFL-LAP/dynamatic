@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 #define GEN_PASS_DECL_HANDSHAKEREMOVEUNUSEDMEMREFS

@@ -31,6 +31,14 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEREPLACEMEMORYINTERFACES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
+
 namespace {
 
 /// Replaces memory interfaces in all Handshake functions in the module
@@ -230,9 +238,4 @@ void HandshakeReplaceMemoryInterfacesPass::replaceMemCompletionSignal(
 
   auto [idx, _] = *oprdIt;
   endOp->setOperand(idx, newDone);
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeReplaceMemoryInterfaces() {
-  return std::make_unique<HandshakeReplaceMemoryInterfacesPass>();
 }

@@ -18,7 +18,6 @@
 //   wrapper around it to manage access to the share operation.
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/ResourceSharing/Crush.h"
 #include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"

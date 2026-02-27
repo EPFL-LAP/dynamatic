@@ -15,15 +15,4 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_HANDSHAKEREPLACEMEMORYINTERFACES
-#define GEN_PASS_DEF_HANDSHAKEREPLACEMEMORYINTERFACES
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass>
-createHandshakeReplaceMemoryInterfaces();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_HANDSHAKEREPLACEMEMORYINTERFACES_H

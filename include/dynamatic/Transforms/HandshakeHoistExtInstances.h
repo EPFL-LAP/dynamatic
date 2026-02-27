@@ -15,14 +15,4 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_HANDSHAKEHOISTEXTINSTANCES
-#define GEN_PASS_DEF_HANDSHAKEHOISTEXTINSTANCES
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeHoistExtInstances();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_HANDSHAKEHOISTEXTINSTANCES

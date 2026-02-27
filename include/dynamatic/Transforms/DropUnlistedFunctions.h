@@ -10,11 +10,4 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/IR/Attributes.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_DROPUNLISTEDFUNCTIONS
-#include "dynamatic/Transforms/Passes.h.inc"
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORM_DROPUNLISTEDFUNCTIONS_H

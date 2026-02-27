@@ -17,11 +17,6 @@
 #include "dynamatic/Support/LLVM.h"
 
 namespace dynamatic {
-
-#define GEN_PASS_DECL_HANDSHAKEINFERBASICBLOCKS
-#define GEN_PASS_DEF_HANDSHAKEINFERBASICBLOCKS
-#include "dynamatic/Transforms/Passes.h.inc"
-
 /// Tries to infer the logical basic block of an operation by looking at the
 /// basic block to which the operation's predecessors and successors belong to.
 /// In case the inference logic produces a different basic block between
@@ -32,9 +27,6 @@ namespace dynamatic {
 /// otherwise, it is undefined. Note that the function never sets the basic
 /// block attribute on the operation.
 LogicalResult inferLogicBB(Operation *op, unsigned &logicBB);
-
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeInferBasicBlocksPass();
-
 } // namespace dynamatic
 
 #endif // DYNAMATIC_TRANSFORMS_INFERBASICBLOCKS_H

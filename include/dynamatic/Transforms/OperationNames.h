@@ -20,18 +20,4 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_NAMEALLOPERATIONS
-#define GEN_PASS_DEF_NAMEALLOPERATIONS
-#define GEN_PASS_DECL_REMOVEOPERATIONNAMES
-#define GEN_PASS_DEF_REMOVEOPERATIONNAMES
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createNameAllOperations();
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-createRemoveOperationNames();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_OPERATIONNAMES_H

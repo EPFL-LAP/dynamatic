@@ -29,7 +29,6 @@ def ArithReduceStrength : DynamaticPass<"arith-reduce-strength"> {
     circuit performance and reduce the area corresponding to arithmetic
     operations present in the circuit.
   }];
-  let constructor = "dynamatic::createArithReduceStrength()";
   let options =
     [Option<"maxAdderDepthMul", "max-adder-depth-mul", "unsigned", "3",
             "The maximum number of adders that can be chained one after the "
@@ -50,7 +49,6 @@ def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
     the std level usually has one less basic block than the original for loop
     would have had, which ultimately reduces the area of the final circuit.
   }];
-  let constructor = "dynamatic::createScfRotateForLoops()";
 }
 
 def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
@@ -73,7 +71,6 @@ def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
         if applicable, the value used as one of the operands of the arithmetic
         operation.
   }];
-  let constructor = "dynamatic::createScfSimpleIfToSelect()";
 }
 
 //===----------------------------------------------------------------------===//
@@ -89,7 +86,6 @@ def FuncMaximizeSSA : Pass<"func-maximize-ssa", "::mlir::func::FuncOp"> {
     semantics. The pass achieves this by adding block arguments wherever
     necessary to forward values to the block(s) where they are used.
   }];
-  let constructor = "dynamatic::createFuncMaximizeSSA()";
 }
 
 def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
@@ -99,7 +95,6 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
     the default argument names given by Polygeist to all function arguments with
     the actual ones used in the source code.
   }];
-  let constructor = "dynamatic::createFuncSetArgNames()";
   let options =
     [Option<"source", "source", "std::string", "",
             "Path to source C file from which the IR was generated.">];
@@ -124,7 +119,6 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
-  let constructor = "dynamatic::createHandshakeAnalyzeLSQUsage()";
 }
 
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
@@ -135,7 +129,6 @@ def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
     status i.e., it inserts forks and sinks as needed to compensate for changes
     made to the IR.
   }];
-  let constructor = "dynamatic::createHandshakeCanonicalize()";
 }
 
 def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> {
@@ -146,7 +139,6 @@ def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> 
     functions. This is the equivalent of moving RTL modules from inside the
     Handshake function to outside of it.       
   }];
-  let constructor = "dynamatic::createHandshakeHoistExtInstances()";
 }
 
 def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
@@ -160,7 +152,6 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
     `dynamatic::BB_ATTR_NAME` on the operation. This pass does not fail, even
     when it does not manage to infer the basic block of all operations.
   }];
-  let constructor = "dynamatic::createHandshakeInferBasicBlocksPass()";
 }
 
 def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
@@ -186,7 +177,6 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
     reduction, considering the specific semantics of all operations present at
     the Handhsake level.
   }];
-  let constructor = "dynamatic::createHandshakeOptimizeBitwidths()";
 }
 
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
@@ -199,7 +189,6 @@ def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
     attention to not create duplicated constants indirectly due to the
     minimization process.
   }];
-  let constructor = "dynamatic::createHandshakeMinimizeCstWidth()";
   let options =
     [Option<"optNegatives", "opt-negatives", "bool", "false",
             "If true, allows bitwidth optimization of negative values.">];
@@ -222,7 +211,6 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
-  let constructor = "dynamatic::createHandshakeReplaceMemoryInterfaces()";
 }
 
 def HandshakeRemoveUnusedMemRefs : Pass<
@@ -246,8 +234,6 @@ def HandshakeSetBufferingProperties :
     as the latter reads these properties and ensures that the buffer placement
     it yields honors them.
   }];
-  let constructor =
-    "dynamatic::buffer::createHandshakeSetBufferingProperties()"; 
   let options =
     [Option<"version", "version", "std::string", "\"fpga20\"",
             "Set of buffering properties to apply. Options are: fpga20 "
@@ -352,8 +338,7 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
     badly formatted or if a referenced operation/operand cannot be found in the
     IR.
   }];
-  let constructor = "dynamatic::createBackAnnotate()";
-    let options =
+  let options =
     [Option<"filepath", "filepath", "std::string", "\"\"",
             "Path to JSON-formatted back-annotation file">];
 }
@@ -367,7 +352,6 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
     attribute on all memory operations in the IR. Exactly one of the two pass
     options should be provided at the same time.
   }];
-  let constructor = "dynamatic::createForceMemoryInterface()";
   let options = [
     Option<"forceLSQ", "force-lsq", "bool", "false",
       "Whether to force the placement of LSQs in the circuit after Handshake "
@@ -402,7 +386,6 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
     the corresponding dimension is a power-of-2), this pass also simplify them
     to shifts.
   }];
-  let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
 }
 
 def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
@@ -425,7 +408,6 @@ def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
     The pass will fail if MLIR's polyhedral analysis infrastructure fails to
     check for a dependence between two affine accesses.
   }];
-  let constructor = "dynamatic::createMarkMemoryDependencies()";
 }
 
 def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
@@ -446,7 +428,6 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
     access depends on any other. If no such attributes are present it is assumed
     that there are no memory dependencies.  
   }];
-  let constructor = "dynamatic::createMarkMemoryInterfaces()";
 }
 
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
@@ -455,7 +436,6 @@ def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
     Uses our name analysis infrastructure to give a unique name to each
     operation in the IR, which is attached as an attribute to each operation.
   }];
-  let constructor = "dynamatic::createNameAllOperations()";
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
@@ -468,7 +448,6 @@ def PushConstants : DynamaticPass<"push-constants"> {
     constant definitions if they have users in multiple blocks. It will also
     delete the original operation if it is not used within its defining block.
   }];
-  let constructor = "dynamatic::createPushConstantsPass()";
 }
 
 def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
@@ -480,7 +459,6 @@ def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
     checked by the verifier (i.e., this pass may be ran after the pass under
     test to remove all names).
   }];
-  let constructor = "dynamatic::createRemoveOperationNames()";
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
@@ -492,7 +470,6 @@ def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
     about. This simply removes them (avoid having to pass the
     --allow-unregistered-dialect flag to all optimizer invokations).
   }];
-  let constructor = "dynamatic::createRemovePolygeistAttributes()";
 }
 
 // Remark: this is an example where the implicit name analysis in DynamaticPass

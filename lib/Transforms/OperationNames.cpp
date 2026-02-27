@@ -10,11 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/OperationNames.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
 using namespace dynamatic;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_NAMEALLOPERATIONS
+#define GEN_PASS_DEF_REMOVEOPERATIONNAMES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 namespace {
 
@@ -46,12 +54,3 @@ struct RemoveOperationNamesPass
 };
 
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createNameAllOperations() {
-  return std::make_unique<NameAllOperationsPass>();
-}
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createRemoveOperationNames() {
-  return std::make_unique<RemoveOperationNamesPass>();
-}

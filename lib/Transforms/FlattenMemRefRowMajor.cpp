@@ -17,7 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/FlattenMemRefRowMajor.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
@@ -35,6 +34,14 @@
 
 using namespace mlir;
 using namespace dynamatic;
+
+// [START Boiler-plate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_FLATTENMEMREFROWMAJOR
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boiler-plate code for the MLIR pass]
 
 static inline bool isUniDimensional(MemRefType memref) {
   return memref.getShape().size() == 1;
@@ -405,6 +412,7 @@ struct FlattenMemRefRowMajorPass
     : public dynamatic::impl::FlattenMemRefRowMajorBase<
           FlattenMemRefRowMajorPass> {
 public:
+  using FlattenMemRefRowMajorBase::FlattenMemRefRowMajorBase;
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -441,9 +449,3 @@ public:
 };
 
 } // namespace
-
-namespace dynamatic {
-std::unique_ptr<dynamatic::DynamaticPass> createFlattenMemRefRowMajorPass() {
-  return std::make_unique<FlattenMemRefRowMajorPass>();
-}
-} // namespace dynamatic

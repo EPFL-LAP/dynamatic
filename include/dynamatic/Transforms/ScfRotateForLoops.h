@@ -16,14 +16,4 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
-namespace dynamatic {
-
-#define GEN_PASS_DECL_SCFFORLOOPROTATION
-#define GEN_PASS_DEF_SCFFORLOOPROTATION
-#include "dynamatic/Transforms/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createScfRotateForLoops();
-
-} // namespace dynamatic
-
 #endif // DYNAMATIC_TRANSFORMS_SCFFORLOOPROTATION_H
