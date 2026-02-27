@@ -294,8 +294,12 @@ INSTANTIATE_TEST_SUITE_P(
       "test_loop_free",
       "test_bitint",
       "test_int16",
+<<<<<<< HEAD
       "test_double",
       "unused_arg"
+=======
+      "test_double"
+>>>>>>> feat/ziad/milp
       ),
       [](const auto &info) { return info.param; });
 

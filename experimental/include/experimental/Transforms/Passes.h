@@ -16,6 +16,15 @@
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+<<<<<<< HEAD
+=======
+#include "experimental/Transforms/HandshakeCombineSteeringLogic.h"
+#include "experimental/Transforms/HandshakePlaceBuffersCustom.h"
+#include "experimental/Transforms/HandshakeStraightToQueue.h"
+#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
+#include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
+#include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
+>>>>>>> feat/ziad/milp
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {

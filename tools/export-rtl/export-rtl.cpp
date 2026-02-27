@@ -11,6 +11,7 @@
 // necessary).
 //
 //===----------------------------------------------------------------------===//
+#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -107,9 +108,9 @@ struct DenseMapInfo<std::pair<std::string, bool>> {
            (static_cast<unsigned>(p.second) << 1);
   }
 
-  static bool isEqual(const std::pair<std::string, bool> &lhs,
-                      const std::pair<std::string, bool> &rhs) {
-    return lhs == rhs;
+  static bool isEqual(const std::pair<std::string, bool> &LHS,
+                      const std::pair<std::string, bool> &RHS) {
+    return LHS == RHS;
   }
 };
 } // namespace llvm
@@ -448,8 +449,10 @@ void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
   auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
                            PortType dir) -> void {
     for (auto &[portName, portType] : io) {
-      const bool toPrint =
-          hdl != HDL::SMV ? true : portName != CLK_PORT && portName != RST_PORT;
+      const bool toPrint = hdl != HDL::SMV
+                               ? true
+                               : portName != dynamatic::hw::CLK_PORT &&
+                                     portName != dynamatic::hw::RST_PORT;
       if (toPrint) {
         writeDeclaration(portName, dir, portType, os);
         if (--numIOLeft != 0)
@@ -640,8 +643,8 @@ void WriteModData::writeSignalAssignments(
                           type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          if (inputPortName.str() != CLK_PORT &&
-              inputPortName.str() != RST_PORT)
+          if (inputPortName.str() != dynamatic::hw::CLK_PORT &&
+              inputPortName.str() != dynamatic::hw::RST_PORT)
             writeAssignment(internalSignalName, inputPortName, os);
         });
   }
@@ -1372,8 +1375,8 @@ void SMVWriter::constructIOMappings(
           addExtraSignals(port, signalName, type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          if (getSignalName(port).first != CLK_PORT &&
-              getSignalName(port).first != RST_PORT)
+          if (getSignalName(port).first != dynamatic::hw::CLK_PORT &&
+              getSignalName(port).first != dynamatic::hw::RST_PORT)
             mappings[getSignalName(port)].push_back(signalName);
         });
   };
