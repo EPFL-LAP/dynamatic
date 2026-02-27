@@ -21,13 +21,13 @@
 using namespace mlir;
 using namespace dynamatic;
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_PUSHCONSTANTS
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 /// Pushes all of a function's constants in blocks using them.
 static LogicalResult pushConstants(func::FuncOp funcOp, MLIRContext *ctx) {

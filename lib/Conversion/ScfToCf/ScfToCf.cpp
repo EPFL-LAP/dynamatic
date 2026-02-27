@@ -27,13 +27,13 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_SCFTOCF
 #include "dynamatic/Conversion/Passes.h.inc"
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;

@@ -16,7 +16,7 @@
 using namespace mlir;
 using namespace dynamatic;
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 // Boilerplate: Include this for the pass option defintitions
 namespace dynamatic {
@@ -25,7 +25,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_DROPUNLISTEDFUNCTIONS
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 struct DropUnlistedFunctionsPass

@@ -24,7 +24,7 @@
 #include "llvm/Support/Debug.h"
 #include <cassert>
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 namespace experimental {
@@ -32,7 +32,7 @@ namespace experimental {
 #include "experimental/Transforms/Passes.h.inc"
 } // namespace experimental
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;

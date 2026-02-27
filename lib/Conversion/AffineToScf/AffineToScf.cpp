@@ -34,13 +34,13 @@ using namespace mlir::vector;
 using namespace mlir::affine;
 using namespace dynamatic;
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_AFFINETOSCF
 #include "dynamatic/Conversion/Passes.h.inc"
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 

@@ -37,7 +37,7 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::speculation;
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 namespace experimental {
@@ -45,7 +45,7 @@ namespace experimental {
 #include "experimental/Transforms/Passes.h.inc"
 } // namespace experimental
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 

@@ -30,13 +30,13 @@
 using namespace mlir;
 using namespace dynamatic;
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEHOISTEXTINSTANCES
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 static bool isIntrinsic(handshake::FuncOp funcOp) {
   return funcOp.getNameAttr().strref().starts_with("__");

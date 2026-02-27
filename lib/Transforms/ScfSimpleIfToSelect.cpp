@@ -18,13 +18,13 @@
 
 using namespace mlir;
 
-// [START Boiler-plate code for the MLIR pass]
+// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_SCFSIMPLEIFTOSELECT
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
-// [END Boiler-plate code for the MLIR pass]
+// [END Boilerplate code for the MLIR pass]
 
 /// If the block is made up of two operations (op + yield), determines whether
 /// it has the right structure and whether the first operation is supported by
