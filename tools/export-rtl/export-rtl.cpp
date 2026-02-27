@@ -137,7 +137,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -160,7 +160,7 @@ struct FormalPropertyInfo {
   StringRef outputPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath){};
+      : table(table), outputPath(outputPath) {};
 };
 } // namespace
 
@@ -264,6 +264,8 @@ struct WriteModData {
   /// Writes the module's internal signal declarations.
   void writeSignalDeclarations(SignalDeclarationWriter writeDeclaration);
 
+  void writeStallAssertion();
+
   using SignalAssignmentWriter = void (*)(const llvm::Twine &dst,
                                           const llvm::Twine &src,
                                           raw_indented_ostream &os);
@@ -333,7 +335,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
-      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl){};
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -517,6 +519,44 @@ void WriteModData::writeSignalDeclarations(
                                ? getRawType(intType)
                                : convertToInclusiveArrayBound(intType),
                            os);
+        });
+  }
+}
+
+void WriteModData::writeStallAssertion() {
+  auto isNotBlockArg = [](auto valAndName) -> bool {
+    return !isa<BlockArgument>(valAndName.first);
+  };
+
+  for (auto &valueAndName : make_filter_range(signals, isNotBlockArg)) {
+    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
+        .Case<ChannelType>([&](ChannelType channelType) {
+          // [START REMOVE THIS]
+          std::string name = valueAndName.second;
+          os << "process(clk)\n";
+          os << "begin\n";
+          os << llvm::formatv(
+              "assert not ({0} = '1' and {1} = '0' and rst = '0') report "
+              "\"Stall in channel {0} -> {1}\" "
+              "severity note;\n",
+              getInternalSignalName(name, SignalType::VALID),
+              getInternalSignalName(name, SignalType::READY));
+          os << "end process;\n";
+          // [END REMOVE THIS]
+        })
+        .Case<ControlType>([&](auto type) {
+          // [START REMOVE THIS]
+          std::string name = valueAndName.second;
+          os << "process(clk)\n";
+          os << "begin\n";
+          os << llvm::formatv(
+              "assert not ({0} = '1' and {1} = '0' and rst = '0') report "
+              "\"Stall in channel {0} -> {1}\" "
+              "severity note;\n",
+              getInternalSignalName(name, SignalType::VALID),
+              getInternalSignalName(name, SignalType::READY));
+          os << "end process;\n";
+          // [END REMOVE THIS]
         });
   }
 }
@@ -865,6 +905,8 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   os << "\nbegin\n\n";
   os.indent();
 
+  data.writeStallAssertion();
+
   // Architecture implementation
   data.writeSignalAssignments(
       [](const llvm::Twine &dst, const llvm::Twine &src,
@@ -980,7 +1022,6 @@ LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
   if (failed(createInternalSignals(data)))
     return failure();
 
-  os << "`timescale 1ns / 1ps\n\n";
   os << "module " << modOp.getSymName() << "(\n";
 
   os.indent();
@@ -1257,30 +1298,17 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                                      propertyTag};
     } else if (auto *p =
                    llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
-      auto sentStates = p->getSentStateNamers();
-      unsigned numOut = sentStates.size();
+      unsigned numOut = p->getNumEagerForkOutputs();
+      std::string opName = p->getOwner();
       std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
-        outNames[i] = sentStates[i].getSMVName();
+        outNames[i] = llvm::formatv("{0}.sent_{1}", opName, i);
       }
       std::string propertyString =
           llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
               .str();
       // e.g. count(fork0.sent_0, fork0.sent_1) < 2
       // for operation "fork0" with 2 eager outputs
-      data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
-                   property.get())) {
-      std::vector<std::string> forkOutNames(0);
-      for (auto [i, sentState] : llvm::enumerate(p->getSentStateNamers())) {
-        forkOutNames.push_back(sentState.getSMVName());
-      }
-      auto copiedSlot = p->getCopiedSlot();
-      std::string bufferFull = copiedSlot.getSMVName();
-      std::string propertyString =
-          llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
-                        bufferFull)
-              .str();
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";

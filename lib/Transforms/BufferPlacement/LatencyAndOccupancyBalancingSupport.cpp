@@ -13,8 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/LLVM.h"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graph_utility.hpp>
@@ -44,8 +46,8 @@ namespace dynamatic {
 ///=== RECONVERGENT PATH FINDER ===///
 
 std::string ReconvergentPathFinderGraph::getNodeLabel(NodeIdType nodeId) const {
-  std::string opName = nodes[nodeId].op->getName().getStringRef().str();
-  return opName + "\\nStep: " + std::to_string(getNodeStep(nodeId));
+  auto opName = nodes[nodeId].op->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  return opName.str() + "\\nStep: " + std::to_string(getNodeStep(nodeId));
 }
 
 std::string ReconvergentPathFinderGraph::getNodeDotId(NodeIdType nodeId) const {

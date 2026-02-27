@@ -63,7 +63,18 @@ static double getUnitLatency(Operation *unit, const TimingDatabase &timingDB,
   double latency = 0.0;
   if (failed(
           timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod))) {
+    if (isa<handshake::LoadOp>(unit)) {
+      auto opName = unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+      // LLVM_DEBUG(llvm::errs() << "Load Operation Latency: " << latency << " for " << opName.str() << "\n");
+      llvm::errs() << "Getting latency for load operation failed! For " << opName.str() << "\n";
+    }
     return 0.0;
+  }
+
+  if (isa<handshake::LoadOp>(unit)) {
+    auto opName = unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+    // LLVM_DEBUG(llvm::errs() << "Load Operation Latency: " << latency << " for " << opName.str() << "\n");
+    llvm::errs() << "Load Operation Latency: " << latency << " for " << opName.str() << "\n";
   }
 
   return latency;
@@ -79,9 +90,13 @@ static unsigned getChannelBitwidth(Value channel) {
 /// In our case, this is the case for LSQ-connected loads/stores.
 static bool hasVariableLatency(Operation *unit) {
   if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
+
     auto memOp = findMemInterface(loadOp.getAddress());
-    if (isa_and_present<handshake::LSQOp>(memOp))
+    if (isa_and_present<handshake::LSQOp>(memOp)) {
+      auto opName = unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+      LLVM_DEBUG(llvm::errs() << "Found unit with variable latency: " << opName.str() << "\n");
       return true;
+    }
   }
 
   if (auto storeOp = dyn_cast<handshake::StoreOp>(unit)) {
@@ -1027,6 +1042,8 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
       ReconvergentPathFinderGraph graph;
       graph.buildGraphFromSequence(funcInfo.funcOp, sequence);
       auto paths = graph.findReconvergentPaths();
+      ReconvergentPathFinderGraph::GraphPathsForDumping graphPaths = { &graph, paths };
+      graph.dumpAllReconvergentPaths(graphPaths, "reconvergent_graph_" + std::to_string(seqIdx) + ".dot");
 
       if (!paths.empty()) {
         /// Filter out duplicate fork/join pairs we've already seen
