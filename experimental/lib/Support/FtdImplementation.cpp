@@ -46,7 +46,8 @@ constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 
 /// Identify the block that has muxCondition as its terminator condition
 /// Note that it is not necessarily the same block defining the muxCondition
-static Block *returnMuxConditionBlock(Value muxCondition, const ftd::BlockIndexing &bi) {
+static Block *returnMuxConditionBlock(Value muxCondition,
+                                      const ftd::BlockIndexing &bi) {
   Block *muxConditionBlock = nullptr;
 
   while (!muxConditionBlock) {
@@ -55,7 +56,7 @@ static Block *returnMuxConditionBlock(Value muxCondition, const ftd::BlockIndexi
       Block *userBlock = userOp->getBlock();
 
       if ((isa_and_nonnull<cf::CondBranchOp>(userOp) ||
-          isa_and_nonnull<handshake::ConditionalBranchOp>(userOp)) &&
+           isa_and_nonnull<handshake::ConditionalBranchOp>(userOp)) &&
           !(userOp->hasAttr(FTD_OP_TO_SKIP))) {
         if (!muxConditionBlock || bi.isLess(userBlock, muxConditionBlock)) {
           muxConditionBlock = userBlock;
@@ -63,15 +64,15 @@ static Block *returnMuxConditionBlock(Value muxCondition, const ftd::BlockIndexi
       }
     }
 
-    // If no valid target block was found among the users, attempt to trace 
+    // If no valid target block was found among the users, attempt to trace
     // backward through the suppression branch, if it exists.
     if (!muxConditionBlock) {
       Operation *defOp = muxCondition.getDefiningOp();
       if (defOp && isa_and_nonnull<handshake::ConditionalBranchOp>(defOp) &&
           defOp->hasAttr(FTD_OP_TO_SKIP)) {
-          muxCondition = defOp->getOperand(1);
+        muxCondition = defOp->getOperand(1);
       } else {
-        break; 
+        break;
       }
     }
   }
@@ -686,8 +687,8 @@ static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
 }
 
 static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
-                                          CFGLoopInfo &li,
-                                          const ftd::BlockIndexing &bi) {
+                                                 CFGLoopInfo &li,
+                                                 const ftd::BlockIndexing &bi) {
 
   // Get the boolean expression associated to the block exit
   BoolExpression *blockCond =
@@ -1024,7 +1025,7 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
 }
 
 /// Main entry point of distribution logic.
-static void buildDistributionNetwork(PatternRewriter &rewriter, 
+static void buildDistributionNetwork(PatternRewriter &rewriter,
                                      const ftd::LocalCFG &lcfg,
                                      const ftd::BlockIndexing &bi,
                                      SignalRegistry &registry) {
@@ -1034,7 +1035,6 @@ static void buildDistributionNetwork(PatternRewriter &rewriter,
   std::map<std::string, std::vector<VariableRequirement>> varNeeds;
   std::function<void(Block *, PathContext)> collect = [&](Block *curr,
                                                           PathContext path) {
-
     // Stop recursion if reaching the consumer or the sink block
     if (curr == lcfg.newCons || curr == lcfg.sinkBB)
       return;
@@ -1064,7 +1064,8 @@ static void buildDistributionNetwork(PatternRewriter &rewriter,
         falsePath.push_back({var, false});
         collect(condBr.getFalseDest(), falsePath);
       } else {
-        llvm::errs() << "[FTD ERROR] CondBranchOp encountered with empty condition variable at block " 
+        llvm::errs() << "[FTD ERROR] CondBranchOp encountered with empty "
+                        "condition variable at block "
                      << origBlock << ". Successors will not be traversed.\n";
       }
     } else {
@@ -1319,9 +1320,11 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 
 /// Constructs a NEW LocalCFG that represents the Decision Graph.
 /// \param rawGraph The source LocalCFG.
-/// \param dependencies The set of blocks (from rawGraph) that are relevant decision nodes.
-/// \param muxConstraints A map {Block* -> bool} enforcing specific values for blocks.
-///                       If a block is in this map, the branch corresponding to !value is wired to Sink.
+/// \param dependencies The set of blocks (from rawGraph) that are relevant
+/// decision nodes.
+/// \param muxConstraints A map {Block* -> bool} enforcing specific values for
+/// blocks. If a block is in this map, the branch corresponding to !value is
+/// wired to Sink.
 static std::unique_ptr<ftd::LocalCFG>
 buildDecisionGraph(const ftd::LocalCFG &rawGraph,
                    const DenseSet<Block *> &dependencies,
@@ -1455,7 +1458,7 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph,
       // If this block has a constraint, wire the invalid path to Sink.
       if (muxConstraints.count(oldBlock)) {
         bool requiredVal = muxConstraints.lookup(oldBlock);
-        if (requiredVal) { 
+        if (requiredVal) {
           // Require True -> Wire False to Sink
           newFalse = newL->sinkBB;
         } else {
@@ -1527,7 +1530,7 @@ static void insertDirectSuppression(
   bool deliverToGamma = llvm::isa<handshake::MuxOp>(consumer) &&
                         consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
                         (producerBlock != consumerBlock ||
-                        connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_MU));
+                         connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_MU));
 
   if (debuglog) {
     out << "[FTD] Producer block: ";
@@ -1589,7 +1592,8 @@ static void insertDirectSuppression(
       }
     }
 
-    // 2. Update dominatorBlock to be the block defining the condition of the last Mux
+    // 2. Update dominatorBlock to be the block defining the condition of the
+    // last Mux
     Value finalCondition = lastMuxInChain->getOperand(0);
     dominatorBlock = returnMuxConditionBlock(finalCondition, bi);
   }
@@ -1611,7 +1615,8 @@ static void insertDirectSuppression(
   DenseSet<Block *> locConsControlDepsTmp =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
 
-  // Map to store specific requirements for Mux Conditions (LocalBlock -> RequiredValue)
+  // Map to store specific requirements for Mux Conditions (LocalBlock ->
+  // RequiredValue)
   DenseMap<Block *, bool> muxConstraints;
   SignalRegistry registry;
   rewriter.setInsertionPointToStart(consumer->getBlock());
@@ -1627,14 +1632,14 @@ static void insertDirectSuppression(
       bool requiredVal = true;
 
       // Check how the connection enters the current Mux
-      // If operand(0) == currentConnection, it is the condition input. 
-      // In that case, isDataInput remains false, and we simply traverse 
+      // If operand(0) == currentConnection, it is the condition input.
+      // In that case, isDataInput remains false, and we simply traverse
       // to the output to find the next mux in the chain.
       if (!(currentMuxOp->getOperand(0) == currentConnection)) {
         if (currentMuxOp->getOperand(1) == currentConnection) {
           // Input 1 is the FALSE input
           isDataInput = true;
-          requiredVal = false; 
+          requiredVal = false;
         } else if (currentMuxOp->getOperand(2) == currentConnection) {
           // Input 2 is the TRUE input
           isDataInput = true;
@@ -1645,7 +1650,8 @@ static void insertDirectSuppression(
       if (isDataInput) {
         if (debuglog) {
           out << "[MUX] Mux Condition Block: ";
-          Block *muxConditionBlock = returnMuxConditionBlock(currentMuxOp->getOperand(0), bi);
+          Block *muxConditionBlock =
+              returnMuxConditionBlock(currentMuxOp->getOperand(0), bi);
           if (muxConditionBlock)
             muxConditionBlock->printAsOperand(out);
           else
@@ -1653,9 +1659,9 @@ static void insertDirectSuppression(
           out << "\n";
 
           if (!requiredVal) {
-             out << "      Negated : (false input Selected)\n";
-           } else {
-             out << "      Original: (true input Selected)\n";
+            out << "      Negated : (false input Selected)\n";
+          } else {
+            out << "      Original: (true input Selected)\n";
           }
         }
         // 1. Get the condition value driving this Mux
@@ -1664,7 +1670,7 @@ static void insertDirectSuppression(
         // Trace back through suppression branches
         // to find the original source of the condition signal.
         while (Operation *defOp = muxCondition.getDefiningOp()) {
-          if (llvm::isa<handshake::ConditionalBranchOp>(defOp) && 
+          if (llvm::isa<handshake::ConditionalBranchOp>(defOp) &&
               defOp->hasAttr(FTD_OP_TO_SKIP)) {
             // Move up to the data input of the branch
             muxCondition = defOp->getOperand(1);
@@ -1678,7 +1684,8 @@ static void insertDirectSuppression(
         Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, bi);
 
         // 3. Find the corresponding Block in the Local CFG
-        // Since locGraph->origMap maps Local->Original, we iterate to reverse lookup.
+        // Since locGraph->origMap maps Local->Original, we iterate to reverse
+        // lookup.
         Block *condBlockLocal = nullptr;
         for (auto it : locGraph->origMap) {
           if (it.second == muxConditionBlock) {
@@ -1689,9 +1696,10 @@ static void insertDirectSuppression(
 
         // 4. Add to dependencies and record requirement
         if (condBlockLocal) {
-          // Add this block to the dependency set so path enumeration observes it
+          // Add this block to the dependency set so path enumeration observes
+          // it
           locConsControlDepsTmp.insert(condBlockLocal);
-          
+
           // Record the specific value required (True/False) to pass this Mux
           muxConstraints[condBlockLocal] = requiredVal;
         }
@@ -1708,13 +1716,14 @@ static void insertDirectSuppression(
             user->getBlock() == currentMuxOp->getBlock()) {
           // Count how many data inputs use currentResult
           unsigned connectionCount = 0;
-          if (user->getOperand(1) == currentResult) 
+          if (user->getOperand(1) == currentResult)
             connectionCount++;
-          if (user->getOperand(2) == currentResult) 
+          if (user->getOperand(2) == currentResult)
             connectionCount++;
 
-          // We only proceed if at most ONE data input comes from the previous mux.
-          // Otherwise, the user is a temporary MUX which we don't care about.
+          // We only proceed if at most ONE data input comes from the previous
+          // mux. Otherwise, the user is a temporary MUX which we don't care
+          // about.
           if (connectionCount != 2) {
             nextMuxOp = user;
             // Update connection for next iteration
@@ -1726,7 +1735,7 @@ static void insertDirectSuppression(
 
       if (nextMuxOp) {
         if (debuglog) {
-            out << "    -> Found Cascaded Gamma Mux:\n";
+          out << "    -> Found Cascaded Gamma Mux:\n";
         }
         currentMuxOp = nextMuxOp;
       } else {
@@ -1738,14 +1747,16 @@ static void insertDirectSuppression(
   }
 
   // --- Common Logic for Building Suppression ---
-  // If deliverToGamma is true, we use the empty constraints to build the distribution
-  // network (so it covers all paths), but we use the muxConstraints to calculate
-  // the specific suppression condition for this path.
-  // If deliverToGamma is false, muxConstraints will be empty, so both graphs are identical.
+  // If deliverToGamma is true, we use the empty constraints to build the
+  // distribution network (so it covers all paths), but we use the
+  // muxConstraints to calculate the specific suppression condition for this
+  // path. If deliverToGamma is false, muxConstraints will be empty, so both
+  // graphs are identical.
 
   DenseMap<Block *, bool> emptyConstraints;
-  auto fullDecisionGraph = buildDecisionGraph(*locGraph, locConsControlDepsTmp, emptyConstraints);
-  
+  auto fullDecisionGraph =
+      buildDecisionGraph(*locGraph, locConsControlDepsTmp, emptyConstraints);
+
   // Build the distribution network based on the full graph
   buildDistributionNetwork(rewriter, *fullDecisionGraph, bi, registry);
 
@@ -1775,7 +1786,8 @@ static void insertDirectSuppression(
   }
 
   // Build the constrained graph for logic calculation
-  auto decisionGraph = buildDecisionGraph(*fullDecisionGraph, locConsControlDepsTmp, muxConstraints);
+  auto decisionGraph = buildDecisionGraph(
+      *fullDecisionGraph, locConsControlDepsTmp, muxConstraints);
 
   ControlDependenceAnalysis decCDA(*decisionGraph->region);
   DenseSet<Block *> locConsControlDeps =
@@ -1802,26 +1814,32 @@ static void insertDirectSuppression(
   // Suppression Logic between Dominator and Producer
   BoolExpression *fSupDP = BoolExpression::boolZero();
 
-  // If deliverToGamma is true, we must also ensure the path from Gamma Root to Data Source is valid.
-  if (dominatorBlock != producerBlock) {  
+  // If deliverToGamma is true, we must also ensure the path from Gamma Root to
+  // Data Source is valid.
+  if (dominatorBlock != producerBlock) {
     OpBuilder tmpBuilder2(funcOp.getContext());
-    auto locGraphDP = bi.isLess(producerBlock, dominatorBlock) 
-        ? buildLocalCFGRegion(tmpBuilder2, producerBlock, dominatorBlock, bi)
-        : buildLocalCFGRegion(tmpBuilder2, dominatorBlock, producerBlock, bi);
+    auto locGraphDP = bi.isLess(producerBlock, dominatorBlock)
+                          ? buildLocalCFGRegion(tmpBuilder2, producerBlock,
+                                                dominatorBlock, bi)
+                          : buildLocalCFGRegion(tmpBuilder2, dominatorBlock,
+                                                producerBlock, bi);
 
     if (locGraphDP->newCons) {
       // 1. Get dependencies for upstream graph
       ControlDependenceAnalysis dpCDA(*locGraphUp->region);
-      auto dpDepsTmp = dpCDA.getAllBlockDeps()[locGraphUp->newCons].allControlDeps;
+      auto dpDepsTmp =
+          dpCDA.getAllBlockDeps()[locGraphUp->newCons].allControlDeps;
 
       // 2. Build Upstream Decision Graph (No constraints needed)
       DenseMap<Block *, bool> noConstraints;
-      auto decisionGraphDP = buildDecisionGraph(*locGraphDP, dpDepsTmp, noConstraints);
+      auto decisionGraphDP =
+          buildDecisionGraph(*locGraphDP, dpDepsTmp, noConstraints);
 
       // 3. Calculate Upstream Logic
       ControlDependenceAnalysis finalDpCDA(*decisionGraphDP->region);
-      auto dpDeps = finalDpCDA.getAllBlockDeps()[decisionGraphDP->newCons].allControlDeps;
-      
+      auto dpDeps =
+          finalDpCDA.getAllBlockDeps()[decisionGraphDP->newCons].allControlDeps;
+
       BoolExpression *fConsDP = enumeratePaths(*decisionGraphDP, bi, dpDeps);
       // Calculate Upstream Suppress Condition (stored separately)
       fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
@@ -1836,13 +1854,14 @@ static void insertDirectSuppression(
   }
 
   bool hasFSup = (fSup->type != experimental::boolean::ExpressionType::Zero);
-  bool hasFSupDP = (fSupDP->type != experimental::boolean::ExpressionType::Zero);
+  bool hasFSupDP =
+      (fSupDP->type != experimental::boolean::ExpressionType::Zero);
   bool earlyDef = bi.isLess(producerBlock, dominatorBlock);
 
   // If the activation function is not zero, then a suppress block is to be
   // inserted
   if (hasFSup || (hasFSupDP && earlyDef)) {
-    // We use a separate variable so we don't lose track of the 
+    // We use a separate variable so we don't lose track of the
     // original 'connection' value needed for the use-replacement later.
     Value supDataIn = connection;
     Value branchCond = nullptr;
@@ -1857,7 +1876,8 @@ static void insertDirectSuppression(
         llvm::errs() << "\n";
       }
       BDD *bdd = buildBDD(fSup, cofactorList);
-      branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
+      branchCond =
+          bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
     }
 
     // Cascaded Upstream Filter
@@ -1865,9 +1885,10 @@ static void insertDirectSuppression(
       std::set<std::string> blocksDP = fSupDP->getVariables();
       std::vector<std::string> cofactorListDP(blocksDP.begin(), blocksDP.end());
       BDD *bddDP = buildBDD(fSupDP, cofactorListDP);
-      
+
       // Build the Upstream Condition Circuit
-      Value dpBranchCond = bddToCircuit(rewriter, bddDP, consumer->getBlock(), registry, {}, bi);
+      Value dpBranchCond =
+          bddToCircuit(rewriter, bddDP, consumer->getBlock(), registry, {}, bi);
 
       if (earlyDef) {
         // [Case A] Upstream logic filters the DATA path directly.
@@ -1875,9 +1896,9 @@ static void insertDirectSuppression(
         // Data Input: supDataIn (The data itself)
         // Condition: dpBranchCond (from Upstream logic)
         auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(supDataIn.getType()), 
-          dpBranchCond, supDataIn);
-        
+            consumer->getLoc(), ftd::getListTypes(supDataIn.getType()),
+            dpBranchCond, supDataIn);
+
         dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
         // Update: The data feeding the next stage is now the filtered data
@@ -1889,13 +1910,13 @@ static void insertDirectSuppression(
         // Data Input: branchCond (The Downstream suppression signal)
         // Condition: dpBranchCond (from Upstream logic)
         auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(branchCond.getType()), 
-          dpBranchCond, branchCond);
-        
+            consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
+            dpBranchCond, branchCond);
+
         dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
-        // Update 'branchCond': The effective suppression signal is now the result 
-        // of this cascade.
+        // Update 'branchCond': The effective suppression signal is now the
+        // result of this cascade.
         branchCond = dpBranchOp.getFalseResult();
       }
     }
@@ -1904,8 +1925,8 @@ static void insertDirectSuppression(
     Value supDataOut = supDataIn;
     if (branchCond) {
       auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
-          supDataIn);
+          consumer->getLoc(), ftd::getListTypes(connection.getType()),
+          branchCond, supDataIn);
       branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
       supDataOut = branchOp.getFalseResult();
     }
@@ -1921,15 +1942,17 @@ static void insertDirectSuppression(
           consumer->getOperand(0) == connection &&
           use.getOperandNumber() != 0) {
         auto src = rewriter.create<handshake::SourceOp>(consumer->getLoc());
-        auto innerType = connection.getType().cast<handshake::ChannelType>().getDataType();
-        auto attr = rewriter.getIntegerAttr(innerType, (use.getOperandNumber() == 2)); 
+        auto innerType =
+            connection.getType().cast<handshake::ChannelType>().getDataType();
+        auto attr =
+            rewriter.getIntegerAttr(innerType, (use.getOperandNumber() == 2));
         auto cst = rewriter.create<handshake::ConstantOp>(
             consumer->getLoc(), connection.getType(), attr, src.getResult());
         cst->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
         use.set(cst.getResult());
         continue;
       }
-      use.set(supDataOut); 
+      use.set(supDataOut);
     }
   }
 }
@@ -2231,10 +2254,10 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
 
       // Get the condition for the block exiting
       Value conditionValue;
-      
+
       // Determine the gate exit condition
       if (gate->gsaGateFunction == MuGate) {
-        // For MU gates, we generate the condition based on the 
+        // For MU gates, we generate the condition based on the
         // reaching condition from the loop header back to itself.
         OpBuilder tmpBuilder(region.getContext());
         Block *loopHeader = gate->getBlock();
@@ -2247,12 +2270,14 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         DenseSet<Block *> locConsControlDepsTmp =
             locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
         DenseMap<Block *, bool> emptyConstraints;
-        auto decisionGraph = buildDecisionGraph(*locGraph, locConsControlDepsTmp, emptyConstraints);
+        auto decisionGraph = buildDecisionGraph(
+            *locGraph, locConsControlDepsTmp, emptyConstraints);
 
-        // 2. Construct distribution circuit and suppression circuit on distribution
+        // 2. Construct distribution circuit and suppression circuit on
+        // distribution
         SignalRegistry registry;
         buildDistributionNetwork(rewriter, *decisionGraph, bi, registry);
-        
+
         // 3. Control Dependence Analysis on the Decision Graph
         ControlDependenceAnalysis locCDA(*decisionGraph->region);
         auto depsMap = locCDA.getAllBlockDeps();
@@ -2294,17 +2319,16 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
           // cofactors
           BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
           // Convert the boolean expression obtained through BDD to a circuit
-          // We pass an empty registry, since this is not an expression for suppression 
-          // and does not require distribution.
+          // We pass an empty registry, since this is not an expression for
+          // suppression and does not require distribution.
           SignalRegistry emptyRegistry;
-          conditionValue =
-              bddToCircuit(rewriter, bdd, gate->getBlock(), emptyRegistry, {}, bi);
+          conditionValue = bddToCircuit(rewriter, bdd, gate->getBlock(),
+                                        emptyRegistry, {}, bi);
         } else {
-          conditionValue =
-              gate->conditionBlock->getTerminator()->getOperand(0);
+          conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
           // Ensure type consistency (Channel vs i1)
           if (!conditionValue.getType().isa<handshake::ChannelType>())
-             conditionValue.setType(channelifyType(conditionValue.getType()));
+            conditionValue.setType(channelifyType(conditionValue.getType()));
         }
       }
 
