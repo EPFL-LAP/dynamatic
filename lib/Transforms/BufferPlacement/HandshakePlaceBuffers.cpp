@@ -15,6 +15,7 @@
 #include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
@@ -638,6 +639,10 @@ static void insertBufferOpAndOccupancyInCFDFC(
     handshake::BufferOp bufOp, CFDFC &cfdfc, unsigned totalChannelLatency,
     unsigned totalChannelOccupancy, double &remainingTknsToDistribute) {
 
+  auto effectiveCapacity = (bufOp.getBufferType() == BufferType::COUNTER_BUFFER)
+                               ? 1u
+                               : bufOp.getNumSlots();
+
   // When we add a new buffer op, the value remains the same object (now
   // used by a different user). Therefore, we just need to add the newly
   // added operation and channel.
@@ -666,6 +671,7 @@ static void insertBufferOpAndOccupancyInCFDFC(
     // slots; each DV slot holds 2/3 tokens.
     tokensInBufOp =
         (bufOp.getLatencyDV() / totalChannelLatency) * totalChannelOccupancy;
+    tokensInBufOp = fmin(tokensInBufOp, static_cast<double>(effectiveCapacity));
     cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
   } else {
     // Case "#tokens in the channel" => "Total latency of the channel":
@@ -679,22 +685,26 @@ static void insertBufferOpAndOccupancyInCFDFC(
     //
     // In this case, the token must occupy in the 2 DV slots and the last T
     // slot.
+    unsigned latencyDV = bufOp.getLatencyDV();
+    unsigned nonLatencyCapacity =
+        (effectiveCapacity > latencyDV) ? (effectiveCapacity - latencyDV) : 0;
+
     tokensInBufOp =
         // Assign to the slot with DV latency >= 1
-        bufOp.getLatencyDV() +
+        latencyDV +
         // Assign to the slots DV latency = 1. We insert buffers into the
         // CFDFC starting from the channel that is the closest to the receiver,
         // so this function does not need to take care of the order between the
         // slots without DV latency.
-        fmin(bufOp.getNumSlots() - bufOp.getLatencyDV(),
-             remainingTknsToDistribute);
+        fmin(nonLatencyCapacity, remainingTknsToDistribute);
+    tokensInBufOp = fmin(tokensInBufOp, static_cast<double>(effectiveCapacity));
 
     cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
   }
 
   // Sanity check: we should never assign more tokens to the buffer than its
   // buffer slot.
-  assert(tokensInBufOp <= bufOp.getNumSlots() &&
+  assert(tokensInBufOp <= effectiveCapacity &&
          "Should not assign tokens to a buffer more than its slots!");
   remainingTknsToDistribute -= tokensInBufOp;
 }
@@ -714,12 +724,13 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
     // We need to record the list of placed buffers. We will calculate their
     // token occupancy in each CFDFC below.
     SmallVector<handshake::BufferOp, 2> placedBuffers;
-    auto placeBuffer = [&](BufferType bufferType, unsigned numSlots) {
+    auto placeBuffer = [&](BufferType bufferType, unsigned numSlots,
+                           std::optional<int64_t> dvLatency = std::nullopt) {
       if (numSlots == 0)
         return;
 
       auto bufOp = builder.create<handshake::BufferOp>(
-          bufferIn.getLoc(), bufferIn, numSlots, bufferType);
+          bufferIn.getLoc(), bufferIn, numSlots, bufferType, dvLatency);
       placedBuffers.push_back(bufOp);
       inheritBB(opDst, bufOp);
       nameAnalysis.setName(bufOp);
@@ -743,6 +754,16 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
     placeBuffer(BufferType::FIFO_BREAK_NONE, placeRes.numFifoNone);
     for (unsigned int i = 0; i < placeRes.numOneSlotR; i++) {
       placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
+    }
+
+    // Prefer explicit per-instance counter buffer delays when available.
+    for (unsigned delay : placeRes.counterBufferLatencies)
+      placeBuffer(BufferType::COUNTER_BUFFER, /*numSlots=*/1, delay);
+    // Backward-compatible fallback for single counter-buffer encoding.
+    if (placeRes.counterBufferLatencies.empty()) {
+      for (unsigned i = 0; i < placeRes.numCounterBuffer; ++i)
+        placeBuffer(BufferType::COUNTER_BUFFER, /*numSlots=*/1,
+                    /*dvLatency=*/1);
     }
 
     unsigned totalChannelLatency = 0;

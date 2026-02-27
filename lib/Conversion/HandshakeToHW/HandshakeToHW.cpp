@@ -593,8 +593,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
         // Bitwidth
         addType("DATA_TYPE", bufferOp.getOperand());
-
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
+        addUnsigned("DV_LATENCY", bufferOp.getLatencyDV());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
       })
       .Case<handshake::ConditionalBranchOp>(

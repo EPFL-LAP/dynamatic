@@ -227,9 +227,9 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
 
   let arguments = (ins HandshakeType:$operand,
-                        Handshake_BufferTypeAttr:$bufferType,
-                        ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots
-                        );
+                       Handshake_BufferTypeAttr:$bufferType,
+                       ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots,
+                       ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dvLatency);
 
   let results = (outs HandshakeType:$result);
 
@@ -241,6 +241,7 @@ def BufferOp : Handshake_Op<"buffer", [
         case BufferType::FIFO_BREAK_DV:
         case BufferType::SHIFT_REG_BREAK_DV:
         case BufferType::ONE_SLOT_BREAK_DVR:
+        case BufferType::COUNTER_BUFFER:
           return false;
         case BufferType::ONE_SLOT_BREAK_R:
         case BufferType::FIFO_BREAK_NONE:
@@ -249,19 +250,8 @@ def BufferOp : Handshake_Op<"buffer", [
       llvm_unreachable("Unknown BufferType in isBypassDV()");
     }
 
-    int getLatencyDV(){
-      switch (getBufferType()) {
-        case BufferType::ONE_SLOT_BREAK_R:
-        case BufferType::FIFO_BREAK_NONE:
-          return 0;
-        case BufferType::ONE_SLOT_BREAK_DV:
-        case BufferType::FIFO_BREAK_DV:
-        case BufferType::ONE_SLOT_BREAK_DVR:
-          return 1;
-        case BufferType::SHIFT_REG_BREAK_DV:
-          return getNumSlots();
-      }
-      llvm_unreachable("Unknown BufferType in getLatencyDV()");
+    int64_t getLatencyDV() {
+      return (*this)->getAttrOfType<IntegerAttr>("dvLatency").getInt();
     }
   }];
 
@@ -271,12 +261,34 @@ def BufferOp : Handshake_Op<"buffer", [
       ins
         "Value":$operand,
         "int":$numSlots,
-        "::dynamatic::handshake::BufferType":$bufferType
+        "::dynamatic::handshake::BufferType":$bufferType,
+        CArg<"std::optional<int64_t>", "std::nullopt">:$dvLatency
     ), [{
+      int64_t resolvedDvLatency = 0;
+      switch (bufferType) {
+        case BufferType::ONE_SLOT_BREAK_R:
+        case BufferType::FIFO_BREAK_NONE:
+          resolvedDvLatency = 0;
+          break;
+        case BufferType::ONE_SLOT_BREAK_DV:
+        case BufferType::FIFO_BREAK_DV:
+        case BufferType::ONE_SLOT_BREAK_DVR:
+          resolvedDvLatency = 1;
+          break;
+        case BufferType::SHIFT_REG_BREAK_DV:
+          resolvedDvLatency = numSlots;
+          break;
+        case BufferType::COUNTER_BUFFER:
+          resolvedDvLatency = dvLatency.value_or(0);
+          break;
+      }
+
       $_state.addOperands(operand);
       $_state.addTypes(operand.getType());
       $_state.addAttribute("bufferType", ::dynamatic::handshake::BufferTypeAttr::get($_builder.getContext(), bufferType));
       $_state.addAttribute("numSlots", $_builder.getI64IntegerAttr(numSlots));
+      $_state.addAttribute("dvLatency",
+                           $_builder.getI64IntegerAttr(resolvedDvLatency));
     }]>
   ];
 

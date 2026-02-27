@@ -221,22 +221,37 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
 
     PlacementResult result;
 
-    /// Buffer configuration (Paper: Section 6)
+    /// Buffer configuration with COUNTER_BUFFER:
     /// L_c = latencyCycles (extra latency to add)
     /// N_c = numSlots (occupancy/capacity needed)
+    ///
+    /// Counter Buffer Placement Logic:
+    /// - place K counter buffers where K is bounded by both latency and
+    ///   occupancy requirements;
+    /// - distribute total latency across these K buffers so that
+    ///   sum(dvLatency_i) = L_c;
+    /// - add FIFO_BREAK_NONE slots when occupancy requires more pure storage.
     if (latencyCycles == 0 && numSlots > 0) {
       /// Case 1: L=0, N>0 - No latency, just storage
       result.numFifoNone = numSlots;
-    } else if (numSlots > latencyCycles) {
-      /// Case 3: N > L - Need L pipeline stages + (N-L) transparent FIFO slots
-      result.numOneSlotDV = latencyCycles;
-      result.numFifoNone = numSlots - latencyCycles;
-    } else {
-      /// Case 2: L >= N - Need L cycles of latency
-      /// Paper suggests ⌈L/N⌉ latency per slot, but our infrastructure
-      /// uses 1-cycle DV buffers. We use L DV buffers for correctness.
-      /// This provides L cycles latency and L capacity (>= N, so sufficient).
-      result.numOneSlotDV = latencyCycles;
+    } else if (latencyCycles > 0) {
+      /// Case 2/3: L>0
+      unsigned kCounter = std::max(1u, std::min(latencyCycles, numSlots));
+      unsigned baseDelay = latencyCycles / kCounter;
+      unsigned remainder = latencyCycles % kCounter;
+
+      for (unsigned i = 0; i < kCounter; ++i) {
+        unsigned delay = baseDelay + (i < remainder ? 1u : 0u);
+        if (delay > 0)
+          result.counterBufferLatencies.push_back(delay);
+      }
+
+      result.numCounterBuffer = result.counterBufferLatencies.size();
+
+      /// If occupancy requires more one-token buffers than those used to carry
+      /// latency, add transparent slots for pure storage.
+      if (numSlots > kCounter)
+        result.numFifoNone = numSlots - kCounter;
     }
 
     /// For Mux/Merge/ControlMerge on cycles, add break_r for deadlock
@@ -246,12 +261,13 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
                         handshake::ControlMergeOp>(srcOp) &&
         srcOp->getNumOperands() > 1 && isChannelOnCycle(channel)) {
       result.numOneSlotR = 1;
-      if (result.numOneSlotDV == 0)
-        result.numOneSlotDV = 1;
+      if (result.numOneSlotDV == 0 && result.numCounterBuffer == 0)
+        result.counterBufferLatencies.push_back(1);
+      result.numCounterBuffer = result.counterBufferLatencies.size();
     }
 
     if (result.numFifoNone > 0 || result.numOneSlotDV > 0 ||
-        result.numOneSlotR > 0) {
+        result.numOneSlotR > 0 || result.numCounterBuffer > 0) {
       placement[channel] = result;
     }
   }
