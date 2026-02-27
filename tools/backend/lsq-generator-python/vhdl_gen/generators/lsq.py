@@ -910,12 +910,15 @@ class LSQ:
         store_p1_ready = Logic(ctx, 'store_p1_ready', 'w')
 
         if self.configs.pipe1:
-            # load_*_p1 control signals
+            # pipeline register control signals (load_*_p1, store_*_p1)
+            # This implements a pipeline register stage with backpressure and
+            # with a # combinational path from output ready to input ready. We
+            # are ready # for new data if either there is a handshake at the
+            # output (*_hs), # or the register is currently empty (not *_en_p1).
             load_hs = LogicArray(ctx, 'load_hs', 'w', self.configs.numLdMem)
             for w in range(0, self.configs.numLdMem):
                 arch += Op(ctx, load_hs[w], load_en_p1[w], 'and', rreq_ready_i[w])
                 arch += Op(ctx, load_p1_ready[w], load_hs[w], 'or', 'not', load_en_p1[w])
-            # store_*_p1 control signals
             store_hs = Logic(ctx, 'store_hs', 'w')
             arch += Op(ctx, store_hs, store_en_p1, 'and', wreq_ready_i[0])
             arch += Op(ctx, store_p1_ready, store_hs, 'or', 'not', store_en_p1)
