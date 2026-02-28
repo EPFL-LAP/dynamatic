@@ -1354,6 +1354,12 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph,
   newL->containerOp = newContainer;
 
   // 3. Create Blocks & Map
+  // Create a dummy start block that ensures the entry block never has
+  // back-edges.
+  Block *dummyStart = new Block();
+  newRegion.push_back(dummyStart);
+  newL->origMap[dummyStart] = nullptr;
+
   DenseMap<Block *, Block *> oldToNew;
 
   for (Block *oldBlock : rawGraph.topoOrder) {
@@ -1368,7 +1374,7 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph,
         newL->origMap[newBlock] = nullptr;
       }
 
-      // [CRITICAL] Set newProd to the first valid block (TopoOrder)
+      // Set newProd to the first valid block (TopoOrder)
       if (newL->newProd == nullptr) {
         newL->newProd = newBlock;
       }
@@ -1382,12 +1388,12 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph,
     }
   }
 
-  // Fallback for newProd
-  if (newL->newProd == nullptr && !newL->region->empty()) {
-    newL->newProd = &newL->region->front();
+  // Fallback for newProd (unlikely, as newCons/sinkBB are in nodeSet)
+  if (newL->newProd == nullptr && newRegion.getBlocks().size() > 1) {
+    newL->newProd = &newRegion.back();
   }
 
-  // --- 4. Helper: Find Nearest using DFS with Visited Set ---
+  // 4. Helper: Find Nearest using DFS with Visited Set
   auto findNearest = [&](Block *start) -> Block * {
     if (!start)
       return nullptr;
@@ -1409,7 +1415,14 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph,
   };
 
   // 5. Wire the Graph
-  builder.setInsertionPointToStart(&newRegion.front());
+  
+  // Wire the dummy start unconditionally to the true logic entry
+  builder.setInsertionPointToEnd(dummyStart);
+  if (newL->newProd) {
+    builder.create<cf::BranchOp>(loc, newL->newProd);
+  } else {
+    builder.create<func::ReturnOp>(loc);
+  }
 
   for (auto [oldBlock, newBlock] : oldToNew) {
     // Sink Logic: Terminate
@@ -1493,8 +1506,8 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph,
     order.push_back(u);
   };
 
-  if (newL->newProd) {
-    topo(newL->newProd);
+  if (!newRegion.empty()) {
+    topo(&newRegion.front());
     std::reverse(order.begin(), order.end());
     newL->topoOrder = std::move(order);
   }
