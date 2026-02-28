@@ -52,6 +52,7 @@ class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
+class FtdWithSimpleBuffersFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
@@ -88,6 +89,25 @@ TEST_P(CBCSolverFixture, basic) {
   logPerformance(config.simTime);
 }
 #endif // DYNAMATIC_ENABLE_CBC
+
+TEST_P(FtdWithSimpleBuffersFixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .disableLsq = true,
+      .milpSolver = "cbc",
+      .bufferAlgorithm = "on-merges",
+      .useFtd = true,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
 
 #if 0
 TEST_P(FPL22Fixture, basic) {
@@ -313,6 +333,24 @@ INSTANTIATE_TEST_SUITE_P(
       ),
       [](const auto &info) { return info.param; });
 #endif // DYNAMATIC_ENABLE_CBC
+
+// Smoke test: Using the fast token delivery algorithm to compile the circuit.
+INSTANTIATE_TEST_SUITE_P(
+    Tiny, FtdWithSimpleBuffersFixture,
+    testing::Values(
+      // "matvec" // matvec does not work currently
+      "fir",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir",
+      "matvec",
+      "kernel_2mm",
+      "kernel_3mm",
+      "kmp",
+      "gcd",
+      "bicg"
+      ),
+      [](const auto &info) { return info.param; });
 
 #if 0
 // Smoke test: Using the FPL22 placement algorithm to optimize some simple benchmarks
