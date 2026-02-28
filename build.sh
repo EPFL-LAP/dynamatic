@@ -298,7 +298,7 @@ else
         "llvm-b06546b-x86_64-linux-Debug.part-ac" \
         "llvm-b06546b-x86_64-linux-Debug.part-ad" \
         "llvm-b06546b-x86_64-linux-Debug.part-ae" \
-        > llvm-b06546b-x86_64-linux-Debug.tar.gz
+        > $PREBUILT_LLVM_TARBALL
       exit_on_fail "Failed to download the prebuilt llvm-project (debug)!"
     fi
   fi
