@@ -1596,6 +1596,9 @@ static void insertDirectSuppression(
     // last Mux
     Value finalCondition = lastMuxInChain->getOperand(0);
     dominatorBlock = returnMuxConditionBlock(finalCondition, bi);
+    if (bi.isLess(producerBlock, dominatorBlock)) {
+      dominatorBlock = producerBlock;
+    }
   }
 
   if (debuglog && deliverToGamma) {
@@ -1853,83 +1856,42 @@ static void insertDirectSuppression(
     locGraphDP->containerOp->erase();
   }
 
-  bool hasFSup = (fSup->type != experimental::boolean::ExpressionType::Zero);
-  bool hasFSupDP =
-      (fSupDP->type != experimental::boolean::ExpressionType::Zero);
-  bool earlyDef = bi.isLess(producerBlock, dominatorBlock);
-
   // If the activation function is not zero, then a suppress block is to be
   // inserted
-  if (hasFSup || (hasFSupDP && earlyDef)) {
-    // We use a separate variable so we don't lose track of the
-    // original 'connection' value needed for the use-replacement later.
-    Value supDataIn = connection;
-    Value branchCond = nullptr;
-
-    if (hasFSup) {
-      std::set<std::string> blocks = fSup->getVariables();
-      std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
-      if (debuglog) {
-        llvm::errs() << "[CofactorList] ";
-        for (const auto &s : cofactorList)
-          llvm::errs() << s << " ";
-        llvm::errs() << "\n";
-      }
-      BDD *bdd = buildBDD(fSup, cofactorList);
-      branchCond =
-          bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
-    }
+  if (fSup->type != experimental::boolean::ExpressionType::Zero) {
+    std::set<std::string> blocks = fSup->getVariables();
+    std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
+    BDD *bdd = buildBDD(fSup, cofactorList);
+    Value branchCond =
+        bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
 
     // Cascaded Upstream Filter
-    if (hasFSupDP) {
+    if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
       std::set<std::string> blocksDP = fSupDP->getVariables();
       std::vector<std::string> cofactorListDP(blocksDP.begin(), blocksDP.end());
       BDD *bddDP = buildBDD(fSupDP, cofactorListDP);
-
-      // Build the Upstream Condition Circuit
       Value dpBranchCond =
           bddToCircuit(rewriter, bddDP, consumer->getBlock(), registry, {}, bi);
 
-      if (earlyDef) {
-        // [Case A] Upstream logic filters the DATA path directly.
-        // Create an Intermediate Branch on the 'connection' wire.
-        // Data Input: supDataIn (The data itself)
-        // Condition: dpBranchCond (from Upstream logic)
-        auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-            consumer->getLoc(), ftd::getListTypes(supDataIn.getType()),
-            dpBranchCond, supDataIn);
-
-        dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-        // Update: The data feeding the next stage is now the filtered data
-        supDataIn = dpBranchOp.getFalseResult();
-
-      } else {
-        // [Case B] Upstream logic filters the SUPPRESSION SIGNAL.
-        // Create an Intermediate Branch on the 'branchCond' wire.
-        // Data Input: branchCond (The Downstream suppression signal)
-        // Condition: dpBranchCond (from Upstream logic)
-        auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
-            consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
-            dpBranchCond, branchCond);
-
-        dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-        // Update 'branchCond': The effective suppression signal is now the
-        // result of this cascade.
-        branchCond = dpBranchOp.getFalseResult();
-      }
+      // Upstream logic filters the SUPPRESSION SIGNAL.
+      // Create an Intermediate Branch on the 'branchCond' wire.
+      // Data Input: branchCond (The Downstream suppression signal)
+      // Condition: dpBranchCond (from Upstream logic)
+      auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
+          dpBranchCond, branchCond);
+      dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+      branchCond = dpBranchOp.getFalseResult();
     }
 
-    // Final Data Branch
-    Value supDataOut = supDataIn;
-    if (branchCond) {
-      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(connection.getType()),
-          branchCond, supDataIn);
-      branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-      supDataOut = branchOp.getFalseResult();
-    }
+    // We use a separate variable so we don't lose track of the
+    // original 'connection' value needed for the use-replacement later.
+    Value supData = connection;
+    auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+        consumer->getLoc(), ftd::getListTypes(connection.getType()),
+        branchCond, supData);
+    branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+    supData = branchOp.getFalseResult();
 
     // Take into account the possibility of a mux to get the condition input
     // also as data input. In this case, the data input can be optimized to
@@ -1952,7 +1914,7 @@ static void insertDirectSuppression(
         use.set(cst.getResult());
         continue;
       }
-      use.set(supDataOut);
+      use.set(supData);
     }
   }
 }
