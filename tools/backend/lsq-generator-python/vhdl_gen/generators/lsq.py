@@ -890,9 +890,9 @@ class LSQ:
         else:
             # bypass disabled: tie bypass signals low
             for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, bypass_en[i], "'0'")
+                arch += Op(ctx, bypass_en[i], 0)
             for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, bypass_idx_oh_p0[i], "'0'")
+                arch += Op(ctx, bypass_idx_oh_p0[i], 0)
 
         # Pipeline Stage 1
 

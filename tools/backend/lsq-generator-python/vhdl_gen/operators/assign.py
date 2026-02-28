@@ -22,10 +22,7 @@ def Op(ctx: VHDLContext, out, *list_in) -> str:
             str_ret = ctx.get_current_indent() + f'{out[0].getNameWrite(out[1], out[2])} <='
     else:
         str_ret = ctx.get_current_indent() + f'{out.getNameWrite()} <='
-        if (type(out) == Logic):
-            size = 1
-        else:
-            size = out.size
+        size = None if type(out) == Logic else out.size
     for arg in list_in:
         if type(arg) == str:
             str_ret += ' ' + arg
