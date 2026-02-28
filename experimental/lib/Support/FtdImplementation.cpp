@@ -1620,6 +1620,7 @@ static void insertDirectSuppression(
       dominatorBlock->printAsOperand(out);
     out << "\n";
   }
+
   // Create a temporary builder to isolate the LocalCFG creation from the
   // main PatternRewriter. This prevents the rewriter from tracking the
   // temporary operations which are later erased manually.
@@ -1631,11 +1632,9 @@ static void insertDirectSuppression(
   DenseSet<Block *> locConsControlDepsTmp =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
 
-  // Map to store specific requirements for Mux Conditions (LocalBlock ->
+  // Map to store specific constraints for Mux Conditions (LocalBlock ->
   // RequiredValue)
   DenseMap<Block *, bool> muxConstraints;
-  SignalRegistry registry;
-  rewriter.setInsertionPointToStart(consumer->getBlock());
 
   // Logic specific to Gamma delivery to identify Mux dependencies
   if (deliverToGamma) {
@@ -1712,9 +1711,12 @@ static void insertDirectSuppression(
 
         // 4. Add to dependencies and record requirement
         if (condBlockLocal) {
-          // Add this block to the dependency set so path enumeration observes
-          // it
+          // Add this block and its all-dependency blocks to the dependency set so path 
+          // enumeration observes it.
           locConsControlDepsTmp.insert(condBlockLocal);
+          for (Block *dep : locCDA.getAllBlockDeps()[condBlockLocal].allControlDeps) {
+            locConsControlDepsTmp.insert(dep);
+          }
 
           // Record the specific value required (True/False) to pass this Mux
           muxConstraints[condBlockLocal] = requiredVal;
@@ -1762,13 +1764,14 @@ static void insertDirectSuppression(
     }
   }
 
-  // --- Common Logic for Building Suppression ---
+  // Common Logic for Building Suppression.
   // If deliverToGamma is true, we use the empty constraints to build the
   // distribution network (so it covers all paths), but we use the
   // muxConstraints to calculate the specific suppression condition for this
   // path. If deliverToGamma is false, muxConstraints will be empty, so both
   // graphs are identical.
-
+  SignalRegistry registry;
+  rewriter.setInsertionPointToStart(consumer->getBlock());
   DenseMap<Block *, bool> emptyConstraints;
   auto fullDecisionGraph =
       buildDecisionGraph(*locGraph, locConsControlDepsTmp, emptyConstraints);
