@@ -56,6 +56,9 @@ namespace dynamatic {
 } // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
 
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
 #define DEBUG_TYPE "handshake-place-buffers"
 
 static void logFuncInfo(FuncInfo &info);
@@ -76,7 +79,8 @@ struct HandshakePlaceBuffersPass
   /// Trivial field-by-field constructor.
   HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
                             StringRef timingModels, bool firstCFDFC,
-                            double targetCP, unsigned timeout, bool dumpLogs);
+                            double targetCP, unsigned timeout,
+                            bool dumpMILPModels);
 
   /// Use the auto-generated construtors from tblgen
   using HandshakePlaceBuffersBase::HandshakePlaceBuffersBase;
@@ -160,6 +164,7 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   namer.nameAllUnnamedOps();
 
+  // The MILP solving the buffer placement happens here:
   if (algorithm == ON_MERGES) {
     if (failed(placeWithoutUsingMILP()))
       return signalPassFailure();
@@ -443,7 +448,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 
     // Path where to dump the MILP model and solutions, if necessary
     std::string logPath = "";
-    if (dumpLogs)
+    if (dumpMILPModels)
       logPath = "cfdfc" + std::to_string(cfdfcs.size());
 
     // Try to extract the next CFDFC
@@ -523,13 +528,13 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
 
   auto funcName = info.funcOp.getName().str();
 
-  if (dumpLogs) {
+  if (dumpMILPModels) {
     std::filesystem::create_directories(dumpDir);
   }
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
-    if (dumpLogs) {
+    if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
     }
     return solveMILP<fpga20::FPGA20Buffers>(placement, solverKind, timeout,
@@ -549,7 +554,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     // accumulated over all MILPs. It's not possible to override a previous
     // placement decision because each CFDFC union is disjoint from the others
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
-      if (dumpLogs) {
+      if (dumpMILPModels) {
         writeTo = dumpDir + sep + funcName + "-cfunion" + std::to_string(idx);
       }
       if (failed(solveMILP<fpl22::CFDFCUnionBuffers>(
@@ -558,7 +563,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
         return failure();
     }
 
-    if (dumpLogs) {
+    if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-out-of-cycle";
     }
 
@@ -567,7 +572,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
         placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
   }
   if (algorithm == COST_AWARE) {
-    if (dumpLogs) {
+    if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-cost-aware";
     }
     // Create and solve the MILP
@@ -576,7 +581,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
   }
 
   if (algorithm == MAPBUF) {
-    if (dumpLogs) {
+    if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-mapbuf";
     }
     // Create and solve the MILP

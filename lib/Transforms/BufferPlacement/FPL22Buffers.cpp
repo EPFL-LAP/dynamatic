@@ -22,6 +22,9 @@
 #include <iterator>
 #include <optional>
 
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
 #define DEBUG_TYPE "fpl22-buffers"
 
 using namespace llvm::sys;
