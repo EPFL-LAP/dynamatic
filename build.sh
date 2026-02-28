@@ -268,20 +268,45 @@ else
     echo "Please configure the LLVM submodule and run without --use-prebuilt-llvm."
     exit 1
   fi
-  URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
-  PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
 
-  # Download only if the file doesn't exist
-  if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
-      echo "Downloading $PREBUILT_LLVM_TARBALL..."
-      wget -O "$PREBUILT_LLVM_TARBALL" "$URL"
-      exit_on_fail "Failed to download the prebuilt llvm-project!"
+
+  if [[ $BUILD_TYPE == "Release" ]]; then
+    URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
+    PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
+    # Download only if the file doesn't exist
+    if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
+        echo "Downloading $PREBUILT_LLVM_TARBALL..."
+        wget --no-verbose --show-progress -O "$PREBUILT_LLVM_TARBALL" "$URL"
+        exit_on_fail "Failed to download the prebuilt llvm-project (release)!"
+    fi
+  else
+    PREBUILT_LLVM_TARBALL=$(realpath "./llvm-b06546b-x86_64-linux-Debug.tar.gz")
+    if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-aa" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-aa"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ab" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ab"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ac" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ac"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ad" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ad"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ae" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ae"
+      cat \
+        "llvm-b06546b-x86_64-linux-Debug.part-aa" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ab" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ac" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ad" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ae" \
+        > $PREBUILT_LLVM_TARBALL
+      exit_on_fail "Failed to download the prebuilt llvm-project (debug)!"
+    fi
   fi
 
   # untar the file 
   if [ ! -f "$LLVM_DIR/lib/cmake/llvm/AddLLVM.cmake" ]; then
     mkdir -p "$LLVM_DIR"
-    echo "Prebuilt LLVM not found. Unzipping the prebuilt llvm-project!"
+    echo "Prebuilt LLVM directory not found. Unzipping the prebuilt llvm-project!"
     tar -xf "$PREBUILT_LLVM_TARBALL" -C "$LLVM_DIR"
     exit_on_fail "Failed to untar the prebuilt llvm-project!"
   else
