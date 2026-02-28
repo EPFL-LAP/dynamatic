@@ -868,9 +868,10 @@ class LSQ:
         arch += Op(ctx, store_idx, stq_issue)
 
         # Bypass
-        bypass_en = LogicArray(ctx, 'bypass_en', 'w', self.configs.numLdqEntries)
         bypass_idx_oh_p0 = LogicVecArray(
             ctx, 'bypass_idx_oh_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+        bypass_en = LogicArray(ctx, 'bypass_en', 'w',
+                               self.configs.numLdqEntries)
         if self.configs.bypass:
             stq_last_oh = LogicVec(
                 ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
