@@ -585,8 +585,6 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
   return success();
 }
 
-using ArgReplacements = DenseMap<BlockArgument, OpResult>;
-
 LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
@@ -629,7 +627,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
 
   // Stores mapping from each value that passes through a merge-like
   // operation to the data result of that merge operation
-  ArgReplacements argReplacements;
+  BlockArgToMergeResult argReplacements;
 
   // Currently, the following 2 functions do nothing but construct the network
   // of CMerges in complete isolation from the rest of the components
@@ -683,7 +681,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Create the memory interface according to the algorithm from FPGA'23. This
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
-  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+  if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo,
+                                          argReplacements)))
     return failure();
 
   // Convert the constants and undefined values from the `arith` dialect to
