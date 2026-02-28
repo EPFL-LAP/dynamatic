@@ -82,7 +82,7 @@ class Configs:
 
         self.stResp = bool(config["stResp"])
         self.gaMulti = bool(config["groupMulti"])
-        self.bypass = False # FIXME: pass through from JSON
+        self.bypass = False  # FIXME: pass through from JSON
 
         self.gaNumLoads = config["numLoads"]
         self.gaNumStores = config["numStores"]
