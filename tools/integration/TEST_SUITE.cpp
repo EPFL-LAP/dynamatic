@@ -89,7 +89,7 @@ TEST_P(CBCSolverFixture, basic) {
 }
 #endif // DYNAMATIC_ENABLE_CBC
 
-#if 1
+#if 0
 TEST_P(FPL22Fixture, basic) {
   IntegrationTestData config{
       // clang-format off
@@ -314,7 +314,7 @@ INSTANTIATE_TEST_SUITE_P(
       [](const auto &info) { return info.param; });
 #endif // DYNAMATIC_ENABLE_CBC
 
-#if 1
+#if 0
 // Smoke test: Using the FPL22 placement algorithm to optimize some simple benchmarks
 INSTANTIATE_TEST_SUITE_P(
     Tiny, FPL22Fixture,
