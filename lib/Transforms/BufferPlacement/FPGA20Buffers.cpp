@@ -18,6 +18,8 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/IR/Value.h"
 
+#define DEBUG_TYPE "fpga20-buffers"
+
 using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
@@ -26,19 +28,9 @@ using namespace dynamatic::buffer::fpga20;
 
 FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
                              FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                             double targetPeriod)
-    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                          targetPeriod) {
-  if (!unsatisfiable)
-    setup();
-}
-
-FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
-                             FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                             double targetPeriod, Logger &logger,
-                             StringRef milpName)
+                             double targetPeriod, StringRef writeTo)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                          logger, milpName) {
+                          writeTo) {
   if (!unsatisfiable)
     setup();
 }
@@ -84,8 +76,7 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     placement[channel] = result;
   }
 
-  if (logger)
-    logResults(placement);
+  LLVM_DEBUG(logResults(placement););
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {

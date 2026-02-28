@@ -29,6 +29,8 @@
 #include <string>
 #include <unordered_map>
 
+#define DEBUG_TYPE "mapbuf-buffers"
+
 using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
@@ -38,22 +40,10 @@ using namespace dynamatic::buffer::mapbuf;
 MAPBUFBuffers::MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
                              FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, StringRef blifFiles,
-                             double lutDelay, int lutSize, bool acyclicType)
-    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                          targetPeriod),
-      acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
-      blifFiles(blifFiles) {
-  if (!unsatisfiable)
-    setup();
-}
-
-MAPBUFBuffers::MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
-                             FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                             double targetPeriod, StringRef blifFiles,
                              double lutDelay, int lutSize, bool acyclicType,
-                             Logger &logger, StringRef milpName)
+                             StringRef writeTo)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                          logger, milpName),
+                          writeTo),
       acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
       blifFiles(blifFiles) {
   if (!unsatisfiable)
@@ -110,8 +100,7 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
     placement[channel] = result;
   }
 
-  if (logger)
-    logResults(placement);
+  LLVM_DEBUG(logResults(placement););
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
