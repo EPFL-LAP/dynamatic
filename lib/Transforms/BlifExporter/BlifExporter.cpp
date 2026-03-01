@@ -11,9 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BlifExporter/BlifExporter.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Transforms/BlifExporter/BlifExporterSupport.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -24,10 +24,19 @@
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_BLIFEXPORTER
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 namespace {
 struct BlifExporterPass
     : public dynamatic::impl::BlifExporterBase<BlifExporterPass> {
 public:
+  using BlifExporterBase::BlifExporterBase;
   void runDynamaticPass() override {
 
     auto moduleOp = getOperation();
@@ -78,9 +87,3 @@ public:
 };
 
 } // namespace
-
-namespace dynamatic {
-std::unique_ptr<dynamatic::DynamaticPass> createBlifExporterPass() {
-  return std::make_unique<BlifExporterPass>();
-}
-} // namespace dynamatic
