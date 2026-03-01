@@ -1846,11 +1846,8 @@ static void insertDirectSuppression(
   // Data Source is valid.
   if (dominatorBlock != producerBlock) {
     OpBuilder tmpBuilder2(funcOp.getContext());
-    auto locGraphDP = bi.isLess(producerBlock, dominatorBlock)
-                          ? buildLocalCFGRegion(tmpBuilder2, producerBlock,
-                                                dominatorBlock, bi)
-                          : buildLocalCFGRegion(tmpBuilder2, dominatorBlock,
-                                                producerBlock, bi);
+    auto locGraphDP = buildLocalCFGRegion(tmpBuilder2, dominatorBlock,
+                                          producerBlock, bi);
 
     if (locGraphDP->newCons) {
       // 1. Get dependencies for upstream graph
