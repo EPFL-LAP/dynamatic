@@ -507,7 +507,6 @@ def BlifImporter : DynamaticPass<"blif-importer"> {
     The pass will fail if the input BLIF file is malformed or if
     the ABC tool fails to process it for any reason.
   }];
-  let constructor = "dynamatic::createBlifImporterPass()";
   let options =
     [Option<"filepath", "filepath", "std::string", "\"\"",
             "Path to the input BLIF file.">];
@@ -521,7 +520,6 @@ def BlifExporter : DynamaticPass<"blif-exporter"> {
     This pass exports a Synth circuit in BLIF format. The pass will fail if the
     output BLIF file cannot be created or written to for any reason.
   }];
-  let constructor = "dynamatic::createBlifExporterPass()";
   let options =
     [Option<"filepath", "filepath", "std::string", "\"\"",
             "Path to the output BLIF file.">];
