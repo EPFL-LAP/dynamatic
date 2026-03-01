@@ -17,7 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeInferBasicBlocks.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Support/LogicalResult.h"
@@ -26,31 +25,21 @@
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEINFERBASICBLOCKS
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 /// Determines if the pass should attempt to infer the basic block of the
 /// operation if it is missing.
 static bool isLegalForInference(Operation *op) {
   return !isa<handshake::MemoryOpInterface, handshake::SinkOp>(op);
 }
 
-/// Iterates over all operations legal for inference that do not have a "bb"
-/// attribute and tries to infer it.
-static bool inferBasicBlocks(Operation *op, PatternRewriter &rewriter) {
-  // Check whether we even need to run inference for the operation
-  if (!isLegalForInference(op))
-    return false;
-  if (std::optional<unsigned> bb = getLogicBB(op); bb.has_value())
-    return false;
-
-  // Run the inference logic
-  unsigned infBB;
-  if (succeeded(inferLogicBB(op, infBB))) {
-    op->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(infBB));
-    return true;
-  }
-  return false;
-}
-
-LogicalResult dynamatic::inferLogicBB(Operation *op, unsigned &logicBB) {
+static LogicalResult inferLogicBB(Operation *op, unsigned &logicBB) {
   std::optional<unsigned> infBB;
 
   auto mergeInferredBB = [&](std::optional<unsigned> otherBB) -> LogicalResult {
@@ -103,6 +92,24 @@ LogicalResult dynamatic::inferLogicBB(Operation *op, unsigned &logicBB) {
   return failure();
 }
 
+/// Iterates over all operations legal for inference that do not have a "bb"
+/// attribute and tries to infer it.
+static bool inferBasicBlocks(Operation *op, PatternRewriter &rewriter) {
+  // Check whether we even need to run inference for the operation
+  if (!isLegalForInference(op))
+    return false;
+  if (std::optional<unsigned> bb = getLogicBB(op); bb.has_value())
+    return false;
+
+  // Run the inference logic
+  unsigned infBB;
+  if (succeeded(inferLogicBB(op, infBB))) {
+    op->setAttr(BB_ATTR_NAME, rewriter.getUI32IntegerAttr(infBB));
+    return true;
+  }
+  return false;
+}
+
 namespace {
 
 /// Tries to infer the basic block of untagged operations in a function.
@@ -132,6 +139,8 @@ struct HandshakeInferBasicBlocksPass
     : public dynamatic::impl::HandshakeInferBasicBlocksBase<
           HandshakeInferBasicBlocksPass> {
 
+  using HandshakeInferBasicBlocksBase::HandshakeInferBasicBlocksBase;
+
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns{ctx};
@@ -144,8 +153,3 @@ struct HandshakeInferBasicBlocksPass
   };
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeInferBasicBlocksPass() {
-  return std::make_unique<HandshakeInferBasicBlocksPass>();
-}

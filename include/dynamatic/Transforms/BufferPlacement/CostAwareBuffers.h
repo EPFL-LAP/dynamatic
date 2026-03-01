@@ -38,11 +38,7 @@ public:
   /// ensuring that further calls to `optimize` fail.
   CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
                    FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                   double targetPeriod);
-
-  CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
-                   FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                   double targetPeriod, Logger &logger, StringRef milpName);
+                   double targetPeriod, StringRef writeTo = "");
 
 protected:
   /// Interprets the MILP solution to derive buffer placement decisions.

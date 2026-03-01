@@ -24,6 +24,9 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Path.h"
 
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
 #define DEBUG_TYPE "buffer-milp"
 
 using namespace mlir;
@@ -93,22 +96,10 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
 BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
                                          int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
-                                         double targetPeriod)
-    : MILP<BufferPlacement>(solverKind, timeout), timingDB(timingDB),
-      targetPeriod(targetPeriod), funcInfo(funcInfo), logger(nullptr) {
-  initialize();
-}
-
-BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
-                                         int timeout, FuncInfo &funcInfo,
-                                         const TimingDatabase &timingDB,
-                                         double targetPeriod, Logger &logger,
-                                         StringRef milpName)
-    : MILP<BufferPlacement>(solverKind, timeout,
-                            logger.getLogDir() +
-                                llvm::sys::path::get_separator() + milpName),
-      timingDB(timingDB), targetPeriod(targetPeriod), funcInfo(funcInfo),
-      logger(&logger) {
+                                         double targetPeriod,
+                                         llvm::StringRef writeTo)
+    : MILP<BufferPlacement>(solverKind, timeout, writeTo), timingDB(timingDB),
+      targetPeriod(targetPeriod), funcInfo(funcInfo) {
   initialize();
 }
 
@@ -1062,8 +1053,8 @@ void BufferPlacementMILP::forEachIOPair(
 }
 
 void BufferPlacementMILP::logResults(BufferPlacement &placement) {
-  assert(logger && "no logger was provided");
-  mlir::raw_indented_ostream &os = **logger;
+
+  mlir::raw_indented_ostream os(llvm::errs());
 
   os << "# ========================== #\n";
   os << "# Buffer Placement Decisions #\n";

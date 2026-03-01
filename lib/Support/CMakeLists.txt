@@ -3,7 +3,6 @@ add_dynamatic_library(DynamaticSupport
   Backedge.cpp
   CFG.cpp
   DOT.cpp
-  Logging.cpp
   MILP.cpp
   System.cpp
   TimingModels.cpp

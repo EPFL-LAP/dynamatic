@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -23,6 +22,7 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -50,6 +50,14 @@
 #include <iterator>
 #include <string>
 #include <utility>
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKETOHW
+#include "dynamatic/Conversion/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
@@ -139,8 +147,8 @@ public:
   /// ports.
   void addClkAndRst() {
     Type i1Type = IntegerType::get(ctx, 1);
-    addInput(dynamatic::hw::CLK_PORT, i1Type);
-    addInput(dynamatic::hw::RST_PORT, i1Type);
+    addInput(CLK_PORT, i1Type);
+    addInput(RST_PORT, i1Type);
   }
 
   /// Returns the MLIR context used by the builder.
@@ -1074,10 +1082,9 @@ static std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   unsigned numInputs = hwModOp.getNumInputPorts();
   assert(numInputs >= 2 && "module should have at least clock and reset");
   size_t lastIdx = hwModOp.getPortIdForInputId(numInputs - 1);
-  assert(hwModOp.getPort(lastIdx - 1).getName() == dynamatic::hw::CLK_PORT &&
+  assert(hwModOp.getPort(lastIdx - 1).getName() == CLK_PORT &&
          "expected clock");
-  assert(hwModOp.getPort(lastIdx).getName() == dynamatic::hw::RST_PORT &&
-         "expected reset");
+  assert(hwModOp.getPort(lastIdx).getName() == RST_PORT && "expected reset");
 
   // Add clock and reset to the instance's operands
   ValueRange blockArgs = hwModOp.getBodyBlock()->getArguments();
@@ -1157,8 +1164,8 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 /// Handshake function. Fills in the lowering state object with information
 /// that will allow the conversion pass to connect memory interface to their
 /// top-level IO later on.
-hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
-                                   ModuleLoweringState &state) {
+static hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
+                                          ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
   handshake::PortNamer portNames(funcOp);
 
@@ -2079,6 +2086,8 @@ namespace {
 class HandshakeToHWPass
     : public dynamatic::impl::HandshakeToHWBase<HandshakeToHWPass> {
 public:
+  using HandshakeToHWBase::HandshakeToHWBase;
+
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -2227,7 +2236,3 @@ private:
 };
 
 } // end anonymous namespace
-
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createHandshakeToHWPass() {
-  return std::make_unique<HandshakeToHWPass>();
-}
