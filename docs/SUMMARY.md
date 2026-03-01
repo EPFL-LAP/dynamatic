@@ -77,6 +77,10 @@
     - [Commit Unit Placement Algorithm](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/CommitUnitPlacementAlgorithm.md)
     - [Integration Tests](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/IntegrationTests.md)
     - [Save Commit Behavior](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/SaveCommitBehavior.md)
+  - [Synth]()
+    - [Synth Dialect](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/Synth.md)
+    - [Blif Importer](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifImporter.md)
+    - [Blif Exporter](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifExporter.md)
 
 - [Specs]()
   - [Floating Point Units](DeveloperGuide/Specs/FloatingPointUnits.md)
