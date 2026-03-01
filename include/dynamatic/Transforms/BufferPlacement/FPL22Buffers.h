@@ -38,17 +38,9 @@ protected:
   /// signature.
   FPL22BuffersBase(CPSolver::SolverKind solverKind, int timeout,
                    FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                   double targetPeriod)
+                   double targetPeriod, StringRef writeTo = "")
       : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                            targetPeriod) {};
-
-  /// Just forwards its arguments to the super class constructor with the same
-  /// signature.
-  FPL22BuffersBase(CPSolver::SolverKind solverKind, int timeout,
-                   FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                   double targetPeriod, Logger &logger, StringRef milpName)
-      : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                            targetPeriod, logger, milpName) {};
+                            targetPeriod, writeTo) {};
 
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots
@@ -100,15 +92,8 @@ public:
   /// ensuring that further calls to `optimize` fail.
   CFDFCUnionBuffers(CPSolver::SolverKind solverKind, int timeout,
                     FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                    double targetPeriod, CFDFCUnion &cfUnion);
-
-  /// Achieves the same as the other constructor but additionally logs placement
-  /// decisions and achieved throughputs using the provided logger, and dumps
-  /// the MILP model and solution at the provided name next to the log file.
-  CFDFCUnionBuffers(CPSolver::SolverKind solverKind, int timeout,
-                    FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                    double targetPeriod, CFDFCUnion &cfUnion, Logger &logger,
-                    StringRef milpName);
+                    double targetPeriod, CFDFCUnion &cfUnion,
+                    StringRef writeTo);
 
 private:
   /// The CFDFC union over which the MILP is described. Constraints are only
@@ -141,15 +126,7 @@ public:
   /// ensuring that further calls to `optimize` fail.
   OutOfCycleBuffers(CPSolver::SolverKind solverKind, int timeout,
                     FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                    double targetPeriod);
-
-  /// Achieves the same as the other constructor but additionally logs placement
-  /// decisions and achieved throughputs using the provided logger, and dumps
-  /// the MILP model and solution at the provided name next to the log file.
-  OutOfCycleBuffers(CPSolver::SolverKind solverKind, int timeout,
-                    FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                    double targetPeriod, Logger &logger,
-                    StringRef milpName = "out_of_cycle");
+                    double targetPeriod, StringRef writeTo);
 
 private:
   /// Setups the entire MILP, creating all variables, constraints, and setting

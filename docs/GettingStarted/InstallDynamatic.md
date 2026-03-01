@@ -15,13 +15,11 @@ The following instructions can be used to setup Dynamatic from source.
 
 **1. Install Dependencies Required by the Project**  
 Most of our dependencies are provided as standard packages on most Linux distributions. Dynamatic needs a working C/C++ toolchain (compiler, linker), cmake and ninja for building the project, Python (3.6 or newer), GraphViz to work with .dot files, and standard command-line tools like git.
-> [!NOTE]  
-> You will need at least 50GB of internal storage to compile the llvm-project and 16GB+ of memory is recommended to facilitate the linking process
 
 On `apt`-based Linux distributions:
 ```sh
 apt-get update
-apt-get install clang lld ccache cmake ninja-build python3 graphviz git curl gzip libreadline-dev libboost-all-dev pkg-config 
+apt-get install clang lld ccache cmake ninja-build python3 graphviz git curl gzip libreadline-dev libboost-all-dev 
 ```
 Note that you may need super user privileges for any package installation. You can use **sudo** before entering the commands
 
@@ -46,6 +44,7 @@ git clone --recurse-submodules https://github.com/EPFL-LAP/dynamatic.git
 This creates a `dynamatic` folder in your current working directory.
 
 **3. Build the Project**  
+
 Run the build script from the directory created by the clone command (see the [advanced build](../UserGuide/AdvancedBuild.md#3-building) instructions for details on how to customize the build process).
 ```sh
 cd dynamatic
@@ -53,13 +52,16 @@ chmod +x ./build.sh
 ./build.sh --release
 ```
 
-The commands above might take quite some time to finish since we need to build LLVM. Alternatively, the `build.sh` script can downloads a prebuilt LLVM and link Dynamatic against that instead. If this is preferred, you could run the following command:
+**Using prebuilt LLVM.** The commands above might take quite some time to finish since we need to build LLVM. Alternatively, the `build.sh` script can download a prebuilt LLVM and link Dynamatic against that instead. If this is preferred, you could run the following command:
 
 ```sh
-cd dynamatic
-chmod +x ./build.sh
 ./build.sh --release --use-prebuilt-llvm
 ```
+
+> [!NOTE]  
+> You need at least 6GB of free disk space for Dynamatic (if you enable the `--use-prebuilt-llvm` option).
+> If you need to build `llvm-project` from scratch, you will need at least 50GB
+> of free disk space and 16GB+ of RAM.
 
 **4. Run the Dynamatic Testsuite**  
 To confirm that you have successfully compiled Dynamatic and to test its functionality, you can run Dynamatic's testsuite from the top-level `build` folder using `ninja`.

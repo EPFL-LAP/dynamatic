@@ -293,7 +293,9 @@ INSTANTIATE_TEST_SUITE_P(
       "while_loop_3",
       "test_loop_free",
       "test_bitint",
-      "test_int16"
+      "test_int16",
+      "test_double",
+      "unused_arg"
       ),
       [](const auto &info) { return info.param; });
 

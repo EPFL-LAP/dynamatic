@@ -27,6 +27,9 @@
 #include <numeric>
 #include <queue>
 
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
 #define DEBUG_TYPE "latency-and-occupancy-balancing"
 
 // Make the graph boost analyzable.

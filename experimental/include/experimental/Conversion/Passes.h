@@ -16,18 +16,16 @@
 #define EXPERIMENTAL_CONVERSION_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Conversion/FtdCfToHandshake.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
 namespace dynamatic {
 namespace experimental {
-
 /// Generate the code for registering passes.
+#define GEN_PASS_DECL
 #define GEN_PASS_REGISTRATION
 #include "experimental/Conversion/Passes.h.inc"
-
 } // namespace experimental
 } // namespace dynamatic
 

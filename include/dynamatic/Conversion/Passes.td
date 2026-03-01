@@ -33,7 +33,6 @@ def AffineToScf : DynamaticPass<"lower-affine-to-scf", [
     dependence information between memory accesses to lower IR levels, in
     particular to the std-to-handshake lowering pass. 
   }];
-  let constructor = "dynamatic::createAffineToScfPass()";
 }
 
 //===----------------------------------------------------------------------===//
@@ -50,7 +49,6 @@ def ScfToCf : DynamaticPass<"lower-scf-to-cf", [
     instead of a signed one (lt) if the loop's iterator can be proven to be
     always positive.
   }];
-  let constructor = "dynamatic::createLowerScfToCf()";
 }
 
 //===----------------------------------------------------------------------===//
@@ -65,7 +63,6 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
       which represent dataflow circuits that can ultimately be converted to an
           RTL design.
 }];
-let constructor = "dynamatic::createCfToHandshake()";
 }
 
 //===----------------------------------------------------------------------===//
@@ -79,7 +76,6 @@ def HandshakeToHW
     Lowers Handshake IR into a "netlist-style" representation made up of HW
     instances of external modules interconnected by dataflow channels.
   }];
-  let constructor = "dynamatic::createHandshakeToHWPass()";
 }
   
 #endif // DYNAMATIC_CONVERSION_PASSES_TD

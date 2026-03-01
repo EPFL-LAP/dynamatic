@@ -121,10 +121,9 @@ It is also common to run out of RAM especially during linking of LLVM/MLIR. If t
 Dynamatic includes a `Dockerfile` that configures all the open-source dependencies. To build the dockerfile, run the following command in the root directory of Dynamatic:
 
 ```bash
-$ docker build -t dynamatic-image .
+$ docker build -t dynamatic-image . --build-arg UID=$(id -u) --build-arg GID=$(id -g)
 ```
 
-The docker image is has a user called "ubuntu".
 To launch the Docker container, run the following command in the root directory of dynamatic:
 
 ```bash 
