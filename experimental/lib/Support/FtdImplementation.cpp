@@ -1325,10 +1325,9 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 /// \param muxConstraints A map {Block* -> bool} enforcing specific values for
 /// blocks. If a block is in this map, the branch corresponding to !value is
 /// wired to Sink.
-static std::unique_ptr<ftd::LocalCFG>
-buildDecisionGraph(const ftd::LocalCFG &rawGraph,
-                   const DenseSet<Block *> &dependencies,
-                   const DenseMap<Block *, bool> &muxConstraints = DenseMap<Block *, bool>()) {
+static std::unique_ptr<ftd::LocalCFG> buildDecisionGraph(
+    const ftd::LocalCFG &rawGraph, const DenseSet<Block *> &dependencies,
+    const DenseMap<Block *, bool> &muxConstraints = DenseMap<Block *, bool>()) {
 
   if (!rawGraph.newCons)
     return nullptr;
@@ -1415,7 +1414,7 @@ buildDecisionGraph(const ftd::LocalCFG &rawGraph,
   };
 
   // 5. Wire the Graph
-  
+
   // Wire the dummy start unconditionally to the true logic entry
   builder.setInsertionPointToEnd(dummyStart);
   if (newL->newProd) {
@@ -1629,7 +1628,8 @@ static void insertDirectSuppression(
       buildLocalCFGRegion(tmpBuilder, dominatorBlock, consumerBlock, bi);
 
   ControlDependenceAnalysis locCDA(*locGraph->region);
-  // Full Set: contains consumer dependences, Mux Conditions and their dependences.
+  // Full Set: contains consumer dependences, Mux Conditions and their
+  // dependences.
   DenseSet<Block *> locConsControlDepsFull =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
   // The set containing Mux Conditions
@@ -1715,17 +1715,19 @@ static void insertDirectSuppression(
 
         // 4. Add to dependencies and record requirement
         if (condBlockLocal) {
-          // Add this block and its all-dependency blocks to the dependency set so path 
-          // enumeration observes it.
+          // Add this block and its all-dependency blocks to the dependency set
+          // so path enumeration observes it.
           locConsControlDepsFull.insert(condBlockLocal);
-          for (Block *dep : locCDA.getAllBlockDeps()[condBlockLocal].allControlDeps) {
+          for (Block *dep :
+               locCDA.getAllBlockDeps()[condBlockLocal].allControlDeps) {
             locConsControlDepsFull.insert(dep);
           }
 
           // Record the specific value required (True/False) to pass this Mux
           muxConstraints[condBlockLocal] = requiredVal;
         } else {
-          llvm::errs() << "[FTD Warning] Mux condition block not found in LocalCFG for condition: ";
+          llvm::errs() << "[FTD Warning] Mux condition block not found in "
+                          "LocalCFG for condition: ";
           muxConditionBlock->printAsOperand(llvm::errs());
           llvm::errs() << " \n";
         }
@@ -1812,8 +1814,8 @@ static void insertDirectSuppression(
   }
 
   // Build the constrained graph for logic calculation
-  auto decisionGraph = buildDecisionGraph(
-      *locGraph, locConsControlDepsFull, muxConstraints);
+  auto decisionGraph =
+      buildDecisionGraph(*locGraph, locConsControlDepsFull, muxConstraints);
 
   ControlDependenceAnalysis decCDA(*decisionGraph->region);
   DenseSet<Block *> locConsControlDeps =
@@ -1857,8 +1859,7 @@ static void insertDirectSuppression(
           dpCDA.getAllBlockDeps()[locGraphDP->newCons].allControlDeps;
 
       // 2. Build Upstream Decision Graph (No constraints needed)
-      auto decisionGraphDP =
-          buildDecisionGraph(*locGraphDP, dpDepsTmp);
+      auto decisionGraphDP = buildDecisionGraph(*locGraphDP, dpDepsTmp);
 
       // 3. Calculate Upstream Logic
       ControlDependenceAnalysis finalDpCDA(*decisionGraphDP->region);
@@ -1910,8 +1911,8 @@ static void insertDirectSuppression(
     // original 'connection' value needed for the use-replacement later.
     Value supData = connection;
     auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-        consumer->getLoc(), ftd::getListTypes(connection.getType()),
-        branchCond, supData);
+        consumer->getLoc(), ftd::getListTypes(connection.getType()), branchCond,
+        supData);
     branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
     supData = branchOp.getFalseResult();
 
@@ -2253,8 +2254,8 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         ControlDependenceAnalysis locCDATmp(*locGraph->region);
         DenseSet<Block *> locConsControlDepsTmp =
             locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
-        auto decisionGraph = buildDecisionGraph(
-            *locGraph, locConsControlDepsTmp);
+        auto decisionGraph =
+            buildDecisionGraph(*locGraph, locConsControlDepsTmp);
 
         // 2. Construct distribution circuit and suppression circuit on
         // distribution
