@@ -41,3 +41,5 @@ add_dynamatic_library(DynamaticTransforms
 add_subdirectory(BufferPlacement)
 add_subdirectory(ResourceSharing)
 add_subdirectory(LLVMIR)
+add_subdirectory(BlifImporter)
+add_subdirectory(BlifExporter)
