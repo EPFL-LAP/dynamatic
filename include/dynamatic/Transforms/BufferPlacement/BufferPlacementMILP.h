@@ -20,7 +20,6 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/MILP.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
@@ -125,14 +124,7 @@ public:
   /// constructor sets the `unsatisfiable` flag to true.
   BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod);
-
-  /// Follows the same pre-processing step as the other constructor; in
-  /// addition, dumps the MILP model and solution under the provided name in the
-  /// logger's directory.
-  BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
-                      FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod, Logger &logger, StringRef milpName);
+                      double targetPeriod, llvm::StringRef writeTo = "");
 
 protected:
   /// Represents a list of signals that are buffered together by a single
@@ -181,8 +173,6 @@ protected:
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).
   llvm::MapVector<Value, handshake::ChannelBufProps> channelProps;
-  /// Logger; if not null the class may log setup and result information to it.
-  Logger *logger;
   /// Contains all variables used throughout the MILP. Variables can be added to
   /// it with the `BufferPlacementMILP::addChannelVars` and
   /// `BufferPlacementMILP::addCFDFCVars` methods.

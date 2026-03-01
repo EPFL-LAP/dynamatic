@@ -49,15 +49,7 @@ public:
   /// ensuring that further calls to `optimize` fail.
   FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
                 FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod);
-
-  /// Achieves the same as the other constructor but additionally logs placement
-  /// decisions and achieved throughputs using the provided logger, and dumps
-  /// the MILP model and solution at the provided name next to the log file.
-  FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
-                FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, Logger &logger,
-                StringRef milpName = "placement");
+                double targetPeriod, StringRef writeTo = "");
 
 protected:
   /// Interprets the MILP solution to derive buffer placement decisions. Since
