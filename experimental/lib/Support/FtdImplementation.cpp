@@ -1328,7 +1328,7 @@ buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 static std::unique_ptr<ftd::LocalCFG>
 buildDecisionGraph(const ftd::LocalCFG &rawGraph,
                    const DenseSet<Block *> &dependencies,
-                   const DenseMap<Block *, bool> &muxConstraints = {}) {
+                   const DenseMap<Block *, bool> &muxConstraints = DenseMap<Block *, bool>()) {
 
   if (!rawGraph.newCons)
     return nullptr;
