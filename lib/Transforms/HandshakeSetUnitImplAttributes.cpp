@@ -6,8 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Support/TimingModels.h"
+
+// [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 // include tblgen base class definition
@@ -39,11 +40,8 @@ struct HandshakeSetUnitImplAttributesPass
     : public dynamatic::impl::HandshakeSetUnitImplAttributesBase<
           HandshakeSetUnitImplAttributesPass> {
   using HandshakeSetUnitImplAttributesBase::HandshakeSetUnitImplAttributesBase;
-  void runOnOperation() override {
 
-    handshake::FuncOp func = getOperation();
-    if (func.isExternal())
-      return;
+  void runOnOperation() override {
 
     TimingDatabase timingDB;
     if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
@@ -59,7 +57,7 @@ struct HandshakeSetUnitImplAttributesPass
     FPUImpl impl = implOpt.value();
 
     // iterate over each operation that implements FPUImplInterface
-    getOperation()->walk([&](FPUImplInterface fpuImplInterfaceOp) {
+    getOperation().walk([&](FPUImplInterface fpuImplInterfaceOp) {
       // and set it based on the pass option
       // mark the FPU vendor
       fpuImplInterfaceOp.setFPUImpl(impl);
@@ -79,7 +77,7 @@ struct HandshakeSetUnitImplAttributesPass
       // [END mark the internal delay of the FPU units]
     });
 
-    func.walk([&](LatencyInterface latencyInterfaceOp) {
+    getOperation().walk([&](LatencyInterface latencyInterfaceOp) {
       // [START mark the latency]
       double latency;
       if (!failed(timingDB.getLatency(latencyInterfaceOp, SignalType::DATA,
