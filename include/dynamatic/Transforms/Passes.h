@@ -16,6 +16,8 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "dynamatic/Transforms/BackAnnotate.h"
+#include "dynamatic/Transforms/BlifExporter/BlifExporter.h"
+#include "dynamatic/Transforms/BlifImporter/BlifImporter.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakeSetBufferingProperties.h"
 #include "dynamatic/Transforms/DropUnlistedFunctions.h"
