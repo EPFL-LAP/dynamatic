@@ -1,4 +1,4 @@
-# `vhdl_gen.generators` — Folder Overview
+# `core_gen.generators` — Folder Overview
 
 This folder contains all code‑generation helpers responsible for emitting
 parameterized VHDL RTL used by the Load/Store Queue (LSQ) for the spatial computing and
