@@ -1,4 +1,3 @@
-from core_gen.context import Context
 from core_gen.signals import LogicArray, LogicVec, LogicVecArray
 from core_gen.ir import Op, BinOp, Val, Bit
 from core_gen.emitters import Emitter

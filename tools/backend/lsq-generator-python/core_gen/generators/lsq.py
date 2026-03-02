@@ -1,4 +1,3 @@
-from core_gen.context import Context
 from core_gen.emitters import Emitter
 from core_gen.signals import *
 from core_gen.operators import *
