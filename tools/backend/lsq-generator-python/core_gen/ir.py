@@ -6,8 +6,7 @@ class Statement:
     Represents a statement base class.
 
     This class contains common operator overloads and helpers used across the
-    generator. Extracted into its own module to avoid circular imports when
-    `signals.py` needs to reference the type.
+    generator.
     """
 
     def __add__(self, other):
@@ -88,7 +87,8 @@ class Type(Enum):
 
 class Val(Statement):
     """
-    Represents a variable statement
+    Represents a value, which can be either a variable or a constant
+    Can be initialized with a string, an int, a tuple of (var, index), or a tuple of (var, index1, index2)
     """
 
     def __init__(self, *var, size=None):
@@ -123,6 +123,8 @@ class Val(Statement):
 
 
 class BinOp(Enum):
+    """Represents a binary operator"""
+
     ADD = ("+", 4, Type.ARITH, Type.ARITH)
     SUB = ("-", 4, Type.ARITH, Type.ARITH)
     AND = ("and", 3, Type.LOGIC, Type.LOGIC)
@@ -171,6 +173,8 @@ class Bin(Statement):
 
 
 class UnOp(Enum):
+    """Represents a unary operator"""
+
     NOT = ("not", 10, Type.LOGIC, Type.LOGIC)
 
     def get_precedence(self) -> int:
