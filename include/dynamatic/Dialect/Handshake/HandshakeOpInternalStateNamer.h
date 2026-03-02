@@ -47,7 +47,7 @@ struct InternalStateNamer {
 
   static inline bool classof(const InternalStateNamer *fp) { return true; }
 
-  std::unique_ptr<ConstrainedNamer> tryConstrain(int64_t value);
+  std::unique_ptr<ConstrainedNamer> tryConstrain(int32_t value);
 
   TYPE type;
   static constexpr llvm::StringLiteral TYPE_LIT = "type";
@@ -61,7 +61,7 @@ struct InternalStateNamer {
 
 struct ConstrainedNamer : public virtual InternalStateNamer {
   ConstrainedNamer() = default;
-  ConstrainedNamer(TYPE type, int64_t value)
+  ConstrainedNamer(TYPE type, int32_t value)
       : InternalStateNamer(TYPE::Constrained), value(value) {}
   virtual ~ConstrainedNamer() = default;
 
@@ -83,7 +83,7 @@ struct ConstrainedNamer : public virtual InternalStateNamer {
   std::unique_ptr<InternalStateNamer> static fromInnerJSON(
       const llvm::json::Value &value, llvm::json::Path path);
 
-  int64_t value;
+  int32_t value;
   static constexpr llvm::StringLiteral CONSTRAINT_VALUE = "value";
 };
 
@@ -172,6 +172,7 @@ struct ConstrainedEagerForkSentNamer : public ConstrainedNamer {
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
 };
 
+struct ConstrainedBufferSlotFullNamer;
 struct BufferSlotFullNamer : public InternalStateNamer {
   BufferSlotFullNamer() = default;
   BufferSlotFullNamer(const std::string &opName, const std::string &slotName,
@@ -183,6 +184,8 @@ struct BufferSlotFullNamer : public InternalStateNamer {
   static inline bool classof(const InternalStateNamer *fp) {
     return fp->type == TYPE::BufferSlotFull;
   }
+
+  ConstrainedBufferSlotFullNamer constrain(int32_t value);
 
   inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}_full", opName, slotName).str();
@@ -204,6 +207,34 @@ struct BufferSlotFullNamer : public InternalStateNamer {
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral SLOT_NAME_LIT = "slot_name";
   static constexpr llvm::StringLiteral SLOT_SIZE_LIT = "slot_size";
+};
+
+struct ConstrainedBufferSlotFullNamer : public ConstrainedNamer {
+  ConstrainedBufferSlotFullNamer() = default;
+  ConstrainedBufferSlotFullNamer(const BufferSlotFullNamer &base, int32_t value)
+      : ConstrainedNamer(), base(base), value(value) {}
+  ~ConstrainedBufferSlotFullNamer() = default;
+
+  inline std::string getSMVName() const override {
+    return llvm::formatv("{0} & ({1}.data = {2})", base.getSMVName(),
+                         base.opName, smvValue(base.slotSize, value))
+        .str();
+  }
+
+  inline llvm::json::Value toInnerJSON() const override {
+    llvm::json::Value obj = base.toInnerJSON();
+    return llvm::json::Object({{BASE_LIT, obj}, {VALUE_LIT, value}});
+  }
+
+  inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
+    return std::make_unique<BufferSlotFullNamer>(base);
+  }
+
+  BufferSlotFullNamer base;
+  int32_t value;
+  static constexpr llvm::StringLiteral BASE_LIT = "base";
+  static constexpr llvm::StringLiteral VALUE_LIT = "value";
+  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
 };
 
 struct LatencyInducedSlotNamer : public InternalStateNamer {

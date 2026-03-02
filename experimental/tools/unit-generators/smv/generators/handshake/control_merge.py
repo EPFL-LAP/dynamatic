@@ -37,6 +37,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
   index := inner_one_slot_break_r.outs;
 
   slot_full := inner_one_slot_break_r.slot_0_full;
+  data := inner_one_slot_break_r.data;
 
   outs_sent := inner_fork.outs_0_sent;
   index_sent := inner_fork.outs_1_sent;

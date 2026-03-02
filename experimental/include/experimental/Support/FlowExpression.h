@@ -98,7 +98,6 @@ struct FlowExpression {
   std::unordered_map<FlowVariable, int> terms;
   FlowExpression() = default;
   FlowExpression(const FlowVariable &v);
-  void debug() const;
 
   llvm::json::Value toJSON() const;
   static FlowExpression fromJSON(const llvm::json::Value &value,
