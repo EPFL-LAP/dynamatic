@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Transforms/BlifExporter/BlifExporterSupport.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HW.h.inc"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
@@ -80,10 +81,10 @@ LogicalResult generateBlifHeader(hw::HWModuleOp hwModuleOp,
   StringRef moduleName = hwModuleOp.getName();
 
   // Write the module name in the blif file
-  outputFile << ".model " << moduleName.str() << "\n";
+  outputFile << modelNode << " " << moduleName.str() << "\n";
 
   // Write the input ports in the blif file
-  outputFile << ".inputs";
+  outputFile << inputsNodes; // .inputs
   for (auto port : hwModuleOp.getPortList()) {
     if (port.isInput()) {
       outputFile << " " << port.getName().str();
@@ -93,7 +94,7 @@ LogicalResult generateBlifHeader(hw::HWModuleOp hwModuleOp,
   outputFile << "\n";
 
   // Write the output ports in the blif file
-  outputFile << ".outputs";
+  outputFile << outputsNodes; // .outputs
   for (auto port : hwModuleOp.getPortList()) {
     if (port.isOutput()) {
       outputFile << " " << port.getName().str();
@@ -167,7 +168,7 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
     if (isa<synth::LatchOp>(op)) {
       auto latchOp = dyn_cast<synth::LatchOp>(op);
       // .latch <input> <output> [<latch type> <control>] [<init value>]
-      outputFile << ".latch";
+      outputFile << latchNode;
       outputFile << " " << getValueName(latchOp.getOperand(0));
       outputFile << " " << getValueName(latchOp.getResult());
       // Check for optional fields: latch type, control and init value
@@ -186,7 +187,7 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
     } else if (isa<synth::aig::AndInverterOp>(op)) {
       auto andOp = dyn_cast<synth::aig::AndInverterOp>(op);
       // .names <input1> <input2> <output>
-      outputFile << ".names";
+      outputFile << logicNode;
       outputFile << " " << getValueName(andOp.getOperand(0));
       outputFile << " " << getValueName(andOp.getOperand(1));
       outputFile << " " << getValueName(andOp.getResult());
@@ -206,7 +207,8 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
       APInt constValue = constOp.getValue();
       assert(constValue.getBitWidth() == 1 &&
              "only 1-bit constants supported in BLIF export");
-      outputFile << ".names " << getValueName(constOp.getResult()) << "\n";
+      outputFile << logicNode << " " << getValueName(constOp.getResult())
+                 << "\n";
       outputFile << (constValue == 1 ? "1" : "0") << "\n";
     } else if (isa<hw::OutputOp>(op)) {
       // We will process the output ports at the end to check if there is any
@@ -248,7 +250,7 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
             iosNames[operandIdx + hwModuleOp.getNumInputPorts()];
         // Write a .names statement to create a wire between the input and
         // output
-        outputFile << ".names " << inputPortName << " " << outputPortName
+        outputFile << logicNode << " " << inputPortName << " " << outputPortName
                    << "\n";
         outputFile << "1 1\n"; // output is 1 when input is 1
         // Add the output port name to the synthOutputsNames variable to check
@@ -295,7 +297,7 @@ LogicalResult exportBlifCircuit(hw::HWModuleOp hwModuleOp,
     return failure();
   }
   // Write the end of the blif file
-  outputFile << ".end\n";
+  outputFile << endNode << "\n";
 
   return success();
 }

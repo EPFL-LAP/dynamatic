@@ -108,7 +108,7 @@ LogicalResult getBlifModuleHeader(StringRef blifFilePath,
     iss >> type;
 
     // Model name
-    if (type == ".model") {
+    if (type == modelNode) {
       std::string moduleName;
       iss >> moduleName;
       if (moduleName.empty()) {
@@ -123,10 +123,10 @@ LogicalResult getBlifModuleHeader(StringRef blifFilePath,
     }
 
     // Input/Output nodes. These are also Dataflow graph channels.
-    else if ((type == ".inputs") || (type == ".outputs")) {
+    else if ((type == inputsNodes) || (type == outputsNodes)) {
       std::string nodeName;
       while (iss >> nodeName) {
-        if (type == ".inputs") {
+        if (type == inputsNodes) {
           // Check if the input has already been added to the input ports list
           if (std::find(inputPorts.begin(), inputPorts.end(), nodeName) !=
               inputPorts.end()) {
@@ -155,12 +155,12 @@ LogicalResult getBlifModuleHeader(StringRef blifFilePath,
     // reading the header since we have already collected the module name and
     // the input and output ports and we assume that they should be defined
     // before any other element in the blif file
-    else if (type == ".latch" || type == ".names" || type == ".subckt") {
+    else if (type == latchNode || type == logicNode || type == subcktNode) {
       break;
     }
 
     // Ends the file.
-    else if (line.find(".end") == 0) {
+    else if (line.find(endNode) == 0) {
       break;
     }
   }
@@ -226,7 +226,7 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
     iss >> type;
 
     // Latches.
-    if (type == ".latch") {
+    if (type == latchNode) {
       std::string regInput, regOutput;
       iss >> regInput >> regOutput;
       // Elaboration of optional fields for latches. The syntax for latches in
@@ -285,7 +285,7 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
     }
 
     // .names stand for logic gates.
-    else if (type == ".names") {
+    else if (type == logicNode) {
       std::vector<std::string> nodeNames;
       std::string currentNode;
 
@@ -330,13 +330,13 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
     }
 
     // Subcircuits. not used for now.
-    else if (line.find(".subckt") == 0) {
+    else if (line.find(subcktNode) == 0) {
       llvm::errs() << "Subcircuits inside the blif file not supported " << "\n";
       continue;
     }
 
     // Ends the file.
-    else if (line.find(".end") == 0) {
+    else if (line.find(endNode) == 0) {
       break;
     }
   }
