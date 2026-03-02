@@ -63,13 +63,6 @@ bool FlowVariable::operator==(const FlowVariable &other) const {
   return type == other.type && lambdaIndex == other.lambdaIndex &&
          op == other.op && pm == other.pm;
 }
-
-bool FlowVariable::sameChannel(const FlowVariable &other) const {
-  assert(isLambda());
-  assert(other.isLambda());
-  return type == other.type && lambdaIndex == other.lambdaIndex &&
-         op == other.op;
-}
 std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
   if (isLambda()) {
     return nullptr;
@@ -91,37 +84,6 @@ std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
   }
 }
 
-std::string FlowVariable::getName() const {
-  std::string sign;
-  switch (pm) {
-  case notApplicable:
-    sign = "";
-    break;
-  case plus:
-    sign = "+";
-    break;
-  case minus:
-    sign = "-";
-    break;
-  case plusAndMinus:
-    sign = "+-";
-    break;
-  }
-  switch (type) {
-  case internalState:
-    return llvm::formatv("{0}{1}", state->getSMVName(), sign);
-  case inputLambda:
-    return llvm::formatv("{0}.in_{1}{2}", getUniqueName(op), lambdaIndex, sign)
-        .str();
-  case outputLambda:
-    return llvm::formatv("{0}.out_{1}{2}", getUniqueName(op), lambdaIndex, sign)
-        .str();
-  case internalLambda:
-    return llvm::formatv("{0}.#{1}{2}", getUniqueName(op), lambdaIndex, sign)
-        .str();
-  };
-}
-
 FlowExpression::FlowExpression(const FlowVariable &v) {
   if (v.isPlusMinus()) {
     // If plusAndMinus, separate into plus and minus parts
@@ -131,31 +93,6 @@ FlowExpression::FlowExpression(const FlowVariable &v) {
     terms[v] = 1;
   }
 };
-
-void FlowExpression::debug() const {
-  std::string txt = "0 = ";
-  bool first = true;
-  for (auto &[key, value] : terms) {
-    if (!first) {
-      if (value > 0) {
-        txt += " + ";
-      } else if (value < 0) {
-        txt += " - ";
-      }
-    } else {
-      if (value < 0)
-        txt += "-";
-      first = false;
-    }
-    if (abs(value) == 1) {
-      txt += key.getName();
-
-    } else {
-      txt += llvm::formatv("{0} * {1}", value, key.getName()).str();
-    }
-  }
-  llvm::errs() << txt << "\n";
-}
 
 llvm::json::Value FlowExpression::toJSON() const {
   std::vector<llvm::json::Value> jsonTerms{};

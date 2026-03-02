@@ -68,9 +68,13 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
 }
 
 std::unique_ptr<ConstrainedNamer>
-InternalStateNamer::tryConstrain(int64_t value) {
+InternalStateNamer::tryConstrain(int32_t value) {
   if (auto *namer = dyn_cast<EagerForkSentNamer>(this)) {
     return std::make_unique<ConstrainedEagerForkSentNamer>(
+        namer->constrain(value));
+  }
+  if (auto *namer = dyn_cast<BufferSlotFullNamer>(this)) {
+    return std::make_unique<ConstrainedBufferSlotFullNamer>(
         namer->constrain(value));
   }
 
@@ -106,6 +110,11 @@ BufferSlotFullNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
+ConstrainedBufferSlotFullNamer BufferSlotFullNamer::constrain(int32_t value) {
+  ConstrainedBufferSlotFullNamer p(*this, value);
+  return p;
+}
+
 std::unique_ptr<LatencyInducedSlotNamer>
 LatencyInducedSlotNamer::fromInnerJSON(const llvm::json::Value &value,
                                        llvm::json::Path path) {
@@ -125,7 +134,7 @@ ConstrainedNamer::fromInnerJSON(const llvm::json::Value &value,
   auto namer = InternalStateNamer::fromJSON(value, path);
   assert(namer && "inner json must be an internal state");
   auto mapper = llvm::json::ObjectMapper(value, path);
-  int64_t val;
+  int32_t val;
   if (!mapper || !mapper.map(CONSTRAINT_VALUE, val))
     return nullptr;
 

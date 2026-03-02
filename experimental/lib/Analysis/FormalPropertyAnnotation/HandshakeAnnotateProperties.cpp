@@ -262,12 +262,13 @@ struct FlowEquationsMatrix {
   FlowEquationsMatrix() = default;
   FlowEquationsMatrix(const std::vector<FlowExpression> &exprs) {
     size_t index = 0;
-    // annotate lambdas/+- first
+    // give lower indices to variables that cannot be annotated
     for (auto &expr : exprs) {
       for (auto &[key, value] : expr.terms) {
-        // skip non-lambda variables that are not +-
-        if (key.getAnnotater() != nullptr)
+        // skip variables that can be annotated in SMV
+        if (key.getAnnotater() != nullptr) {
           continue;
+        }
         // PlusAndMinus variables should never be inserted, as the DSL will
         // insert them as two separate variables
         assert(!key.isPlusMinus());
@@ -459,7 +460,6 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
             assert(after.isPlusMinus());
             FlowVariable fullPM = full;
             fullPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-            equations.push_back(full - fullPM);
             equations.push_back(before.getPlus() - fullPM.getPlus() -
                                 after.getPlus());
             equations.push_back(before.getMinus() - fullPM.getMinus() -
@@ -505,10 +505,8 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         FlowVariable slot(std::make_shared<BufferSlotFullNamer>(slots[0]));
         FlowVariable slotPM = slot;
         slotPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-        equations.push_back(slot - slotPM);
         FlowVariable sentPM = indexSent;
         sentPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-        equations.push_back(indexSent - sentPM);
 
         equations.push_back(indexChannel.getMinus() + slotPM.getMinus() - inM -
                             sentPM.getMinus());
