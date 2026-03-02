@@ -31,18 +31,22 @@ struct FlowVariable {
         "internal states should be initialized with the according constructor");
   }
 
+  // FlowVariable from output
   FlowVariable(const OpResult &channel);
 
+  // FlowVariable from input
   FlowVariable(OpOperand &back, Operation &resOp);
-  // utility functions for initializing variables
+
+  // utility functions for initializing internal channels
   static FlowVariable internalChannel(Operation *op, unsigned index);
 
+  // useful for generating multiple internal channels without collisions
   FlowVariable nextInternal() const;
 
+  // compares the relevant struct fields to determine if two variables are equal
   bool operator==(const FlowVariable &other) const;
 
-  bool sameChannel(const FlowVariable &other) const;
-
+  // utility functions for handling binary channels
   inline bool isPlusMinus() const { return pm == plusAndMinus; }
   inline FlowVariable getPlus() const {
     assert(isPlusMinus());
@@ -64,8 +68,8 @@ struct FlowVariable {
            type == FlowVariable::TYPE::internalLambda;
   }
 
+  // get the annotater for internal state - if it exists
   std::shared_ptr<InternalStateNamer> getAnnotater() const;
-  std::string getName() const;
 };
 
 } // namespace handshake
