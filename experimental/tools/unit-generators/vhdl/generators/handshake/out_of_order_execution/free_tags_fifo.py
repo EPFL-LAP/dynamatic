@@ -27,7 +27,8 @@ use work.types.all;
 -- Entity of free_tags_fifo
 entity {name} is 
 port (
-        clk, rst      : in  std_logic;
+        clk           : in std_logic;
+        rst           : in std_logic;
         ins           : in  std_logic_vector({bitwidth} - 1 downto 0);
         outs          : out std_logic_vector({bitwidth} - 1 downto 0);
         ins_valid     : in  std_logic;

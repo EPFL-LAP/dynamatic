@@ -36,7 +36,8 @@ use IEEE.math_real.all;
 -- Entity of untagger
 entity {name} is
 port(
-  clk, rst      : in  std_logic;
+  clk        : in std_logic;
+  rst        : in std_logic;
   ins_valid : in std_logic;
 
   outs_ready : in std_logic; 
@@ -47,13 +48,13 @@ port(
   ins   : in  std_logic_vector({data_bitwidth} - 1 downto 0);
   outs  : out std_logic_vector({data_bitwidth} - 1 downto 0);
 
-  tagOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
-  tagOut_valid : out  std_logic;
-  tagOut_ready : in std_logic;
+  dataOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  dataOut_valid : out  std_logic;
+  dataOut_ready : in std_logic;
 
   ins_{current_tag} : in std_logic_vector({tag_bitwidth}-1 downto 0) 
 );
-end {name};
+end entity;
 """
 
   architecture = f"""
@@ -61,10 +62,10 @@ end {name};
 architecture arch of {name} is
 begin
     outs_valid<= ins_valid;
-    tagOut_valid<= ins_valid;
-    ins_ready <= tagOut_ready and outs_ready;
+    dataOut_valid<= ins_valid;
+    ins_ready <= dataOut_ready and outs_ready;
     outs <= ins;
-    tagOut <= ins_{current_tag};
+    dataOut <= ins_{current_tag};
 end architecture;
 """
 
@@ -83,7 +84,8 @@ use IEEE.math_real.all;
 -- Entity of untagger
 entity {name} is
 port(
-  clk, rst      : in  std_logic;
+  clk       : in std_logic;
+  rst       : in std_logic;
   ins_valid : in std_logic;
 
   outs_ready : in std_logic; 
@@ -91,9 +93,9 @@ port(
 
   ins_ready : out std_logic;
 
-  tagOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
-  tagOut_valid : out  std_logic;
-  tagOut_ready : in std_logic;
+  dataOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  dataOut_valid : out  std_logic;
+  dataOut_ready : in std_logic;
 
   ins_{current_tag} : in std_logic_vector({tag_bitwidth}-1 downto 0) 
 );
@@ -105,9 +107,9 @@ end {name};
 architecture arch of {name} is
 begin
     outs_valid<= ins_valid;
-    tagOut_valid<= ins_valid;
-    ins_ready <= tagOut_ready and outs_ready;
-    tagOut <= ins_{current_tag};
+    dataOut_valid<= ins_valid;
+    ins_ready <= dataOut_ready and outs_ready;
+    dataOut <= ins_{current_tag};
 end architecture;
 """
 
@@ -138,7 +140,7 @@ def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitw
       "bitwidth": data_bitwidth,
       "extra_signals": extra_signals
   }, {
-      "name": "tagOut",
+      "name": "dataOut",
       "bitwidth": tag_bitwidth,
       "extra_signals": {}
   }]

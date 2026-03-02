@@ -43,7 +43,8 @@ use IEEE.math_real.all;
 -- Entity of tagger
 entity {name} is
   port(
-    clk, rst      : in  std_logic;
+    clk        : in std_logic;
+    rst        : in std_logic;
     ins_valid : in std_logic;
     
     outs_ready : in std_logic; 
@@ -54,13 +55,13 @@ entity {name} is
     ins   : in  std_logic_vector({data_bitwidth} - 1 downto 0);
     outs  : out std_logic_vector({data_bitwidth} - 1 downto 0);
 
-    tagIn : in std_logic_vector({tag_bitwidth}-1 downto 0);
-    tagIn_valid : in  std_logic;
-    tagIn_ready : out std_logic;
+    dataIn : in std_logic_vector({tag_bitwidth}-1 downto 0);
+    dataIn_valid : in  std_logic;
+    dataIn_ready : out std_logic;
 
     outs_{current_tag} : out std_logic_vector({tag_bitwidth}-1 downto 0) 
   );
-end {name};
+end entity;
 """
 
   architecture = f"""
@@ -69,8 +70,8 @@ architecture arch of {name} is
   signal combined_valid : std_logic_vector(1 downto 0);
   signal combined_ready : std_logic_vector(1 downto 0);
 begin
-    -- Combine tagIn_valid and ins_valid
-    combined_valid <= tagIn_valid & ins_valid;
+    -- Combine dataIn_valid and ins_valid
+    combined_valid <= dataIn_valid & ins_valid;
 
     j : entity work.{join_name}
                 port map(   combined_valid,
@@ -80,11 +81,11 @@ begin
 
     outs <= ins;
 
-    -- Split combined_ready into ins_ready and tagIn_ready
+    -- Split combined_ready into ins_ready and dataIn_ready
     ins_ready   <= combined_ready(0);
-    tagIn_ready <= combined_ready(1);
+    dataIn_ready <= combined_ready(1);
 
-    outs_{current_tag} <= tagIn;
+    outs_{current_tag} <= dataIn;
 
 end architecture;
 """
@@ -110,7 +111,8 @@ use IEEE.math_real.all;
 -- Entity of tagger
 entity {name} is
   port(
-    clk, rst      : in  std_logic;
+    clk       : in std_logic;
+    rst       : in std_logic;
     ins_valid : in std_logic;
     
     outs_ready : in std_logic; 
@@ -118,13 +120,13 @@ entity {name} is
 
     ins_ready : out std_logic;
 
-    tagIn : in std_logic_vector({tag_bitwidth}-1 downto 0);
-    tagIn_valid : in  std_logic;
-    tagIn_ready : out std_logic;
+    dataIn : in std_logic_vector({tag_bitwidth}-1 downto 0);
+    dataIn_valid : in  std_logic;
+    dataIn_ready : out std_logic;
 
     outs_{current_tag} : out std_logic_vector({tag_bitwidth}-1 downto 0) 
   );
-end {name};
+end entity;
 """
 
   architecture = f"""
@@ -133,8 +135,8 @@ architecture arch of {name} is
   signal combined_valid : std_logic_vector(1 downto 0);
   signal combined_ready : std_logic_vector(1 downto 0);
 begin
-    -- Combine tagIn_valid and ins_valid
-    combined_valid <= tagIn_valid & ins_valid;
+    -- Combine dataIn_valid and ins_valid
+    combined_valid <= dataIn_valid & ins_valid;
 
     j : entity work.{join_name}
                 port map(   combined_valid,
@@ -142,11 +144,11 @@ begin
                             outs_valid,
                             combined_ready);
 
-    -- Split combined_ready into ins_ready and tagIn_ready
+    -- Split combined_ready into ins_ready and dataIn_ready
     ins_ready   <= combined_ready(0);
-    tagIn_ready <= combined_ready(1);
+    dataIn_ready <= combined_ready(1);
 
-    outs_{current_tag} <= tagIn;
+    outs_{current_tag} <= dataIn;
 
 end architecture;
 """
@@ -167,7 +169,7 @@ def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwid
       "bitwidth": data_bitwidth,
       "extra_signals": extra_signals
   }, {
-      "name": "tagIn",
+      "name": "dataIn",
       "bitwidth": tag_bitwidth,
       "extra_signals": {}
   }]
