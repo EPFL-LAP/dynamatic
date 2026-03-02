@@ -653,7 +653,7 @@ class LSQWrapper:
         em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            em.add_assignment(rresp_id[i], Bit(0), in_process=True)
+            em.add_assignment(rresp_id[i], Val(0), in_process=True)
 
         em.decrease_indent()
         em.add_custom_statement(
@@ -696,7 +696,7 @@ class LSQWrapper:
 
         for i in range(self.lsq_config.numStMem):
             em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
-            em.add_assignment(wresp_id[i], Bit(0), in_process=True)
+            em.add_assignment(wresp_id[i], Val(0), in_process=True)
 
         em.add_custom_statement(
             CustomStatement("elsif rising_edge(clock) then", "end\nelse begin")
