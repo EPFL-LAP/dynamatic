@@ -30,20 +30,34 @@ namespace hw {
 class HWDialect;
 } // namespace hw
 
-// Function to export the synth circuit inside an hwModuleOp to a blif file
-LogicalResult exportBlifCircuit(hw::HWModuleOp hwModuleOp,
-                                llvm::raw_fd_ostream &outputFile);
+class BlifExporter {
 
-// Function to generate the header of the blif file with the module name and the
-// input and output ports
-LogicalResult generateBlifHeader(hw::HWModuleOp hwModuleOp,
-                                 llvm::raw_fd_ostream &outputFile,
-                                 SmallVector<std::string> &iosNames);
+public:
+  // Method to create BlifExporter object with the hw module operation and the
+  // output file stream as arguments
+  BlifExporter(hw::HWModuleOp hwModuleOp, llvm::raw_fd_ostream &outputFile)
+      : hwModuleOp(hwModuleOp), outputFile(outputFile) {}
 
-// Function to generate latches and logic gates in the blif file from the synth
-// circuit inside the hw module
-LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
-                                           llvm::raw_fd_ostream &outputFile,
-                                           SmallVector<std::string> &iosNames);
+  // Function to export the synth circuit inside an hwModuleOp to a blif file
+  LogicalResult exportBlifCircuit();
+
+  // Function to generate the header of the blif file with the module name and
+  // the input and output ports
+  LogicalResult generateBlifHeader();
+
+  // Function to generate latches and logic gates in the blif file from the
+  // synth circuit inside the hw module
+  LogicalResult generateBlifCircuitFromSynth();
+
+private:
+  // HW module operation to be exported as a blif file
+  hw::HWModuleOp hwModuleOp;
+  // Output file stream to write the blif content
+  llvm::raw_fd_ostream &outputFile;
+  // Vector containing the input ports of the blif circuit
+  SmallVector<std::string> inputPorts;
+  // Vector containing the output ports of the blif circuit
+  SmallVector<std::string> outputPorts;
+};
 
 } // namespace dynamatic

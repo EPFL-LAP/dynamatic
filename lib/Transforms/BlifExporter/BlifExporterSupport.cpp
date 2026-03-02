@@ -74,9 +74,7 @@ namespace dynamatic {
 
 // Function to generate the header of the blif file with the module name and the
 // input and output ports
-LogicalResult generateBlifHeader(hw::HWModuleOp hwModuleOp,
-                                 llvm::raw_fd_ostream &outputFile,
-                                 SmallVector<std::string> &iosNames) {
+LogicalResult BlifExporter::generateBlifHeader() {
   // Get the name of the hwModuleOp to use it as the name of the blif file
   StringRef moduleName = hwModuleOp.getName();
 
@@ -88,7 +86,7 @@ LogicalResult generateBlifHeader(hw::HWModuleOp hwModuleOp,
   for (auto port : hwModuleOp.getPortList()) {
     if (port.isInput()) {
       outputFile << " " << port.getName().str();
-      iosNames.push_back(port.getName().str());
+      inputPorts.push_back(port.getName().str());
     }
   }
   outputFile << "\n";
@@ -98,7 +96,7 @@ LogicalResult generateBlifHeader(hw::HWModuleOp hwModuleOp,
   for (auto port : hwModuleOp.getPortList()) {
     if (port.isOutput()) {
       outputFile << " " << port.getName().str();
-      iosNames.push_back(port.getName().str());
+      outputPorts.push_back(port.getName().str());
     }
   }
   outputFile << "\n";
@@ -108,9 +106,7 @@ LogicalResult generateBlifHeader(hw::HWModuleOp hwModuleOp,
 
 // Function to generate latches and logic gates in the blif file from the synth
 // circuit inside the hw module
-LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
-                                           llvm::raw_fd_ostream &outputFile,
-                                           SmallVector<std::string> &iosNames) {
+LogicalResult BlifExporter::generateBlifCircuitFromSynth() {
   // Build AsmState once for the whole module to get consistent value names
   mlir::AsmState asmState(hwModuleOp);
 
@@ -126,11 +122,11 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
     // Check if the value is a block argument (input port)
     if (auto blockArg = dyn_cast<mlir::BlockArgument>(value)) {
       unsigned argIdx = blockArg.getArgNumber();
-      if (argIdx < iosNames.size()) {
-        return iosNames[argIdx];
+      if (argIdx < inputPorts.size()) {
+        return inputPorts[argIdx];
       }
       llvm::errs() << "Block argument index " << argIdx
-                   << " is out of bounds for iosNames.\n";
+                   << " is out of bounds for inputPorts.\n";
       return "invalid_arg";
     }
     // Check if the value is used as an input of the terminator of the hw module
@@ -138,17 +134,12 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
     for (auto &use : value.getUses()) {
       if (auto returnOp = dyn_cast<hw::OutputOp>(use.getOwner())) {
         unsigned operandIdx = use.getOperandNumber();
-        unsigned numInputPorts = hwModuleOp.getNumInputPorts();
-        // Output ports come after input ports in iosNames, so we need to add
-        // the number of input ports to the operand index to get the correct
-        // index in iosNames
-        operandIdx += numInputPorts;
-        if (operandIdx < iosNames.size()) {
-          synthOutputsNames.push_back(iosNames[operandIdx]);
-          return iosNames[operandIdx];
+        if (operandIdx < outputPorts.size()) {
+          synthOutputsNames.push_back(outputPorts[operandIdx]);
+          return outputPorts[operandIdx];
         }
         llvm::errs() << "Operand index " << operandIdx
-                     << " is out of bounds for iosNames.\n";
+                     << " is out of bounds for outputPorts.\n";
         return "invalid_operand";
       }
     }
@@ -237,8 +228,8 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
     // Check if it is a block argument (input port)
     if (auto blockArg = dyn_cast<mlir::BlockArgument>(operand)) {
       unsigned argIdx = blockArg.getArgNumber();
-      if (argIdx < iosNames.size()) {
-        std::string inputPortName = iosNames[argIdx];
+      if (argIdx < inputPorts.size()) {
+        std::string inputPortName = inputPorts[argIdx];
         // Assert it is not part of the synthOutputsNames variable
         assert(std::find(synthOutputsNames.begin(), synthOutputsNames.end(),
                          inputPortName) == synthOutputsNames.end() &&
@@ -246,8 +237,7 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
                "synth circuit generation since it is directly connected to an "
                "input port without any synth operation in between");
         // Get the output port name corresponding to the operand
-        std::string outputPortName =
-            iosNames[operandIdx + hwModuleOp.getNumInputPorts()];
+        std::string outputPortName = outputPorts[operandIdx];
         // Write a .names statement to create a wire between the input and
         // output
         outputFile << logicNode << " " << inputPortName << " " << outputPortName
@@ -256,8 +246,11 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
         // Add the output port name to the synthOutputsNames variable to check
         // that all outputs are processed at the end
         synthOutputsNames.push_back(outputPortName);
+      } else {
+        llvm::errs() << "Block argument index " << argIdx
+                     << " is out of bounds for inputPorts.\n";
+        return failure();
       }
-      assert(argIdx < iosNames.size() && "Block argument index out of bounds");
     }
   }
   // Assert that all output ports are processed
@@ -276,14 +269,12 @@ LogicalResult generateBlifCircuitFromSynth(hw::HWModuleOp hwModuleOp,
 }
 
 // Function to export the synth circuit inside an hwModuleOp to a blif file
-LogicalResult exportBlifCircuit(hw::HWModuleOp hwModuleOp,
-                                llvm::raw_fd_ostream &outputFile) {
+LogicalResult BlifExporter::exportBlifCircuit() {
   // Get the name of the hwModuleOp to use it as the name of the blif file
   StringRef moduleName = hwModuleOp.getName();
 
-  SmallVector<std::string> iosNames;
   // Generate header with module name and input and output ports
-  if (failed(generateBlifHeader(hwModuleOp, outputFile, iosNames))) {
+  if (failed(generateBlifHeader())) {
     llvm::errs() << "Failed to generate the blif file header for module '"
                  << moduleName << "'.\n";
     return failure();
@@ -291,7 +282,7 @@ LogicalResult exportBlifCircuit(hw::HWModuleOp hwModuleOp,
 
   // Generate latches and logic gates of the blif file from the synth
   // circuit inside the hw module
-  if (failed(generateBlifCircuitFromSynth(hwModuleOp, outputFile, iosNames))) {
+  if (failed(generateBlifCircuitFromSynth())) {
     llvm::errs() << "Failed to generate the blif circuit for module '"
                  << moduleName << "'.\n";
     return failure();

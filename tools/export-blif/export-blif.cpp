@@ -140,8 +140,9 @@ int main(int argc, char **argv) {
     // Get the name of the hwModuleOp to use it as the name of the blif file
     StringRef moduleName = hwModuleOp.getName();
 
+    BlifExporter blifExporter(hwModuleOp, outputFile);
     // Export the hwModuleOp as a blif file in the output folder
-    if (failed(exportBlifCircuit(hwModuleOp, outputFile))) {
+    if (failed(blifExporter.exportBlifCircuit())) {
       llvm::errs() << "Failed to export the hw module '" << moduleName
                    << "' to a blif file." << "\n";
       return 1;
