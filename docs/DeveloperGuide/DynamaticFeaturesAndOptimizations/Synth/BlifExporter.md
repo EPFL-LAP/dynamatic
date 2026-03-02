@@ -1,14 +1,17 @@
 # BLIF Exporter
 
-The **BLIF Exporter** is an MLIR pass that serializes a Synth dialect circuit contained inside `hw.module` operations into a BLIF file. It serves as the inverse of the BLIF Importer, allowing Dynamatic's IR to be exported back to a standard BLIF representation for use with external synthesis tools.
+The **BLIF Exporter** is an binary that serializes a Synth dialect circuit contained inside `hw.module` operations into a BLIF file. It serves as the inverse of the BLIF Importer, allowing Dynamatic's IR to be exported back to a standard BLIF representation for use with external synthesis tools.
 
 ---
 
 ## Pass Structure
 
-The pass is implemented as `BlifExporterPass` and exposes a single argument:
+The binary `export-blif` can be called as follows:
+```bash
+./bin/export-blif <input-mlir-file> <output-blif-file>
+```
 
-- `filepath` — path to the output `.blif` file to write.
+where `input-mlir-file` is the file that contains the Synth circuit to be exported and `output-blif-file` is the file where the location of the exported BLIF.
 
 The core functionality is the following:
 
@@ -16,7 +19,7 @@ The core functionality is the following:
 
 The core function `exportBlifCircuit` executes the following steps:
 
-1. It writes the `.model`, `.inputs`, and `.outputs` lines, and collects all port names into the `iosNames` vector using the `generateBlifHeader` function.
+1. It writes the `.model`, `.inputs`, and `.outputs` lines, and collects all port names into the `inputPorts` and `outputPorts` vectors using the `generateBlifHeader` function.
 2. It iterates over the ops inside the module body and emit the corresponding BLIF statements using the `generateBlifCircuitFromSynth` function.
 3. Writes the `.end` terminator to close the BLIF model.
 
@@ -31,9 +34,8 @@ In this subsection of the doc, we highlight the key support functions.
 The core function that writes the header section of the BLIF file for a given `hw.HWModuleOp` is `generateBlifHeader`. It:
 
 1. Writes the `.model` line using the `hw.module` name.
-2. Iterates over the module's port list and writes all input ports on the `.inputs` line.
-3. Iterates over the module's port list and writes all output ports on the `.outputs` line.
-4. Populates the `iosNames` vector with all port names in order (inputs first, then outputs), which is used downstream to resolve value names.
+2. Iterates over the module's port list and writes all input ports on the `.inputs` line. It populates the vector `inputPorts` which contains the same list.
+3. Iterates over the module's port list and writes all output ports on the `.outputs` line. It populates the vector `outputPorts` which contains the same list.
 
 ### Generate BLIF Functionality 
 
@@ -54,8 +56,8 @@ Any other operation type is reported as unsupported via an error message.
 
 Value names in the BLIF output are resolved by the internal `getValueName` lambda, which applies the following priority:
 
-1. If the value is a block argument (input port), return its name from `iosNames` using the argument index.
-2. If the value is used as an operand of `hw.output` (output port), return its name from `iosNames` using the operand index offset by the number of input ports.
+1. If the value is a block argument (input port), return its name from `inputPorts` using the argument index.
+2. If the value is used as an operand of `hw.output` (output port), return its name from `outputPorts` using the operand index offset by the number of input ports.
 3. Otherwise, print the value using MLIR's `AsmState` (e.g., `%4`), strip the leading `%`, and prepend `n` to produce a valid BLIF node name (e.g., `n4`).
 
 This function ensure uniqueness and consistency of names inside a BLIF module.
