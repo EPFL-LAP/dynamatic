@@ -15,6 +15,7 @@
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Synth/SynthDialect.h"
 #include "dynamatic/Dialect/Synth/SynthOps.h"
+#include "dynamatic/Support/BLIFIO.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 

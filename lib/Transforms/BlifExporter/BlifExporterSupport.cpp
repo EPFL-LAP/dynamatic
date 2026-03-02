@@ -29,7 +29,6 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Utils/Utils.h"
-#include "dynamatic/Transforms/BlifImporter/BlifImporterSupport.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"

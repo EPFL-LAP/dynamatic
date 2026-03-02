@@ -14,6 +14,7 @@
 
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Synth/SynthOps.h"
+#include "dynamatic/Support/BLIFIO.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 
@@ -28,21 +29,6 @@ namespace hw {
 /// Forward declare the HW dialect which the pass depends on.
 class HWDialect;
 } // namespace hw
-
-// Constant string to represent .name structure in the blif file
-const std::string logicNode = ".names";
-// Constant string to represent .latch structure in the blif file
-const std::string latchNode = ".latch";
-// Constant string to represent .inputs structure in the blif file
-const std::string inputsNodes = ".inputs";
-// Constant string to represent .outputs structure in the blif file
-const std::string outputsNodes = ".outputs";
-// Constant string to represent .model structure in the blif file
-const std::string modelNode = ".model";
-// Constant string to represent .subckt structure in the blif file
-const std::string subcktNode = ".subckt";
-// Constant string to represent the end of the module in the blif file
-const std::string endNode = ".end";
 
 class BlifImporter {
 
