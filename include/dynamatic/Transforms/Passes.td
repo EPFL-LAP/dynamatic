@@ -499,31 +499,4 @@ def HandshakeTreeHeightReduction : Pass<"handshake-tree-height-reduction"> {
 }
 
 
-// Pass to import BLIF files and generate a corresponding Synth circuit.
-def BlifImporter : DynamaticPass<"blif-importer"> {
-  let summary = "Import BLIF files and generate a corresponding Synth circuit.";
-  let description = [{
-    This pass imports a BLIF file and generates a corresponding Synth circuit.
-    The pass will fail if the input BLIF file is malformed or if
-    the ABC tool fails to process it for any reason.
-  }];
-  let options =
-    [Option<"filepath", "filepath", "std::string", "\"\"",
-            "Path to the input BLIF file.">];
-  let dependentDialects = ["dynamatic::synth::SynthDialect"];
-}
-
-// Pass to export Synth circuits in BLIF format.
-def BlifExporter : DynamaticPass<"blif-exporter"> {
-  let summary = "Export Synth circuits in BLIF format.";
-  let description = [{
-    This pass exports a Synth circuit in BLIF format. The pass will fail if the
-    output BLIF file cannot be created or written to for any reason.
-  }];
-  let options =
-    [Option<"filepath", "filepath", "std::string", "\"\"",
-            "Path to the output BLIF file.">];
-  let dependentDialects = ["dynamatic::synth::SynthDialect"];
-}
-
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
