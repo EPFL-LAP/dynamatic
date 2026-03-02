@@ -151,8 +151,6 @@ struct ConstrainedEagerForkSentNamer : public ConstrainedNamer {
   ~ConstrainedEagerForkSentNamer() = default;
 
   inline std::string getSMVName() const override {
-    llvm::errs() << llvm::formatv("{0} has channel size {1}\n",
-                                  base.getSMVName(), base.channelSize);
     return llvm::formatv("{0} & ({1}.ins = {2})", base.getSMVName(),
                          base.opName, smvValue(base.channelSize, value))
         .str();
