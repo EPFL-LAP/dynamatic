@@ -482,7 +482,7 @@ class LSQ:
 
         # Load Queue Entries
         ldq_alloc.regInit(init=[0]*self.configs.numLdqEntries)
-        ldq_issue.regInit()
+        ldq_issue.regInit(init=[0]*self.configs.numLdqEntries)
         if (self.configs.ldpAddrW > 0):
             ldq_port_idx.regInit(ldq_wen)
         ldq_addr_valid.regInit()
@@ -730,7 +730,7 @@ class LSQ:
         ldq_head_oh_p0 = LogicVec(
             ctx, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries)
         if self.configs.pipe0:
-            ldq_head_oh_p0.regInit()
+            ldq_head_oh_p0.regInit(init=0)
         arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
 
         can_load_list = []
