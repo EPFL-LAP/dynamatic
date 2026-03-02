@@ -28,11 +28,11 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 class SynthOp<string mnemonic, list<Trait> traits = []> :
     Op<Synth_Dialect, mnemonic, traits>;
 
-def MajorityInverterOp : SynthOp<"mig.maj_inv",
+def MajorityInverterOp : SynthOp<"maj_inv",
                                  [SameOperandsAndResultType, Pure]> {
   let summary = "Majority-Inverter operation";
   let description = [{
-    The `synth.mig.maj_inv` operation represents a Majority-Inverter in the
+    The `synth.maj_inv` operation represents a Majority-Inverter in the
     Synth dialect. This is used to represent majority inverter graph in
     synthesis. This operation computes the majority function of its inputs,
     where operands can be inverted respectively.
@@ -43,9 +43,9 @@ def MajorityInverterOp : SynthOp<"mig.maj_inv",
 
     Example:
     ```mlir
-      %r1 = synth.mig.maj_inv %a, %b, %c : i1
-      %r2 = synth.mig.maj_inv not %a, %b, not %c : i1
-      %r3 = synth.mig.maj_inv %a, %b, %c, %d, %e : i3
+      %r1 = synth.maj_inv %a, %b, %c : i1
+      %r2 = synth.maj_inv not %a, %b, not %c : i1
+      %r3 = synth.maj_inv %a, %b, %c, %d, %e : i3
     ```
 
     The number of inputs must be odd to avoid ties.
@@ -61,7 +61,7 @@ def MajorityInverterOp : SynthOp<"mig.maj_inv",
     custom<VariadicInvertibleOperands>($inputs, type($result), $inverted,
                                        attr-dict)
   }];
-  let cppNamespace = "::dynamatic::synth::mig";
+  let cppNamespace = "::dynamatic::synth";
   let extraClassDeclaration = [{
     // Evaluate the operation with the given input values.
     APInt evaluate(ArrayRef<APInt> inputs);
@@ -74,20 +74,20 @@ def MajorityInverterOp : SynthOp<"mig.maj_inv",
 
 }
 
-def AndInverterOp : SynthOp<"aig.and_inv", [SameOperandsAndResultType, Pure]> {
+def AndInverterOp : SynthOp<"and_inv", [SameOperandsAndResultType, Pure]> {
   let summary = "AIG dialect AND operation";
   let description = [{
-    The `synth.aig.and_inv` operation represents an And-Inverter in the AIG dialect.
+    The `synth.and_inv` operation represents an And-Inverter in the AIG dialect.
     Unlike `comb.and`, operands can be inverted respectively.
 
     Example:
     ```mlir
-      %r1 = synth.aig.and_inv %a, %b: i3
-      %r2 = synth.aig.and_inv not %a, %b, not %c : i3
-      %r3 = synth.aig.and_inv not %a : i3
+      %r1 = synth.and_inv %a, %b: i3
+      %r2 = synth.and_inv not %a, %b, not %c : i3
+      %r3 = synth.and_inv not %a : i3
     ```
 
-    Traditionally, an And-Node in AIG has two operands. However, `synth.aig.and_inv`
+    Traditionally, an And-Node in AIG has two operands. However, `synth.and_inv`
     extends this concept by allowing variadic operands and non-i1 integer types.
     Although the final stage of the synthesis pipeline requires lowering
     everything to i1-binary operands, it's more efficient to progressively lower
@@ -136,7 +136,7 @@ def AndInverterOp : SynthOp<"aig.and_inv", [SameOperandsAndResultType, Pure]> {
   }];
   let hasFolder = 1;
   let hasCanonicalizeMethod = 1;
-  let cppNamespace = "::dynamatic::synth::aig";
+  let cppNamespace = "::dynamatic::synth";
 }
 
 def LatchOp : SynthOp<"latch", [SameOperandsAndResultType, Pure]> {

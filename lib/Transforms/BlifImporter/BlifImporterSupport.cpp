@@ -432,7 +432,7 @@ void BlifImporter::createSynthWire(Location loc,
       builder.getIntegerAttr(builder.getIntegerType(1), 1));
 
   // Create aig node
-  auto aigOp = builder.create<synth::aig::AndInverterOp>(
+  auto aigOp = builder.create<synth::AndInverterOp>(
       loc, inputValue, constOp.getResult(),
       /*invertInput0=*/true, /*invertInput1=*/false);
 
@@ -479,7 +479,7 @@ void BlifImporter::createSynthLogicGate(Location loc,
   bool invertInput1 = (secondInputBit == 0) ? true : false;
 
   // Create aig node
-  auto aigOp = builder.create<synth::aig::AndInverterOp>(
+  auto aigOp = builder.create<synth::AndInverterOp>(
       loc, inputValues[0], inputValues[1],
       /*invertInput0=*/invertInput0, /*invertInput1=*/invertInput1);
 
@@ -495,7 +495,7 @@ void BlifImporter::createSynthLogicGate(Location loc,
         builder.getIntegerAttr(builder.getIntegerType(1), 1));
 
     // Create aig node
-    auto aigOpInvertedOutput = builder.create<synth::aig::AndInverterOp>(
+    auto aigOpInvertedOutput = builder.create<synth::AndInverterOp>(
         loc, aigOp.getResult(), constOp.getResult(),
         /*invertInput0=*/true, /*invertInput1=*/false);
     outputValueAig = aigOpInvertedOutput.getResult();

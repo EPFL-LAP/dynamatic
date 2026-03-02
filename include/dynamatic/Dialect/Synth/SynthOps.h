@@ -35,11 +35,10 @@
 
 namespace dynamatic {
 namespace synth {
-struct AndInverterVariadicOpConversion
-    : mlir::OpRewritePattern<aig::AndInverterOp> {
-  using OpRewritePattern<aig::AndInverterOp>::OpRewritePattern;
+struct AndInverterVariadicOpConversion : mlir::OpRewritePattern<AndInverterOp> {
+  using OpRewritePattern<AndInverterOp>::OpRewritePattern;
   mlir::LogicalResult
-  matchAndRewrite(aig::AndInverterOp op,
+  matchAndRewrite(AndInverterOp op,
                   mlir::PatternRewriter &rewriter) const override;
 };
 

@@ -26,8 +26,7 @@
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::synth::mig;
-using namespace dynamatic::synth::aig;
+using namespace dynamatic::synth;
 
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Synth/Synth.cpp.inc"
@@ -202,7 +201,7 @@ LogicalResult AndInverterOp::canonicalize(AndInverterOp op,
       continue;
     }
 
-    if (auto andInverterOp = value.getDefiningOp<synth::aig::AndInverterOp>()) {
+    if (auto andInverterOp = value.getDefiningOp<synth::AndInverterOp>()) {
       if (andInverterOp.getInputs().size() == 1 &&
           andInverterOp.isInverted(0)) {
         value = andInverterOp.getOperand(0);
@@ -250,7 +249,7 @@ LogicalResult AndInverterOp::canonicalize(AndInverterOp op,
 
   // build new op with reduced input values
   auto name = op->getAttrOfType<StringAttr>("sv.namehint");
-  auto newOp = rewriter.replaceOpWithNewOp<synth::aig::AndInverterOp>(
+  auto newOp = rewriter.replaceOpWithNewOp<synth::AndInverterOp>(
       op, op.getType(), uniqueValues, uniqueInverts);
   if (name && !newOp->hasAttr("sv.namehint"))
     newOp->setAttr("sv.namehint", name);
@@ -280,12 +279,12 @@ static Value lowerVariadicAndInverterOp(AndInverterOp op, OperandRange operands,
     break;
   case 1:
     if (inverts[0])
-      return rewriter.create<synth::aig::AndInverterOp>(op.getLoc(),
+      return rewriter.create<synth::AndInverterOp>(op.getLoc(),
                                                         operands[0], true);
     else
       return operands[0];
   case 2:
-    return rewriter.create<synth::aig::AndInverterOp>(
+    return rewriter.create<synth::AndInverterOp>(
         op.getLoc(), operands[0], operands[1], inverts[0], inverts[1]);
   default:
     auto firstHalf = operands.size() / 2;
@@ -295,7 +294,7 @@ static Value lowerVariadicAndInverterOp(AndInverterOp op, OperandRange operands,
     auto rhs =
         lowerVariadicAndInverterOp(op, operands.drop_front(firstHalf),
                                    inverts.drop_front(firstHalf), rewriter);
-    return rewriter.create<synth::aig::AndInverterOp>(op.getLoc(), lhs, rhs);
+    return rewriter.create<synth::AndInverterOp>(op.getLoc(), lhs, rhs);
   }
   return Value();
 }

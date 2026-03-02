@@ -175,8 +175,8 @@ LogicalResult BlifExporter::generateBlifCircuitFromSynth() {
         outputFile << " " << latchOp.getInitVal().value();
       }
       outputFile << "\n";
-    } else if (isa<synth::aig::AndInverterOp>(op)) {
-      auto andOp = dyn_cast<synth::aig::AndInverterOp>(op);
+    } else if (isa<synth::AndInverterOp>(op)) {
+      auto andOp = dyn_cast<synth::AndInverterOp>(op);
       // .names <input1> <input2> <output>
       outputFile << logicNode;
       outputFile << " " << getValueName(andOp.getOperand(0));
