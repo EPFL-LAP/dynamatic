@@ -46,6 +46,7 @@ class GroupAllocator:
         Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
 
         Parameters:
+            em          : Emitter used for code generation
             path_rtl    : Output directory for VHDL files.
 
         Output:
@@ -298,7 +299,7 @@ class GroupAllocator:
         Creates the VHDL port mapping for the group allocator entity.
 
         Parameters:
-            ctx                  : VHDLContext for code generation state.
+            em                   : Emitter for code generation
             group_init_valid_i   : Group Allocator handshake valid signal
             group_init_ready_o   : Group Allocator handshake ready signal
             ldq_tail_i           : Load queue tail

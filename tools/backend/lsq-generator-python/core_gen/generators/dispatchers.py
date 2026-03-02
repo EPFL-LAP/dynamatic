@@ -213,7 +213,7 @@ class PortToQueueDispatcher:
         to the internal dispatcher instance named <self.module_name>_dispatcher.
 
         Parameters:
-            em                  : VHDLContext for code generation state.
+            em                  : Emitter for code generation
             port_payload_i          : Input data or address bits from each port
             port_valid_i         : Valid signal for each input port (Valid data/address)
             port_ready_o         : Ready signal indicating the queue is ready to receive data/address
@@ -370,8 +370,8 @@ class QueueToPortDispatcher:
         that routes data from queue entries to their access ports.
 
         Parameters:
+            em          : Emitter used for code generation
             path_rtl    : Output directory for VHDL files.
-            emitter     : Emitter used to generate code
 
         Output:
             Appends the 'entity' and 'architecture' definitions
@@ -522,16 +522,16 @@ class QueueToPortDispatcher:
         to the internal dispatcher instance named <self.module_name>_dispatcher.
 
         Parameters:
-            em                  : Emitter for code generation
+            em                      : Emitter for code generation
             port_payload_o          : Output data bits from each queue entry
-            port_valid_o         : Valid signal for each input port (Valid data)
-            port_ready_i         : Ready signal indicating the queue is ready to send data
-            entry_alloc_i        : Valid bit for a queue entry
+            port_valid_o            : Valid signal for each input port (Valid data)
+            port_ready_i            : Ready signal indicating the queue is ready to send data
+            entry_alloc_i           : Valid bit for a queue entry
             entry_payload_valid_i   : Valid bit for the contents of a queue entry
-            entry_port_idx_i     : Indicates to which port the entry is assigned
+            entry_port_idx_i        : Indicates to which port the entry is assigned
             entry_payload_i         : Input data bits which is written in the queue entry
-            entry_reset_o        : Array of reset outputs for entries.
-            queue_head_oh_i      : One-hot vector indicating the current head index of the queue.
+            entry_reset_o           : Array of reset outputs for entries.
+            queue_head_oh_i         : One-hot vector indicating the current head index of the queue.
 
         Returns:
             VHDL instantiation string for inclusion in the architecture body.
