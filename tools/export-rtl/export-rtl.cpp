@@ -1287,8 +1287,11 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       for (auto &eq : p->getEquations()) {
         std::vector<std::string> terms;
         for (auto &[key, value] : eq.terms) {
+          auto annotater = key.getAnnotater();
+          assert(annotater != nullptr &&
+                 "variable without annotater in final equation");
           std::string t =
-              llvm::formatv("toint({0}) * {1}", key.getName(), value);
+              llvm::formatv("toint({0}) * {1}", annotater->getSMVName(), value);
           terms.push_back(t);
         }
         std::string equationString =

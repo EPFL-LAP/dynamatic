@@ -22,6 +22,7 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
@@ -223,7 +224,6 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
-#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 namespace dynamatic {
 #ifdef false
 // The structs FlowVariable and FlowExpression together form a DSL that help
@@ -517,7 +517,7 @@ struct FlowEquationsMatrix {
     for (auto &expr : exprs) {
       for (auto &[key, value] : expr.terms) {
         // skip non-lambda variables that are not +-
-        if (!key.isLambda() && key.pm == FlowVariable::PLUSMINUS::notApplicable)
+        if (key.getAnnotater() != nullptr)
           continue;
         // PlusAndMinus variables should never be inserted, as the DSL will
         // insert them as two separate variables
@@ -665,8 +665,16 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         }
       }
 
-      // Annotate latency-induced slots
       FlowVariable exit = entry;
+      if (auto arithOp = dyn_cast<handshake::ArithOpInterface>(op)) {
+        // Arithmetic operations modify the channel - unless further analysis is
+        // done, information about the bit is lost
+        exit = entry.nextInternal();
+        exit.pm = FlowVariable::PLUSMINUS::notApplicable;
+        equations.push_back(entry - exit);
+      }
+
+      // Annotate latency-induced slots
       if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
         for (auto &latencySlot : latencyOp.getLatencyInducedSlots()) {
           FlowVariable full = FlowVariable(
@@ -768,13 +776,18 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
           FlowVariable result = FlowVariable(op.getResults()[i]);
           if (exit.isPlusMinus()) {
             assert(result.isPlusMinus());
-            FlowVariable sentPM = sent;
-            sentPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-            equations.push_back(sent - sentPM);
-            equations.push_back(exit.getPlus() + sentPM.getPlus() -
+            // FlowVariable sentPM = sent;
+            sent.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+            // equations.push_back(sent - sentPM);
+            equations.push_back(exit.getPlus() + sent.getPlus() -
                                 result.getPlus());
-            equations.push_back(exit.getMinus() + sentPM.getMinus() -
+            equations.push_back(exit.getMinus() + sent.getMinus() -
                                 result.getMinus());
+            llvm::errs() << llvm::formatv("{0} is a forkOp with binary input\n",
+                                          getUniqueName(&op));
+            llvm::errs() << llvm::formatv(
+                "   the + annotater of index {0} outputs {1}\n", i,
+                sent.getPlus().getAnnotater()->getSMVName());
           } else {
             equations.push_back(exit + sent - result);
           }
@@ -866,10 +879,12 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-  if (failed(annotateAbsenceOfBackpressure(modOp)))
-    return signalPassFailure();
-  if (failed(annotateValidEquivalence(modOp)))
-    return signalPassFailure();
+  if (false) {
+    if (failed(annotateAbsenceOfBackpressure(modOp)))
+      return signalPassFailure();
+    if (failed(annotateValidEquivalence(modOp)))
+      return signalPassFailure();
+  }
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
