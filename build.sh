@@ -469,12 +469,14 @@ create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/elastic-miter
+create_symlink ../build/bin/export-blif
 create_symlink ../build/bin/export-dot
 create_symlink ../build/bin/export-cfg
 create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
+create_symlink ../build/bin/import-blif
 create_symlink ../build/bin/log2csv
 create_symlink "../build/bin/rigidification-testbench"
 create_generator_symlink build/bin/rtl-cmpf-generator
