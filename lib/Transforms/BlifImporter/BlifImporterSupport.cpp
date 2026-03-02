@@ -74,11 +74,9 @@ namespace dynamatic {
 
 // Function to get the module name and the input and output ports from the blif
 // file
-LogicalResult getBlifModuleHeader(StringRef blifFilePath,
-                                  std::string &moduleNameBlif,
-                                  SmallVector<std::string> &inputPorts,
-                                  SmallVector<std::string> &outputPorts) {
-  std::ifstream file(blifFilePath.str());
+LogicalResult BlifImporter::extractBlifModuleHeader() {
+
+  std::ifstream file(blifFilePath);
 
   if (!file.is_open()) {
     llvm::errs() << "The blif file '" << blifFilePath
@@ -109,9 +107,9 @@ LogicalResult getBlifModuleHeader(StringRef blifFilePath,
 
     // Model name
     if (type == modelNode) {
-      std::string moduleName;
-      iss >> moduleName;
-      if (moduleName.empty()) {
+      std::string module;
+      iss >> module;
+      if (module.empty()) {
         llvm::errs()
             << "The .model line in the blif file does not contain a "
                "module name. Please provide a valid module name in the "
@@ -119,7 +117,7 @@ LogicalResult getBlifModuleHeader(StringRef blifFilePath,
             << "\n";
         return failure();
       }
-      moduleNameBlif = moduleName;
+      moduleName = module;
     }
 
     // Input/Output nodes. These are also Dataflow graph channels.
@@ -172,31 +170,24 @@ LogicalResult getBlifModuleHeader(StringRef blifFilePath,
 }
 // Function to read a blif file and generate the synth circuit depending on the
 // blif description
-LogicalResult
-generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
-                             DenseMap<StringAttr, Value> &synthInputs,
-                             SmallVector<std::string> &synthOutputsNames,
-                             SmallVector<Value> &synthOutputs,
-                             OpBuilder &builder) {
+LogicalResult BlifImporter::generateSynthCircuitFromBlif(
+    Location loc, llvm::StringMap<Value> &synthInputs,
+    SmallVector<std::string> &synthOutputsNames,
+    SmallVector<Value> &synthOutputs, OpBuilder &builder) {
   // The following function reads the blif file specified by blifFilePath
   // and generates the synth circuit defined in it.
 
-  // Map to store the values of the nodes
-  DenseMap<StringAttr, Value> nodeValuesMap;
-  // Map to store temporary values for nodes not yet defined
-  DenseMap<StringAttr, Value> tmpValuesMap;
-
   // Iterate over the synth inputs and add the mapping to nodeValuesMap
   for (const auto &synthInput : synthInputs) {
-    StringAttr inputNameAttr = synthInput.first;
+    std::string inputName = synthInput.first().str();
     Value inputValue = synthInput.second;
     // Check the input name is not already in the map
-    assert(!nodeValuesMap.count(inputNameAttr) &&
+    assert(!nodeValuesMap.count(inputName) &&
            "input name already exists in the node values map");
-    nodeValuesMap[inputNameAttr] = inputValue;
+    nodeValuesMap[inputName] = inputValue;
   }
 
-  std::ifstream file(blifFilePath.str());
+  std::ifstream file(blifFilePath);
 
   if (!file.is_open()) {
     llvm::errs() << "The blif file '" << blifFilePath
@@ -261,14 +252,12 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
       // remaining.size() == 0: no optional fields present, which is also valid
 
       // Get the input signal for the register
-      Value inputSignal = getInputMappingSynthSignal(
-          loc, nodeValuesMap, tmpValuesMap, regInput, builder);
+      Value inputSignal = getInputMappingSynthSignal(loc, regInput, builder);
 
       // Get optional control signal
       Value controlSignal = nullptr;
       if (!controlName.empty()) {
-        controlSignal = getInputMappingSynthSignal(
-            loc, nodeValuesMap, tmpValuesMap, controlName, builder);
+        controlSignal = getInputMappingSynthSignal(loc, controlName, builder);
       }
 
       // Create synth register operation
@@ -279,8 +268,7 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
           initVal.has_value() ? builder.getI64IntegerAttr(*initVal) : nullptr);
 
       // Map the output node to the register output
-      updateOutputSynthSignalMapping(regOp.getResult(), regOutput,
-                                     nodeValuesMap, tmpValuesMap, builder);
+      updateOutputSynthSignalMapping(regOp.getResult(), regOutput, builder);
 
     }
 
@@ -317,15 +305,13 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
 
         // Map the output node to the constant output
         updateOutputSynthSignalMapping(constOp.getResult(), nodeNames[0],
-                                       nodeValuesMap, tmpValuesMap, builder);
+                                       builder);
       } else if (nodeNames.size() == 2) {
         // Create wire as a function of other existing synth operations
-        createSynthWire(loc, nodeNames, function, nodeValuesMap, tmpValuesMap,
-                        builder);
+        createSynthWire(loc, nodeNames, function, builder);
       } else {
         // Create logic gate as a function of other existing synth operations
-        createSynthLogicGate(loc, nodeNames, function, nodeValuesMap,
-                             tmpValuesMap, builder);
+        createSynthLogicGate(loc, nodeNames, function, builder);
       }
     }
 
@@ -347,12 +333,12 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
   // caller
   // Map hw instance outputs to the corresponding synth signals
   for (const auto &outputNodeName : synthOutputsNames) {
-    if (!nodeValuesMap.count(builder.getStringAttr(outputNodeName))) {
+    if (!nodeValuesMap.count(outputNodeName)) {
       llvm::errs() << "Output node '" << outputNodeName
                    << "' not found in synth circuit." << "\n";
       return failure();
     }
-    Value outputSignal = nodeValuesMap[builder.getStringAttr(outputNodeName)];
+    Value outputSignal = nodeValuesMap[outputNodeName];
     synthOutputs.push_back(outputSignal);
   }
 
@@ -360,18 +346,16 @@ generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
 }
 
 // Function to get the input mapping of a signal value
-Value getInputMappingSynthSignal(Location loc,
-                                 DenseMap<StringAttr, Value> &nodeValuesMap,
-                                 DenseMap<StringAttr, Value> &tmpValuesMap,
-                                 StringRef nodeName, OpBuilder &builder) {
+Value BlifImporter::getInputMappingSynthSignal(Location loc, StringRef nodeName,
+                                               OpBuilder &builder) {
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
   // Check if the signal is already in the map
-  if (nodeValuesMap.count(builder.getStringAttr(nodeName))) {
-    return nodeValuesMap[builder.getStringAttr(nodeName)];
+  if (nodeValuesMap.count(nodeName.str())) {
+    return nodeValuesMap[nodeName.str()];
   }
   // Check if the signal is in the tmp values map
-  if (tmpValuesMap.count(builder.getStringAttr(nodeName))) {
-    return tmpValuesMap[builder.getStringAttr(nodeName)];
+  if (tmpValuesMap.count(nodeName.str())) {
+    return tmpValuesMap[nodeName.str()];
   }
   // If not, create a temporary input signal (e.g., hw constant)
   auto tempInput = builder.create<hw::ConstantOp>(
@@ -379,40 +363,36 @@ Value getInputMappingSynthSignal(Location loc,
       builder.getIntegerAttr(builder.getIntegerType(1), 0));
 
   // Add the temporary input signal to the map
-  tmpValuesMap[builder.getStringAttr(nodeName)] = tempInput;
+  tmpValuesMap[nodeName.str()] = tempInput;
   return tempInput;
 }
 
 // Function to update the output signal mapping after creating a new synth
 // operation
-void updateOutputSynthSignalMapping(Value newResult, StringRef nodeName,
-                                    DenseMap<StringAttr, Value> &nodeValuesMap,
-                                    DenseMap<StringAttr, Value> &tmpValuesMap,
-                                    OpBuilder &builder) {
+void BlifImporter::updateOutputSynthSignalMapping(Value newResult,
+                                                  StringRef nodeName,
+                                                  OpBuilder &builder) {
   // Check if the old result is in the tmp values map
-  if (tmpValuesMap.count(builder.getStringAttr(nodeName))) {
+  if (tmpValuesMap.count(nodeName.str())) {
     // Replace all uses of the temporary value with the new result value
-    tmpValuesMap[builder.getStringAttr(nodeName)].replaceAllUsesWith(newResult);
-    auto *constOp =
-        tmpValuesMap[builder.getStringAttr(nodeName)].getDefiningOp();
+    tmpValuesMap[nodeName.str()].replaceAllUsesWith(newResult);
+    auto *constOp = tmpValuesMap[nodeName.str()].getDefiningOp();
     assert(constOp && "temporary value should have a defining operation");
     assert(constOp->use_empty() && "temporary value should have no more uses");
     // Erase the operation
     constOp->erase();
     // Remove the temporary value from the map
-    tmpValuesMap.erase(builder.getStringAttr(nodeName));
+    tmpValuesMap.erase(nodeName.str());
   }
   // Add the new result value to the node values map
-  nodeValuesMap[builder.getStringAttr(nodeName)] = newResult;
+  nodeValuesMap[nodeName.str()] = newResult;
 }
 
 // Function to create a wire in function of synth logic gate operations based
 // on .names definition
-void createSynthWire(Location loc, std::vector<std::string> &ports,
-                     std::string &function,
-                     DenseMap<StringAttr, Value> &nodeValuesMap,
-                     DenseMap<StringAttr, Value> &tmpValuesMap,
-                     OpBuilder &builder) {
+void BlifImporter::createSynthWire(Location loc,
+                                   std::vector<std::string> &ports,
+                                   std::string &function, OpBuilder &builder) {
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
   unsigned numInputs = ports.size() - 1;
   assert(numInputs == 1 && "wire should have only one input");
@@ -420,8 +400,7 @@ void createSynthWire(Location loc, std::vector<std::string> &ports,
   // Get input values
   for (unsigned i = 0; i < numInputs; ++i) {
     StringRef inputNodeName = ports[i];
-    Value inputValue = getInputMappingSynthSignal(
-        loc, nodeValuesMap, tmpValuesMap, inputNodeName, builder);
+    Value inputValue = getInputMappingSynthSignal(loc, inputNodeName, builder);
     inputValues.push_back(inputValue);
   }
   StringRef outputNodeName = ports.back();
@@ -442,8 +421,7 @@ void createSynthWire(Location loc, std::vector<std::string> &ports,
   if (inputBit == outputBit) {
     // We just need to update the output map function so that the output
     // points to the same value as input
-    updateOutputSynthSignalMapping(inputValue, outputNodeName, nodeValuesMap,
-                                   tmpValuesMap, builder);
+    updateOutputSynthSignalMapping(inputValue, outputNodeName, builder);
     return;
   }
   // If this is not the case, we have to create a new aig node which inverts
@@ -458,16 +436,14 @@ void createSynthWire(Location loc, std::vector<std::string> &ports,
       loc, inputValue, constOp.getResult(),
       /*invertInput0=*/true, /*invertInput1=*/false);
 
-  updateOutputSynthSignalMapping(aigOp.getResult(), outputNodeName,
-                                 nodeValuesMap, tmpValuesMap, builder);
+  updateOutputSynthSignalMapping(aigOp.getResult(), outputNodeName, builder);
 }
 
 // Function to create synth logic gate operations based on .names definition
-void createSynthLogicGate(Location loc, std::vector<std::string> &ports,
-                          std::string &function,
-                          DenseMap<StringAttr, Value> &nodeValuesMap,
-                          DenseMap<StringAttr, Value> &tmpValuesMap,
-                          OpBuilder &builder) {
+void BlifImporter::createSynthLogicGate(Location loc,
+                                        std::vector<std::string> &ports,
+                                        std::string &function,
+                                        OpBuilder &builder) {
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
   unsigned numInputs = ports.size() - 1;
   assert(numInputs > 1 && "logic gate must have at least two inputs");
@@ -477,8 +453,7 @@ void createSynthLogicGate(Location loc, std::vector<std::string> &ports,
   // Get input values
   for (unsigned i = 0; i < numInputs; ++i) {
     StringRef inputNodeName = ports[i];
-    Value inputValue = getInputMappingSynthSignal(
-        loc, nodeValuesMap, tmpValuesMap, inputNodeName, builder);
+    Value inputValue = getInputMappingSynthSignal(loc, inputNodeName, builder);
     inputValues.push_back(inputValue);
   }
   StringRef outputNodeName = ports.back();
@@ -527,8 +502,7 @@ void createSynthLogicGate(Location loc, std::vector<std::string> &ports,
   }
 
   // Update output mapping
-  updateOutputSynthSignalMapping(outputValueAig, outputNodeName, nodeValuesMap,
-                                 tmpValuesMap, builder);
+  updateOutputSynthSignalMapping(outputValueAig, outputNodeName, builder);
 }
 
 // Function to create a new synth circuit from a blif file from an empty IR
@@ -540,15 +514,16 @@ void importBlifCircuit(ModuleOp moduleOp, Location loc,
   // Set as insertion point the beginning of the module body to create the synth
   // circuit inside the module body and before any other operation
   builder.setInsertionPointToStart(moduleOp.getBody());
+  BlifImporter blifImporter(blifFilePath);
   // Read input and output ports from the blif file
-  std::string moduleName;
-  SmallVector<std::string> inputPortsNames;
-  SmallVector<std::string> outputPortsNames;
-  if (failed(getBlifModuleHeader(blifFilePath, moduleName, inputPortsNames,
-                                 outputPortsNames))) {
+  if (failed(blifImporter.extractBlifModuleHeader())) {
     llvm::errs() << "Failed to read the blif file header." << "\n";
     return;
   }
+  std::string moduleName = blifImporter.getModuleName();
+  SmallVector<std::string> inputPortsNames = blifImporter.getInputPortsNames();
+  SmallVector<std::string> outputPortsNames =
+      blifImporter.getOutputPortsNames();
   // Create array of port info to create the hw module operation
   SmallVector<hw::PortInfo> portInfos;
   for (auto [idx, inputPortName] : llvm::enumerate(inputPortsNames)) {
@@ -569,7 +544,7 @@ void importBlifCircuit(ModuleOp moduleOp, Location loc,
 
   // Collect the inputs of the hw module in a map to pass to the function that
   // generates the synth circuit
-  DenseMap<StringAttr, Value> synthInputs;
+  llvm::StringMap<Value> synthInputs;
   unsigned inputIndex = 0;
   for (auto port : hwModule.getPortList()) {
     if (!port.isInput()) {
@@ -580,7 +555,7 @@ void importBlifCircuit(ModuleOp moduleOp, Location loc,
     Value portValue = hwModule.getModuleBody().getArgument(inputIndex);
     inputIndex++;
     // Add the mapping between the input port name and its value to the map
-    synthInputs[builder.getStringAttr(portName)] = portValue;
+    synthInputs[portName.str()] = portValue;
   }
   builder.setInsertionPointToStart(hwModule.getBodyBlock());
 
@@ -591,9 +566,8 @@ void importBlifCircuit(ModuleOp moduleOp, Location loc,
   // Collect the outputs of the synth circuit
   SmallVector<Value> synthOutputs;
   // Generate the synth circuit from the blif file
-  if (failed(generateSynthCircuitFromBlif(blifFilePath, hwModuleloc,
-                                          synthInputs, outputPortsNames,
-                                          synthOutputs, builder))) {
+  if (failed(blifImporter.generateSynthCircuitFromBlif(
+          hwModuleloc, synthInputs, outputPortsNames, synthOutputs, builder))) {
     llvm::errs() << "Failed to generate the synth circuit from the blif file."
                  << "\n";
     return;

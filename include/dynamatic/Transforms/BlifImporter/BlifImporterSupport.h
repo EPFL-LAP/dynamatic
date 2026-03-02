@@ -44,49 +44,79 @@ const std::string subcktNode = ".subckt";
 // Constant string to represent the end of the module in the blif file
 const std::string endNode = ".end";
 
-// Function to read a blif file and generate the synth circuit depending on the
-// blif description
-LogicalResult
-generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
-                             DenseMap<StringAttr, Value> &synthInputs,
-                             SmallVector<std::string> &synthOutputsNames,
-                             SmallVector<Value> &synthOutputs,
-                             OpBuilder &builder);
+class BlifImporter {
 
-// Function to get the input mapping of a signal value
-Value getInputMappingSynthSignal(Location loc,
-                                 DenseMap<StringAttr, Value> &nodeValuesMap,
-                                 DenseMap<StringAttr, Value> &tmpValuesMap,
-                                 StringRef nodeName, OpBuilder &builder);
+public:
+  // Method to create BlifImporter object with the blif file path as argument
+  BlifImporter(StringRef blifFilePath) : blifFilePath(blifFilePath.str()) {}
 
-// Function to update the output signal mapping after creating a new synth
-// operation
-void updateOutputSynthSignalMapping(Value newResult, StringRef nodeName,
-                                    DenseMap<StringAttr, Value> &nodeValuesMap,
-                                    DenseMap<StringAttr, Value> &tmpValuesMap,
-                                    OpBuilder &builder);
+  // Function to read a blif file and generate the synth circuit depending on
+  // the blif description
+  LogicalResult generateSynthCircuitFromBlif(
+      Location loc, llvm::StringMap<Value> &synthInputs,
+      SmallVector<std::string> &synthOutputsNames,
+      SmallVector<Value> &synthOutputs, OpBuilder &builder);
 
-// Function to create a wire in function of synth logic gate operations based
-// on .names definition
-void createSynthWire(Location loc, std::vector<std::string> &ports,
-                     std::string &function,
-                     DenseMap<StringAttr, Value> &nodeValuesMap,
-                     DenseMap<StringAttr, Value> &tmpValuesMap,
-                     OpBuilder &builder);
+  // Function to get the input mapping of a signal value
+  Value getInputMappingSynthSignal(Location loc, StringRef nodeName,
+                                   OpBuilder &builder);
 
-// Function to create synth logic gate operations based on .names definition
-void createSynthLogicGate(Location loc, std::vector<std::string> &ports,
-                          std::string &function,
-                          DenseMap<StringAttr, Value> &nodeValuesMap,
-                          DenseMap<StringAttr, Value> &tmpValuesMap,
-                          OpBuilder &builder);
+  // Function to update the output signal mapping after creating a new synth
+  // operation
+  void updateOutputSynthSignalMapping(Value newResult, StringRef nodeName,
+                                      OpBuilder &builder);
 
-// Function to get the module name and the input and output ports from the blif
-// file
-LogicalResult getBlifModuleHeader(StringRef blifFilePath,
-                                  std::string &moduleNameBlif,
-                                  SmallVector<std::string> &inputPorts,
-                                  SmallVector<std::string> &outputPorts);
+  // Function to create a wire in function of synth logic gate operations based
+  // on .names definition
+  void createSynthWire(Location loc, std::vector<std::string> &ports,
+                       std::string &function, OpBuilder &builder);
+
+  // Function to create synth logic gate operations based on .names definition
+  void createSynthLogicGate(Location loc, std::vector<std::string> &ports,
+                            std::string &function, OpBuilder &builder);
+
+  // Function to extract the module name and the input and output ports from the
+  // blif file
+  LogicalResult extractBlifModuleHeader();
+
+  // Function to get the module name
+  std::string getModuleName() {
+    assert(!moduleName.empty() &&
+           "Before calling getModuleName(), the module name must be set by "
+           "extractBlifModuleHeader().");
+    return moduleName;
+  }
+
+  // Function to get the input ports names
+  SmallVector<std::string> getInputPortsNames() {
+    assert(!inputPorts.empty() && "Before calling getInputPortsNames(), the "
+                                  "input ports names must be set "
+                                  "by extractBlifModuleHeader().");
+    return inputPorts;
+  }
+
+  // Function to get the output ports names
+  SmallVector<std::string> getOutputPortsNames() {
+    assert(!outputPorts.empty() && "Before calling getOutputPortsNames(), the "
+                                   "output ports names must be set "
+                                   "by extractBlifModuleHeader().");
+    return outputPorts;
+  }
+
+private:
+  // String representing the blif file containing the circuit to import
+  std::string blifFilePath;
+  // String representing the module name in the blif file
+  std::string moduleName = "";
+  // Vector containing the input ports of the blif circuit
+  SmallVector<std::string> inputPorts;
+  // Vector containing the output ports of the blif circuit
+  SmallVector<std::string> outputPorts;
+  // Map to store the values of the nodes
+  llvm::StringMap<Value> nodeValuesMap;
+  // Map to store temporary values for nodes not yet defined
+  llvm::StringMap<Value> tmpValuesMap;
+};
 
 // Function to create a new synth circuit from a blif file from an empty IR
 void importBlifCircuit(ModuleOp moduleOp, Location loc, StringRef blifFilePath);
