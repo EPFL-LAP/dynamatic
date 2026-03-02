@@ -532,11 +532,6 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
                                 result.getPlus());
             equations.push_back(exit.getMinus() + sent.getMinus() -
                                 result.getMinus());
-            llvm::errs() << llvm::formatv("{0} is a forkOp with binary input\n",
-                                          getUniqueName(&op));
-            llvm::errs() << llvm::formatv(
-                "   the + annotater of index {0} outputs {1}\n", i,
-                sent.getPlus().getAnnotater()->getSMVName());
           } else {
             equations.push_back(exit + sent - result);
           }

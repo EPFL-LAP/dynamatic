@@ -1,3 +1,6 @@
+#ifndef DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
+#define DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
+
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -115,3 +118,5 @@ void operator+=(FlowExpression &left, const FlowExpression &right);
 void operator-=(FlowExpression &left, const FlowExpression &right);
 } // namespace handshake
 } // namespace dynamatic
+
+#endif
