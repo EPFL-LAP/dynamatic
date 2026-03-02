@@ -1,5 +1,4 @@
 add_dynamatic_library(DynamaticBlifExporter
-  BlifExporter.cpp
   BlifExporterSupport.cpp
 
   DEPENDS
