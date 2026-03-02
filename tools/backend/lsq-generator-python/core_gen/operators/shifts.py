@@ -1,6 +1,6 @@
 from core_gen.emitters import Emitter
 from core_gen.signals import *
-from core_gen.ir import Op, Val
+from core_gen.ir import Val
 
 
 # ===----------------------------------------------------------------------===#

@@ -1,5 +1,5 @@
 from core_gen.emitters import Emitter
-from core_gen.ir import Op, Val
+from core_gen.ir import Val
 
 
 def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:

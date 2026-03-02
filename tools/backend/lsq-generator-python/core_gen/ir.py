@@ -266,9 +266,3 @@ class WhenElse(Statement):
                 f"true_statement and false_statement must have the same type, got {self.true_statement.get_type()} and {self.false_statement.get_type()}"
             )
         return self.true_statement.get_type()
-
-
-def Op(ctx, *args):
-    raise ValueError(
-        "Op is deprecated, please use Val, Bin, Un, WhenElse, or CustomStr instead"
-    )

@@ -1,5 +1,5 @@
 from core_gen.emitters import Emitter
-from core_gen.ir import Op, Val, Bit
+from core_gen.ir import Val, Bit
 from core_gen.utils import isPow2
 from core_gen.signals import *
 
