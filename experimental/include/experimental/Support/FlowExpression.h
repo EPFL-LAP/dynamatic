@@ -1,7 +1,20 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Support/LLVM.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/JSON.h"
 
 namespace dynamatic {
 namespace handshake {
+
+struct OtherVariable {
+  virtual ~OtherVariable() = default;
+  virtual bool isAnnotatable() = 0;
+  virtual std::string annotate() = 0;
+  virtual llvm::json::Value toJSON() = 0;
+  virtual std::optional<int64_t> getConstraint() = 0;
+  virtual std::unique_ptr<OtherVariable> constrain(int64_t value) = 0;
+  virtual std::unique_ptr<OtherVariable> getUnconstrained() = 0;
+};
 
 struct FlowVariable {
   enum TYPE { internalState, inputLambda, outputLambda, internalLambda };
@@ -58,6 +71,7 @@ struct FlowVariable {
            type == FlowVariable::TYPE::internalLambda;
   }
 
+  std::shared_ptr<InternalStateNamer> getAnnotater() const;
   std::string getName() const;
 };
 

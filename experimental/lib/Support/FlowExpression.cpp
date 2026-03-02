@@ -70,6 +70,26 @@ bool FlowVariable::sameChannel(const FlowVariable &other) const {
   return type == other.type && lambdaIndex == other.lambdaIndex &&
          op == other.op;
 }
+std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
+  if (isLambda()) {
+    return nullptr;
+  }
+  assert(type == internalState);
+
+  switch (pm) {
+  case notApplicable:
+    return state;
+  case plus:
+    return state->tryConstrain(1);
+  case minus:
+    return state->tryConstrain(0);
+  case plusAndMinus:
+    // should not happen because `plusAndMinus` is split into `plus` and `minus`
+    // within a flow expression
+    assert(false && "trying to get the annotater for plusAndMinus");
+    return nullptr;
+  }
+}
 
 std::string FlowVariable::getName() const {
   std::string sign;
