@@ -630,7 +630,6 @@ class LSQWrapper:
             self.lsq_config.numLdMem,
             self.lsq_config.idW,
             dyn_comp=True,
-            force_reg=True,
         )
         wreq_id = LogicVecArray(
             em,
@@ -639,7 +638,6 @@ class LSQWrapper:
             self.lsq_config.numStMem,
             self.lsq_config.idW,
             dyn_comp=True,
-            force_reg=True,
         )
 
         # Define the process to update
