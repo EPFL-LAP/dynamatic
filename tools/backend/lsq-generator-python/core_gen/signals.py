@@ -17,13 +17,13 @@ from core_gen.ir import Statement
 
 class Logic(Statement):
     """
-    A one-bit VHDL std_logic signal.
+    A one-bit logic signal.
 
     Logic class encapsulates wires, ports, and registers in the code generator,
     handling name with '_i', '_o', '_q', '_d' suffixes.
 
     Attributes:
-        ctx (VHDLContext): Context for code generation.
+        em (Emitter): Emitter for code generation.
         name (str): The base name of the signal.
         type (str):
             'i' input port      (<name>_i: in std_logic)
@@ -31,6 +31,8 @@ class Logic(Statement):
             'w' internal wire   (signal <name>: std_logic)
             'r' register        (<name>_q) for the registered value
                                 (<name>_d) for the next-cycled value
+        dyn_comp (bool): Flag indicating whether to use dynamatic compatible naming
+        force_reg (bool): Flag indicating whether to force the signal to be a register, only relevant for Verilog generation
 
     Methods:
         getNameRead(): Returns the name we should use when reading the signal. (e.g. <name>_q for a register type)
@@ -46,7 +48,7 @@ class Logic(Statement):
 
     def __init__(
         self,
-        ctx: Statement,
+        em: Statement,
         name: str,
         type: str = "w",
         init: bool = True,
@@ -60,7 +62,7 @@ class Logic(Statement):
         """
         # Type should be one of the four types.
         assert type in ("i", "o", "w", "r")
-        self.ctx = ctx
+        self.em = em
         self.name = name
         self.type = type
         self.dyn_comp = dyn_comp
@@ -128,10 +130,10 @@ class Logic(Statement):
             return self.get_base_name(sufix) + ("_o" if not self.dyn_comp else "")
 
     def signalInit(self, sufix="") -> None:
-        self.ctx.logic_signal_init(self, sufix)
+        self.em.logic_signal_init(self, sufix)
 
     def regInit(self, enable=None, init=None) -> None:
-        self.ctx.logic_reg_init(self, enable, init)
+        self.em.logic_reg_init(self, enable, init)
 
     def get_base_name(self, sufix="") -> str:
         if not self.dyn_comp or sufix == "":
@@ -178,7 +180,7 @@ class LogicVec(Logic):
 
     def __init__(
         self,
-        ctx: Statement,
+        em: Statement,
         name: str,
         type: str = "w",
         size: int = 1,
@@ -186,7 +188,7 @@ class LogicVec(Logic):
         dyn_comp=False,
         force_reg=False,
     ) -> None:
-        Logic.__init__(self, ctx, name, type, False, dyn_comp, force_reg)
+        Logic.__init__(self, em, name, type, False, dyn_comp, force_reg)
         assert size > 0
         self.size = size
         if init:
@@ -214,20 +216,20 @@ class LogicVec(Logic):
             return Logic.getNameRead(self, sufix)
         else:
             assert i < self.size
-            return self.ctx.index_var(Logic.getNameRead(self, sufix), i)
+            return self.em.index_var(Logic.getNameRead(self, sufix), i)
 
     def getNameWrite(self, i=None, sufix="") -> str:
         if i == None:
             return Logic.getNameWrite(self, sufix)
         else:
             assert i < self.size
-            return self.ctx.index_var(Logic.getNameWrite(self, sufix), i)
+            return self.em.index_var(Logic.getNameWrite(self, sufix), i)
 
     def signalInit(self, sufix=""):
-        self.ctx.logicvec_signal_init(self, sufix)
+        self.em.logicvec_signal_init(self, sufix)
 
     def regInit(self, enable=None, init=None) -> None:
-        self.ctx.logicvec_reg_init(self, enable, init)
+        self.em.logicvec_reg_init(self, enable, init)
 
 
 #
@@ -259,7 +261,7 @@ class LogicArray(Logic):
 
     def __init__(
         self,
-        ctx: Statement,
+        em: Statement,
         name: str,
         type: str = "w",
         length: int = 1,
@@ -267,7 +269,7 @@ class LogicArray(Logic):
         force_reg=False,
     ):
         self.length = length
-        Logic.__init__(self, ctx, name, type, False, dyn_comp, force_reg)
+        Logic.__init__(self, em, name, type, False, dyn_comp, force_reg)
         self.signalInit()
 
     def __repr__(self) -> str:
@@ -288,11 +290,11 @@ class LogicArray(Logic):
     def __getitem__(self, i) -> Logic:
         assert i in range(0, self.length)
         return Logic(
-            self.ctx, self.get_base_name(f"_{i}"), self.type, False, self.dyn_comp
+            self.em, self.get_base_name(f"_{i}"), self.type, False, self.dyn_comp
         )
 
     def regInit(self, enable=None, init=None) -> None:
-        self.ctx.logicarray_reg_init(self, enable, init)
+        self.em.logicarray_reg_init(self, enable, init)
 
 
 #
@@ -325,7 +327,7 @@ class LogicVecArray(LogicVec):
 
     def __init__(
         self,
-        ctx: Statement,
+        em: Statement,
         name: str,
         type: str = "w",
         length: int = 1,
@@ -334,7 +336,7 @@ class LogicVecArray(LogicVec):
         force_reg=False,
     ):
         self.length = length
-        LogicVec.__init__(self, ctx, name, type, size, False, dyn_comp, force_reg)
+        LogicVec.__init__(self, em, name, type, size, False, dyn_comp, force_reg)
         self.signalInit()
 
     def __repr__(self) -> str:
@@ -355,7 +357,7 @@ class LogicVecArray(LogicVec):
     def __getitem__(self, i) -> LogicVec:
         assert i in range(0, self.length)
         return LogicVec(
-            self.ctx,
+            self.em,
             self.get_base_name(f"_{i}"),
             self.type,
             self.size,
@@ -364,4 +366,4 @@ class LogicVecArray(LogicVec):
         )
 
     def regInit(self, enable=None, init=None) -> None:
-        self.ctx.logicvecarray_reg_init(self, enable, init)
+        self.em.logicvecarray_reg_init(self, enable, init)
