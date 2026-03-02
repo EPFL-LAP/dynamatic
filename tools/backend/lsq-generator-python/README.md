@@ -20,7 +20,7 @@ This Python-based LSQ generator generates the LSQ design outlined in Hailin Wang
 ### Sampele usage
 
 ```
-usage: lsq-generator.py [-h] [--output-dir OUTPUT_PATH] --config-file CONFIG_FILES
+usage: lsq-generator.py [-h] [--output-dir OUTPUT_PATH] --config-file CONFIG_FILES --hdl [vhdl|verilog]
 ```
 
 ### Sample json configuration file (Example: Histogram)
@@ -89,12 +89,9 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
 - **lsq-generator.py**  
   Runs the tool.
 
-- **vhdl_gen/**
+- **core_gen/**
   - **\_\_init__.py**  
     Re-exports a curated list of public API symbols (e.g. `main`, `generate`, `Logic`, `LSQ`).
-
-  - **cli.py**  
-    Parses command-line arguments (with `argparse`), converts them into a `Configs` instance, and calls the core generator.
 
   - **codegen.py**  
     Implements the `codeGen(config: Configs)` function.
@@ -102,18 +99,17 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
   - **configs.py**  
     Defines the `Configs` class.
 
-  - **context.py**  
-    Defines the `VHDLContext` class. It substitutes the previous `global` VHDL context variables.
-
-  - **utils.py**  
-    - Defines `VHDLLogicType`, `VHDLLogicVecType`, `VHDLLogicTypeArray`, `VHDLLogicVecTypeArray`, `OpTab`.
-    - `IntToBits`, `Zero`, `GetValue`, `MaskLess`, `isPow2`, `log2Ceil` helper functions.
-    - Classes and functions need to be relocated into other files later.
+  - **ir.py**  
+    Defines the intermediate representation used to generate HDL
+    Defines  `Statement`, `Type`, `Val`, `BinOp`, `Bin`, `UnOp`, `Un`, `Bit`, `CustomStatement`, `WhenElse`.
 
   - **signals.py**  
     Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
 
-  - **vhdlgen/operators/**  
+  - **utils.py**  
+    - Defines `GetValue`, `isPow2`, `log2Ceil` helper functions.
+
+  - **operators/**  
     Low-level functions that generate VHDL snippets:  
     - `assign.py`: `Op`  
     - `arithmetic.py`: `WrapAdd`, `WrapAddConst`, `WrapSub`
@@ -123,10 +119,17 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     - `reduction.py`: `ReduceLogicVec`, `ReduceLogicArray`, `ReduceLogicVecArray`, `Reduce`
     - `shifts.py`: `RotateLogicVec`, `RotateLogicArray`, `RotateLogicVecArray`, `CyclicLeftShift`
 
-  - **vhdlgen/generators/**  
+  - **generators/**  
     High-level modules that build complete entities/architectures:  
     - `dispatchers.py` : `PortToQueueDispatcher`, `QueueToPortDispatcher`, `PortToQueueDispatcherInit`, `QueueToPortDispatcherInit`
     - `group_allocator.py` : `GroupAllocator`, `GroupAllocatorInit`
     - `lsq.py` : `LSQ`
+    
+  - **emitters/**
+    Emitters used to emit either VHDL or Verilog code.
+    - `emmitter.py` : Abstract class `Emitter`
+    - `verilog_emitter.py` : `VerilogEmitter`
+    - `vhdl_emitter.py` : `VHDLEmitter`
+    
 
  
