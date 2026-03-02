@@ -125,7 +125,7 @@ struct EagerForkSentNamer : public InternalStateNamer {
 
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral CHANNEL_NAME_LIT = "channel_name";
-  static constexpr llvm::StringLiteral CHANNEL_SIZE_LIT = "channel_name";
+  static constexpr llvm::StringLiteral CHANNEL_SIZE_LIT = "channel_size";
 };
 
 inline std::string smvValue(size_t channelSize, size_t value) {
@@ -151,6 +151,8 @@ struct ConstrainedEagerForkSentNamer : public ConstrainedNamer {
   ~ConstrainedEagerForkSentNamer() = default;
 
   inline std::string getSMVName() const override {
+    llvm::errs() << llvm::formatv("{0} has channel size {1}\n",
+                                  base.getSMVName(), base.channelSize);
     return llvm::formatv("{0} & ({1}.ins = {2})", base.getSMVName(),
                          base.opName, smvValue(base.channelSize, value))
         .str();

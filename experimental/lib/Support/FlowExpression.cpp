@@ -161,8 +161,10 @@ llvm::json::Value FlowExpression::toJSON() const {
   std::vector<llvm::json::Value> jsonTerms{};
   for (auto &[key, value] : terms) {
     assert(key.type == FlowVariable::TYPE::internalState);
-    jsonTerms.emplace_back(llvm::json::Object(
-        {{STATE_LIT, key.state->toJSON()}, {COEFFICIENT_LIT, value}}));
+    int pm = key.pm;
+    jsonTerms.emplace_back(llvm::json::Object({{STATE_LIT, key.state->toJSON()},
+                                               {COEFFICIENT_LIT, value},
+                                               {CONSTRAINT_LIT, pm}}));
   }
   return llvm::json::Array(jsonTerms);
 }
@@ -185,6 +187,11 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
       assert(false &&
              "FlowExpression term JSON does not contain COEFFICIENT_LIT");
     }
+    int pm;
+    if (!mapper.map(CONSTRAINT_LIT, pm)) {
+      assert(false && "FlowExpression does not contain CONSTRAINT_LIT");
+    }
+    var.pm = (FlowVariable::PLUSMINUS)pm;
 
     expr.terms[var] = coef;
   }
