@@ -7,44 +7,57 @@ class Emitter:
     Holds indentation level, temporary name counter, and initialization strings.
     """
 
-    def __init__(self):
-        raise NotImplementedError(
-            "Emitter is an abstract class and cannot be instantiated directly."
-        )
+    def __init__(self, clock_name: str = "clk", reset_name: str = "rst"):
+        self.tabLevel = 1
+        self.tempCount = 0
+
+        self.signalInitString = ""
+        self.portInitString = ""
+        self.regInitString = ""
+        self.statementString = ""
+
+        self.clock_name = clock_name
+        self.reset_name = reset_name
+
+        self.inst_started = False
+
+        # Keep Emitter abstract: prevent direct instantiation of the base class
+        if self.__class__ is Emitter:
+            raise NotImplementedError(
+                "Emitter is an abstract class and cannot be instantiated directly."
+            )
 
     def get_current_indent(self) -> str:
-        raise NotImplementedError(
-            "Emitter subclasses must implement get_current_indent()"
-        )
+        return "\t" * self.tabLevel
 
     def increase_indent(self):
-        raise NotImplementedError("Emitter subclasses must implement increase_indent()")
+        self.tabLevel += 1
 
     def decrease_indent(self):
-        raise NotImplementedError("Emitter subclasses must implement decrease_indent()")
+        self.tabLevel = max(0, self.tabLevel - 1)
 
     def get_temp(self, name: str) -> str:
-        raise NotImplementedError("Emitter subclasses must implement get_temp()")
+        return f"TEMP_{self.tempCount}_{name}"
 
     def use_temp(self):
-        raise NotImplementedError("Emitter subclasses must implement use_temp()")
+        self.tempCount += 1
 
     def add_signal_str(self, code: str):
-        raise NotImplementedError("Emitter subclasses must implement add_signal_str()")
+        self.signalInitString += code
 
     def add_port_str(self, code: str):
-        raise NotImplementedError("Emitter subclasses must implement add_port_str()")
+        self.portInitString += code
+
+    def add_statement(self, code: str):
+        self.statementString += self.get_current_indent() + code
 
     def add_reg_str(self, code: str):
         raise NotImplementedError("Emitter subclasses must implement add_reg_str()")
 
-    def add_statement(self, code: str):
-        raise NotImplementedError("Emitter subclasses must implement add_statement()")
-
-    def add_assignment(self, op: str):
+    def add_assignment(self, out, statement: 'Statement', in_process: bool = False):
         raise NotImplementedError("Emitter subclasses must implement add_assignment()")
 
-    def comment(self, op: str):
+    def add_comment(self, comment: str):
         raise NotImplementedError("Emitter subclasses must implement add_comment()")
 
     def get_binop_str(self, op) -> str:
@@ -53,13 +66,13 @@ class Emitter:
     def get_unop_str(self, op) -> str:
         raise NotImplementedError("Emitter subclasses must implement get_unop_str()")
 
-    def get_bit_str(self, bit, size: int) -> str:
+    def get_bit_str(self, bit) -> str:
         raise NotImplementedError("Emitter subclasses must implement get_bit_str()")
 
-    def bin_to_str(self, bin, size: int) -> str:
+    def bin_to_str(self, bin, meta: 'Meta') -> str:
         raise NotImplementedError("Emitter subclasses must implement bin_to_str()")
 
-    def un_to_str(self, un, size: int) -> str:
+    def un_to_str(self, un, meta: 'Meta') -> str:
         raise NotImplementedError("Emitter subclasses must implement un_to_str()")
 
     def assigned_var_to_str(self, var):

@@ -13,24 +13,8 @@ class VerilogEmitter(Emitter):
     """
 
     def __init__(self, clock_name="clk", reset_name="rst"):
-        # Indentation level for generated code
-        self.tabLevel = 1
-
-        # Counter for generating unique temporary names
-        self.tempCount = 0
-
-        # Accumulated initialization code sections
-        self.signalInitString = ""
-
-        self.portInitString = ""
-
-        self.regInitString = ""
-        self.statementString = ""
-
-        self.clock_name = clock_name
-        self.reset_name = reset_name
-
-        self.inst_started = False
+        # Initialize common emitter fields
+        super().__init__(clock_name=clock_name, reset_name=reset_name)
 
     def get_reg_init_str(self) -> str:
         return f"always @(posedge {self.clock_name}) begin\n"
@@ -44,32 +28,8 @@ class VerilogEmitter(Emitter):
     def get_port_end_str(self) -> str:
         return "\n\t);"
 
-    def get_current_indent(self) -> str:
-        return "\t" * self.tabLevel
-
-    def increase_indent(self):
-        self.tabLevel += 1
-
-    def decrease_indent(self):
-        self.tabLevel = max(0, self.tabLevel - 1)
-
-    def get_temp(self, name: str) -> str:
-        return f"TEMP_{self.tempCount}_{name}"
-
-    def use_temp(self):
-        self.tempCount += 1
-
-    def add_signal_str(self, code: str):
-        self.signalInitString += code
-
-    def add_port_str(self, code: str):
-        self.portInitString += code
-
     def add_reg_str(self, code: str):
         self.regInitString += self.get_current_indent() + code + "\n"
-
-    def add_statement(self, code: str):
-        self.statementString += self.get_current_indent() + code
 
     def add_comment(self, comment: str):
         self.statementString += self.get_current_indent() + f"// {comment}\n"
