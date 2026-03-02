@@ -1,19 +1,22 @@
 # Blif Importer
 
 
-The BLIF Importer is an MLIR pass that reads a BLIF file and generates a corresponding Synth dialect circuit inside an `hw.module`. It serves as a standalone entry point for importing externally synthesized logic directly into Dynamatic's IR.
+The BLIF Importer is a binary that reads a BLIF file and generates a corresponding Synth dialect circuit inside an `hw.module`. It serves as a standalone entry point for importing externally synthesized logic directly into Dynamatic's IR.
 
-This pass interprets each BLIF model as an AIG-style circuit composed of 1-bit registers and AND-with-inverter gates, and re-expresses it directly in the Synth dialect while preserving the instance’s interface.
+This code interprets each BLIF model as an AIG-style circuit composed of 1-bit registers and AND-with-inverter gates, and re-expresses it directly in the Synth dialect while preserving the instance’s interface.
 
 ---
 
-## Pass Structure
+## Code Structure
 
-The pass is implemented as `BlifImporterPass` and exposes a single argument:
+The binary `import-blif` can be called as follows:
+```bash
+./bin/export-blif <output-mlir-file> <intput-blif-file>
+```
 
-- `filepath` — path to the `.blif` file to import.
+where `output-mlir-file` is the file that will contain the Synth circuit to be imported and `input-blif-file` is the file containing imported BLIF.
 
-The pass core function is `importBlifCircuit(moduleOp, loc, blifFilePath)` which imports the blif specified in `blifFilePath` in the module operation `moduleOp`.
+The code core function is `importBlifCircuit(moduleOp, loc, blifFilePath)` which imports the blif specified in `blifFilePath` in the module operation `moduleOp`.
 
 This function executes the following steps:
 
@@ -68,6 +71,6 @@ The function that creates a wire in the Synth circuit is `createSynthWire`. It h
 
 ### Create a Logic Gate
 
-The function that creates a logic gate in the Synth circuit is `createSynthLogicGate`. It handles multi-input `.names` blocks. Currently asserts that exactly 2 inputs are present, reflecting that the pass operates on already-binarized AIG-form BLIF. The truth-table function string (format: "XY Z") determines the inversion flags for each input. A `synth.aig.and_inv` is created with the appropriate inversion flags. If the output bit is `0`, a second `synth.aig.and_inv` ANDing with constant 1 and inverting the first input is appended to negate the result.
+The function that creates a logic gate in the Synth circuit is `createSynthLogicGate`. It handles multi-input `.names` blocks. Currently asserts that exactly 2 inputs are present, reflecting that the code operates on already-binarized AIG-form BLIF. The truth-table function string (format: "XY Z") determines the inversion flags for each input. A `synth.aig.and_inv` is created with the appropriate inversion flags. If the output bit is `0`, a second `synth.aig.and_inv` ANDing with constant 1 and inverting the first input is appended to negate the result.
 
 

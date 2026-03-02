@@ -4,14 +4,14 @@ The **BLIF Exporter** is an binary that serializes a Synth dialect circuit conta
 
 ---
 
-## Pass Structure
+## Code Structure
 
 The binary `export-blif` can be called as follows:
 ```bash
 ./bin/export-blif <input-mlir-file> <output-blif-file>
 ```
 
-where `input-mlir-file` is the file that contains the Synth circuit to be exported and `output-blif-file` is the file where the location of the exported BLIF.
+where `input-mlir-file` is the file that contains the Synth circuit to be exported and `output-blif-file` is the file containing the exported BLIF.
 
 The core functionality is the following:
 
