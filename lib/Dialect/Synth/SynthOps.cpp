@@ -279,8 +279,8 @@ static Value lowerVariadicAndInverterOp(AndInverterOp op, OperandRange operands,
     break;
   case 1:
     if (inverts[0])
-      return rewriter.create<synth::AndInverterOp>(op.getLoc(),
-                                                        operands[0], true);
+      return rewriter.create<synth::AndInverterOp>(op.getLoc(), operands[0],
+                                                   true);
     else
       return operands[0];
   case 2:
