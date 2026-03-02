@@ -6,19 +6,9 @@
 namespace dynamatic {
 namespace handshake {
 
-struct OtherVariable {
-  virtual ~OtherVariable() = default;
-  virtual bool isAnnotatable() = 0;
-  virtual std::string annotate() = 0;
-  virtual llvm::json::Value toJSON() = 0;
-  virtual std::optional<int64_t> getConstraint() = 0;
-  virtual std::unique_ptr<OtherVariable> constrain(int64_t value) = 0;
-  virtual std::unique_ptr<OtherVariable> getUnconstrained() = 0;
-};
-
 struct FlowVariable {
   enum TYPE { internalState, inputLambda, outputLambda, internalLambda };
-  enum PLUSMINUS { notApplicable, plusAndMinus, plus, minus };
+  enum PLUSMINUS { notApplicable = 0, plusAndMinus = -1, plus = 1, minus = 2 };
   // A Lambda variable is defined by type, lambdaIndex, and op.
   // An internal state is defined by type, state
   TYPE type;
@@ -109,6 +99,7 @@ struct FlowExpression {
 
   inline static const StringLiteral COEFFICIENT_LIT = "coefficient";
   inline static const StringLiteral STATE_LIT = "state";
+  inline static const StringLiteral CONSTRAINT_LIT = "constraint";
 };
 
 FlowExpression operator-(FlowExpression expr);

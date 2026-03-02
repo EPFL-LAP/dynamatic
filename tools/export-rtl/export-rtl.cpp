@@ -1295,7 +1295,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
           terms.push_back(t);
         }
         std::string equationString =
-            llvm::formatv("({0}) = 0", llvm::join(terms, " + ")).str();
+            llvm::formatv("({0} = 0)", llvm::join(terms, " + ")).str();
         eqs.push_back(equationString);
       }
       std::string propertyString = llvm::join(eqs, " & ");

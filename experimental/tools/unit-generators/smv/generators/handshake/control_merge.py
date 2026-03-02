@@ -40,6 +40,7 @@ MODULE {name}({", ".join([f"ins_{n}_valid" for n in range(size)])}, outs_ready, 
 
   outs_sent := inner_fork.outs_0_sent;
   index_sent := inner_fork.outs_1_sent;
+  ins := index_in;
 
 {generate_merge(f"{name}__merge_dataless", {ATTR_SIZE: size, ATTR_BITWIDTH: 0})}
 {generate_one_slot_break_r(f"{name}__one_slot_break_r", {ATTR_BITWIDTH: index_type.bitwidth})}

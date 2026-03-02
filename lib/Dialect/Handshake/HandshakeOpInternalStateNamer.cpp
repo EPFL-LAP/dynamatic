@@ -83,7 +83,8 @@ EagerForkSentNamer::fromInnerJSON(const llvm::json::Value &value,
   llvm::json::ObjectMapper mapper(value, path);
   auto prop = std::make_unique<EagerForkSentNamer>();
   if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
-      !mapper.map(CHANNEL_NAME_LIT, prop->channelName))
+      !mapper.map(CHANNEL_NAME_LIT, prop->channelName) ||
+      !mapper.map(CHANNEL_SIZE_LIT, prop->channelSize))
     return nullptr;
   return prop;
 }

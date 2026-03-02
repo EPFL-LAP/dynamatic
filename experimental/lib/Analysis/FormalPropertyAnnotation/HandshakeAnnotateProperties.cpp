@@ -225,257 +225,6 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
 }
 
 namespace dynamatic {
-#ifdef false
-// The structs FlowVariable and FlowExpression together form a DSL that help
-// with writing flow equations. A similar DSL exists for constraint programming
-// in `ConstraintProgramming.h`, but it is not reused for the following reasons:
-// 1. FlowExpression uses integer coefficients, whereas CPVars have doubles as
-// coefficients
-// 2. Metadata that is necessary for FlowExpressions can easily be added (type,
-// operation, index)
-// 3. No name is necessary, as a variable is uniquely defined by the metadata
-// 4. Dedicated conversion function to a matrix, as this is necessary anyway
-struct FlowVariable {
-  enum TYPE { internalState, inputLambda, outputLambda, internalLambda };
-  enum PLUSMINUS { notApplicable, plusAndMinus, plus, minus };
-  // A Lambda variable is defined by type, lambdaIndex, and op.
-  // An internal state is defined by type, state
-  TYPE type;
-  unsigned lambdaIndex;
-  Operation *op;
-  PLUSMINUS pm;
-  std::shared_ptr<InternalStateNamer> state;
-
-  FlowVariable(std::shared_ptr<InternalStateNamer> state)
-      : type(TYPE::internalState), pm(PLUSMINUS::notApplicable),
-        state(std::move(state)) {}
-  FlowVariable(TYPE t, Operation *op, unsigned lambdaIndex)
-      : type(t), lambdaIndex(lambdaIndex), op(op),
-        pm(PLUSMINUS::notApplicable) {
-    assert(
-        t != TYPE::internalState &&
-        "internal states should be initialized with the according constructor");
-  }
-
-  FlowVariable(const OpResult &channel) {
-    op = channel.getDefiningOp();
-    assert(op && "cannot get FlowVariable from channel without owner");
-    type = outputLambda;
-    lambdaIndex = channel.getResultNumber();
-
-    pm = PLUSMINUS::notApplicable;
-    if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
-      if (ct.getDataBitWidth() == 1) {
-        pm = PLUSMINUS::plusAndMinus;
-      }
-    }
-  }
-
-  FlowVariable(OpOperand &back, Operation &resOp) {
-    Value channel = back.get();
-    op = channel.getDefiningOp();
-    pm = PLUSMINUS::notApplicable;
-    if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
-      if (ct.getDataBitWidth() == 1) {
-        pm = PLUSMINUS::plusAndMinus;
-      }
-    }
-    if (op == nullptr) {
-      type = inputLambda;
-      op = &resOp;
-      lambdaIndex = back.getOperandNumber();
-    } else {
-      type = outputLambda;
-      bool found = false;
-      for (auto res : op->getResults()) {
-        if (res == channel) {
-          assert(!found && "found multiple matches");
-          found = true;
-          lambdaIndex = res.getResultNumber();
-        }
-      }
-      assert(found && "did not find matching OpResult");
-    }
-  }
-
-  // utility functions for initializing variables
-  static FlowVariable internalChannel(Operation *op, unsigned index) {
-    return FlowVariable(TYPE::internalLambda, op, index);
-  }
-
-  FlowVariable nextInternal() const {
-    assert(type == TYPE::internalLambda);
-    FlowVariable next = *this;
-    next.lambdaIndex = lambdaIndex + 1;
-    return next;
-  }
-
-  bool operator==(const FlowVariable &other) const {
-    if (type == TYPE::internalState && other.type == TYPE::internalState) {
-      return pm == other.pm && state.get() == other.state.get();
-    }
-
-    return type == other.type && lambdaIndex == other.lambdaIndex &&
-           op == other.op && pm == other.pm;
-  }
-
-  bool sameChannel(const FlowVariable &other) const {
-    assert(isLambda());
-    assert(other.isLambda());
-    return type == other.type && lambdaIndex == other.lambdaIndex &&
-           op == other.op;
-  }
-
-  inline bool isPlusMinus() const { return pm == plusAndMinus; }
-  inline FlowVariable getPlus() const {
-    assert(isPlusMinus());
-    FlowVariable p = *this;
-    p.pm = plus;
-    return p;
-  }
-
-  inline FlowVariable getMinus() const {
-    assert(isPlusMinus());
-    FlowVariable p = *this;
-    p.pm = minus;
-    return p;
-  }
-
-  bool isLambda() const {
-    return type == FlowVariable::TYPE::inputLambda ||
-           type == FlowVariable::TYPE::outputLambda ||
-           type == FlowVariable::TYPE::internalLambda;
-  }
-
-  std::string getName() const {
-    std::string sign;
-    switch (pm) {
-    case notApplicable:
-      sign = "";
-      break;
-    case plus:
-      sign = "+";
-      break;
-    case minus:
-      sign = "-";
-      break;
-    case plusAndMinus:
-      sign = "+-";
-      break;
-    }
-    switch (type) {
-    case internalState:
-      return llvm::formatv("{0}{1}", state->getSMVName(), sign);
-    case inputLambda:
-      return llvm::formatv("{0}.in_{1}{2}", getUniqueName(op), lambdaIndex,
-                           sign)
-          .str();
-    case outputLambda:
-      return llvm::formatv("{0}.out_{1}{2}", getUniqueName(op), lambdaIndex,
-                           sign)
-          .str();
-    case internalLambda:
-      return llvm::formatv("{0}.#{1}{2}", getUniqueName(op), lambdaIndex, sign)
-          .str();
-    };
-  }
-};
-
-// Hash implementation required so that FlowVariable can be used in an
-// unordered_map
-template <>
-struct std::hash<FlowVariable> {
-  size_t operator()(const FlowVariable &var) const {
-    using std::hash;
-    if (var.type == FlowVariable::TYPE::internalState) {
-      return hash<FlowVariable::TYPE>()(var.type) ^
-             hash<std::string>()(var.state->getSMVName());
-    }
-    return (hash<FlowVariable::TYPE>()(var.type) ^
-            hash<unsigned>()(var.lambdaIndex) ^ hash<Operation *>()(var.op));
-  }
-};
-
-struct FlowExpression {
-  std::unordered_map<FlowVariable, int> terms;
-  FlowExpression() = default;
-  FlowExpression(const FlowVariable &v) {
-    if (v.isPlusMinus()) {
-      // If plusAndMinus, separate into plus and minus parts
-      terms[v.getPlus()] = 1;
-      terms[v.getMinus()] = 1;
-    } else {
-      terms[v] = 1;
-    }
-  };
-  void debug() const {
-    std::string txt = "0 = ";
-    bool first = true;
-    for (auto &[key, value] : terms) {
-      if (!first) {
-        if (value > 0) {
-          txt += " + ";
-        } else if (value < 0) {
-          txt += " - ";
-        }
-      } else {
-        if (value < 0)
-          txt += "-";
-        first = false;
-      }
-      if (abs(value) == 1) {
-        txt += key.getName();
-
-      } else {
-        txt += llvm::formatv("{0} * {1}", value, key.getName()).str();
-      }
-    }
-    llvm::errs() << txt << "\n";
-  }
-  inline static const StringLiteral COEFFICIENT_LIT = "coef";
-  inline static const StringLiteral INNER_LIT = "inner";
-};
-
-FlowExpression operator-(FlowExpression expr) {
-  for (auto &[key, value] : expr.terms) {
-    expr.terms[key] = -value;
-  }
-  return expr;
-}
-
-FlowExpression operator+(FlowExpression left, const FlowExpression &right) {
-  for (auto &[key, value] : right.terms) {
-    left.terms[key] += value;
-  }
-  return left;
-}
-
-FlowExpression operator*(int coef, FlowExpression expr) {
-  for (auto &[key, value] : expr.terms) {
-    expr.terms[key] *= coef;
-  }
-  return expr;
-}
-
-FlowExpression operator-(FlowExpression left, const FlowExpression &right) {
-  for (auto &[key, value] : right.terms) {
-    left.terms[key] -= value;
-  }
-  return left;
-}
-
-void operator+=(FlowExpression &left, const FlowExpression &right) {
-  for (auto &[key, value] : right.terms) {
-    left.terms[key] += value;
-  }
-}
-
-void operator-=(FlowExpression &left, const FlowExpression &right) {
-  for (auto &[key, value] : right.terms) {
-    left.terms[key] -= value;
-  }
-}
-#endif
 // Used to assign dense indices to FlowVariables based on a list of
 // FlowExpression, i.e. indices 0 to n-1 are used for n variables, while keeping
 // lambda variables with low indices to ensure they are eliminated first within
@@ -798,10 +547,6 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
           FlowVariable result = FlowVariable(channel);
-          // TODO: What if this operator is a binary not-operator? This check
-          // will yield true, but still map plus->plus and minus->minus. WRONG
-          // BEHAVIOUR! Similarly for any unary operator on bits (i.e. fixed 0
-          // or fixed 1)
           if (exit.isPlusMinus() && result.isPlusMinus()) {
             equations.push_back(exit.getPlus() - result.getPlus());
             equations.push_back(exit.getMinus() - result.getMinus());
@@ -830,9 +575,6 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   gaussianElimination(matrix);
 
   size_t rows = matrix.size1();
-  // ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
-  // uid++;
-
   for (size_t row = 0; row < rows; ++row) {
     bool canAnnotate = true;
     for (size_t col = 0; col < indices.nLambdas; ++col) {
@@ -853,25 +595,6 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
       uid++;
       propertyTable.push_back(p.toJSON());
     }
-    /*
-    std::vector<int> coefs{};
-    std::vector<std::string> names{};
-
-    for (size_t col = indices.nLambdas; col < cols; ++col) {
-      if (matrix(row, col) != 0) {
-        coefs.push_back(matrix(row, col));
-        names.push_back(indices.indexToVar[col].getName());
-      }
-    }
-    if (coefs.size() > 0) {
-      ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
-      uid++;
-      p.addEquation(coefs, names);
-      if (p.getEquations().size() > 0) {
-        propertyTable.push_back(p.toJSON());
-      }
-    }
-    */
   }
   return success();
 }
@@ -879,12 +602,10 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-  if (false) {
-    if (failed(annotateAbsenceOfBackpressure(modOp)))
-      return signalPassFailure();
-    if (failed(annotateValidEquivalence(modOp)))
-      return signalPassFailure();
-  }
+  if (failed(annotateAbsenceOfBackpressure(modOp)))
+    return signalPassFailure();
+  if (failed(annotateValidEquivalence(modOp)))
+    return signalPassFailure();
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
