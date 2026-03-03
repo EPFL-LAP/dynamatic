@@ -733,6 +733,12 @@ class LSQ:
                                load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
 
         # Store
+
+        # Store request is valid if the entry is allocated and has valid address+data.
+        store_req_valid_arr = LogicArray(ctx, 'store_req_valid_arr', 'w', self.configs.numStqEntries)
+        for i in range(self.configs.numStqEntries):
+            arch += Op(ctx, store_req_valid_arr[i], stq_alloc_pcomp[i], 'and', stq_addr_valid_pcomp[i], 'and', stq_data_valid_pcomp[i])
+
         if self.configs.pipe0:
             # with pipelining: complicated logic with look-ahead
             stq_issue_next = LogicVec(
@@ -740,29 +746,19 @@ class LSQ:
 
             store_conflict = Logic(ctx, 'store_conflict', 'w')
 
-            can_store_curr = Logic(ctx, 'can_store_curr', 'w')
+            store_req_valid_curr = Logic(ctx, 'store_req_valid_curr', 'w')
             st_ld_conflict_curr = LogicVec(
                 ctx, 'st_ld_conflict_curr', 'w', self.configs.numLdqEntries)
-            store_valid_curr = Logic(ctx, 'store_valid_curr', 'w')
-            store_data_valid_curr = Logic(
-                ctx, 'store_data_valid_curr', 'w')
-            store_addr_valid_curr = Logic(
-                ctx, 'store_addr_valid_curr', 'w')
 
-            can_store_next = Logic(ctx, 'can_store_next', 'w')
+            store_req_valid_next = Logic(ctx, 'store_req_valid_next', 'w')
             st_ld_conflict_next = LogicVec(
                 ctx, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries)
-            store_valid_next = Logic(ctx, 'store_valid_next', 'w')
-            store_data_valid_next = Logic(
-                ctx, 'store_data_valid_next', 'w')
-            store_addr_valid_next = Logic(
-                ctx, 'store_addr_valid_next', 'w')
 
-            can_store_p0 = Logic(ctx, 'can_store_p0', 'r')
+            store_req_valid_p0 = Logic(ctx, 'store_req_valid_p0', 'r')
             st_ld_conflict_p0 = LogicVec(
                 ctx, 'st_ld_conflict_p0', 'r', self.configs.numLdqEntries)
 
-            can_store_p0.regInit(init=0)
+            store_req_valid_p0.regInit(init=0)
             st_ld_conflict_p0.regInit()
 
             arch += WrapAddConst(ctx, stq_issue_next,
@@ -791,47 +787,27 @@ class LSQ:
                            '(', MuxIndex(
                                addr_same_pcomp[i], stq_issue_next), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
                            )
-            # The store is valid whe the entry is valid and the data is also valid,
-            # the store address should also be valid
-            arch += MuxLookUp(ctx, store_valid_curr,
-                              stq_alloc_pcomp, stq_issue)
-            arch += MuxLookUp(ctx, store_data_valid_curr,
-                              stq_data_valid_pcomp, stq_issue)
-            arch += MuxLookUp(ctx, store_addr_valid_curr,
-                              stq_addr_valid_pcomp, stq_issue)
-            arch += Op(ctx, can_store_curr,
-                       store_valid_curr, 'and',
-                       store_data_valid_curr, 'and',
-                       store_addr_valid_curr
-                       )
-            arch += MuxLookUp(ctx, store_valid_next,
-                              stq_alloc_pcomp, stq_issue_next)
-            arch += MuxLookUp(ctx, store_data_valid_next,
-                              stq_data_valid_pcomp, stq_issue_next)
-            arch += MuxLookUp(ctx, store_addr_valid_next,
-                              stq_addr_valid_pcomp, stq_issue_next)
-            arch += Op(ctx, can_store_next,
-                       store_valid_next, 'and',
-                       store_data_valid_next, 'and',
-                       store_addr_valid_next
-                       )
+
+            arch += MuxLookUp(ctx, store_req_valid_curr,
+                              store_req_valid_arr, stq_issue)
+            arch += MuxLookUp(ctx, store_req_valid_next,
+                              store_req_valid_arr, stq_issue_next)
+
             # Multiplex from current and next
             arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_next,
                        'when', stq_issue_en, 'else', st_ld_conflict_curr)
-            arch += Op(ctx, can_store_p0, can_store_next, 'when',
-                       stq_issue_en, 'else', can_store_curr)
+            arch += Op(ctx, store_req_valid_p0, store_req_valid_next, 'when',
+                       stq_issue_en, 'else', store_req_valid_curr)
             # The store conflicts with any load
             arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
             arch += Op(ctx, store_en, 'not',
-                       store_conflict, 'and', can_store_p0)
+                       store_conflict, 'and', store_req_valid_p0)
         else:
             # without pipelining: simple combinational logic
             st_ld_conflict = LogicVec(
                 ctx, 'st_ld_conflict', 'w', self.configs.numLdqEntries)
             store_conflict = Logic(ctx, 'store_conflict', 'w')
-            store_valid = Logic(ctx, 'store_valid', 'w')
-            store_data_valid = Logic(ctx, 'store_data_valid', 'w')
-            store_addr_valid = Logic(ctx, 'store_addr_valid', 'w')
+            store_req_valid = Logic(ctx, 'store_req_valid', 'w')
 
             # A store conflicts with a load when:
             # 1. The load entry is valid, and
@@ -849,19 +825,8 @@ class LSQ:
                            )
             # The store conflicts with any load
             arch += Reduce(ctx, store_conflict, st_ld_conflict, 'or')
-            # The store is valid whe the entry is valid and the data is also valid,
-            # the store address should also be valid
-            arch += MuxLookUp(ctx, store_valid, stq_alloc_pcomp, stq_issue)
-            arch += MuxLookUp(ctx, store_data_valid,
-                              stq_data_valid_pcomp, stq_issue)
-            arch += MuxLookUp(ctx, store_addr_valid,
-                              stq_addr_valid_pcomp, stq_issue)
-            arch += Op(ctx, store_en,
-                       'not', store_conflict, 'and',
-                       store_valid, 'and',
-                       store_data_valid, 'and',
-                       store_addr_valid
-                       )
+            arch += MuxLookUp(ctx, store_req_valid, store_req_valid_arr, stq_issue)
+            arch += Op(ctx, store_en, 'not', store_conflict, 'and', store_req_valid)
         arch += Op(ctx, store_idx, stq_issue)
 
         # Bypass
