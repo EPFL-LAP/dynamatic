@@ -587,15 +587,17 @@ class LSQ:
         store_req_valid = Logic(ctx, 'store_req_valid', 'w')
         # whether the current store request has conflicts with any previous loads
         store_conflict = Logic(ctx, 'store_conflict', 'w')
-        # whether the to-be-issued store entry is older than each of the load entries
-        store_is_older_arr = LogicArray(ctx, 'store_is_older_arr', 'w', self.configs.numLdqEntries)
+        if self.configs.fallbackIssue:
+            # whether the to-be-issued store entry is older than each of the load entries
+            store_is_older_arr = LogicArray(ctx, 'store_is_older_arr', 'w', self.configs.numLdqEntries)
         # store request enable (after fallback logic)
         store_en = Logic(ctx, 'store_en', 'w')
 
         # Fallback load/store signals
-        fallback_load_idx_oh = LogicVec(ctx, 'fallback_load_idx_oh', 'w', self.configs.numLdqEntries)
-        fallback_load_en = Logic(ctx, 'fallback_load_en', 'w')
-        fallback_store_en_if_valid = Logic(ctx, 'fallback_store_en_if_valid', 'w')
+        if self.configs.fallbackIssue:
+            fallback_load_idx_oh = LogicVec(ctx, 'fallback_load_idx_oh', 'w', self.configs.numLdqEntries)
+            fallback_load_en = Logic(ctx, 'fallback_load_en', 'w')
+            fallback_store_en_if_valid = Logic(ctx, 'fallback_store_en_if_valid', 'w')
 
         # Matrix Generation
         ld_st_conflict = LogicVecArray(
@@ -762,63 +764,64 @@ class LSQ:
                                load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
 
         for w in range(self.configs.numLdMem):
-            if w != self.configs.numLdMem - 1:
+            last_load_port = (w == self.configs.numLdMem - 1)
+            if self.configs.fallbackIssue and last_load_port:
+                # last load port: use fallback load (if any) as the first priority, then service other loads (from _tmp)
+                arch += Op(ctx, load_idx_oh[w], fallback_load_idx_oh, 'when', fallback_load_en, 'else', load_idx_tmp_oh[w])
+                arch += Op(ctx, load_en[w], fallback_load_en, 'or', load_en_tmp[w])
+            else:
                 # non-last load port: use _tmp signals directly
                 arch += Op(ctx, load_idx_oh[w], load_idx_tmp_oh[w])
                 arch += Op(ctx, load_en[w], load_en_tmp[w])
-            else:
-                # last load port: use fallback load (if any) as the first priority, then service
-                # other loads (from _tmp)
-                arch += Op(ctx, load_idx_oh[w], fallback_load_idx_oh, 'when', fallback_load_en, 'else', load_idx_tmp_oh[w])
-                arch += Op(ctx, load_en[w], fallback_load_en, 'or', load_en_tmp[w])
 
-        # Fallback Load / Store
+        if self.configs.fallbackIssue:
+            # Fallback Load / Store
 
-        # The fallback load candidate is the oldest allocated and un-issued load.
-        ldq_alloc_no_issue = LogicArray(ctx, 'ldq_alloc_no_issue', 'w', self.configs.numLdqEntries)
-        fallback_load_candidate_oh = LogicArray(ctx, 'fallback_load_candidate_oh', 'w', self.configs.numLdqEntries)
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, ldq_alloc_no_issue[i], ldq_alloc_p0[i], 'and', 'not', ldq_issue[i])
-        arch += CyclicPriorityMasking(ctx, fallback_load_candidate_oh, ldq_alloc_no_issue, ldq_head_oh_p0)
+            # The fallback load candidate is the oldest allocated and un-issued load.
+            ldq_alloc_no_issue = LogicArray(ctx, 'ldq_alloc_no_issue', 'w', self.configs.numLdqEntries)
+            fallback_load_candidate_oh = LogicArray(ctx, 'fallback_load_candidate_oh', 'w', self.configs.numLdqEntries)
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, ldq_alloc_no_issue[i], ldq_alloc_p0[i], 'and', 'not', ldq_issue[i])
+            arch += CyclicPriorityMasking(ctx, fallback_load_candidate_oh, ldq_alloc_no_issue, ldq_head_oh_p0)
 
-        # The fallback store canddiate is the oldest allocated and un-issued store. This is simply
-        # the store at the store queue issue pointer (if allocated). We do not explicitly track the
-        # fallback store candidate, but rather just keep the relevant row/column from the order
-        # matrix.
+            # The fallback store canddiate is the oldest allocated and un-issued store. This is simply
+            # the store at the store queue issue pointer (if allocated). We do not explicitly track the
+            # fallback store candidate, but rather just keep the relevant row/column from the order
+            # matrix.
 
-        # If the oldest load is older than the oldest store, this contains a single bit set (at the oldest load entry).
-        # Otherwise (oldest store is oldest overall), this is all zeros.
-        fallback_load_is_oldest_oh = LogicArray(ctx, 'fallback_load_is_oldest_oh', 'w', self.configs.numLdqEntries)
-        for i in range(self.configs.numLdqEntries):
-            arch += Op(ctx, fallback_load_is_oldest_oh[i], fallback_load_candidate_oh[i], 'and', 'not', store_is_older_arr[i])
+            # If the oldest load is older than the oldest store, this contains a single bit set (at the oldest load entry).
+            # Otherwise (oldest store is oldest overall), this is all zeros.
+            fallback_load_is_oldest_oh = LogicArray(ctx, 'fallback_load_is_oldest_oh', 'w', self.configs.numLdqEntries)
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, fallback_load_is_oldest_oh[i], fallback_load_candidate_oh[i], 'and', 'not', store_is_older_arr[i])
 
-        # Whether the fallback load is the oldest.
-        fallback_load_is_oldest = Logic(ctx, 'fallback_load_is_oldest', 'w')
-        arch += Reduce(ctx, fallback_load_is_oldest, fallback_load_is_oldest_oh, 'or')
+            # Whether the fallback load is the oldest.
+            fallback_load_is_oldest = Logic(ctx, 'fallback_load_is_oldest', 'w')
+            arch += Reduce(ctx, fallback_load_is_oldest, fallback_load_is_oldest_oh, 'or')
 
-        # FIXME: What if we are about to issue a store? We shouldn't issue a fallback load in the same cycle.
-        store_outstanding = Logic(ctx, 'store_outstanding', 'w')
-        arch += Op(ctx, store_outstanding, "'1'", 'when', '(', stq_issue, '/=', stq_resp, ')', 'else ', "'0'")
+            # FIXME: What if we are about to issue a store? We shouldn't issue a fallback load in the same cycle.
+            store_outstanding = Logic(ctx, 'store_outstanding', 'w')
+            arch += Op(ctx, store_outstanding, "'1'", 'when', '(', stq_issue, '/=', stq_resp, ')', 'else ', "'0'")
 
-        # FIXME: What if we are about to issue a load? We shouldn't issue a fallback store in the same cycle.
-        load_oustanding_arr = LogicArray(ctx, 'load_outstanding_arr', 'w', self.configs.numLdqEntries)
-        load_outstanding = Logic(ctx, 'load_outstanding', 'w')
-        for i in range(self.configs.numLdqEntries):
-            arch += Op(ctx, load_oustanding_arr[i], "'1'", 'when', '(', ldq_issue[i], 'and', 'not', ldq_data_valid[i], ')', 'else', "'0'")
-        arch += Reduce(ctx, load_outstanding, load_oustanding_arr, 'or')
+            # FIXME: What if we are about to issue a load? We shouldn't issue a fallback store in the same cycle.
+            load_oustanding_arr = LogicArray(ctx, 'load_outstanding_arr', 'w', self.configs.numLdqEntries)
+            load_outstanding = Logic(ctx, 'load_outstanding', 'w')
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, load_oustanding_arr[i], "'1'", 'when', '(', ldq_issue[i], 'and', 'not', ldq_data_valid[i], ')', 'else', "'0'")
+            arch += Reduce(ctx, load_outstanding, load_oustanding_arr, 'or')
 
-        # We can issue the fallback load candidate if:
-        # - It is older than the oldest store (implicit in fallback_load_is_oldest_oh[]).
-        # - It has a valid address.
-        # - There are no outstanding stores.
-        for i in range(self.configs.numLdqEntries):
-            arch += Op(ctx, (fallback_load_idx_oh, i), fallback_load_is_oldest_oh[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', store_outstanding)
-        arch += Reduce(ctx, fallback_load_en, fallback_load_idx_oh, 'or')
+            # We can issue the fallback load candidate if:
+            # - It is older than the oldest store (implicit in fallback_load_is_oldest_oh[]).
+            # - It has a valid address.
+            # - There are no outstanding stores.
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, (fallback_load_idx_oh, i), fallback_load_is_oldest_oh[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', store_outstanding)
+            arch += Reduce(ctx, fallback_load_en, fallback_load_idx_oh, 'or')
 
-        # We can issue the fallback store candidate (if it is valid) if:
-        # - It is older than the oldest store (NOT fallback_load_is_oldest).
-        # - There are no outstanding loads.
-        arch += Op(ctx, fallback_store_en_if_valid, 'not', fallback_load_is_oldest, 'and', 'not', load_outstanding)
+            # We can issue the fallback store candidate (if it is valid) if:
+            # - It is older than the oldest store (NOT fallback_load_is_oldest).
+            # - There are no outstanding loads.
+            arch += Op(ctx, fallback_store_en_if_valid, 'not', fallback_load_is_oldest, 'and', 'not', load_outstanding)
 
         # Store
         # When pipelining (pipe0) is enabled, this uses look-ahead to the next store entry to reduce the critical path.
@@ -833,12 +836,14 @@ class LSQ:
 
         store_conflict = Logic(ctx, 'store_conflict', 'w')
         store_req_valid_p0 = Logic(ctx, 'store_req_valid_p0', pipe0_type)
-        store_is_older_arr_p0 = LogicArray(ctx, 'store_is_older_arr_p0', pipe0_type, self.configs.numLdqEntries)
         st_ld_conflict_p0 = LogicVec(ctx, 'st_ld_conflict_p0', pipe0_type, self.configs.numLdqEntries)
         if self.configs.pipe0:
             store_req_valid_p0.regInit(init=0)
-            store_is_older_arr_p0.regInit()
             st_ld_conflict_p0.regInit()
+        if self.configs.fallbackIssue:
+            store_is_older_arr_p0 = LogicArray(ctx, 'store_is_older_arr_p0', pipe0_type, self.configs.numLdqEntries)
+            if self.configs.pipe0:
+                store_is_older_arr_p0.regInit()
 
         # next issue pointer (needed for look-ahead when pipelining is enabled)
         if self.configs.pipe0:
@@ -900,25 +905,29 @@ class LSQ:
                        'when', stq_issue_en, 'else', st_ld_conflict_curr)
             arch += Op(ctx, store_req_valid_p0, store_req_valid_next, 'when',
                        stq_issue_en, 'else', store_req_valid_curr)
-            for i in range(self.configs.numLdqEntries):
-                arch += Op(ctx, store_is_older_arr_p0[i], store_is_older_arr_next[i], 'when',
-                           stq_issue_en, 'else', store_is_older_arr_curr[i])
+            if self.configs.fallbackIssue:
+                for i in range(self.configs.numLdqEntries):
+                    arch += Op(ctx, store_is_older_arr_p0[i], store_is_older_arr_next[i], 'when',
+                               stq_issue_en, 'else', store_is_older_arr_curr[i])
         else:
             # without pipelining: only consider current store entry
             arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_curr)
             arch += Op(ctx, store_req_valid_p0, store_req_valid_curr)
-            for i in range(self.configs.numLdqEntries):
-                arch += Op(ctx, store_is_older_arr_p0[i], store_is_older_arr_curr[i])
+            if self.configs.fallbackIssue:
+                for i in range(self.configs.numLdqEntries):
+                    arch += Op(ctx, store_is_older_arr_p0[i], store_is_older_arr_curr[i])
 
         # The store conflicts with any load
         arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
-        # The store can be issued when it is valid AND (no conflict OR it is older than the fallback load).
-        arch += Op(ctx, store_en, store_req_valid_p0, 'and', '(', 'not', store_conflict, 'or', fallback_store_en_if_valid, ')')
         arch += Op(ctx, store_idx, stq_issue)
-        # needed for fallback logic
-        # FIXME: conditionally enable based on fallback issue flag
-        for i in range(self.configs.numLdqEntries):
-            arch += Op(ctx, store_is_older_arr[i], store_is_older_arr_p0[i])
+        # The store can be issued when it is valid AND (no conflict OR it is older than the fallback load).
+        if self.configs.fallbackIssue:
+            arch += Op(ctx, store_en, store_req_valid_p0, 'and', '(', 'not', store_conflict, 'or', fallback_store_en_if_valid, ')')
+            # ordering information needed by fallback issue logic
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, store_is_older_arr[i], store_is_older_arr_p0[i])
+        else:
+            arch += Op(ctx, store_en, store_req_valid_p0, 'and', 'not', store_conflict)
 
         # Bypass
         bypass_idx_oh_p0 = LogicVecArray(
