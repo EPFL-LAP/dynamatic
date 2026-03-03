@@ -872,11 +872,11 @@ class LSQ:
             ctx, 'bypass_idx_oh_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
         bypass_en = LogicArray(ctx, 'bypass_en', 'w',
                                self.configs.numLdqEntries)
+        if self.configs.pipe0:
+            bypass_idx_oh_p0.regInit()
         if self.configs.bypass:
             stq_last_oh = LogicVec(
                 ctx, 'stq_last_oh', 'w', self.configs.numStqEntries)
-            if self.configs.pipe0:
-                bypass_idx_oh_p0.regInit()
             arch += BitsToOHSub1(ctx, stq_last_oh, stq_tail)
             for i in range(0, self.configs.numLdqEntries):
                 bypass_en_vec = LogicVec(
