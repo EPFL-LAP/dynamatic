@@ -64,7 +64,7 @@ class Configs:
     # one cycle later than the valid bits of entries
     stResp:        bool = False     # Whether store response channel in store access port is enabled
     gaMulti:       bool = False     # Whether multiple groups are allowed to request an allocation at the same cycle
-    bypass:        bool = False     # Whether bypassing (store-to-load forwarding) is enabled
+    bypass:        bool = True      # Whether bypassing (store-to-load forwarding) is enabled
 
     def __init__(self, config: dict) -> None:
         self.name = config["name"]
@@ -82,7 +82,7 @@ class Configs:
 
         self.stResp = bool(config["stResp"])
         self.gaMulti = bool(config["groupMulti"])
-        self.bypass = False  # FIXME: pass through from JSON
+        self.bypass = True
 
         self.gaNumLoads = config["numLoads"]
         self.gaNumStores = config["numStores"]
