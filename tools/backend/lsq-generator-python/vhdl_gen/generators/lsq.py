@@ -830,11 +830,11 @@ class LSQ:
             arch += Op(ctx, store_outstanding, "'1'", 'when', '(', stq_issue, '/=', stq_resp, ')', 'else ', "'0'")
 
             # FIXME: What if we are about to issue a load? We shouldn't issue a fallback store in the same cycle.
-            load_oustanding_arr = LogicArray(ctx, 'load_outstanding_arr', 'w', self.configs.numLdqEntries)
+            load_outstanding_arr = LogicArray(ctx, 'load_outstanding_arr', 'w', self.configs.numLdqEntries)
             load_outstanding = Logic(ctx, 'load_outstanding', 'w')
             for i in range(self.configs.numLdqEntries):
-                arch += Op(ctx, load_oustanding_arr[i], "'1'", 'when', '(', ldq_issue[i], 'and', 'not', ldq_data_valid[i], ')', 'else', "'0'")
-            arch += Reduce(ctx, load_outstanding, load_oustanding_arr, 'or')
+                arch += Op(ctx, load_outstanding_arr[i], "'1'", 'when', '(', ldq_issue[i], 'and', 'not', ldq_data_valid[i], ')', 'else', "'0'")
+            arch += Reduce(ctx, load_outstanding, load_outstanding_arr, 'or')
 
             # We can issue the fallback load candidate if:
             # - It is older than the oldest store (implicit in fallback_load_is_oldest_oh[]).
