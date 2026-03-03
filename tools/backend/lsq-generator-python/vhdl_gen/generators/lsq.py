@@ -739,12 +739,17 @@ class LSQ:
         for i in range(self.configs.numStqEntries):
             arch += Op(ctx, store_req_valid_arr[i], stq_alloc_pcomp[i], 'and', stq_addr_valid_pcomp[i], 'and', stq_data_valid_pcomp[i])
 
+        store_conflict = Logic(ctx, 'store_conflict', 'w')
+        store_req_valid_p0 = Logic(ctx, 'store_req_valid_p0', pipe0_type)
+        st_ld_conflict_p0 = LogicVec(ctx, 'st_ld_conflict_p0', pipe0_type, self.configs.numLdqEntries)
+        if self.configs.pipe0:
+            store_req_valid_p0.regInit(init=0)
+            st_ld_conflict_p0.regInit()
+
         if self.configs.pipe0:
             # with pipelining: complicated logic with look-ahead
             stq_issue_next = LogicVec(
                 ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
-
-            store_conflict = Logic(ctx, 'store_conflict', 'w')
 
             store_req_valid_curr = Logic(ctx, 'store_req_valid_curr', 'w')
             st_ld_conflict_curr = LogicVec(
@@ -753,13 +758,6 @@ class LSQ:
             store_req_valid_next = Logic(ctx, 'store_req_valid_next', 'w')
             st_ld_conflict_next = LogicVec(
                 ctx, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries)
-
-            store_req_valid_p0 = Logic(ctx, 'store_req_valid_p0', 'r')
-            st_ld_conflict_p0 = LogicVec(
-                ctx, 'st_ld_conflict_p0', 'r', self.configs.numLdqEntries)
-
-            store_req_valid_p0.regInit(init=0)
-            st_ld_conflict_p0.regInit()
 
             arch += WrapAddConst(ctx, stq_issue_next,
                                  stq_issue, 1, self.configs.numStqEntries)
@@ -798,16 +796,8 @@ class LSQ:
                        'when', stq_issue_en, 'else', st_ld_conflict_curr)
             arch += Op(ctx, store_req_valid_p0, store_req_valid_next, 'when',
                        stq_issue_en, 'else', store_req_valid_curr)
-            # The store conflicts with any load
-            arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
-            arch += Op(ctx, store_en, 'not',
-                       store_conflict, 'and', store_req_valid_p0)
         else:
             # without pipelining: simple combinational logic
-            st_ld_conflict = LogicVec(
-                ctx, 'st_ld_conflict', 'w', self.configs.numLdqEntries)
-            store_conflict = Logic(ctx, 'store_conflict', 'w')
-            store_req_valid = Logic(ctx, 'store_req_valid', 'w')
 
             # A store conflicts with a load when:
             # 1. The load entry is valid, and
@@ -816,17 +806,17 @@ class LSQ:
             # Index order are reversed for store matrix.
             for i in range(0, self.configs.numLdqEntries):
                 arch += Op(ctx,
-                           (st_ld_conflict, i),
+                           (st_ld_conflict_p0, i),
                            (ldq_alloc_pcomp, i), 'and',
                            'not', MuxIndex(
                                store_is_older_pcomp[i], stq_issue), 'and',
                            '(', MuxIndex(
                                addr_same_pcomp[i], stq_issue), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
                            )
-            # The store conflicts with any load
-            arch += Reduce(ctx, store_conflict, st_ld_conflict, 'or')
-            arch += MuxLookUp(ctx, store_req_valid, store_req_valid_arr, stq_issue)
-            arch += Op(ctx, store_en, 'not', store_conflict, 'and', store_req_valid)
+            arch += MuxLookUp(ctx, store_req_valid_p0, store_req_valid_arr, stq_issue)
+        # The store conflicts with any load
+        arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
+        arch += Op(ctx, store_en, 'not', store_conflict, 'and', store_req_valid_p0)
         arch += Op(ctx, store_idx, stq_issue)
 
         # Bypass
