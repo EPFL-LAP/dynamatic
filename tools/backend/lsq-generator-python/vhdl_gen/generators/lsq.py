@@ -735,7 +735,6 @@ class LSQ:
         # Store
         if self.configs.pipe0:
             # with pipelining: complicated logic with look-ahead
-            stq_issue_en_p0 = Logic(ctx, 'stq_issue_en_p0', 'r')
             stq_issue_next = LogicVec(
                 ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
 
@@ -763,11 +762,9 @@ class LSQ:
             st_ld_conflict_p0 = LogicVec(
                 ctx, 'st_ld_conflict_p0', 'r', self.configs.numLdqEntries)
 
-            stq_issue_en_p0.regInit(init=0)
             can_store_p0.regInit(init=0)
             st_ld_conflict_p0.regInit()
 
-            arch += Op(ctx, stq_issue_en_p0, stq_issue_en)
             arch += WrapAddConst(ctx, stq_issue_next,
                                  stq_issue, 1, self.configs.numStqEntries)
 
