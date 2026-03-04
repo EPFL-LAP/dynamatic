@@ -21,9 +21,8 @@ The code core function is `importBlifCircuit(moduleOp, loc, blifFilePath)` which
 This function executes the following steps:
 
 1. Extract the module name, input and output port names of the module from the BLIF file using the `getBlifModuleHeader` function.
-2. Create an hw module operation `hw.HWModuleOp` with input and output ports corresponding to the one of the model described in the BLIF file.
-3. Create all synth operations inside the `hw.HWModuleOp` using the function `generateSynthCircuitFromBlif`.
-4. Attach all the outputs of the synth circuit to the terminator of the `hw.HWModuleOp`.
+2. Create an hw module operation `hw.HWModuleOp` with input and output ports corresponding to the one of the model described in the BLIF file using the `createHWModuleShell`.
+3. Create all synth operations inside the `hw.HWModuleOp` using the function `populateHWModuleShell`. Then, attach all the outputs of the synth circuit to the terminator of the `hw.HWModuleOp`.
 
 ---
 
@@ -34,7 +33,7 @@ In this subsection of the doc, we highlight the key support functions.
 
 ### Generate Synth Operations
 
-The core function to generate synth operations is `generateSynthCircuitFromBlif`. It parses the BLIF body line by line and emits the corresponding Synth operations. It maintains two maps throughout:
+The core function to generate synth operations is `populateHWModuleShell`. It parses the BLIF body line by line and emits the corresponding Synth operations. It maintains two maps throughout:
 
 - `nodeValuesMap` which maps a BLIF node name to its Synth Value. Pre-populated with all input port signals before parsing begins.
 - `tmpValuesMap` which maps a BLIF node name to a temporary `hw.constant 0` placeholder, created when a node is referenced before being defined. Placeholders are replaced and erased once the real value is available.
