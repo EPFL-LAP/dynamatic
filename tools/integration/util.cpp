@@ -186,6 +186,9 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
       (fs::path(DYNAMATIC_ROOT) / "data" / "components.json").string();
   if (!runSubprocess(
           {DYNAMATIC_OPT_BIN, handshakeTransformed.string(),
+           "\"--handshake-set-unit-impl-attr=target-period=4 impl=flopoco "
+           "timing-models=" +
+               timingModel + "\"",
            "--handshake-set-buffering-properties=version=fpga20",
            "\"--handshake-place-buffers=algorithm=on-merges timing-models=" +
                timingModel + "\""},
