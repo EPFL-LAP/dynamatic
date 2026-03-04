@@ -44,7 +44,6 @@ CyclicGraphManager::buildScopeRecursive(mlir::CFGLoop *loop, unsigned level) {
   SmallVector<Block *> latches;
   loop->getLoopLatches(latches);
   scope->latches = latches;
-  // TODO: print
 
   for (Block *latch : latches) {
     scope->allBackEdges.insert({latch, scope->header});
@@ -53,7 +52,7 @@ CyclicGraphManager::buildScopeRecursive(mlir::CFGLoop *loop, unsigned level) {
   auto loopBlocks = loop->getBlocks();
   for (Block *b : loopBlocks) {
     scope->allBlocksInclusive.insert(b);
-    // This requires outer loops to be executed prior to inner loops.
+    // Outer loops must be processed before inner loops for correct leveling.
     blockLevelMap[b] = level;
   }
 
@@ -105,42 +104,44 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
   newGraph->region = &R;
   newGraph->containerOp = dummyFunc;
 
-  // Create the False terminal representing loop back-edges or sink.
+  // Create the sink terminal (False).
+  // For level > 0, back-edges to own header are redirected here.
+  // All terminal paths eventually converge here.
   Block *falseTerm = new Block();
   R.push_back(falseTerm);
   newGraph->sinkBB = falseTerm;
   newGraph->origMap[falseTerm] = nullptr;
 
-  // Create the True terminal representing the loop exit or consumer.
+  // Create the consumer terminal (True).
+  // For level > 0 this represents the loop exit.
+  // For level 0 this maps to the actual consumer in the original CFG.
   Block *trueTerm = new Block();
   R.push_back(trueTerm);
   newGraph->newCons = trueTerm;
 
-  // For Level 0, terminals map to the actual Consumer in the original CFG.
   if (scope->level == 0)
     newGraph->origMap[trueTerm] = lcfg.origMap.lookup(lcfg.newCons);
   else
     newGraph->origMap[trueTerm] = nullptr;
 
-  // Clone the header block which acts as the entry (Producer) for this layer.
+  // Clone the header block as the entry (Producer) of this layer.
   Block *clonedHeader = new Block();
   R.push_back(clonedHeader);
   newGraph->newProd = clonedHeader;
-
-  // Map the new header directly to the block in the original CFG.
   newGraph->origMap[clonedHeader] = lcfg.origMap.lookup(scope->header);
 
-  // Initialize the mapping from the current Scope to the new blocks.
+  // Build a mapping from original blocks to their cloned counterparts.
   DenseMap<Block *, Block *> clonedMap;
   clonedMap[scope->header] = clonedHeader;
 
-  // Pre-fill terminals for Level 0.
+  // At level 0, map the original consumer and sink to the terminals
+  // so that in-scope edges targeting them are resolved correctly.
   if (scope->level == 0) {
     clonedMap[lcfg.newCons] = trueTerm;
     clonedMap[lcfg.sinkBB] = falseTerm;
   }
 
-  // Clone all blocks within the scope, excluding special ones handled above.
+  // Clone all in-scope blocks except those already handled above.
   for (Block *b : scope->allBlocksInclusive) {
     if (b == scope->header || b == lcfg.newCons || b == lcfg.sinkBB)
       continue;
@@ -150,9 +151,9 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
     newGraph->origMap[nb] = lcfg.origMap.lookup(b);
   }
 
-  // Reconstruct edges and terminators.
+  // Reconstruct edges and terminators for each cloned block.
   for (auto [origBlock, newBlock] : clonedMap) {
-    // Skip special blocks handled above.
+    // Skip terminal blocks; they receive their terminators later.
     if (origBlock == lcfg.newCons || origBlock == lcfg.sinkBB)
       continue;
 
@@ -168,15 +169,15 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
     SmallVector<Block *, 2> validSuccessors;
     SmallVector<bool, 2> keepSuccessor;
 
-    // Analyze successors to reconstruct paths.
     for (unsigned i = 0; i < origTerm->getNumSuccessors(); ++i) {
       Block *origSucc = origTerm->getSuccessor(i);
 
       if (origSucc == scope->header) {
-        // Current level back-edge redirects to Sink (False).
+        // Back-edge to this scope's own header.
+        // Level 0: header is dummystart; no real back-edge should exist,
+        // but cut defensively if encountered.
+        // Level > 0: redirect to the sink terminal.
         if (scope->level == 0) {
-          // At Level 0, back-edges to the header are considered to come from
-          // inner loops and are dropped.
           validSuccessors.push_back(nullptr);
           keepSuccessor.push_back(false);
         } else {
@@ -184,66 +185,74 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
           keepSuccessor.push_back(true);
         }
       } else if (scope->allBackEdges.contains({origBlock, origSucc})) {
-        // Deep back-edge (from inner loops) is pruned/dropped.
+        // Deep back-edge belonging to an inner loop.
+        // Always cut; the inner loop's own layer handles it.
         validSuccessors.push_back(nullptr);
         keepSuccessor.push_back(false);
       } else if (clonedMap.count(origSucc)) {
-        // Standard in-scope jump.
+        // Standard in-scope edge.
         validSuccessors.push_back(clonedMap[origSucc]);
         keepSuccessor.push_back(true);
       } else {
-        // Jump outside scope redirects to True terminal.
-        if (scope->level == 0)
+        // Edge leaving the current scope.
+        if (scope->level == 0) {
           llvm::errs()
               << "[FTD Warning] Block outside Level 0 scope encountered.\n";
+        }
+        // Redirect to the consumer terminal (represents loop exit).
         validSuccessors.push_back(trueTerm);
         keepSuccessor.push_back(true);
       }
     }
 
-    // Rebuild terminator based on valid successors.
+    // Rebuild the terminator based on surviving successors.
     if (auto cbr = dyn_cast<cf::CondBranchOp>(origTerm)) {
       if (keepSuccessor[0] && keepSuccessor[1]) {
-        // Both paths are valid, keep condition.
+        // Both paths survived; keep conditional branch.
         builder.create<cf::CondBranchOp>(
             loc, cbr.getCondition(), validSuccessors[0], validSuccessors[1]);
       } else if (keepSuccessor[0] && !keepSuccessor[1]) {
-        // Only true path is valid, degrade to unconditional branch.
+        // Only the true path survived.
         builder.create<cf::BranchOp>(loc, validSuccessors[0]);
       } else if (!keepSuccessor[0] && keepSuccessor[1]) {
-        // Only false path is valid, degrade to unconditional branch.
+        // Only the false path survived.
         builder.create<cf::BranchOp>(loc, validSuccessors[1]);
       }
+      // If neither survived the block is left without a terminator (dead).
     } else if (auto br = dyn_cast<cf::BranchOp>(origTerm)) {
-      if (keepSuccessor[0])
+      if (keepSuccessor[0]) {
         builder.create<cf::BranchOp>(loc, validSuccessors[0]);
+      }
+      // If the sole successor was cut, no terminator is created (dead).
     }
   }
 
-  // Iterative Graph Optimization (Canonicalization)
-  // 1. Remove blocks with no terminator due to invalid successors.
-  //    - Explicitly update predecessors to disconnect them.
-  //    - Erase the dead block.
-  // 2. Merge identical successors (CondBranch -> Branch).
-  // 3. Inline single-successor blocks (Path Compression).
-  // 4. Repeat until fixed point.
+  // Graph simplification.
+  //
+  // Level 0: only remove dead blocks (those without a terminator that are
+  // not terminals). This eliminates unreachable subgraphs created by
+  // cutting deep back-edges. No duplicate-successor merging and no path
+  // compression are performed; those are deferred to the caller.
+  //
+  // Level > 0: full canonicalization. After this pass every non-terminal
+  // block should carry a conditional branch, which is what the BDD builder
+  // expects.
   bool changed = true;
   while (changed) {
     changed = false;
 
-    // Use early_inc_range to safely erase blocks during iteration.
     for (Block &block : llvm::make_early_inc_range(R)) {
-      // Do not optimize/remove terminal blocks or the entry.
+      // Never touch the entry or the two terminal blocks.
       if (&block == newGraph->newProd || &block == newGraph->newCons ||
           &block == newGraph->sinkBB)
         continue;
 
       Operation *term = block.getTerminator();
 
-      // Remove blocks with no terminator.
+      // Dead block removal (applies to all levels).
+      // A block without a terminator has no outgoing edges and is dead.
+      // Disconnect its predecessors so the removal can propagate.
       if (!term) {
-        // Collect all users (Terminators of predecessor blocks) first.
-        // We cannot iterate predecessors while modifying them.
         SmallVector<Operation *, 4> predTerms;
         for (auto &use : block.getUses())
           predTerms.push_back(use.getOwner());
@@ -253,37 +262,37 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
           localBuilder.setInsertionPoint(predTerm);
 
           if (auto br = dyn_cast<cf::BranchOp>(predTerm)) {
-            // Predecessor unconditionally jumps to this dead block.
-            // Remove the jump, making the predecessor dead as well.
+            // Predecessor unconditionally jumps here; it becomes dead too.
             predTerm->erase();
           } else if (auto cbr = dyn_cast<cf::CondBranchOp>(predTerm)) {
             Block *trueDest = cbr.getTrueDest();
             Block *falseDest = cbr.getFalseDest();
 
             if (trueDest == &block && falseDest == &block) {
-              // Both legs go to dead block. Predecessor becomes dead.
+              // Both legs land on this dead block; predecessor dies.
               predTerm->erase();
             } else if (trueDest == &block) {
-              // True leg is dead, simplify to unconditional jump to False.
+              // True leg is dead; degrade to unconditional false branch.
               localBuilder.create<cf::BranchOp>(loc, falseDest);
               predTerm->erase();
             } else if (falseDest == &block) {
-              // False leg is dead, simplify to unconditional jump to True.
+              // False leg is dead; degrade to unconditional true branch.
               localBuilder.create<cf::BranchOp>(loc, trueDest);
               predTerm->erase();
             }
           }
         }
 
-        // Now that all edges pointing to this block are removed/redirected,
-        // erase it.
         block.erase();
         changed = true;
         continue;
       }
 
-      // Optimization: Merge Duplicate Successors.
-      // If CondBranch jumps to A and A, replace with Branch(A).
+      // The remaining optimizations only apply to level > 0.
+      if (scope->level == 0)
+        continue;
+
+      // Merge duplicate successors: CondBranch(A, A) becomes Branch(A).
       if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
         if (condBr.getTrueDest() == condBr.getFalseDest()) {
           OpBuilder localBuilder(term->getContext());
@@ -295,13 +304,11 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
         }
       }
 
-      // Optimization: Single Successor Inlining (Path Compression).
-      // If Block A simply jumps to Block B, replace all jumps to A with jumps
-      // to B, then remove A. This implicitly handles "Dead Ends" (nodes that
-      // only point to Sink).
+      // Path compression: if a block unconditionally jumps to a single
+      // destination, redirect all predecessors directly to that destination
+      // and remove the block.
       if (auto br = dyn_cast<cf::BranchOp>(term)) {
         Block *dest = br.getDest();
-        // Redirect all predecessors of 'block' to 'dest'.
         block.replaceAllUsesWith(dest);
         block.erase();
         changed = true;
@@ -310,12 +317,15 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
     }
   }
 
-  // Finalize terminals.
+  // Finalize the terminal blocks with proper terminators.
+  // The consumer terminal (True) falls through to the sink (False).
   builder.setInsertionPointToEnd(trueTerm);
   builder.create<cf::BranchOp>(loc, falseTerm);
+  // The sink terminal ends the region.
   builder.setInsertionPointToEnd(falseTerm);
   builder.create<func::ReturnOp>(loc);
 
+  // Compute topological order starting from the producer.
   DenseSet<Block *> visited;
   std::function<void(Block *)> topo = [&](Block *u) {
     if (!u || visited.contains(u))
