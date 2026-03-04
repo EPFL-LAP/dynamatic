@@ -1517,6 +1517,241 @@ static std::unique_ptr<ftd::LocalCFG> buildDecisionGraph(
   return newL;
 }
 
+/// Helper struct encapsulating cyclic demotion logic for reuse across
+/// different suppression contexts (direct suppression and MU gate exit).
+struct CyclicDemotionHelper {
+  PatternRewriter &rewriter;
+  handshake::FuncOp &funcOp;
+  const ftd::BlockIndexing &bi;
+  ftd::CyclicGraphManager &cyclicMgr;
+  DenseMap<Block *, Block *> &origToFullDG;
+  Location loc;
+  Block *insertBlock;
+  std::map<std::pair<std::string, unsigned>, Value> demotionCache;
+
+  CyclicDemotionHelper(PatternRewriter &rewriter,
+                        handshake::FuncOp &funcOp,
+                        const ftd::BlockIndexing &bi,
+                        ftd::CyclicGraphManager &cyclicMgr,
+                        DenseMap<Block *, Block *> &origToFullDG,
+                        Location loc, Block *insertBlock)
+      : rewriter(rewriter), funcOp(funcOp), bi(bi),
+        cyclicMgr(cyclicMgr), origToFullDG(origToFullDG),
+        loc(loc), insertBlock(insertBlock) {}
+
+  /// Get the nesting level of a condition variable
+  unsigned getVarNativeLevel(const std::string &var) {
+    auto opt = bi.getBlockFromCondition(var);
+    if (!opt)
+      return 0;
+    auto it = origToFullDG.find(opt.value());
+    if (it == origToFullDG.end())
+      return 0;
+    return cyclicMgr.getNestingLevel(it->second);
+  }
+
+  /// Find the LoopScope at a given level that contains a block
+  ftd::LoopScope *findScopeForBlock(Block *origIRBlock, unsigned level) {
+    auto it = origToFullDG.find(origIRBlock);
+    if (it == origToFullDG.end())
+      return nullptr;
+    Block *dgBlock = it->second;
+    std::function<ftd::LoopScope *(ftd::LoopScope *)> search;
+    search = [&](ftd::LoopScope *s) -> ftd::LoopScope * {
+      if (s->level == level && s->allBlocksInclusive.contains(dgBlock))
+        return s;
+      for (auto &sub : s->subLoops)
+        if (auto *f = search(sub.get()))
+          return f;
+      return nullptr;
+    };
+    return search(cyclicMgr.getTopLevelScope());
+  }
+
+  /// demoteOneLevel: demotes a value from fromLevel to fromLevel-1 using
+  /// the layered CFG of the LoopScope at fromLevel that contains origBlock.
+  /// origBlock is the original IR block where the value is defined.
+  Value demoteOneLevel(Value currentValue, Block *origBlock,
+                       unsigned fromLevel) {
+    ftd::LoopScope *scope = findScopeForBlock(origBlock, fromLevel);
+    if (!scope) {
+      llvm::errs() << "[FTD Warning] No LoopScope found at level " << fromLevel
+                   << " for demotion.\n";
+      return currentValue;
+    }
+
+    // 1. Extract acyclic layered CFG for this loop scope
+    OpBuilder layerBuilder(funcOp.getContext());
+    auto levelCFG = cyclicMgr.extractLayeredCFG(scope, layerBuilder);
+
+    // 2. CDA on levelCFG (main suppression: header -> loop exit)
+    ControlDependenceAnalysis levelCDA(*levelCFG->region);
+    DenseSet<Block *> levelDeps =
+        levelCDA.getAllBlockDeps()[levelCFG->newCons].allControlDeps;
+
+    // 3. Create level-local registry and pre-register all dep variables
+    //    at their correct level (demoting higher-level ones recursively)
+    SignalRegistry levelRegistry;
+    for (Block *depBlock : levelDeps) {
+      Block *depOrigBlock = levelCFG->origMap.lookup(depBlock);
+      if (!depOrigBlock)
+        continue;
+      std::string depVar = bi.getBlockCondition(depOrigBlock);
+      if (depVar.empty())
+        continue;
+
+      unsigned depNative = getVarNativeLevel(depVar);
+      Value depValue;
+      if (depNative <= fromLevel) {
+        // Variable is at this level or outer — use original value
+        depValue = getOriginalValue(rewriter, depVar, bi);
+      } else {
+        // Variable is from a deeper loop — demote to this level
+        depValue = getValueAtLevel(depVar, fromLevel);
+      }
+      if (depValue) {
+        if (!depValue.getType().isa<handshake::ChannelType>())
+          depValue.setType(ftd::channelifyType(depValue.getType()));
+        levelRegistry.registerSignal(depVar, {}, depValue);
+      }
+    }
+
+    // 4. Distribution on levelCFG
+    buildDistributionNetwork(rewriter, *levelCFG, bi, levelRegistry);
+
+    // 5. Main suppression expression: header -> loop exit
+    BoolExpression *fCons = enumeratePaths(*levelCFG, bi, levelDeps);
+    fCons = fCons->boolMinimize();
+    BoolExpression *fSup = fCons->boolNegate()->boolMinimize();
+
+    // 6. DP suppression: header -> value's block
+    BoolExpression *fSupDP = BoolExpression::boolZero();
+    Block *origHeader = levelCFG->origMap.lookup(levelCFG->newProd);
+
+    if (origHeader && origHeader != origBlock) {
+      OpBuilder dpBuilder(funcOp.getContext());
+      auto dpLocGraph =
+          buildLocalCFGRegion(dpBuilder, origHeader, origBlock, bi);
+      if (dpLocGraph->newCons) {
+        ControlDependenceAnalysis dpCDA(*dpLocGraph->region);
+        auto dpDepsTmp =
+            dpCDA.getAllBlockDeps()[dpLocGraph->newCons].forwardControlDeps;
+        auto dpDG = buildDecisionGraph(*dpLocGraph, dpDepsTmp);
+        ControlDependenceAnalysis dpDGCDA(*dpDG->region);
+        auto dpDeps =
+            dpDGCDA.getAllBlockDeps()[dpDG->newCons].allControlDeps;
+        BoolExpression *fConsDP = enumeratePaths(*dpDG, bi, dpDeps);
+        fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
+
+        // Ensure all DP expression variables are in the level registry
+        std::set<std::string> dpVars = fSupDP->getVariables();
+        for (const auto &v : dpVars) {
+          if (!levelRegistry.lookup(v, {})) {
+            unsigned vNative = getVarNativeLevel(v);
+            Value vVal;
+            if (vNative <= fromLevel)
+              vVal = getOriginalValue(rewriter, v, bi);
+            else
+              vVal = getValueAtLevel(v, fromLevel);
+            if (vVal) {
+              if (!vVal.getType().isa<handshake::ChannelType>())
+                vVal.setType(ftd::channelifyType(vVal.getType()));
+              levelRegistry.registerSignal(v, {}, vVal);
+            }
+          }
+        }
+
+        dpDG->containerOp->erase();
+      }
+      dpLocGraph->containerOp->erase();
+    }
+
+    // 7. Build suppression circuit
+    Value result = currentValue;
+    if (!currentValue.getType().isa<handshake::ChannelType>())
+      currentValue.setType(ftd::channelifyType(currentValue.getType()));
+
+    if (fSup->type != experimental::boolean::ExpressionType::Zero) {
+      std::set<std::string> vars = fSup->getVariables();
+      std::vector<std::string> cofactorList(vars.begin(), vars.end());
+      BDD *bdd = buildBDD(fSup, cofactorList);
+      Value branchCond = bddToCircuit(rewriter, bdd, insertBlock,
+                                       levelRegistry, {}, bi);
+
+      // Cascaded DP filter
+      if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
+        std::set<std::string> dpVarsSet = fSupDP->getVariables();
+        std::vector<std::string> dpCofactorList(dpVarsSet.begin(),
+                                                 dpVarsSet.end());
+        BDD *dpBdd = buildBDD(fSupDP, dpCofactorList);
+        Value dpCond = bddToCircuit(rewriter, dpBdd, insertBlock,
+                                     levelRegistry, {}, bi);
+        auto dpBranch = rewriter.create<handshake::ConditionalBranchOp>(
+            loc, ftd::getListTypes(branchCond.getType()),
+            dpCond, branchCond);
+        dpBranch->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+        branchCond = dpBranch.getFalseResult();
+      }
+
+      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+          loc, ftd::getListTypes(currentValue.getType()),
+          branchCond, currentValue);
+      branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+      result = branchOp.getFalseResult();
+    }
+
+    levelCFG->containerOp->erase();
+    return result;
+  }
+
+  /// getValueAtLevel: returns the value of a condition variable demoted to
+  /// the target level. Uses caching to avoid duplicate circuits.
+  Value getValueAtLevel(const std::string &varName, unsigned targetLevel) {
+    auto key = std::make_pair(varName, targetLevel);
+    auto it = demotionCache.find(key);
+    if (it != demotionCache.end())
+      return it->second;
+
+    unsigned native = getVarNativeLevel(varName);
+    Value val;
+    if (native <= targetLevel) {
+      // Variable is at or below target level — use original value
+      val = getOriginalValue(rewriter, varName, bi);
+      if (val && !val.getType().isa<handshake::ChannelType>())
+        val.setType(ftd::channelifyType(val.getType()));
+    } else {
+      // Recursively get value one level above, then demote
+      Value higher = getValueAtLevel(varName, targetLevel + 1);
+      auto blockOpt = bi.getBlockFromCondition(varName);
+      assert(blockOpt.has_value() && "Variable block not found");
+      val = demoteOneLevel(higher, blockOpt.value(), targetLevel + 1);
+    }
+
+    demotionCache[key] = val;
+    return val;
+  }
+
+  /// Pre-register demoted values for high-level variables in a decision
+  /// graph into the given registry.
+  template <typename DGType>
+  void preRegisterDemotedValues(DGType &dg, SignalRegistry &registry) {
+    for (Block *b : dg->topoOrder) {
+      Block *origBlock = dg->origMap.lookup(b);
+      if (!origBlock)
+        continue;
+      std::string var = bi.getBlockCondition(origBlock);
+      if (var.empty())
+        continue;
+      unsigned native = getVarNativeLevel(var);
+      if (native > 0) {
+        Value demoted = getValueAtLevel(var, 0);
+        if (demoted)
+          registry.registerSignal(var, {}, demoted);
+      }
+    }
+  }
+};
+
 /// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
 static void insertDirectSuppression(
@@ -1809,225 +2044,16 @@ static void insertDirectSuppression(
     if (origBlock)
       origToFullDG[origBlock] = dgBlock;
 
-  // Helper: get the nesting level of a condition variable
-  auto getVarNativeLevel = [&](const std::string &var) -> unsigned {
-    auto opt = bi.getBlockFromCondition(var);
-    if (!opt)
-      return 0;
-    auto it = origToFullDG.find(opt.value());
-    if (it == origToFullDG.end())
-      return 0;
-    return cyclicMgr.getNestingLevel(it->second);
-  };
-
-  // Helper: find the LoopScope at a given level that contains a block
-  auto findScopeForBlock =
-      [&](Block *origIRBlock,
-          unsigned level) -> ftd::LoopScope * {
-    auto it = origToFullDG.find(origIRBlock);
-    if (it == origToFullDG.end())
-      return nullptr;
-    Block *dgBlock = it->second;
-    std::function<ftd::LoopScope *(ftd::LoopScope *)> search;
-    search = [&](ftd::LoopScope *s) -> ftd::LoopScope * {
-      if (s->level == level && s->allBlocksInclusive.contains(dgBlock))
-        return s;
-      for (auto &sub : s->subLoops)
-        if (auto *f = search(sub.get()))
-          return f;
-      return nullptr;
-    };
-    return search(cyclicMgr.getTopLevelScope());
-  };
-
-  // Demotion cache: (varName, level) -> demoted Value
-  std::map<std::pair<std::string, unsigned>, Value> demotionCache;
-
-  // Forward-declared recursive getter
-  std::function<Value(const std::string &, unsigned)> getValueAtLevel;
-
-  // demoteOneLevel: demotes a value from fromLevel to fromLevel-1 using
-  // the layered CFG of the LoopScope at fromLevel that contains origBlock.
-  // origBlock is the original IR block where the value is defined.
-  auto demoteOneLevel = [&](Value currentValue, Block *origBlock,
-                            unsigned fromLevel) -> Value {
-    ftd::LoopScope *scope = findScopeForBlock(origBlock, fromLevel);
-    if (!scope) {
-      llvm::errs() << "[FTD Warning] No LoopScope found at level " << fromLevel
-                   << " for demotion.\n";
-      return currentValue;
-    }
-
-    // 1. Extract acyclic layered CFG for this loop scope
-    OpBuilder layerBuilder(funcOp.getContext());
-    auto levelCFG = cyclicMgr.extractLayeredCFG(scope, layerBuilder);
-
-    // 2. CDA on levelCFG (main suppression: header -> loop exit)
-    ControlDependenceAnalysis levelCDA(*levelCFG->region);
-    DenseSet<Block *> levelDeps =
-        levelCDA.getAllBlockDeps()[levelCFG->newCons].allControlDeps;
-
-    // 3. Create level-local registry and pre-register all dep variables
-    //    at their correct level (demoting higher-level ones recursively)
-    SignalRegistry levelRegistry;
-    for (Block *depBlock : levelDeps) {
-      Block *depOrigBlock = levelCFG->origMap.lookup(depBlock);
-      if (!depOrigBlock)
-        continue;
-      std::string depVar = bi.getBlockCondition(depOrigBlock);
-      if (depVar.empty())
-        continue;
-
-      unsigned depNative = getVarNativeLevel(depVar);
-      Value depValue;
-      if (depNative <= fromLevel) {
-        // Variable is at this level or outer — use original value
-        depValue = getOriginalValue(rewriter, depVar, bi);
-      } else {
-        // Variable is from a deeper loop — demote to this level
-        depValue = getValueAtLevel(depVar, fromLevel);
-      }
-      if (depValue) {
-        if (!depValue.getType().isa<handshake::ChannelType>())
-          depValue.setType(ftd::channelifyType(depValue.getType()));
-        levelRegistry.registerSignal(depVar, {}, depValue);
-      }
-    }
-
-    // 4. Distribution on levelCFG
-    buildDistributionNetwork(rewriter, *levelCFG, bi, levelRegistry);
-
-    // 5. Main suppression expression: header -> loop exit
-    BoolExpression *fCons = enumeratePaths(*levelCFG, bi, levelDeps);
-    fCons = fCons->boolMinimize();
-    BoolExpression *fSup = fCons->boolNegate()->boolMinimize();
-
-    // 6. DP suppression: header -> value's block
-    BoolExpression *fSupDP = BoolExpression::boolZero();
-    Block *origHeader = levelCFG->origMap.lookup(levelCFG->newProd);
-
-    if (origHeader && origHeader != origBlock) {
-      OpBuilder dpBuilder(funcOp.getContext());
-      auto dpLocGraph =
-          buildLocalCFGRegion(dpBuilder, origHeader, origBlock, bi);
-      if (dpLocGraph->newCons) {
-        ControlDependenceAnalysis dpCDA(*dpLocGraph->region);
-        auto dpDepsTmp =
-            dpCDA.getAllBlockDeps()[dpLocGraph->newCons].forwardControlDeps;
-        auto dpDG = buildDecisionGraph(*dpLocGraph, dpDepsTmp);
-        ControlDependenceAnalysis dpDGCDA(*dpDG->region);
-        auto dpDeps =
-            dpDGCDA.getAllBlockDeps()[dpDG->newCons].allControlDeps;
-        BoolExpression *fConsDP = enumeratePaths(*dpDG, bi, dpDeps);
-        fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
-
-        // Ensure all DP expression variables are in the level registry
-        std::set<std::string> dpVars = fSupDP->getVariables();
-        for (const auto &v : dpVars) {
-          if (!levelRegistry.lookup(v, {})) {
-            unsigned vNative = getVarNativeLevel(v);
-            Value vVal;
-            if (vNative <= fromLevel)
-              vVal = getOriginalValue(rewriter, v, bi);
-            else
-              vVal = getValueAtLevel(v, fromLevel);
-            if (vVal) {
-              if (!vVal.getType().isa<handshake::ChannelType>())
-                vVal.setType(ftd::channelifyType(vVal.getType()));
-              levelRegistry.registerSignal(v, {}, vVal);
-            }
-          }
-        }
-
-        dpDG->containerOp->erase();
-      }
-      dpLocGraph->containerOp->erase();
-    }
-
-    // 7. Build suppression circuit
-    Value result = currentValue;
-    if (!currentValue.getType().isa<handshake::ChannelType>())
-      currentValue.setType(ftd::channelifyType(currentValue.getType()));
-
-    if (fSup->type != experimental::boolean::ExpressionType::Zero) {
-      std::set<std::string> vars = fSup->getVariables();
-      std::vector<std::string> cofactorList(vars.begin(), vars.end());
-      BDD *bdd = buildBDD(fSup, cofactorList);
-      Value branchCond = bddToCircuit(rewriter, bdd, consumer->getBlock(),
-                                       levelRegistry, {}, bi);
-
-      // Cascaded DP filter
-      if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
-        std::set<std::string> dpVarsSet = fSupDP->getVariables();
-        std::vector<std::string> dpCofactorList(dpVarsSet.begin(),
-                                                 dpVarsSet.end());
-        BDD *dpBdd = buildBDD(fSupDP, dpCofactorList);
-        Value dpCond = bddToCircuit(rewriter, dpBdd, consumer->getBlock(),
-                                     levelRegistry, {}, bi);
-        auto dpBranch = rewriter.create<handshake::ConditionalBranchOp>(
-            consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
-            dpCond, branchCond);
-        dpBranch->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-        branchCond = dpBranch.getFalseResult();
-      }
-
-      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
-          consumer->getLoc(), ftd::getListTypes(currentValue.getType()),
-          branchCond, currentValue);
-      branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-      result = branchOp.getFalseResult();
-    }
-
-    levelCFG->containerOp->erase();
-    return result;
-  };
-
-  // getValueAtLevel: returns the value of a condition variable demoted to
-  // the target level. Uses caching to avoid duplicate circuits.
-  getValueAtLevel = [&](const std::string &varName,
-                        unsigned targetLevel) -> Value {
-    auto key = std::make_pair(varName, targetLevel);
-    auto it = demotionCache.find(key);
-    if (it != demotionCache.end())
-      return it->second;
-
-    unsigned native = getVarNativeLevel(varName);
-    Value val;
-    if (native <= targetLevel) {
-      // Variable is at or below target level — use original value
-      val = getOriginalValue(rewriter, varName, bi);
-      if (val && !val.getType().isa<handshake::ChannelType>())
-        val.setType(ftd::channelifyType(val.getType()));
-    } else {
-      // Recursively get value one level above, then demote
-      Value higher = getValueAtLevel(varName, targetLevel + 1);
-      auto blockOpt = bi.getBlockFromCondition(varName);
-      assert(blockOpt.has_value() && "Variable block not found");
-      val = demoteOneLevel(higher, blockOpt.value(), targetLevel + 1);
-    }
-
-    demotionCache[key] = val;
-    return val;
-  };
+  // Create the cyclic demotion helper
+  CyclicDemotionHelper demotionHelper(rewriter, funcOp, bi, cyclicMgr,
+                                       origToFullDG, consumer->getLoc(),
+                                       consumer->getBlock());
 
   // Level 0: distribution graph (no constraints)
   auto level0FullDG = buildDecisionGraph(*locGraph, locConsAcyclicDeps);
 
   // Pre-register demoted values for high-level variables in level 0
-  for (Block *b : level0FullDG->topoOrder) {
-    Block *origBlock = level0FullDG->origMap.lookup(b);
-    if (!origBlock)
-      continue;
-    std::string var = bi.getBlockCondition(origBlock);
-    if (var.empty())
-      continue;
-    unsigned native = getVarNativeLevel(var);
-    if (native > 0) {
-      Value demoted = getValueAtLevel(var, 0);
-      if (demoted)
-        registry.registerSignal(var, {}, demoted);
-    }
-  }
+  demotionHelper.preRegisterDemotedValues(level0FullDG, registry);
 
   // Build distribution on level 0
   buildDistributionNetwork(rewriter, *level0FullDG, bi, registry);
@@ -2101,7 +2127,8 @@ static void insertDirectSuppression(
         if (!supData.getType().isa<handshake::ChannelType>())
           supData.setType(ftd::channelifyType(supData.getType()));
         for (unsigned lvl = prodNative; lvl > 0; --lvl) {
-          supData = demoteOneLevel(supData, producerBlock, lvl);
+          supData =
+              demotionHelper.demoteOneLevel(supData, producerBlock, lvl);
         }
       }
     }
@@ -2479,26 +2506,49 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         ControlDependenceAnalysis locCDATmp(*locGraph->region);
         DenseSet<Block *> locConsControlDepsTmp =
             locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
+        DenseSet<Block *> locConsAcyclicDeps =
+            locCDATmp.getAllBlockDeps()[locGraph->newCons].forwardControlDeps;
+
+        // 2. Build decision graph for CyclicGraphManager
         auto decisionGraph =
             buildDecisionGraph(*locGraph, locConsControlDepsTmp);
+        ftd::CyclicGraphManager cyclicMgr(*decisionGraph);
 
-        // 2. Construct distribution circuit and suppression circuit on
-        // distribution
+        DenseMap<Block *, Block *> origToDG;
+        for (auto [dgBlock, origBlock] : decisionGraph->origMap)
+          if (origBlock)
+            origToDG[origBlock] = dgBlock;
+
+        // 3. Create the cyclic demotion helper
+        //    (MU gate: producer is at level 0, and no top-level DP needed)
+        auto funcOp = region.getParentOfType<handshake::FuncOp>();
+        CyclicDemotionHelper demotionHelper(
+            rewriter, funcOp, bi, cyclicMgr, origToDG,
+            loc, loopHeader);
+
+        // 4. Build acyclic decision graph for distribution and expression
+        auto acyclicDG =
+            buildDecisionGraph(*locGraph, locConsAcyclicDeps);
+
+        // 5. Pre-register demoted values for high-level variables
         SignalRegistry registry;
-        buildDistributionNetwork(rewriter, *decisionGraph, bi, registry);
+        demotionHelper.preRegisterDemotedValues(acyclicDG, registry);
 
-        // 3. Control Dependence Analysis on the Decision Graph
-        ControlDependenceAnalysis locCDA(*decisionGraph->region);
+        // 6. Construct distribution circuit
+        buildDistributionNetwork(rewriter, *acyclicDG, bi, registry);
+
+        // 7. Control Dependence Analysis on the acyclic Decision Graph
+        ControlDependenceAnalysis locCDA(*acyclicDG->region);
         auto depsMap = locCDA.getAllBlockDeps();
         DenseSet<Block *> locConsControlDeps =
-            depsMap[decisionGraph->newCons].allControlDeps;
+            depsMap[acyclicDG->newCons].allControlDeps;
 
-        // 4. Enumerate paths to get the boolean expression for the backedges
+        // 8. Enumerate paths to get the boolean expression for the backedges
         // (i.e., condition is True if we are looping back)
         BoolExpression *fBackedge =
-            enumeratePaths(*decisionGraph, bi, locConsControlDeps);
+            enumeratePaths(*acyclicDG, bi, locConsControlDeps);
 
-        // 5. Build BDD
+        // 9. Build BDD
         std::set<std::string> vars = fBackedge->getVariables();
         std::vector<std::string> cofactorList(vars.begin(), vars.end());
 
@@ -2513,11 +2563,12 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
                   });
 
         BDD *bdd = buildBDD(fBackedge, cofactorList);
-        // 6. Convert to Circuit.
+        // 10. Convert to Circuit.
         conditionValue =
             bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi);
 
         // Clean up temporary graphs
+        acyclicDG->containerOp->erase();
         decisionGraph->containerOp->erase();
         locGraph->containerOp->erase();
 
