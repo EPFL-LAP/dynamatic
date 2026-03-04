@@ -2,73 +2,29 @@
 
 namespace dynamatic {
 namespace handshake {
-FlowVariable::FlowVariable(const OpResult &channel) {
-  op = channel.getDefiningOp();
-  assert(op && "cannot get FlowVariable from channel without owner");
-  type = outputLambda;
-  lambdaIndex = channel.getResultNumber();
-
-  pm = PLUSMINUS::notApplicable;
-  if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
+FlowVariable::FlowVariable(ChannelLambda channel) {
+  *this = FlowVariable(Variants(channel));
+  if (auto ct = dyn_cast<handshake::ChannelType>(channel.channel.getType())) {
     if (ct.getDataBitWidth() == 1) {
       pm = PLUSMINUS::plusAndMinus;
     }
   }
-}
-
-FlowVariable::FlowVariable(OpOperand &back, Operation &resOp) {
-  Value channel = back.get();
-  op = channel.getDefiningOp();
-  pm = PLUSMINUS::notApplicable;
-  if (auto ct = dyn_cast<handshake::ChannelType>(channel.getType())) {
-    if (ct.getDataBitWidth() == 1) {
-      pm = PLUSMINUS::plusAndMinus;
-    }
-  }
-  if (op == nullptr) {
-    type = inputLambda;
-    op = &resOp;
-    lambdaIndex = back.getOperandNumber();
-  } else {
-    type = outputLambda;
-    bool found = false;
-    for (auto res : op->getResults()) {
-      if (res == channel) {
-        assert(!found && "found multiple matches");
-        found = true;
-        lambdaIndex = res.getResultNumber();
-      }
-    }
-    assert(found && "did not find matching OpResult");
-  }
-}
-
-// utility functions for initializing variables
-FlowVariable FlowVariable::internalChannel(Operation *op, unsigned index) {
-  return FlowVariable(TYPE::internalLambda, op, index);
 }
 
 FlowVariable FlowVariable::nextInternal() const {
-  assert(type == TYPE::internalLambda);
-  FlowVariable next = *this;
-  next.lambdaIndex = lambdaIndex + 1;
+  auto *lambda = std::get_if<InternalLambda>(&variable);
+  assert(lambda && "next internal can only be used on internal variables");
+  InternalLambda next = *lambda;
+  next.index += 1;
   return next;
 }
 
-bool FlowVariable::operator==(const FlowVariable &other) const {
-  if (type == TYPE::internalState && other.type == TYPE::internalState) {
-    return pm == other.pm && state.get() == other.state.get();
-  }
-
-  return type == other.type && lambdaIndex == other.lambdaIndex &&
-         op == other.op && pm == other.pm;
-}
 std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
-  if (isLambda()) {
+  auto *namer = std::get_if<std::shared_ptr<InternalStateNamer>>(&variable);
+  if (!namer)
     return nullptr;
-  }
-  assert(type == internalState);
 
+  auto &state = *namer;
   switch (pm) {
   case notApplicable:
     return state;
@@ -97,9 +53,11 @@ FlowExpression::FlowExpression(const FlowVariable &v) {
 llvm::json::Value FlowExpression::toJSON() const {
   std::vector<llvm::json::Value> jsonTerms{};
   for (auto &[key, value] : terms) {
-    assert(key.type == FlowVariable::TYPE::internalState);
+    auto *namer =
+        std::get_if<std::shared_ptr<InternalStateNamer>>(&key.variable);
+    assert(namer);
     int pm = key.pm;
-    jsonTerms.emplace_back(llvm::json::Object({{STATE_LIT, key.state->toJSON()},
+    jsonTerms.emplace_back(llvm::json::Object({{STATE_LIT, (*namer)->toJSON()},
                                                {COEFFICIENT_LIT, value},
                                                {CONSTRAINT_LIT, pm}}));
   }
@@ -116,8 +74,9 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
     assert(obj && "FlowExpression term JSON not an object");
     const llvm::json::Value *state = obj->get(STATE_LIT);
     assert(state && "FlowExpression term JSON does not contain STATE_LIT");
-    auto namer = InternalStateNamer::fromJSON(*state, path);
-    FlowVariable var(std::move(namer));
+    std::shared_ptr<InternalStateNamer> namer =
+        InternalStateNamer::fromJSON(*state, path);
+    FlowVariable var(namer);
     int coef;
     llvm::json::ObjectMapper mapper(termJSON, path);
     if (!mapper || !mapper.map(COEFFICIENT_LIT, coef)) {
