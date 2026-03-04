@@ -358,4 +358,34 @@ InterfaceMethod<[{
   ];
 }
 
+
+def BLIFImplInterface : OpInterface<"BLIFImplInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Allows specification of attributes to specify the BLIF
+      implementation of a Handshake operation, which is used in the
+      Handshake to Synth lowering.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Sets the BLIF Impl. as a StringAttr attr named "blif_impl".
+    }], "void", "setBLIFImpl", (ins "::llvm::StringRef":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("blif_impl",
+                  StringAttr::get(op->getContext(), value));
+    }]>,
+
+    InterfaceMethod<[{
+      Gets the BLIF impl. as a StringAttr named "blif_impl". Defaults to an empty string if not set.
+    }], "StringAttr", "getBLIFImpl", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<StringAttr>("blif_impl")) {
+        return attr;
+      }
+      return StringAttr::get(op->getContext(), "");
+    }]>
+  ];
+}
+
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

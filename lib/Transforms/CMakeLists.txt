@@ -14,6 +14,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeInferBasicBlocks.cpp
   HandshakeReplaceMemoryInterfaces.cpp
   HandshakeRemoveUnusedMemRefs.cpp
+  HandshakeMarkBLIFImpl.cpp
   HandshakeMarkFPUImpl.cpp
   MarkMemoryDependencies.cpp
   MarkMemoryInterfaces.cpp
