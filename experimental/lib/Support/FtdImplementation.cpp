@@ -686,51 +686,6 @@ static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
   return term->getOperand(0);
 }
 
-static BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
-                                                 CFGLoopInfo &li,
-                                                 const ftd::BlockIndexing &bi) {
-
-  // Get the boolean expression associated to the block exit
-  BoolExpression *blockCond =
-      BoolExpression::parseSop(bi.getBlockCondition(loopExit));
-
-  // Since we are in a loop, the terminator is a conditional branch.
-  auto *terminatorOperation = loopExit->getTerminator();
-  auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
-  assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
-
-  // If the destination of the false outcome is not the block, then the
-  // condition must be negated
-  if (li.getLoopFor(condBranch.getFalseDest()) != loop)
-    blockCond->boolNegate();
-
-  return blockCond;
-}
-
-static BoolExpression *
-getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
-                     mlir::CFGLoopInfo &li, const ftd::BlockIndexing &bi) {
-
-  SmallVector<Block *> exitBlocks;
-  loop->getExitingBlocks(exitBlocks);
-
-  BoolExpression *fLoopExit = BoolExpression::boolZero();
-
-  // Get the list of all the cofactors related to possible exit conditions
-  for (Block *exitBlock : exitBlocks) {
-    BoolExpression *blockCond =
-        getBlockLoopExitCondition(exitBlock, loop, li, bi);
-    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
-    cofactorList->push_back(bi.getBlockCondition(exitBlock));
-    fLoopExit = fLoopExit->boolMinimize();
-  }
-
-  // Sort the cofactors alphabetically
-  std::sort(cofactorList->begin(), cofactorList->end());
-
-  return fLoopExit;
-}
-
 /// Converts a boolean expression node to a circuit signal.
 static Value boolExpressionToCircuit(
     PatternRewriter &rewriter, experimental::boolean::BoolExpression *expr,
@@ -1764,7 +1719,7 @@ static void insertDirectSuppression(
   Block *consumerBlock = consumer->getBlock();
   Block *dominatorBlock = producerBlock;
 
-  bool debuglog = true;
+  bool debuglog = false;
   std::string funcName = funcOp.getName().str();
   std::string dir = "/home/yuqin/dynamatic-scripts/TempOutputs/";
   std::string logFile = dir + funcName + "_debuglog.txt";
@@ -2249,20 +2204,69 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
 
     // Determine the loop exit condition:
-    // - If the condition spans multiple cofactors, build a BDD and
-    //   translate it into a circuit.
-    // - Otherwise, use the simple terminating condition of the exiting block
     Value conditionValue;
-    std::vector<std::string> cofactorList;
-    BoolExpression *exitCondition =
-        getLoopExitCondition(loop, &cofactorList, loopInfo, bi);
-    if (size(cofactorList) > 1) {
-      BDD *bdd = buildBDD(exitCondition, cofactorList);
-      SignalRegistry emptyRegistry;
-      conditionValue =
-          bddToCircuit(rewriter, bdd, loop->getHeader(), emptyRegistry, {}, bi);
-    } else
-      conditionValue = loop->getExitingBlock()->getTerminator()->getOperand(0);
+    Block *loopHeader = loop->getHeader();
+
+    // 1. Build Local CFG with Prod = Cons = Loop Header
+    // This graph captures the loop-back paths.
+    OpBuilder tmpBuilder(funcOp.getContext());
+    auto locGraph =
+        buildLocalCFGRegion(tmpBuilder, loopHeader, loopHeader, bi);
+    ControlDependenceAnalysis locCDATmp(*locGraph->region);
+    DenseSet<Block *> locConsControlDepsFull =
+        locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
+    DenseSet<Block *> locConsAcyclicDeps =
+        locCDATmp.getAllBlockDeps()[locGraph->newCons].forwardControlDeps;
+
+    // 2. Build full decision graph for CyclicGraphManager
+    auto fullDecisionGraph =
+        buildDecisionGraph(*locGraph, locConsControlDepsFull);
+    ftd::CyclicGraphManager cyclicMgr(*fullDecisionGraph);
+
+    DenseMap<Block *, Block *> origToFullDG;
+    for (auto [dgBlock, origBlock] : fullDecisionGraph->origMap)
+      if (origBlock)
+        origToFullDG[origBlock] = dgBlock;
+
+    // 3. Create the cyclic demotion helper
+    CyclicDemotionHelper demotionHelper(
+        rewriter, funcOp, bi, cyclicMgr, origToFullDG,
+        consumerOp->getLoc(), loopHeader);
+
+    // 4. Build acyclic decision graph for distribution and expression
+    auto acyclicDG =
+        buildDecisionGraph(*locGraph, locConsAcyclicDeps);
+
+    // 5. Pre-register demoted values for high-level variables
+    SignalRegistry registry;
+    demotionHelper.preRegisterDemotedValues(acyclicDG, registry);
+
+    // 6. Construct distribution circuit
+    buildDistributionNetwork(rewriter, *acyclicDG, bi, registry);
+
+    // 7. Control Dependence Analysis on the acyclic Decision Graph
+    ControlDependenceAnalysis locCDA(*acyclicDG->region);
+    DenseSet<Block *> locConsControlDeps =
+        locCDA.getAllBlockDeps()[acyclicDG->newCons].allControlDeps;
+
+    // 8. Enumerate paths to get the boolean expression for the backedges
+    BoolExpression *fBackedge =
+        enumeratePaths(*acyclicDG, bi, locConsControlDeps);
+    fBackedge = fBackedge->boolMinimize();
+
+    // 9. Build BDD
+    std::set<std::string> vars = fBackedge->getVariables();
+    std::vector<std::string> cofactorList(vars.begin(), vars.end());
+
+    BDD *bdd = buildBDD(fBackedge, cofactorList);
+    // 10. Convert to Circuit.
+    conditionValue =
+        bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi);
+
+    // Clean up temporary graphs
+    acyclicDG->containerOp->erase();
+    fullDecisionGraph->containerOp->erase();
+    locGraph->containerOp->erase();
 
     // Create the false constant to feed `init`
     auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
@@ -2546,21 +2550,11 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         // 8. Enumerate paths to get the boolean expression for the backedges
         // (i.e., condition is True if we are looping back)
         BoolExpression *fBackedge =
-            enumeratePaths(*acyclicDG, bi, locConsControlDeps);
-
+            enumeratePaths(*acyclicDG, bi, locConsControlDeps);       
+        fBackedge = fBackedge->boolMinimize();
         // 9. Build BDD
         std::set<std::string> vars = fBackedge->getVariables();
         std::vector<std::string> cofactorList(vars.begin(), vars.end());
-
-        // Sort cofactors strictly to ensure consistent BDD structure
-        std::sort(cofactorList.begin(), cofactorList.end(),
-                  [&](const std::string &a, const std::string &b) {
-                    auto idA = bi.getBlockFromCondition(a);
-                    auto idB = bi.getBlockFromCondition(b);
-                    if (!idA || !idB)
-                      return a < b;
-                    return bi.isLess(idA.value(), idB.value());
-                  });
 
         BDD *bdd = buildBDD(fBackedge, cofactorList);
         // 10. Convert to Circuit.
