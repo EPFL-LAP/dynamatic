@@ -52,13 +52,17 @@ public:
   // synth circuit being generated from the blif file
   void createHWModuleShell();
 
-  // Function to create a wire in function of synth logic gate operations based
-  // on .names definition
-  void createSynthWire(std::vector<std::string> &ports, std::string &function);
+  // Function to create a wire in function of synth logic gate operations
+  // between an input and an output port based on the input and output bits in
+  // the .names definition
+  void createSynthWire(Value inputValue, std::string outputPortName,
+                       unsigned inputBitFunc, unsigned outputBitFunc);
 
-  // Function to create synth logic gate operations based on .names definition
-  void createSynthLogicGate(std::vector<std::string> &ports,
-                            std::string &function);
+  // Function to create synth logic gate operations between two input ports and
+  // an output port based on the input and output bits in the .names definition
+  void createSynthLogicGate(SmallVector<Value> inputValues,
+                            std::string outputNodeName, bool invertInput0,
+                            bool invertInput1, unsigned outputBit);
 
   // Function to extract the module name and the input and output ports from the
   // blif file

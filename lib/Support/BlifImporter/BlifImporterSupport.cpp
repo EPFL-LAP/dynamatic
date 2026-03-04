@@ -300,11 +300,52 @@ LogicalResult BlifImporter::populateHWModuleShell() {
         // Map the output node to the constant output
         updateOutputSynthSignalMapping(constOp.getResult(), nodeNames[0]);
       } else if (nodeNames.size() == 2) {
+        // Elaborate function
+        assert(function.size() == 3 &&
+               "function string must be of size 3 for a wire");
+        char inputValueFunc = function[0];
+        char outputValueFunc = function[2];
+        assert((inputValueFunc == '0' || inputValueFunc == '1') &&
+               "input value must be 0 or 1");
+        assert((outputValueFunc == '0' || outputValueFunc == '1') &&
+               "output value must be 0 or 1");
+        unsigned inputBit = (inputValueFunc == '1') ? 1 : 0;
+        unsigned outputBit = (outputValueFunc == '1') ? 1 : 0;
         // Create wire as a function of other existing synth operations
-        createSynthWire(nodeNames, function);
+        Value inputSignal = getInputMappingSynthSignal(nodeNames[0]);
+        createSynthWire(inputSignal, nodeNames[1], inputBit, outputBit);
       } else {
+        unsigned numInputs = nodeNames.size() - 1;
+        assert(numInputs == 2 &&
+               "the following pass transforms the logic gates to "
+               "aig nodes only");
+        SmallVector<Value> inputValues = {
+            getInputMappingSynthSignal(nodeNames[0]),
+            getInputMappingSynthSignal(nodeNames[1])};
+        std::string outputNodeName = nodeNames.back();
+
+        // Elaborate function to understand inversion of inputs/outputs
+        // Get the value of the first and second input and output
+        assert(function.size() == 4 &&
+               "function string must be of size 4 for 2-input logic gate");
+        char firstInputValue = function[0];
+        char secondInputValue = function[1];
+        char outputValue = function[3];
+        assert((firstInputValue == '0' || firstInputValue == '1') &&
+               "first input value must be 0 or 1");
+        assert((secondInputValue == '0' || secondInputValue == '1') &&
+               "second input value must be 0 or 1");
+        assert((outputValue == '0' || outputValue == '1') &&
+               "output value must be 0 or 1");
+        unsigned firstInputBit = (firstInputValue == '1') ? 1 : 0;
+        unsigned secondInputBit = (secondInputValue == '1') ? 1 : 0;
+        unsigned outputBit = (outputValue == '1') ? 1 : 0;
+
+        bool invertInput0 = (firstInputBit == 0) ? true : false;
+        bool invertInput1 = (secondInputBit == 0) ? true : false;
         // Create logic gate as a function of other existing synth operations
-        createSynthLogicGate(nodeNames, function);
+        createSynthLogicGate(inputValues, outputNodeName, invertInput0,
+                             invertInput1, outputBit);
       }
     }
 
@@ -454,41 +495,21 @@ void BlifImporter::createHWModuleShell() {
 
 // Function to create a wire in function of synth logic gate operations based
 // on .names definition
-void BlifImporter::createSynthWire(std::vector<std::string> &ports,
-                                   std::string &function) {
+void BlifImporter::createSynthWire(Value inputValue, std::string outputPortName,
+                                   unsigned inputBitFunc,
+                                   unsigned outputBitFunc) {
   MLIRContext *ctx = moduleOp.getContext();
   OpBuilder builder(ctx);
   builder.setInsertionPoint(hwModuleShell.getBodyBlock()->getTerminator());
   Location loc = hwModuleShell.getLoc();
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
-  unsigned numInputs = ports.size() - 1;
-  assert(numInputs == 1 && "wire should have only one input");
-  SmallVector<Value> inputValues;
-  // Get input values
-  for (unsigned i = 0; i < numInputs; ++i) {
-    std::string inputNodeName = ports[i];
-    Value inputValue = getInputMappingSynthSignal(inputNodeName);
-    inputValues.push_back(inputValue);
-  }
-  std::string outputNodeName = ports.back();
-  // Elaborate function
-  assert(function.size() == 3 &&
-         "function string must be of size 3 for a wire");
-  char inputValueFunc = function[0];
-  char outputValueFunc = function[2];
-  assert((inputValueFunc == '0' || inputValueFunc == '1') &&
-         "input value must be 0 or 1");
-  assert((outputValueFunc == '0' || outputValueFunc == '1') &&
-         "output value must be 0 or 1");
-  int inputBit = (inputValueFunc == '1') ? 1 : 0;
-  int outputBit = (outputValueFunc == '1') ? 1 : 0;
-  Value inputValue = inputValues[0];
+
   // If the input and output bits are identical, you can skip the creation
   // of any node since they are identical
-  if (inputBit == outputBit) {
+  if (inputBitFunc == outputBitFunc) {
     // We just need to update the output map function so that the output
     // points to the same value as input
-    updateOutputSynthSignalMapping(inputValue, outputNodeName);
+    updateOutputSynthSignalMapping(inputValue, outputPortName);
     return;
   }
   // If this is not the case, we have to create a new aig node which inverts
@@ -503,49 +524,19 @@ void BlifImporter::createSynthWire(std::vector<std::string> &ports,
       loc, inputValue, constOp.getResult(),
       /*invertInput0=*/true, /*invertInput1=*/false);
 
-  updateOutputSynthSignalMapping(aigOp.getResult(), outputNodeName);
+  updateOutputSynthSignalMapping(aigOp.getResult(), outputPortName);
 }
 
 // Function to create synth logic gate operations based on .names definition
-void BlifImporter::createSynthLogicGate(std::vector<std::string> &ports,
-                                        std::string &function) {
+void BlifImporter::createSynthLogicGate(SmallVector<Value> inputValues,
+                                        std::string outputNodeName,
+                                        bool invertInput0, bool invertInput1,
+                                        unsigned outputBit) {
   MLIRContext *ctx = moduleOp.getContext();
   OpBuilder builder(ctx);
   Location loc = hwModuleShell.getLoc();
   builder.setInsertionPoint(hwModuleShell.getBodyBlock()->getTerminator());
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
-  unsigned numInputs = ports.size() - 1;
-  assert(numInputs > 1 && "logic gate must have at least two inputs");
-  assert(numInputs == 2 && "the following pass transforms the logic gates to "
-                           "aig nodes only");
-  SmallVector<Value> inputValues;
-  // Get input values
-  for (unsigned i = 0; i < numInputs; ++i) {
-    std::string inputNodeName = ports[i];
-    Value inputValue = getInputMappingSynthSignal(inputNodeName);
-    inputValues.push_back(inputValue);
-  }
-  std::string outputNodeName = ports.back();
-
-  // Elaborate function to understand inversion of inputs/outputs
-  // Get the value of the first and second input and output
-  assert(function.size() == 4 &&
-         "function string must be of size 4 for 2-input logic gate");
-  char firstInputValue = function[0];
-  char secondInputValue = function[1];
-  char outputValue = function[3];
-  assert((firstInputValue == '0' || firstInputValue == '1') &&
-         "first input value must be 0 or 1");
-  assert((secondInputValue == '0' || secondInputValue == '1') &&
-         "second input value must be 0 or 1");
-  assert((outputValue == '0' || outputValue == '1') &&
-         "output value must be 0 or 1");
-  int firstInputBit = (firstInputValue == '1') ? 1 : 0;
-  int secondInputBit = (secondInputValue == '1') ? 1 : 0;
-  int outputBit = (outputValue == '1') ? 1 : 0;
-
-  bool invertInput0 = (firstInputBit == 0) ? true : false;
-  bool invertInput1 = (secondInputBit == 0) ? true : false;
 
   // Create aig node
   auto aigOp = builder.create<synth::AndInverterOp>(
