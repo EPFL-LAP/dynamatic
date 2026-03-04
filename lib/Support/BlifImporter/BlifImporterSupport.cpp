@@ -343,7 +343,19 @@ LogicalResult BlifImporter::populateHWModuleShell() {
   return success();
 }
 
-// Function to get the input mapping of a signal value
+// Function to get the input mapping of a signal value. If a value corresponding
+// to the signal name already exists in the node values map, return it. If not,
+// check if a temporary value for this signal name exists in the temporary
+// values map and return it if it exists. Otherwise, create a new temporary
+// input signal (e.g., hw constant) and add it to the temporary values map
+// before returning it. In this way, we can drive nodes whose input nodes have
+// not been defined yet.
+// IMPORTANT: The temporary constants created by this function could slow down
+// the generation of the synth circuit since they add extra nodes to the circuit
+// and they need to be removed later on. However, in general BLIF files, these
+// temporary nodes are mainly added for the inputs of latches. Hence, the number
+// of constants is directly proportional only to the number of latches in the
+// BLIF file.
 Value BlifImporter::getInputMappingSynthSignal(std::string nodeName) {
 
   Location loc = hwModuleShell.getLoc();
@@ -370,7 +382,13 @@ Value BlifImporter::getInputMappingSynthSignal(std::string nodeName) {
 }
 
 // Function to update the output signal mapping after creating a new synth
-// operation
+// operation. This function takes as input the new result value of the synth
+// operation and the name of the output node that this synth operation drives.
+// It first checks if the output node name is already in the temporary values
+// map. If it is, it replaces all uses of the temporary value with the new
+// result value, erases the temporary value's defining operation, and removes
+// the temporary value from the temporary values map. Finally, it adds the new
+// result value to the node values map with the output node name as key.
 void BlifImporter::updateOutputSynthSignalMapping(Value newResult,
                                                   std::string nodeName) {
   // Check if the old result is in the tmp values map
