@@ -865,24 +865,13 @@ MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
   // We aim to use this analysis to report:
   // (predecessor, successor, iteration-dist)
   //
-  // which means that we cannot reorder predecessor in iteration i and successor
-  // in iteration i + "iteration-dist"
+  // which means that predecessor in iteration i has to go before successor in
+  // iteration i + "iteration-dist"
   //
   // Example:
   // (ld, st, 1)
-  // this means that the ld in iteration i and st in iteration i + 1 cannot be
-  // reordered.
-  //
-  // One important thing is that this analysis is of iteration granularity, but
-  // not BB level. Therefore, we will see an interesting thing in the next:
-  //
-  // Example:
-  // (ld, st, 0)
-  // this is a special case and show the specific feature of this analysis:
-  // this just says that ld and st cannot be reordered, but their iterations do
-  // not actually define any ordering (same iteration). More over, the analysis
-  // will likely report another dependency as well:
-  // (st, ld, 0)
+  // this means that the ld in iteration i has to go before st in iteration i +
+  // 1
   //
   // So, we need to rely on their BB order to understand who actually goes
   // first.
@@ -916,6 +905,9 @@ MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
       if (src->getParent() != dst->getParent())
         continue;
 
+      // Check the base address pointer used in gep of the two accesses (e.g.,
+      // function arguments, allocas..), we assume that different function
+      // arguments do not alias.
       if (!equalBase(src, dst))
         continue;
 
@@ -941,8 +933,8 @@ MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
           //   for (int i = 0; i < n; ++i) {
           //     int m = feature[i];
           //     float wt = weight[i];
-          //     float x = hist[m];
-          //     hist[m + 3] = x + wt;
+          //     float x = hist[m]; <-- LD
+          //     hist[m + 3] = x + wt; <--- ST
           //   }
           // }
           //
@@ -953,14 +945,13 @@ MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
           // order:
           //
           if (!src->comesBefore(dst)) {
-            // CASE 1. If the reported distance is not the same as their BB
-            // sequence:
+            // CASE 1. If the reported distance is not the same as their
+            // instruction sequence:
             //
             // --- program order --------
-            // val1 = ld addr
-            // st val2
+            // DST -> SRC
             // --- dependence reported --
-            // (st, ld, "I don't know the distance")
+            // (SRC, DST, "I don't know the distance")
             // --------------------------
             // here, we conservatively choose that the distance to be 1 (so the
             // ld in the next iteration already has to wait)
@@ -975,14 +966,13 @@ MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
             );
             finalDistanceOrNoDependency = 1;
           } else {
-            // CASE 2. If the reported distance is the same as their BB
+            // CASE 2. If the reported distance is the same as their instruction
             // sequence:
             //
             // --- program order --------
-            // val1 = ld addr
-            // st val2
+            // SRC -> DST
             // --- dependence reported --
-            // (ld, st, "I don't know the distance")
+            // (SRC, DST, "I don't know the distance")
             // --------------------------
             // here, we conservatively choose that the distance to be 0 (so the
             // st in the same iteration has to wait for the load).
