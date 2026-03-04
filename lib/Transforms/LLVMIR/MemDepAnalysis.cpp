@@ -1,3 +1,35 @@
+//===- MemDepAnalysis.cpp ---------------------------------------*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+///
+/// Usage 1: Legacy Dynamatic's memory analysis based on Polly
+///
+/// ```
+/// opt input.ll \
+///   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so"
+///   -passes="mem-dep-analysis" \
+///   -polly-process-unprofitable \
+///   > output.ll
+/// ```
+///
+/// Usage 2: A implementation based on "llvm/Analysis/DependenceAnalysis.h". We
+/// use this to supply constraints to SDC-based static scheduling. This option
+/// is enabled by using the flag `-use-dependence-analysis`
+///
+/// ```
+/// opt input.ll \
+///   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so"
+///   -passes="mem-dep-analysis" \
+///   -use-dependence-analysis \
+///   > output.ll
+/// ```
+///
+///
+//===----------------------------------------------------------------------===//
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
@@ -21,8 +53,18 @@
 #include "dynamatic/Support/MemoryDependency.h"
 #include "llvm/Analysis/ValueTracking.h"
 
+#include "llvm/Analysis/DependenceAnalysis.h"
+
+#define DEBUG_TYPE "mem-dep-analysis"
+
 using namespace llvm;
 using namespace polly;
+
+static cl::opt<bool> useDependenceAnalysis(
+    "use-dependence-analysis", cl::init(false),
+    cl::desc("Use the memory dependency analysis based on "
+             "llvm/Analysis/DependenceAnalysis.h instead of the one based on "
+             "polly"));
 
 namespace {
 
@@ -164,6 +206,26 @@ bool InstructionDependenceInfo::hasGlobalInOrderInstrDependency(
 
   return instructionAlwaysDepends(cfgPath, srcInst, loopSet);
 }
+
+std::optional<int64_t> getDistance(Dependence *d) {
+  unsigned innerMostLoopLevel = d->getLevels();
+  const auto *dist = d->getDistance(innerMostLoopLevel);
+
+  LLVM_DEBUG(llvm::errs() << "Distance cannot be calculated at all!");
+  if (!dist)
+    return std::nullopt;
+
+  if (const auto *distScev = dyn_cast<SCEVConstant>(dist)) {
+    auto apInt = distScev->getAPInt();
+    // llvm::errs() << "Dist (const): " << apInt.getSExtValue() << "\n";
+    return apInt.getSExtValue();
+  }
+
+  LLVM_DEBUG(
+      llvm::errs() << "Conservatively choose a value based on BB ordering!";);
+  LLVM_DEBUG(d->dump(llvm::errs()););
+  return std::nullopt;
+};
 
 } // namespace
 
@@ -615,6 +677,16 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
   /// \brief: Loops through the loops in the IR and collect the loads and
   /// stores.
   void processLoop(Loop *l, std::vector<struct LoopMetaData> &loopMetaInfos);
+
+  // Uses "llvm/Analysis/DependenceAnalysis.h"
+  PreservedAnalyses runDependenceAnalysisBased(Function &llvmFunction,
+                                               FunctionAnalysisManager &fam);
+
+  // Polly-based implementation inherited from the legacy Dynamatic
+  PreservedAnalyses
+  runPollyBasedInLegacyDynamatic(Function &llvmFunction,
+                                 FunctionAnalysisManager &fam);
+
   PreservedAnalyses run(Function &llvmFunction, FunctionAnalysisManager &fam);
 
   /// \brief: returns a list of (srcInst, dstInst) pairs that might have a WAR
@@ -782,9 +854,215 @@ MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
   return depPairList;
 }
 
-PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
-                                          FunctionAnalysisManager &fam) {
+// This flow currently only supports the dependence analysis within one BB and
+// the inner-most loops in all loop nests
+PreservedAnalyses
+MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
+                                               FunctionAnalysisManager &fam) {
 
+  // REMARK:
+  //
+  // We aim to use this analysis to report:
+  // (predecessor, successor, iteration-dist)
+  //
+  // which means that predecessor in iteration i has to go before successor in
+  // iteration i + "iteration-dist"
+  //
+  // Example:
+  // (ld, st, 1)
+  // this means that the ld in iteration i has to go before st in iteration i +
+  // 1
+  //
+  // So, we need to rely on their BB order to understand who actually goes
+  // first.
+  auto &dependenceAnalysis = fam.getResult<DependenceAnalysis>(llvmFunction);
+  auto nameMapping = nameAllLoadStores(llvmFunction);
+
+  if (llvmFunction.getName() == "main") {
+    return PreservedAnalyses::all();
+  }
+
+  std::vector<Instruction *> memoryInsts;
+  for (BasicBlock &bb : llvmFunction) {
+    for (Instruction &inst : bb)
+      if (isa<LoadInst, StoreInst>(inst))
+        memoryInsts.push_back(&inst);
+  }
+
+  // This map is used to record the dependencies and we serialize them to
+  // metadata nodes later.
+  std::map<Instruction *, LLVMMemDependency> instToDepsMap;
+
+  // REMARK:
+  // - When the dependency analysis reports a loop independent dependency, it
+  // actually tests positive for both RAW and WAR; in this case,  we use the BB
+  // order to determine which one goes first.
+  // - When the dependency analysis reports a loop-carried dependency, it will
+  // correctly reports both direction with one positive and one negative.
+  //
+  for (auto *src : memoryInsts) {
+    for (auto *dst : memoryInsts) {
+      if (src->getParent() != dst->getParent())
+        continue;
+
+      // Check the base address pointer used in gep of the two accesses (e.g.,
+      // function arguments, allocas..), we assume that different function
+      // arguments do not alias.
+      if (!equalBase(src, dst))
+        continue;
+
+      if (src == dst)
+        continue;
+
+      if (auto d = dependenceAnalysis.depends(/* proceed */ src,
+                                              /* succeed */ dst, true)) {
+
+        auto llvmAnalyzedDistance = getDistance(d.get());
+        std::optional<int> finalDistanceOrNoDependency;
+
+        // getLevels reports the innermost loop. This parameter is currently not
+        // used anywhere in Dynamatic (as of Mar. 4, 2026), but is extracted and
+        // represented in the IR for completeness.
+        unsigned depth = d->getLevels();
+        if (/* When distance is not available (example: histogram) */
+            !llvmAnalyzedDistance) {
+
+          //
+          // void histogram(in_int_t feature[1000], in_float_t weight[1000],
+          //                inout_float_t hist[1000], in_int_t n) {
+          //   for (int i = 0; i < n; ++i) {
+          //     int m = feature[i];
+          //     float wt = weight[i];
+          //     float x = hist[m]; <-- LD
+          //     hist[m + 3] = x + wt; <--- ST
+          //   }
+          // }
+          //
+          // In the histogram example above, the compiler identifies that src
+          // has to go before dst in the inner-most loop in some cases, but it
+          // cannot statically determine the exact distance (which depends on
+          // the value of m). In this case, we can use the most conservative
+          // order:
+          //
+          if (!src->comesBefore(dst)) {
+            // CASE 1. If the reported distance is not the same as their
+            // instruction sequence:
+            //
+            // --- program order --------
+            // DST -> SRC
+            // --- dependence reported --
+            // (SRC, DST, "I don't know the distance")
+            // --------------------------
+            // here, we conservatively choose that the distance to be 1 (so the
+            // ld in the next iteration already has to wait)
+            //
+            LLVM_DEBUG(llvm::errs() << "Dependence (distance unknown, "
+                                       "conservatively set to 1):\n";
+                       llvm::errs() << *src << "\n";
+                       llvm::errs() << "  precedes:\n";
+                       llvm::errs() << *dst << "\n";
+                       llvm::errs() << "  distance: " << 1 << "\n";
+
+            );
+            finalDistanceOrNoDependency = 1;
+          } else {
+            // CASE 2. If the reported distance is the same as their instruction
+            // sequence:
+            //
+            // --- program order --------
+            // SRC -> DST
+            // --- dependence reported --
+            // (SRC, DST, "I don't know the distance")
+            // --------------------------
+            // here, we conservatively choose that the distance to be 0 (so the
+            // st in the same iteration has to wait for the load).
+            //
+            LLVM_DEBUG(
+                llvm::errs() << "Dependence (distance unknown, conservatively "
+                                "set to 0):\n";
+                llvm::errs() << *src << "\n"; llvm::errs() << "  precedes:\n";
+                llvm::errs() << *dst << "\n";
+                llvm::errs() << "  distance: " << 0 << "\n";);
+            finalDistanceOrNoDependency = 0;
+          }
+        } else if (d->isOrdered()) {
+          if (/* When distance is available and it is not a RAR (trivial dep.)
+               */
+              *llvmAnalyzedDistance == 0) {
+            // Special case when dist == 0 (same BB): the analysis reports in
+            // both directions. Here we we can directly use program order to
+            // enforce:
+            //
+            // void test_memory_1(int a[N], int n) {
+            //   for (int i = 0; i < n; i++)
+            //     a[i] = a[i] + 5;
+            // }
+            // In this example, we technically cannot reorder the load/store
+            // w.r.t their iterations, so the analysis tells us that there is
+            // (RAW, 0) and (WAR, 0).
+            //
+            // In this case, we can use Instruction::comesBefore(...) to check
+            // the actual program order.
+            //
+            if (src->comesBefore(dst)) {
+              LLVM_DEBUG(
+                  llvm::errs() << "Dependence (same iteration or no loop):\n";
+                  llvm::errs() << *src << "\n"; llvm::errs() << "  precedes:\n";
+                  llvm::errs() << *dst << "\n";
+                  llvm::errs()
+                  << "  distance: " << *llvmAnalyzedDistance << "\n";);
+              finalDistanceOrNoDependency = *llvmAnalyzedDistance;
+            }
+          } else {
+            LLVM_DEBUG(
+                llvm::errs() << "Dependence:\n"; llvm::errs() << *src << "\n";
+                llvm::errs() << "  precedes:\n"; llvm::errs() << *dst << "\n";
+                llvm::errs()
+                << "  distance: " << *llvmAnalyzedDistance << "\n";);
+            finalDistanceOrNoDependency = *llvmAnalyzedDistance;
+          }
+        }
+
+        if (
+            // clang-format off
+            /* there is a dependency */
+            finalDistanceOrNoDependency &&
+            /* it reports both fwd and bwd directions, we just need one of them for the SDC constraints */
+            *finalDistanceOrNoDependency >= 0
+            // clang-format on
+        ) {
+          if (instToDepsMap.count(src) == 0) {
+            // This branch creates the list [dep1] if the predecessor
+            // instruction hasn't been visited yet
+            LLVMMemDependency newDep;
+            newDep.name = nameMapping[src];
+            newDep.destAndDepthAndDist.emplace_back(
+                nameMapping[dst], depth, *finalDistanceOrNoDependency);
+            instToDepsMap[src] = newDep;
+          } else {
+            // Otherwise, populate the existing list [dep1, dep2, ...] with the
+            // new dep.
+            instToDepsMap[src].destAndDepthAndDist.emplace_back(
+                nameMapping[dst], depth, *finalDistanceOrNoDependency);
+          }
+        }
+
+        LLVM_DEBUG(llvm::errs() << "-------------------------\n";);
+      }
+    }
+  }
+  llvm::LLVMContext &ctx = llvmFunction.getContext();
+
+  for (auto [src, dests] : instToDepsMap) {
+    dests.toLLVMMetaDataNode(ctx, src);
+  }
+
+  return PreservedAnalyses::all();
+}
+
+// Polly-based implementation inherited from the legacy Dynamatic
+PreservedAnalyses MemDepAnalysisPass::runPollyBasedInLegacyDynamatic(
+    Function &llvmFunction, FunctionAnalysisManager &fam) {
   llvm::LLVMContext &ctx = llvmFunction.getContext();
 
   auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(llvmFunction);
@@ -852,12 +1130,13 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
       // hasn't been visited yet
       LLVMMemDependency newDep;
       newDep.name = nameMapping[src];
-      newDep.destAndDepth.emplace_back(nameMapping[dst], 1);
+      newDep.destAndDepthAndDist.emplace_back(nameMapping[dst], 0, 0);
       instToDepsMap[src] = newDep;
     } else {
       // Otherwise, populate the existing list [dep1, dep2, ...] with the new
       // dep.
-      instToDepsMap[src].destAndDepth.emplace_back(nameMapping[dst], 1);
+      instToDepsMap[src].destAndDepthAndDist.emplace_back(nameMapping[dst], 0,
+                                                          0);
     }
   }
 
@@ -868,7 +1147,16 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
   return PreservedAnalyses::all();
 }
 
-} // end anonymous namespace
+PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
+                                          FunctionAnalysisManager &fam) {
+
+  if (useDependenceAnalysis) {
+    return this->runDependenceAnalysisBased(llvmFunction, fam);
+  }
+
+  return this->runPollyBasedInLegacyDynamatic(llvmFunction, fam);
+}
+} // namespace
 
 // Register the pass for opt-style loading
 // plugin:
