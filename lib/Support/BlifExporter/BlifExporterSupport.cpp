@@ -78,10 +78,10 @@ LogicalResult BlifExporter::generateBlifHeader() {
   StringRef moduleName = hwModuleOp.getName();
 
   // Write the module name in the blif file
-  outputFile << modelNode << " " << moduleName.str() << "\n";
+  outputFile << LIT_MODEL << " " << moduleName.str() << "\n";
 
   // Write the input ports in the blif file
-  outputFile << inputsNodes; // .inputs
+  outputFile << LIT_INPUTS; // .inputs
   for (auto port : hwModuleOp.getPortList()) {
     if (port.isInput()) {
       outputFile << " " << port.getName().str();
@@ -91,7 +91,7 @@ LogicalResult BlifExporter::generateBlifHeader() {
   outputFile << "\n";
 
   // Write the output ports in the blif file
-  outputFile << outputsNodes; // .outputs
+  outputFile << LIT_OUTPUTS; // .outputs
   for (auto port : hwModuleOp.getPortList()) {
     if (port.isOutput()) {
       outputFile << " " << port.getName().str();
@@ -158,7 +158,7 @@ LogicalResult BlifExporter::generateBlifCircuitFromSynth() {
     if (isa<synth::LatchOp>(op)) {
       auto latchOp = dyn_cast<synth::LatchOp>(op);
       // .latch <input> <output> [<latch type> <control>] [<init value>]
-      outputFile << latchNode;
+      outputFile << LIT_LATCH;
       outputFile << " " << getValueName(latchOp.getOperand(0));
       outputFile << " " << getValueName(latchOp.getResult());
       // Check for optional fields: latch type, control and init value
@@ -177,7 +177,7 @@ LogicalResult BlifExporter::generateBlifCircuitFromSynth() {
     } else if (isa<synth::AndInverterOp>(op)) {
       auto andOp = dyn_cast<synth::AndInverterOp>(op);
       // .names <input1> <input2> <output>
-      outputFile << logicNode;
+      outputFile << LIT_NAMES;
       outputFile << " " << getValueName(andOp.getOperand(0));
       outputFile << " " << getValueName(andOp.getOperand(1));
       outputFile << " " << getValueName(andOp.getResult());
@@ -197,7 +197,7 @@ LogicalResult BlifExporter::generateBlifCircuitFromSynth() {
       APInt constValue = constOp.getValue();
       assert(constValue.getBitWidth() == 1 &&
              "only 1-bit constants supported in BLIF export");
-      outputFile << logicNode << " " << getValueName(constOp.getResult())
+      outputFile << LIT_NAMES << " " << getValueName(constOp.getResult())
                  << "\n";
       outputFile << (constValue == 1 ? "1" : "0") << "\n";
     } else if (isa<hw::OutputOp>(op)) {
@@ -239,7 +239,7 @@ LogicalResult BlifExporter::generateBlifCircuitFromSynth() {
         std::string outputPortName = outputPorts[operandIdx];
         // Write a .names statement to create a wire between the input and
         // output
-        outputFile << logicNode << " " << inputPortName << " " << outputPortName
+        outputFile << LIT_NAMES << " " << inputPortName << " " << outputPortName
                    << "\n";
         outputFile << "1 1\n"; // output is 1 when input is 1
         // Add the output port name to the synthOutputsNames variable to check
@@ -287,7 +287,7 @@ LogicalResult BlifExporter::exportBlifCircuit() {
     return failure();
   }
   // Write the end of the blif file
-  outputFile << endNode << "\n";
+  outputFile << LIT_END << "\n";
 
   return success();
 }

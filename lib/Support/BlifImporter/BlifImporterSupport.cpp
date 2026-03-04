@@ -106,7 +106,7 @@ LogicalResult BlifImporter::extractBlifModuleHeader() {
     iss >> type;
 
     // Model name
-    if (type == modelNode) {
+    if (type == LIT_MODEL) {
       std::string module;
       iss >> module;
       if (module.empty()) {
@@ -121,10 +121,10 @@ LogicalResult BlifImporter::extractBlifModuleHeader() {
     }
 
     // Input/Output nodes. These are also Dataflow graph channels.
-    else if ((type == inputsNodes) || (type == outputsNodes)) {
+    else if ((type == LIT_INPUTS) || (type == LIT_OUTPUTS)) {
       std::string nodeName;
       while (iss >> nodeName) {
-        if (type == inputsNodes) {
+        if (type == LIT_INPUTS) {
           // Check if the input has already been added to the input ports list
           if (std::find(inputPorts.begin(), inputPorts.end(), nodeName) !=
               inputPorts.end()) {
@@ -153,12 +153,12 @@ LogicalResult BlifImporter::extractBlifModuleHeader() {
     // reading the header since we have already collected the module name and
     // the input and output ports and we assume that they should be defined
     // before any other element in the blif file
-    else if (type == latchNode || type == logicNode || type == subcktNode) {
+    else if (type == LIT_LATCH || type == LIT_NAMES || type == LIT_SUBCKT) {
       break;
     }
 
     // Ends the file.
-    else if (line.find(endNode) == 0) {
+    else if (line.find(LIT_END) == 0) {
       break;
     }
   }
@@ -211,7 +211,7 @@ LogicalResult BlifImporter::populateHWModuleShell() {
     iss >> type;
 
     // Latches.
-    if (type == latchNode) {
+    if (type == LIT_LATCH) {
       std::string regInput, regOutput;
       iss >> regInput >> regOutput;
       // Elaboration of optional fields for latches. The syntax for latches in
@@ -267,7 +267,7 @@ LogicalResult BlifImporter::populateHWModuleShell() {
     }
 
     // .names stand for logic gates.
-    else if (type == logicNode) {
+    else if (type == LIT_NAMES) {
       std::vector<std::string> nodeNames;
       std::string currentNode;
 
@@ -350,13 +350,13 @@ LogicalResult BlifImporter::populateHWModuleShell() {
     }
 
     // Subcircuits. not used for now.
-    else if (line.find(subcktNode) == 0) {
+    else if (line.find(LIT_SUBCKT) == 0) {
       llvm::errs() << "Subcircuits inside the blif file not supported " << "\n";
       continue;
     }
 
     // Ends the file.
-    else if (line.find(endNode) == 0) {
+    else if (line.find(LIT_END) == 0) {
       break;
     }
   }
