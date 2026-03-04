@@ -2,7 +2,7 @@
 
 ## Overview
 
-`BLIFFileManager` is a utility class in the **Dynamatic** project that resolves `.blif` file paths describing the functionality of Handshake IR operations. Given a base directory and an operation, it constructs the expected file path and validates that the file exists.
+`BLIFFileManager` is a utility class that resolves `.blif` file paths describing the functionality of Handshake IR operations. Given a base directory and an operation, it constructs the expected file path and validates that the file exists.
 
 ---
 
