@@ -799,11 +799,17 @@ class LSQ:
             fallback_load_is_oldest = Logic(ctx, 'fallback_load_is_oldest', 'w')
             arch += Reduce(ctx, fallback_load_is_oldest, fallback_load_is_oldest_oh, 'or')
 
-            # FIXME: What if we are about to issue a store? We shouldn't issue a fallback load in the same cycle.
+            # NOTE: For both the outstanding loads and stores, we only need to consider loads/store which were issued
+            # previously. If a load (store) is issued through the regular path in the same cycle as the fallback store
+            # (load), it cannot conflict with the fallback store (load). This is because:
+            # 1. The regular load (store) must be younger than the fallback store (load) by construction.
+            # 2. The regular load (store) has been dependency-checked against the fallback store (load) before being
+            #    issued.
+            # 3. Thus, the fallback store (load) and the regular load (store) must have different addresses.
+
             store_outstanding = Logic(ctx, 'store_outstanding', 'w')
             arch += Op(ctx, store_outstanding, "'1'", 'when', '(', stq_issue, '/=', stq_resp, ')', 'else ', "'0'")
 
-            # FIXME: What if we are about to issue a load? We shouldn't issue a fallback store in the same cycle.
             load_outstanding_arr = LogicArray(ctx, 'load_outstanding_arr', 'w', self.configs.numLdqEntries)
             load_outstanding = Logic(ctx, 'load_outstanding', 'w')
             for i in range(self.configs.numLdqEntries):
