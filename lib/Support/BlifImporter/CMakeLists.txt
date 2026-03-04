@@ -1,8 +1,6 @@
 add_dynamatic_library(DynamaticBlifImporter
   BlifImporterSupport.cpp
 
-  DEPENDS
-  DynamaticTransformsPassIncGen
 
   LINK_LIBS PUBLIC
   DynamaticSupport

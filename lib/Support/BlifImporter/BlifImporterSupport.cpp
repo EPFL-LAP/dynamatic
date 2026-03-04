@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BlifImporter/BlifImporterSupport.h"
+#include "dynamatic/Support/BlifImporter/BlifImporterSupport.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HW.h.inc"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"

@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BlifExporter/BlifExporterSupport.h"
+#include "dynamatic/Support/BlifExporter/BlifExporterSupport.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HW.h.inc"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"

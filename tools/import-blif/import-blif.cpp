@@ -23,7 +23,7 @@
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/System.h"
 #include "dynamatic/Support/Utils/Utils.h"
-#include "dynamatic/Transforms/BlifImporter/BlifImporterSupport.h"
+#include "dynamatic/Support/BlifImporter/BlifImporterSupport.h"
 #include "experimental/Support/FormalProperty.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/IR/BuiltinAttributes.h"
