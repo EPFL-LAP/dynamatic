@@ -33,6 +33,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LLVM.h"
@@ -133,11 +134,13 @@ int main(int argc, char **argv) {
   mlir::ModuleOp moduleOp = modOp.get();
 
   // Import the blif circuit and generate the corresponding synth circuit
-  importBlifCircuit(moduleOp,
-                    /*Location inside module operation*/ moduleOp->getLoc(),
-                    inputBlifFilename);
+  importBlifCircuit(moduleOp, inputBlifFilename);
 
   // Write the generated MLIR module to the output file
+  if (failed(verify(moduleOp))) {
+    llvm::errs() << "Module verification failed!\n";
+    return 1;
+  }
   moduleOp.print(outputMlirFile);
   outputMlirFile.flush();
 }

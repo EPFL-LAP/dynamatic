@@ -170,22 +170,16 @@ LogicalResult BlifImporter::extractBlifModuleHeader() {
 }
 // Function to read a blif file and generate the synth circuit depending on the
 // blif description
-LogicalResult BlifImporter::generateSynthCircuitFromBlif(
-    Location loc, llvm::StringMap<Value> &synthInputs,
-    SmallVector<std::string> &synthOutputsNames,
-    SmallVector<Value> &synthOutputs, OpBuilder &builder) {
+LogicalResult BlifImporter::populateHWModuleShell() {
   // The following function reads the blif file specified by blifFilePath
   // and generates the synth circuit defined in it.
 
-  // Iterate over the synth inputs and add the mapping to nodeValuesMap
-  for (const auto &synthInput : synthInputs) {
-    std::string inputName = synthInput.first().str();
-    Value inputValue = synthInput.second;
-    // Check the input name is not already in the map
-    assert(!nodeValuesMap.count(inputName) &&
-           "input name already exists in the node values map");
-    nodeValuesMap[inputName] = inputValue;
-  }
+  MLIRContext *ctx = moduleOp.getContext();
+  OpBuilder builder(ctx);
+  builder.setInsertionPoint(hwModuleShell.getBodyBlock()->getTerminator());
+  Location loc = hwModuleShell.getLoc();
+
+  assert(builder.getInsertionBlock() && "Builder has no insertion block!");
 
   std::ifstream file(blifFilePath);
 
@@ -252,12 +246,12 @@ LogicalResult BlifImporter::generateSynthCircuitFromBlif(
       // remaining.size() == 0: no optional fields present, which is also valid
 
       // Get the input signal for the register
-      Value inputSignal = getInputMappingSynthSignal(loc, regInput, builder);
+      Value inputSignal = getInputMappingSynthSignal(regInput);
 
       // Get optional control signal
       Value controlSignal = nullptr;
       if (!controlName.empty()) {
-        controlSignal = getInputMappingSynthSignal(loc, controlName, builder);
+        controlSignal = getInputMappingSynthSignal(controlName);
       }
 
       // Create synth register operation
@@ -268,7 +262,7 @@ LogicalResult BlifImporter::generateSynthCircuitFromBlif(
           initVal.has_value() ? builder.getI64IntegerAttr(*initVal) : nullptr);
 
       // Map the output node to the register output
-      updateOutputSynthSignalMapping(regOp.getResult(), regOutput, builder);
+      updateOutputSynthSignalMapping(regOp.getResult(), regOutput);
 
     }
 
@@ -304,14 +298,13 @@ LogicalResult BlifImporter::generateSynthCircuitFromBlif(
                                    function == "1" ? 1 : 0));
 
         // Map the output node to the constant output
-        updateOutputSynthSignalMapping(constOp.getResult(), nodeNames[0],
-                                       builder);
+        updateOutputSynthSignalMapping(constOp.getResult(), nodeNames[0]);
       } else if (nodeNames.size() == 2) {
         // Create wire as a function of other existing synth operations
-        createSynthWire(loc, nodeNames, function, builder);
+        createSynthWire(nodeNames, function);
       } else {
         // Create logic gate as a function of other existing synth operations
-        createSynthLogicGate(loc, nodeNames, function, builder);
+        createSynthLogicGate(nodeNames, function);
       }
     }
 
@@ -329,10 +322,10 @@ LogicalResult BlifImporter::generateSynthCircuitFromBlif(
   // Close the file
   file.close();
 
-  // Collect the outputs of the synth circuit in a vector to pass back to the
-  // caller
+  // Collect the outputs of the synth circuit in a vector
+  SmallVector<Value> synthOutputs;
   // Map hw instance outputs to the corresponding synth signals
-  for (const auto &outputNodeName : synthOutputsNames) {
+  for (const auto &outputNodeName : outputPorts) {
     if (!nodeValuesMap.count(outputNodeName)) {
       llvm::errs() << "Output node '" << outputNodeName
                    << "' not found in synth circuit." << "\n";
@@ -342,20 +335,29 @@ LogicalResult BlifImporter::generateSynthCircuitFromBlif(
     synthOutputs.push_back(outputSignal);
   }
 
+  // Enforce the new outputs of the hw module shell to be the outputs of the
+  // synth circuit
+  auto outputOp =
+      cast<hw::OutputOp>(hwModuleShell.getBodyBlock()->getTerminator());
+  outputOp->setOperands(synthOutputs);
   return success();
 }
 
 // Function to get the input mapping of a signal value
-Value BlifImporter::getInputMappingSynthSignal(Location loc, StringRef nodeName,
-                                               OpBuilder &builder) {
+Value BlifImporter::getInputMappingSynthSignal(std::string nodeName) {
+
+  Location loc = hwModuleShell.getLoc();
+  MLIRContext *ctx = moduleOp.getContext();
+  OpBuilder builder(ctx);
+  builder.setInsertionPoint(hwModuleShell.getBodyBlock()->getTerminator());
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
   // Check if the signal is already in the map
-  if (nodeValuesMap.count(nodeName.str())) {
-    return nodeValuesMap[nodeName.str()];
+  if (nodeValuesMap.count(nodeName)) {
+    return nodeValuesMap[nodeName];
   }
   // Check if the signal is in the tmp values map
-  if (tmpValuesMap.count(nodeName.str())) {
-    return tmpValuesMap[nodeName.str()];
+  if (tmpValuesMap.count(nodeName)) {
+    return tmpValuesMap[nodeName];
   }
   // If not, create a temporary input signal (e.g., hw constant)
   auto tempInput = builder.create<hw::ConstantOp>(
@@ -363,47 +365,94 @@ Value BlifImporter::getInputMappingSynthSignal(Location loc, StringRef nodeName,
       builder.getIntegerAttr(builder.getIntegerType(1), 0));
 
   // Add the temporary input signal to the map
-  tmpValuesMap[nodeName.str()] = tempInput;
+  tmpValuesMap[nodeName] = tempInput;
   return tempInput;
 }
 
 // Function to update the output signal mapping after creating a new synth
 // operation
 void BlifImporter::updateOutputSynthSignalMapping(Value newResult,
-                                                  StringRef nodeName,
-                                                  OpBuilder &builder) {
+                                                  std::string nodeName) {
   // Check if the old result is in the tmp values map
-  if (tmpValuesMap.count(nodeName.str())) {
+  if (tmpValuesMap.count(nodeName)) {
     // Replace all uses of the temporary value with the new result value
-    tmpValuesMap[nodeName.str()].replaceAllUsesWith(newResult);
-    auto *constOp = tmpValuesMap[nodeName.str()].getDefiningOp();
+    tmpValuesMap[nodeName].replaceAllUsesWith(newResult);
+    auto *constOp = tmpValuesMap[nodeName].getDefiningOp();
     assert(constOp && "temporary value should have a defining operation");
     assert(constOp->use_empty() && "temporary value should have no more uses");
     // Erase the operation
     constOp->erase();
     // Remove the temporary value from the map
-    tmpValuesMap.erase(nodeName.str());
+    tmpValuesMap.erase(nodeName);
   }
   // Add the new result value to the node values map
-  nodeValuesMap[nodeName.str()] = newResult;
+  nodeValuesMap[nodeName] = newResult;
+}
+
+// Function to create hw module operation that represents the shell of the
+// synth circuit being generated from the blif file
+void BlifImporter::createHWModuleShell() {
+
+  MLIRContext *ctx = moduleOp.getContext();
+  OpBuilder builder(ctx);
+  builder.setInsertionPointToStart(moduleOp.getBody());
+  assert(builder.getInsertionBlock() && "Builder has no insertion block!");
+  Location loc = moduleOp.getLoc();
+  // Create array of port info to create the hw module operation
+  SmallVector<hw::PortInfo> portInfos;
+  for (auto [idx, inputPortName] : llvm::enumerate(inputPorts)) {
+    portInfos.push_back(hw::PortInfo{hw::ModulePort{
+        StringAttr::get(ctx, inputPortName), builder.getIntegerType(1),
+        hw::ModulePort::Direction::Input}});
+  }
+  for (auto [idx, outputPortName] : llvm::enumerate(outputPorts)) {
+    portInfos.push_back(hw::PortInfo{hw::ModulePort{
+        StringAttr::get(ctx, outputPortName), builder.getIntegerType(1),
+        hw::ModulePort::Direction::Output}});
+  }
+  // Module name
+  StringAttr moduleNameAttr = builder.getStringAttr(moduleName);
+  // Create a new hw module operation
+  hwModuleShell = builder.create<hw::HWModuleOp>(
+      loc, moduleNameAttr, ArrayRef<hw::PortInfo>(portInfos));
+
+  // Collect the inputs of the hw module shell
+  unsigned inputIndex = 0;
+  for (auto port : hwModuleShell.getPortList()) {
+    if (!port.isInput()) {
+      continue;
+    }
+    StringRef portName = port.name.getValue();
+    // Get value of hw module input argument
+    Value portValue = hwModuleShell.getModuleBody().getArgument(inputIndex);
+    inputIndex++;
+    // Check the input name is not already in the map
+    assert(!nodeValuesMap.count(portName.str()) &&
+           "input name already exists in the node values map");
+    // Add the mapping between the input port name and its value to the map
+    nodeValuesMap[portName.str()] = portValue;
+  }
 }
 
 // Function to create a wire in function of synth logic gate operations based
 // on .names definition
-void BlifImporter::createSynthWire(Location loc,
-                                   std::vector<std::string> &ports,
-                                   std::string &function, OpBuilder &builder) {
+void BlifImporter::createSynthWire(std::vector<std::string> &ports,
+                                   std::string &function) {
+  MLIRContext *ctx = moduleOp.getContext();
+  OpBuilder builder(ctx);
+  builder.setInsertionPoint(hwModuleShell.getBodyBlock()->getTerminator());
+  Location loc = hwModuleShell.getLoc();
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
   unsigned numInputs = ports.size() - 1;
   assert(numInputs == 1 && "wire should have only one input");
   SmallVector<Value> inputValues;
   // Get input values
   for (unsigned i = 0; i < numInputs; ++i) {
-    StringRef inputNodeName = ports[i];
-    Value inputValue = getInputMappingSynthSignal(loc, inputNodeName, builder);
+    std::string inputNodeName = ports[i];
+    Value inputValue = getInputMappingSynthSignal(inputNodeName);
     inputValues.push_back(inputValue);
   }
-  StringRef outputNodeName = ports.back();
+  std::string outputNodeName = ports.back();
   // Elaborate function
   assert(function.size() == 3 &&
          "function string must be of size 3 for a wire");
@@ -421,7 +470,7 @@ void BlifImporter::createSynthWire(Location loc,
   if (inputBit == outputBit) {
     // We just need to update the output map function so that the output
     // points to the same value as input
-    updateOutputSynthSignalMapping(inputValue, outputNodeName, builder);
+    updateOutputSynthSignalMapping(inputValue, outputNodeName);
     return;
   }
   // If this is not the case, we have to create a new aig node which inverts
@@ -436,14 +485,16 @@ void BlifImporter::createSynthWire(Location loc,
       loc, inputValue, constOp.getResult(),
       /*invertInput0=*/true, /*invertInput1=*/false);
 
-  updateOutputSynthSignalMapping(aigOp.getResult(), outputNodeName, builder);
+  updateOutputSynthSignalMapping(aigOp.getResult(), outputNodeName);
 }
 
 // Function to create synth logic gate operations based on .names definition
-void BlifImporter::createSynthLogicGate(Location loc,
-                                        std::vector<std::string> &ports,
-                                        std::string &function,
-                                        OpBuilder &builder) {
+void BlifImporter::createSynthLogicGate(std::vector<std::string> &ports,
+                                        std::string &function) {
+  MLIRContext *ctx = moduleOp.getContext();
+  OpBuilder builder(ctx);
+  Location loc = hwModuleShell.getLoc();
+  builder.setInsertionPoint(hwModuleShell.getBodyBlock()->getTerminator());
   assert(builder.getInsertionBlock() && "Builder has no insertion block!");
   unsigned numInputs = ports.size() - 1;
   assert(numInputs > 1 && "logic gate must have at least two inputs");
@@ -452,11 +503,11 @@ void BlifImporter::createSynthLogicGate(Location loc,
   SmallVector<Value> inputValues;
   // Get input values
   for (unsigned i = 0; i < numInputs; ++i) {
-    StringRef inputNodeName = ports[i];
-    Value inputValue = getInputMappingSynthSignal(loc, inputNodeName, builder);
+    std::string inputNodeName = ports[i];
+    Value inputValue = getInputMappingSynthSignal(inputNodeName);
     inputValues.push_back(inputValue);
   }
-  StringRef outputNodeName = ports.back();
+  std::string outputNodeName = ports.back();
 
   // Elaborate function to understand inversion of inputs/outputs
   // Get the value of the first and second input and output
@@ -502,83 +553,34 @@ void BlifImporter::createSynthLogicGate(Location loc,
   }
 
   // Update output mapping
-  updateOutputSynthSignalMapping(outputValueAig, outputNodeName, builder);
+  updateOutputSynthSignalMapping(outputValueAig, outputNodeName);
 }
 
 // Function to create a new synth circuit from a blif file from an empty IR
-void importBlifCircuit(ModuleOp moduleOp, Location loc,
-                       StringRef blifFilePath) {
-  MLIRContext *ctx = moduleOp.getContext();
-  // Create a new module operation
-  OpBuilder builder(ctx);
-  // Set as insertion point the beginning of the module body to create the synth
-  // circuit inside the module body and before any other operation
-  builder.setInsertionPointToStart(moduleOp.getBody());
-  BlifImporter blifImporter(blifFilePath);
+hw::HWModuleOp importBlifCircuit(ModuleOp moduleOp, StringRef blifFilePath) {
+
+  BlifImporter blifImporter(blifFilePath, moduleOp);
   // Read input and output ports from the blif file
   if (failed(blifImporter.extractBlifModuleHeader())) {
     llvm::errs() << "Failed to read the blif file header." << "\n";
-    return;
+    return nullptr;
   }
-  std::string moduleName = blifImporter.getModuleName();
-  SmallVector<std::string> inputPortsNames = blifImporter.getInputPortsNames();
-  SmallVector<std::string> outputPortsNames =
-      blifImporter.getOutputPortsNames();
-  // Create array of port info to create the hw module operation
-  SmallVector<hw::PortInfo> portInfos;
-  for (auto [idx, inputPortName] : llvm::enumerate(inputPortsNames)) {
-    portInfos.push_back(hw::PortInfo{hw::ModulePort{
-        StringAttr::get(ctx, inputPortName), builder.getIntegerType(1),
-        hw::ModulePort::Direction::Input}});
-  }
-  for (auto [idx, outputPortName] : llvm::enumerate(outputPortsNames)) {
-    portInfos.push_back(hw::PortInfo{hw::ModulePort{
-        StringAttr::get(ctx, outputPortName), builder.getIntegerType(1),
-        hw::ModulePort::Direction::Output}});
-  }
-  // Module name
-  StringAttr moduleNameAttr = builder.getStringAttr(moduleName);
-  // Create a new hw module operation
-  hw::HWModuleOp hwModule = builder.create<hw::HWModuleOp>(
-      loc, moduleNameAttr, ArrayRef<hw::PortInfo>(portInfos));
 
-  // Collect the inputs of the hw module in a map to pass to the function that
-  // generates the synth circuit
-  llvm::StringMap<Value> synthInputs;
-  unsigned inputIndex = 0;
-  for (auto port : hwModule.getPortList()) {
-    if (!port.isInput()) {
-      continue;
-    }
-    StringRef portName = port.name.getValue();
-    // Get value of hw module input argument
-    Value portValue = hwModule.getModuleBody().getArgument(inputIndex);
-    inputIndex++;
-    // Add the mapping between the input port name and its value to the map
-    synthInputs[portName.str()] = portValue;
-  }
-  builder.setInsertionPointToStart(hwModule.getBodyBlock());
+  // Create the hw module shell for the synth circuit being generated from the
+  // blif file
+  blifImporter.createHWModuleShell();
 
-  // Get hwmodule location to pass it to the function that generates the synth
-  // circuit so that the created synth operations have the same location as the
-  // hw module
-  Location hwModuleloc = hwModule.getLoc();
-  // Collect the outputs of the synth circuit
-  SmallVector<Value> synthOutputs;
-  // Generate the synth circuit from the blif file
-  if (failed(blifImporter.generateSynthCircuitFromBlif(
-          hwModuleloc, synthInputs, outputPortsNames, synthOutputs, builder))) {
+  // Generate the synth circuit from the blif file and populate the hw module
+  // shell with the generated circuit
+  if (failed(blifImporter.populateHWModuleShell())) {
     llvm::errs() << "Failed to generate the synth circuit from the blif file."
                  << "\n";
-    return;
+    return nullptr;
   }
-  // Erase the default hw module terminator and create a new one with the synth
-  // outputs as operands
-  hwModule.getBodyBlock()->getTerminator()->erase();
-  // Set the insertion point at the end of the hw module body
-  builder.setInsertionPointToEnd(hwModule.getBodyBlock());
-  // Create hw module terminator operation with the synth outputs as operands
-  builder.create<hw::OutputOp>(hwModuleloc, synthOutputs);
+
+  // Return the generated hw module shell containing the synth circuit being
+  // generated from the blif file
+  return blifImporter.getHWModuleShell();
 }
 
 } // namespace dynamatic
