@@ -53,6 +53,7 @@ MODULE {name}(ins_valid, outs_ready)
   -- output
   DEFINE ins_ready := inner_one_slot_break_dv.ins_ready;
   DEFINE outs_valid := inner_one_slot_break_dv.outs_valid;
+  DEFINE v{no_one_slot_break_dv_latency} := inner_one_slot_break_dv.slot_0_full;
 
 {generate_one_slot_break_dv(f"{name}__one_slot_break_dv_dataless", {ATTR_BITWIDTH: 0})}
 """

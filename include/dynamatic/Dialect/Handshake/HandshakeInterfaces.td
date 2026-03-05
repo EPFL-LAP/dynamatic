@@ -306,6 +306,24 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
   }]>,
 
   InterfaceMethod<[{
+    Gets the latency-induced slots based on the II and the latency.
+    TODO: Actually retrieve the II, instead of just assuming II=1
+  }], "std::vector<LatencyInducedSlotNamer>", "getLatencyInducedSlots", (ins), [{
+    Operation *op = $_op.getOperation();
+    auto attr = op->getAttrOfType<IntegerAttr>("latency");
+    assert(attr && "cannot latency slot without defined latency");
+    auto name = op->getAttrOfType<::mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+    assert(name && "cannot latency slot without defined op name");
+    int64_t latency = attr.getInt();
+    int64_t II = 1;
+    int64_t numSlots = latency / II;
+    std::vector<LatencyInducedSlotNamer> ret(numSlots);
+    for (int64_t i = 0; i < numSlots; ++i) {
+      ret[i] = LatencyInducedSlotNamer(name.str(), i);
+    }
+    return ret;
+  }]>,
+  InterfaceMethod<[{
   Sets the operation latency.
     }], "void", "setLatency", (ins "int64_t":$latency), [{
       $_op->setAttr("latency", IntegerAttr::get(IntegerType::get($_op->getContext(), 64), latency));

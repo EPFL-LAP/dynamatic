@@ -31,6 +31,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::EFNAO;
   if (s == "CSOAFAF")
     return FormalProperty::TYPE::CSOAFAF;
+  if (s == "RPF")
+    return FormalProperty::TYPE::RPF;
 
   return std::nullopt;
 }
@@ -45,6 +47,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "EFNAO";
   case TYPE::CSOAFAF:
     return "CSOAFAF";
+  case TYPE::RPF:
+    return "RPF";
   }
 }
 
@@ -102,6 +106,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::CSOAFAF:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::RPF:
+    return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -248,11 +254,12 @@ EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
-  std::vector<std::string> channels(sentStateNamers.size());
-  std::string opName = sentStateNamers[0].opName;
+  std::vector<llvm::json::Value> channels{};
+  // std::string opName = sentStateNamers[0].opName;
   for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    assert(state.opName == opName);
-    channels[i] = state.channelName;
+    channels.push_back(state.toInnerJSON());
+    // assert(state.opName == opName);
+    // channels[i] = state.channelName;
   }
   // Example JSON:
   // {
@@ -266,7 +273,7 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
   //   "owner_op": "control_merge0",
   //   "channels": ["outs", "index"]
   // }
-  return llvm::json::Object({{OWNER_OP_LIT, opName}, {CHANNELS_LIT, channels}});
+  return llvm::json::Array(channels);
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
@@ -275,17 +282,13 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::ObjectMapper mapper(info, path);
-  std::string opName;
-  std::vector<std::string> channelNames;
-  if (!mapper || !mapper.map(OWNER_OP_LIT, opName) ||
-      !mapper.map(CHANNELS_LIT, channelNames))
-    return nullptr;
-  prop->sentStateNamers =
-      std::vector<handshake::EagerForkSentNamer>(channelNames.size());
-  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
-    prop->sentStateNamers[i] =
-        handshake::EagerForkSentNamer(opName, channelName);
+  llvm::json::Array *array = info.getAsArray();
+  assert(array &&
+         "expected info of EFNAO to be an array of eager fork outputs");
+  for (auto &stateJSON : *array) {
+    auto sentStateNamer =
+        handshake::EagerForkSentNamer::fromInnerJSON(stateJSON, path);
+    prop->sentStateNamers.push_back(*sentStateNamer);
   }
   return prop;
 }
@@ -303,16 +306,12 @@ CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
-  std::vector<std::string> channels(sentStateNamers.size());
-  std::string forkOpName = sentStateNamers[0].opName;
+  std::vector<llvm::json::Value> channels{};
   for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    assert(state.opName == forkOpName);
-    channels[i] = state.channelName;
+    channels.push_back(state.toInnerJSON());
   }
-  return llvm::json::Object({{FORK_OP_LIT, forkOpName},
-                             {FORK_CHANNELS_LIT, channels},
-                             {BUFFER_OP_LIT, copiedSlot.opName},
-                             {BUFFER_SLOT_LIT, copiedSlot.slotName}});
+  return llvm::json::Object({{FORK_CHANNELS_LIT, channels},
+                             {COPIED_SLOT_LIT, copiedSlot.toInnerJSON()}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -321,26 +320,56 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<CopiedSlotsOfActiveForkAreFull>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::ObjectMapper mapper(info, path);
 
-  std::string forkOpName;
-  std::vector<std::string> channelNames;
-  if (!mapper || !mapper.map(FORK_OP_LIT, forkOpName) ||
-      !mapper.map(FORK_CHANNELS_LIT, channelNames))
-    return nullptr;
-  prop->sentStateNamers =
-      std::vector<handshake::EagerForkSentNamer>(channelNames.size());
-  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
-    prop->sentStateNamers[i] =
-        handshake::EagerForkSentNamer(forkOpName, channelName);
+  const llvm::json::Object *obj = info.getAsObject();
+  assert(obj && "CSOAFAF json info not an object");
+
+  const llvm::json::Value *channelNameJSON = obj->get(FORK_CHANNELS_LIT);
+  assert(channelNameJSON && "missing FORK_CHANNELS_LIT in CSOAFAF info");
+  const llvm::json::Array *channelNameJSONs = channelNameJSON->getAsArray();
+  assert(channelNameJSONs && "FORK_CHANNELS_LIT in CSOAFAF is not an array");
+  for (auto &sentJSON : *channelNameJSONs) {
+    prop->sentStateNamers.push_back(
+        *handshake::EagerForkSentNamer::fromInnerJSON(sentJSON, path));
   }
-  std::string bufferOpName;
-  std::string slotName;
-  if (!mapper.map(BUFFER_OP_LIT, bufferOpName) ||
-      !mapper.map(BUFFER_SLOT_LIT, slotName))
+
+  const llvm::json::Value *bufferSlotJSON = obj->get(COPIED_SLOT_LIT);
+  assert(bufferSlotJSON && "missing COPIED_SLOT_LIT in CSOAFAF json");
+  prop->copiedSlot =
+      *handshake::BufferSlotFullNamer::fromInnerJSON(*bufferSlotJSON, path);
+
+  return prop;
+}
+
+// Reconvergent path flow
+
+ReconvergentPathFlow::ReconvergentPathFlow(unsigned long id, TAG tag)
+    : FormalProperty(id, tag, TYPE::RPF) {}
+
+llvm::json::Value ReconvergentPathFlow::extraInfoToJSON() const {
+  std::vector<llvm::json::Value> jsonEqs{};
+  jsonEqs.reserve(equations.size());
+
+  for (auto &eq : equations) {
+    jsonEqs.push_back(eq.toJSON());
+  }
+  return llvm::json::Array(jsonEqs);
+}
+
+std::unique_ptr<ReconvergentPathFlow>
+ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<ReconvergentPathFlow>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  const llvm::json::Array *arr = info.getAsArray();
+  if (!arr)
     return nullptr;
 
-  prop->copiedSlot = handshake::BufferSlotFullNamer(bufferOpName, slotName);
+  for (const llvm::json::Value &eq : *arr) {
+    prop->equations.push_back(FlowExpression::fromJSON(eq, path));
+  }
+
   return prop;
 }
 
