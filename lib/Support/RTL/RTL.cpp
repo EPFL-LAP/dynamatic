@@ -337,7 +337,8 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.spec_commit" ||
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.sharing_wrapper" ||
-      handshakeOp == "handshake.non_spec"
+      handshakeOp == "handshake.non_spec" || 
+      handshakeOp == "handshake.init"
       // clang-format on
   ) {
     // Default
@@ -492,7 +493,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.load" ||
       handshakeOp == "handshake.store" ||
       handshakeOp == "handshake.spec_commit" ||
-      handshakeOp == "handshake.speculating_branch"
+      handshakeOp == "handshake.speculating_branch" ||
+      handshakeOp == "handshake.init"
       // clang-format on
 
   ) {
