@@ -43,31 +43,48 @@ constexpr llvm::StringLiteral NEW_PHI("nphi");
 constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 /// Annotation to use for regeneration multiplexers.
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
+/// Annotation for condition variable placeholders.
+constexpr llvm::StringLiteral FTD_COND_VAR("ftd.cvar");
+
+/// Get or create a SourceOp placeholder marked with FTD_COND_VAR in the given
+/// block. Uses InsertionGuard so the caller's insertion point is not disturbed.
+static Value getOrCreateCondPlaceholder(Block *block, OpBuilder &builder) {
+  for (Operation &op : *block) {
+    if (op.hasAttr(FTD_COND_VAR))
+      return op.getResult(0);
+  }
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(block);
+  auto sourceOp =
+      builder.create<handshake::SourceOp>(builder.getUnknownLoc());
+  sourceOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
+  // SourceOp defaults to !handshake.control<>, but condition values must be
+  // !handshake.channel<i1>. Cast to Value to avoid templated setType issue.
+  Value result = sourceOp.getResult();
+  result.setType(ftd::channelifyType(builder.getI1Type()));
+  return result;
+}
 
 /// Identify the block that has muxCondition as its terminator condition
 /// Note that it is not necessarily the same block defining the muxCondition
-static Block *returnMuxConditionBlock(Value muxCondition,
-                                      const ftd::BlockIndexing &bi) {
+static Block *returnMuxConditionBlock(Value muxCondition) {
   Block *muxConditionBlock = nullptr;
 
+  // The mux condition should ultimately be connected to the condition input of
+  // a conditional branch. However, during suppression, the condition value may
+  // be rerouted through intermediate suppression branches, changing the actual
+  // Value. To handle this, we place a SourceOp placeholder (FTD_COND_VAR) in
+  // the target block. Once suppression is complete, all uses of the placeholder
+  // will be reconnected to the correct condition input.
   while (!muxConditionBlock) {
-    for (auto &use : muxCondition.getUses()) {
-      Operation *userOp = use.getOwner();
-      Block *userBlock = userOp->getBlock();
-
-      if ((isa_and_nonnull<cf::CondBranchOp>(userOp) ||
-           isa_and_nonnull<handshake::ConditionalBranchOp>(userOp)) &&
-          !(userOp->hasAttr(FTD_OP_TO_SKIP))) {
-        if (!muxConditionBlock || bi.isLess(userBlock, muxConditionBlock)) {
-          muxConditionBlock = userBlock;
-        }
-      }
+    Operation *defOp = muxCondition.getDefiningOp();
+    if (defOp && defOp->hasAttr(FTD_COND_VAR)) {
+      muxConditionBlock = defOp->getBlock();
     }
 
-    // If no valid target block was found among the users, attempt to trace
+    // If no valid target block was found, attempt to trace
     // backward through the suppression branch, if it exists.
     if (!muxConditionBlock) {
-      Operation *defOp = muxCondition.getDefiningOp();
       if (defOp && isa_and_nonnull<handshake::ConditionalBranchOp>(defOp) &&
           defOp->hasAttr(FTD_OP_TO_SKIP)) {
         muxCondition = defOp->getOperand(1);
@@ -682,8 +699,11 @@ static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
   Operation *term = conditionOpt.value()->getTerminator();
   if (!term || term->getNumOperands() == 0)
     return nullptr;
-
-  return term->getOperand(0);
+  
+  // Use a SourceOp placeholder for the condition value, which will be
+  // replaced with the actual condition input after every suppression
+  // is done.
+  return getOrCreateCondPlaceholder(conditionOpt.value(), rewriter);
 }
 
 /// Converts a boolean expression node to a circuit signal.
@@ -1798,7 +1818,7 @@ static void insertDirectSuppression(
     // 2. Update dominatorBlock to be the block defining the condition of the
     // last Mux
     Value finalCondition = lastMuxInChain->getOperand(0);
-    dominatorBlock = returnMuxConditionBlock(finalCondition, bi);
+    dominatorBlock = returnMuxConditionBlock(finalCondition);
     if (bi.isLess(producerBlock, dominatorBlock)) {
       dominatorBlock = producerBlock;
     }
@@ -1862,7 +1882,7 @@ static void insertDirectSuppression(
         if (debuglog) {
           out << "[MUX] Mux Condition Block: ";
           Block *muxConditionBlock =
-              returnMuxConditionBlock(currentMuxOp->getOperand(0), bi);
+              returnMuxConditionBlock(currentMuxOp->getOperand(0));
           if (muxConditionBlock)
             muxConditionBlock->printAsOperand(out);
           else
@@ -1892,7 +1912,7 @@ static void insertDirectSuppression(
 
         // 2. Identify the Original Block defining this condition variable
         // (Using the provided helper function)
-        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, bi);
+        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
         muxConditionSet.insert(muxConditionBlock);
 
         // 3. Find the corresponding Block in the Local CFG
@@ -2370,7 +2390,6 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
         llvm::isa_and_nonnull<handshake::ControlMergeOp>(producerOp) ||
         llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
         llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) ||
-        llvm::isa_and_nonnull<cf::CondBranchOp>(consumerOp) ||
         llvm::isa_and_nonnull<cf::BranchOp>(consumerOp) ||
         (llvm::isa<memref::LoadOp>(consumerOp) &&
          !llvm::isa<handshake::LoadOp>(consumerOp)) ||
@@ -2378,6 +2397,17 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
          !llvm::isa<handshake::StoreOp>(consumerOp)) ||
         llvm::isa<mlir::MemRefType>(operand.getType()))
       return;
+
+    // Skip cf::CondBranchOp consumers unless this operand is the condition
+    // input (operand 0) of the block's terminator.
+    if (llvm::isa_and_nonnull<cf::CondBranchOp>(consumerOp) &&
+        (consumerOp != consumerBlock->getTerminator() ||
+         operand != consumerOp->getOperand(0)))
+      return;
+
+    // Handle the suppression in all the other cases (including the operand
+    // being a function argument)
+    insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
 
     // Handle the suppression in all the other cases (including the operand
     // being a function argument)
@@ -2395,6 +2425,37 @@ void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
   for (auto *consumerOp : consumersToCover) {
     for (auto operand : consumerOp->getOperands())
       addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
+  }
+
+  // During suppression, SourceOp placeholders marked with FTD_COND_VAR were
+  // used in place of the condition input. Now that suppression is complete,
+  // replace all uses of each placeholder with the actual condition input
+  // (operand 0 of the conditional branch), then erase the placeholder.
+  for (Block &block : funcOp.getBody()) {
+    Operation *terminator = block.getTerminator();
+    auto cbr = dyn_cast<cf::CondBranchOp>(terminator);
+    auto hsCbr = dyn_cast<handshake::ConditionalBranchOp>(terminator);
+    if (!cbr && !hsCbr) {
+      continue;
+    }
+
+    Operation *placeholderOp = nullptr;
+    for (Operation &op : block) {
+      if (op.hasAttr(FTD_COND_VAR)) {
+        placeholderOp = &op;
+        break;
+      }
+    }
+    if (!placeholderOp)
+      continue;
+
+    Value condInput;
+    if (cbr)
+      condInput = cbr.getOperand(0);
+    else 
+      condInput = hsCbr.getOperand(0);
+    placeholderOp->getResult(0).replaceAllUsesWith(condInput);
+    rewriter.eraseOp(placeholderOp);
   }
 }
 
@@ -2579,7 +2640,11 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
           conditionValue = bddToCircuit(rewriter, bdd, gate->getBlock(),
                                         emptyRegistry, {}, bi);
         } else {
-          conditionValue = gate->conditionBlock->getTerminator()->getOperand(0);
+          // Use a SourceOp placeholder for the condition value, which will be
+          // replaced with the actual condition input after every suppression
+          // is done.
+          conditionValue =
+              getOrCreateCondPlaceholder(gate->conditionBlock, rewriter);
           // Ensure type consistency (Channel vs i1)
           if (!conditionValue.getType().isa<handshake::ChannelType>())
             conditionValue.setType(channelifyType(conditionValue.getType()));
