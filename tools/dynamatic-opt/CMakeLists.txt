@@ -24,6 +24,8 @@ target_link_libraries(dynamatic-opt
   DynamaticCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW
+  DynamaticBlifExporter
+  DynamaticBlifImporter
   DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
