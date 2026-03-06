@@ -12,6 +12,7 @@ import logging
 import shutil
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -79,7 +80,7 @@ def setup_logging() -> None:
 
 def build() -> None:
     """Run ninja to build Dynamatic."""
-    logging.info("Building Dynamatic (ninja -C build) …")
+    logging.info("Building Dynamatic...")
     result = subprocess.run(
         ["ninja", "-C", "build"],
         cwd=REPO_ROOT,
@@ -158,7 +159,8 @@ def main() -> None:
 
     build()
 
-    logging.info("Running %d kernel(s) with %d parallel job(s) …", len(KERNELS), args.jobs)
+    logging.info("Running %d kernel(s) with %d parallel job(s)...", len(KERNELS), args.jobs)
+    start_time = time.time()
 
     passed: list[str] = []
     failed: list[tuple[str, int]] = []
@@ -178,6 +180,11 @@ def main() -> None:
                 shutil.move(src, dst)
 
     # Summary
+    elapsed = int(time.time() - start_time) // 60
+    hours = elapsed // 60
+    minutes = elapsed % 60
+    logging.info("Total time: %dh %02dm.", hours, minutes)
+
     total = len(KERNELS)
     logging.info(
         "Results: %d/%d passed, %d failed.",
