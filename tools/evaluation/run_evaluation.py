@@ -96,6 +96,7 @@ def run_kernel(kernel: str) -> tuple[str, int]:
     integration-test/{kernel}/out/dynamatic_{out,err}.txt, and return
     (kernel, returncode).
     """
+    logging.info("Running kernel %s...", kernel)
     src = f"integration-test/{kernel}/{kernel}.c"
     script = DYN_SCRIPT.format(src=src)
 
@@ -118,6 +119,10 @@ def run_kernel(kernel: str) -> tuple[str, int]:
             cwd=REPO_ROOT,
         )
 
+    if result.returncode == 0:
+        logging.info("[PASS] %s", kernel)
+    else:
+        logging.error("[FAIL] %s (exit code %d)", kernel, result.returncode)
     return kernel, result.returncode
 
 
@@ -163,10 +168,8 @@ def main() -> None:
         for future in as_completed(futures):
             kernel, returncode = future.result()
             if returncode == 0:
-                logging.info("[PASS] %s", kernel)
                 passed.append(kernel)
             else:
-                logging.error("[FAIL] %s (exit code %d)", kernel, returncode)
                 failed.append((kernel, returncode))
 
             if args.output_dir is not None:
