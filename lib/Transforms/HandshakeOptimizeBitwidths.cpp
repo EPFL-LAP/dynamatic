@@ -404,7 +404,19 @@ static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
 
 /// Transfer function for or/xor operations or alike.
 static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
-  return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth)};
+  ignoreCommutativity(lhs, rhs);
+  if (rhs.extType <= ExtType::LOGICAL)
+    return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth)};
+  // rhs guaranteed to be at least arithmetic from here on.
+
+  // If lhs is zero-extended and the larger bitwidth, we need to add one extra
+  // bit such that sign-extending the output doesn't quasi "sign-extend" the top
+  // bit of lhs.
+  // We must sign-extend the result for the case that rhs was extended with 1s.
+  if (lhs.extType == ExtType::LOGICAL && lhs.bitWidth > rhs.bitWidth)
+    return {ExtType::ARITHMETIC, 1 + lhs.bitWidth};
+
+  return {ExtType::ARITHMETIC, std::max(lhs.bitWidth, rhs.bitWidth)};
 }
 
 //===----------------------------------------------------------------------===//
