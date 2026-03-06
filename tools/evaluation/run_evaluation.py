@@ -85,7 +85,7 @@ def build() -> None:
         cwd=REPO_ROOT,
     )
     if result.returncode != 0:
-        logging.error("Build failed with exit code %d — aborting.", result.returncode)
+        logging.error("Build failed with exit code %d. Aborting...", result.returncode)
         sys.exit(result.returncode)
     logging.info("Build succeeded.")
 
@@ -134,7 +134,21 @@ def main() -> None:
         metavar="JOBS",
         help="Number of kernels to run in parallel (default: 1).",
     )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Copy kernel out/ directories to DIR/{kernel}/out after each run.",
+    )
     args = parser.parse_args()
+
+    if args.output_dir is not None:
+        if args.output_dir.exists():
+            logging.error("Output directory %s already exists. Aborting...", args.output_dir)
+            sys.exit(1)
+        args.output_dir.mkdir(parents=True)
 
     build()
 
@@ -153,6 +167,11 @@ def main() -> None:
             else:
                 logging.error("[FAIL] %s (exit code %d)", kernel, returncode)
                 failed.append((kernel, returncode))
+
+            if args.output_dir is not None:
+                src = REPO_ROOT / "integration-test" / kernel / "out"
+                dst = args.output_dir / kernel / "out"
+                shutil.move(src, dst)
 
     # Summary
     total = len(KERNELS)
