@@ -8,5 +8,7 @@ add_dynamatic_library(DynamaticSupportRTL
   DynamaticHandshake
   DynamaticHW
   MLIRIR
-  LLVMSupport
+
+  LINK_COMPONENTS
+  Support
 )

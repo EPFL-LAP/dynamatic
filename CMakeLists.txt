@@ -49,15 +49,47 @@ endif()
 # MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
 
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-message(STATUS "Using ClangConfig.cmake in: ${CLANG_DIR}")
-message(STATUS "Using PollyConfig.cmake in: ${Polly_DIR}")
+option(DYNAMATIC_BUILD_LLVM "Build LLVM as part of the Dynamatic build" OFF)
+if (DYNAMATIC_BUILD_LLVM)
+  set(LLVM_ENABLE_PROJECTS "mlir;clang;polly" CACHE STRING "" FORCE)
+  set(LLVM_TARGETS_TO_BUILD "host"  CACHE STRING "" FORCE)
+  add_subdirectory(llvm-project/llvm "llvm-project" EXCLUDE_FROM_ALL)
 
-find_package(MLIR REQUIRED CONFIG)
-set(Clang_DIR ${CLANG_DIR})
-find_package(Clang REQUIRED CONFIG)
-find_package(Polly REQUIRED CONFIG)
+  set(LLVM_CMAKE_DIR "${CMAKE_BINARY_DIR}/llvm-project/lib/cmake/llvm")
+  list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
+  set(MLIR_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/mlir")
+  list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
+  set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang")
+  list(APPEND CMAKE_MODULE_PATH ${CLANG_CMAKE_DIR})
+  set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py")
+  set(LLVM_INCLUDE_DIRS
+          llvm-project/llvm/include
+          ${CMAKE_BINARY_DIR}/llvm-project/include
+  )
+  set(MLIR_INCLUDE_DIRS
+          llvm-project/mlir/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/mlir/include
+  )
+  set(CLANG_INCLUDE_DIRS
+          llvm-project/clang/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/clang/include
+  )
+  set(Polly_INCLUDE_DIRS
+          llvm-project/polly/include
+          llvm-project/polly/lib/External/isl/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/polly/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/polly/lib/External/isl/include
+  )
+else ()
+  message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+  message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+  message(STATUS "Using ClangConfig.cmake in: ${CLANG_DIR}")
+  message(STATUS "Using PollyConfig.cmake in: ${Polly_DIR}")
+  set(Clang_DIR ${CLANG_DIR})
+  find_package(Clang REQUIRED CONFIG)
+  find_package(Polly REQUIRED CONFIG)
+  find_package(MLIR REQUIRED CONFIG)
+endif ()
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
