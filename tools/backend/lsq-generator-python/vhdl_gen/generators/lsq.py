@@ -666,8 +666,9 @@ class LSQ:
 
         # A load conflicts with a store when:
         # 1. The store entry is valid, and
-        # 2. The store is older than the load, and
-        # 3. The address conflicts(same or invalid store address).
+        # 2. The store entry hasn't completed (received write response from memory), and
+        # 3. The store is older than the load, and
+        # 4. The address conflicts(same or invalid store address).
         # NOTE: Because we only consider non-completed stores to conflict with a load, bypass will
         # not forward from any stores which are already completed (but still allocated). However,
         # such loads only exist if store responses or pipe0 are enabled, which is not the case by
@@ -796,8 +797,9 @@ class LSQ:
 
         # A store conflicts with a load when:
         # 1. The load entry is valid, and
-        # 2. The load is older than the store, and
-        # 3. The address conflicts(same or invalid store address).
+        # 2. The load entry hasn't completed (received data from memory), and
+        # 3. The load is older than the store, and
+        # 4. The address conflicts(same or invalid store address).
         # Index order are reversed for store matrix.
         for i in range(self.configs.numLdqEntries):
             arch += Op(ctx,
