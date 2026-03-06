@@ -10,7 +10,7 @@ project open simulation
 project addfile %{designsrc}
 project calculateorder
 project compileall
-eval vsim tb
+eval vsim -debugdb -voptargs=+acc -onfinish stop tb
 power add %powerflag /duv_inst/*
 log -r *
 run -all

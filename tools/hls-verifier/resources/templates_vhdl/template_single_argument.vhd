@@ -37,6 +37,7 @@ end single_argument;
 architecture behav of single_argument is
   -- Internal signals
   signal emitToken, tokenEmitted : std_logic;
+  signal dout0_valid_r           : std_logic;
   shared variable mem            : std_logic_vector(DATA_WIDTH - 1 downto 0) := (others => '0');
 begin
 
@@ -110,19 +111,21 @@ begin
   end process file_to_mem;
 
   -- Transfer: mem-array -> RTL ports ---------------------------------------
+  dout0_valid <= dout0_valid_r;
+
   mem_to_port0 : process (clk, rst)
   begin
     if (rst = '1') then
       tokenEmitted    <= '0';
       dout0       <= (others => '0');
-      dout0_valid <= '0';
+      dout0_valid_r <= '0';
     elsif rising_edge(clk) then
-      if (not tokenEmitted) then
+      if (tokenEmitted = '0') then
         tokenEmitted    <= '1';
         dout0       <= mem;
-        dout0_valid <= '1';
+        dout0_valid_r <= '1';
       else
-        dout0_valid <= dout0_valid and (not dout0_ready);
+        dout0_valid_r <= dout0_valid_r and (not dout0_ready);
       end if;
     end if;
   end process mem_to_port0;
