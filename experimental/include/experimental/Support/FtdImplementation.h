@@ -81,8 +81,8 @@ LogicalResult createPhiNetworkDeps(
     Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
 
-}; // namespace ftd
-}; // namespace experimental
-}; // namespace dynamatic
+} // namespace ftd
+} // namespace experimental
+} // namespace dynamatic
 
 #endif // DYNAMATIC_SUPPORT_FTD_IMPLEMENTATION_H

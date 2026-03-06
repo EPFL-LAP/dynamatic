@@ -52,7 +52,7 @@ using namespace dynamatic::buffer;
 namespace dynamatic {
 #define GEN_PASS_DEF_CREDITBASEDSHARING
 #include "dynamatic/Transforms/Passes.h.inc"
-}; // namespace dynamatic
+} // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
 
 static constexpr unsigned MAX_GROUP_SIZE = 20;
