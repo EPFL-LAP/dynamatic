@@ -466,7 +466,7 @@ void TEHBSupport::resetDataFull(ConsumerRW *ins, ProducerRW *outs,
     *outsData = dataReg;
 
   ins->ready = regNotFull;
-};
+}
 
 void TEHBSupport::execDataFull(bool isClkRisingEdge, ConsumerRW *ins,
                                ProducerRW *outs, const Data *insData,
@@ -503,7 +503,7 @@ void BranchModel::reset() {
   outs->valid = ins->valid;
   ins->ready = outs->ready;
   outsData = insData;
-};
+}
 
 void BranchModel::exec(bool isClkRisingEdge) { reset(); }
 

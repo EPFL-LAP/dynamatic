@@ -43,7 +43,7 @@ static inline std::string baseBlifPath;
 
 // Default constructor, used for Subject Graph creation without an MLIR
 // Operation.
-BaseSubjectGraph::BaseSubjectGraph() { subjectGraphVector.push_back(this); };
+BaseSubjectGraph::BaseSubjectGraph() { subjectGraphVector.push_back(this); }
 
 // Constructor for a SubjectGraph based on an MLIR Operation.
 BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
@@ -162,7 +162,7 @@ void assignSignals(ChannelSignals &signals, Node *node,
   } else {
     signals.dataSignals.push_back(node);
   }
-};
+}
 
 // Populate inputSubjectGraphs and outputSubjectGraphs after all of the
 // Subject Graphs are created. Retrieves the Result Numbers.
