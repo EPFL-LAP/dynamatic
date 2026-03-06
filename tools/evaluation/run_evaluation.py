@@ -65,7 +65,7 @@ exit
 # ──────────────────────────────────────────────────────────────────────────────
 # Paths
 # ──────────────────────────────────────────────────────────────────────────────
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def setup_logging() -> None:
@@ -129,6 +129,7 @@ def main() -> None:
     )
     parser.add_argument(
         "-j",
+        "--jobs",
         type=int,
         default=1,
         metavar="JOBS",
@@ -152,12 +153,12 @@ def main() -> None:
 
     build()
 
-    logging.info("Running %d kernel(s) with -j %d …", len(KERNELS), args.j)
+    logging.info("Running %d kernel(s) with %d parallel job(s) …", len(KERNELS), args.jobs)
 
     passed: list[str] = []
     failed: list[tuple[str, int]] = []
 
-    with ThreadPoolExecutor(max_workers=args.j) as executor:
+    with ThreadPoolExecutor(max_workers=args.jobs) as executor:
         futures = {executor.submit(run_kernel, k): k for k in KERNELS}
         for future in as_completed(futures):
             kernel, returncode = future.result()
