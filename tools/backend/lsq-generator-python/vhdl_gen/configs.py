@@ -65,9 +65,11 @@ class Configs:
     stResp:        bool = False     # Whether store response channel in store access port is enabled
     gaMulti:       bool = False     # Whether multiple groups are allowed to request an allocation at the same cycle
     bypass:        bool = True      # Whether bypassing (store-to-load forwarding) is enabled
+
     # guarantees execution of the oldest pending memory operation (load or store) in the presence of false conflicts
     # (which can happen with approximate address comparison)
-    fallbackIssue: bool = False
+    fallbackIssueLoad: bool = False
+    fallbackIssueStore: bool = False
 
     def __init__(self, config: dict) -> None:
         self.name = config["name"]
@@ -88,7 +90,8 @@ class Configs:
 
         # TODO: set based on requested LSQ model
         self.bypass = True
-        self.fallbackIssue = False
+        self.fallbackIssueLoad = False
+        self.fallbackIssueStore = False
 
         self.gaNumLoads = config["numLoads"]
         self.gaNumStores = config["numStores"]
@@ -127,8 +130,9 @@ class Configs:
         assert (len(self.gaLdPortIdx) == self.numGroups)
         assert (len(self.gaStPortIdx) == self.numGroups)
 
-        if self.fallbackIssue:
+        if self.fallbackIssueLoad or self.fallbackIssueStore:
             assert not self.bypass, "Fallback issue is not compatible with bypassing."
+        if self.fallbackIssueLoad:
             # TODO: To properly support multiple load channels, we need to ensure that the fallback load is not
             # duplicated a load # issued by another load channel in the same cycle. Multiple load channels are not
             # currently used by Dynamatic, so this is left as future work.
