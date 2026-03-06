@@ -591,7 +591,6 @@ class LSQ:
             ctx, 'can_bypass', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         can_bypass_p0 = LogicVecArray(
             ctx, 'can_bypass_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
-        bypass_en = LogicArray(ctx, 'bypass_en', 'w', self.configs.numLdqEntries)
         if self.configs.pipe0:
             can_bypass_p0.regInit(init=[0]*self.configs.numLdqEntries)
 
@@ -669,11 +668,16 @@ class LSQ:
         # 1. The store entry is valid, and
         # 2. The store is older than the load, and
         # 3. The address conflicts(same or invalid store address).
+        # NOTE: Because we only consider non-completed stores to conflict with a load, bypass will
+        # not forward from any stores which are already completed (but still allocated). However,
+        # such loads only exist if store responses or pipe0 are enabled, which is not the case by
+        # default.
         for i in range(0, self.configs.numLdqEntries):
             for j in range(0, self.configs.numStqEntries):
                 arch += Op(ctx,
                            (ld_st_conflict, i, j),
-                           (stq_alloc_pcomp, j),   'and',
+                           (stq_alloc_pcomp, j), 'and',
+                           'not', (store_completed, j), 'and',
                            (store_is_older_pcomp, i, j), 'and',
                            '(', (addr_same_pcomp, i,
                                  j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
@@ -702,9 +706,6 @@ class LSQ:
 
         # Load
 
-        # There is a load-store conflict, and the store is still pending (hasn't completed yet).
-        ld_st_conflict_pending = LogicVecArray(
-            ctx, 'ld_st_conflict_pending', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
         load_conflict = LogicArray(
             ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
         load_req_valid = LogicArray(
@@ -716,13 +717,10 @@ class LSQ:
         if self.configs.pipe0:
             can_load_p0.regInit(init=[0]*self.configs.numLdqEntries)
 
-        # Mask the load-store conflicts where the store has already completed, as they do not block issuing the load.
-        for i in range(self.configs.numLdqEntries):
-            for j in range(self.configs.numStqEntries):
-                arch += Op(ctx, (ld_st_conflict_pending, i, j), (ld_st_conflict, i, j), 'and', 'not', (store_completed, j))
-        # The load conflicts with any store (that is still pending)
+        # The load conflicts with any store
         for i in range(0, self.configs.numLdqEntries):
-            arch += Reduce(ctx, load_conflict[i], ld_st_conflict_pending[i], 'or')
+            arch += Reduce(ctx,
+                           load_conflict[i], ld_st_conflict[i], 'or')
         # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
         # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
         for i in range(0, self.configs.numLdqEntries):
@@ -732,11 +730,9 @@ class LSQ:
         for i in range(0, self.configs.numLdqEntries):
             arch += Op(ctx, can_load_p0[i], 'not',
                        load_conflict[i], 'and', load_req_valid[i])
-        # A load could be both issued and bypassed at the same time if it is being bypassed from an already
-        # completed store (which is not considered in ld_st_conflict_pending). Thus, we need to disallow issuing the
-        # load in case it is being bypassed in the same cycle.
         for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i], 'and', 'not', bypass_en[i])
+            arch += Op(ctx, can_load[i], 'not',
+                       ldq_issue[i], 'and', can_load_p0[i])
 
         ldq_head_oh_p0 = LogicVec(
             ctx, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries)
@@ -846,6 +842,8 @@ class LSQ:
         # Bypass
         bypass_idx_oh_p0 = LogicVecArray(
             ctx, 'bypass_idx_oh_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+        bypass_en = LogicArray(ctx, 'bypass_en', 'w',
+                               self.configs.numLdqEntries)
         if self.configs.pipe0:
             bypass_idx_oh_p0.regInit()
         if self.configs.bypass:
