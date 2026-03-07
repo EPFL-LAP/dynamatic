@@ -4,10 +4,14 @@ on:
   # Make sure that settings are set to require permission
   # to run workflows by external contributors!
   pull_request:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
     types: [opened, synchronize, reopened, ready_for_review]
   
   push:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
 
 concurrency:
@@ -15,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
     env:
       DEBIAN_FRONTEND: noninteractive
@@ -35,10 +39,9 @@ jobs:
           sudo apt-get install -y \
             --option APT::Immediate-Configure=false \
             sudo vim clang lld ccache cmake wget \
-            ninja-build python3 openjdk-21-jdk \
-            graphviz git curl gzip libreadline-dev \
-            libboost-all-dev pkg-config coinor-cbc \
-            coinor-libcbc-dev python3.12 \
+            ninja-build python3 graphviz git curl \
+            gzip libreadline-dev \
+            libboost-all-dev pkg-config python3.12 \
             python3.12-venv python3.12-dev \
             ghdl verilator
 
@@ -47,4 +50,54 @@ jobs:
 
       - name: Build Dynamatic (release, prebuilt LLVM)
         run: |
-          bash ./build.sh --release --use-prebuilt-llvm
+          bash ./build.sh --release --use-prebuilt-llvm --enable-cbc
+
+  build-debug:
+    runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update apt and install prerequisites
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install software-properties-common
+          sudo add-apt-repository ppa:deadsnakes/ppa
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install -y \
+            --option APT::Immediate-Configure=false \
+            sudo vim clang lld ccache cmake wget \
+            ninja-build python3 graphviz git curl \
+            gzip libreadline-dev \
+            libboost-all-dev pkg-config python3.12 \
+            python3.12-venv python3.12-dev \
+            ghdl verilator
+
+      - name: Verify Python 3.12
+        run: python3.12 --version
+
+      - name: Build Dynamatic (debug, prebuilt LLVM)
+        run: |
+          bash ./build.sh --use-prebuilt-llvm --enable-cbc
+
+  build-release-docker-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker build -t dynamatic-image . --build-arg UID=$(id -u) --build-arg GID=$(id -g)
+
+
+      - name: Run container tests (release, prebuilt LLVM)
+        run: docker run -u $(id -u):$(id -g) -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash build.sh --use-prebuilt-llvm --release

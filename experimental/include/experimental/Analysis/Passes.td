@@ -23,7 +23,6 @@ def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"
     define and check a set of properties. Currently it only annotates Absence of
     Backpressure and Valid Equivalence, but it can be extended to annotate more.
   }];
-  let constructor = "dynamatic::experimental::formalprop::createAnnotateProperties()";
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
     "Path to JSON-formatted file where the properties' information is stored.">,
     Option<"annotateInvariants", "annotate-invariants", "bool", "false",

@@ -135,7 +135,7 @@ FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
 
 // Absence of Backpressure
 
-AbsenceOfBackpressure::AbsenceOfBackpressure(unsigned long id, TAG tag,
+AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
                                              const OpResult &res)
     : FormalProperty(id, tag, TYPE::AOB) {
   Operation *ownerOp = res.getOwner();
@@ -192,8 +192,8 @@ AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
 
 // Valid Equivalence
 
-ValidEquivalence::ValidEquivalence(unsigned long id, TAG tag,
-                                   const OpResult &res1, const OpResult &res2)
+ValidEquivalence::ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
+                                   const OpResult &res2)
     : FormalProperty(id, tag, TYPE::VEQ) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
@@ -242,15 +242,31 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
 // Invariant 1 -- see https://ieeexplore.ieee.org/document/10323796
 
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
-    unsigned long id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
+    uint64_t id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
     : FormalProperty(id, tag, TYPE::EFNAO) {
-  ownerOp = getUniqueName(forkOp).str();
-  numEagerForkOutputs = forkOp.getNumEagerOutputs();
+  sentStateNamers = forkOp.getInternalSentStateNamers();
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
-  return llvm::json::Object(
-      {{OWNER_OP_LIT, ownerOp}, {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs}});
+  std::vector<std::string> channels(sentStateNamers.size());
+  std::string opName = sentStateNamers[0].opName;
+  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
+    assert(state.opName == opName);
+    channels[i] = state.channelName;
+  }
+  // Example JSON:
+  // {
+  //   "owner_op": "fork0",
+  //   "channels": ["out0", "out1", "out2"]
+  // }
+  //
+  // or
+  //
+  // {
+  //   "owner_op": "control_merge0",
+  //   "channels": ["outs", "index"]
+  // }
+  return llvm::json::Object({{OWNER_OP_LIT, opName}, {CHANNELS_LIT, channels}});
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
@@ -260,31 +276,43 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
-
-  if (!mapper || !mapper.map(OWNER_OP_LIT, prop->ownerOp) ||
-      !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs))
+  std::string opName;
+  std::vector<std::string> channelNames;
+  if (!mapper || !mapper.map(OWNER_OP_LIT, opName) ||
+      !mapper.map(CHANNELS_LIT, channelNames))
     return nullptr;
-
+  prop->sentStateNamers =
+      std::vector<handshake::EagerForkSentNamer>(channelNames.size());
+  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
+    prop->sentStateNamers[i] =
+        handshake::EagerForkSentNamer(opName, channelName);
+  }
   return prop;
 }
 
 // Invariant 2 -- see https://ieeexplore.ieee.org/document/10323796
 
 CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
-    unsigned long id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
+    uint64_t id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
     handshake::EagerForkLikeOpInterface &forkOpI)
     : FormalProperty(id, tag, TYPE::CSOAFAF) {
-  forkOp = getUniqueName(forkOpI).str();
-  numEagerForkOutputs = forkOpI.getNumEagerOutputs();
-  bufferOp = getUniqueName(bufferOpI).str();
-  bufferSlot = bufferOpI.getNumSlots() - 1;
+  sentStateNamers = forkOpI.getInternalSentStateNamers();
+  auto slots = bufferOpI.getInternalSlotStateNamers();
+  // last slot is the copied slot!
+  copiedSlot = slots[slots.size() - 1];
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
-  return llvm::json::Object({{FORK_OP_LIT, forkOp},
-                             {NUM_EAGER_OUTPUTS_LIT, numEagerForkOutputs},
-                             {BUFFER_OP_LIT, bufferOp},
-                             {BUFFER_SLOT_LIT, bufferSlot}});
+  std::vector<std::string> channels(sentStateNamers.size());
+  std::string forkOpName = sentStateNamers[0].opName;
+  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
+    assert(state.opName == forkOpName);
+    channels[i] = state.channelName;
+  }
+  return llvm::json::Object({{FORK_OP_LIT, forkOpName},
+                             {FORK_CHANNELS_LIT, channels},
+                             {BUFFER_OP_LIT, copiedSlot.opName},
+                             {BUFFER_SLOT_LIT, copiedSlot.slotName}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -295,12 +323,24 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   auto info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  if (!mapper || !mapper.map(FORK_OP_LIT, prop->forkOp) ||
-      !mapper.map(NUM_EAGER_OUTPUTS_LIT, prop->numEagerForkOutputs) ||
-      !mapper.map(BUFFER_OP_LIT, prop->bufferOp) ||
-      !mapper.map(BUFFER_SLOT_LIT, prop->bufferSlot))
+  std::string forkOpName;
+  std::vector<std::string> channelNames;
+  if (!mapper || !mapper.map(FORK_OP_LIT, forkOpName) ||
+      !mapper.map(FORK_CHANNELS_LIT, channelNames))
+    return nullptr;
+  prop->sentStateNamers =
+      std::vector<handshake::EagerForkSentNamer>(channelNames.size());
+  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
+    prop->sentStateNamers[i] =
+        handshake::EagerForkSentNamer(forkOpName, channelName);
+  }
+  std::string bufferOpName;
+  std::string slotName;
+  if (!mapper.map(BUFFER_OP_LIT, bufferOpName) ||
+      !mapper.map(BUFFER_SLOT_LIT, slotName))
     return nullptr;
 
+  prop->copiedSlot = handshake::BufferSlotFullNamer(bufferOpName, slotName);
   return prop;
 }
 

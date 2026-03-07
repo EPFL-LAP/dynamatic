@@ -4,10 +4,14 @@ on:
   # Make sure that settings are set to require permission
   # to run workflows by external contributors!
   pull_request:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
     types: [opened, synchronize, reopened, ready_for_review]
   
   push:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
 
 concurrency:
@@ -80,7 +84,7 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
 
       - name: build
-        run: ./build.sh --release --force
+        run: ./build.sh --release --enable-cbc --force 
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
@@ -89,6 +93,10 @@ jobs:
       - name: check-dynamatic-experimental
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic-experimental
+
+      - name: check-constraint-programming-library
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build run-constraint-programming-test
 
       - name: integration-test
         if: steps.build.outputs.exit_code == 0

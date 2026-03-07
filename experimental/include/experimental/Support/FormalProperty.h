@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
+#include <cstdint>
 #include <fstream>
 #include <memory>
 #include <optional>
@@ -33,7 +35,7 @@ public:
 
   TAG getTag() const { return tag; }
   TYPE getType() const { return type; }
-  unsigned long getId() const { return id; }
+  uint64_t getId() const { return id; }
   std::optional<bool> getCheck() const { return check; }
 
   static std::optional<TYPE> typeFromStr(const std::string &s);
@@ -54,14 +56,17 @@ public:
       const llvm::json::Value &value, llvm::json::Path path);
 
   FormalProperty() = default;
-  FormalProperty(unsigned long id, TAG tag, TYPE type)
+  // Use uint64_t instead of unsigned long because LLVM JSON provides
+  // fromJSON(uint64_t&) but not fromJSON(unsigned long&) on some platforms
+  // (ex. arm64 macos).
+  FormalProperty(uint64_t id, TAG tag, TYPE type)
       : id(id), tag(tag), type(type), check(std::nullopt) {}
   virtual ~FormalProperty() = default;
 
   static bool classof(const FormalProperty *fp) { return true; }
 
 protected:
-  unsigned long id;
+  uint64_t id;
   TAG tag;
   TYPE type;
   std::optional<bool> check;
@@ -100,7 +105,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   AbsenceOfBackpressure() = default;
-  AbsenceOfBackpressure(unsigned long id, TAG tag, const OpResult &res);
+  AbsenceOfBackpressure(uint64_t id, TAG tag, const OpResult &res);
   ~AbsenceOfBackpressure() = default;
 
   static bool classof(const FormalProperty *fp) {
@@ -135,7 +140,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   ValidEquivalence() = default;
-  ValidEquivalence(unsigned long id, TAG tag, const OpResult &res1,
+  ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
                    const OpResult &res2);
   ~ValidEquivalence() = default;
 
@@ -164,8 +169,9 @@ private:
 // details.
 class EagerForkNotAllOutputSent : public FormalProperty {
 public:
-  std::string getOwner() { return ownerOp; }
-  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
+  std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
+    return sentStateNamers;
+  }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -173,7 +179,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   EagerForkNotAllOutputSent() = default;
-  EagerForkNotAllOutputSent(unsigned long id, TAG tag,
+  EagerForkNotAllOutputSent(uint64_t id, TAG tag,
                             handshake::EagerForkLikeOpInterface &op);
   ~EagerForkNotAllOutputSent() = default;
 
@@ -182,10 +188,10 @@ public:
   }
 
 private:
-  std::string ownerOp;
-  unsigned numEagerForkOutputs;
+  // The `sent` states that cannot be active at the same time
+  std::vector<handshake::EagerForkSentNamer> sentStateNamers;
   inline static const StringLiteral OWNER_OP_LIT = "owner_op";
-  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral CHANNELS_LIT = "channels";
 };
 
 // When an eager fork is `sent` state for at least one of its outputs, it is
@@ -197,10 +203,10 @@ private:
 // https://ieeexplore.ieee.org/document/10323796 for more details
 class CopiedSlotsOfActiveForkAreFull : public FormalProperty {
 public:
-  std::string getForkOp() { return forkOp; }
-  unsigned getNumEagerForkOutputs() { return numEagerForkOutputs; }
-  std::string getBufferOp() { return bufferOp; }
-  unsigned getBufferSlot() { return bufferSlot; }
+  std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
+    return sentStateNamers;
+  }
+  handshake::BufferSlotFullNamer getCopiedSlot() { return copiedSlot; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -208,7 +214,7 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   CopiedSlotsOfActiveForkAreFull() = default;
-  CopiedSlotsOfActiveForkAreFull(unsigned long id, TAG tag,
+  CopiedSlotsOfActiveForkAreFull(uint64_t id, TAG tag,
                                  handshake::BufferLikeOpInterface &bufferOp,
                                  handshake::EagerForkLikeOpInterface &forkOp);
   ~CopiedSlotsOfActiveForkAreFull() = default;
@@ -218,12 +224,10 @@ public:
   }
 
 private:
-  std::string forkOp;
-  unsigned numEagerForkOutputs;
-  std::string bufferOp;
-  unsigned bufferSlot;
+  std::vector<handshake::EagerForkSentNamer> sentStateNamers;
+  handshake::BufferSlotFullNamer copiedSlot;
   inline static const StringLiteral FORK_OP_LIT = "fork_op";
-  inline static const StringLiteral NUM_EAGER_OUTPUTS_LIT = "num_eager_outputs";
+  inline static const StringLiteral FORK_CHANNELS_LIT = "channels";
   inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
   inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
 };

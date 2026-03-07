@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
 #include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -20,7 +19,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/Logging.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
@@ -35,6 +33,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
+#include <filesystem>
 #include <string>
 
 using namespace mlir;
@@ -49,51 +48,20 @@ static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
     COST_AWARE("costaware"), MAPBUF("mapbuf");
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
-namespace buffer {
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
 #include "dynamatic/Transforms/Passes.h.inc"
-} // namespace buffer
 } // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
-namespace {
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
+#define DEBUG_TYPE "handshake-place-buffers"
 
-/// Thin wrapper around a `Logger` that allows to conditionally create the
-/// resources to write to the file based on a flag provided during objet
-/// creation. This enables us to use RAII to deallocate the logger only if it
-/// was created.
-class BufferLogger {
-public:
-  /// The underlying logger object, which may remain nullptr.
-  Logger *log = nullptr;
-
-  /// Optionally allocates a logger based on whether the `dumpLogs` flag is set.
-  /// If it is, the log file's location is determined based om the provided
-  /// function's name. On error, `ec` will contain a non-zero error code
-  /// and the logger should not be used.
-  BufferLogger(handshake::FuncOp funcOp, bool dumpLogs, std::error_code &ec);
-
-  /// Returns the underlying logger, which may be nullptr.
-  Logger *operator*() { return log; }
-
-  /// Returns the underlying indented writer stream to the log file. Requires
-  /// the object to have been created with the `dumpLogs` flag set to true.
-  mlir::raw_indented_ostream &getStream() {
-    assert(log && "logger was not allocated");
-    return **log;
-  }
-
-  BufferLogger(const BufferLogger *) = delete;
-  BufferLogger operator=(const BufferLogger *) = delete;
-
-  /// Deletes the underlying logger object if it was allocated.
-  ~BufferLogger() {
-    if (log)
-      delete log;
-  }
-};
-
-} // namespace
+static void logFuncInfo(FuncInfo &info);
 
 namespace dynamatic {
 namespace buffer {
@@ -105,13 +73,14 @@ namespace buffer {
 /// exposes most of its behavior in protected virtual methods which may be
 /// overriden by sub-types of the pass.
 struct HandshakePlaceBuffersPass
-    : public dynamatic::buffer::impl::HandshakePlaceBuffersBase<
+    : public dynamatic::impl::HandshakePlaceBuffersBase<
           HandshakePlaceBuffersPass> {
 
   /// Trivial field-by-field constructor.
   HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
                             StringRef timingModels, bool firstCFDFC,
-                            double targetCP, unsigned timeout, bool dumpLogs);
+                            double targetCP, unsigned timeout,
+                            bool dumpMILPModels);
 
   /// Use the auto-generated construtors from tblgen
   using HandshakePlaceBuffersBase::HandshakePlaceBuffersBase;
@@ -126,37 +95,30 @@ protected:
   /// Checks a couple of invariants in the function that are required by our
   /// buffer placement algorithm. Fails when the function does not satisfy at
   /// least one invariant.
-  virtual LogicalResult checkFuncInvariants(FuncInfo &info);
-
-  /// Places buffers in the function, according to the logic dictated by the
-  /// algorithm the pass was instantiated with.
-  virtual LogicalResult placeBuffers(FuncInfo &info, TimingDatabase &timingDB,
-                                     CFDFCAnalysis &cfdfcAnalysis);
+  LogicalResult checkFuncInvariants(FuncInfo &info);
 
   /// Identifies and extracts all existing CFDFCs in the function using
   /// estimated transition frequencies between its basic blocks. Fills the
   /// `cfdfcs` vector with the extracted cycles. CFDFC identification works by
   /// iteratively solving MILPs until the MILP solution indicates that no
   /// "executable cycle" remains in the circuit.
-  virtual LogicalResult getCFDFCs(FuncInfo &info, Logger *logger,
-                                  std::vector<CFDFC> &cfdfcs);
+  LogicalResult getCFDFCs(FuncInfo &info, std::vector<CFDFC> &cfdfcs);
 
   /// Computes an optimal buffer placement for a Handhsake function by solving
   /// a large MILP over the entire dataflow circuit represented by the
   /// function. Fills the `placement` map with placement decisions derived
   /// from the MILP's solution.
-  virtual LogicalResult getBufferPlacement(FuncInfo &info,
-                                           TimingDatabase &timingDB,
-                                           Logger *logger,
-                                           BufferPlacement &placement);
+  LogicalResult solveBufferPlacementMILP(FuncInfo &info,
+                                         TimingDatabase &timingDB,
+                                         BufferPlacement &placement);
   /// Called for all buffer placement strategies that do not require Gurobi to
   /// be installed on the host system.
   LogicalResult placeWithoutUsingMILP();
 
   /// Instantiates buffers inside the IR, following placement decisions
   /// determined by the buffer placement MILP.
-  virtual void instantiateBuffers(BufferPlacement &placement,
-                                  std::vector<CFDFC> &cfdfcs);
+  void instantiateBuffers(BufferPlacement &placement,
+                          std::vector<CFDFC> &cfdfcs);
 
   CPSolver::SolverKind getSolverKind() {
     CPSolver::SolverKind solverKind;
@@ -185,16 +147,6 @@ protected:
 } // namespace buffer
 } // namespace dynamatic
 
-BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
-                           std::error_code &ec) {
-  if (!dumpLogs)
-    return;
-
-  std::string sep = llvm::sys::path::get_separator().str();
-  std::string fp = "buffer-placement" + sep + funcOp.getName().str() + sep;
-  log = new Logger(fp + "placement.log", ec);
-}
-
 void HandshakePlaceBuffersPass::runOnOperation() {
   // Buffer placement requires that all values are used exactly once
   mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
@@ -207,34 +159,29 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   if (!nameAnalysis.isAnalysisValid())
     return signalPassFailure();
 
-  // Map algorithms to the function to call to execute them
-  llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
-      allAlgorithms;
-  allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
-  allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[COST_AWARE] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
-
-  // Check that the algorithm exists
-  if (!allAlgorithms.contains(algorithm)) {
-    llvm::errs() << "Unknown algorithm '" << algorithm
-                 << "', possible choices are:\n";
-    for (auto &algo : allAlgorithms)
-      llvm::errs() << "\t- " << algo.first << "\n";
-    return signalPassFailure();
-  }
-
   // Make sure all operations are named (used to generate unique MILP variable
   // names).
-
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   namer.nameAllUnnamedOps();
 
-  // Call the right function
-  auto func = allAlgorithms[algorithm];
-  if (failed(((*this).*(func))()))
+  // The MILP solving the buffer placement happens here:
+  if (algorithm == ON_MERGES) {
+    if (failed(placeWithoutUsingMILP()))
+      return signalPassFailure();
+  } else if (
+      // clang-format off
+      algorithm == FPGA20 ||
+      algorithm == FPL22 ||
+      algorithm == COST_AWARE ||
+      algorithm == MAPBUF
+      // clang-format on
+  ) {
+    if (failed(placeUsingMILP()))
+      return signalPassFailure();
+  } else {
+    llvm::errs() << "Unknown algorithm '" << algorithm << "\n";
     return signalPassFailure();
+  }
 
   // run the delay selection logic again, writing it to the IR for processing in
   // the backend
@@ -268,8 +215,8 @@ void HandshakePlaceBuffersPass::runOnOperation() {
       if (!failed(
               timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
 
-        int64_t latency_int = static_cast<int64_t>(latency);
-        latencyInterface.setLatency(latency_int);
+        int64_t latencyInt = static_cast<int64_t>(latency);
+        latencyInterface.setLatency(latencyInt);
       } else {
         op->emitError("Failed to get latency from timing model");
         return signalPassFailure();
@@ -299,12 +246,16 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+  //
+  // Read the operations' timing models from disk
+  TimingDatabase timingDB;
+  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
+    return failure();
 
-  // Check IR invariants and parse basic block archs from disk
-  DenseMap<handshake::FuncOp, FuncInfo> funcToInfo;
+  auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
+
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    funcToInfo.insert(std::make_pair(funcOp, FuncInfo(funcOp)));
-    FuncInfo &info = funcToInfo[funcOp];
+    auto info = FuncInfo(funcOp);
 
     // Read the CSV containing arch information (number of transitions between
     // pairs of basic blocks) from disk. While the rest of this pass works if
@@ -315,22 +266,59 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
+    // Check IR invariants and parse basic block archs from disk
     if (failed(checkFuncInvariants(info)))
       return failure();
-  }
 
-  // Read the operations' timing models from disk
-  TimingDatabase timingDB;
-  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
-    return failure();
+    // Get CFDFCs from the function unless the functions has no archs (i.e.,
+    // it has a single block) in which case there are no CFDFCs
+    std::vector<CFDFC> cfdfcs;
 
-  auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
+    // If the CFG does not have any backedges (e.g., it only has one or many
+    // if-else blocks), then we don't need to size buffers for performance
+    // reasons.
+    bool cfgHasBackedge =
+        std::any_of(info.archs.begin(), info.archs.end(),
+                    [](ArchBB arch) { return arch.isBackEdge; });
 
-  // Place buffers in each function
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    // Create an empty list of CFDFCs for funcOp
-    if (failed(placeBuffers(funcToInfo[funcOp], timingDB, cfdfcAnalysis)))
+    assert(
+        (not info.archs.empty() or not cfgHasBackedge) &&
+        "Sanity check failed: no BB edges -> CFG does not have any backedges");
+
+    if (cfgHasBackedge && failed(getCFDFCs(info, cfdfcs)))
       return failure();
+
+    // All extracted CFDFCs must be optimized
+    for (CFDFC &cf : cfdfcs)
+      info.cfdfcs[&cf] = true;
+
+    // Create a new map for the cfdfc extraction
+    llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
+
+    // Iterate through all extracted cfdfc
+    for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
+      auto &[cf, _] = cfAndOpt;
+      for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
+        // Add the bb to the corresponding in the cfdfc result map
+        cfdfcResult[idx].push_back(cf->cycle[i]);
+      }
+      cfdfcResult[idx].push_back(cf->cycle.back());
+    }
+
+    // Create and add the handshake.cfdfc attribute
+    auto cfdfcMap = handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(),
+                                                      cfdfcResult);
+    setDialectAttr(info.funcOp, cfdfcMap);
+
+    LLVM_DEBUG(logFuncInfo(info););
+
+    // Solve the MILP to obtain a buffer placement
+    BufferPlacement placement;
+    if (failed(solveBufferPlacementMILP(info, timingDB, placement)))
+      return failure();
+
+    instantiateBuffers(placement, cfdfcs);
+    cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = cfdfcs;
   }
 
   markAnalysesPreserved<NameAnalysis, CFDFCAnalysis>();
@@ -395,9 +383,10 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
 }
 
 /// Logs arch and CFDFC information (sequence of basic blocks, number of
-/// executions, channels, units) to the logger.
-static void logFuncInfo(FuncInfo &info, Logger &log) {
-  mlir::raw_indented_ostream &os = *log;
+/// executions, channels, units).
+static void logFuncInfo(FuncInfo &info) {
+  mlir::raw_indented_ostream os(llvm::errs());
+
   os << "# ===== #\n";
   os << "# Archs #\n";
   os << "# ===== #\n\n";
@@ -431,73 +420,7 @@ static void logFuncInfo(FuncInfo &info, Logger &log) {
   os.flush();
 }
 
-LogicalResult HandshakePlaceBuffersPass::placeBuffers(
-    FuncInfo &info, TimingDatabase &timingDB, CFDFCAnalysis &cfdfcAnalysis) {
-  // Use a wrapper around a logger to benefit from RAII
-  std::error_code ec;
-  BufferLogger bufLogger(info.funcOp, dumpLogs, ec);
-  if (ec.value() != 0) {
-    info.funcOp->emitError() << "Failed to create logger for function "
-                             << info.funcOp.getName() << "\n"
-                             << ec.message();
-    return failure();
-  }
-  Logger *logger = dumpLogs ? *bufLogger : nullptr;
-
-  // Get CFDFCs from the function unless the functions has no archs (i.e.,
-  // it has a single block) in which case there are no CFDFCs
-  std::vector<CFDFC> cfdfcs;
-
-  // If the CFG does not have any backedges (e.g., it only has one or many
-  // if-else blocks), then we don't need to size buffers for performance
-  // reasons.
-  bool cfgHasBackedge =
-      std::any_of(info.archs.begin(), info.archs.end(),
-                  [](ArchBB arch) { return arch.isBackEdge; });
-
-  assert((not info.archs.empty() or not cfgHasBackedge) &&
-         "Sanity check failed: no BB edges -> CFG does not have any backedges");
-
-  if (cfgHasBackedge && failed(getCFDFCs(info, logger, cfdfcs)))
-    return failure();
-
-  // All extracted CFDFCs must be optimized
-  for (CFDFC &cf : cfdfcs)
-    info.cfdfcs[&cf] = true;
-
-  // Create a new map for the cfdfc extraction
-  llvm::MapVector<size_t, std::vector<unsigned>> cfdfcResult;
-
-  // Iterate through all extracted cfdfc
-  for (auto [idx, cfAndOpt] : llvm::enumerate(info.cfdfcs)) {
-    auto &[cf, _] = cfAndOpt;
-    for (size_t i = 0, e = cf->cycle.size() - 1; i < e; ++i) {
-      // Add the bb to the corresponding in the cfdfc result map
-      cfdfcResult[idx].push_back(cf->cycle[i]);
-    }
-    cfdfcResult[idx].push_back(cf->cycle.back());
-  }
-
-  // Create and add the handshake.cfdfc attribute
-  auto cfdfcMap =
-      handshake::CFDFCToBBListAttr::get(info.funcOp.getContext(), cfdfcResult);
-  setDialectAttr(info.funcOp, cfdfcMap);
-
-  if (dumpLogs)
-    logFuncInfo(info, *logger);
-
-  // Solve the MILP to obtain a buffer placement
-  BufferPlacement placement;
-  if (failed(getBufferPlacement(info, timingDB, logger, placement)))
-    return failure();
-
-  instantiateBuffers(placement, cfdfcs);
-  cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = cfdfcs;
-  return success();
-}
-
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
-                                                   Logger *logger,
                                                    std::vector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
 
@@ -525,9 +448,8 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 
     // Path where to dump the MILP model and solutions, if necessary
     std::string logPath = "";
-    if (logger)
-      logPath = logger->getLogDir() + llvm::sys::path::get_separator().str() +
-                "cfdfc" + std::to_string(cfdfcs.size());
+    if (dumpMILPModels)
+      logPath = "cfdfc" + std::to_string(cfdfcs.size());
 
     // Try to extract the next CFDFC
     int milpStat;
@@ -547,9 +469,9 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 }
 
 /// TODO
-static void logCFDFCUnions(FuncInfo &info, Logger &log,
-                           std::vector<CFDFCUnion> &disjointUnions) {
-  mlir::raw_indented_ostream &os = *log;
+static void logCFDFCUnions(FuncInfo &info,
+                           llvm::ArrayRef<CFDFCUnion> disjointUnions) {
+  mlir::raw_indented_ostream os(llvm::errs());
 
   // Map each individual CFDFC to its iteration index
   std::map<CFDFC *, size_t> cfIndices;
@@ -590,40 +512,33 @@ static void logCFDFCUnions(FuncInfo &info, Logger &log,
   }
 }
 
-/// Wraps a call to solveMILP and conditionally passes the logger and MILP name
-/// to the MILP's constructor as last arguments if the logger is not null.
-template <typename MILP, typename... Args>
-static inline LogicalResult
-checkLoggerAndSolve(Logger *logger, StringRef milpName,
-                    BufferPlacement &placement, Args &&...args) {
-  if (logger) {
-    return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
-                           milpName);
-  }
-  return solveMILP<MILP>(placement, std::forward<Args>(args)...);
-}
+LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
+    FuncInfo &info, TimingDatabase &timingDB, BufferPlacement &placement) {
 
-LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
-    FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
-    BufferPlacement &placement) {
-
-  // Create solver
-  if (dumpLogs) {
-    mlir::raw_indented_ostream &os = *(*logger);
-    os << "\n";
-    os << "# =========================== #\n";
-    os << "# Solver for buffer placement #\n";
-    os << "# =========================== #\n\n";
-    os << "Selected MILP solver: " << solver << "\n\n";
-  }
+  LLVM_DEBUG(llvm::errs() << "\n";
+             llvm::errs() << "# =========================== #\n";
+             llvm::errs() << "# Solver for buffer placement #\n";
+             llvm::errs() << "# =========================== #\n\n";
+             llvm::errs() << "Selected MILP solver: " << solver << "\n\n";);
 
   CPSolver::SolverKind solverKind = getSolverKind();
+  std::string writeTo;
+  std::string sep = llvm::sys::path::get_separator().str();
+  std::string dumpDir = "buffer-placement";
+
+  auto funcName = info.funcOp.getName().str();
+
+  if (dumpMILPModels) {
+    std::filesystem::create_directories(dumpDir);
+  }
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
-    return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
-        logger, "placement", placement, solverKind, timeout, info, timingDB,
-        targetCP);
+    if (dumpMILPModels) {
+      writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
+    }
+    return solveMILP<fpga20::FPGA20Buffers>(placement, solverKind, timeout,
+                                            info, timingDB, targetCP, writeTo);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -632,37 +547,47 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     llvm::transform(info.cfdfcs, std::back_inserter(cfdfcs),
                     [](auto cfAndOpt) { return cfAndOpt.first; });
     getDisjointBlockUnions(cfdfcs, disjointUnions);
-    if (logger)
-      logCFDFCUnions(info, *logger, disjointUnions);
+
+    LLVM_DEBUG(logCFDFCUnions(info, disjointUnions););
 
     // Create and solve an MILP for each CFDFC union. Placement decisions get
     // accumulated over all MILPs. It's not possible to override a previous
     // placement decision because each CFDFC union is disjoint from the others
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
-      std::string milpName = "cfdfc_placement_" + std::to_string(idx);
-      if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
-              logger, milpName, placement, solverKind, timeout, info, timingDB,
-              targetCP, cfUnion)))
+      if (dumpMILPModels) {
+        writeTo = dumpDir + sep + funcName + "-cfunion" + std::to_string(idx);
+      }
+      if (failed(solveMILP<fpl22::CFDFCUnionBuffers>(
+              placement, solverKind, timeout, info, timingDB, targetCP, cfUnion,
+              writeTo)))
         return failure();
     }
 
+    if (dumpMILPModels) {
+      writeTo = dumpDir + sep + funcName + "-out-of-cycle";
+    }
+
     // Solve last MILP on channels/units that are not part of any CFDFC
-    return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-        logger, "out_of_cycle", placement, solverKind, timeout, info, timingDB,
-        targetCP);
+    return solveMILP<fpl22::OutOfCycleBuffers>(
+        placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
   }
   if (algorithm == COST_AWARE) {
+    if (dumpMILPModels) {
+      writeTo = dumpDir + sep + funcName + "-cost-aware";
+    }
     // Create and solve the MILP
-    return checkLoggerAndSolve<costaware::CostAwareBuffers>(
-        logger, "placement", placement, solverKind, timeout, info, timingDB,
-        targetCP);
+    return solveMILP<costaware::CostAwareBuffers>(
+        placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
   }
 
   if (algorithm == MAPBUF) {
+    if (dumpMILPModels) {
+      writeTo = dumpDir + sep + funcName + "-mapbuf";
+    }
     // Create and solve the MILP
-    return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, solverKind, timeout, info, timingDB,
-        targetCP, blifFiles, lutDelay, lutSize, acyclicType);
+    return solveMILP<mapbuf::MAPBUFBuffers>(
+        placement, solverKind, timeout, info, timingDB, targetCP, blifFiles,
+        lutDelay, lutSize, acyclicType, writeTo);
   }
 
   llvm_unreachable("unknown algorithm");

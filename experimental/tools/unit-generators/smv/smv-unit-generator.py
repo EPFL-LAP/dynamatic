@@ -122,8 +122,8 @@ def generate_code(name, mod_type, parameters):
             return muli.generate_muli(name, parameters)
         case "negf":
             return negf.generate_negf(name, parameters)
-        case "not":
-            return noti.generate_not(name, parameters)
+        case "noti":
+            return noti.generate_noti(name, parameters)
         case "ori":
             return ori.generate_ori(name, parameters)
         case "shli":

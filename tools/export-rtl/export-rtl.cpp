@@ -11,7 +11,6 @@
 // necessary).
 //
 //===----------------------------------------------------------------------===//
-#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -108,9 +107,9 @@ struct DenseMapInfo<std::pair<std::string, bool>> {
            (static_cast<unsigned>(p.second) << 1);
   }
 
-  static bool isEqual(const std::pair<std::string, bool> &LHS,
-                      const std::pair<std::string, bool> &RHS) {
-    return LHS == RHS;
+  static bool isEqual(const std::pair<std::string, bool> &lhs,
+                      const std::pair<std::string, bool> &rhs) {
+    return lhs == rhs;
   }
 };
 } // namespace llvm
@@ -447,10 +446,8 @@ void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
   auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
                            PortType dir) -> void {
     for (auto &[portName, portType] : io) {
-      const bool toPrint = hdl != HDL::SMV
-                               ? true
-                               : portName != dynamatic::hw::CLK_PORT &&
-                                     portName != dynamatic::hw::RST_PORT;
+      const bool toPrint =
+          hdl != HDL::SMV ? true : portName != CLK_PORT && portName != RST_PORT;
       if (toPrint) {
         writeDeclaration(portName, dir, portType, os);
         if (--numIOLeft != 0)
@@ -603,8 +600,8 @@ void WriteModData::writeSignalAssignments(
                           type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          if (inputPortName.str() != dynamatic::hw::CLK_PORT &&
-              inputPortName.str() != dynamatic::hw::RST_PORT)
+          if (inputPortName.str() != CLK_PORT &&
+              inputPortName.str() != RST_PORT)
             writeAssignment(internalSignalName, inputPortName, os);
         });
   }
@@ -1257,11 +1254,11 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                                      propertyTag};
     } else if (auto *p =
                    llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
-      unsigned numOut = p->getNumEagerForkOutputs();
-      std::string opName = p->getOwner();
+      auto sentStates = p->getSentStateNamers();
+      unsigned numOut = sentStates.size();
       std::vector<std::string> outNames{numOut};
       for (unsigned i = 0; i < numOut; ++i) {
-        outNames[i] = llvm::formatv("{0}.sent_{1}", opName, i);
+        outNames[i] = sentStates[i].getSMVName();
       }
       std::string propertyString =
           llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
@@ -1271,16 +1268,12 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
                    property.get())) {
-      unsigned numOut = p->getNumEagerForkOutputs();
-      std::string forkName = p->getForkOp();
-      std::string bufferName = p->getBufferOp();
-      int bufferSlot = p->getBufferSlot();
-      std::vector<std::string> forkOutNames{numOut};
-      for (unsigned i = 0; i < numOut; ++i) {
-        forkOutNames[i] = llvm::formatv("{0}.sent_{1}", forkName, i).str();
+      std::vector<std::string> forkOutNames(0);
+      for (auto [i, sentState] : llvm::enumerate(p->getSentStateNamers())) {
+        forkOutNames.push_back(sentState.getSMVName());
       }
-      std::string bufferFull =
-          llvm::formatv("{0}.full_{1}", bufferName, bufferSlot).str();
+      auto copiedSlot = p->getCopiedSlot();
+      std::string bufferFull = copiedSlot.getSMVName();
       std::string propertyString =
           llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
                         bufferFull)
@@ -1351,8 +1344,8 @@ void SMVWriter::constructIOMappings(
           addExtraSignals(port, signalName, type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          if (getSignalName(port).first != dynamatic::hw::CLK_PORT &&
-              getSignalName(port).first != dynamatic::hw::RST_PORT)
+          if (getSignalName(port).first != CLK_PORT &&
+              getSignalName(port).first != RST_PORT)
             mappings[getSignalName(port)].push_back(signalName);
         });
   };

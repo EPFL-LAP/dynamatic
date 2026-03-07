@@ -199,10 +199,11 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   
   let parameters = (ins 
     "::mlir::StringAttr":$dstAccess,
-    "unsigned":$loopDepth
+    "unsigned":$loopDepth,
+    "unsigned":$distance
   );
 
-  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `]`";
+  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `,` $distance `]`";
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {

@@ -13,8 +13,8 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeOptimizeBitwidths.cpp
   HandshakeInferBasicBlocks.cpp
   HandshakeReplaceMemoryInterfaces.cpp
+  HandshakeRemoveUnusedMemRefs.cpp
   HandshakeMarkFPUImpl.cpp
-  MarkMemoryDependencies.cpp
   MarkMemoryInterfaces.cpp
   OperationNames.cpp
   PushConstants.cpp
@@ -39,4 +39,5 @@ add_dynamatic_library(DynamaticTransforms
 )
 
 add_subdirectory(BufferPlacement)
+add_subdirectory(ResourceSharing)
 add_subdirectory(LLVMIR)

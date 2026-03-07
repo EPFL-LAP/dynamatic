@@ -83,7 +83,7 @@ create_symlink() {
     local src=$1
     local dst="bin/$(basename $1)"
     echo "$dst -> $src"
-    ln -f --symbolic $src $dst
+    ln -sf "$src" "$dst"
 }
 
 # Same as create_symlink but creates the symbolic link inside the bin/generators
@@ -92,14 +92,14 @@ create_generator_symlink() {
     local src=$1
     local dst="bin/generators/$(basename $1)"
     echo "$dst -> $src"
-    ln -f --symbolic ../../$src $dst
+    ln -sf "../../$src" "$dst"
 }
 
 create_include_symlink() {
     local src=$1
     local dst="build/include/clang_headers"
     echo "$dst -> $src"
-    ln -fT --symbolic "$src" "$dst"
+    ln -sf "$src" "$dst"
 }
 
 # Determine whether cmake should be re-configured by looking for a
@@ -141,6 +141,7 @@ GODOT_PATH=""
 ENABLE_XLS_INTEGRATION=0
 PREBUILT_LLVM=0
 BUILD_CHIESEL_LSQ=0
+ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
 LLVM_DIR="$PWD/llvm-project/build"
 
@@ -203,6 +204,7 @@ do
               ;;
           "--enable-cbc")
               CMAKE_DYNAMATIC_ENABLE_CBC="-DDYNAMATIC_ENABLE_CBC=ON"
+              ENABLE_CBC=1
               ;;
           "--build-legacy-lsq")
               BUILD_CHIESEL_LSQ=1
@@ -221,7 +223,6 @@ if [[ $PARSE_ARG != "" ]]; then
   echo "Missing argument \"$PARSE_ARG\", printing help and aborting"
   print_help_and_exit
 fi
-
 
 #### Build the project (submodules, superproject, and tools) ####
 
@@ -262,21 +263,55 @@ else
   #### llvm-project (prebuilt) ####
   prepare_to_build_project "Dynamatic (prebuilt-llvm)" "build"
 
-  URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
-  PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
+  if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+    echo "Prebuilt LLVM is currently configured only for Linux/X86 in this script."
+    echo "Please configure the LLVM submodule and run without --use-prebuilt-llvm."
+    exit 1
+  fi
 
-  # Download only if the file doesn't exist
-  if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
-      echo "Downloading $PREBUILT_LLVM_TARBALL..."
-      wget -O "$PREBUILT_LLVM_TARBALL" "$URL"
-      exit_on_fail "Failed to download the prebuilt llvm-project!"
+
+  if [[ $BUILD_TYPE == "Release" ]]; then
+    URL="https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux.tar.gz"
+    PREBUILT_LLVM_TARBALL=$(realpath "./llvm-project-x86_64.tar.gz")
+    # Download only if the file doesn't exist
+    if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
+        echo "Downloading $PREBUILT_LLVM_TARBALL..."
+        wget --no-verbose --show-progress -O "$PREBUILT_LLVM_TARBALL" "$URL"
+        exit_on_fail "Failed to download the prebuilt llvm-project (release)!"
+    fi
+  else
+    PREBUILT_LLVM_TARBALL=$(realpath "./llvm-b06546b-x86_64-linux-Debug.tar.gz")
+    if [ ! -f "$PREBUILT_LLVM_TARBALL" ]; then
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-aa" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-aa"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ab" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ab"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ac" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ac"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ad" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ad"
+      wget --no-verbose --show-progress -O "llvm-b06546b-x86_64-linux-Debug.part-ae" \
+        "https://github.com/ETHZ-DYNAMO/llvm-project/releases/download/llvm-b06546b/llvm-b06546b-x86_64-linux-Debug.part-ae"
+      cat \
+        "llvm-b06546b-x86_64-linux-Debug.part-aa" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ab" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ac" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ad" \
+        "llvm-b06546b-x86_64-linux-Debug.part-ae" \
+        > $PREBUILT_LLVM_TARBALL
+      exit_on_fail "Failed to download the prebuilt llvm-project (debug)!"
+    fi
   fi
 
   # untar the file 
-  mkdir -p "$SCRIPT_CWD/build/llvm-project/"
-  echo "Unzipping the prebuilt llvm-project!"
-  tar -xf "$PREBUILT_LLVM_TARBALL" -C "$SCRIPT_CWD/build/llvm-project/"
-  exit_on_fail "Failed to untar the prebuilt llvm-project!"
+  if [ ! -f "$LLVM_DIR/lib/cmake/llvm/AddLLVM.cmake" ]; then
+    mkdir -p "$LLVM_DIR"
+    echo "Prebuilt LLVM directory not found. Unzipping the prebuilt llvm-project!"
+    tar -xf "$PREBUILT_LLVM_TARBALL" -C "$LLVM_DIR"
+    exit_on_fail "Failed to untar the prebuilt llvm-project!"
+  else
+    echo "Found Prebuilt LLVM! Skipping untaring the llvm-project!"
+  fi
 
 fi
 
@@ -402,6 +437,11 @@ fi
 #### Godot ####
 
 if [[ $GODOT_PATH != "" ]]; then
+  # TODO: Support this for other configurations as well.
+  if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+    echo "Godot export preset can only be configured for Linux/X11 by this script."
+    exit 1
+  fi
   # Go to the visualizer's subfolder and build it using godot
   cd "$SCRIPT_CWD/visual-dataflow"
   "$GODOT_PATH" --headless --export-debug "Linux/X11"
@@ -445,6 +485,10 @@ create_generator_symlink build/bin/exp-sharing-wrapper-generator
 
 if [[ BUILD_CHIESEL_LSQ -eq 1 ]]; then
   create_generator_symlink "$LSQ_GEN_PATH/$LSQ_GEN_JAR"
+fi 
+
+if [[ ENABLE_CBC -eq 1 ]]; then
+  create_symlink "../build/cbc/bin/cbc"
 fi 
 
 # Create symbolic links to clang headers (standard c library for clang)

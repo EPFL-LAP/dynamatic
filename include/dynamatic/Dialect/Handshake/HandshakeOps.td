@@ -217,7 +217,7 @@ def InstanceOp : Handshake_Op<"instance", [
 
 def BufferOp : Handshake_Op<"buffer", [
   HasClock, SameOperandsAndResultType,
-  BufferLikeOpInterface,
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -637,7 +637,12 @@ def BlockerOp : Handshake_Op<"blocker", [
   let assemblyFormat = "$data attr-dict `:` type($result)";
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+def NotIOp : Handshake_Op<"noti", [
+  Pure,
+  SameOperandsAndResultType,
+  IsIntChannel<"operand">,
+  IsIntChannel<"result">
+]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
@@ -645,7 +650,7 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
     Example:
 
     ```mlir
-    %neg = not %value : !handshake.channel<i32>
+    %neg = noti %value : !handshake.channel<i32>
     ```
   }];
   let arguments = (ins ChannelType:$operand);
@@ -909,6 +914,11 @@ def LoadOp : Handshake_MemPortOp<"load", [
     1. address (to memory interface).
     2. data value (to successor)
 
+    This operation contains a slot for the incoming address, and also a
+    slot for the data value. These slots are identified by the literals
+    `ADDR_SLOT_LIT` and `DATA_SLOT_LIT`. The slots can be accessed
+    through the `BufferLikeOpInterface`
+
     Example:
 
     ```mlir
@@ -916,6 +926,10 @@ def LoadOp : Handshake_MemPortOp<"load", [
     ```
   }];
 
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral ADDR_SLOT_LIT = "addr";
+    static constexpr ::llvm::StringLiteral DATA_SLOT_LIT = "data";
+  }];
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");

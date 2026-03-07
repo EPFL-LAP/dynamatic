@@ -82,7 +82,11 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${CLANG_INCLUDE_DIRS})
 include_directories(${Polly_INCLUDE_DIRS})
+# Explicitly add the path resolved by CMake so that Boost includes are
+# found reliably everywhere.
+include_directories(${Boost_INCLUDE_DIRS})
 message(STATUS "Including from ${Polly_INCLUDE_DIRS}")
+message(STATUS "Including from ${Boost_INCLUDE_DIRS}")
 
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
@@ -174,22 +178,19 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(DYNAMATIC_ENABLE_CBC)
-  # Find the CBC, Osi, Clp libraries
-  find_package(PkgConfig REQUIRED)
+  if (UNIX)
+    FetchContent_Declare(
+      cbc
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+      SOURCE_DIR ${CMAKE_BINARY_DIR}/cbc
+      URL https://github.com/coin-or/Cbc/releases/download/releases%2F2.10.12/Cbc-releases.2.10.12-x86_64-ubuntu22-gcc1140-static.tar.gz
+      SYSTEM
+    )
 
-  # Use pkg-config to get include dirs and libs
-  # This command sets 
-  # - *_INCLUDE_DIRS
-  # - *_LIBRARY_DIRS
-  # But these variable will not be automatically discovered by the target.
-  pkg_check_modules(CBC QUIET cbc)
-
-  if(CBC_FOUND)
-    message(STATUS "CBC available via pkg-config")
-    # This command makes the include directory of CBC discoverable
+    FetchContent_MakeAvailable(cbc)
     add_compile_definitions(DYNAMATIC_ENABLE_CBC)
   else()
-    message(STATUS "cbc is missing! Disabling the CBC-related feature in Dynamatic.")
+    message(FATAL_ERROR "Cbc integration is not tested on the OS you use!")
   endif()
 endif()
 
@@ -264,6 +265,7 @@ FetchContent_Declare(
   googletest
   DOWNLOAD_EXTRACT_TIMESTAMP true
   URL https://github.com/google/googletest/archive/2ae29b52fdff88c52fef655fa0d245fc514ca35b.zip
+  SYSTEM
 )
 
 # For Windows: Prevent overriding the parent project's compiler/linker settings
@@ -271,7 +273,11 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # TODO: Use the JSON package from Boost instead.
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_Declare(
+  json
+  URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+  SYSTEM
+)
 FetchContent_MakeAvailable(json)
 
 #-------------------------------------------------------------------------------
@@ -285,4 +291,3 @@ add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)
-

@@ -12,11 +12,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include <stack>
@@ -24,6 +26,16 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
+
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKESTRAIGHTTOQUEUE
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
@@ -535,7 +547,7 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
 }
 
 struct HandshakeStraightToQueuePass
-    : public dynamatic::experimental::ftd::impl::HandshakeStraightToQueueBase<
+    : public dynamatic::experimental::impl::HandshakeStraightToQueueBase<
           HandshakeStraightToQueuePass> {
 
   void runDynamaticPass() override {
@@ -548,8 +560,3 @@ struct HandshakeStraightToQueuePass
   };
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::ftd::createStraightToQueue() {
-  return std::make_unique<HandshakeStraightToQueuePass>();
-}
