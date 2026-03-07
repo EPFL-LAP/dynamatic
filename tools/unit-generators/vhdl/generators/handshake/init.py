@@ -1,30 +1,33 @@
-from generators.support.signal_manager import generate_signal_manager, get_concat_extra_signals_bitwidth
+from generators.support.signal_manager import generate_concat_signal_manager
+from generators.support.signal_manager.utils.concat import get_concat_extra_signals_bitwidth
 
 
-def generate_tehb(name, params):
+def generate_init(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
   # Flag indicating whether the buffer is initialized when created
   initialized = params.get("initialized", 0)
+  print("hellooooo\n\n")
+  print(name, initialized)
   # The initial value to use for the buffer
   initial_value = params.get("initial_value", 0)
 
   if extra_signals:
-    return _generate_tehb_signal_manager(name, bitwidth, extra_signals, initialized, initial_value)
+    return _generate_init_signal_manager(name, bitwidth, extra_signals, initialized, initial_value)
   elif bitwidth == 0:
-    return _generate_tehb_dataless(name, initialized)
+    return _generate_init_dataless(name, initialized)
   else:
-    return _generate_tehb(name, bitwidth, initialized, initial_value)
+    return _generate_init(name, bitwidth, initialized, initial_value)
 
 
-def _generate_tehb_dataless(name, initialized):
+def _generate_init_dataless(name, initialized):
 
   entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of tehb_dataless
+-- Entity of init_dataless
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -39,7 +42,7 @@ end entity;
 """
 
   architecture = f"""
--- Architecture of tehb_dataless
+-- Architecture of init_dataless
 architecture arch of {name} is
   signal fullReg, outputValid : std_logic;
 begin
@@ -64,11 +67,11 @@ end architecture;
   return entity + architecture
 
 
-def _generate_tehb(name, bitwidth, initialized, initial_value):
-  tehb_dataless_name = f"{name}_dataless"
+def _generate_init(name, bitwidth, initialized, initial_value):
+  init_dataless_name = f"{name}_dataless"
 
-  dependencies = _generate_tehb_dataless(
-      tehb_dataless_name, initialized)
+  dependencies = _generate_init_dataless(
+      init_dataless_name, initialized)
 
   dataReg_init = f"'{initial_value}'"
 
@@ -77,7 +80,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Entity of tehb
+-- Entity of init
 entity {name} is
   port (
     clk, rst : in std_logic;
@@ -94,14 +97,14 @@ end entity;
 """
 
   architecture = f"""
--- Architecture of tehb
+-- Architecture of init
 architecture arch of {name} is
   signal regEnable, regNotFull : std_logic;
   signal dataReg               : std_logic_vector({bitwidth} - 1 downto 0);
 begin
   regEnable <= regNotFull and ins_valid and not outs_ready;
 
-  control : entity work.{tehb_dataless_name}
+  control : entity work.{init_dataless_name}
     port map(
       clk        => clk,
       rst        => rst,
@@ -139,20 +142,20 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_tehb_signal_manager(name, bitwidth, extra_signals, initialized, initial_value):
+def _generate_init_signal_manager(name, bitwidth, extra_signals, initialized, initial_value):
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
-  return generate_signal_manager(name, {
-      "type": "concat",
-      "in_ports": [{
-          "name": "ins",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "out_ports": [{
-          "name": "outs",
-          "bitwidth": bitwidth,
-          "extra_signals": extra_signals
-      }],
-      "extra_signals": extra_signals
-  }, lambda name: _generate_tehb(name, bitwidth + extra_signals_bitwidth, initialized, initial_value))
+  return generate_concat_signal_manager(
+    name, 
+    [{
+        "name": "ins",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }],
+    [{
+        "name": "outs",
+        "bitwidth": bitwidth,
+        "extra_signals": extra_signals
+    }],
+    extra_signals,
+    lambda name: _generate_init(name, bitwidth + extra_signals_bitwidth, initialized, initial_value))
   
