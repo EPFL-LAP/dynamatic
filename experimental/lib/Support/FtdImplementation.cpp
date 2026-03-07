@@ -28,8 +28,6 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 
-bool useInit = true;
-
 /// Different types of loop suppression.
 enum BranchToLoopType {
 
@@ -753,20 +751,15 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
     Operation *initOp;
-    if (useInit)
-      initOp = rewriter.create<handshake::InitOp>(consumerOp->getLoc(),
-                                                  conditionValue);
-    else {
-      SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-      initOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
-                                                   mergeOperands);
-    }
+    initOp = rewriter.create<handshake::InitOp>(consumerOp->getLoc(),
+                                                conditionValue);
 
     initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
     // Create the `init` operation
     // SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-    // auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+    // auto initMergeOp =
+    // rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
     //                                                        mergeOperands);
     // initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 
@@ -1291,29 +1284,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         //     rewriter.create<handshake::MergeOp>(loc, mergeOperands);
 
         Operation *initOp;
-        if (useInit)
-          initOp = rewriter.create<handshake::InitOp>(loc, conditionValue);
-        else {
-          // The inputs of the merge are the condition value and a `false`
-          // constant driven by the start value of the function. This will
-          // created later on, so we use a dummy value.
-          SmallVector<Value> mergeOperands;
-          mergeOperands.push_back(conditionValue);
-          mergeOperands.push_back(conditionValue);
-
-          initOp = rewriter.create<handshake::MergeOp>(loc, mergeOperands);
-
-          // Add the activation constant driven by the backedge value, which
-          // will
-          // be then updated with the real start value, once available
-          auto cstType = rewriter.getIntegerType(1);
-          auto cstAttr = IntegerAttr::get(cstType, 0);
-          rewriter.setInsertionPointToStart(initOp->getBlock());
-          auto constOp = rewriter.create<handshake::ConstantOp>(
-              initOp->getLoc(), cstAttr, startValue);
-          constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-          initOp->setOperand(0, constOp.getResult());
-        }
+        initOp = rewriter.create<handshake::InitOp>(loc, conditionValue);
 
         initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
 

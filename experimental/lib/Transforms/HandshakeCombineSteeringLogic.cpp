@@ -39,7 +39,7 @@ using namespace dynamatic;
 
 namespace {
 
-  struct CombineInits : public OpRewritePattern<handshake::InitOp> {
+struct CombineInits : public OpRewritePattern<handshake::InitOp> {
   using OpRewritePattern<handshake::InitOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(handshake::InitOp init,
                                 PatternRewriter &rewriter) const override {

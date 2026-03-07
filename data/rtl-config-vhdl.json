@@ -453,8 +453,11 @@
   },
   {
     "name": "handshake.init",
-    "parameters": [
-      { "name": "INITIAL_VALUE", "type": "unsigned" }
+        "parameters": [
+      {
+        "name": "INITIAL_VALUE",
+        "type": "unsigned"
+      }
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initial_value=$INITIAL_VALUE"
   },
