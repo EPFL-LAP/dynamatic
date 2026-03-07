@@ -5,22 +5,18 @@ from generators.support.signal_manager.utils.concat import get_concat_extra_sign
 def generate_init(name, params):
   bitwidth = params["bitwidth"]
   extra_signals = params.get("extra_signals", None)
-  # Flag indicating whether the buffer is initialized when created
-  initialized = params.get("initialized", 0)
-  print("hellooooo\n\n")
-  print(name, initialized)
   # The initial value to use for the buffer
   initial_value = params.get("initial_value", 0)
 
   if extra_signals:
-    return _generate_init_signal_manager(name, bitwidth, extra_signals, initialized, initial_value)
+    return _generate_init_signal_manager(name, bitwidth, extra_signals, initial_value)
   elif bitwidth == 0:
-    return _generate_init_dataless(name, initialized)
+    return _generate_init_dataless(name)
   else:
-    return _generate_init(name, bitwidth, initialized, initial_value)
+    return _generate_init(name, bitwidth, initial_value)
 
 
-def _generate_init_dataless(name, initialized):
+def _generate_init_dataless(name):
 
   entity = f"""
 library ieee;
@@ -52,7 +48,7 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        fullReg <= '{initialized}';
+        fullReg <= '1';
       else
         fullReg <= outputValid and not outs_ready;
       end if;
@@ -67,11 +63,11 @@ end architecture;
   return entity + architecture
 
 
-def _generate_init(name, bitwidth, initialized, initial_value):
+def _generate_init(name, bitwidth, initial_value):
   init_dataless_name = f"{name}_dataless"
 
   dependencies = _generate_init_dataless(
-      init_dataless_name, initialized)
+      init_dataless_name)
 
   dataReg_init = f"'{initial_value}'"
 
@@ -142,7 +138,7 @@ end architecture;
   return dependencies + entity + architecture
 
 
-def _generate_init_signal_manager(name, bitwidth, extra_signals, initialized, initial_value):
+def _generate_init_signal_manager(name, bitwidth, extra_signals, initial_value):
   extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
   return generate_concat_signal_manager(
     name, 
@@ -157,5 +153,5 @@ def _generate_init_signal_manager(name, bitwidth, extra_signals, initialized, in
         "extra_signals": extra_signals
     }],
     extra_signals,
-    lambda name: _generate_init(name, bitwidth + extra_signals_bitwidth, initialized, initial_value))
+    lambda name: _generate_init(name, bitwidth + extra_signals_bitwidth, initial_value))
   
