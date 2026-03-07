@@ -772,7 +772,7 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
 
     // The multiplexer is to be fed by the init block, and takes as inputs the
     // regenerated value and the result itself (to be set after) it was created.
-    auto selectSignal = initOp.getResult(0);
+    auto selectSignal = initOp->getResult(0);
     selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
