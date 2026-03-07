@@ -23,10 +23,17 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+#include <fstream>
 #include <cassert>
 
 using namespace mlir;
 using namespace dynamatic;
+
+static void logLine(const char *msg) {
+  std::ofstream f("/home/yuqin/dynamatic-scripts/TempOutputs/HandshakeCombineSteeringLogic.txt", std::ios::app);
+  f << msg << "\n";
+}
 
 namespace {
 
@@ -69,6 +76,7 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
     if (redundantInits.empty())
       return failure();
 
+    logLine("[HandshakeCombineSteeringLogic] CombineInits applied");
     for (auto init : redundantInits) {
       rewriter.replaceAllUsesWith(init.getResult(), mergeOp.getResult());
       rewriter.eraseOp(init);
@@ -204,6 +212,7 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
     if (redundantMuxes.empty())
       return failure();
 
+    logLine("[HandshakeCombineSteeringLogic] CombineMuxes applied");
     // Loop over redundantMuxes and replace the users of them with the output of
     // muxOp Note that the users of all redundantMuxes include the Branches
     // forming cycles with each of them, but as we erase the redundantMuxes,
@@ -277,6 +286,7 @@ struct CombineEquivalentMuxes : public OpRewritePattern<handshake::MuxOp> {
     if (redundant.empty())
       return failure();
 
+    logLine("[HandshakeCombineSteeringLogic] CombineEquivalentMuxes applied\n");
     for (auto mux : redundant) {
       rewriter.replaceAllUsesWith(mux.getResult(), muxOp.getResult());
       rewriter.eraseOp(mux);
@@ -311,6 +321,7 @@ struct CombineEquivalentBranches
     if (redundant.empty())
       return failure();
 
+    logLine("[HandshakeCombineSteeringLogic] CombineEquivalentBranches applied\n");
       for (auto br : redundant) {
       rewriter.replaceAllUsesWith(br.getTrueResult(),
                                   condBranchOp.getTrueResult());
@@ -335,6 +346,7 @@ struct RemoveUnusedOp : public OpRewritePattern<OpTy> {
         return failure();
     }
 
+    logLine(("[HandshakeCombineSteeringLogic] RemoveUnusedOp<" + std::string(OpTy::getOperationName()) + "> applied").c_str());
     rewriter.eraseOp(op);
     return success();
   }
@@ -393,6 +405,7 @@ struct CombineBranchesOppositeSign
     if (redundantBranches.empty())
       return failure();
 
+    logLine("[HandshakeCombineSteeringLogic] CombineBranchesOppositeSign applied\n");
     // Erase the redundant branch
     for (auto br : redundantBranches) {
       rewriter.replaceAllUsesWith(br.getFalseResult(),
@@ -435,6 +448,7 @@ struct RemoveNotCondition
     newBranch->setAttr("handshake.bb", condBranchOp->getAttr("handshake.bb"));
     rewriter.eraseOp(condBranchOp);
 
+    logLine("[HandshakeCombineSteeringLogic] RemoveNotCondition applied\n");
     return success();
   }
 };
@@ -535,6 +549,8 @@ struct SimplifyKnownConditionBranch
     replaceDownstreamCond(condBranchOp.getTrueResult(), /*outputIsTrue=*/true);
     replaceDownstreamCond(condBranchOp.getFalseResult(), /*outputIsTrue=*/false);
 
+    if (changed)
+      logLine("[HandshakeCombineSteeringLogic] SimplifyKnownConditionBranch applied\n");
     return changed ? success() : failure();
   }
 };
@@ -569,6 +585,7 @@ struct EliminateConstantCondBranch
     if (!notTakenResult.use_empty())
       return failure();
 
+    logLine("[HandshakeCombineSteeringLogic] EliminateConstantCondBranch applied\n");
     // Short-circuit the always-taken side
     rewriter.replaceAllUsesWith(takenResult, condBranchOp.getDataOperand());
 
