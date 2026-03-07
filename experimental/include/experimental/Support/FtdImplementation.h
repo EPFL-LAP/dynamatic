@@ -38,12 +38,29 @@ struct PendingMerge {
       : mergeOp(op), operandIndex(idx), originalCFValue(cfVal) {}
 };
 
+/// Stores loop information prior to flattening to be used in the end in addSupp
+/// and addRegen of FTD.
+struct LoopExitInfo {
+  Block *exitBlock;   // block containing the branch
+  bool isNegatedExit; // true if the loop exit condition should be negated
+};
+
+struct LoopSummary {
+  int id;
+  Block *header;
+  SmallVector<LoopExitInfo> exits;
+  SmallVector<int> enclosingLoopNest; // all loops enclosing the loop object
+                                      // under study from outermost to the
+                                      // innermost right above the loop object
+};
+
 /// This function implements the regeneration mechanism over a pair made of a
 /// producer and a consumer (see `addRegen` description).
-void addRegenOperandConsumer(PatternRewriter &rewriter,
+void addRegenOperandConsumer(mlir::OpBuilder &builder,
                              dynamatic::handshake::FuncOp &funcOp,
                              Operation *consumerOp, Value operand,
-                             mlir::CFGLoopInfo &loopInfo);
+                             const DenseMap<unsigned, int> &blockToLoopId,
+                             const DenseMap<int, LoopSummary> &loopSummaries);
 
 /// This function implements the suppression mechanism over a pair made of a
 /// producer and a consumer (see `addSupp` description).
@@ -56,7 +73,9 @@ void addSuppOperandConsumer(PatternRewriter &rewriter,
 /// adding some merges to the network, to that this can be done. The new
 /// merge is moved inside of the loop, and it works like a reassignment
 /// (cfr. FPGA'22, Section V.C).
-// void addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
+void addFtdRegen(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
+                 const DenseMap<unsigned, int> &blockToLoopId,
+                 const DenseMap<int, LoopSummary> &loopSummaries);
 
 /// Given each pairs of producers and consumers within the circuit, the
 /// producer might create a token which is never used by the corresponding

@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -31,7 +32,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/SmallVector.h"
 
 #include <utility>
@@ -139,76 +139,76 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
   }
 };
 
-struct ConvertRegenPattern : public RewritePattern {
-  NameAnalysis &namer;
-  CfToHandshakeTypeConverter &converter;
+// Aya: added the following
+static void buildLoopSummaries(
+    ModuleOp module, DenseMap<unsigned, int> &blockToLoopId,
+    DenseMap<int, dynamatic::experimental::ftd::LoopSummary> &loopSummaries) {
+  llvm::DenseMap<mlir::CFGLoop *, int> loopToId;
+  int nextId = 0;
 
-  DenseMap<handshake::FuncOp, std::unique_ptr<mlir::CFGLoopInfo>> &loopInfoMap;
+  for (auto func : module.getOps<func::FuncOp>()) {
+    // Build CFGLoopInfo on CF IR for this function
+    mlir::DominanceInfo domInfo(func);
+    mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&func.getBody()));
 
-  ConvertRegenPattern(
-      NameAnalysis &n, CfToHandshakeTypeConverter &c,
-      DenseMap<handshake::FuncOp, std::unique_ptr<mlir::CFGLoopInfo>> &loops,
-      MLIRContext *ctx)
-      : RewritePattern(handshake::FuncOp::getOperationName(), 1, ctx), namer(n),
-        converter(c), loopInfoMap(loops) {}
+    std::function<void(mlir::CFGLoop *)> assignIds = [&](mlir::CFGLoop *loop) {
+      loopToId.try_emplace(loop, nextId++);
+      for (mlir::CFGLoop *subLoop : loop->getSubLoops())
+        assignIds(subLoop);
+    };
+    for (mlir::CFGLoop *topLoop : loopInfo.getTopLevelLoops())
+      assignIds(topLoop);
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
+    std::function<void(CFGLoop *, int)> processLoop;
+    processLoop = [&](CFGLoop *loop, int id) {
+      dynamatic::experimental::ftd::LoopSummary summary;
+      summary.id = id;
+      summary.header = loop->getHeader();
 
-    auto funcOp = cast<handshake::FuncOp>(op);
+      // Compute exits
+      SmallVector<Block *> exitBlocks;
+      loop->getExitingBlocks(exitBlocks);
+      for (Block *exitBlock : exitBlocks) {
+        // Determine if exit happens when block condition is true
+        bool isNegatedExit = false;
+        auto *terminatorOperation = exitBlock->getTerminator();
+        auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+        assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
+        if (loopInfo.getLoopFor(condBranch.getFalseDest()) != loop)
+          isNegatedExit = true;
 
-    auto it = loopInfoMap.find(funcOp);
-    assert(it != loopInfoMap.end() &&
-           "Missing precomputed CFGLoopInfo for FuncOp");
-
-    mlir::CFGLoopInfo &loopInfo = *it->second;
-
-    // Set of original operations in the IR
-    SmallVector<Operation *> consumersToCover;
-    for (Operation &consumerOp : funcOp.getOps())
-      consumersToCover.push_back(&consumerOp);
-
-    llvm::errs()
-        << "\n\n\t\tHI from matchAndRewrite of convertRegenPattern\n\n";
-
-    // For each producer/consumer relationship
-    for (Operation *consumerOp : consumersToCover) {
-      for (Value operand : consumerOp->getOperands()) {
-        addRegenOperandConsumer(rewriter, funcOp, consumerOp, operand,
-                                loopInfo);
+        summary.exits.push_back({exitBlock, isNegatedExit});
       }
-    }
-    return success();
-  }
-};
 
-struct ConvertSuppPattern : public RewritePattern {
-  NameAnalysis &namer;
-  CfToHandshakeTypeConverter &converter;
+      auto loopLevel = loop->getParentLoop();
+      while (loopLevel) {
+        auto it = loopToId.find(loopLevel);
+        assert(it != loopToId.end() && "Loop missing from loopToId!");
+        summary.enclosingLoopNest.push_back(it->second);
+        loopLevel = loopLevel->getParentLoop();
+      }
+      // Reverse to the get the loops from outermost to innermost
+      std::reverse(summary.enclosingLoopNest.begin(),
+                   summary.enclosingLoopNest.end());
 
-  ConvertSuppPattern(NameAnalysis &n, CfToHandshakeTypeConverter &c,
-                     MLIRContext *ctx)
-      : RewritePattern(handshake::FuncOp::getOperationName(), 1, ctx), namer(n),
-        converter(c) {}
+      loopSummaries[summary.id] = std::move(summary);
+    };
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    auto funcOp = cast<handshake::FuncOp>(op);
-    // Set of original operations in the IR
-    std::vector<Operation *> consumersToCover;
-    for (Operation &consumerOp : funcOp.getOps())
-      consumersToCover.push_back(&consumerOp);
-
-    llvm::errs() << "\n\n\t\tHI from matchAndRewrite of convertSUppPattern\n\n";
-
-    for (auto *consumerOp : consumersToCover) {
-      for (auto operand : consumerOp->getOperands())
-        addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
+    // Create an entry for every loop
+    for (const auto &[loop, id] : loopToId) {
+      processLoop(loop, id);
     }
 
-    return success();
+    // Map every block to the Id of the innermost loop containing it and to -1
+    // if it is not inside any loop
+    for (auto [blockID, block] : llvm::enumerate(func)) {
+      if (CFGLoop *loop = loopInfo.getLoopFor(&block))
+        blockToLoopId[blockID] = loopToId.lookup(loop);
+      else
+        blockToLoopId[blockID] = -1;
+    }
   }
-};
+}
 
 namespace {
 
@@ -222,6 +222,13 @@ struct FtdCfToHandshakePass
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
+
+    // Aya: added the following
+    // Structures to store all loop information to be reused later by the FTD
+    // functions after flattening the IR and having it entirely in handshake
+    DenseMap<unsigned, int> blockToLoopId;
+    DenseMap<int, LoopSummary> loopSummaries;
+    buildLoopSummaries(modOp, blockToLoopId, loopSummaries);
 
     patterns.add<experimental::ftd::FtdLowerFuncToHandshake>(
         getAnalysis<ControlDependenceAnalysis>(),
@@ -305,6 +312,11 @@ struct FtdCfToHandshakePass
                "__init function should not have users after transformation");
         func.erase();
       }
+    }
+
+    for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+      mlir::OpBuilder builder(funcOp.getContext());
+      // ftd::addFtdRegen(funcOp, builder, blockToLoopId, loopSummaries);
     }
   }
 };
