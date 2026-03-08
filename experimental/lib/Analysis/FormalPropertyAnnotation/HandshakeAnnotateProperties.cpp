@@ -333,6 +333,56 @@ extractLocalEquations(ModuleOp modOp,
         continue;
       }
 
+      if (auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op)) {
+        size_t numInputs = cmergeOp.getDataOperands().size();
+
+        FlowVariable x0(InternalLambda(&op, 0));
+        x0.constraint = IndexConstraint(numInputs);
+
+        for (auto [i, channel] : llvm::enumerate(cmergeOp.getDataOperands())) {
+          FlowVariable channelVar(ChannelLambda(channel), map);
+          equations.push_back(channelVar - x0.getConstrained(i));
+        }
+
+        auto slots = cmergeOp.getInternalSlotStateNamers();
+        std::shared_ptr<InternalStateNamer> slotNamer =
+            std::make_shared<BufferSlotFullNamer>(slots[0]);
+        FlowVariable slot(slotNamer);
+        slot.constraint = IndexConstraint(numInputs);
+
+        FlowVariable indexChannel = x0.nextInternal();
+        for (size_t i = 0; i < numInputs; ++i) {
+          equations.push_back(x0.getConstrained(i) -
+                              indexChannel.getConstrained(i) -
+                              slot.getConstrained(i));
+        }
+        FlowVariable dataChannel = indexChannel.nextInternal();
+        dataChannel.constraint.reset();
+        equations.push_back(x0 - dataChannel - slot);
+
+        auto sentNamers = cmergeOp.getInternalSentStateNamers();
+
+        std::shared_ptr<InternalStateNamer> dataNamer =
+            std::make_shared<EagerForkSentNamer>(sentNamers[0]);
+        std::shared_ptr<InternalStateNamer> indexNamer =
+            std::make_shared<EagerForkSentNamer>(sentNamers[1]);
+        FlowVariable dataSent(dataNamer);
+        FlowVariable indexSent(indexNamer);
+        indexSent.constraint = IndexConstraint(numInputs);
+
+        auto outputs = cmergeOp.getResults();
+        FlowVariable data(ChannelLambda(outputs[0]), map);
+        FlowVariable index(ChannelLambda(outputs[1]), map);
+
+        for (size_t i = 0; i < numInputs; ++i) {
+          equations.push_back(index.getConstrained(i) -
+                              indexSent.getConstrained(i) -
+                              indexChannel.getConstrained(i));
+        }
+        equations.push_back(data - dataSent - dataChannel);
+        continue;
+      }
+
       FlowVariable entry = InternalLambda(&op, 0);
       // Join operation, merge operation, or mux
       if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
@@ -352,7 +402,8 @@ extractLocalEquations(ModuleOp modOp,
             assert(false && "muxOp select var should always be index");
             FlowExpression dataEq = -entry;
             for (auto operand : muxOp.getDataOperands()) {
-              dataEq += FlowVariable(ChannelLambda(operand));
+              FlowVariable chVar(ChannelLambda(operand), map);
+              dataEq += chVar;
             }
             equations.push_back(dataEq);
           }
@@ -414,7 +465,8 @@ extractLocalEquations(ModuleOp modOp,
           }
         } else {
           for (auto channel : channels) {
-            equations.push_back(FlowVariable(ChannelLambda(channel)) - entry);
+            FlowVariable chVar(ChannelLambda(channel), map);
+            equations.push_back(chVar - entry);
           }
         }
       }
@@ -484,53 +536,6 @@ extractLocalEquations(ModuleOp modOp,
         }
       }
 
-      /*
-      auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op);
-      if (cmergeOp && op.getOpOperands().size() == 2) {
-        auto sentStates = cmergeOp.getInternalSentStateNamers();
-
-        std::shared_ptr<InternalStateNamer> namer =
-            std::make_shared<EagerForkSentNamer>(sentStates[0]);
-        FlowVariable dataChannel = ChannelLambda(cmergeOp.getDataResult());
-        FlowVariable dataSent(namer);
-        // Handle case where the data is a bit
-        if (exit.isPlusMinus()) {
-          assert(dataChannel.isPlusMinus());
-          FlowVariable sentPM = dataSent;
-          sentPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-          equations.push_back(dataSent - sentPM);
-          equations.push_back(exit.getPlus() + sentPM.getPlus() -
-                              dataChannel.getPlus());
-          equations.push_back(exit.getMinus() + sentPM.getMinus() -
-                              dataChannel.getMinus());
-        } else {
-          equations.push_back(exit + dataSent - dataChannel);
-        }
-
-        FlowVariable indexChannel = ChannelLambda(cmergeOp.getResults()[1]);
-        std::shared_ptr<InternalStateNamer> indexNamer =
-            std::make_shared<EagerForkSentNamer>(sentStates[1]);
-        FlowVariable indexSent(indexNamer);
-        assert(indexChannel.isPlusMinus() &&
-               "cmerge with 2 inputs should have 1 bit to determine index");
-
-        auto operands = op.getOperands();
-        FlowVariable inM = ChannelLambda(operands[0]);
-        FlowVariable inP = ChannelLambda(operands[1]);
-        auto slots = cmergeOp.getInternalSlotStateNamers();
-        std::shared_ptr<InternalStateNamer> slotNamer =
-            std::make_shared<BufferSlotFullNamer>(slots[0]);
-        FlowVariable slot(slotNamer);
-        FlowVariable slotPM = slot;
-        slotPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-        FlowVariable sentPM = indexSent;
-        sentPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-
-        equations.push_back(indexChannel.getMinus() + slotPM.getMinus() - inM -
-                            sentPM.getMinus());
-        equations.push_back(indexChannel.getPlus() + slotPM.getPlus() - inP -
-                            sentPM.getPlus());
-      } else */
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         // eagerfork: for every channel, either same tokens in as out, or in
         // `sent` state and in = out - 1
@@ -643,10 +648,6 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   // The equations are represented by a FlowExpression that is equal to zero
   std::vector<FlowExpression> equations = extractLocalEquations(modOp, map);
 
-  for (auto &expr : equations) {
-    expr.debug();
-  }
-
   // Map all variables used in `equations` to an index in the matrix
   FlowEquationsMatrix indices(equations);
   MatIntType &matrix = indices.matrix;
@@ -673,7 +674,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     if (expr.terms.size() == 0) {
       continue;
     }
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::OPT);
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
     p.addEquation(expr);
     if (p.getEquations().size() > 0) {
       uid++;
@@ -686,12 +687,10 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-#ifdef false
   if (failed(annotateAbsenceOfBackpressure(modOp)))
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
-#endif
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();

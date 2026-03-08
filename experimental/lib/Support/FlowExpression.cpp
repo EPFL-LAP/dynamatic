@@ -8,6 +8,7 @@ FlowVariable::FlowVariable(ChannelLambda channel,
   for (auto &[key, value] : map) {
     if (key == channel.channel) {
       constraint = IndexConstraint(value);
+      return;
     }
   }
 }
@@ -15,8 +16,10 @@ FlowVariable::FlowVariable(ChannelLambda channel,
 FlowVariable FlowVariable::nextInternal() const {
   auto *lambda = std::get_if<InternalLambda>(&variable);
   assert(lambda && "next internal can only be used on internal variables");
-  InternalLambda next = *lambda;
-  next.index += 1;
+  InternalLambda nextLambda = *lambda;
+  nextLambda.index += 1;
+  FlowVariable next = *this;
+  next.variable = nextLambda;
   return next;
 }
 

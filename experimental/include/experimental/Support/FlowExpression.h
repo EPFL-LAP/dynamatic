@@ -99,7 +99,10 @@ struct FlowVariable {
   inline bool isIndex() const { return constraint.has_value(); }
   inline FlowVariable getConstrained(size_t x) const {
     FlowVariable p = *this;
-    assert(p.isIndex());
+    if (!p.isIndex()) {
+      p.debug();
+      assert(p.isIndex());
+    }
     p.constraint->singleValue = x;
     return p;
   }
@@ -138,7 +141,11 @@ struct FlowVariable {
     }
 
     if (constraint) {
-      llvm::errs() << llvm::formatv("(={0})", *(constraint->singleValue));
+      if (constraint->singleValue) {
+        llvm::errs() << llvm::formatv("(={0})", *(constraint->singleValue));
+      } else {
+        llvm::errs() << llvm::formatv("(=x)");
+      }
     }
   }
 
