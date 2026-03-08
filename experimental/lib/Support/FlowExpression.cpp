@@ -2,11 +2,12 @@
 
 namespace dynamatic {
 namespace handshake {
-FlowVariable::FlowVariable(ChannelLambda channel) {
+FlowVariable::FlowVariable(ChannelLambda channel,
+                           const llvm::DenseMap<mlir::Value, IndexInfo> &map) {
   *this = FlowVariable(Variants(channel));
-  if (auto ct = dyn_cast<handshake::ChannelType>(channel.channel.getType())) {
-    if (ct.getDataBitWidth() == 1) {
-      pm = PLUSMINUS::plusAndMinus;
+  for (auto &[key, value] : map) {
+    if (key == channel.channel) {
+      constraint = IndexConstraint(value);
     }
   }
 }
@@ -25,26 +26,22 @@ std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
     return nullptr;
 
   auto &state = *namer;
-  switch (pm) {
-  case notApplicable:
-    return state;
-  case plus:
-    return state->tryConstrain(1);
-  case minus:
-    return state->tryConstrain(0);
-  case plusAndMinus:
-    // should not happen because `plusAndMinus` is split into `plus` and `minus`
-    // within a flow expression
-    assert(false && "trying to get the annotater for plusAndMinus");
-    return nullptr;
+  if (constraint && constraint->singleValue) {
+    return state->tryConstrain(*(constraint->singleValue));
   }
+  return state;
 }
 
 FlowExpression::FlowExpression(const FlowVariable &v) {
-  if (v.isPlusMinus()) {
+  if (v.isIndex()) {
+    if (v.constraint->singleValue) {
+      terms[v] = 1;
+      return;
+    }
     // If plusAndMinus, separate into plus and minus parts
-    terms[v.getPlus()] = 1;
-    terms[v.getMinus()] = 1;
+    for (size_t i = 0; i < v.constraint->info.numValues; ++i) {
+      terms[v.getConstrained(i)] = 1;
+    }
   } else {
     terms[v] = 1;
   }
@@ -56,10 +53,17 @@ llvm::json::Value FlowExpression::toJSON() const {
     auto *namer =
         std::get_if<std::shared_ptr<InternalStateNamer>>(&key.variable);
     assert(namer);
-    int pm = key.pm;
-    jsonTerms.emplace_back(llvm::json::Object({{STATE_LIT, (*namer)->toJSON()},
-                                               {COEFFICIENT_LIT, value},
-                                               {CONSTRAINT_LIT, pm}}));
+    std::optional<llvm::json::Value> constraintJson;
+    if (key.constraint) {
+      constraintJson = key.constraint->toJSON();
+    } else {
+      constraintJson = nullptr;
+    }
+    // int pm = key.pm;
+    jsonTerms.emplace_back(
+        llvm::json::Object({{STATE_LIT, (*namer)->toJSON()},
+                            {COEFFICIENT_LIT, value},
+                            {CONSTRAINT_LIT, constraintJson}}));
   }
   return llvm::json::Array(jsonTerms);
 }
@@ -83,11 +87,13 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
       assert(false &&
              "FlowExpression term JSON does not contain COEFFICIENT_LIT");
     }
-    int pm;
-    if (!mapper.map(CONSTRAINT_LIT, pm)) {
-      assert(false && "FlowExpression does not contain CONSTRAINT_LIT");
+    const llvm::json::Value *constraint = obj->get(CONSTRAINT_LIT);
+    assert(constraint && "FlowExpression does not contain CONSTRAINT_LIT");
+    if (auto n = constraint->getAsNull()) {
+      assert(!var.constraint);
+    } else {
+      var.constraint = IndexConstraint::fromJSON(*constraint, path);
     }
-    var.pm = (FlowVariable::PLUSMINUS)pm;
 
     expr.terms[var] = coef;
   }

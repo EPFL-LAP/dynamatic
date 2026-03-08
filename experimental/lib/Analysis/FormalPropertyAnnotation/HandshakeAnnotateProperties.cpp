@@ -276,7 +276,7 @@ struct FlowEquationsMatrix {
         }
         // PlusAndMinus variables should never be inserted, as the DSL will
         // insert them as two separate variables
-        assert(!key.isPlusMinus());
+        assert(!key.constraint || key.constraint->singleValue);
         if (varToIndex.count(key) == 0) {
           varToIndex[key] = index;
           ++index;
@@ -309,7 +309,9 @@ struct FlowEquationsMatrix {
   }
 };
 
-std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
+std::vector<FlowExpression>
+extractLocalEquations(ModuleOp modOp,
+                      const DenseMap<mlir::Value, IndexInfo> &map) {
   std::vector<FlowExpression> equations{};
   // annotate equations derived from operations
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
@@ -337,15 +339,17 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
           // mux : select input has same as output lambda, data inputs act like
           Value select = muxOp.getSelectOperand();
-          FlowVariable selectVar = ChannelLambda(select);
+          FlowVariable selectVar(ChannelLambda(select), map);
           equations.push_back(selectVar - entry);
-          if (selectVar.isPlusMinus()) {
+          if (selectVar.isIndex()) {
             auto dataOperands = muxOp.getDataOperands();
-            FlowVariable falseVar = ChannelLambda(dataOperands[0]);
-            FlowVariable trueVar = ChannelLambda(dataOperands[1]);
-            equations.push_back(selectVar.getPlus() - trueVar);
-            equations.push_back(selectVar.getMinus() - falseVar);
+            assert(selectVar.constraint->info.numValues == dataOperands.size());
+            for (auto [i, operand] : llvm::enumerate(dataOperands)) {
+              FlowVariable var(ChannelLambda(operand), map);
+              equations.push_back(selectVar.getConstrained(i) - var);
+            }
           } else {
+            assert(false && "muxOp select var should always be index");
             FlowExpression dataEq = -entry;
             for (auto operand : muxOp.getDataOperands()) {
               dataEq += FlowVariable(ChannelLambda(operand));
@@ -355,29 +359,38 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         } else {
           // merge : the sum of input lambdas is the output lambda
           FlowExpression mergeEq = -entry;
-          FlowExpression plusEq;
-          FlowExpression minusEq;
-          bool allPM = true;
-          bool nonePM = true;
+          std::vector<FlowExpression> constrainedEqs;
+          size_t indexValue;
+          bool foundIndexed = false;
+          bool foundUnindexed = false;
           auto channels = op.getOperands();
           for (auto channel : channels) {
-            FlowVariable ch = ChannelLambda(channel);
-            if (ch.isPlusMinus()) {
-              nonePM = false;
-              plusEq += ch.getPlus();
-              minusEq += ch.getMinus();
+            FlowVariable ch(ChannelLambda(channel), map);
+            if (ch.isIndex()) {
+              if (!foundIndexed) {
+                indexValue = ch.constraint->info.numValues;
+                constrainedEqs.resize(indexValue);
+              }
+              foundIndexed = true;
+              assert(indexValue == ch.constraint->info.numValues &&
+                     "found differing index");
+              for (size_t i = 0; i < indexValue; ++i) {
+                constrainedEqs[i] += ch.getConstrained(i);
+              }
             } else {
-              allPM = false;
+              foundUnindexed = true;
+              assert(foundIndexed == false);
               mergeEq += ch;
             }
           }
-          assert((allPM || nonePM) && "why are merge inputs not all the same?");
-          if (allPM) {
-            entry.pm = FlowVariable::plusAndMinus;
-            plusEq -= entry.getPlus();
-            minusEq -= entry.getMinus();
-            equations.push_back(plusEq);
-            equations.push_back(minusEq);
+          assert(!(foundIndexed && foundUnindexed) &&
+                 "some index channels and some normal channels");
+          if (foundIndexed) {
+            entry.constraint = IndexConstraint(IndexInfo(indexValue));
+            for (size_t i = 0; i < indexValue; ++i) {
+              constrainedEqs[i] -= entry.getConstrained(i);
+              equations.push_back(constrainedEqs[i]);
+            }
           } else {
             equations.push_back(mergeEq);
           }
@@ -388,12 +401,14 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         if (channels.size() == 1) {
           // Only 1 input channel
           auto channel = channels[0];
-          FlowVariable chVar = ChannelLambda(channel);
+          FlowVariable chVar(ChannelLambda(channel), map);
           // If input is +-, then intermediate channel is as well
-          entry.pm = chVar.pm;
-          if (chVar.isPlusMinus()) {
-            equations.push_back(chVar.getPlus() - entry.getPlus());
-            equations.push_back(chVar.getMinus() - entry.getMinus());
+          entry.constraint = chVar.constraint;
+          if (chVar.isIndex()) {
+            for (size_t i = 0; i < chVar.constraint->info.numValues; ++i) {
+              equations.push_back(chVar.getConstrained(i) -
+                                  entry.getConstrained(i));
+            }
           } else {
             equations.push_back(chVar - entry);
           }
@@ -408,9 +423,11 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
       if (auto arithOp = dyn_cast<handshake::ArithOpInterface>(op)) {
         // Arithmetic operations modify the channel - unless further analysis is
         // done, information about the bit is lost
-        exit = entry.nextInternal();
-        exit.pm = FlowVariable::PLUSMINUS::notApplicable;
-        equations.push_back(entry - exit);
+        if (entry.isIndex()) {
+          exit = entry.nextInternal();
+          exit.constraint.reset();
+          equations.push_back(entry - exit);
+        }
       }
 
       // Annotate latency-induced slots
@@ -422,15 +439,17 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
 
           FlowVariable before = exit;
           FlowVariable after = before.nextInternal();
-          if (before.isPlusMinus()) {
-            assert(after.isPlusMinus());
+          if (before.isIndex()) {
+            assert(after.isIndex());
             FlowVariable fullPM = full;
-            fullPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+            size_t numValues = before.constraint->info.numValues;
+            fullPM.constraint = IndexConstraint(numValues);
             equations.push_back(full - fullPM);
-            equations.push_back(before.getPlus() - fullPM.getPlus() -
-                                after.getPlus());
-            equations.push_back(before.getMinus() - fullPM.getMinus() -
-                                after.getMinus());
+            for (size_t i = 0; i < numValues; ++i) {
+              equations.push_back(before.getConstrained(i) -
+                                  fullPM.getConstrained(i) -
+                                  after.getConstrained(i));
+            }
           } else {
             equations.push_back(before - full - after);
           }
@@ -447,14 +466,17 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
 
           FlowVariable before = exit;
           FlowVariable after = before.nextInternal();
-          if (before.isPlusMinus()) {
-            assert(after.isPlusMinus());
+          if (before.isIndex()) {
+            assert(after.isIndex());
             FlowVariable fullPM = full;
-            fullPM.pm = FlowVariable::PLUSMINUS::plusAndMinus;
-            equations.push_back(before.getPlus() - fullPM.getPlus() -
-                                after.getPlus());
-            equations.push_back(before.getMinus() - fullPM.getMinus() -
-                                after.getMinus());
+            size_t numValues = before.constraint->info.numValues;
+            fullPM.constraint = IndexConstraint(numValues);
+            equations.push_back(full - fullPM);
+            for (size_t i = 0; i < numValues; ++i) {
+              equations.push_back(before.getConstrained(i) -
+                                  fullPM.getConstrained(i) -
+                                  after.getConstrained(i));
+            }
           } else {
             equations.push_back(before - full - after);
           }
@@ -462,6 +484,7 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
         }
       }
 
+      /*
       auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op);
       if (cmergeOp && op.getOpOperands().size() == 2) {
         auto sentStates = cmergeOp.getInternalSentStateNamers();
@@ -507,8 +530,8 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
                             sentPM.getMinus());
         equations.push_back(indexChannel.getPlus() + slotPM.getPlus() - inP -
                             sentPM.getPlus());
-      } else if (auto forkOp =
-                     dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+      } else */
+      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         // eagerfork: for every channel, either same tokens in as out, or in
         // `sent` state and in = out - 1
         for (auto [i, sentVariable] :
@@ -516,29 +539,37 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
           std::shared_ptr<InternalStateNamer> namer =
               std::make_shared<EagerForkSentNamer>(sentVariable);
           FlowVariable sent(namer);
-          FlowVariable result = ChannelLambda(op.getResults()[i]);
-          if (exit.isPlusMinus()) {
-            assert(result.isPlusMinus());
-            // FlowVariable sentPM = sent;
-            sent.pm = FlowVariable::PLUSMINUS::plusAndMinus;
+          FlowVariable result(ChannelLambda(op.getResults()[i]), map);
+          if (exit.isIndex()) {
+            assert(result.isIndex());
+            sent.constraint = IndexConstraint(exit.constraint->info.numValues);
             // equations.push_back(sent - sentPM);
-            equations.push_back(exit.getPlus() + sent.getPlus() -
-                                result.getPlus());
-            equations.push_back(exit.getMinus() + sent.getMinus() -
-                                result.getMinus());
+            for (size_t i = 0; i < exit.constraint->info.numValues; ++i) {
+              equations.push_back(exit.getConstrained(i) +
+                                  sent.getConstrained(i) -
+                                  result.getConstrained(i));
+            }
           } else {
             equations.push_back(exit + sent - result);
           }
         }
       } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
-        continue;
+        /*
+        FlowVariable trueVar(ChannelLambda(branchOp.getTrueResult()), map);
+        FlowVariable falseVar(ChannelLambda(branchOp.getFalseResult()), map);
+        assert(exit.isIndex() && exit.constraint->info.numValues == 2);
+        equations.push_back(falseVar - exit.getConstrained(0));
+        equations.push_back(falseVar - exit.getConstrained(1));
+        */
       } else {
         // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
-          FlowVariable result = ChannelLambda(channel);
-          if (exit.isPlusMinus() && result.isPlusMinus()) {
-            equations.push_back(exit.getPlus() - result.getPlus());
-            equations.push_back(exit.getMinus() - result.getMinus());
+          FlowVariable result(ChannelLambda(channel), map);
+          if (exit.isIndex() && result.isIndex()) {
+            for (size_t i = 0; i < exit.constraint->info.numValues; ++i) {
+              equations.push_back(exit.getConstrained(i) -
+                                  result.getConstrained(i));
+            }
           } else {
             equations.push_back(exit - result);
           }
@@ -550,10 +581,71 @@ std::vector<FlowExpression> extractLocalEquations(ModuleOp modOp) {
 }
 } // namespace dynamatic
 
+void annotateIndexChannels(llvm::DenseMap<mlir::Value, IndexInfo> &map,
+                           mlir::Value index, IndexInfo info) {
+  map.insert({index, info});
+
+  Operation *op = index.getDefiningOp();
+  if (!op)
+    return;
+
+  // Arithmetic ops can turn non-index into index, so stop following
+  if (isa<ArithOpInterface>(op))
+    return;
+
+  if (auto bufOp = dyn_cast<BufferOp>(op)) {
+    annotateIndexChannels(map, bufOp.getOperand(), info);
+    return;
+  }
+
+  if (auto forkOp = dyn_cast<ForkOp>(op)) {
+    annotateIndexChannels(map, forkOp.getOperand(), info);
+    return;
+  }
+
+  if (auto muxOp = dyn_cast<MuxOp>(op)) {
+    for (auto prevOp : muxOp.getDataOperands()) {
+      annotateIndexChannels(map, prevOp, info);
+    }
+    return;
+  }
+
+  if (auto mergeOp = dyn_cast<MergeOp>(op)) {
+    for (auto prevOp : mergeOp.getOperands()) {
+      annotateIndexChannels(map, prevOp, info);
+    }
+    return;
+  }
+}
+
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
+  llvm::DenseMap<mlir::Value, IndexInfo> map;
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (auto &op : funcOp.getOps()) {
+      mlir::Value index = nullptr;
+      std::optional<IndexInfo> info;
+      if (auto muxOp = dyn_cast<MuxOp>(op)) {
+        index = muxOp.getSelectOperand();
+        info = IndexInfo(muxOp.getDataOperands().size());
+      } else if (auto branchOp = dyn_cast<ConditionalBranchOp>(op)) {
+        index = branchOp.getConditionOperand();
+        info = IndexInfo(2);
+      }
+
+      if (index == nullptr) {
+        continue;
+      }
+      annotateIndexChannels(map, index, *info);
+    }
+  }
+
   // The equations are represented by a FlowExpression that is equal to zero
-  std::vector<FlowExpression> equations = extractLocalEquations(modOp);
+  std::vector<FlowExpression> equations = extractLocalEquations(modOp, map);
+
+  for (auto &expr : equations) {
+    expr.debug();
+  }
 
   // Map all variables used in `equations` to an index in the matrix
   FlowEquationsMatrix indices(equations);
@@ -578,7 +670,10 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     }
 
     FlowExpression expr = indices.getRowAsExpression(row);
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+    if (expr.terms.size() == 0) {
+      continue;
+    }
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::OPT);
     p.addEquation(expr);
     if (p.getEquations().size() > 0) {
       uid++;
@@ -591,10 +686,12 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
+#ifdef false
   if (failed(annotateAbsenceOfBackpressure(modOp)))
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
+#endif
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
