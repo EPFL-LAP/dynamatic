@@ -352,7 +352,6 @@ if should_run_cmake ; then
             -DDYNAMATIC_BUILD_LLVM=ON \
             -DLLVM_ENABLE_RTTI=ON \
             -DDYNAMATIC_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
-            -DBUILD_SHARED_LIBS=ON \
             -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
             -DCMAKE_EXPORT_COMPILE_COMMANDS="ON" \
             $CMAKE_COMPILERS \
