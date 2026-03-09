@@ -91,11 +91,11 @@ def build() -> None:
     logging.info("Build succeeded.")
 
 
-def run_kernel(kernel: str) -> tuple[str, int]:
+def run_kernel(kernel: str) -> tuple[str, str | None]:
     """
     Run the .dyn script for *kernel*, writing stdout/stderr directly to
     integration-test/{kernel}/out/dynamatic_{out,err}.txt, and return
-    (kernel, returncode).
+    (kernel, failure_reason).  failure_reason is None on success.
     """
     logging.info("Running kernel %s...", kernel)
     src = f"integration-test/{kernel}/{kernel}.c"
@@ -107,10 +107,10 @@ def run_kernel(kernel: str) -> tuple[str, int]:
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
 
-    with (
-        open(out_dir / "dynamatic_out.txt", "w") as out_f,
-        open(out_dir / "dynamatic_err.txt", "w") as err_f,
-    ):
+    out_path = out_dir / "dynamatic_out.txt"
+    err_path = out_dir / "dynamatic_err.txt"
+
+    with open(out_path, "w") as out_f, open(err_path, "w") as err_f:
         result = subprocess.run(
             ["bin/dynamatic"],
             input=script,
@@ -120,11 +120,32 @@ def run_kernel(kernel: str) -> tuple[str, int]:
             cwd=REPO_ROOT,
         )
 
-    if result.returncode == 0:
-        logging.info("[PASS] %s", kernel)
-    else:
-        logging.error("[FAIL] %s (exit code %d)", kernel, result.returncode)
-    return kernel, result.returncode
+    if result.returncode != 0:
+        reason = f"exit code {result.returncode}"
+        logging.error("[FAIL] %s (%s)", kernel, reason)
+        return kernel, reason
+
+    # Check stdout for FATAL messages
+    if "FATAL" in out_path.read_text(errors="replace"):
+        reason = "FATAL in stdout"
+        logging.error("[FAIL] %s (%s)", kernel, reason)
+        return kernel, reason
+
+    # Check simulation report
+    report_path = out_dir / "sim" / "report.txt"
+    if not report_path.exists():
+        reason = "sim/report.txt not found"
+        logging.error("[FAIL] %s (%s)", kernel, reason)
+        return kernel, reason
+
+    report_text = report_path.read_text(errors="replace")
+    if "C and VHDL outputs match" not in report_text:
+        reason = 'sim/report.txt missing "C and VHDL outputs match"'
+        logging.error("[FAIL] %s (%s)", kernel, reason)
+        return kernel, reason
+
+    logging.info("[PASS] %s", kernel)
+    return kernel, None
 
 
 def main() -> None:
@@ -163,16 +184,16 @@ def main() -> None:
     start_time = time.time()
 
     passed: list[str] = []
-    failed: list[tuple[str, int]] = []
+    failed: list[tuple[str, str | None]] = []
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
         futures = {executor.submit(run_kernel, k): k for k in KERNELS}
         for future in as_completed(futures):
-            kernel, returncode = future.result()
-            if returncode == 0:
+            kernel, failure_reason = future.result()
+            if failure_reason is None:
                 passed.append(kernel)
             else:
-                failed.append((kernel, returncode))
+                failed.append((kernel, failure_reason))
 
             if args.output_dir is not None:
                 src = REPO_ROOT / "integration-test" / kernel / "out"
@@ -195,7 +216,7 @@ def main() -> None:
     if failed:
         logging.error(
             "Failed kernels: %s",
-            ", ".join(f"{k} (rc={rc})" for k, rc in sorted(failed)),
+            ", ".join(f"{k} ({reason})" for k, reason in sorted(failed)),
         )
         sys.exit(1)
 
