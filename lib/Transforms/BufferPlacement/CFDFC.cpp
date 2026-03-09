@@ -153,7 +153,7 @@ static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
       succArchsConstr += var;
     model->addConstr(succArchsConstr == varBB, "out" + std::to_string(bb));
   }
-};
+}
 
 CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     : numExecs(numExec) {

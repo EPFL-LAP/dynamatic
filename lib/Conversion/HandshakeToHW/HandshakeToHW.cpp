@@ -331,7 +331,7 @@ void MemLoweringState::connectWithCircuit(ModuleBuilder &modBuilder) {
 
   numInputs = modBuilder.getNumInputs() - inputIdx;
   numOutputs = modBuilder.getNumOutputs() - outputIdx;
-};
+}
 
 SmallVector<hw::ModulePort>
 MemLoweringState::getMemInputPorts(hw::HWModuleOp modOp) {
@@ -357,7 +357,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {}
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -2025,7 +2025,7 @@ static hw::HWModuleOp createEmptyWrapperMod(
   Operation *outputOp = wrapperOp.getBodyBlock()->getTerminator();
   outputOp->setOperands(modOutputs);
   return wrapperOp;
-};
+}
 
 /// Creates a wrapper module made up of the hardware module that resulted from
 /// Handshake lowering and of memory converters sitting between the latter's

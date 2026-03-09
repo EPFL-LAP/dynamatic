@@ -146,7 +146,7 @@ std::string toBinaryString(int initialValue, unsigned int bitwidth) {
   std::string binaryString;
   to_string(intInBinary, binaryString);
   return binaryString;
-};
+}
 
 // Writes the Verilog signal declaration to ostream.
 // Examples:

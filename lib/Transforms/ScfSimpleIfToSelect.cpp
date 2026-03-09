@@ -121,7 +121,7 @@ Value ConvertIfToSelect::hoistSingleArithOp(scf::IfOp ifOp, Operation *arithOp,
       .create<arith::SelectOp>(ifOp->getLoc(), ifOp.getCondition(), trueVal,
                                falseVal)
       .getResult();
-};
+}
 
 Value ConvertIfToSelect::createSelectThenArithOp(
     scf::IfOp ifOp, Value trueVal, Value falseVal, StringRef arithOpName,
