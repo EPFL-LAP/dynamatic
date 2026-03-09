@@ -56,6 +56,7 @@ KERNELS = [
 # ──────────────────────────────────────────────────────────────────────────────
 DYN_SCRIPT = """\
 set-src {src}
+set-clock-period 5
 compile --buffer-algorithm fpga20
 write-hdl --hdl vhdl
 simulate
