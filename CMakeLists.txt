@@ -84,6 +84,7 @@ if (DYNAMATIC_BUILD_LLVM)
           llvm-project/llvm/include
           ${CMAKE_BINARY_DIR}/llvm-project/include
   )
+  set(LLVM_TOOLS_BINARY_DIR "${CMAKE_BINARY_DIR}/llvm-project/bin")
   set(MLIR_INCLUDE_DIRS
           llvm-project/mlir/include
           ${CMAKE_BINARY_DIR}/llvm-project/tools/mlir/include
