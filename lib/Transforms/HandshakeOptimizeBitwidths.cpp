@@ -390,13 +390,29 @@ static ExtWidth divWidth(ExtWidth lhs, ExtWidth _) {
 /// Transfer function for and operations or alike.
 static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
   ignoreCommutativity(lhs, rhs);
+  // Given two operands such as "a = 01, b = 101":
   // If both operands are zero-extended or not extended at all, then the
-  // effective bitwidth is whichever is smaller.
+  // effective bitwidth is whichever is smaller since 1) any bits beyond
+  // max(|a|, |b|) are guaranteed to be zero by definition and 2) the top
+  // abs(|a| - |b|) are guaranteed to be zero in the result too (through
+  // zero-extension of one operand and 0 being the destructive element of AND).
+  // From our example:
+  // Extending 'a' to 00001 and 'b' to 00101 yields the same result as if ANDing
+  // "a = 01, b = 01" and zero-extending the result.
   if (rhs.extType <= ExtType::LOGICAL)
     return {ExtType::LOGICAL, std::min(lhs.bitWidth, rhs.bitWidth)};
 
   // Sign-extension might fill with 1-bits, meaning all bits of the larger
   // operand are part of the effective result bitwidth.
+  // A sign-extension of the result is required to replicate the top bit.
+  // Specifically: For any bits beyond max(|a|, |b|), the newly added bits are
+  // replications of a[|a|-1] and b[|b|-1] respectively. It suffices to
+  // effectively AND these top bits once and replicate with a resulting
+  // sign-extension.
+  // For bits the bits inbetween |a| and |b|, sign-extension of the smaller
+  // operand is still required as the corresponding result bits are dependent
+  // on the sign of the smaller operand.
+  //
   // TODO: CONFLICT might be able to be optimized better but needs further
   // investigation. This case is conservatively correct.
   return {ExtType::ARITHMETIC, std::max(lhs.bitWidth, rhs.bitWidth)};
@@ -1693,7 +1709,7 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
   fwPatterns.add<ArithSingleType<handshake::DivUIOp>>(
       true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
   fwPatterns.add<ArithSingleType<handshake::DivSIOp>>(
-      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
+      true, divWidth</*zeroExtend=*/false>, ctx, getAnalysis<NameAnalysis>());
 
   fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx, getAnalysis<NameAnalysis>());
 }
