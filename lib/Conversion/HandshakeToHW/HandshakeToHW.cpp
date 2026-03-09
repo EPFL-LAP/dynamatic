@@ -759,6 +759,28 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
+      .Case<handshake::TaggerOp>([&](handshake::TaggerOp taggerOp) {
+          // Data bitwidth
+          addType("DATA_TYPE", taggerOp.getDataOperand());
+          addType("TAG_TYPE", taggerOp.getTagOperand());
+      })
+      .Case<handshake::UntaggerOp>([&](handshake::UntaggerOp untaggerOp) {
+          addType("DATA_TYPE", untaggerOp.getDataOperand());
+          addType("TAG_TYPE", untaggerOp.getTagOut());
+      })
+      .Case<handshake::FreeTagsFifoOp>([&](handshake::FreeTagsFifoOp fifo) {
+          // Tag bitwidth and fifo depth
+          addType("TAG_TYPE", fifo.getTagOut());
+          ChannelType ct =
+            dyn_cast_or_null<ChannelType>(fifo.getTagOut().getType());
+          if (!ct) {
+            op->emitError() << "FreeTagsFifoOp tag type must be an integer type";
+            unsupported = true;
+            return;
+          }
+          addUnsigned("FIFO_DEPTH",
+            fifo->getAttrOfType<IntegerAttr>("fifo_depth").getUInt());
+      })
       .Case<handshake::RAMOp>([&](handshake::RAMOp ramOp) {
         MemRefType resType = ramOp.getResult().getType();
         addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
@@ -2195,7 +2217,12 @@ public:
         ConvertToHWInstance<handshake::SpecSaveCommitOp>,
         ConvertToHWInstance<handshake::SpeculatorOp>,
         ConvertToHWInstance<handshake::SpeculatingBranchOp>,
-        ConvertToHWInstance<handshake::NonSpecOp>
+        ConvertToHWInstance<handshake::NonSpecOp>,
+        
+        // Out-of-order execution operations
+        ConvertToHWInstance<handshake::TaggerOp>,
+        ConvertToHWInstance<handshake::UntaggerOp>,
+        ConvertToHWInstance<handshake::FreeTagsFifoOp>
         // clang-format on
         >(typeConverter, funcOp->getContext());
 
