@@ -45,6 +45,24 @@ if(DYNAMATIC_CCACHE_BUILD)
     endif()
 endif()
 
+# Workaround for 'HandleLLVMArgs' and LLVM_PARALLEL_LINK_JOBS not being idempotent.
+# This causes it to be applied twice (once when adding LLVM as subdirectory and
+# once when included below) which generates an invalid Ninja file.
+set(DYNAMATIC_PARALLEL_LINK_JOBS "" CACHE STRING
+        "Define the maximum number of concurrent link jobs (Ninja only).")
+if(CMAKE_GENERATOR MATCHES "Ninja")
+  if(NOT DYNAMATIC_PARALLEL_LINK_JOBS AND uppercase_LLVM_ENABLE_LTO STREQUAL "THIN")
+    message(STATUS "ThinLTO provides its own parallel linking - limiting parallel link jobs to 2.")
+    set(DYNAMATIC_PARALLEL_LINK_JOBS "2")
+  endif()
+  if(DYNAMATIC_PARALLEL_LINK_JOBS)
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS link_job_pool=${DYNAMATIC_PARALLEL_LINK_JOBS})
+    set(CMAKE_JOB_POOL_LINK link_job_pool)
+  endif()
+elseif(DYNAMATIC_PARALLEL_LINK_JOBS)
+  message(WARNING "Job pooling is only available with Ninja generators.")
+endif()
+
 #-------------------------------------------------------------------------------
 # MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
@@ -102,18 +120,7 @@ include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
 include(AddClang)
-if (NOT DYNAMATIC_BUILD_LLVM)
-  # 'HandleLLVMOptions' does not currently handle being called twice.
-  # This occurs in a unified LLVM build due to LLVM's cmake itself including
-  # 'HandleLLVMOptions' as well as dynamatic.
-  # This should be fixed upstream!
-  include(HandleLLVMOptions)
-else ()
-  # Workaround 'LLVM_PLUGIN_EXT' only being set in 'HandleLLVMOptions' despite
-  # being used in 'AddLLVM.cmake'.
-  # This should be fixed upstream!
-  set(LLVM_PLUGIN_EXT ${CMAKE_SHARED_LIBRARY_SUFFIX})
-endif ()
+include(HandleLLVMOptions)
 include(FetchContent)
 
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
