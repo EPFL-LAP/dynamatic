@@ -233,6 +233,6 @@ private:
   /// passed through its port information.
   void fromPorts(FuncMemoryPorts &ports);
 };
-}; // namespace dynamatic
+} // namespace dynamatic
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_MEMORY_INTERFACES_H

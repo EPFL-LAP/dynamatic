@@ -29,7 +29,7 @@ static bool runSubprocess(const std::vector<std::string> &args,
   command << " 1>" << outputPath.string();
   std::cout << "[INFO] Running command: " << command.str().c_str() << std::endl;
   return std::system(command.str().c_str()) == 0;
-};
+}
 
 int runIntegrationTest(IntegrationTestData &config) {
   fs::path cSourcePath =
