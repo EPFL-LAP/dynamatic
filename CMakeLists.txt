@@ -55,7 +55,7 @@ if (DYNAMATIC_BUILD_LLVM)
   set(LLVM_TARGETS_TO_BUILD "host"  CACHE STRING "" FORCE)
   add_subdirectory(llvm-project/llvm "llvm-project" EXCLUDE_FROM_ALL)
 
-  set(LLVM_CMAKE_DIR "${CMAKE_BINARY_DIR}/llvm-project/lib/cmake/llvm")
+  set(LLVM_CMAKE_DIR "${PROJECT_SOURCE_DIR}/llvm-project/llvm/cmake/modules")
   list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
   set(MLIR_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/mlir")
   list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
@@ -102,7 +102,18 @@ include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
 include(AddClang)
-include(HandleLLVMOptions)
+if (NOT DYNAMATIC_BUILD_LLVM)
+  # 'HandleLLVMOptions' does not currently handle being called twice.
+  # This occurs in a unified LLVM build due to LLVM's cmake itself including
+  # 'HandleLLVMOptions' as well as dynamatic.
+  # This should be fixed upstream!
+  include(HandleLLVMOptions)
+else ()
+  # Workaround 'LLVM_PLUGIN_EXT' only being set in 'HandleLLVMOptions' despite
+  # being used in 'AddLLVM.cmake'.
+  # This should be fixed upstream!
+  set(LLVM_PLUGIN_EXT ${CMAKE_SHARED_LIBRARY_SUFFIX})
+endif ()
 include(FetchContent)
 
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
