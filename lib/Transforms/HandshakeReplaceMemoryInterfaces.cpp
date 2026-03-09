@@ -197,6 +197,30 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
     return failure();
   assert(newMCOp || newLSQOp && "no new interface instantiated");
 
+  // HACK: Isolate LSQ from dataflow circuit by forcing buffer instantiation at
+  // load data ports.
+  // Insert a ONE_SLOT_BREAK_DV buffer at each load data output port of the LSQ
+  // to break the combinational data/valid path from the LSQ to its consumers.
+  if (newLSQOp) {
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    builder.setInsertionPointAfter(newLSQOp);
+    LSQPorts lsqPorts = newLSQOp.getPorts();
+    for (LSQGroup group : lsqPorts.getGroups()) {
+      for (MemoryPort &port : group->accessPorts) {
+        auto *loadPort = dyn_cast<LoadPort>(&port);
+        if (!loadPort)
+          continue;
+        Value ldData = newLSQOp->getResult(loadPort->getDataOutputIndex());
+        auto bufOp = builder.create<handshake::BufferOp>(
+            newLSQOp.getLoc(), ldData, 1,
+            handshake::BufferType::ONE_SLOT_BREAK_DV);
+        inheritBB(loadPort->getLoadOp(), bufOp);
+        namer.setName(bufOp);
+        ldData.replaceAllUsesExcept(bufOp->getResult(0), bufOp);
+      }
+    }
+  }
+
   // The memory completiong signal needs to come from the new interfaces
   Value newMemEnd = newMCOp ? newMCOp.getMemEnd() : newLSQOp.getMemEnd();
   replaceMemCompletionSignal(masterIface, newMemEnd, builder);
