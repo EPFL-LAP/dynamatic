@@ -1709,7 +1709,7 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
   fwPatterns.add<ArithSingleType<handshake::DivUIOp>>(
       true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
   fwPatterns.add<ArithSingleType<handshake::DivSIOp>>(
-      true, divWidth</*zeroExtend=*/false>, ctx, getAnalysis<NameAnalysis>());
+      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
 
   fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx, getAnalysis<NameAnalysis>());
 }
