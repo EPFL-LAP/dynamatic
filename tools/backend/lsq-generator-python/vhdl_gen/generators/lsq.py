@@ -612,6 +612,13 @@ class LSQ:
         store_is_older_pcomp = LogicVecArray(
             ctx, 'store_is_older_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.numStqEntries)
 
+        # combinational signal indicating whether a load has already completed (assuming it is allocated), meaning the
+        # data (= read response) from memory has been received
+        load_completed = LogicArray(ctx, 'load_completed', 'w', self.configs.numLdqEntries)
+        # combinational signal indicating whether a store has already completed (assuming it is allocated), meaning the
+        # write response from memory has been received
+        store_completed = LogicArray(ctx, 'store_completed', 'w', self.configs.numStqEntries)
+
         if self.configs.pipeComp:
             ldq_alloc_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
             ldq_addr_valid_pcomp.regInit()
@@ -644,15 +651,34 @@ class LSQ:
                 arch += Op(ctx, (addr_same_pcomp, i, j), '\'1\'', 'when',
                            (ldq_addr, i), '=', (stq_addr, j), 'else', '\'0\'')
 
+        for i in range(self.configs.numLdqEntries):
+            # No need to use pipelined ldq_data_valid here: As soon as the load entry has valid data (in the queue
+            # itself, not the pipeline), the load is considered completed.
+            arch += Op(ctx, load_completed[i], ldq_data_valid[i])
+        for i in range(self.configs.numStqEntries):
+            if self.configs.stResp:
+                # No need to use pipelined stq_exec here: As soon as the store response has been received from memory,
+                # the store is considered completed.
+                arch += Op(ctx, store_completed[i], stq_exec[i])
+            else:
+                # If the store queue entry is not valid (anymore), the store has completed.
+                arch += Op(ctx, store_completed[i], 'not', stq_alloc[i])
+
         # A load conflicts with a store when:
         # 1. The store entry is valid, and
-        # 2. The store is older than the load, and
-        # 3. The address conflicts(same or invalid store address).
+        # 2. The store entry hasn't completed (received write response from memory), and
+        # 3. The store is older than the load, and
+        # 4. The address conflicts(same or invalid store address).
+        # NOTE: Because we only consider non-completed stores to conflict with a load, bypass will
+        # not forward from any stores which are already completed (but still allocated). However,
+        # such loads only exist if store responses or pipe0 are enabled, which is not the case by
+        # default.
         for i in range(0, self.configs.numLdqEntries):
             for j in range(0, self.configs.numStqEntries):
                 arch += Op(ctx,
                            (ld_st_conflict, i, j),
-                           (stq_alloc_pcomp, j),   'and',
+                           (stq_alloc_pcomp, j), 'and',
+                           'not', (store_completed, j), 'and',
                            (store_is_older_pcomp, i, j), 'and',
                            '(', (addr_same_pcomp, i,
                                  j), 'or', 'not', (stq_addr_valid_pcomp, j), ')'
@@ -771,13 +797,15 @@ class LSQ:
 
         # A store conflicts with a load when:
         # 1. The load entry is valid, and
-        # 2. The load is older than the store, and
-        # 3. The address conflicts(same or invalid store address).
+        # 2. The load entry hasn't completed (received data from memory), and
+        # 3. The load is older than the store, and
+        # 4. The address conflicts(same or invalid store address).
         # Index order are reversed for store matrix.
         for i in range(self.configs.numLdqEntries):
             arch += Op(ctx,
                        (st_ld_conflict_curr, i),
                        (ldq_alloc_pcomp, i), 'and',
+                       'not', (load_completed, i), 'and',
                        'not', MuxIndex(
                            store_is_older_pcomp[i], stq_issue), 'and',
                        '(', MuxIndex(
@@ -789,6 +817,7 @@ class LSQ:
                 arch += Op(ctx,
                            (st_ld_conflict_next, i),
                            (ldq_alloc_pcomp, i), 'and',
+                           'not', (load_completed, i), 'and',
                            'not', MuxIndex(
                                store_is_older_pcomp[i], stq_issue_next), 'and',
                            '(', MuxIndex(
