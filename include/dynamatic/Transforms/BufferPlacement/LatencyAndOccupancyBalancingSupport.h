@@ -187,6 +187,12 @@ public:
   // inputs to be active at the same time. Unlike: ControlMergeOp and MergeOp.
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(nodes[nodeId].op)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+        return true;
+    }
+
     return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
                handshake::ConditionalBranchOp>(nodes[nodeId].op);
   }
@@ -312,6 +318,12 @@ public:
 
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(nodes[nodeId].op)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+        return true;
+    }
+
     return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
                handshake::ConditionalBranchOp>(nodes[nodeId].op);
   }
