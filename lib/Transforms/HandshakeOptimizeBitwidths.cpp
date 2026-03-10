@@ -355,27 +355,72 @@ static void modArithOp(Op op, ExtValue lhs, ExtValue rhs, unsigned optWidth,
 // Transfer functions for arith operations
 //===----------------------------------------------------------------------===//
 
+namespace {
+/// Convenience type that carries both an extension type and a bitWidth.
+struct ExtWidth {
+  ExtType extType{};
+  unsigned bitWidth{};
+};
+} // namespace
+
+/// If needed, swaps the operands such that 'rhs' contains the larger extension
+/// type.
+/// This allows eliminating symmetrical cases in commutative operations.
+static void ignoreCommutativity(ExtWidth &lhs, ExtWidth &rhs) {
+  if (lhs.extType > rhs.extType)
+    std::swap(lhs, rhs);
+}
+
 /// Transfer function for add/sub operations or alike.
-static inline unsigned addWidth(unsigned lhs, unsigned rhs) {
-  return std::max(lhs, rhs) + 1;
+static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
+  return {ExtType::UNKNOWN, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 }
 
 /// Transfer function for mul operations or alike.
-static inline unsigned mulWidth(unsigned lhs, unsigned rhs) {
-  return lhs + rhs;
+static ExtWidth mulWidth(ExtWidth lhs, ExtWidth rhs) {
+  return {ExtType::UNKNOWN, lhs.bitWidth + rhs.bitWidth};
 }
 
 /// Transfer function for div/rem operations or alike.
-static inline unsigned divWidth(unsigned lhs, unsigned _) { return lhs + 1; }
+template <bool zeroExtend>
+static ExtWidth divWidth(ExtWidth lhs, ExtWidth _) {
+  return {zeroExtend ? ExtType::LOGICAL : ExtType::UNKNOWN, lhs.bitWidth + 1};
+}
 
 /// Transfer function for and operations or alike.
-static inline unsigned andWidth(unsigned lhs, unsigned rhs) {
-  return std::min(lhs, rhs);
+static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
+  ignoreCommutativity(lhs, rhs);
+  // Given two operands such as "a = 01, b = 101":
+  // If both operands are zero-extended or not extended at all, then the
+  // effective bitwidth is whichever is smaller since 1) any bits beyond
+  // max(|a|, |b|) are guaranteed to be zero by definition and 2) the top
+  // abs(|a| - |b|) are guaranteed to be zero in the result too (through
+  // zero-extension of one operand and 0 being the destructive element of AND).
+  // From our example:
+  // Extending 'a' to 00001 and 'b' to 00101 yields the same result as if ANDing
+  // "a = 01, b = 01" and zero-extending the result.
+  if (rhs.extType <= ExtType::LOGICAL)
+    return {ExtType::LOGICAL, std::min(lhs.bitWidth, rhs.bitWidth)};
+
+  // Sign-extension might fill with 1-bits, meaning all bits of the larger
+  // operand are part of the effective result bitwidth.
+  // A sign-extension of the result is required to replicate the top bit.
+  // Specifically: For any bits beyond max(|a|, |b|), the newly added bits are
+  // replications of a[|a|-1] and b[|b|-1] respectively. It suffices to
+  // effectively AND these top bits once and replicate with a resulting
+  // sign-extension.
+  // For bits the bits inbetween |a| and |b|, sign-extension of the smaller
+  // operand is still required as the corresponding result bits are dependent
+  // on the sign of the smaller operand.
+  //
+  // TODO: CONFLICT might be able to be optimized better but needs further
+  // investigation. This case is conservatively correct.
+  return {ExtType::ARITHMETIC, std::max(lhs.bitWidth, rhs.bitWidth)};
 }
 
 /// Transfer function for or/xor operations or alike.
-static inline unsigned orWidth(unsigned lhs, unsigned rhs) {
-  return std::max(lhs, rhs);
+static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
+  return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth)};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1010,7 +1055,7 @@ namespace {
 /// Transfer function type for arithmetic operations with two operands and a
 /// single result of the same type. Returns the result bitwidth required to
 /// achieve the operation behavior given the two operands' respective bitwidths.
-using FTransfer = std::function<unsigned(unsigned, unsigned)>;
+using FTransfer = std::function<ExtWidth(ExtWidth, ExtWidth)>;
 
 /// Generic rewrite pattern for arith operations that have two operands and a
 /// single result, all of the same type. The first template parameter is meant
@@ -1041,27 +1086,22 @@ struct ArithSingleType : public OpRewritePattern<Op> {
     ExtType extLhs = ExtType::UNKNOWN, extRhs = ExtType::UNKNOWN;
     ChannelVal minLhs = getMinimalValue(op.getLhs(), &extLhs);
     ChannelVal minRhs = getMinimalValue(op.getRhs(), &extRhs);
-    unsigned optWidth;
+    ExtWidth optWidth;
     if (forward)
-      optWidth = fTransfer(minLhs.getType().getDataBitWidth(),
-                           minRhs.getType().getDataBitWidth());
-    else
-      optWidth = getUsefulResultWidth(op.getResult());
+      optWidth = fTransfer({extLhs, minLhs.getType().getDataBitWidth()},
+                           {extRhs, minRhs.getType().getDataBitWidth()});
+    else {
+      // It does not matter whether we use sign- or zero-extension in this case
+      // since the bits added by the extension are unused by definition.
+      // We use zero-extension as it is cheaper and easier to optimize.
+      optWidth = {ExtType::LOGICAL, getUsefulResultWidth(op.getResult())};
+    }
     unsigned resWidth = channelVal.getType().getDataBitWidth();
-    if (optWidth >= resWidth)
+    if (optWidth.bitWidth >= resWidth)
       return failure();
 
-    // Result extension is always logical for bitwise logical operations and
-    // explicitly unsigned operations, othweise it is determined byt the
-    // result's type
-    ExtType extRes = ExtType::UNKNOWN;
-    if (isa<handshake::AndIOp, handshake::OrIOp, handshake::XOrIOp,
-            handshake::DivUIOp>((Operation *)op))
-      extRes = ExtType::LOGICAL;
-    else
-      extRes = ExtType::UNKNOWN;
-    modArithOp(op, {minLhs, extLhs}, {minRhs, extRhs}, optWidth, extRes,
-               rewriter, namer);
+    modArithOp(op, {minLhs, extLhs}, {minRhs, extRhs}, optWidth.bitWidth,
+               optWidth.extType, rewriter, namer);
     return success();
   }
 
@@ -1666,9 +1706,10 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
   // arith operations
   addArithPatterns(fwPatterns, true);
 
-  fwPatterns.add<ArithSingleType<handshake::DivUIOp>,
-                 ArithSingleType<handshake::DivSIOp>>(
-      true, divWidth, ctx, getAnalysis<NameAnalysis>());
+  fwPatterns.add<ArithSingleType<handshake::DivUIOp>>(
+      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
+  fwPatterns.add<ArithSingleType<handshake::DivSIOp>>(
+      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
 
   fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx, getAnalysis<NameAnalysis>());
 }
