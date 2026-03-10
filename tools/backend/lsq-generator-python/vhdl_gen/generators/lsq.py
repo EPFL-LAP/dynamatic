@@ -875,7 +875,6 @@ class LSQ:
         for i in range(self.configs.numStqEntries):
             arch += Op(ctx, store_req_valid_arr[i], stq_alloc_pcomp[i], 'and', stq_addr_valid_pcomp[i], 'and', stq_data_valid_pcomp[i])
 
-        store_conflict = Logic(ctx, 'store_conflict', 'w')
         store_req_valid_p0 = Logic(ctx, 'store_req_valid_p0', pipe0_type)
         st_ld_conflict_p0 = LogicVec(ctx, 'st_ld_conflict_p0', pipe0_type, self.configs.numLdqEntries)
         if self.configs.pipe0:
