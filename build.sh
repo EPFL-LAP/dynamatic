@@ -361,7 +361,7 @@ if should_run_cmake ; then
             $CMAKE_DYNAMATIC_ENABLE_CBC \
             $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
 
-    LLVM_DIR=$(pwd)/llvm-project/bin
+    LLVM_DIR="../build/llvm-project/bin"
   else
     cmake -G Ninja .. \
         -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
