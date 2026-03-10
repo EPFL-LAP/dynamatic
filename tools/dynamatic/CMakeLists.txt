@@ -11,7 +11,7 @@ add_llvm_tool(dynamatic
   # Required by simulate.sh
   hls-verifier
   # Required by write-hdl.sh
-  export-rtl
+  export-rtl rtl-constant-generator-verilog rtl-cmpi-generator rtl-cmpf-generator rtl-text-generator
 )
 
 llvm_update_compile_flags(dynamatic)
