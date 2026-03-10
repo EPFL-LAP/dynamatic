@@ -373,7 +373,11 @@ static void ignoreCommutativity(ExtWidth &lhs, ExtWidth &rhs) {
 
 /// Transfer function for add/sub operations or alike.
 static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
-  return {ExtType::UNKNOWN, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+  ignoreCommutativity(lhs, rhs);
+  if (rhs.extType <= ExtType::LOGICAL)
+    return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+
+  return {ExtType::ARITHMETIC, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 }
 
 /// Transfer function for mul operations or alike.
