@@ -134,6 +134,6 @@ class Configs:
             assert not self.bypass, "Fallback issue is not compatible with bypassing."
         if self.fallbackIssueLoad:
             # TODO: To properly support multiple load channels, we need to ensure that the fallback load is not
-            # duplicated a load # issued by another load channel in the same cycle. Multiple load channels are not
+            # duplicated a load issued by another load channel in the same cycle. Multiple load channels are not
             # currently used by Dynamatic, so this is left as future work.
-            assert self.numLdMem == 1, "Fallback issue is only supported for single load port configuration."
+            assert self.numLdMem == 1, "Fallback issue is only supported for single load channel configuration."
