@@ -1941,7 +1941,7 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
 /// index inside the `circuitBackedges` vector.
 static hw::HWModuleOp createEmptyWrapperMod(
     hw::HWModuleOp circuitOp, LoweringState &state, OpBuilder &builder,
-    DenseMap<const MemLoweringState *, ConverterBuilder> &memConverters,
+    llvm::MapVector<const MemLoweringState *, ConverterBuilder> &memConverters,
     SmallVector<std::pair<size_t, Backedge>> &circuitBackedges) {
 
   ModuleLoweringState &modState = state.modState[circuitOp];
@@ -2034,7 +2034,7 @@ static hw::HWModuleOp createEmptyWrapperMod(
 static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
                           OpBuilder &builder) {
 
-  DenseMap<const MemLoweringState *, ConverterBuilder> memConverters;
+  llvm::MapVector<const MemLoweringState *, ConverterBuilder> memConverters;
   SmallVector<std::pair<size_t, Backedge>> circuitBackedges;
   hw::HWModuleOp wrapperOp = createEmptyWrapperMod(
       circuitOp, state, builder, memConverters, circuitBackedges);
