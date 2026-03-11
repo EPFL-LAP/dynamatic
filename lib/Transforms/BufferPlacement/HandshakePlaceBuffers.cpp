@@ -23,8 +23,8 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
@@ -47,7 +47,7 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    FPGA24("fpga24"), COST_AWARE("costaware"), MAPBUF("mapbuf");
+    COST_AWARE("costaware"), MAPBUF("mapbuf"), FPGA24("fpga24");
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
@@ -159,25 +159,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
   if (!nameAnalysis.isAnalysisValid())
     return signalPassFailure();
-
-  // Map algorithms to the function to call to execute them
-  llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
-      allAlgorithms;
-  allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
-  allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[FPGA24] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[COST_AWARE] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
-
-  // Check that the algorithm exists
-  if (!allAlgorithms.contains(algorithm)) {
-    llvm::errs() << "Unknown algorithm '" << algorithm
-                 << "', possible choices are:\n";
-    for (auto &algo : allAlgorithms)
-      llvm::errs() << "\t- " << algo.first << "\n";
-    return signalPassFailure();
-  }
 
   // Make sure all operations are named (used to generate unique MILP variable
   // names).
@@ -532,22 +513,8 @@ static void logCFDFCUnions(FuncInfo &info,
   }
 }
 
-/// Wraps a call to solveMILP and conditionally passes the logger and MILP name
-/// to the MILP's constructor as last arguments if the logger is not null.
-template <typename MILP, typename... Args>
-static inline LogicalResult
-checkLoggerAndSolve(Logger *logger, StringRef milpName,
-                    BufferPlacement &placement, Args &&... args) {
-  if (logger) {
-    return solveMILP<MILP>(placement, std::forward<Args>(args)..., *logger,
-                           milpName);
-  }
-  return solveMILP<MILP>(placement, std::forward<Args>(args)...);
-}
-
-LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
-    FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
-    BufferPlacement &placement) {
+LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
+    FuncInfo &info, TimingDatabase &timingDB, BufferPlacement &placement) {
 
   LLVM_DEBUG(llvm::errs() << "\n";
              llvm::errs() << "# =========================== #\n";
