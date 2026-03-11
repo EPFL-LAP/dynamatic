@@ -183,47 +183,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  // run the delay selection logic again, writing it to the IR for processing in
-  // the backend
-  // In order tp avoid interleaving this IR writing with the value extraction,
-  // we keep it seperate. this does mean redudant logic, but the Database
-  // parsing is not a performance bottleneck, so this should be acceptable.
-  // TODO : this should go into a bespoke function
-
-  TimingDatabase timingDB;
-  if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
-    llvm::errs() << "=== TimindDB read failed ===\n";
-  modOp.walk([&](mlir::Operation *op) {
-    if (auto fpuImplInterface =
-            llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
-      double delay;
-
-      if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
-                                                         delay, targetCP))) {
-
-        std::string delayStr = std::to_string(delay);
-        std::replace(delayStr.begin(), delayStr.end(), '.', '_');
-        fpuImplInterface.setInternalDelay(delayStr);
-      } else {
-        op->emitError("Failed to get internal delay from timing model");
-        return signalPassFailure();
-      }
-    }
-    if (auto latencyInterface =
-            llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
-      double latency;
-      if (!failed(
-              timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
-
-        int64_t latencyInt = static_cast<int64_t>(latency);
-        latencyInterface.setLatency(latencyInt);
-      } else {
-        op->emitError("Failed to get latency from timing model");
-        return signalPassFailure();
-      }
-    }
-  });
-
   // Make sure all operation names are unique and haven't changed from what is
   // cached. Also name operations that do not currently have a name (unless
   // instructed otherwise)
