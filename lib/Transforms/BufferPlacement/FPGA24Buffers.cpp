@@ -178,8 +178,9 @@ LatencyBalancingMILP::LatencyBalancingMILP(
     const SynchronizingCyclesFinderGraph &syncGraph, ArrayRef<CFDFC *> cfdfcs)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
                           targetPeriod),
-      reconvergentPaths(reconvergentPaths), syncCyclePairs(syncCyclePairs),
-      syncGraph(syncGraph), cfdfcs(cfdfcs) {
+      reconvergentPaths(reconvergentPaths.begin(), reconvergentPaths.end()),
+      syncCyclePairs(syncCyclePairs.begin(), syncCyclePairs.end()),
+      syncGraph(syncGraph), cfdfcs(cfdfcs.begin(), cfdfcs.end()) {
   setup();
 }
 
@@ -765,8 +766,9 @@ OccupancyBalancingLP::OccupancyBalancingLP(
     ArrayRef<CFDFC *> cfdfcs)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
                           targetPeriod),
-      latencyResult(latencyResult), reconvergentPaths(reconvergentPaths),
-      cfdfcs(cfdfcs) {
+      latencyResult(latencyResult),
+      reconvergentPaths(reconvergentPaths.begin(), reconvergentPaths.end()),
+      cfdfcs(cfdfcs.begin(), cfdfcs.end()) {
   setup();
 }
 

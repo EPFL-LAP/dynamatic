@@ -31,6 +31,7 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include <vector>
 
 namespace dynamatic {
 namespace buffer {
@@ -79,14 +80,14 @@ protected:
   void extractResult(BufferPlacement &placement) override;
 
 private:
-  ArrayRef<ReconvergentPathWithGraph> reconvergentPaths;
-  ArrayRef<SynchronizingCyclePair> syncCyclePairs;
+  std::vector<ReconvergentPathWithGraph> reconvergentPaths;
+  std::vector<SynchronizingCyclePair> syncCyclePairs;
 
   /// Reference to synchronizing cycles graph.
   const SynchronizingCyclesFinderGraph &syncGraph;
 
   /// CFDFCs needed for cylce constraints.
-  ArrayRef<CFDFC *> cfdfcs;
+  std::vector<CFDFC *> cfdfcs;
 
   /// Computed minimum feasible Initiation Interval across all CFDFCs (set by
   /// addCycleTimeConstraints).
@@ -133,8 +134,8 @@ public:
 private:
   const LatencyBalancingResult &latencyResult;
 
-  ArrayRef<ReconvergentPathWithGraph> reconvergentPaths;
-  ArrayRef<CFDFC *> cfdfcs;
+  std::vector<ReconvergentPathWithGraph> reconvergentPaths;
+  std::vector<CFDFC *> cfdfcs;
 
   DenseMap<Value, CPVar> channelOccupancy;
 
