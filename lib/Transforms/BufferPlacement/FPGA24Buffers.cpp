@@ -342,8 +342,8 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
     const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     CPVar &patternImbalanced = vars.reconvergentPathVars[pathIdx].imbalanced;
 
-    /// [START Handle pattern with variable latency (mark them as always imbalanced)]
-    /// Check if any unit in the path has variable latency.
+    /// [START Handle pattern with variable latency (mark them as always
+    /// imbalanced)] Check if any unit in the path has variable latency.
     bool hasVarLatency = false;
     for (NodeIdType nodeId : path.nodeIds) {
       Operation *op = graph->nodes[nodeId].op;
@@ -361,8 +361,8 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
                        "varLatency_rp_" + std::to_string(pathIdx));
       continue;
     }
-    /// [END Handle pattern with variable latency (mark them as always imbalanced)]
-
+    /// [END Handle pattern with variable latency (mark them as always
+    /// imbalanced)]
 
     /// Enumerate all simple paths from fork to join
     NodeIdType forkId = path.forkNodeId;
@@ -518,8 +518,8 @@ void LatencyBalancingMILP::addStallPropagationConstraints() {
       for (EdgeIdType edgeId : graph->adjList[nodeId]) {
         const auto &edge = graph->edges[edgeId];
         if (path.nodeIds.count(edge.dstId)) {
-          addPatternToChannelStallProp(edge.channel,
-                                       &vars.reconvergentPathVars[i].imbalanced);
+          addPatternToChannelStallProp(
+              edge.channel, &vars.reconvergentPathVars[i].imbalanced);
         }
       }
     }

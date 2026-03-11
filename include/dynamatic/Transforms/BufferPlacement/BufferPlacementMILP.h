@@ -90,7 +90,8 @@ struct ChannelVars {
   CPVar maxOccupancy;
 };
 
-/// [FPGA24] Holds all variables associated to a synchronization pattern. (e.g. reconvergent paths)
+/// [FPGA24] Holds all variables associated to a synchronization pattern. (e.g.
+/// reconvergent paths)
 struct SynchronizationPatternVars {
   /// Whether the synchronization pattern is imbalanced (binary).
   CPVar imbalanced;
