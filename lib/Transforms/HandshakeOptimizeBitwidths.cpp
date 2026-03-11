@@ -429,10 +429,16 @@ static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
     return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth)};
   // rhs guaranteed to be at least arithmetic from here on.
 
-  // If lhs is zero-extended and the larger bitwidth, we need to add one extra
-  // bit such that sign-extending the output doesn't quasi "sign-extend" the top
-  // bit of lhs.
-  // We must sign-extend the result for the case that rhs was extended with 1s.
+  // Since rhs was sign-extended the result to continue extending with 1s in the
+  // case rhs extends with 1s.
+  // However, if lhs is zero-extended and the larger bitwidth, we need to add
+  // one extra bit to the result such the result isn't sign-extended using the
+  // sign-bit of lhs.
+  // Example: lhs = zext(101) to i32, rhs = sext(01) to i32.
+  // We must perform the OR using 3 bits at the very least. Performing it
+  // with 3 bits would be wrong however, since sext(OR 101, sext(01) to i3)
+  // would extend with 1s, merely due to the bitwidth reduction.
+  // The extra bit prevents this behavior.
   if (lhs.extType == ExtType::LOGICAL && lhs.bitWidth > rhs.bitWidth)
     return {ExtType::ARITHMETIC, 1 + lhs.bitWidth};
 
