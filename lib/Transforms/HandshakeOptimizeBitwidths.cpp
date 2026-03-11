@@ -366,14 +366,22 @@ struct ExtWidth {
 /// If needed, swaps the operands such that 'rhs' contains the larger extension
 /// type.
 /// This allows eliminating symmetrical cases in commutative operations.
-static void ignoreCommutativity(ExtWidth &lhs, ExtWidth &rhs) {
+/// Users are allowed to assume that 'rhs.extType >= lhs.extType'.
+/// The cases that need to be handled are then only:
+/// * NONE, NONE
+/// * NONE, LOGICAL
+/// * NONE, ARITHMETIC
+/// * LOGICAL, LOGICAL
+/// * LOGICAL, ARITHMETIC
+/// * ARITHMETIC, ARITHMETIC
+static void canonicalizeCommutativeExtensionType(ExtWidth &lhs, ExtWidth &rhs) {
   if (lhs.extType > rhs.extType)
     std::swap(lhs, rhs);
 }
 
 /// Transfer function for add/sub operations or alike.
 static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
-  ignoreCommutativity(lhs, rhs);
+  canonicalizeCommutativeExtensionType(lhs, rhs);
   if (rhs.extType <= ExtType::LOGICAL)
     return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 
@@ -393,7 +401,7 @@ static ExtWidth divWidth(ExtWidth lhs, ExtWidth _) {
 
 /// Transfer function for and operations or alike.
 static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
-  ignoreCommutativity(lhs, rhs);
+  canonicalizeCommutativeExtensionType(lhs, rhs);
   // Given two operands such as "a = 01, b = 101":
   // If both operands are zero-extended or not extended at all, then the
   // effective bitwidth is whichever is smaller since 1) any bits beyond
@@ -424,7 +432,7 @@ static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
 
 /// Transfer function for or/xor operations or alike.
 static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
-  ignoreCommutativity(lhs, rhs);
+  canonicalizeCommutativeExtensionType(lhs, rhs);
   if (rhs.extType <= ExtType::LOGICAL)
     return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth)};
   // rhs guaranteed to be at least arithmetic from here on.
