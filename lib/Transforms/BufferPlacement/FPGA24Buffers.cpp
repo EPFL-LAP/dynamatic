@@ -543,6 +543,9 @@ void LatencyBalancingMILP::addSyncCycleConstraints() {
 /// (Paper: Section 4, Equation 4)
 void LatencyBalancingMILP::addStallPropagationConstraints() {
   DenseMap<Value, SmallVector<CPVar *>> channelToPatterns;
+  auto addPatternToChannelStallProp = [&](Value channel, CPVar *imbalanced) {
+    channelToPatterns[channel].push_back(imbalanced);
+  };
 
   /// From reconvergent paths:
   for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
@@ -553,8 +556,8 @@ void LatencyBalancingMILP::addStallPropagationConstraints() {
       for (EdgeIdType edgeId : graph->adjList[nodeId]) {
         const auto &edge = graph->edges[edgeId];
         if (path.nodeIds.count(edge.dstId)) {
-          channelToPatterns[edge.channel].push_back(
-              &vars.reconvergentPathVars[i].imbalanced);
+          addPatternToChannelStallProp(edge.channel,
+                                       &vars.reconvergentPathVars[i].imbalanced);
         }
       }
     }
@@ -565,12 +568,12 @@ void LatencyBalancingMILP::addStallPropagationConstraints() {
     const auto &pair = syncCyclePairs[i];
     for (const auto &edgeInfo : pair.edgesToJoins) {
       for (EdgeIdType edgeId : edgeInfo.edgesFromCycleOne) {
-        channelToPatterns[syncGraph.edges[edgeId].channel].push_back(
-            &vars.syncCycleVars[i].imbalanced);
+        addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
+                                     &vars.syncCycleVars[i].imbalanced);
       }
       for (EdgeIdType edgeId : edgeInfo.edgesFromCycleTwo) {
-        channelToPatterns[syncGraph.edges[edgeId].channel].push_back(
-            &vars.syncCycleVars[i].imbalanced);
+        addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
+                                     &vars.syncCycleVars[i].imbalanced);
       }
     }
   }
