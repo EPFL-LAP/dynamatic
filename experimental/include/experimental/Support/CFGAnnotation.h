@@ -114,8 +114,8 @@ LogicalResult flattenFunction(handshake::FuncOp &funcOp);
 /// block from which the operation originates in the std-level IR.
 void markBasicBlocks(handshake::FuncOp &funcOp, PatternRewriter &rewriter);
 
-}; // namespace cfg
-}; // namespace experimental
-}; // namespace dynamatic
+} // namespace cfg
+} // namespace experimental
+} // namespace dynamatic
 
 #endif // DYNAMATIC_SUPPORT_FTD_SUPPORT_H

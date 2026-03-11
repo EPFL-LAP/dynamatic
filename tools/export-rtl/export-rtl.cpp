@@ -611,7 +611,7 @@ void WriteModData::writeProperties(PropertyWriter writeProperty) {
   for (auto const &[id, property] : properties) {
     writeProperty(id, property.first, property.second, os);
   }
-};
+}
 
 RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
   auto addValidAndReady = [&](StringRef portName, std::vector<IOPort> &down,

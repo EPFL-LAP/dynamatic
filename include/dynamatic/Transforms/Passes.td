@@ -307,19 +307,26 @@ def CreditBasedSharing : Pass<"credit-based-sharing"> {
   let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
-def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
-  let summary = "Sets the floating point arithmetic unit 'vendor'.";
+def HandshakeSetUnitImplAttributes : Pass<
+  "handshake-set-unit-impl-attr",
+  "handshake::FuncOp"
+> {
+  let summary = "Sets the unit attributes needed for the unit generators of the backend";
   let description = [{
-    This pass takes a single floating point unit 'vendor' as input and
-    marks every floating point arithmetic operation. This is later used
-    to decide how to generate the RTL of these units.
-    Defaults to vivado.
+    Sets the following attributes:
+    - the floating-point arithmetic unit 'vendor'. 
+    - the internal delays of the floating point units.
+    - the latencies of the pipeline units.
   }];
   let options = [
-    Option<"impl", "impl", "::std::string",
-      "\"VIVADO\"",
-      "Which FPU impl to use.">
+    Option<"impl", "impl", "::std::string", "\"VIVADO\"", "Which FPU impl to use.">,
+    Option<"timingModels", "timing-models", "std::string", "",
+    "Path to JSON-formatted file containing timing models for dataflow "
+    "components.">,
+    Option<"targetCP", "target-period", "double", "4.0",
+    "Target clock period for the buffer placement CFDFC">
   ];
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//

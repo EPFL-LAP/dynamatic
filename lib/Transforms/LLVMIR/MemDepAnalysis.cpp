@@ -225,7 +225,7 @@ std::optional<int64_t> getDistance(Dependence *d) {
       llvm::errs() << "Conservatively choose a value based on BB ordering!";);
   LLVM_DEBUG(d->dump(llvm::errs()););
   return std::nullopt;
-};
+}
 
 } // namespace
 

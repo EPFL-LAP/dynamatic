@@ -410,4 +410,4 @@ struct HandshakeCombineSteeringLogicPass
       return signalPassFailure();
   };
 };
-}; // namespace
+} // namespace
