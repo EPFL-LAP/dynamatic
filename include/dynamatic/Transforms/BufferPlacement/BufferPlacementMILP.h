@@ -55,7 +55,7 @@ struct UnitVars {
   /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
   /// input if the latter is combinational (real).
   CPVar retOut;
-  /// Occupancy contribution of this unit (real).
+  /// [FPGA24] Occupancy contribution of this unit (real).
   CPVar occupancy;
 };
 
@@ -82,14 +82,15 @@ struct ChannelVars {
   /// Usage of a shift register on the channel (binary).
   CPVar shiftReg;
 
-  /// Extra latency to insert on this channel for balancing (integer).
+  /// [FPGA24] Extra latency to insert on this channel for balancing (integer).
   CPVar extraLatency;
-  /// Whether the channel is stalled due to pattern imbalance (binary).
+  /// [FPGA24] Whether the channel is stalled due to pattern imbalance (binary).
   CPVar stalled;
-  /// Maximum token occupancy for this channel (real).
+  /// [FPGA24] Maximum token occupancy for this channel (real).
   CPVar maxOccupancy;
 };
 
+/// [FPGA24] Holds all variables associated to a synchronization pattern. (e.g. reconvergent paths)
 struct SynchronizationPatternVars {
   /// Whether the synchronization pattern is imbalanced (binary).
   CPVar imbalanced;
@@ -115,9 +116,9 @@ struct MILPVars {
   llvm::MapVector<CFDFC *, CFDFCVars> cfdfcVars;
   /// Mapping between channels and their related variables.
   llvm::MapVector<Value, ChannelVars> channelVars;
-  /// Balancing variables for reconvergent paths.
+  /// [FPGA24] Balancing variables for reconvergent paths.
   SmallVector<SynchronizationPatternVars> reconvergentPathVars;
-  /// Balancing variables for synchronizing cycles.
+  /// [FPGA24] Balancing variables for synchronizing cycles.
   SmallVector<SynchronizationPatternVars> syncCycleVars;
   /// List of units in the function.
   llvm::MapVector<Operation *, UnitVars> unitVars;
