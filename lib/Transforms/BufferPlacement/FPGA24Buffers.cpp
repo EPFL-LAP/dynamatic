@@ -404,12 +404,6 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
       pathBaseLatencies.push_back(baseLatency);
     }
 
-    /// Add imbalance constraints for each pair of paths:
-    /// |L_i - L_j| <= M * s_p.
-    /// Which translates to:
-    ///   L_i - L_j <= M * s_p.
-    ///   L_j - L_i <= M * s_p.
-    /// (Paper: Section 4, Equation 2)
     if (pathBaseLatencies.empty())
       continue;
 
@@ -418,6 +412,12 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
         std::string baseName = "imbalance_rp_" + std::to_string(pathIdx) + "_" +
                                std::to_string(i) + "_" + std::to_string(j);
 
+        /// Add imbalance constraints for each pair of paths:
+        /// |L_i - L_j| <= M * s_p.
+        /// Which translates to:
+        ///   L_i - L_j <= M * s_p.
+        ///   L_j - L_i <= M * s_p.
+        /// (Paper: Section 4, Equation 2)
         model->addConstr(pathLatencies[i] - pathLatencies[j] <=
                              BIG_M * patternImbalanced,
                          baseName + "_a");
