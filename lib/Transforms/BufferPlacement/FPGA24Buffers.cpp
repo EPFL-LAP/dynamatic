@@ -377,12 +377,9 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
     /// (Paper: Section 4, Equation 1)
     std::vector<LinExpr> pathLatencies;
     std::vector<double> pathBaseLatencies; /// For debugging
-    std::vector<unsigned> pathNumVars;     /// Number of L_c vars per path
-    std::vector<unsigned> pathNumEdges;    /// Total edges per path
     for (const auto &simplePath : allPaths) {
       LinExpr pathLatency;
       double baseLatency = 0.0;
-      unsigned numVars = 0;
 
       /// Add unit latencies D_u along the path (constants)
       for (NodeIdType nodeId : simplePath.nodes) {
@@ -397,14 +394,11 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
         Value channel = graph->edges[edgeId].channel;
         if (vars.channelVars.count(channel)) {
           pathLatency += vars.channelVars[channel].extraLatency;
-          numVars++;
         }
       }
 
       pathLatencies.push_back(pathLatency);
       pathBaseLatencies.push_back(baseLatency);
-      pathNumVars.push_back(numVars);
-      pathNumEdges.push_back(simplePath.edges.size());
     }
 
     /// Debug: Log path latencies for this reconvergent pattern (only for first
@@ -424,8 +418,7 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
         for (size_t i = 0; i < pathBaseLatencies.size(); i++) {
           LLVM_DEBUG(llvm::errs()
                      << "  Path " << i << ": base=" << pathBaseLatencies[i]
-                     << ", edges=" << pathNumEdges[i]
-                     << ", L_c vars=" << pathNumVars[i] << "\n");
+                     << "\n");
         }
         /// For the first pattern with difference, show channel names on short
         /// vs long paths
