@@ -159,7 +159,7 @@ static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
   // Reverse to the get the loops from outermost to innermost
   std::reverse(result.begin(), result.end());
   return result;
-};
+}
 
 /// Given two sets containing object of type `Block*`, remove the common
 /// entries.

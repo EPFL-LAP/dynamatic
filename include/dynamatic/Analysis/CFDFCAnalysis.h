@@ -19,4 +19,4 @@ struct CFDFCAnalysis {
   CFDFCAnalysis(mlir::Operation *modOp) {}
 };
 
-}; // namespace dynamatic
+} // namespace dynamatic
