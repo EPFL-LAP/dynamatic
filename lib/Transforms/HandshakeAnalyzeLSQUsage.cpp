@@ -186,7 +186,7 @@ static void markLSQPorts(const DenseSet<Op> &accesses,
     else
       setDialectAttr<MemInterfaceAttr>(accessOp, ctx);
   }
-};
+}
 
 void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
     handshake::FuncOp funcOp, TypedValue<mlir::MemRefType> memref,

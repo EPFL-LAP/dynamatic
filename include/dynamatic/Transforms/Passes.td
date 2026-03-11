@@ -270,10 +270,8 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     "Target clock period for the buffer placement CFDFC">,
     Option<"timeout", "timeout", "unsigned", "180",
     "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
-    Option<"dumpLogs", "dump-logs", "bool", "false",
-    "If true, dump debugging information (identified CFDFCs, MILP "
-    "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">,
+    Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
+    "If true, dump MILP models into a directory named 'buffer-placement'.">,
     Option<"blifFiles", "blif-files", "std::string", "",
     "Path to AND-Inverter Graphs of dataflow components in Berkeley "
     "Logic Interchange Format (BLIF).">,
@@ -388,27 +386,6 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
   }];
 }
 
-def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
-  let summary = "Mark all memory dependencies in the IR.";
-  let description = [{
-    Analyzes memory accesses in each function in a module and identifies all
-    dependencies between them. Stores information about these dependencies in a
-    `dynamatic::handshake::MemDependenceArrayAttr` attribute attached to each
-    operation that is the source of at least one dependency.
-
-    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
-    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
-    It uses MLIR's polyhedral analysis infrastructure to identify complex
-    dependencies between pairs of affine accesses, and uses a pessimistic
-    approach for pairs of accesses that involve at least one non-affine access.
-    While this pass can be ran at any point before conversion to Handshake, it
-    makes the most sense to run it as early as possible since affine analysis 
-    relies on very high-level information.
-
-    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
-    check for a dependence between two affine accesses.
-  }];
-}
 
 def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
   let summary = "Mark memory accesses with the interface they should connect to.";

@@ -27,7 +27,12 @@ Type ArgType::getMlirType(OpBuilder &builder, bool flattenArray) const {
     switch (std::get<CXBuiltInScalarTypes>(baseElemType)) {
       // clang-format off
       case Void:       baseMLIRElemType = builder.getNoneType(); break;
-      case Bool:       baseMLIRElemType = builder.getI1Type();   break;
+      case Bool:
+        // The in-memory representation of a bool type coming from C is a full
+        // byte (See https://www.open-std.org/Jtc1/sc22/wg14/www/docs/n3220.pdf
+        // C23 6.2.6.2).
+        baseMLIRElemType = (arrayDimensions.empty() ? builder.getI1Type() : builder.getI8Type());
+        break;
       case Int8:       baseMLIRElemType = builder.getI8Type();   break;
       case Int16:      baseMLIRElemType = builder.getI16Type();  break;
       case Int32:      baseMLIRElemType = builder.getI32Type();  break;

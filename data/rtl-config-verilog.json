@@ -150,7 +150,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/divui.v",
-    "dependencies": ["join_type", "delay_buffer"],
+    "dependencies": ["join_type", "delay_buffer", "oehb_dataless"],
     "hdl": "verilog"
   },
   {

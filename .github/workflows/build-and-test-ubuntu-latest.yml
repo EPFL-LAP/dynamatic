@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
     env:
       DEBIAN_FRONTEND: noninteractive
@@ -52,7 +52,40 @@ jobs:
         run: |
           bash ./build.sh --release --use-prebuilt-llvm --enable-cbc
 
-  build-docker-image:
+  build-debug:
+    runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update apt and install prerequisites
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install software-properties-common
+          sudo add-apt-repository ppa:deadsnakes/ppa
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install -y \
+            --option APT::Immediate-Configure=false \
+            sudo vim clang lld ccache cmake wget \
+            ninja-build python3 graphviz git curl \
+            gzip libreadline-dev \
+            libboost-all-dev pkg-config python3.12 \
+            python3.12-venv python3.12-dev \
+            ghdl verilator
+
+      - name: Verify Python 3.12
+        run: python3.12 --version
+
+      - name: Build Dynamatic (debug, prebuilt LLVM)
+        run: |
+          bash ./build.sh --use-prebuilt-llvm --enable-cbc
+
+  build-release-docker-image:
     runs-on: ubuntu-latest
 
     steps:
@@ -66,5 +99,5 @@ jobs:
         run: docker build -t dynamatic-image . --build-arg UID=$(id -u) --build-arg GID=$(id -g)
 
 
-      - name: Run container tests
-        run: docker run -u $(id -u):$(id -g) -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash build.sh --use-prebuilt-llvm
+      - name: Run container tests (release, prebuilt LLVM)
+        run: docker run -u $(id -u):$(id -g) -v "$(pwd):/home/ubuntu/dynamatic" -w "/home/ubuntu/dynamatic" dynamatic-image /bin/bash build.sh --use-prebuilt-llvm --release
