@@ -1,6 +1,7 @@
 #ifndef DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
 #define DYNAMATIC_SUPPORT_FLOW_EXPRESSION_H
 
+#include "dynamatic/Analysis/IndexChannelAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
@@ -11,27 +12,19 @@
 namespace dynamatic {
 namespace handshake {
 
-struct IndexInfo {
-  size_t numValues;
-  IndexInfo(size_t numValues) : numValues(numValues) {}
-  inline bool operator==(const IndexInfo &other) const {
-    return numValues == other.numValues;
-  }
-};
-
 struct IndexConstraint {
-  IndexInfo info;
+  size_t numValues;
   // if singleValue is nullptr, the index is not constrained
   std::optional<size_t> singleValue;
 
-  IndexConstraint(IndexInfo info) : info(info) {}
+  IndexConstraint(size_t numValues) : numValues(numValues) {}
   inline bool operator==(const IndexConstraint &other) const {
-    return info == other.info && singleValue == other.singleValue;
+    return numValues == other.numValues && singleValue == other.singleValue;
   }
 
   inline llvm::json::Value toJSON() const {
     return llvm::json::Object(
-        {{NUM_VALUES_LIT, info.numValues}, {SINGLE_VALUE_LIT, singleValue}});
+        {{NUM_VALUES_LIT, numValues}, {SINGLE_VALUE_LIT, singleValue}});
   }
 
   inline IndexConstraint static fromJSON(const llvm::json::Value &value,
@@ -82,7 +75,8 @@ struct FlowVariable {
 
   FlowVariable(Variants variable)
       : variable(std::move(variable)), constraint() {}
-  FlowVariable(ChannelLambda l, const DenseMap<mlir::Value, IndexInfo> &map);
+  FlowVariable(const IndexChannelAnalysis &indexChannels,
+               ChannelLambda channel);
   FlowVariable(InternalLambda l) : FlowVariable(Variants(l)) {}
   FlowVariable(std::shared_ptr<InternalStateNamer> n)
       : FlowVariable(Variants(n)) {}
@@ -112,42 +106,7 @@ struct FlowVariable {
            std::get_if<InternalLambda>(&variable);
   }
 
-  inline void debug() const {
-    if (auto *namer =
-            std::get_if<std::shared_ptr<InternalStateNamer>>(&variable)) {
-      llvm::errs() << (*namer)->getSMVName();
-    }
-    if (auto *channel = std::get_if<ChannelLambda>(&variable)) {
-      if (auto *op = channel->channel.getDefiningOp()) {
-        llvm::errs() << getUniqueName(op);
-        for (auto [i, ch] : llvm::enumerate(op->getResults())) {
-          if (ch == channel->channel) {
-            llvm::errs() << llvm::formatv(".out{0}", i);
-            break;
-          }
-        }
-      } else {
-        for (auto &opop : channel->channel.getUses()) {
-          llvm::errs() << llvm::formatv("{0}.in{1}",
-                                        getUniqueName(opop.getOwner()),
-                                        opop.getOperandNumber());
-          break;
-        }
-      }
-    }
-    if (auto *internal = std::get_if<InternalLambda>(&variable)) {
-      llvm::errs() << llvm::formatv("{0}.#{1}", getUniqueName(internal->op),
-                                    internal->index);
-    }
-
-    if (constraint) {
-      if (constraint->singleValue) {
-        llvm::errs() << llvm::formatv("(={0})", *(constraint->singleValue));
-      } else {
-        llvm::errs() << llvm::formatv("(=x)");
-      }
-    }
-  }
+  void debug() const;
 
   // get the annotater for internal state - if it exists
   std::shared_ptr<InternalStateNamer> getAnnotater() const;
@@ -184,7 +143,7 @@ struct std::hash<FlowVariable> {
     using std::hash;
     if (var.constraint) {
       return hash<Variants>()(var.variable) ^ hash<unsigned>()(0) ^
-             hash<size_t>()(var.constraint->info.numValues) ^
+             hash<size_t>()(var.constraint->numValues) ^
              hash<std::optional<size_t>>()(var.constraint->singleValue);
     }
     return hash<Variants>()(var.variable) ^ hash<unsigned>()(1);
@@ -202,22 +161,8 @@ struct FlowExpression {
   static FlowExpression fromJSON(const llvm::json::Value &value,
                                  llvm::json::Path path);
 
-  inline void debug() {
-    for (auto &[var, coef] : terms) {
-      if (coef == 0) {
-        llvm::errs() << "0 * ";
-      } else if (coef == 1) {
-        llvm::errs() << "+ ";
-      } else if (coef == -1) {
-        llvm::errs() << "- ";
-      } else {
-        llvm::errs() << llvm::formatv("{0} * ", coef);
-      }
-      var.debug();
-      llvm::errs() << "  ";
-    }
-    llvm::errs() << "\n";
-  }
+  void debug() const;
+
   inline static const StringLiteral COEFFICIENT_LIT = "coefficient";
   inline static const StringLiteral STATE_LIT = "state";
   inline static const StringLiteral CONSTRAINT_LIT = "constraint";

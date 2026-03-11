@@ -2,14 +2,11 @@
 
 namespace dynamatic {
 namespace handshake {
-FlowVariable::FlowVariable(ChannelLambda channel,
-                           const llvm::DenseMap<mlir::Value, IndexInfo> &map) {
+FlowVariable::FlowVariable(const IndexChannelAnalysis &indexChannels,
+                           ChannelLambda channel) {
   *this = FlowVariable(Variants(channel));
-  for (auto &[key, value] : map) {
-    if (key == channel.channel) {
-      constraint = IndexConstraint(value);
-      return;
-    }
+  if (auto numValues = indexChannels.getIndexChannelValues(channel.channel)) {
+    constraint = *numValues;
   }
 }
 
@@ -35,6 +32,43 @@ std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
   return state;
 }
 
+void FlowVariable::debug() const {
+  if (auto *namer =
+          std::get_if<std::shared_ptr<InternalStateNamer>>(&variable)) {
+    llvm::errs() << (*namer)->getSMVName();
+  }
+  if (auto *channel = std::get_if<ChannelLambda>(&variable)) {
+    if (auto *op = channel->channel.getDefiningOp()) {
+      llvm::errs() << getUniqueName(op);
+      for (auto [i, ch] : llvm::enumerate(op->getResults())) {
+        if (ch == channel->channel) {
+          llvm::errs() << llvm::formatv(".out{0}", i);
+          break;
+        }
+      }
+    } else {
+      for (auto &opop : channel->channel.getUses()) {
+        llvm::errs() << llvm::formatv("{0}.in{1}",
+                                      getUniqueName(opop.getOwner()),
+                                      opop.getOperandNumber());
+        break;
+      }
+    }
+  }
+  if (auto *internal = std::get_if<InternalLambda>(&variable)) {
+    llvm::errs() << llvm::formatv("{0}.#{1}", getUniqueName(internal->op),
+                                  internal->index);
+  }
+
+  if (constraint) {
+    if (constraint->singleValue) {
+      llvm::errs() << llvm::formatv("(={0})", *(constraint->singleValue));
+    } else {
+      llvm::errs() << llvm::formatv("(=x)");
+    }
+  }
+}
+
 FlowExpression::FlowExpression(const FlowVariable &v) {
   if (v.isIndex()) {
     if (v.constraint->singleValue) {
@@ -42,7 +76,7 @@ FlowExpression::FlowExpression(const FlowVariable &v) {
       return;
     }
     // If plusAndMinus, separate into plus and minus parts
-    for (size_t i = 0; i < v.constraint->info.numValues; ++i) {
+    for (size_t i = 0; i < v.constraint->numValues; ++i) {
       terms[v.getConstrained(i)] = 1;
     }
   } else {
@@ -101,6 +135,23 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
     expr.terms[var] = coef;
   }
   return expr;
+}
+
+void FlowExpression::debug() const {
+  for (auto &[var, coef] : terms) {
+    if (coef == 0) {
+      llvm::errs() << "0 * ";
+    } else if (coef == 1) {
+      llvm::errs() << "+ ";
+    } else if (coef == -1) {
+      llvm::errs() << "- ";
+    } else {
+      llvm::errs() << llvm::formatv("{0} * ", coef);
+    }
+    var.debug();
+    llvm::errs() << "  ";
+  }
+  llvm::errs() << "\n";
 }
 
 FlowExpression operator-(FlowExpression expr) {

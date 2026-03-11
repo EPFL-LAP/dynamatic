@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/Analysis/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
+#include "dynamatic/Analysis/IndexChannelAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -311,7 +313,7 @@ struct FlowEquationsMatrix {
 
 std::vector<FlowExpression>
 extractLocalEquations(ModuleOp modOp,
-                      const DenseMap<mlir::Value, IndexInfo> &map) {
+                      const IndexChannelAnalysis &indexChannelAnalysis) {
   std::vector<FlowExpression> equations{};
   // annotate equations derived from operations
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
@@ -340,7 +342,7 @@ extractLocalEquations(ModuleOp modOp,
         x0.constraint = IndexConstraint(numInputs);
 
         for (auto [i, channel] : llvm::enumerate(cmergeOp.getDataOperands())) {
-          FlowVariable channelVar(ChannelLambda(channel), map);
+          FlowVariable channelVar(indexChannelAnalysis, ChannelLambda(channel));
           equations.push_back(channelVar - x0.getConstrained(i));
         }
 
@@ -371,8 +373,8 @@ extractLocalEquations(ModuleOp modOp,
         indexSent.constraint = IndexConstraint(numInputs);
 
         auto outputs = cmergeOp.getResults();
-        FlowVariable data(ChannelLambda(outputs[0]), map);
-        FlowVariable index(ChannelLambda(outputs[1]), map);
+        FlowVariable data(indexChannelAnalysis, ChannelLambda(outputs[0]));
+        FlowVariable index(indexChannelAnalysis, ChannelLambda(outputs[1]));
 
         for (size_t i = 0; i < numInputs; ++i) {
           equations.push_back(index.getConstrained(i) -
@@ -389,20 +391,20 @@ extractLocalEquations(ModuleOp modOp,
         if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
           // mux : select input has same as output lambda, data inputs act like
           Value select = muxOp.getSelectOperand();
-          FlowVariable selectVar(ChannelLambda(select), map);
+          FlowVariable selectVar(indexChannelAnalysis, ChannelLambda(select));
           equations.push_back(selectVar - entry);
           if (selectVar.isIndex()) {
             auto dataOperands = muxOp.getDataOperands();
-            assert(selectVar.constraint->info.numValues == dataOperands.size());
+            assert(selectVar.constraint->numValues == dataOperands.size());
             for (auto [i, operand] : llvm::enumerate(dataOperands)) {
-              FlowVariable var(ChannelLambda(operand), map);
+              FlowVariable var(indexChannelAnalysis, ChannelLambda(operand));
               equations.push_back(selectVar.getConstrained(i) - var);
             }
           } else {
             assert(false && "muxOp select var should always be index");
             FlowExpression dataEq = -entry;
             for (auto operand : muxOp.getDataOperands()) {
-              FlowVariable chVar(ChannelLambda(operand), map);
+              FlowVariable chVar(indexChannelAnalysis, ChannelLambda(operand));
               dataEq += chVar;
             }
             equations.push_back(dataEq);
@@ -416,14 +418,14 @@ extractLocalEquations(ModuleOp modOp,
           bool foundUnindexed = false;
           auto channels = op.getOperands();
           for (auto channel : channels) {
-            FlowVariable ch(ChannelLambda(channel), map);
+            FlowVariable ch(indexChannelAnalysis, ChannelLambda(channel));
             if (ch.isIndex()) {
               if (!foundIndexed) {
-                indexValue = ch.constraint->info.numValues;
+                indexValue = ch.constraint->numValues;
                 constrainedEqs.resize(indexValue);
               }
               foundIndexed = true;
-              assert(indexValue == ch.constraint->info.numValues &&
+              assert(indexValue == ch.constraint->numValues &&
                      "found differing index");
               for (size_t i = 0; i < indexValue; ++i) {
                 constrainedEqs[i] += ch.getConstrained(i);
@@ -437,7 +439,7 @@ extractLocalEquations(ModuleOp modOp,
           assert(!(foundIndexed && foundUnindexed) &&
                  "some index channels and some normal channels");
           if (foundIndexed) {
-            entry.constraint = IndexConstraint(IndexInfo(indexValue));
+            entry.constraint = IndexConstraint(indexValue);
             for (size_t i = 0; i < indexValue; ++i) {
               constrainedEqs[i] -= entry.getConstrained(i);
               equations.push_back(constrainedEqs[i]);
@@ -452,11 +454,11 @@ extractLocalEquations(ModuleOp modOp,
         if (channels.size() == 1) {
           // Only 1 input channel
           auto channel = channels[0];
-          FlowVariable chVar(ChannelLambda(channel), map);
+          FlowVariable chVar(indexChannelAnalysis, ChannelLambda(channel));
           // If input is +-, then intermediate channel is as well
           entry.constraint = chVar.constraint;
           if (chVar.isIndex()) {
-            for (size_t i = 0; i < chVar.constraint->info.numValues; ++i) {
+            for (size_t i = 0; i < chVar.constraint->numValues; ++i) {
               equations.push_back(chVar.getConstrained(i) -
                                   entry.getConstrained(i));
             }
@@ -465,7 +467,7 @@ extractLocalEquations(ModuleOp modOp,
           }
         } else {
           for (auto channel : channels) {
-            FlowVariable chVar(ChannelLambda(channel), map);
+            FlowVariable chVar(indexChannelAnalysis, ChannelLambda(channel));
             equations.push_back(chVar - entry);
           }
         }
@@ -494,7 +496,7 @@ extractLocalEquations(ModuleOp modOp,
           if (before.isIndex()) {
             assert(after.isIndex());
             FlowVariable fullPM = full;
-            size_t numValues = before.constraint->info.numValues;
+            size_t numValues = before.constraint->numValues;
             fullPM.constraint = IndexConstraint(numValues);
             equations.push_back(full - fullPM);
             for (size_t i = 0; i < numValues; ++i) {
@@ -521,7 +523,7 @@ extractLocalEquations(ModuleOp modOp,
           if (before.isIndex()) {
             assert(after.isIndex());
             FlowVariable fullPM = full;
-            size_t numValues = before.constraint->info.numValues;
+            size_t numValues = before.constraint->numValues;
             fullPM.constraint = IndexConstraint(numValues);
             equations.push_back(full - fullPM);
             for (size_t i = 0; i < numValues; ++i) {
@@ -544,12 +546,13 @@ extractLocalEquations(ModuleOp modOp,
           std::shared_ptr<InternalStateNamer> namer =
               std::make_shared<EagerForkSentNamer>(sentVariable);
           FlowVariable sent(namer);
-          FlowVariable result(ChannelLambda(op.getResults()[i]), map);
+          FlowVariable result(indexChannelAnalysis,
+                              ChannelLambda(op.getResults()[i]));
           if (exit.isIndex()) {
             assert(result.isIndex());
-            sent.constraint = IndexConstraint(exit.constraint->info.numValues);
+            sent.constraint = IndexConstraint(exit.constraint->numValues);
             // equations.push_back(sent - sentPM);
-            for (size_t i = 0; i < exit.constraint->info.numValues; ++i) {
+            for (size_t i = 0; i < exit.constraint->numValues; ++i) {
               equations.push_back(exit.getConstrained(i) +
                                   sent.getConstrained(i) -
                                   result.getConstrained(i));
@@ -569,9 +572,9 @@ extractLocalEquations(ModuleOp modOp,
       } else {
         // lazy fork: all outputs have same tokens in as out
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
-          FlowVariable result(ChannelLambda(channel), map);
+          FlowVariable result(indexChannelAnalysis, ChannelLambda(channel));
           if (exit.isIndex() && result.isIndex()) {
-            for (size_t i = 0; i < exit.constraint->info.numValues; ++i) {
+            for (size_t i = 0; i < exit.constraint->numValues; ++i) {
               equations.push_back(exit.getConstrained(i) -
                                   result.getConstrained(i));
             }
@@ -586,67 +589,13 @@ extractLocalEquations(ModuleOp modOp,
 }
 } // namespace dynamatic
 
-void annotateIndexChannels(llvm::DenseMap<mlir::Value, IndexInfo> &map,
-                           mlir::Value index, IndexInfo info) {
-  map.insert({index, info});
-
-  Operation *op = index.getDefiningOp();
-  if (!op)
-    return;
-
-  // Arithmetic ops can turn non-index into index, so stop following
-  if (isa<ArithOpInterface>(op))
-    return;
-
-  if (auto bufOp = dyn_cast<BufferOp>(op)) {
-    annotateIndexChannels(map, bufOp.getOperand(), info);
-    return;
-  }
-
-  if (auto forkOp = dyn_cast<ForkOp>(op)) {
-    annotateIndexChannels(map, forkOp.getOperand(), info);
-    return;
-  }
-
-  if (auto muxOp = dyn_cast<MuxOp>(op)) {
-    for (auto prevOp : muxOp.getDataOperands()) {
-      annotateIndexChannels(map, prevOp, info);
-    }
-    return;
-  }
-
-  if (auto mergeOp = dyn_cast<MergeOp>(op)) {
-    for (auto prevOp : mergeOp.getOperands()) {
-      annotateIndexChannels(map, prevOp, info);
-    }
-    return;
-  }
-}
-
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
-  llvm::DenseMap<mlir::Value, IndexInfo> map;
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-    for (auto &op : funcOp.getOps()) {
-      mlir::Value index = nullptr;
-      std::optional<IndexInfo> info;
-      if (auto muxOp = dyn_cast<MuxOp>(op)) {
-        index = muxOp.getSelectOperand();
-        info = IndexInfo(muxOp.getDataOperands().size());
-      } else if (auto branchOp = dyn_cast<ConditionalBranchOp>(op)) {
-        index = branchOp.getConditionOperand();
-        info = IndexInfo(2);
-      }
-
-      if (index == nullptr) {
-        continue;
-      }
-      annotateIndexChannels(map, index, *info);
-    }
-  }
+  auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
 
   // The equations are represented by a FlowExpression that is equal to zero
-  std::vector<FlowExpression> equations = extractLocalEquations(modOp, map);
+  std::vector<FlowExpression> equations =
+      extractLocalEquations(modOp, indexChannelAnalysis);
 
   // Map all variables used in `equations` to an index in the matrix
   FlowEquationsMatrix indices(equations);
