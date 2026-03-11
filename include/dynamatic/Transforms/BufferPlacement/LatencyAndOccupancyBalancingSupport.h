@@ -293,6 +293,10 @@ struct SynchronizingCyclePair {
   SimpleCycle cycleOne;
   SimpleCycle cycleTwo;
 
+  /// The edges are grouped by the join node they reach.
+  /// We keep track of:
+  /// - The join node each edge group belongs to.
+  /// - Whether the edge group comes from cycleOne or cycleTwo.
   std::vector<EdgesToJoin> edgesToJoins;
 
   SynchronizingCyclePair(SimpleCycle one, SimpleCycle two,
