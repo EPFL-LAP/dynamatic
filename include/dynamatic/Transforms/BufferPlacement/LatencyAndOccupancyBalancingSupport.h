@@ -176,7 +176,7 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
 
 /// A dataflow graph specialized for reconvergent path analysis.
 /// IMPORTANT: This class assumes the graph an ACYCLIC transition sequence.
-class ReconvergentPathFinderGraph : public DataflowSubgraphBase {
+class CFGTransitionSequenceSubgraph : public DataflowSubgraphBase {
 public:
   bool isForkNode(NodeIdType nodeId) const override {
     return isa<handshake::ForkOp, handshake::LazyForkOp,
@@ -229,18 +229,19 @@ public:
 
   /// Dump multiple graphs to a single GraphViz file.
   /// Each graph is placed in its own cluster subgraph.
-  static void dumpAllGraphs(llvm::ArrayRef<ReconvergentPathFinderGraph> graphs,
-                            llvm::StringRef filename);
+  static void
+  dumpAllGraphs(llvm::ArrayRef<CFGTransitionSequenceSubgraph> graphs,
+                llvm::StringRef filename);
 
   /// Dump all reconvergent paths from multiple graphs to a single GraphViz
   /// file. Each path is placed in its own cluster subgraph with a graph index
   /// prefix. The input is a vector of GraphPathsForDumping objects. Each object
   /// contains:
-  /// - graph: Pointer to the ReconvergentPathFinderGraph for this sequence.
+  /// - graph: Pointer to the CFGTransitionSequenceSubgraph for this sequence.
   /// - paths: Vector of ReconvergentPath objects for this sequence.
 
   struct GraphPathsForDumping {
-    const ReconvergentPathFinderGraph *graph;
+    const CFGTransitionSequenceSubgraph *graph;
     std::vector<ReconvergentPath> paths;
   };
 

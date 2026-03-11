@@ -64,17 +64,23 @@ static double getUnitLatency(Operation *unit, const TimingDatabase &timingDB,
   if (failed(
           timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod))) {
     if (isa<handshake::LoadOp>(unit)) {
-      auto opName = unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
-      // LLVM_DEBUG(llvm::errs() << "Load Operation Latency: " << latency << " for " << opName.str() << "\n");
-      llvm::errs() << "Getting latency for load operation failed! For " << opName.str() << "\n";
+      auto opName =
+          unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+      // LLVM_DEBUG(llvm::errs() << "Load Operation Latency: " << latency << "
+      // for " << opName.str() << "\n");
+      llvm::errs() << "Getting latency for load operation failed! For "
+                   << opName.str() << "\n";
     }
     return 0.0;
   }
 
   if (isa<handshake::LoadOp>(unit)) {
-    auto opName = unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
-    // LLVM_DEBUG(llvm::errs() << "Load Operation Latency: " << latency << " for " << opName.str() << "\n");
-    llvm::errs() << "Load Operation Latency: " << latency << " for " << opName.str() << "\n";
+    auto opName =
+        unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+    // LLVM_DEBUG(llvm::errs() << "Load Operation Latency: " << latency << " for
+    // " << opName.str() << "\n");
+    llvm::errs() << "Load Operation Latency: " << latency << " for "
+                 << opName.str() << "\n";
   }
 
   return latency;
@@ -93,8 +99,10 @@ static bool hasVariableLatency(Operation *unit) {
 
     auto memOp = findMemInterface(loadOp.getAddress());
     if (isa_and_present<handshake::LSQOp>(memOp)) {
-      auto opName = unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
-      LLVM_DEBUG(llvm::errs() << "Found unit with variable latency: " << opName.str() << "\n");
+      auto opName =
+          unit->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+      LLVM_DEBUG(llvm::errs() << "Found unit with variable latency: "
+                              << opName.str() << "\n");
       return true;
     }
   }
@@ -210,7 +218,7 @@ void LatencyBalancingMILP::addLatencyVariables() {
   /// From reconvergent paths:
   for (const auto &pathWithGraph : reconvergentPaths) {
     const ReconvergentPath &path = pathWithGraph.path;
-    const ReconvergentPathFinderGraph *graph = pathWithGraph.graph;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     for (NodeIdType nodeId : path.nodeIds) {
       for (EdgeIdType edgeId : graph->adjList[nodeId]) {
         const auto &edge = graph->edges[edgeId];
@@ -275,8 +283,7 @@ void LatencyBalancingMILP::addLatencyVariables() {
 
     /// L_c: extra latency to add to the channel for balancing (integer >= 0).
     /// (Paper: Section 4, Table 1)
-    chVars.extraLatency =
-        model->addVar("L_" + name, INTEGER, 0, std::nullopt);
+    chVars.extraLatency = model->addVar("L_" + name, INTEGER, 0, std::nullopt);
 
     /// S_c: whether the channel is stalled due to imbalance (binary).
     /// (Paper: Section 4, Table 1)
@@ -331,7 +338,7 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
 
     const ReconvergentPathWithGraph &pathWithGraph = reconvergentPaths[pathIdx];
     const ReconvergentPath &path = pathWithGraph.path;
-    const ReconvergentPathFinderGraph *graph = pathWithGraph.graph;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     CPVar &patternImbalanced = vars.reconvergentPathVars[pathIdx].imbalanced;
 
     /// Check if any unit in the path has variable latency.
@@ -547,7 +554,7 @@ void LatencyBalancingMILP::addStallPropagationConstraints() {
   for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
     const ReconvergentPathWithGraph &pathWithGraph = reconvergentPaths[i];
     const ReconvergentPath &path = pathWithGraph.path;
-    const ReconvergentPathFinderGraph *graph = pathWithGraph.graph;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     for (NodeIdType nodeId : path.nodeIds) {
       for (EdgeIdType edgeId : graph->adjList[nodeId]) {
         const auto &edge = graph->edges[edgeId];
@@ -788,7 +795,7 @@ void OccupancyBalancingLP::setup() {
   /// This ensures LP2 handles entry/exit paths that LP1 balanced.
   for (const auto &pathWithGraph : reconvergentPaths) {
     const ReconvergentPath &path = pathWithGraph.path;
-    const ReconvergentPathFinderGraph *graph = pathWithGraph.graph;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     for (NodeIdType nodeId : path.nodeIds) {
       for (EdgeIdType edgeId : graph->adjList[nodeId]) {
         const auto &edge = graph->edges[edgeId];
@@ -1003,7 +1010,7 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
 
   LLVM_DEBUG(llvm::errs() << "Found " << cfdfcPtrs.size() << " CFDFCs\n");
 
-  std::list<ReconvergentPathFinderGraph> reconvergentGraphs;
+  std::list<CFGTransitionSequenceSubgraph> reconvergentGraphs;
   std::vector<ReconvergentPathWithGraph> allReconvergentPaths;
   std::vector<SynchronizingCyclePair> allSyncCyclePairs;
   SynchronizingCyclesFinderGraph syncGraph;
@@ -1039,11 +1046,13 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
       }
 
       const auto &sequence = sequences[seqIdx];
-      ReconvergentPathFinderGraph graph;
+      CFGTransitionSequenceSubgraph graph;
       graph.buildGraphFromSequence(funcInfo.funcOp, sequence);
       auto paths = graph.findReconvergentPaths();
-      ReconvergentPathFinderGraph::GraphPathsForDumping graphPaths = { &graph, paths };
-      graph.dumpAllReconvergentPaths(graphPaths, "reconvergent_graph_" + std::to_string(seqIdx) + ".dot");
+      CFGTransitionSequenceSubgraph::GraphPathsForDumping graphPaths = {&graph,
+                                                                        paths};
+      graph.dumpAllReconvergentPaths(
+          graphPaths, "reconvergent_graph_" + std::to_string(seqIdx) + ".dot");
 
       if (!paths.empty()) {
         /// Filter out duplicate fork/join pairs we've already seen
@@ -1064,7 +1073,7 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
         if (!uniquePaths.empty()) {
           /// Add graph to list first
           reconvergentGraphs.push_back(std::move(graph));
-          const ReconvergentPathFinderGraph *graphPtr =
+          const CFGTransitionSequenceSubgraph *graphPtr =
               &reconvergentGraphs.back();
 
           /// Then add paths with pointer to their graph

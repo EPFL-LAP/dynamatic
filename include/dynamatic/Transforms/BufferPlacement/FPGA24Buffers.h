@@ -54,10 +54,10 @@ struct LatencyBalancingResult {
 /// better to pair them like this instead of playing around with indices.
 struct ReconvergentPathWithGraph {
   ReconvergentPath path;
-  const ReconvergentPathFinderGraph *graph;
+  const CFGTransitionSequenceSubgraph *graph;
 
   ReconvergentPathWithGraph(ReconvergentPath p,
-                            const ReconvergentPathFinderGraph *g)
+                            const CFGTransitionSequenceSubgraph *g)
       : path(std::move(p)), graph(g) {}
 };
 
