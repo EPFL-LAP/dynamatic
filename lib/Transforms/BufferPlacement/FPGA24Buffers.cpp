@@ -342,6 +342,7 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
     const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     CPVar &patternImbalanced = vars.reconvergentPathVars[pathIdx].imbalanced;
 
+    /// [START Handle pattern with variable latency (mark them as always imbalanced)]
     /// Check if any unit in the path has variable latency.
     bool hasVarLatency = false;
     for (NodeIdType nodeId : path.nodeIds) {
@@ -360,6 +361,8 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
                        "varLatency_rp_" + std::to_string(pathIdx));
       continue;
     }
+    /// [END Handle pattern with variable latency (mark them as always imbalanced)]
+
 
     /// Enumerate all simple paths from fork to join
     NodeIdType forkId = path.forkNodeId;
@@ -399,47 +402,6 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
 
       pathLatencies.push_back(pathLatency);
       pathBaseLatencies.push_back(baseLatency);
-    }
-
-    /// Debug: Log path latencies for this reconvergent pattern (only for first
-    /// few patterns with different base latencies)
-    static int debugPathCount = 0;
-    if (pathBaseLatencies.size() >= 2) {
-      double minLat =
-          *std::min_element(pathBaseLatencies.begin(), pathBaseLatencies.end());
-      double maxLat =
-          *std::max_element(pathBaseLatencies.begin(), pathBaseLatencies.end());
-      if (maxLat - minLat > 0.5) {
-        LLVM_DEBUG(llvm::errs()
-                   << "[LP1] Reconvergent path " << pathIdx
-                   << ": base latencies differ by " << (maxLat - minLat)
-                   << " (min=" << minLat << ", max=" << maxLat << ")\n");
-        /// Show details of each path
-        for (size_t i = 0; i < pathBaseLatencies.size(); i++) {
-          LLVM_DEBUG(llvm::errs()
-                     << "  Path " << i << ": base=" << pathBaseLatencies[i]
-                     << "\n");
-        }
-        /// For the first pattern with difference, show channel names on short
-        /// vs long paths
-        if (debugPathCount < 1) {
-          debugPathCount++;
-          LLVM_DEBUG(llvm::errs() << "  [DETAIL] Channels on each path:\n");
-          for (size_t i = 0; i < allPaths.size() && i < 3; i++) {
-            LLVM_DEBUG(llvm::errs() << "    Path " << i << " (base="
-                                    << pathBaseLatencies[i] << "):\n");
-            for (EdgeIdType edgeId : allPaths[i].edges) {
-              Value channel = graph->edges[edgeId].channel;
-              std::string name =
-                  std::string(getUniqueName(*channel.getUses().begin()));
-              bool hasVar = vars.channelVars.count(channel) > 0;
-              LLVM_DEBUG(llvm::errs()
-                         << "      " << name
-                         << (hasVar ? " [HAS L_c]" : " [NO L_c]") << "\n");
-            }
-          }
-        }
-      }
     }
 
     /// Add imbalance constraints for each pair of paths:
