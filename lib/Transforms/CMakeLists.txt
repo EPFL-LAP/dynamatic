@@ -24,6 +24,7 @@ add_dynamatic_library(DynamaticTransforms
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
   HandshakeTreeHeightReduction.cpp
+  HandshakeSetUnitImplAttributes.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
