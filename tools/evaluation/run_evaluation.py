@@ -9,6 +9,7 @@ the -j flag.
 
 import argparse
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -149,8 +150,9 @@ def run_kernel(kernel: str, synth_lsqs: bool) -> tuple[str, str | None]:
     # Run out-of-context synthesis for LSQs
     if synth_lsqs:
         hdl_dir = out_dir / "hdl"
-        for lsq_file in hdl_dir.glob("*_lsq_lsq*_core.vhd"):
-            lsq_name = lsq_file.stem
+        for lsq_file in hdl_dir.glob("*_lsq*_core.vhd"):
+            lsq_top = lsq_file.stem
+            lsq_name = re.match(r".*_(lsq\d+)_core.vhd", lsq_top).group(1)
             lsq_synth_dir = out_dir / "synth_lsq" / lsq_name
             logging.info("Running LSQ synthesis for %s (kernel %s)...", lsq_name, kernel)
 
@@ -161,7 +163,7 @@ def run_kernel(kernel: str, synth_lsqs: bool) -> tuple[str, str | None]:
                     ["tools/dynamatic/scripts/synthesize.sh",
                      REPO_ROOT,
                      out_dir,
-                     lsq_name,
+                     lsq_top,
                      f"{CLOCK_PERIOD:.3f}", f"{CLOCK_PERIOD/2:.3f}",
                      lsq_synth_dir],
                     text=True,
