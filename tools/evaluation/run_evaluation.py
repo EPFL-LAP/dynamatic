@@ -54,15 +54,16 @@ KERNELS = [
 # ──────────────────────────────────────────────────────────────────────────────
 # .dyn script template: {src} is substituted with the kernel source path
 # ──────────────────────────────────────────────────────────────────────────────
+CLOCK_PERIOD = 5
 DYN_SCRIPT = """\
 set-src {src}
-set-clock-period 5
+set-clock-period %d
 compile --buffer-algorithm fpga20
 write-hdl --hdl vhdl
 simulate
 synthesize
 exit
-"""
+""" % (CLOCK_PERIOD,)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Paths
@@ -92,7 +93,7 @@ def build() -> None:
     logging.info("Build succeeded.")
 
 
-def run_kernel(kernel: str) -> tuple[str, str | None]:
+def run_kernel(kernel: str, synth_lsqs: bool) -> tuple[str, str | None]:
     """
     Run the .dyn script for *kernel*, writing stdout/stderr directly to
     integration-test/{kernel}/out/dynamatic_{out,err}.txt, and return
@@ -145,6 +146,35 @@ def run_kernel(kernel: str) -> tuple[str, str | None]:
         logging.error("[FAIL] %s (%s)", kernel, reason)
         return kernel, reason
 
+    # Run out-of-context synthesis for LSQs
+    if synth_lsqs:
+        hdl_dir = out_dir / "hdl"
+        for lsq_file in hdl_dir.glob("*_lsq_lsq*_core.vhd"):
+            lsq_name = lsq_file.stem
+            lsq_synth_dir = out_dir / "synth_lsq" / lsq_name
+            logging.info("Running LSQ synthesis for %s (kernel %s)...", lsq_name, kernel)
+
+            lsq_out_path = lsq_synth_dir / "vivado_out.txt"
+            lsq_err_path = lsq_synth_dir / "vivado_err.txt"
+            with open(lsq_out_path, "w") as out_f, open(lsq_err_path, "w") as err_f:
+                result = subprocess.run(
+                    ["tools/dynamatic/scripts/synthesize.sh",
+                     REPO_ROOT,
+                     out_dir,
+                     lsq_name,
+                     f"{CLOCK_PERIOD:.3f}", f"{CLOCK_PERIOD/2:.3f}",
+                     lsq_synth_dir],
+                    text=True,
+                    stdout=out_f,
+                    stderr=err_f,
+                    cwd=REPO_ROOT,
+                )
+
+            if result.returncode != 0:
+                reason = f"LSQ synthesis ({lsq_name}): exit code {result.returncode}"
+                logging.error("[FAIL] %s (%s)", kernel, reason)
+                return kernel, reason
+
     logging.info("[PASS] %s", kernel)
     return kernel, None
 
@@ -154,6 +184,11 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         description="Run Dynamatic evaluation for a list of kernels."
+    )
+    parser.add_argument(
+        "--synth-lsqs",
+        action="store_true",
+        help="Run out-of-context synthesis for LSQs after simulation (default: False).",
     )
     parser.add_argument(
         "-j",
@@ -188,7 +223,7 @@ def main() -> None:
     failed: list[tuple[str, str | None]] = []
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-        futures = {executor.submit(run_kernel, k): k for k in KERNELS}
+        futures = {executor.submit(run_kernel, k, args.synth_lsqs): k for k in KERNELS}
         for future in as_completed(futures):
             kernel, failure_reason = future.result()
             if failure_reason is None:
