@@ -6,6 +6,7 @@
 
 import math
 import json
+import os
 import sys
 
 # read and parse the json file
@@ -70,7 +71,6 @@ class Configs:
         self.name = config["name"]
         self.dataW = config["dataWidth"]
         self.addrW = config["addrWidth"]
-        self.idW = config["indexWidth"]
         self.numLdqEntries = config["fifoDepth_L"]
         self.numStqEntries = config["fifoDepth_S"]
         self.numLdPorts = config["numLoadPorts"]
@@ -90,8 +90,40 @@ class Configs:
         self.gaLdPortIdx = config["ldPortIdx"]
         self.gaStPortIdx = config["stPortIdx"]
 
+        self.pipe0 = bool(config["pipe0En"])
+        self.pipe1 = bool(config["pipe1En"])
+        self.pipeComp = bool(config["pipeCompEn"])
+        self.headLag = bool(config["headLagEn"])
+
+        def get_env(name: str) -> int | None:
+            value = os.environ.get(name, "")
+            if value == "":
+                return None
+            else:
+                return int(value)
+
+        numLdqEntries = get_env("LSQ_NUM_LDQ_ENTRIES")
+        if numLdqEntries is not None:
+            self.numLdqEntries = numLdqEntries
+        numStqEntries = get_env("LSQ_NUM_STQ_ENTRIES")
+        if numStqEntries is not None:
+            self.numStqEntries = numStqEntries
+        pipeComp = get_env("LSQ_PIPE_COMP_EN")
+        if pipeComp is not None:
+            self.pipeComp = bool(pipeComp)
+        pipe0 = get_env("LSQ_PIPE0_EN")
+        if pipe0 is not None:
+            self.pipe0 = bool(pipe0)
+        pipe1 = get_env("LSQ_PIPE1_EN")
+        if pipe1 is not None:
+            self.pipe1 = bool(pipe1)
+        headLag = get_env("LSQ_HEAD_LAG_EN")
+        if headLag is not None:
+            self.headLag = bool(headLag)
+
         self.ldqAddrW = math.ceil(math.log2(self.numLdqEntries))
         self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
+        self.idW = max(self.ldqAddrW, self.stqAddrW)
 
         # Original empty assignment assumes the size of load or store queue to be always a multiple of 2
         if (self.numLdqEntries & (self.numLdqEntries % 2 == 0)):
@@ -106,11 +138,6 @@ class Configs:
         # Check the number of ports, if num*Ports == 0, set it to 1
         self.ldpAddrW = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
-
-        self.pipe0 = bool(config["pipe0En"])
-        self.pipe1 = bool(config["pipe1En"])
-        self.pipeComp = bool(config["pipeCompEn"])
-        self.headLag = bool(config["headLagEn"])
 
         assert (self.idW >= self.ldqAddrW)
 
