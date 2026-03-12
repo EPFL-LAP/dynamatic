@@ -7,5 +7,7 @@ add_dynamatic_library(DynamaticBlifExporter
   DynamaticHW
   DynamaticSynth
   MLIRIR
+
+  LINK_COMPONENTS
   LLVMSupport
 )
