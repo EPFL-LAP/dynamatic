@@ -1,6 +1,15 @@
 # Testing using the BLIF files contained in test-cases which should contain a variety of combinational and sequential circuits
 
-find_program(ABC_EXECUTABLE abc)
+# Look for ABC in the CMake binary path
+find_program(ABC_EXECUTABLE abc
+  HINTS ${CMAKE_BINARY_DIR}/abc
+  NO_DEFAULT_PATH
+)
+# Fall back to system PATH if not found in build dir
+if(NOT ABC_EXECUTABLE)
+  find_program(ABC_EXECUTABLE abc)
+endif()
+
 if(ABC_EXECUTABLE)
 
   get_filename_component(DYNAMATIC_BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../.. ABSOLUTE)
