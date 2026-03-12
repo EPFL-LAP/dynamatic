@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   unittests:
-    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    runs-on: self-hosted
 
     steps:
       - name: cleanup
@@ -58,6 +59,6 @@ jobs:
 
       - name: check-blif-importer-exporter
         if: steps.build.outputs.exit_code == 0
-        run: ninja -C build run-blif-equiv-tests
+        run: ninja run-blif-equiv-tests
 
 
