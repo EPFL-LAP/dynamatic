@@ -30,17 +30,34 @@ jobs:
           echo "Folder contents"
           ls -la
 
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          ref: ${{github.event.pull_request.head.ref}}
-          repository: ${{github.event.pull_request.head.repo.full_name}}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update apt and install prerequisites
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install software-properties-common
+          sudo add-apt-repository ppa:deadsnakes/ppa
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install -y \
+            --option APT::Immediate-Configure=false \
+            sudo vim clang lld ccache cmake wget \
+            ninja-build python3 graphviz git curl \
+            gzip libreadline-dev \
+            libboost-all-dev pkg-config python3.12 \
+            python3.12-venv python3.12-dev \
+            ghdl verilator
+
+      - name: Verify Python 3.12
+        run: python3.12 --version
 
       - name: build
-        run: ./build.sh --release --enable-cbc --force 
+        run: ./build.sh --release --use-prebuilt-llvm --enable-cbc --force 
 
       - name: build-abc
-        run: ./build.sh --release --enable-abc --enable-cbc --force
+        run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
 
       - name: check-constraint-programming-library
         if: steps.build.outputs.exit_code == 0
