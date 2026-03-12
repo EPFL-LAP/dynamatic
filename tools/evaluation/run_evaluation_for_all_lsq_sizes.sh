@@ -17,7 +17,11 @@ for LSQ_SIZE in "${LSQ_SIZES[@]}"; do
     export LSQ_PIPE0_EN=0
     export LSQ_PIPE1_EN=0
     export LSQ_HEAD_LAG_EN=0
+    # Allow errors when running evaluation script:
+    # Required due to failures if LSQ is too small to hold a full group.
+    set +e
     python3 "$SCRIPT_DIR/run_evaluation.py" \
         -j 24 --synth-lsqs \
-        --json "$RESULTS_DIR/lsq_${LSQ_SIZE}_${LSQ_SIZE}.json"
+        --json "$RESULTS_DIR/lsq_${LSQ_SIZE}_${LSQ_SIZE}.json" \
+    set -e
 done
