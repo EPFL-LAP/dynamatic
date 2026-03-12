@@ -76,8 +76,8 @@ execute_process(
   OUTPUT_VARIABLE ABC_OUT
   ERROR_VARIABLE ABC_ERR
 )
-message(STATUS "ABC stdout:\n${ABC_OUT}")
-message(STATUS "ABC stderr:\n${ABC_ERR}")
+message(STATUS \"ABC output:\n\${ABC_OUT}\")
+message(STATUS \"ABC stderr:\n\${ABC_ERR}\")
 if(NOT RES3 EQUAL 0)
   message(FATAL_ERROR \"ABC equivalence command failed\")
 endif()
