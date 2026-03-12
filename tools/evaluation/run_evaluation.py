@@ -8,6 +8,7 @@ the -j flag.
 """
 
 import argparse
+import json
 import logging
 import re
 import shutil
@@ -71,6 +72,91 @@ exit
 # ──────────────────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Data extraction helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def parse_sim_report(path: Path):
+    """Return (cycle_count, passed) from a simulation report.txt."""
+    text = path.read_text()
+    passed = "C and VHDL outputs match" in text
+    m = re.search(r"Simulation done!\s+Latency\s*=\s*(\d+)\s+cycles", text)
+    cycle_count = int(m.group(1)) if m else None
+    return cycle_count, passed
+
+
+def parse_utilization(path: Path):
+    """Return (slices, luts, ffs) from a utilization report."""
+    slices = luts = ffs = None
+    for line in path.read_text().splitlines():
+        if m := re.match(r"\|\s*Slice LUTs\s*\|\s*(\d+)", line):
+            luts = int(m.group(1))
+        elif m := re.match(r"\|\s*Slice Registers\s*\|\s*(\d+)", line):
+            ffs = int(m.group(1))
+        elif m := re.match(r"\|\s*Slice\s*\|\s*(\d+)", line):
+            slices = int(m.group(1))
+    return slices, luts, ffs
+
+
+def parse_timing(path: Path):
+    """Return (cp_ns, slack_ns, cp_src, cp_dst) from a timing report."""
+    cp_ns = slack_ns = cp_src = cp_dst = None
+    for line in path.read_text().splitlines():
+        if m := re.match(r"\s*Slack\s*\([^)]*\)\s*:\s*(-?[\d.]+)ns", line):
+            slack_ns = float(m.group(1))
+        elif m := re.match(r"\s*Data Path Delay:\s*([\d.]+)ns", line):
+            cp_ns = float(m.group(1))
+        elif m := re.match(r"\s*Source:\s*(\S+)", line):
+            cp_src = m.group(1)
+        elif m := re.match(r"\s*Destination:\s*(\S+)", line):
+            cp_dst = m.group(1)
+    return cp_ns, slack_ns, cp_src, cp_dst
+
+
+def extract_kernel_data(kernel: str, out_dir: Path) -> dict:
+    """Extract metrics from a kernel's out/ directory. Missing files yield None values."""
+    data: dict = {}
+
+    sim_report = out_dir / "sim" / "report.txt"
+    if sim_report.exists():
+        cycle_count, passed = parse_sim_report(sim_report)
+        data["cycle_count"] = cycle_count
+        data["sim_passed"] = passed
+    else:
+        data["cycle_count"] = None
+        data["sim_passed"] = None
+
+    util_rpt = out_dir / "synth" / "utilization_post_pr.rpt"
+    if util_rpt.exists():
+        slices, luts, ffs = parse_utilization(util_rpt)
+        data["utilization_slice"] = slices
+        data["utilization_lut"] = luts
+        data["utilization_ff"] = ffs
+    else:
+        data["utilization_slice"] = None
+        data["utilization_lut"] = None
+        data["utilization_ff"] = None
+
+    timing_rpt = out_dir / "synth" / "timing_post_pr.rpt"
+    if timing_rpt.exists():
+        cp_ns, slack_ns, cp_src, cp_dst = parse_timing(timing_rpt)
+        data["timing_cp_ns"] = cp_ns
+        data["timing_slack_ns"] = slack_ns
+        data["timing_cp_src"] = cp_src
+        data["timing_cp_dst"] = cp_dst
+    else:
+        data["timing_cp_ns"] = None
+        data["timing_slack_ns"] = None
+        data["timing_cp_src"] = None
+        data["timing_cp_dst"] = None
+
+    return data
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Evaluation runner
+# ──────────────────────────────────────────────────────────────────────────────
 
 def setup_logging() -> None:
     logging.basicConfig(
@@ -201,20 +287,13 @@ def main() -> None:
         help="Number of kernels to run in parallel (default: 1).",
     )
     parser.add_argument(
-        "-o",
-        "--output-dir",
+        "--json",
         type=Path,
         default=None,
-        metavar="DIR",
-        help="Copy kernel out/ directories to DIR/{kernel}/out after each run.",
+        metavar="PATH",
+        help="Write extracted metrics as JSON to PATH after all kernels complete.",
     )
     args = parser.parse_args()
-
-    if args.output_dir is not None:
-        if args.output_dir.exists():
-            logging.error("Output directory %s already exists. Aborting...", args.output_dir)
-            sys.exit(1)
-        args.output_dir.mkdir(parents=True)
 
     build()
 
@@ -233,11 +312,6 @@ def main() -> None:
             else:
                 failed.append((kernel, failure_reason))
 
-            if args.output_dir is not None:
-                src = REPO_ROOT / "integration-test" / kernel / "out"
-                dst = args.output_dir / kernel / "out"
-                shutil.move(src, dst)
-
     # Summary
     elapsed = int(time.time() - start_time) // 60
     hours = elapsed // 60
@@ -251,6 +325,19 @@ def main() -> None:
         total,
         len(failed),
     )
+
+    if args.json is not None:
+        results = {}
+        for kernel in KERNELS:
+            out_dir = REPO_ROOT / "integration-test" / kernel / "out"
+            failure_reason = next((r for k, r in failed if k == kernel), None)
+            entry: dict = {"passed": failure_reason is None, "failure_reason": failure_reason}
+            if failure_reason is None:
+                entry.update(extract_kernel_data(kernel, out_dir))
+            results[kernel] = entry
+        args.json.write_text(json.dumps(results, indent=2))
+        logging.info("Results written to %s.", args.json)
+
     if failed:
         logging.error(
             "Failed kernels: %s",
