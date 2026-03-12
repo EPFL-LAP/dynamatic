@@ -53,9 +53,6 @@ jobs:
       - name: Verify Python 3.12
         run: python3.12 --version
 
-      - name: build
-        run: ./build.sh --release --use-prebuilt-llvm --enable-cbc --force 
-
       - name: build-abc
         run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
 
