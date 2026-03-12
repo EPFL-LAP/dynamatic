@@ -58,11 +58,11 @@ namespace {
 /// way. Then, when modifying a value's bitwidth, serves to guide
 /// the determination of which extension operation to use.
 /// - NONE when no extension has been encountered.
-/// - LOGICAL when only logical extensions have been encountered / when a value
-/// should be logically extended.
-/// - ARITHMETIC when only arithmaric extensions have been encountered / when a
-/// value should be arithmetically extended.
-enum class ExtType { NONE, LOGICAL, ARITHMETIC };
+/// - ZEXT when a zero extension has been encountered / when a value
+/// should be zero extended.
+/// - SEXT when a sign extension has been encountered / when a
+/// value should be sign extended.
+enum class ExtType { NONE, ZEXT, SEXT };
 
 /// A channel-typed value.
 using ChannelVal = TypedValue<handshake::ChannelType>;
@@ -104,14 +104,14 @@ static ChannelVal getMinimalValue(ChannelVal val, ExtType *ext = nullptr) {
 
   if (auto op = val.getDefiningOp<handshake::ExtSIOp>()) {
     if (ext)
-      *ext = ExtType::ARITHMETIC;
+      *ext = ExtType::SEXT;
 
     return op.getIn();
   }
 
   if (auto op = val.getDefiningOp<handshake::ExtUIOp>()) {
     if (ext)
-      *ext = ExtType::LOGICAL;
+      *ext = ExtType::ZEXT;
 
     return op.getIn();
   }
@@ -203,7 +203,7 @@ static ChannelVal modBitWidth(ExtValue extVal, unsigned targetWidth,
     // signedness information in the integer type.
     // All code should be migrated to pass LOGICAL or ARITHMETIC if it performs
     // bitwidth changes.
-    if (ext == ExtType::LOGICAL ||
+    if (ext == ExtType::ZEXT ||
         (ext == ExtType::NONE &&
          val.getType().getDataType().isUnsignedInteger())) {
       newOp = rewriter.create<handshake::ExtUIOp>(loc, dstChannelType, val);
@@ -355,10 +355,10 @@ static void canonicalizeCommutativeExtensionType(ExtWidth &lhs, ExtWidth &rhs) {
 /// Transfer function for add/sub operations or alike.
 static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
   canonicalizeCommutativeExtensionType(lhs, rhs);
-  if (rhs.extType <= ExtType::LOGICAL)
-    return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+  if (rhs.extType <= ExtType::ZEXT)
+    return {ExtType::ZEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 
-  return {ExtType::ARITHMETIC, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 }
 
 /// Transfer function for mul operations or alike.
@@ -369,7 +369,7 @@ static ExtWidth mulWidth(ExtWidth lhs, ExtWidth rhs) {
 /// Transfer function for div/rem operations or alike.
 template <bool zeroExtend>
 static ExtWidth divWidth(ExtWidth lhs, ExtWidth _) {
-  return {zeroExtend ? ExtType::LOGICAL : ExtType::NONE, lhs.bitWidth + 1};
+  return {zeroExtend ? ExtType::ZEXT : ExtType::NONE, lhs.bitWidth + 1};
 }
 
 /// Transfer function for and operations or alike.
@@ -384,8 +384,8 @@ static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
   // From our example:
   // Extending 'a' to 00001 and 'b' to 00101 yields the same result as if ANDing
   // "a = 01, b = 01" and zero-extending the result.
-  if (rhs.extType <= ExtType::LOGICAL)
-    return {ExtType::LOGICAL, std::min(lhs.bitWidth, rhs.bitWidth)};
+  if (rhs.extType <= ExtType::ZEXT)
+    return {ExtType::ZEXT, std::min(lhs.bitWidth, rhs.bitWidth)};
 
   // Sign-extension might fill with 1-bits, meaning all bits of the larger
   // operand are part of the effective result bitwidth.
@@ -397,14 +397,14 @@ static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
   // For bits the bits inbetween |a| and |b|, sign-extension of the smaller
   // operand is still required as the corresponding result bits are dependent
   // on the sign of the smaller operand.
-  return {ExtType::ARITHMETIC, std::max(lhs.bitWidth, rhs.bitWidth)};
+  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth)};
 }
 
 /// Transfer function for or/xor operations or alike.
 static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
   canonicalizeCommutativeExtensionType(lhs, rhs);
-  if (rhs.extType <= ExtType::LOGICAL)
-    return {ExtType::LOGICAL, std::max(lhs.bitWidth, rhs.bitWidth)};
+  if (rhs.extType <= ExtType::ZEXT)
+    return {ExtType::ZEXT, std::max(lhs.bitWidth, rhs.bitWidth)};
   // rhs guaranteed to be at least arithmetic from here on.
 
   // Since rhs was sign-extended the result to continue extending with 1s in the
@@ -417,10 +417,10 @@ static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
   // with 3 bits would be wrong however, since sext(OR 101, sext(01) to i3)
   // would extend with 1s, merely due to the bitwidth reduction.
   // The extra bit prevents this behavior.
-  if (lhs.extType == ExtType::LOGICAL && lhs.bitWidth > rhs.bitWidth)
-    return {ExtType::ARITHMETIC, 1 + lhs.bitWidth};
+  if (lhs.extType == ExtType::ZEXT && lhs.bitWidth > rhs.bitWidth)
+    return {ExtType::SEXT, 1 + lhs.bitWidth};
 
-  return {ExtType::ARITHMETIC, std::max(lhs.bitWidth, rhs.bitWidth)};
+  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth)};
 }
 
 //===----------------------------------------------------------------------===//
@@ -725,7 +725,7 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
     // Create a new mux whose select operand is optimized
     SmallVector<Value, 3> newOperands;
     newOperands.push_back(
-        modBitWidth({selectOperand, ExtType::LOGICAL}, optWidth, rewriter));
+        modBitWidth({selectOperand, ExtType::ZEXT}, optWidth, rewriter));
     auto dataOprds = muxOp.getDataOperands();
     newOperands.append(dataOprds.begin(), dataOprds.end());
     auto newMuxOp = rewriter.create<handshake::MuxOp>(
@@ -774,7 +774,7 @@ struct HandshakeCMergeIndex
         cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
         cmergeOp->getAttrs());
     namer.replaceOp(cmergeOp, newCmergeOp);
-    Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::LOGICAL},
+    Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::ZEXT},
                                  indexWidth, rewriter);
     rewriter.replaceOp(cmergeOp, {newCmergeOp.getResult(), modIndex});
     return success();
@@ -817,7 +817,7 @@ struct MemInterfaceAddrOpt
     // by inputIdx, and increment inputIdx before returning the optimized value
     auto getOptAddrInput = [&](unsigned inputIdx) {
       return modBitWidth({getMinimalValue(cast<ChannelVal>(operands[inputIdx])),
-                          ExtType::LOGICAL},
+                          ExtType::ZEXT},
                          optWidth, rewriter);
     };
 
@@ -878,7 +878,7 @@ struct MemInterfaceAddrOpt
     SmallVector<Value> replacementValues(newMemOp->getResults());
     for (unsigned resIdx : addrResultIndices) {
       replacementValues[resIdx] = modBitWidth(
-          {cast<ChannelVal>(replacementValues[resIdx]), ExtType::LOGICAL},
+          {cast<ChannelVal>(replacementValues[resIdx]), ExtType::ZEXT},
           ports.addrWidth, rewriter);
     }
     inheritBB(memOp, newMemOp);
@@ -914,9 +914,8 @@ struct MemPortAddrOpt
       return failure();
 
     // Derive new operands and result types with the narrrower address type
-    Value newAddr = modBitWidth(
-        {getMinimalValue(portOp.getAddressInput()), ExtType::LOGICAL}, optWidth,
-        rewriter);
+    Value newAddr = modBitWidth({getMinimalValue(portOp.getAddressInput()), ExtType::ZEXT},
+                    optWidth, rewriter);
     Value dataIn = portOp.getDataInput();
     SmallVector<Value, 2> newOperands{newAddr, dataIn};
     SmallVector<Type, 2> newResultTypes{newAddr.getType(), dataIn.getType()};
@@ -930,7 +929,7 @@ struct MemPortAddrOpt
     namer.replaceOp(portOp, newPortOp);
     inheritBB(portOp, newPortOp);
     Value newAddrRes = modBitWidth(
-        {newPortOp.getAddressOutput(), ExtType::LOGICAL}, addrWidth, rewriter);
+        {newPortOp.getAddressOutput(), ExtType::ZEXT}, addrWidth, rewriter);
     rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput()});
     return success();
   }
@@ -1094,7 +1093,7 @@ struct ArithSingleType : public OpRewritePattern<Op> {
       // It does not matter whether we use sign- or zero-extension in this case
       // since the bits added by the extension are unused by definition.
       // We use zero-extension as it is cheaper and easier to optimize.
-      optWidth = {ExtType::LOGICAL, getUsefulResultWidth(op.getResult())};
+      optWidth = {ExtType::ZEXT, getUsefulResultWidth(op.getResult())};
     }
     unsigned resWidth = channelVal.getType().getDataBitWidth();
     if (optWidth.bitWidth >= resWidth)
@@ -1149,8 +1148,8 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
 
     // Different operand extension types mean that we don't know how to extend
     // the operation's result, so it cannot be optimized
-    if ((extLhs == ExtType::LOGICAL && extRhs == ExtType::ARITHMETIC) ||
-        (extLhs == ExtType::ARITHMETIC && extRhs == ExtType::LOGICAL))
+    if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT) ||
+        (extLhs == ExtType::SEXT && extRhs == ExtType::ZEXT))
       return failure();
 
     // Create a new operation as well as appropriate bitwidth modification
@@ -1228,7 +1227,7 @@ struct ArithShift : public OpRewritePattern<Op> {
       Value newToShift =
           modBitWidth({minToShift, extToShift}, optWidth, rewriter);
       Value newShifyBy =
-          modBitWidth({minShiftBy, ExtType::LOGICAL}, optWidth, rewriter);
+          modBitWidth({minShiftBy, ExtType::ZEXT}, optWidth, rewriter);
       rewriter.setInsertionPoint(op);
       auto newOp = rewriter.create<Op>(op.getLoc(), newToShift.getType(),
                                        newToShift, newShifyBy);
@@ -1255,7 +1254,7 @@ struct ArithShift : public OpRewritePattern<Op> {
         modToShift = modBitWidth({minToShift, extToShift}, requiredToShiftWidth,
                                  rewriter);
       }
-      modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::LOGICAL},
+      modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::ZEXT},
                  optWidth, extToShift, rewriter, namer);
     }
     return success();
