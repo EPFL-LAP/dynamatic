@@ -152,7 +152,7 @@ def extract_kernel_data(kernel: str, out_dir: Path) -> dict:
         for lsq_dir in lsq_synth_dir.iterdir():
             if lsq_dir.is_dir():
                 lsq_data = extract_synth_data(lsq_dir)
-                data["lsq_synth"][lsq_dir.name] = lsq_data
+                data["synth_lsq"][lsq_dir.name] = lsq_data
         # Aggregate LSQ data across all LSQs for this kernel
         if data["synth_lsq"]:
             # Sum resources across all LSQs
@@ -253,10 +253,11 @@ def run_kernel(kernel: str, synth_lsqs: bool) -> tuple[str, str | None]:
         hdl_dir = out_dir / "hdl"
         for lsq_file in hdl_dir.glob("*_lsq*_core.vhd"):
             lsq_top = lsq_file.stem
-            lsq_name = re.match(r".*_(lsq\d+)_core.vhd", lsq_top).group(1)
+            lsq_name = re.match(r".*_(lsq\d+)_core", lsq_top).group(1)
             lsq_synth_dir = out_dir / "synth_lsq" / lsq_name
             logging.info("Running LSQ synthesis for %s (kernel %s)...", lsq_name, kernel)
 
+            lsq_synth_dir.mkdir(parents=True)
             lsq_out_path = lsq_synth_dir / "vivado_out.txt"
             lsq_err_path = lsq_synth_dir / "vivado_err.txt"
             with open(lsq_out_path, "w") as out_f, open(lsq_err_path, "w") as err_f:
