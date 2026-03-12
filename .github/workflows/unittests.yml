@@ -1,0 +1,54 @@
+name: unittests
+
+on:
+  # Make sure that settings are set to require permission
+  # to run workflows by external contributors!
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+    branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
+  
+  push:
+    paths-ignore:
+      - 'docs/**'
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unittests:
+    if: github.event.pull_request.draft == false
+    runs-on: self-hosted
+
+    steps:
+      - name: cleanup
+        run: |
+          echo "Emptying folder"
+          rm -rf -- * .*
+          echo "Folder contents"
+          ls -la
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{github.event.pull_request.head.ref}}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
+
+      - name: build
+        run: ./build.sh --release --enable-cbc --force 
+
+      - name: build-abc
+        run: ./build.sh --release --enable-abc --enable-cbc --force
+
+      - name: check-constraint-programming-library
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build run-constraint-programming-test
+
+      - name: check-blif-importer-exporter
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build-abc run-blif-equiv-tests
+
+
