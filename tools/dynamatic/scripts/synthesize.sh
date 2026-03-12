@@ -12,9 +12,9 @@ OUTPUT_DIR=$2
 KERNEL_NAME=$3
 FULL_CLOCK=$4
 HALF_CLOCK=$5
+SYNTH_DIR="${6:-$OUTPUT_DIR/synth}"
 
 # Generated directories/files
-SYNTH_DIR="$OUTPUT_DIR/synth"
 SYNTH_HDL_DIR="$SYNTH_DIR/hdl"
 F_REPORT="$SYNTH_DIR/report.txt"
 F_SCRIPT="$SYNTH_DIR/synthesize.tcl"
