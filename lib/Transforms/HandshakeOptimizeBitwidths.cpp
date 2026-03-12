@@ -914,7 +914,8 @@ struct MemPortAddrOpt
       return failure();
 
     // Derive new operands and result types with the narrrower address type
-    Value newAddr = modBitWidth({getMinimalValue(portOp.getAddressInput()), ExtType::ZEXT},
+    Value newAddr =
+        modBitWidth({getMinimalValue(portOp.getAddressInput()), ExtType::ZEXT},
                     optWidth, rewriter);
     Value dataIn = portOp.getDataInput();
     SmallVector<Value, 2> newOperands{newAddr, dataIn};
