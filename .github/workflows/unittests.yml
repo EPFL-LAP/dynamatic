@@ -59,6 +59,6 @@ jobs:
 
       - name: check-blif-importer-exporter
         if: steps.build.outputs.exit_code == 0
-        run: ninja -C build-abc run-blif-equiv-tests
+        run: ninja -C run-blif-equiv-tests
 
 
