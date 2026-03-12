@@ -30,6 +30,7 @@ List of options:
                                          checking
   --use-prebuilt-llvm                  : download and use the prebuilt LLVM
   --enable-cbc                         : enable the CBC milp solver
+  --enable-abc                         : enable the ABC logic synthesis tool
   --build-legacy-lsq                   : build the legacy chisel-based lsq
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
