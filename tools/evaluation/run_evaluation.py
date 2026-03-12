@@ -78,12 +78,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # ──────────────────────────────────────────────────────────────────────────────
 
 def parse_sim_report(path: Path):
-    """Return (cycle_count, passed) from a simulation report.txt."""
-    text = path.read_text()
-    passed = "C and VHDL outputs match" in text
-    m = re.search(r"Simulation done!\s+Latency\s*=\s*(\d+)\s+cycles", text)
-    cycle_count = int(m.group(1)) if m else None
-    return cycle_count, passed
+    """Return cycle_count from a simulation report.txt."""
+    m = re.search(r"Simulation done!\s+Latency\s*=\s*(\d+)\s+cycles", path.read_text())
+    return int(m.group(1)) if m else None
 
 
 def parse_utilization(path: Path):
@@ -114,42 +111,60 @@ def parse_timing(path: Path):
     return cp_ns, slack_ns, cp_src, cp_dst
 
 
+def extract_synth_data(synth_dir: Path) -> dict | None:
+    """Extract synthesis metrics from a synth directory."""
+    util_rpt = synth_dir / "utilization_post_pr.rpt"
+    timing_rpt = synth_dir / "timing_post_pr.rpt"
+
+    if not util_rpt.exists() and not timing_rpt.exists():
+        return None
+
+    assert util_rpt.exists() and timing_rpt.exists(), \
+        "Expected both utilization and timing reports to be present if either is present."
+
+    slices, luts, ffs = parse_utilization(util_rpt)
+    resources = {"slice": slices, "lut": luts, "ff": ffs}
+
+    cp_ns, slack_ns, cp_src, cp_dst = parse_timing(timing_rpt)
+    timing = {"cp_ns": cp_ns, "slack_ns": slack_ns, "cp_src": cp_src, "cp_dst": cp_dst}
+
+    return {"resources": resources, "timing": timing}
+
+
 def extract_kernel_data(kernel: str, out_dir: Path) -> dict:
     """Extract metrics from a kernel's out/ directory. Missing files yield None values."""
     data: dict = {}
 
     sim_report = out_dir / "sim" / "report.txt"
     if sim_report.exists():
-        cycle_count, passed = parse_sim_report(sim_report)
-        data["cycle_count"] = cycle_count
-        data["sim_passed"] = passed
+        data["simulation"] = {"cycle_count": parse_sim_report(sim_report)}
     else:
-        data["cycle_count"] = None
-        data["sim_passed"] = None
+        data["simulation"] = None
 
-    util_rpt = out_dir / "synth" / "utilization_post_pr.rpt"
-    if util_rpt.exists():
-        slices, luts, ffs = parse_utilization(util_rpt)
-        data["utilization_slice"] = slices
-        data["utilization_lut"] = luts
-        data["utilization_ff"] = ffs
-    else:
-        data["utilization_slice"] = None
-        data["utilization_lut"] = None
-        data["utilization_ff"] = None
+    synth_dir = out_dir / "synth"
+    if synth_dir.exists():
+        data["synth"] = extract_synth_data(out_dir / "synth")
 
-    timing_rpt = out_dir / "synth" / "timing_post_pr.rpt"
-    if timing_rpt.exists():
-        cp_ns, slack_ns, cp_src, cp_dst = parse_timing(timing_rpt)
-        data["timing_cp_ns"] = cp_ns
-        data["timing_slack_ns"] = slack_ns
-        data["timing_cp_src"] = cp_src
-        data["timing_cp_dst"] = cp_dst
-    else:
-        data["timing_cp_ns"] = None
-        data["timing_slack_ns"] = None
-        data["timing_cp_src"] = None
-        data["timing_cp_dst"] = None
+    # Extract LSQ synth data if present
+    lsq_synth_dir = out_dir / "synth_lsq"
+    if lsq_synth_dir.exists():
+        data["synth_lsq"] = {}
+        for lsq_dir in lsq_synth_dir.iterdir():
+            if lsq_dir.is_dir():
+                lsq_data = extract_synth_data(lsq_dir)
+                data["lsq_synth"][lsq_dir.name] = lsq_data
+        # Aggregate LSQ data across all LSQs for this kernel
+        if data["synth_lsq"]:
+            # Sum resources across all LSQs
+            total_slices = sum(d["resources"]["slice"] for d in data["synth_lsq"].values())
+            total_luts = sum(d["resources"]["lut"] for d in data["synth_lsq"].values())
+            total_ffs = sum(d["resources"]["ff"] for d in data["synth_lsq"].values())
+            resources = {"slice": total_slices, "lut": total_luts, "ff": total_ffs}
+            # Find most critical timing across all LSQs (longest critical path)
+            critical_cp_ns = max(d["timing"]["cp_ns"] for d in data["synth_lsq"].values())
+            critical_slack_ns = min(d["timing"]["slack_ns"] for d in data["synth_lsq"].values())
+            timing = {"cp_ns": critical_cp_ns, "slack_ns": critical_slack_ns}
+            data["synth_lsq"]["total"] = {"resources": resources, "timing": timing}
 
     return data
 
