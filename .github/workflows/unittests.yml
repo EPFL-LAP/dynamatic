@@ -53,9 +53,8 @@ jobs:
       - name: Verify Python 3.12
         run: python3.12 --version
 
-      - name: build-abc
+      - name: build
         run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
-
 
       - name: check-blif-importer-exporter
         if: steps.build.outputs.exit_code == 0
