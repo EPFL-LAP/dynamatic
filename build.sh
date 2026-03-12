@@ -143,6 +143,7 @@ PREBUILT_LLVM=0
 BUILD_CHIESEL_LSQ=0
 ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
+CMAKE_DYNAMATIC_ENABLE_ABC=""
 LLVM_DIR="$PWD/llvm-project/build"
 
 # Loop over command line arguments and update script variables
@@ -205,6 +206,9 @@ do
           "--enable-cbc")
               CMAKE_DYNAMATIC_ENABLE_CBC="-DDYNAMATIC_ENABLE_CBC=ON"
               ENABLE_CBC=1
+              ;;
+          "--enable-abc")
+              CMAKE_DYNAMATIC_ENABLE_ABC="-DDYNAMATIC_ENABLE_ABC=ON"
               ;;
           "--build-legacy-lsq")
               BUILD_CHIESEL_LSQ=1
@@ -359,6 +363,7 @@ if should_run_cmake ; then
             $CMAKE_LLVM_BUILD_OPTIMIZATIONS \
             $CMAKE_DYNAMATIC_ENABLE_XLS \
             $CMAKE_DYNAMATIC_ENABLE_CBC \
+            $CMAKE_DYNAMATIC_ENABLE_ABC \
             $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
 
     LLVM_DIR="../build/llvm-project"
@@ -375,6 +380,7 @@ if should_run_cmake ; then
         $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
         $CMAKE_DYNAMATIC_ENABLE_XLS \
         $CMAKE_DYNAMATIC_ENABLE_CBC \
+        $CMAKE_DYNAMATIC_ENABLE_ABC \
         $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   fi
   exit_on_fail "Failed to cmake dynamatic"

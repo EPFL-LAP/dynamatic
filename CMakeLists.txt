@@ -246,6 +246,28 @@ if(DYNAMATIC_ENABLE_CBC)
 endif()
 
 #-------------------------------------------------------------------------------
+# ABC setup
+#-------------------------------------------------------------------------------
+
+if(DYNAMATIC_ENABLE_ABC)
+  if (UNIX)
+    FetchContent_Declare(
+      abc
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+      SOURCE_DIR ${CMAKE_BINARY_DIR}/abc
+      URL https://github.com/ETHZ-DYNAMO/abc/archive/refs/tags/v1.0.0.tar.gz
+      SYSTEM
+    )
+
+    FetchContent_MakeAvailable(abc)
+    add_compile_definitions(DYNAMATIC_ENABLE_ABC)
+  else()
+    message(FATAL_ERROR "ABC integration is not tested on the OS you use!")
+  endif()
+endif()
+
+
+#-------------------------------------------------------------------------------
 # Python (Virtual Environment)
 #-------------------------------------------------------------------------------
 
