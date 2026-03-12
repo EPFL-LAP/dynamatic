@@ -98,6 +98,10 @@ jobs:
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-constraint-programming-test
 
+      - name: check-blif-importer-exporter
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build run-blif-equiv-tests
+
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-ci-integration-tests
