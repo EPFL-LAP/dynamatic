@@ -10,7 +10,7 @@ if(NOT ABC_EXECUTABLE)
   find_program(ABC_EXECUTABLE abc)
 endif()
 
-if(ABC_EXECUTABLE)
+if(DYNAMATIC_ENABLE_ABC)
 
   get_filename_component(DYNAMATIC_BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../.. ABSOLUTE)
 
