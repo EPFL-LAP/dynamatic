@@ -8,6 +8,4 @@ add_dynamatic_library(DynamaticBlifExporter
   DynamaticSynth
   MLIRIR
 
-  LINK_COMPONENTS
-  LLVMSupport
 )
