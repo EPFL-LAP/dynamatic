@@ -94,6 +94,10 @@ jobs:
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic-experimental
 
+      - name: check-constraint-programming-library
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build run-constraint-programming-test
+
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-ci-integration-tests
