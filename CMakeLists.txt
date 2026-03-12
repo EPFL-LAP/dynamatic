@@ -251,6 +251,11 @@ endif()
 
 if(DYNAMATIC_ENABLE_ABC)
   if (UNIX)
+
+    # Disable reproducibility warning for third-party code
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=date-time -Wno-date-time")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=date-time -Wno-date-time")
+
     FetchContent_Declare(
       abc
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE
@@ -265,7 +270,6 @@ if(DYNAMATIC_ENABLE_ABC)
     message(FATAL_ERROR "ABC integration is not tested on the OS you use!")
   endif()
 endif()
-
 
 #-------------------------------------------------------------------------------
 # Python (Virtual Environment)
