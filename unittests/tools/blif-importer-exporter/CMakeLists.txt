@@ -37,7 +37,7 @@ foreach(BLIF_FILE ${BLIF_TEST_FILES})
   else()
       set(BET_MODE combinational)
   endif()
-  
+
   add_blif_equiv_test(
     NAME ${TEST_NAME}
     INPUT ${BLIF_FILE}
@@ -50,7 +50,7 @@ endforeach()
 add_custom_target(
   run-blif-equiv-tests
   COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel 8 --timeout 1500 --output-on-failure
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMENT "Run BLIF equivalence tests."
   VERBATIM
   USES_TERMINAL
