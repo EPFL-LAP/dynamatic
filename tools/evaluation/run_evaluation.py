@@ -195,7 +195,7 @@ def build() -> None:
     logging.info("Build succeeded.")
 
 
-def run_kernel(kernel: str, synth_lsqs: bool) -> tuple[str, str | None]:
+def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str | None]:
     """
     Run the .dyn script for *kernel*, writing stdout/stderr directly to
     integration-test/{kernel}/out/dynamatic_{out,err}.txt, and return
@@ -204,6 +204,9 @@ def run_kernel(kernel: str, synth_lsqs: bool) -> tuple[str, str | None]:
     logging.info("Running kernel %s...", kernel)
     src = f"integration-test/{kernel}/{kernel}.c"
     script = DYN_SCRIPT.format(src=src)
+    if no_synth:
+        # Remove the "synthesize" command from the script
+        script = "\n".join(l for l in script.splitlines() if not l.startswith("synthesize")) + "\n"
 
     out_dir = REPO_ROOT / "integration-test" / kernel / "out"
     # ensure a clean output directory for the kernel
@@ -290,6 +293,11 @@ def main() -> None:
         description="Run Dynamatic evaluation for a list of kernels."
     )
     parser.add_argument(
+        "--no-synth",
+        action="store_true",
+        help="Skip synthesis (default: False).",
+    )
+    parser.add_argument(
         "--synth-lsqs",
         action="store_true",
         help="Run out-of-context synthesis for LSQs after simulation (default: False).",
@@ -311,6 +319,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.no_synth and args.synth_lsqs:
+        logging.error("Cannot use --synth-lsqs without synthesis. Please remove --synth-lsqs or add --no-synth.")
+        sys.exit(1)
+
     build()
 
     logging.info("Running %d kernel(s) with %d parallel job(s)...", len(KERNELS), args.jobs)
@@ -320,7 +332,7 @@ def main() -> None:
     failed: list[tuple[str, str | None]] = []
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-        futures = {executor.submit(run_kernel, k, args.synth_lsqs): k for k in KERNELS}
+        futures = {executor.submit(run_kernel, k, args.no_synth, args.synth_lsqs): k for k in KERNELS}
         for future in as_completed(futures):
             kernel, failure_reason = future.result()
             if failure_reason is None:
