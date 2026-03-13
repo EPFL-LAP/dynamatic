@@ -482,7 +482,7 @@ LogicalResult Command::parsePositional(StringRef arg,
   }
   args.positionals.push_back(arg);
   return success();
-};
+}
 
 LogicalResult Command::parseFlag(StringRef name, CommandArguments &args) const {
   if (args.flags.contains(name)) {
@@ -491,7 +491,7 @@ LogicalResult Command::parseFlag(StringRef name, CommandArguments &args) const {
   }
   args.flags.insert(name);
   return success();
-};
+}
 
 LogicalResult Command::parseOption(StringRef name, StringRef value,
                                    CommandArguments &args) const {
@@ -501,7 +501,7 @@ LogicalResult Command::parseOption(StringRef name, StringRef value,
   }
   args.options.insert({name, value});
   return success();
-};
+}
 
 std::string Command::getShortCmdDesc() const {
   std::stringstream ss;

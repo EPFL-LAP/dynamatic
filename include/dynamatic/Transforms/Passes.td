@@ -307,19 +307,26 @@ def CreditBasedSharing : Pass<"credit-based-sharing"> {
   let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
-def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
-  let summary = "Sets the floating point arithmetic unit 'vendor'.";
+def HandshakeSetUnitImplAttributes : Pass<
+  "handshake-set-unit-impl-attr",
+  "handshake::FuncOp"
+> {
+  let summary = "Sets the unit attributes needed for the unit generators of the backend";
   let description = [{
-    This pass takes a single floating point unit 'vendor' as input and
-    marks every floating point arithmetic operation. This is later used
-    to decide how to generate the RTL of these units.
-    Defaults to vivado.
+    Sets the following attributes:
+    - the floating-point arithmetic unit 'vendor'. 
+    - the internal delays of the floating point units.
+    - the latencies of the pipeline units.
   }];
   let options = [
-    Option<"impl", "impl", "::std::string",
-      "\"VIVADO\"",
-      "Which FPU impl to use.">
+    Option<"impl", "impl", "::std::string", "\"VIVADO\"", "Which FPU impl to use.">,
+    Option<"timingModels", "timing-models", "std::string", "",
+    "Path to JSON-formatted file containing timing models for dataflow "
+    "components.">,
+    Option<"targetCP", "target-period", "double", "4.0",
+    "Target clock period for the buffer placement CFDFC">
   ];
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 def HandshakeMarkBLIFImpl : DynamaticPass<"handshake-mark-blif-impl"> {
@@ -402,27 +409,6 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
   }];
 }
 
-def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
-  let summary = "Mark all memory dependencies in the IR.";
-  let description = [{
-    Analyzes memory accesses in each function in a module and identifies all
-    dependencies between them. Stores information about these dependencies in a
-    `dynamatic::handshake::MemDependenceArrayAttr` attribute attached to each
-    operation that is the source of at least one dependency.
-
-    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
-    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
-    It uses MLIR's polyhedral analysis infrastructure to identify complex
-    dependencies between pairs of affine accesses, and uses a pessimistic
-    approach for pairs of accesses that involve at least one non-affine access.
-    While this pass can be ran at any point before conversion to Handshake, it
-    makes the most sense to run it as early as possible since affine analysis 
-    relies on very high-level information.
-
-    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
-    check for a dependence between two affine accesses.
-  }];
-}
 
 def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
   let summary = "Mark memory accesses with the interface they should connect to.";
@@ -513,5 +499,6 @@ def HandshakeTreeHeightReduction : Pass<"handshake-tree-height-reduction"> {
   let summary = "Optimizes the arithmetic operation depth in handshake IR.";
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
+
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

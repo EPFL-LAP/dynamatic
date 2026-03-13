@@ -296,7 +296,8 @@ INSTANTIATE_TEST_SUITE_P(
       "test_int16",
       "test_double",
       "unused_arg",
-      "test_bool_array"
+      "test_bool_array",
+      "test_divui"
       ),
       [](const auto &info) { return info.param; });
 

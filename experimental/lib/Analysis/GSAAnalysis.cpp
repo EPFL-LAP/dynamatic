@@ -138,7 +138,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
   // an inappropriate operation
   if (functionsCovered != 1)
     llvm::errs() << "[GSA] GSAAnalysis failed due to a wrong input type\n";
-};
+}
 
 experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
     ListExpressionsPerGate &expressions, std::queue<unsigned> conditions,
