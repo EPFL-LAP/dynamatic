@@ -1,4 +1,3 @@
-
 #include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 
 void gaussianElimination(MatIntType &m) {
