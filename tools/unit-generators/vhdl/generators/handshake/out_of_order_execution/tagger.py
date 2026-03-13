@@ -1,4 +1,5 @@
-from generators.support.signal_manager import generate_entity_tag_operations, _forward_extra_signals, generate_inner_port_forwarding_tag_operations
+from generators.support.signal_manager.tag import generate_entity_tag_operations, generate_inner_port_forwarding_tag_operations
+from generators.support.signal_manager.utils.generation import generate_signal_wise_forwarding
 from generators.handshake.join import generate_join
 
 
@@ -187,29 +188,29 @@ def _generate_tagger_signal_manager(name, data_bitwidth, current_tag, tag_bitwid
 
   entity = generate_entity_tag_operations(name, in_ports, out_ports)
 
-  forwarded_extra_signals = _forward_extra_signals(
-      extra_signals, in_ports)
 
   # Assign all extra signals for each output port, based on forwarded_extra_signals.
   # e.g., result_spec <= lhs_spec or rhs_spec;
   extra_signal_assignments = []
-  for out_port in out_ports:
-    port_name = out_port["name"]
-    port_2d = out_port.get("2d", False)
 
-    if not port_2d:
-      # Assign all extra signals to this output port
-      for signal_name in out_port["extra_signals"]:
-        extra_signal_assignments.append(
-            f"  {port_name}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
-    else:
-      port_size = out_port["size"]
-      for signal_name in out_port["extra_signals"]:
-        for i in range(port_size):
-          extra_signal_assignments.append(
-              f"  {port_name}_{i}_{signal_name} <= {forwarded_extra_signals[signal_name]};")
-  extra_signal_assignments_formatted = "\n".join(
-      extra_signal_assignments).lstrip()
+  in_channel_names = [p["name"] for p in in_ports]
+
+  for signal_name in extra_signals:
+    out_channel_names = [
+        p["name"] for p in out_ports
+        if signal_name in p.get("extra_signals", {})
+    ]
+
+    if out_channel_names:
+      extra_signal_assignments.append(
+          generate_signal_wise_forwarding(
+              in_channel_names,
+              out_channel_names,
+              signal_name
+          )
+      )
+
+  extra_signal_assignments_formatted = "\n".join(extra_signal_assignments)
 
   inner_port_forwarding = generate_inner_port_forwarding_tag_operations(
       in_ports + out_ports)
