@@ -25,9 +25,9 @@
 #include "dynamatic/Dialect/Synth/SynthOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/BlifImporter/BlifImporterSupport.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Utils/Utils.h"
-#include "dynamatic/Transforms/BlifImporter/BlifImporterSupport.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
@@ -637,7 +637,7 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
     // module
     BLIFImplInterface blifInterfaceOp = dyn_cast<BLIFImplInterface>(op);
     BLIFImplInterface blifInterfaceModule =
-        dyn_cast<BLIFImplInterface>(hwModule);
+        dyn_cast<BLIFImplInterface>(hwModule.getOperation());
     if (auto blifAttr = blifInterfaceOp.getBLIFImpl()) {
       blifInterfaceModule.setBLIFImpl(blifAttr);
     }
@@ -928,122 +928,12 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 // instances to synth operations
 // ------------------------------------------------------------------
 
-// Function to read a blif file and generate the synth circuit depending on the
-// blif description. It uses the blif importer class to read the blif file and
-// generate the synth circuit. The core functionality is checking the
-// consistency of the blif file with the hw module and hw instance.
-LogicalResult generateSynthCircuitFromBlif(StringRef blifFilePath, Location loc,
-                                           hw::InstanceOp hwInst,
-                                           hw::HWModuleOp hwModule,
-                                           OpBuilder &builder) {
-  builder.setInsertionPoint(hwInst);
-  // The following function reads the blif file specified by blifFilePath
-  // and generates the synth circuit defined in it.
-
-  // Generate blif importer
-  BlifImporter blifImporter(blifFilePath);
-  // Read input and output ports from the blif file
-  if (failed(blifImporter.extractBlifModuleHeader())) {
-    llvm::errs() << "Failed to read the blif file header." << "\n";
-    return failure();
-  }
-
-  std::string moduleName = blifImporter.getModuleName();
-  SmallVector<std::string> inputPortsNames = blifImporter.getInputPortsNames();
-  SmallVector<std::string> outputPortsNames =
-      blifImporter.getOutputPortsNames();
-
-  // Collect the inputs of the hw instance in a map to pass to the function that
-  // generates the synth circuit
-  llvm::StringMap<Value> hwInstInputs;
-
-  // Collect the outputs of the hw instance in a vector to check that they match
-  // the output ports in the blif file
-  SmallVector<StringRef> hwInstOutputs;
-
-  // Collect hw instance inputs
-  for (auto &port : hwModule.getPortList()) {
-    if (port.isInput()) {
-      // Check the port is not already in the map
-      assert(!hwInstInputs.count(builder.getStringAttr(port.name.getValue())) &&
-             "port name already exists in the hw instance inputs map");
-      // Check bounds of argNum
-      unsigned argNum = port.argNum;
-      assert(argNum < hwInst.getNumOperands() &&
-             "Instance operand index out of bounds");
-      Value hwInstInput = hwInst.getOperand(argNum);
-      assert(hwInstInput && "hw instance input value should not be null");
-      hwInstInputs[port.name] = hwInstInput;
-    }
-  }
-
-  // Collect hw instance outputs
-  for (auto &port : hwModule.getPortList()) {
-    if (port.isOutput()) {
-      hwInstOutputs.push_back(port.name.getValue());
-    }
-  }
-
-  // Check that the instance is fully connected
-  assert((hwInst.getOperands().size() == hwModule.getNumInputPorts() &&
-          hwInst.getResults().size() == hwModule.getNumOutputPorts()) &&
-         "Cannot use positional operands on partially-connected instance");
-
-  // Check the number of inputs in the blif file matches the number of input
-  // ports of the hw module
-  if (inputPortsNames.size() != hwModule.getNumInputPorts() ||
-      inputPortsNames.size() != hwInstInputs.size()) {
-    llvm::errs()
-        << "The number of input ports in the blif file ("
-        << inputPortsNames.size()
-        << ") does not match the number of input ports in the hw module ("
-        << hwModule.getNumInputPorts() << ")." << "\n";
-    return failure();
-  }
-
-  // Check the number of outputs in the blif file matches the number of output
-  // ports of the hw module
-  if (outputPortsNames.size() != hwModule.getNumOutputPorts() ||
-      outputPortsNames.size() != hwInstOutputs.size()) {
-    llvm::errs()
-        << "The number of output ports in the blif file ("
-        << outputPortsNames.size()
-        << ") does not match the number of output ports in the hw module ("
-        << hwModule.getNumOutputPorts() << ")." << "\n";
-    return failure();
-  }
-
-  Location hwInstanceloc = hwInst.getLoc();
-  // Collect the outputs of the synth circuit
-  SmallVector<Value> synthOutputs;
-  // Generate the synth circuit from the blif file
-  if (failed(blifImporter.generateSynthCircuitFromBlif(
-          hwInstanceloc, hwInstInputs, outputPortsNames, synthOutputs,
-          builder))) {
-    llvm::errs() << "Failed to generate the synth circuit from the blif file."
-                 << "\n";
-    return failure();
-  }
-
-  assert(synthOutputs.size() == outputPortsNames.size() &&
-         "The number of outputs of the synth circuit does not match the number "
-         "of output ports in the blif file");
-
-  // Replace hw instance outputs with the corresponding synth signals
-  for (unsigned i = 0; i < hwInst.getNumResults(); ++i) {
-    hwInst.getResult(i).replaceAllUsesWith(synthOutputs[i]);
-  }
-  // Erase the hw instance operation
-  hwInst.erase();
-  return success();
-}
-
 // Function to replace an instance with synth operations
 // It manages the replacement of a single hw instance operation
-LogicalResult convertHWInstanceToSynthOps(hw::InstanceOp op,
-                                          OpBuilder &builder) {
+LogicalResult
+convertHWInstanceToSynthOps(ModuleOp modOp, hw::InstanceOp op,
+                            SmallVector<std::string> &modifiedHWModules) {
 
-  builder.setInsertionPoint(op);
   // Ensure that the blif path is specified in the hw module of the hw
   // instance operation
   SymbolTable symTable = SymbolTable(op->getParentOfType<ModuleOp>());
@@ -1052,7 +942,8 @@ LogicalResult convertHWInstanceToSynthOps(hw::InstanceOp op,
     llvm::errs() << "could not find hw module for instance: " << op << "\n";
     return failure();
   }
-  BLIFImplInterface blifInterfaceModule = dyn_cast<BLIFImplInterface>(hwModule);
+  BLIFImplInterface blifInterfaceModule =
+      dyn_cast<BLIFImplInterface>(hwModule.getOperation());
   if (!blifInterfaceModule || !blifInterfaceModule.getBLIFImpl()) {
     llvm::errs() << "hw module for instance does not have blif path attribute: "
                  << hwModule << "\n";
@@ -1064,28 +955,26 @@ LogicalResult convertHWInstanceToSynthOps(hw::InstanceOp op,
 
   // Check if blifFilePath is empty
   if (blifFilePath == "") {
-    // If this is the case, there is no blif for this specific module and it
-    // should be replaced with a subckt operation
-    // Create the synth subcircuit operation inside the hw module
-    synth::SubcktOp synthInstOp = builder.create<synth::SubcktOp>(
-        op->getLoc(), op.getResultTypes(), op.getOperands(), "synth_subckt");
-    //  Collect results of the subckt operation
-    SmallVector<Value> synthResults = synthInstOp.getResults();
-    // For each output of the hw instance, replace with the corresponding
-    // output of the synth subckt operation
-    for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      op.getResult(i).replaceAllUsesWith(synthResults[i]);
-    }
-    // Erase the hw instance operation
-    op.erase();
+    // If the blif path is empty, it means that this module should not be
+    // replaced with synth operations, so just return success without doing
+    // anything
     return success();
   }
 
-  // Read the blif path and extract the synth circuit
-  if (failed(generateSynthCircuitFromBlif(blifFilePath, op.getLoc(), op,
-                                          hwModule, builder))) {
+  // Import the blif circuit corresponding to the hw module of the instance
+  hw::HWModuleOp newHWModule = importBlifCircuit(modOp, blifFilePath);
+
+  // Check if the import was successful
+  if (!newHWModule) {
+    llvm::errs() << "failed to import blif circuit for instance: " << op
+                 << "\n";
     return failure();
   }
+
+  // TODO: check that the ports of the new hw module match the ports of the
+  // original hw module.
+
+  // TODO: replace the hw module with the new one
 
   return success();
 }
@@ -1113,9 +1002,12 @@ LogicalResult convertHWInstancesToSynthOps(mlir::ModuleOp modOp,
   SmallVector<hw::InstanceOp> hwInstances;
   topHWModule.walk([&](hw::InstanceOp op) { hwInstances.push_back(op); });
   OpBuilder builder(ctx);
+  // Collect the list of modified hw modules to avoid modifying the same module
+  // multiple times
+  SmallVector<std::string> modifiedHWModules;
   // Convert each hw instance into synth operations
   for (hw::InstanceOp hwInst : hwInstances) {
-    if (failed(convertHWInstanceToSynthOps(hwInst, builder))) {
+    if (failed(convertHWInstanceToSynthOps(modOp, hwInst, modifiedHWModules))) {
       llvm::errs() << "Failed to convert hw instance to synth ops: " << hwInst
                    << "\n";
       return failure();
