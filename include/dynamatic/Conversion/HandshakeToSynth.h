@@ -75,6 +75,9 @@
 
 namespace dynamatic {
 
+// Static map that contains the blif file path for each operation
+static DenseMap<Operation *, std::string> opToBlifPathMap;
+
 // Keywords for data and control signals when unbundling Handshake types using
 // enums.
 enum SignalKind {

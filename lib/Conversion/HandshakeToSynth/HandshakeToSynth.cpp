@@ -569,10 +569,11 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
     // Copy attribute for blif data path from the original operation to the hw
     // module
     BLIFImplInterface blifInterfaceOp = dyn_cast<BLIFImplInterface>(op);
-    BLIFImplInterface blifInterfaceModule =
-        dyn_cast<BLIFImplInterface>(hwModule.getOperation());
     if (auto blifAttr = blifInterfaceOp.getBLIFImpl()) {
-      blifInterfaceModule.setBLIFImpl(blifAttr);
+      opToBlifPathMap[hwModule.getOperation()] = blifAttr.getValue().str();
+    } else {
+      // Mark it with empty string
+      opToBlifPathMap[hwModule.getOperation()] = "";
     }
   }
 
@@ -887,16 +888,10 @@ populateHWModuleWithSynthOps(ModuleOp modOp, hw::InstanceOp op,
     llvm::errs() << "could not find hw module for instance: " << op << "\n";
     return failure();
   }
-  BLIFImplInterface blifInterfaceModule =
-      dyn_cast<BLIFImplInterface>(hwModule.getOperation());
-  if (!blifInterfaceModule || !blifInterfaceModule.getBLIFImpl()) {
-    llvm::errs() << "hw module for instance does not have blif path attribute: "
-                 << hwModule << "\n";
-    return failure();
-  }
-  // Get the blif path attribute
-  mlir::StringAttr blifPathAttr = blifInterfaceModule.getBLIFImpl();
-  StringRef blifFilePath = blifPathAttr.getValue();
+  // Get the blif path
+  assert(opToBlifPathMap.contains(hwModule.getOperation()) &&
+         "missing blif path for hw module");
+  StringRef blifFilePath = opToBlifPathMap[hwModule.getOperation()];
 
   // Check if blifFilePath is empty
   if (blifFilePath == "") {
@@ -1023,9 +1018,9 @@ public:
       }
       std::string blifFilePath = blifImplInterface.getBLIFImpl().str();
       if (blifFilePath.empty()) {
-        llvm::errs() << "Handshake operation " << getUniqueName(op)
-                     << " is not marked with a BLIF file path\n";
-        return signalPassFailure();
+        // Write out warning
+        llvm::errs() << "Warning: Handshake operation " << getUniqueName(op)
+                     << " has an empty BLIF file path\n";
       }
     });
 
@@ -1033,6 +1028,11 @@ public:
     if (failed(unbundleAllHandshakeTypes(modOp, ctx)))
       return signalPassFailure();
 
+    // Temporary return to test the first two steps before re-implementing step
+    // 3
+    return;
+
+    /*
     // Step 2: invert the direction of all ready signals in the hw modules
     // created from handshake operations. Additionally, unbundle data signals
     // into single-bit signals.
@@ -1044,6 +1044,7 @@ public:
     signalRewriter.setTopFunctionName(topModuleName);
     if (failed(signalRewriter.rewriteAllSignals(modOp)))
       return signalPassFailure();
+    */
 
     // Step 3: Populate the hw module operations with the correspoding synth
     // operations. The description of the implementation is defined in the path
