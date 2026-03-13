@@ -364,7 +364,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (handshakeOp == "handshake.mux") {
+  } else if (handshakeOp == "handshake.mux" || handshakeOp == "handshake.demux") {
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
@@ -516,7 +516,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   } else if (
       // clang-format off
       handshakeOp == "handshake.source" ||
-      handshakeOp == "handshake.non_spec"
+      handshakeOp == "handshake.non_spec"||
+      handshakeOp == "handshake.demux"
       // clang-format on
   ) {
     serializedParams["EXTRA_SIGNALS"] =

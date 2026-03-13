@@ -602,6 +602,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             // Bitwidth
             addType("DATA_TYPE", cbrOp.getDataOperand());
           })
+      .Case<handshake::DemuxOp>([&](handshake::DemuxOp demuxOp) {
+        // Number of output data channels, data bitwidth, and select bitwidth
+        addUnsigned("SIZE", demuxOp->getResults().size());
+        addType("DATA_TYPE", demuxOp.getDataOperand());
+        addType("SELECT_TYPE", demuxOp.getSelectOperand());
+          })
       .Case<handshake::SourceOp>([&](auto) {
         // No discrimianting parameters, just to avoid falling into the
         // default case for sources
@@ -2159,6 +2165,7 @@ public:
         ConvertToHWInstance<handshake::NDWireOp>,
         ConvertToHWInstance<handshake::ConditionalBranchOp>,
         ConvertToHWInstance<handshake::BranchOp>,
+        ConvertToHWInstance<handshake::DemuxOp>,
         ConvertToHWInstance<handshake::MergeOp>,
         ConvertToHWInstance<handshake::ControlMergeOp>,
         ConvertToHWInstance<handshake::MuxOp>,

@@ -82,6 +82,7 @@ if __name__ == "__main__":
     generators.add("handshake", "cmpf")
     generators.add("handshake", "cond_br")
     generators.add("handshake", "br")
+    generators.add("handshake", "demux")
     generators.add("handshake", "constant")
     generators.add("handshake", "control_merge")
     generators.add("handshake", "divf")
