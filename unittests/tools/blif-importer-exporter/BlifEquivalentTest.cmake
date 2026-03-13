@@ -3,6 +3,7 @@ function(add_blif_equiv_test)
   set(oneValueArgs NAME INPUT BLIF2MLIR MLIR2BLIF MODE)
   set(multiValueArgs)
   cmake_parse_arguments(BET "" "NAME;INPUT;BLIF2MLIR;MLIR2BLIF;MODE" "" ${ARGN})
+  message(STATUS \"ARGN: \${ARGN}\")
 
   if(NOT BET_NAME)
     message(FATAL_ERROR "add_blif_equiv_test requires NAME")
