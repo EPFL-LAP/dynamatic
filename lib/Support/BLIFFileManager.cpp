@@ -167,8 +167,11 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
   if (blifFileName != "") {
     // Check if the file exists
     if (!std::filesystem::exists(blifFileName)) {
-      llvm::errs() << "BLIF file for operation " << getUniqueName(op)
-                   << "does not exist: " << blifFileName << "\n";
+      llvm::errs() << "BLIF file for operation `" << getUniqueName(op)
+                   << "` does not exist: " << blifFileName
+                   << ". Check the file path specified for this operation is "
+                      "correct. If it is not present, you should generate it "
+                      "using the blif script generator.\n";
       assert(false && "Check the file path specified for this operation is "
                       "built correctly");
     }
