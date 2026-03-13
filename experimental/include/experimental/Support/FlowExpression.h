@@ -12,23 +12,25 @@
 namespace dynamatic {
 namespace handshake {
 
-struct IndexConstraint {
+struct IndexTracker {
   size_t numValues;
-  // if singleValue is nullptr, the index is not constrained
-  std::optional<size_t> singleValue;
+  // Which token value does this variable track?
+  // e.g. 1 to only count tokens with value 1
+  // If trackedValue has no value, any value (0..numValues) is tracked
+  std::optional<size_t> trackedValue;
 
-  IndexConstraint(size_t numValues) : numValues(numValues) {}
-  inline bool operator==(const IndexConstraint &other) const {
-    return numValues == other.numValues && singleValue == other.singleValue;
+  IndexTracker(size_t numValues) : numValues(numValues) {}
+  inline bool operator==(const IndexTracker &other) const {
+    return numValues == other.numValues && trackedValue == other.trackedValue;
   }
 
   inline llvm::json::Value toJSON() const {
     return llvm::json::Object(
-        {{NUM_VALUES_LIT, numValues}, {SINGLE_VALUE_LIT, singleValue}});
+        {{NUM_VALUES_LIT, numValues}, {SINGLE_VALUE_LIT, trackedValue}});
   }
 
-  inline IndexConstraint static fromJSON(const llvm::json::Value &value,
-                                         llvm::json::Path path) {
+  inline IndexTracker static fromJSON(const llvm::json::Value &value,
+                                      llvm::json::Path path) {
     size_t numValues;
     std::optional<size_t> singleValue;
     llvm::json::ObjectMapper mapper(value, path);
@@ -36,8 +38,8 @@ struct IndexConstraint {
         !mapper.map(SINGLE_VALUE_LIT, singleValue))
       assert(false && "json parsing failed");
 
-    IndexConstraint ret(numValues);
-    ret.singleValue = singleValue;
+    IndexTracker ret(numValues);
+    ret.trackedValue = singleValue;
     return ret;
   }
 
@@ -64,49 +66,51 @@ struct InternalLambda {
   }
 };
 
-using Variants = std::variant<std::shared_ptr<InternalStateNamer>,
-                              ChannelLambda, InternalLambda>;
-
 struct FlowVariable {
-  // A Lambda variable is defined by type, lambdaIndex, and op.
-  // An internal state is defined by type, state
+  // A flow variable can be defined by different parts of a circuit:
+  // 1. It can be a channel lambda, which tracks the number of tokens that
+  // propagated through a specific channel.
+  // 2. It can be an internal state, which represents any data that can be found
+  // in the final HDL: Most commonly, this is the data within a slot of a
+  // buffer, or the state keeping track of which results of an eager fork have
+  // been sent.
+  // 3. It can be an internal lambda, which acts similar to a channel lambda,
+  // except it does not count the tokens of a real channel in the handshake
+  // MLIR, but rather a fictional channel within an operation (e.g. a channel
+  // between slots of a buffer with multiple slots)
+  using Variants = std::variant<std::shared_ptr<InternalStateNamer>,
+                                ChannelLambda, InternalLambda>;
   Variants variable;
-  std::optional<IndexConstraint> constraint;
+
+  // When indexTokenConstraint is set, only tokens of a specific value are
+  // tracked. This can be useful e.g. in the case of control merges, where it is
+  // known that a token at operand 0 leads to a token of value 0 at the index
+  // output, and correspondingly for a token at operand 1.
+  std::optional<IndexTracker> indexTokenConstraint;
 
   FlowVariable(Variants variable)
-      : variable(std::move(variable)), constraint() {}
+      : variable(std::move(variable)), indexTokenConstraint() {}
   FlowVariable(const IndexChannelAnalysis &indexChannels,
                ChannelLambda channel);
   FlowVariable(InternalLambda l) : FlowVariable(Variants(l)) {}
   FlowVariable(std::shared_ptr<InternalStateNamer> n)
       : FlowVariable(Variants(n)) {}
 
-  // useful for generating multiple internal channels without collisions
+  // Utility function for generating multiple internal channels for a single
+  // operation without collisions of indices
   FlowVariable nextInternal() const;
 
-  // compares the relevant struct fields to determine if two variables are equal
+  // Compares the relevant struct fields to determine if two variables are equal
   inline bool operator==(const FlowVariable &other) const {
-    return variable == other.variable && constraint == other.constraint;
+    return variable == other.variable &&
+           indexTokenConstraint == other.indexTokenConstraint;
   }
 
-  // utility functions for handling binary channels
-  inline bool isIndex() const { return constraint.has_value(); }
-  inline FlowVariable getConstrained(size_t x) const {
-    FlowVariable p = *this;
-    if (!p.isIndex()) {
-      p.debug();
-      assert(p.isIndex());
-    }
-    p.constraint->singleValue = x;
-    return p;
-  }
+  // Utility functions for handling flow variables with index tokens
+  inline bool isIndex() const { return indexTokenConstraint.has_value(); }
+  FlowVariable setTrackedTokens(size_t x) const;
 
-  inline bool isLambda() const {
-    return std::get_if<ChannelLambda>(&variable) ||
-           std::get_if<InternalLambda>(&variable);
-  }
-
-  void debug() const;
+  std::string getDebugName() const;
 
   // get the annotater for internal state - if it exists
   std::shared_ptr<InternalStateNamer> getAnnotater() const;
@@ -118,8 +122,8 @@ struct FlowVariable {
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 template <>
-struct std::hash<Variants> {
-  size_t operator()(const Variants &vars) const {
+struct std::hash<FlowVariable::Variants> {
+  size_t operator()(const FlowVariable::Variants &vars) const {
     using std::hash;
     size_t chunk = hash<size_t>()(vars.index());
     if (auto *namer = std::get_if<std::shared_ptr<InternalStateNamer>>(&vars)) {
@@ -141,12 +145,14 @@ template <>
 struct std::hash<FlowVariable> {
   size_t operator()(const FlowVariable &var) const {
     using std::hash;
-    if (var.constraint) {
-      return hash<Variants>()(var.variable) ^ hash<unsigned>()(0) ^
-             hash<size_t>()(var.constraint->numValues) ^
-             hash<std::optional<size_t>>()(var.constraint->singleValue);
+    if (var.indexTokenConstraint) {
+      return hash<FlowVariable::Variants>()(var.variable) ^
+             hash<unsigned>()(0) ^
+             hash<size_t>()(var.indexTokenConstraint->numValues) ^
+             hash<std::optional<size_t>>()(
+                 var.indexTokenConstraint->trackedValue);
     }
-    return hash<Variants>()(var.variable) ^ hash<unsigned>()(1);
+    return hash<FlowVariable::Variants>()(var.variable) ^ hash<unsigned>()(1);
   }
 };
 
@@ -161,7 +167,7 @@ struct FlowExpression {
   static FlowExpression fromJSON(const llvm::json::Value &value,
                                  llvm::json::Path path);
 
-  void debug() const;
+  std::string debug() const;
 
   inline static const StringLiteral COEFFICIENT_LIT = "coefficient";
   inline static const StringLiteral STATE_LIT = "state";

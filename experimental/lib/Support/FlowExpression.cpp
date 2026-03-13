@@ -6,7 +6,7 @@ FlowVariable::FlowVariable(const IndexChannelAnalysis &indexChannels,
                            ChannelLambda channel) {
   *this = FlowVariable(Variants(channel));
   if (auto numValues = indexChannels.getIndexChannelValues(channel.channel)) {
-    constraint = *numValues;
+    indexTokenConstraint = *numValues;
   }
 }
 
@@ -19,6 +19,15 @@ FlowVariable FlowVariable::nextInternal() const {
   next.variable = nextLambda;
   return next;
 }
+FlowVariable FlowVariable::setTrackedTokens(size_t x) const {
+  FlowVariable p = *this;
+  if (!p.isIndex()) {
+    p.getDebugName();
+    assert(p.isIndex());
+  }
+  p.indexTokenConstraint->trackedValue = x;
+  return p;
+}
 
 std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
   auto *namer = std::get_if<std::shared_ptr<InternalStateNamer>>(&variable);
@@ -26,58 +35,59 @@ std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
     return nullptr;
 
   auto &state = *namer;
-  if (constraint && constraint->singleValue) {
-    return state->tryConstrain(*(constraint->singleValue));
+  if (indexTokenConstraint && indexTokenConstraint->trackedValue) {
+    return state->tryConstrain(*(indexTokenConstraint->trackedValue));
   }
   return state;
 }
 
-void FlowVariable::debug() const {
+std::string FlowVariable::getDebugName() const {
+  std::string ret = "";
   if (auto *namer =
           std::get_if<std::shared_ptr<InternalStateNamer>>(&variable)) {
-    llvm::errs() << (*namer)->getSMVName();
+    ret += (*namer)->getSMVName();
   }
   if (auto *channel = std::get_if<ChannelLambda>(&variable)) {
     if (auto *op = channel->channel.getDefiningOp()) {
-      llvm::errs() << getUniqueName(op);
+      ret += getUniqueName(op);
       for (auto [i, ch] : llvm::enumerate(op->getResults())) {
         if (ch == channel->channel) {
-          llvm::errs() << llvm::formatv(".out{0}", i);
+          ret += llvm::formatv(".out{0}", i);
           break;
         }
       }
     } else {
       for (auto &opop : channel->channel.getUses()) {
-        llvm::errs() << llvm::formatv("{0}.in{1}",
-                                      getUniqueName(opop.getOwner()),
-                                      opop.getOperandNumber());
+        ret += llvm::formatv("{0}.in{1}", getUniqueName(opop.getOwner()),
+                             opop.getOperandNumber());
         break;
       }
     }
   }
   if (auto *internal = std::get_if<InternalLambda>(&variable)) {
-    llvm::errs() << llvm::formatv("{0}.#{1}", getUniqueName(internal->op),
-                                  internal->index);
+    ret +=
+        llvm::formatv("{0}.#{1}", getUniqueName(internal->op), internal->index);
   }
 
-  if (constraint) {
-    if (constraint->singleValue) {
-      llvm::errs() << llvm::formatv("(={0})", *(constraint->singleValue));
+  if (indexTokenConstraint) {
+    if (indexTokenConstraint->trackedValue) {
+      ret += llvm::formatv("(={0})", *(indexTokenConstraint->trackedValue));
     } else {
-      llvm::errs() << llvm::formatv("(=x)");
+      ret += llvm::formatv("(=x)");
     }
   }
+  return ret;
 }
 
 FlowExpression::FlowExpression(const FlowVariable &v) {
   if (v.isIndex()) {
-    if (v.constraint->singleValue) {
+    if (v.indexTokenConstraint->trackedValue) {
       terms[v] = 1;
       return;
     }
     // If plusAndMinus, separate into plus and minus parts
-    for (size_t i = 0; i < v.constraint->numValues; ++i) {
-      terms[v.getConstrained(i)] = 1;
+    for (size_t i = 0; i < v.indexTokenConstraint->numValues; ++i) {
+      terms[v.setTrackedTokens(i)] = 1;
     }
   } else {
     terms[v] = 1;
@@ -91,8 +101,8 @@ llvm::json::Value FlowExpression::toJSON() const {
         std::get_if<std::shared_ptr<InternalStateNamer>>(&key.variable);
     assert(namer);
     std::optional<llvm::json::Value> constraintJson;
-    if (key.constraint) {
-      constraintJson = key.constraint->toJSON();
+    if (key.indexTokenConstraint) {
+      constraintJson = key.indexTokenConstraint->toJSON();
     } else {
       constraintJson = nullptr;
     }
@@ -127,9 +137,9 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
     const llvm::json::Value *constraint = obj->get(CONSTRAINT_LIT);
     assert(constraint && "FlowExpression does not contain CONSTRAINT_LIT");
     if (auto n = constraint->getAsNull()) {
-      assert(!var.constraint);
+      assert(!var.indexTokenConstraint);
     } else {
-      var.constraint = IndexConstraint::fromJSON(*constraint, path);
+      var.indexTokenConstraint = IndexTracker::fromJSON(*constraint, path);
     }
 
     expr.terms[var] = coef;
@@ -137,21 +147,23 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
   return expr;
 }
 
-void FlowExpression::debug() const {
+std::string FlowExpression::debug() const {
+  std::string ret;
   for (auto &[var, coef] : terms) {
     if (coef == 0) {
-      llvm::errs() << "0 * ";
+      ret += "0 * ";
     } else if (coef == 1) {
-      llvm::errs() << "+ ";
+      ret += "+ ";
     } else if (coef == -1) {
-      llvm::errs() << "- ";
+      ret += "- ";
     } else {
-      llvm::errs() << llvm::formatv("{0} * ", coef);
+      ret += llvm::formatv("{0} * ", coef);
     }
-    var.debug();
-    llvm::errs() << "  ";
+    ret += var.getDebugName();
+    ret += "  ";
   }
-  llvm::errs() << "\n";
+  ret += "\n";
+  return ret;
 }
 
 FlowExpression operator-(FlowExpression expr) {

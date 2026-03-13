@@ -306,9 +306,9 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
   }]>,
 
   InterfaceMethod<[{
-    Gets the latency-induced slots based on the II and the latency.
+    Gets the pipeline slots based on the II and the latency.
     TODO: Actually retrieve the II, instead of just assuming II=1
-  }], "std::vector<LatencyInducedSlotNamer>", "getLatencyInducedSlots", (ins), [{
+  }], "std::vector<PipelineSlotNamer>", "getPipelineSlots", (ins), [{
     Operation *op = $_op.getOperation();
     auto attr = op->getAttrOfType<IntegerAttr>("latency");
     assert(attr && "cannot latency slot without defined latency");
@@ -317,9 +317,9 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
     int64_t latency = attr.getInt();
     int64_t II = 1;
     int64_t numSlots = latency / II;
-    std::vector<LatencyInducedSlotNamer> ret(numSlots);
+    std::vector<PipelineSlotNamer> ret(numSlots);
     for (int64_t i = 0; i < numSlots; ++i) {
-      ret[i] = LatencyInducedSlotNamer(name.str(), i);
+      ret[i] = PipelineSlotNamer(name.str(), i);
     }
     return ret;
   }]>,

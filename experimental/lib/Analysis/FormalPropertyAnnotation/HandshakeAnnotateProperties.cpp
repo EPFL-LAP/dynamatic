@@ -278,7 +278,8 @@ struct FlowEquationsMatrix {
         }
         // PlusAndMinus variables should never be inserted, as the DSL will
         // insert them as two separate variables
-        assert(!key.constraint || key.constraint->singleValue);
+        assert(!key.indexTokenConstraint ||
+               key.indexTokenConstraint->trackedValue);
         if (varToIndex.count(key) == 0) {
           varToIndex[key] = index;
           ++index;
@@ -339,27 +340,27 @@ extractLocalEquations(ModuleOp modOp,
         size_t numInputs = cmergeOp.getDataOperands().size();
 
         FlowVariable x0(InternalLambda(&op, 0));
-        x0.constraint = IndexConstraint(numInputs);
+        x0.indexTokenConstraint = IndexTracker(numInputs);
 
         for (auto [i, channel] : llvm::enumerate(cmergeOp.getDataOperands())) {
           FlowVariable channelVar(indexChannelAnalysis, ChannelLambda(channel));
-          equations.push_back(channelVar - x0.getConstrained(i));
+          equations.push_back(channelVar - x0.setTrackedTokens(i));
         }
 
         auto slots = cmergeOp.getInternalSlotStateNamers();
         std::shared_ptr<InternalStateNamer> slotNamer =
             std::make_shared<BufferSlotFullNamer>(slots[0]);
         FlowVariable slot(slotNamer);
-        slot.constraint = IndexConstraint(numInputs);
+        slot.indexTokenConstraint = IndexTracker(numInputs);
 
         FlowVariable indexChannel = x0.nextInternal();
         for (size_t i = 0; i < numInputs; ++i) {
-          equations.push_back(x0.getConstrained(i) -
-                              indexChannel.getConstrained(i) -
-                              slot.getConstrained(i));
+          equations.push_back(x0.setTrackedTokens(i) -
+                              indexChannel.setTrackedTokens(i) -
+                              slot.setTrackedTokens(i));
         }
         FlowVariable dataChannel = indexChannel.nextInternal();
-        dataChannel.constraint.reset();
+        dataChannel.indexTokenConstraint.reset();
         equations.push_back(x0 - dataChannel - slot);
 
         auto sentNamers = cmergeOp.getInternalSentStateNamers();
@@ -370,16 +371,16 @@ extractLocalEquations(ModuleOp modOp,
             std::make_shared<EagerForkSentNamer>(sentNamers[1]);
         FlowVariable dataSent(dataNamer);
         FlowVariable indexSent(indexNamer);
-        indexSent.constraint = IndexConstraint(numInputs);
+        indexSent.indexTokenConstraint = IndexTracker(numInputs);
 
         auto outputs = cmergeOp.getResults();
         FlowVariable data(indexChannelAnalysis, ChannelLambda(outputs[0]));
         FlowVariable index(indexChannelAnalysis, ChannelLambda(outputs[1]));
 
         for (size_t i = 0; i < numInputs; ++i) {
-          equations.push_back(index.getConstrained(i) -
-                              indexSent.getConstrained(i) -
-                              indexChannel.getConstrained(i));
+          equations.push_back(index.setTrackedTokens(i) -
+                              indexSent.setTrackedTokens(i) -
+                              indexChannel.setTrackedTokens(i));
         }
         equations.push_back(data - dataSent - dataChannel);
         continue;
@@ -395,10 +396,11 @@ extractLocalEquations(ModuleOp modOp,
           equations.push_back(selectVar - entry);
           if (selectVar.isIndex()) {
             auto dataOperands = muxOp.getDataOperands();
-            assert(selectVar.constraint->numValues == dataOperands.size());
+            assert(selectVar.indexTokenConstraint->numValues ==
+                   dataOperands.size());
             for (auto [i, operand] : llvm::enumerate(dataOperands)) {
               FlowVariable var(indexChannelAnalysis, ChannelLambda(operand));
-              equations.push_back(selectVar.getConstrained(i) - var);
+              equations.push_back(selectVar.setTrackedTokens(i) - var);
             }
           } else {
             assert(false && "muxOp select var should always be index");
@@ -421,14 +423,14 @@ extractLocalEquations(ModuleOp modOp,
             FlowVariable ch(indexChannelAnalysis, ChannelLambda(channel));
             if (ch.isIndex()) {
               if (!foundIndexed) {
-                indexValue = ch.constraint->numValues;
+                indexValue = ch.indexTokenConstraint->numValues;
                 constrainedEqs.resize(indexValue);
               }
               foundIndexed = true;
-              assert(indexValue == ch.constraint->numValues &&
+              assert(indexValue == ch.indexTokenConstraint->numValues &&
                      "found differing index");
               for (size_t i = 0; i < indexValue; ++i) {
-                constrainedEqs[i] += ch.getConstrained(i);
+                constrainedEqs[i] += ch.setTrackedTokens(i);
               }
             } else {
               foundUnindexed = true;
@@ -439,9 +441,9 @@ extractLocalEquations(ModuleOp modOp,
           assert(!(foundIndexed && foundUnindexed) &&
                  "some index channels and some normal channels");
           if (foundIndexed) {
-            entry.constraint = IndexConstraint(indexValue);
+            entry.indexTokenConstraint = IndexTracker(indexValue);
             for (size_t i = 0; i < indexValue; ++i) {
-              constrainedEqs[i] -= entry.getConstrained(i);
+              constrainedEqs[i] -= entry.setTrackedTokens(i);
               equations.push_back(constrainedEqs[i]);
             }
           } else {
@@ -456,11 +458,11 @@ extractLocalEquations(ModuleOp modOp,
           auto channel = channels[0];
           FlowVariable chVar(indexChannelAnalysis, ChannelLambda(channel));
           // If input is +-, then intermediate channel is as well
-          entry.constraint = chVar.constraint;
+          entry.indexTokenConstraint = chVar.indexTokenConstraint;
           if (chVar.isIndex()) {
-            for (size_t i = 0; i < chVar.constraint->numValues; ++i) {
-              equations.push_back(chVar.getConstrained(i) -
-                                  entry.getConstrained(i));
+            for (size_t i = 0; i < chVar.indexTokenConstraint->numValues; ++i) {
+              equations.push_back(chVar.setTrackedTokens(i) -
+                                  entry.setTrackedTokens(i));
             }
           } else {
             equations.push_back(chVar - entry);
@@ -479,16 +481,16 @@ extractLocalEquations(ModuleOp modOp,
         // done, information about the bit is lost
         if (entry.isIndex()) {
           exit = entry.nextInternal();
-          exit.constraint.reset();
+          exit.indexTokenConstraint.reset();
           equations.push_back(entry - exit);
         }
       }
 
       // Annotate latency-induced slots
       if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
-        for (auto &latencySlot : latencyOp.getLatencyInducedSlots()) {
+        for (auto &pipelineSlot : latencyOp.getPipelineSlots()) {
           std::shared_ptr<InternalStateNamer> namer =
-              std::make_shared<LatencyInducedSlotNamer>(latencySlot);
+              std::make_shared<PipelineSlotNamer>(pipelineSlot);
           FlowVariable full(namer);
 
           FlowVariable before = exit;
@@ -496,13 +498,13 @@ extractLocalEquations(ModuleOp modOp,
           if (before.isIndex()) {
             assert(after.isIndex());
             FlowVariable fullPM = full;
-            size_t numValues = before.constraint->numValues;
-            fullPM.constraint = IndexConstraint(numValues);
+            size_t numValues = before.indexTokenConstraint->numValues;
+            fullPM.indexTokenConstraint = IndexTracker(numValues);
             equations.push_back(full - fullPM);
             for (size_t i = 0; i < numValues; ++i) {
-              equations.push_back(before.getConstrained(i) -
-                                  fullPM.getConstrained(i) -
-                                  after.getConstrained(i));
+              equations.push_back(before.setTrackedTokens(i) -
+                                  fullPM.setTrackedTokens(i) -
+                                  after.setTrackedTokens(i));
             }
           } else {
             equations.push_back(before - full - after);
@@ -523,13 +525,13 @@ extractLocalEquations(ModuleOp modOp,
           if (before.isIndex()) {
             assert(after.isIndex());
             FlowVariable fullPM = full;
-            size_t numValues = before.constraint->numValues;
-            fullPM.constraint = IndexConstraint(numValues);
+            size_t numValues = before.indexTokenConstraint->numValues;
+            fullPM.indexTokenConstraint = IndexTracker(numValues);
             equations.push_back(full - fullPM);
             for (size_t i = 0; i < numValues; ++i) {
-              equations.push_back(before.getConstrained(i) -
-                                  fullPM.getConstrained(i) -
-                                  after.getConstrained(i));
+              equations.push_back(before.setTrackedTokens(i) -
+                                  fullPM.setTrackedTokens(i) -
+                                  after.setTrackedTokens(i));
             }
           } else {
             equations.push_back(before - full - after);
@@ -550,12 +552,13 @@ extractLocalEquations(ModuleOp modOp,
                               ChannelLambda(op.getResults()[i]));
           if (exit.isIndex()) {
             assert(result.isIndex());
-            sent.constraint = IndexConstraint(exit.constraint->numValues);
+            sent.indexTokenConstraint =
+                IndexTracker(exit.indexTokenConstraint->numValues);
             // equations.push_back(sent - sentPM);
-            for (size_t i = 0; i < exit.constraint->numValues; ++i) {
-              equations.push_back(exit.getConstrained(i) +
-                                  sent.getConstrained(i) -
-                                  result.getConstrained(i));
+            for (size_t i = 0; i < exit.indexTokenConstraint->numValues; ++i) {
+              equations.push_back(exit.setTrackedTokens(i) +
+                                  sent.setTrackedTokens(i) -
+                                  result.setTrackedTokens(i));
             }
           } else {
             equations.push_back(exit + sent - result);
@@ -574,9 +577,9 @@ extractLocalEquations(ModuleOp modOp,
         for (auto [i, channel] : llvm::enumerate(op.getResults())) {
           FlowVariable result(indexChannelAnalysis, ChannelLambda(channel));
           if (exit.isIndex() && result.isIndex()) {
-            for (size_t i = 0; i < exit.constraint->numValues; ++i) {
-              equations.push_back(exit.getConstrained(i) -
-                                  result.getConstrained(i));
+            for (size_t i = 0; i < exit.indexTokenConstraint->numValues; ++i) {
+              equations.push_back(exit.setTrackedTokens(i) -
+                                  result.setTrackedTokens(i));
             }
           } else {
             equations.push_back(exit - result);

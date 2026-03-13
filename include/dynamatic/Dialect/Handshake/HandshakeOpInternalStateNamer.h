@@ -8,7 +8,13 @@
 
 namespace dynamatic {
 namespace handshake {
+struct InternalStateNamer;
+struct EagerForkSentNamer;
+struct BufferSlotFullNamer;
+struct PipelineSlotNamer;
 struct ConstrainedNamer;
+struct ConstrainedEagerForkSentNamer;
+struct ConstrainedBufferSlotFullNamer;
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
@@ -59,7 +65,7 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
-struct ConstrainedNamer : public virtual InternalStateNamer {
+struct ConstrainedNamer : InternalStateNamer {
   ConstrainedNamer() = default;
   ConstrainedNamer(TYPE type, int32_t value)
       : InternalStateNamer(TYPE::Constrained), value(value) {}
@@ -87,12 +93,11 @@ struct ConstrainedNamer : public virtual InternalStateNamer {
   static constexpr llvm::StringLiteral CONSTRAINT_VALUE = "value";
 };
 
-struct ConstrainedEagerForkSentNamer;
 // To define a `sent` state of an eager fork, the exact channel that contains
 // this `sent` state needs to be identified. The base class defines the
 // operation by its name, and the eager fork class identifies the output by its
 // port name (see NamedIOInterface)
-struct EagerForkSentNamer : public InternalStateNamer {
+struct EagerForkSentNamer : InternalStateNamer {
   EagerForkSentNamer() = default;
   EagerForkSentNamer(const std::string &opName, const std::string &channelName,
                      size_t channelSize)
@@ -172,8 +177,7 @@ struct ConstrainedEagerForkSentNamer : public ConstrainedNamer {
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
 };
 
-struct ConstrainedBufferSlotFullNamer;
-struct BufferSlotFullNamer : public InternalStateNamer {
+struct BufferSlotFullNamer : InternalStateNamer {
   BufferSlotFullNamer() = default;
   BufferSlotFullNamer(const std::string &opName, const std::string &slotName,
                       size_t slotSize)
@@ -209,7 +213,7 @@ struct BufferSlotFullNamer : public InternalStateNamer {
   static constexpr llvm::StringLiteral SLOT_SIZE_LIT = "slot_size";
 };
 
-struct ConstrainedBufferSlotFullNamer : public ConstrainedNamer {
+struct ConstrainedBufferSlotFullNamer : ConstrainedNamer {
   ConstrainedBufferSlotFullNamer() = default;
   ConstrainedBufferSlotFullNamer(const BufferSlotFullNamer &base, int32_t value)
       : ConstrainedNamer(), base(base), value(value) {}
@@ -237,12 +241,12 @@ struct ConstrainedBufferSlotFullNamer : public ConstrainedNamer {
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
 };
 
-struct LatencyInducedSlotNamer : public InternalStateNamer {
-  LatencyInducedSlotNamer() = default;
-  LatencyInducedSlotNamer(const std::string &opName, unsigned slotIndex)
+struct PipelineSlotNamer : InternalStateNamer {
+  PipelineSlotNamer() = default;
+  PipelineSlotNamer(const std::string &opName, unsigned slotIndex)
       : InternalStateNamer(TYPE::LatencyInducedSlot), opName(opName),
         slotIndex(slotIndex) {}
-  ~LatencyInducedSlotNamer() = default;
+  ~PipelineSlotNamer() = default;
 
   static inline bool classof(const InternalStateNamer *fp) {
     return fp->type == TYPE::LatencyInducedSlot;
@@ -259,7 +263,7 @@ struct LatencyInducedSlotNamer : public InternalStateNamer {
         {{OPERATION_LIT, opName}, {SLOT_INDEX_LIT, slotIndex}});
   }
 
-  std::unique_ptr<LatencyInducedSlotNamer> static fromInnerJSON(
+  std::unique_ptr<PipelineSlotNamer> static fromInnerJSON(
       const llvm::json::Value &value, llvm::json::Path path);
   std::string opName;
   unsigned slotIndex;

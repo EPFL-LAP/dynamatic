@@ -57,7 +57,7 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
     assert(prop && "inner buffer slot failed");
     break;
   case TYPE::LatencyInducedSlot:
-    prop = LatencyInducedSlotNamer::fromInnerJSON(inner, path);
+    prop = PipelineSlotNamer::fromInnerJSON(inner, path);
     assert(prop && "inner latency slot failed");
     break;
   case TYPE::Constrained:
@@ -115,11 +115,11 @@ ConstrainedBufferSlotFullNamer BufferSlotFullNamer::constrain(int32_t value) {
   return p;
 }
 
-std::unique_ptr<LatencyInducedSlotNamer>
-LatencyInducedSlotNamer::fromInnerJSON(const llvm::json::Value &value,
-                                       llvm::json::Path path) {
+std::unique_ptr<PipelineSlotNamer>
+PipelineSlotNamer::fromInnerJSON(const llvm::json::Value &value,
+                                 llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<LatencyInducedSlotNamer>();
+  auto prop = std::make_unique<PipelineSlotNamer>();
   int index;
   if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
       !mapper.map(SLOT_INDEX_LIT, index))
