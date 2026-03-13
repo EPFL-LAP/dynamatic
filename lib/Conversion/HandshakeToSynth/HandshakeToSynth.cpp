@@ -15,6 +15,8 @@
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/raw_ostream.h"
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKETOSYNTH
 #include "dynamatic/Conversion/Passes.h.inc"
@@ -1393,8 +1395,15 @@ populateHWModuleWithSynthOps(ModuleOp modOp, hw::InstanceOp op,
   // This function populates the hw module corresponding to the given hw
   // instance with synth operations by importing the blif circuit described in
   // the path specified by the blifPathAttrStr attribute on the hw module.
-  // It first imports the blif circuit as a new hw module, then it replaces the
-  // body of the original hw module with the body of the new hw module.
+  // It first imports the blif circuit as a new hw module, then it replaces
+  // the body of the original hw module with the body of the new hw module.
+
+  // Check if the hw module of the instance has already been modified to not
+  // modify it multiple times
+  if (std::find(modifiedHWModules.begin(), modifiedHWModules.end(),
+                op.getModuleName().str()) != modifiedHWModules.end()) {
+    return success();
+  }
 
   // Ensure that the blif path is specified in the hw module of the hw
   // instance operation
@@ -1417,8 +1426,22 @@ populateHWModuleWithSynthOps(ModuleOp modOp, hw::InstanceOp op,
     return success();
   }
 
+  // Collect the pins of the old hw module to ensure the new hw module has the
+  // same pins ordering
+  SmallVector<std::string> oldInputPins;
+  SmallVector<std::string> oldOutputPins;
+  for (auto &port : hwModule.getPortList()) {
+    if (port.isInput()) {
+      oldInputPins.push_back(port.name.getValue().str());
+    } else {
+      oldOutputPins.push_back(port.name.getValue().str());
+    }
+  }
+  std::pair<SmallVector<std::string>, SmallVector<std::string>> oldPins = {
+      oldInputPins, oldOutputPins};
+
   // Import the blif circuit corresponding to the hw module of the instance
-  hw::HWModuleOp newHWModule = importBlifCircuit(modOp, blifFilePath);
+  hw::HWModuleOp newHWModule = importBlifCircuit(modOp, blifFilePath, oldPins);
 
   // Check if the import was successful
   if (!newHWModule) {
@@ -1427,21 +1450,28 @@ populateHWModuleWithSynthOps(ModuleOp modOp, hw::InstanceOp op,
     return failure();
   }
 
-  // TODO: check that the ports of the new hw module match the ports of the
-  // original hw module.
-
-  // TODO: replace the hw module with the new one
+  // Replace the hw module with the new one
+  std::string originalModuleName = hwModule.getName().str();
+  std::string newModuleName = newHWModule.getName().str();
+  // Replace the name of the new module with the name of the original module
+  newHWModule.setName(originalModuleName);
+  // Remove from symbol table the original module and add the new module with
+  // the original name
+  symTable.erase(hwModule);
+  symTable.insert(newHWModule);
+  // Add the name of the modified module to the list to avoid modifying it
+  modifiedHWModules.push_back(originalModuleName);
 
   return success();
 }
 
-// Function to import the blif circuits corresponding to the original handshake
-// units
+// Function to import the blif circuits corresponding to the original
+// handshake units
 LogicalResult populateHWModules(mlir::ModuleOp modOp, StringRef topModuleName,
                                 MLIRContext *ctx) {
   // The following function iterates through all the hw modules and populate
-  // them with the synth operations like registers, combinational logic, etc. if
-  // possible. The description of the implementation is defined in the path
+  // them with the synth operations like registers, combinational logic, etc.
+  // if possible. The description of the implementation is defined in the path
   // specified by the attribute blifPathAttrStr on each hw module
 
   // Get hw module corresponding to the top module
@@ -1457,8 +1487,8 @@ LogicalResult populateHWModules(mlir::ModuleOp modOp, StringRef topModuleName,
   SmallVector<hw::InstanceOp> hwInstances;
   topHWModule.walk([&](hw::InstanceOp op) { hwInstances.push_back(op); });
   OpBuilder builder(ctx);
-  // Collect the list of modified hw modules to avoid modifying the same module
-  // multiple times
+  // Collect the list of modified hw modules to avoid modifying the same
+  // module multiple times
   SmallVector<std::string> modifiedHWModules;
   // Iterate through each hw instance and populate the corresponding hw module
   // with synth operations
@@ -1489,8 +1519,8 @@ namespace {
 //    opposite direction with respect to data and valid signals. Additionally,
 //    data signals are unbundled into single-bit signals.
 // 3) Populate the hw module operations with the correspoding synth operations.
-//    The description of the implementation is defined in the path specified by
-//    the attribute blifPathAttrStr on each hw module
+//    The description of the implementation is defined in the path specified
+//    by the attribute blifPathAttrStr on each hw module
 class HandshakeToSynthPass
     : public dynamatic::impl::HandshakeToSynthBase<HandshakeToSynthPass> {
 public:
@@ -1556,26 +1586,11 @@ public:
     if (failed(signalRewriter.rewriteAllSignals(modOp)))
       return signalPassFailure();
 
-    // Temporary return to test the first two steps before re-implementing step
-    // 3
-    return;
-
     // Step 3: Populate the hw module operations with the correspoding synth
-    // operations. The description of the implementation is defined in the path
-    // specified by the attribute blifPathAttrStr on each hw module.
+    // operations. The description of the implementation is defined in the
+    // path specified by the attribute blifPathAttrStr on each hw module.
     if (failed(populateHWModules(modOp, topModuleName, ctx)))
       return signalPassFailure();
-    // Remove all hw modules that are different from the top function hw
-    // module
-    SmallVector<hw::HWModuleOp> hwModuleToErase;
-    modOp.walk([&](hw::HWModuleOp op) {
-      if (op.getName() != topModuleName) {
-        hwModuleToErase.push_back(op);
-      }
-    });
-    for (Operation *hwMod : hwModuleToErase) {
-      hwMod->erase();
-    }
   }
 };
 
