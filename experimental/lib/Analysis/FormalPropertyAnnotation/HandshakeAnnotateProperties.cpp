@@ -325,7 +325,11 @@ struct EquationExtractor {
   void extractMergeLikeOp(MergeLikeOpInterface mergeOp, FlowVariable &after);
   void extractMuxOpExtra(MuxOp muxOp, FlowVariable &after);
   void extractJoinOp(Operation &op, FlowVariable &after);
+  void extractPipeline(LatencyInterface op, FlowVariable &i2);
+  void extractBufferLikeOp(BufferLikeOpInterface bufferOp, FlowVariable &exit);
   void extractEagerFork(EagerForkLikeOpInterface forkOp, FlowVariable &before);
+  void extractBranchOp(ConditionalBranchOp branchOp, FlowVariable &before);
+  void extractLazyFork(Operation &op, FlowVariable &before);
 };
 
 void EquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
@@ -463,10 +467,57 @@ void EquationExtractor::extractJoinOp(Operation &op, FlowVariable &after) {
   }
 }
 
+void EquationExtractor::extractPipeline(LatencyInterface latencyOp,
+                                        FlowVariable &i2) {
+  // Annotates equation for each pipeline slot, and changes i2 to be the
+  // internal channel after the slots
+  for (auto &pipelineSlot : latencyOp.getPipelineSlots()) {
+    std::shared_ptr<InternalStateNamer> namer =
+        std::make_shared<PipelineSlotNamer>(pipelineSlot);
+    FlowVariable full(namer);
+
+    FlowVariable before = i2;
+    FlowVariable after = before.nextInternal();
+    assert(!before.isIndex() && "Pipeline slot's data cannot be "
+                                "accessed, so it cannot be constrained");
+
+    equations.push_back(before - full - after);
+    i2 = after;
+  }
+}
+
+void EquationExtractor::extractBufferLikeOp(BufferLikeOpInterface bufferOp,
+                                            FlowVariable &exit) {
+  // Annotates equation for each slot, and changes exit to be the internal
+  // channel after the slots
+  for (auto &slotFull : bufferOp.getInternalSlotStateNamers()) {
+    std::shared_ptr<InternalStateNamer> namer =
+        std::make_shared<BufferSlotFullNamer>(slotFull);
+    FlowVariable full(namer);
+
+    FlowVariable before = exit;
+    FlowVariable after = before.nextInternal();
+    if (before.isIndex()) {
+      assert(after.isIndex());
+      FlowVariable constrainedFull = full;
+      size_t numValues = before.indexTokenConstraint->numValues;
+      constrainedFull.indexTokenConstraint = IndexTracker(numValues);
+      // The slot contains one of the indices - never any other value
+      equations.push_back(full - constrainedFull);
+      for (size_t i = 0; i < numValues; ++i) {
+        equations.push_back(before.setTrackedTokens(i) -
+                            constrainedFull.setTrackedTokens(i) -
+                            after.setTrackedTokens(i));
+      }
+    } else {
+      equations.push_back(before - full - after);
+    }
+    exit = after;
+  }
+}
+
 void EquationExtractor::extractEagerFork(EagerForkLikeOpInterface forkOp,
                                          FlowVariable &before) {
-  // eagerfork: for every channel, either same tokens in as out, or in
-  // `sent` state and in = out - 1
   for (auto [i, sentVariable] :
        llvm::enumerate(forkOp.getInternalSentStateNamers())) {
     std::shared_ptr<InternalStateNamer> namer =
@@ -476,13 +527,12 @@ void EquationExtractor::extractEagerFork(EagerForkLikeOpInterface forkOp,
                         ChannelLambda(forkOp->getResults()[i]));
     if (before.isIndex()) {
       assert(result.isIndex());
-      FlowVariable constrainedSent = sent;
-      constrainedSent.indexTokenConstraint =
+      sent.indexTokenConstraint =
           IndexTracker(before.indexTokenConstraint->numValues);
-      equations.push_back(sent - constrainedSent);
+      // before + sent - result = 0 for every token value
       for (size_t i = 0; i < before.indexTokenConstraint->numValues; ++i) {
         equations.push_back(before.setTrackedTokens(i) +
-                            constrainedSent.setTrackedTokens(i) -
+                            sent.setTrackedTokens(i) -
                             result.setTrackedTokens(i));
       }
     } else {
@@ -491,13 +541,46 @@ void EquationExtractor::extractEagerFork(EagerForkLikeOpInterface forkOp,
   }
 }
 
+void EquationExtractor::extractBranchOp(ConditionalBranchOp branchOp,
+                                        FlowVariable &before) {
+  FlowVariable trueVar(indexChannelAnalysis,
+                       ChannelLambda(branchOp.getTrueResult()));
+  FlowVariable falseVar(indexChannelAnalysis,
+                        ChannelLambda(branchOp.getFalseResult()));
+  FlowVariable condition(indexChannelAnalysis,
+                         ChannelLambda(branchOp.getConditionOperand()));
+  assert(condition.isIndex() && "branch op condition should be an index");
+  assert(condition.indexTokenConstraint->numValues == 2);
+  // The number of tokens going across the false result is equal to the
+  // number of tokens=0 received at the condition input
+  equations.push_back(falseVar - condition.setTrackedTokens(0));
+  equations.push_back(trueVar - condition.setTrackedTokens(1));
+}
+
+void EquationExtractor::extractLazyFork(Operation &op, FlowVariable &before) {
+  // lazy fork: all outputs have same tokens in as out
+  for (auto [i, channel] : llvm::enumerate(op.getResults())) {
+    FlowVariable result(indexChannelAnalysis, ChannelLambda(channel));
+    if (before.isIndex() && result.isIndex()) {
+      for (size_t i = 0; i < before.indexTokenConstraint->numValues; ++i) {
+        equations.push_back(before.setTrackedTokens(i) -
+                            result.setTrackedTokens(i));
+      }
+    } else {
+      equations.push_back(before - result);
+    }
+  }
+}
+
 void EquationExtractor::extractAll(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       // A general structure for an operation is assumed:
-      // in1, in2, ... -> Join/Merge/Mux -> entry channel
-      // entry channel -> pipeline? -> slots? -> exit channel
-      // exit channel -> Fork/Branch -> out1, out2, ...
+      // in1, in2, ... -> Join/Merge/Mux        -> entry channel
+      // entry channel -> arithmetic operation? -> i1
+      // i1            -> pipeline slots?       -> i2
+      // i2            -> slots?                -> exit
+      // exit channel  -> Fork/Branch           -> out1, out2, ...
       //
       // Some operations do not follow this structure, and should be handled
       // separately to avoid making false assumptions.
@@ -526,85 +609,38 @@ void EquationExtractor::extractAll(ModuleOp modOp) {
         extractJoinOp(op, entry);
       }
 
-      FlowVariable exit = entry;
+      // entry channel -> arithmetic operation? -> i1
+      FlowVariable i1 = entry;
       if (auto arithOp = dyn_cast<handshake::ArithOpInterface>(op)) {
         // Arithmetic operations modify the channel - unless further analysis is
         // done, information about the carried token is lost
         if (entry.isIndex()) {
-          exit = entry.nextInternal();
-          exit.indexTokenConstraint.reset();
-          equations.push_back(entry - exit);
+          i1 = entry.nextInternal();
+          i1.indexTokenConstraint.reset();
+          equations.push_back(entry - i1);
         }
       }
 
       // Annotate latency-induced slots
+      // i1            -> pipeline slots?       -> i2
+      FlowVariable i2 = i1;
       if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
-        for (auto &pipelineSlot : latencyOp.getPipelineSlots()) {
-          std::shared_ptr<InternalStateNamer> namer =
-              std::make_shared<PipelineSlotNamer>(pipelineSlot);
-          FlowVariable full(namer);
-
-          FlowVariable before = exit;
-          FlowVariable after = before.nextInternal();
-          assert(!before.isIndex() && "Pipeline slot's data cannot be "
-                                      "accessed, so it cannot be constrained");
-
-          equations.push_back(before - full - after);
-          exit = after;
-        }
+        extractPipeline(latencyOp, i2);
       }
 
       // Annotate buffer slots
+      // i2            -> slots?                -> exit
+      FlowVariable exit = i2;
       if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
-        for (auto &slotFull : bufferOp.getInternalSlotStateNamers()) {
-          std::shared_ptr<InternalStateNamer> namer =
-              std::make_shared<BufferSlotFullNamer>(slotFull);
-          FlowVariable full(namer);
-
-          FlowVariable before = exit;
-          FlowVariable after = before.nextInternal();
-          if (before.isIndex()) {
-            assert(after.isIndex());
-            FlowVariable constrainedFull = full;
-            size_t numValues = before.indexTokenConstraint->numValues;
-            constrainedFull.indexTokenConstraint = IndexTracker(numValues);
-            // The slot contains one of the indices - never any other value
-            equations.push_back(full - constrainedFull);
-            for (size_t i = 0; i < numValues; ++i) {
-              equations.push_back(before.setTrackedTokens(i) -
-                                  constrainedFull.setTrackedTokens(i) -
-                                  after.setTrackedTokens(i));
-            }
-          } else {
-            equations.push_back(before - full - after);
-          }
-          exit = after;
-        }
+        extractBufferLikeOp(bufferOp, exit);
       }
 
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
         extractEagerFork(forkOp, exit);
       } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
-        /*
-        FlowVariable trueVar(ChannelLambda(branchOp.getTrueResult()), map);
-        FlowVariable falseVar(ChannelLambda(branchOp.getFalseResult()), map);
-        assert(exit.isIndex() && exit.constraint->info.numValues == 2);
-        equations.push_back(falseVar - exit.getConstrained(0));
-        equations.push_back(falseVar - exit.getConstrained(1));
-        */
+        extractBranchOp(branchOp, exit);
       } else {
-        // lazy fork: all outputs have same tokens in as out
-        for (auto [i, channel] : llvm::enumerate(op.getResults())) {
-          FlowVariable result(indexChannelAnalysis, ChannelLambda(channel));
-          if (exit.isIndex() && result.isIndex()) {
-            for (size_t i = 0; i < exit.indexTokenConstraint->numValues; ++i) {
-              equations.push_back(exit.setTrackedTokens(i) -
-                                  result.setTrackedTokens(i));
-            }
-          } else {
-            equations.push_back(exit - result);
-          }
-        }
+        extractLazyFork(op, exit);
       }
     }
   }
@@ -617,8 +653,6 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 
   // The equations are represented by a FlowExpression that is equal to zero
   EquationExtractor extractor(modOp, indexChannelAnalysis);
-  llvm::errs() << llvm::formatv("{0} equations extracted!\n",
-                                extractor.equations.size());
 
   // Map all variables used in `equations` to an index in the matrix
   FlowEquationsMatrix indices(extractor.equations);
@@ -646,7 +680,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     if (expr.terms.size() == 0) {
       continue;
     }
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::OPT);
     p.addEquation(expr);
     if (p.getEquations().size() > 0) {
       uid++;
