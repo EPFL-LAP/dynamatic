@@ -864,6 +864,522 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 // the hw modules.
 // ------------------------------------------------------------------
 
+// Function to get a new module name for the rewritten hw module
+mlir::StringAttr
+SignalRewriter::getRewrittenModuleName(hw::HWModuleOp oldMod,
+                                       mlir::MLIRContext *ctx) {
+  return mlir::StringAttr::get(ctx, oldMod.getName() + "_rewritten");
+}
+
+// Function to get the mapping of an input signal from the old module to the
+// new module
+SmallVector<Value> SignalRewriter::getInputSignalMapping(Value oldInputSignal,
+                                                         OpBuilder builder,
+                                                         Location loc) {
+  auto it = oldModuleSignalToNewModuleSignalsMap.find(oldInputSignal);
+  if (it != oldModuleSignalToNewModuleSignalsMap.end()) {
+    return it->second;
+  }
+  // If there is no mapping, it means that the value is not yet
+  // available since the instance that produces it has not been
+  // rewritten yet. In this case, check if we already created a
+  // temporary value for this ready signal
+  auto tempIt = oldModuleSignalToTempValuesMap.find(oldInputSignal);
+  if (tempIt != oldModuleSignalToTempValuesMap.end()) {
+    return tempIt->second;
+  }
+  // Else, create a new temporary hw constant to hold the connection for each
+  // bit
+  SmallVector<Value> tempValues;
+  Type signalType = oldInputSignal.getType();
+  assert(signalType.isa<IntegerType>() &&
+         "only integer types are supported for signals for now");
+  unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
+  assert(bitWidth > 0 && "signal must have positive bit width");
+  for (unsigned i = 0; i < bitWidth; ++i) {
+    auto tempConst = builder.create<hw::ConstantOp>(
+        loc, oldInputSignal.getType(),
+        builder.getIntegerAttr(oldInputSignal.getType(), 0));
+    tempValues.push_back(tempConst.getResult());
+  }
+  // Store the temporary value in the map
+  oldModuleSignalToTempValuesMap[oldInputSignal] = tempValues;
+  // Use the result of the constant as the operand
+  return tempValues;
+}
+
+// Function to update the mapping between old module signals and new module
+// signals after getting a new result value
+void SignalRewriter::updateOutputSignalMapping(
+    Value oldResult, StringRef outputName, int oldOutputIdx,
+    hw::HWModuleOp oldMod, hw::HWModuleOp newMod, hw::InstanceOp newInst) {
+  // Check if you can find the output idx of the oldResult in the list
+  // oldOutputIdxToNewOutputIdxMap
+  OpBuilder builder(oldMod);
+  StringAttr oldModName = builder.getStringAttr(oldMod.getName());
+  SmallVector<std::pair<unsigned, SmallVector<unsigned>>>
+      oldOutIdxToNewOutIdxs = oldOutputIdxToNewOutputIdxMap[oldModName];
+  SmallVector<unsigned> outputIdxsNewInst = {};
+  for (auto &pair : oldOutIdxToNewOutIdxs) {
+    if (oldOutputIdx != -1 &&
+        pair.first == static_cast<unsigned>(oldOutputIdx)) {
+      outputIdxsNewInst = pair.second;
+      break;
+    }
+  }
+  // If you cannot find it, use the output name to find it
+  if (outputIdxsNewInst.empty()) {
+    // The only case in which this is possible is when it is a ready signal
+    assert(outputName.contains("_ready") &&
+           "could not find output index mapping for non-ready signal");
+    // Find the corresponding output index of the output in the new module
+    for (auto &p : newMod.getPortList()) {
+      StringRef portName = p.name.getValue();
+      if (portName == outputName) {
+        outputIdxsNewInst.push_back(p.argNum);
+      }
+    }
+  }
+  assert(!outputIdxsNewInst.empty() &&
+         "could not find output port in new module");
+  SmallVector<Value> newResults;
+  for (unsigned idx : outputIdxsNewInst) {
+    newResults.push_back(newInst->getResult(idx));
+  }
+  // Add mapping between old non-ready signal and new non-ready signal
+  oldModuleSignalToNewModuleSignalsMap[oldResult] = newResults;
+  // Check if any temporary value has been created for the new result
+  // value by seeing if the old output value is in the map of temporary
+  // values
+  auto tempIt = oldModuleSignalToTempValuesMap.find(oldResult);
+  if (tempIt != oldModuleSignalToTempValuesMap.end()) {
+    assert(newResults.size() == tempIt->second.size() &&
+           "mismatched number of bits between temporary value and new result");
+    for (size_t i = 0; i < newResults.size(); ++i) {
+      // Replace all uses of the temporary value with the new result value
+      tempIt->second[i].replaceAllUsesWith(newResults[i]);
+    }
+    for (auto tempVal : tempIt->second) {
+      // Remove the operation creating the temporary value
+      tempVal.getDefiningOp()->erase();
+    }
+    // Remove the temporary value from the map
+    oldModuleSignalToTempValuesMap.erase(tempIt);
+  }
+}
+
+/// Rewrite an HW instance to use the rewritten module interface and operands.
+/// This updates operand connections, reconstructs result groups, and updates
+/// internal mapping structures used by the module-level rewriting.
+void SignalRewriter::rewriteHWInstance(
+    hw::InstanceOp oldInst, ModuleOp parent, SymbolTable &symTable,
+    DenseMap<StringRef, hw::HWModuleOp> &newHWmodules,
+    DenseMap<StringRef, hw::HWModuleOp> &oldHWmodules) {
+
+  // This function executes the following steps:
+  // 1. Check if the instance's module has already been rewritten. If not,
+  //    rewrite it.
+  // 2. Create a new instance operation with the new module and updated
+  //    operands.
+  // 3. Update the mapping between old signals and new signals for the outputs
+  //    of the new hw instance.
+
+  // Step 1: Check if the instance's module has already been rewritten
+  OpBuilder builder(parent);
+  StringRef moduleName = oldInst.getModuleName();
+  // If it has not been processed yet, rewrite it
+  if (!newHWmodules.count(moduleName)) {
+    hw::HWModuleOp oldMod = symTable.lookup<hw::HWModuleOp>(moduleName);
+    if (oldMod) {
+      rewriteHWModule(oldMod, parent, symTable, newHWmodules, oldHWmodules);
+    }
+  }
+
+  // Step 2: Create a new instance operation with the new module and updated
+  // operands.
+  // Get the new hw module after rewriting to be used for the new instance
+  hw::HWModuleOp newMod = newHWmodules[moduleName];
+  assert(newMod && "could not find new hw module for instance");
+
+  // Get the old hw module to identify the ready signals to change
+  hw::HWModuleOp oldMod = oldHWmodules[moduleName];
+  assert(oldMod && "could not find old hw module for instance");
+
+  // Get the top-level module of the old instance
+  hw::HWModuleOp oldInstTopModule = oldInst->getParentOfType<hw::HWModuleOp>();
+  StringRef oldInstTopModuleName = oldInstTopModule.getName();
+  // Find the corresponding new module in the new hw modules map where to
+  // insert the new operations
+  hw::HWModuleOp newTopMod = newHWmodules[oldInstTopModuleName];
+  assert(newTopMod && "could not find new top module for instance");
+  // Create the new operations within the new hw module
+  builder.setInsertionPoint(newTopMod.getBodyBlock()->getTerminator());
+  Location locNewOps = newTopMod.getBodyBlock()->getTerminator()->getLoc();
+
+  // Save the list of outputs that are not ready signals to replace uses later
+  SmallVector<std::pair<StringRef, unsigned>> nonReadyOutputs;
+  // Save the list of the old ready inputs which will be mapped to the new
+  // ready output values
+  SmallVector<std::pair<StringRef, Value>> oldReadyInputs;
+  // Save the new operands for the new instance
+  SmallVector<Value> newOperands;
+  // Iterate through the name of the ports to identify the mapping between
+  // signals of the old hw module and new hw module
+  for (auto &port : oldMod.getPortList()) {
+    bool isReady = port.name.getValue().contains("ready");
+    if (port.isInput() && isReady) {
+      // This is an input of the old module and should become an output of the
+      // new module. Save the old input value to map it later to the
+      // corresponding new output value
+      oldReadyInputs.push_back(std::make_pair(port.name.getValue(),
+                                              oldInst.getOperand(port.argNum)));
+    } else if (port.isOutput() && isReady) {
+      // This is an output of the old module and should become an input of the
+      // new module. Check if there is a mapping for this ready signal
+      Value oldReadyOutput = oldInst->getResult(port.argNum);
+      SmallVector<Value> newReadyInputs =
+          getInputSignalMapping(oldReadyOutput, builder, locNewOps);
+      assert(newReadyInputs.size() == 1 && "ready signal should be 1 bit wide");
+      Value newReadyInput = newReadyInputs[0];
+      newOperands.push_back(newReadyInput);
+    } else if (port.isInput()) {
+      // Check if there is a mapping for this non-ready signal
+      Value oldNonReadyInput = oldInst.getOperand(port.argNum);
+      SmallVector<Value> newNonReadyInputs =
+          getInputSignalMapping(oldNonReadyInput, builder, locNewOps);
+      // Append each bit separately of the non-ready signal to the new
+      // operands
+      for (auto newNonReadyInput : newNonReadyInputs)
+        newOperands.push_back(newNonReadyInput);
+    } else {
+      // Collect non-ready outputs to replace uses later
+      nonReadyOutputs.push_back(
+          std::make_pair(port.name.getValue(), port.argNum));
+    }
+  }
+
+  // Add new inputs for clk and rst from the top function
+  newOperands.push_back(oldModuleSignalToNewModuleSignalsMap[clkSignalTop][0]);
+  newOperands.push_back(oldModuleSignalToNewModuleSignalsMap[rstSignalTop][0]);
+
+  // Create the new instance operation within the new hw module
+  auto newInst = builder.create<hw::InstanceOp>(
+      locNewOps, newMod, oldInst.getInstanceNameAttr(), newOperands);
+
+  // Step 3: Update the mapping between old signals and new signals after
+  // getting the new result values
+  for (auto [outputName, outputIdxOldInst] : nonReadyOutputs) {
+    // Find the output port in the old module
+    Value oldResult = oldInst.getResult(outputIdxOldInst);
+    updateOutputSignalMapping(oldResult, outputName, outputIdxOldInst, oldMod,
+                              newMod, newInst);
+  }
+  // Update the mapping between old ready inputs and new ready outputs after
+  // getting the new result values
+  for (auto [inputName, oldReadyInput] : oldReadyInputs) {
+    updateOutputSignalMapping(oldReadyInput, inputName, -1, oldMod, newMod,
+                              newInst);
+  }
+}
+
+/// Rewrite a HW module to normalize signal directions (e.g., ready going
+/// opposite to data/valid) and unbundle multi-bit signals into single-bit
+/// signals according to the chosen convention.
+void SignalRewriter::rewriteHWModule(
+    hw::HWModuleOp oldMod, ModuleOp parent, SymbolTable &symTable,
+    DenseMap<StringRef, hw::HWModuleOp> &newHWmodules,
+    DenseMap<StringRef, hw::HWModuleOp> &oldHWmodules) {
+
+  // This function executes the following steps:
+  // 1. Check if the module has already been rewritten. If so, return.
+  // 2. Create a new hw module with inverted ready signal directions.
+  // 3. Iterate through the body operations of the old module:
+  //    a. If the operation is an hw instance, rewrite it to fix ready signal
+  //       directions.
+  //    b. If the operation is not an hw instance, check if it is only
+  //       output operations and synth subckt operations. If so, create a
+  //       synth subckt operation to connect the module ports. If not, raise
+  //       an error.
+  // 4. Finally, connect the hw instances to the terminator operands of the
+  // new
+  //    module.
+
+  // Step 1: Check if the module has already been rewritten
+  if (newHWmodules.count(oldMod.getName())) {
+    return;
+  }
+
+  // Step 2: Create a new hw module with inverted ready signal directions
+  MLIRContext *ctx = parent.getContext();
+  OpBuilder builder(parent);
+
+  SmallVector<hw::PortInfo> newInputs;
+  SmallVector<hw::PortInfo> newOutputs;
+
+  // Collect the new inputs and outputs with inverted ready signal directions
+  unsigned inputIdx = 0;
+  unsigned outputIdx = 0;
+  // Store mapping from new output idx start and end to old signal
+  SmallVector<std::pair<std::pair<unsigned, unsigned>, Value>>
+      newModuleOutputIdxToOldSignal;
+  // Store mapping from new input idx start and end to old signal
+  SmallVector<std::pair<std::pair<unsigned, unsigned>, Value>>
+      newModuleInputIdxToOldSignal;
+  // Store the mapping between old output signal idx and new output signal idxs.
+  // This should be applied only to non-ready signals.
+  SmallVector<std::pair<unsigned, SmallVector<unsigned>>>
+      oldOutputIdxToNewOutputIdxs;
+  // Iterate over the ports of the old hw module
+  for (auto &p : oldMod.getPortList()) {
+    bool isReady = p.name.getValue().contains("ready");
+
+    unsigned startOutputIdx = outputIdx;
+    unsigned startInputIdx = inputIdx;
+    if ((p.isInput() && isReady) || (p.isOutput() && !isReady)) {
+      // If the port is input and ready, it becomes output and ready in the
+      // new module. If a port is output and not ready, it stays as such.
+      Type signalType = p.type;
+      assert(signalType.isa<IntegerType>() &&
+             "only integer types are supported for signals for now");
+      unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
+      for (unsigned i = 0; i < bitWidth; ++i) {
+        // Update portname indexing the specific bit unless it is 1 bit wide
+        std::string portName =
+            formatPortName(p.name.getValue().str(), i, bitWidth);
+        if (bitWidth == 1) {
+          portName = p.name.getValue().str();
+        }
+        newOutputs.push_back({hw::ModulePort{StringAttr::get(ctx, portName),
+                                             builder.getIntegerType(1),
+                                             hw::ModulePort::Direction::Output},
+                              outputIdx});
+        outputIdx++;
+      }
+      Value oldSignal;
+      if (isReady) {
+        // Record mapping from new ready output to old ready input
+        oldSignal = oldMod.getBodyBlock()->getArgument(p.argNum);
+      } else {
+        // Record mapping from new non-ready output to old non-ready output
+        oldSignal =
+            oldMod.getBodyBlock()->getTerminator()->getOperand(p.argNum);
+      }
+      unsigned endOutputIdx = outputIdx - 1;
+      newModuleOutputIdxToOldSignal.push_back(std::make_pair(
+          std::make_pair(startOutputIdx, endOutputIdx), oldSignal));
+      if (!isReady) {
+        // Store mapping from old output idx to new output idxs for
+        // non-ready outputs
+        SmallVector<unsigned> newOutputIdxs;
+        for (unsigned i = startOutputIdx; i <= endOutputIdx; ++i) {
+          newOutputIdxs.push_back(i);
+        }
+        oldOutputIdxToNewOutputIdxs.push_back(
+            std::make_pair(p.argNum, newOutputIdxs));
+      }
+    } else if ((p.isOutput() && isReady) || (p.isInput() && !isReady)) {
+      // If the port is output and ready, it becomes input and ready in the
+      // new module. If a port is input and not ready, it stays as such.
+      Type signalType = p.type;
+      assert(signalType.isa<IntegerType>() &&
+             "only integer types are supported for signals for now");
+      unsigned bitWidth = signalType.cast<IntegerType>().getWidth();
+      for (unsigned i = 0; i < bitWidth; ++i) {
+        // Update portname indexing the specific bit unless it is 1 bit wide
+        std::string portName =
+            formatPortName(p.name.getValue().str(), i, bitWidth);
+        if (bitWidth == 1) {
+          portName = p.name.getValue().str();
+        }
+        newInputs.push_back(
+            {hw::ModulePort{StringAttr::get(ctx, StringRef{portName}),
+                            builder.getIntegerType(1),
+                            hw::ModulePort::Direction::Input},
+             inputIdx});
+        inputIdx++;
+      }
+      Value oldSignal;
+      if (isReady) {
+        // Record mapping from new ready input to old ready output
+        oldSignal =
+            oldMod.getBodyBlock()->getTerminator()->getOperand(p.argNum);
+      } else {
+        // Record mapping from new non-ready input to old non-ready input
+        oldSignal = oldMod.getBodyBlock()->getArgument(p.argNum);
+      }
+      unsigned endInputIdx = inputIdx - 1;
+      newModuleInputIdxToOldSignal.push_back(std::make_pair(
+          std::make_pair(startInputIdx, endInputIdx), oldSignal));
+    } else {
+      assert(false && "port is neither input nor output");
+    }
+  }
+
+  // Record the old output idx to new output idxs mapping for non-ready outputs
+  oldOutputIdxToNewOutputIdxMap[builder.getStringAttr(oldMod.getName())] =
+      oldOutputIdxToNewOutputIdxs;
+
+  // Add clk and rst for all new inputs of hw modules
+  newInputs.push_back({hw::ModulePort{mlir::StringAttr::get(ctx, clockSignal),
+                                      builder.getIntegerType(1),
+                                      hw::ModulePort::Direction::Input},
+                       inputIdx});
+  unsigned clkInputIdx = inputIdx;
+  inputIdx++;
+  newInputs.push_back({hw::ModulePort{mlir::StringAttr::get(ctx, resetSignal),
+                                      builder.getIntegerType(1),
+                                      hw::ModulePort::Direction::Input},
+                       inputIdx});
+  unsigned rstInputIdx = inputIdx;
+  inputIdx++;
+
+  hw::ModulePortInfo newPortInfo(newInputs, newOutputs);
+
+  // Create new hw module
+  builder.setInsertionPointAfter(oldMod);
+  mlir::StringAttr newModuleName = getRewrittenModuleName(oldMod, ctx);
+  auto newMod = builder.create<hw::HWModuleOp>(oldMod.getLoc(), newModuleName,
+                                               newPortInfo);
+  // Save it in the list of new module using the same name as the old module
+  // as key
+  newHWmodules[oldMod.getName()] = newMod;
+
+  // Copy the blif path attribute from the old module to the new module
+  if (opToBlifPathMap.contains(oldMod.getOperation())) {
+    auto blifPath = opToBlifPathMap[oldMod.getOperation()];
+    opToBlifPathMap[newMod.getOperation()] = blifPath;
+    // Remove old module from the map
+    opToBlifPathMap.erase(oldMod.getOperation());
+  }
+
+  // Add mapping between new inputs to old signals
+  for (auto [newModuleInputIdxs, oldSignal] : newModuleInputIdxToOldSignal) {
+    unsigned newModuleInputIdxStart = newModuleInputIdxs.first;
+    unsigned newModuleInputIdxEnd = newModuleInputIdxs.second;
+    // For each bit of the input signal, get the corresponding argument
+    SmallVector<Value> newReadyInput;
+    for (unsigned idx = newModuleInputIdxStart; idx <= newModuleInputIdxEnd;
+         ++idx) {
+      newReadyInput.push_back(newMod.getBodyBlock()->getArgument(idx));
+    }
+    assert(newReadyInput.size() && "could not find mapping for input signal");
+    oldModuleSignalToNewModuleSignalsMap[oldSignal] = newReadyInput;
+  }
+
+  // If the hw module represent the top function
+  if (oldMod.getName() == getTopFunctionName()) {
+    // Save the clock and reset signals
+    assert((clkSignalTop == nullptr && rstSignalTop == nullptr) &&
+           "reset and clock signals should be set only once for the top "
+           "function");
+    clkSignalTop = newMod.getBodyBlock()->getArgument(clkInputIdx);
+    rstSignalTop = newMod.getBodyBlock()->getArgument(rstInputIdx);
+    oldModuleSignalToNewModuleSignalsMap[clkSignalTop] = {clkSignalTop};
+    oldModuleSignalToNewModuleSignalsMap[rstSignalTop] = {rstSignalTop};
+  }
+
+  // Step 3: Iterate through the body operations of the old module
+  bool hasHwInstances = true;
+  // Iterate through old body operations and invert ready signals in instances
+  for (auto &op : oldMod.getBody().getOps()) {
+    // Check if the operation is an hw instance
+    if (auto instOp = dyn_cast<hw::InstanceOp>(op)) {
+      // Step 3a: If the operation is an hw instance, rewrite it to fix ready
+      // signal directions.
+      rewriteHWInstance(instOp, parent, symTable, newHWmodules, oldHWmodules);
+    } else if (!isa<hw::OutputOp>(op)) {
+      hasHwInstances = false;
+    }
+  }
+
+  if (!hasHwInstances) {
+    // Step 3b: If the operation is not an hw instance, check if it is only
+    // output operations and synth subckt operations. If so, create a
+    // synth subckt operation to connect the module ports. If not, raise an
+    // error.
+    for (auto &op : oldMod.getBody().getOps()) {
+      if (!isa<hw::OutputOp>(op) && !isa<synth::SubcktOp>(op)) {
+        llvm::errs() << "Found non-instance operation in hw module: " << op
+                     << "\n";
+        assert(false && "found non-instance operation in hw module");
+      }
+    }
+    ConversionPatternRewriter rewriter(ctx);
+    if (failed(instantiateSynthOpInHWModule(newMod, rewriter))) {
+      assert(false && "synth instantiation in hw module failed");
+    }
+    return;
+  }
+
+  // Step 4: Finally, connect the hw instances to the terminator operands of
+  // the new module.
+  builder.setInsertionPointToEnd(newMod.getBodyBlock());
+  SmallVector<Value> newTerminatorOperands;
+  for (auto [newOutputIdxs, oldSignal] : newModuleOutputIdxToOldSignal) {
+    SmallVector<Value> newModuleOutputs =
+        oldModuleSignalToNewModuleSignalsMap[oldSignal];
+    assert(newModuleOutputs.size() &&
+           "could not find mapping for output signal");
+    newTerminatorOperands.append(newModuleOutputs.begin(),
+                                 newModuleOutputs.end());
+  }
+
+  // Add operands to existing terminator
+  Operation *newTerminator = newMod.getBodyBlock()->getTerminator();
+  newTerminator->setOperands(newTerminatorOperands);
+}
+
+/// Function to apply signal-direction and bit-level rewrites to all HW
+/// modules in the MLIR module.
+LogicalResult SignalRewriter::rewriteAllSignals(mlir::ModuleOp modOp) {
+
+  // The following function iterates through all hw modules in the module
+  // and rewrites them to invert the direction of ready signals to follow
+  // the standard handshake protocol where ready signals go in the opposite
+  // direction with respect to data and valid signals. It applies recursively
+  // to all hw modules instantiated within other hw modules.
+  // It does so by creating new hw modules with the rewritten ready signal
+  // directions and then connecting them following the same graph structure of
+  // the old modules. Finally, it removes the old hw modules and renames the
+  // new hw modules to the original names. Additionally, during the ready
+  // signal inversion, it also unbundles multi-bit signals into single-bit
+  // signals.
+
+  // Maps to keep track of old and new hw modules
+  // The old hw modules have the wrong ready signal directions where ready
+  // signals follows the same direction as data and valid signals
+  // The new hw modules will contain the rewritten modules with correct ready
+  // signal directions
+  DenseMap<StringRef, hw::HWModuleOp> oldHWModules;
+  DenseMap<StringRef, hw::HWModuleOp> newHWModules;
+  // Get symbol table for hw modules
+  SymbolTable symTable(modOp);
+  // Collect all hw modules in the module
+  modOp.walk([&](hw::HWModuleOp m) { oldHWModules.insert({m.getName(), m}); });
+  // Iterate through all hw modules and rewrite them
+  for (auto [name, hwMod] : oldHWModules)
+    rewriteHWModule(hwMod, modOp, symTable, newHWModules, oldHWModules);
+  // Erase old hw modules
+  for (auto [modName, oldMod] : oldHWModules) {
+    oldMod.erase();
+  }
+  // Iterate through all new hw modules and rename them to the original names
+  for (auto [originalName, newMod] : newHWModules) {
+    mlir::StringAttr originalNameAttr =
+        mlir::StringAttr::get(modOp.getContext(), originalName);
+    StringRef currentModName = newMod.getName();
+    // Change the module name of the instances of this module
+    modOp.walk([&](hw::InstanceOp instOp) {
+      if (instOp.getModuleName() == currentModName) {
+        instOp.setModuleName(originalNameAttr);
+      }
+    });
+    // Rename the new module to the original name
+    newMod.setName(originalName);
+  }
+  return success();
+}
+
 // ------------------------------------------------------------------
 // Instantiation of the synth operations in the hw modules and conversion of hw
 // instances to synth operations
@@ -1028,11 +1544,6 @@ public:
     if (failed(unbundleAllHandshakeTypes(modOp, ctx)))
       return signalPassFailure();
 
-    // Temporary return to test the first two steps before re-implementing step
-    // 3
-    return;
-
-    /*
     // Step 2: invert the direction of all ready signals in the hw modules
     // created from handshake operations. Additionally, unbundle data signals
     // into single-bit signals.
@@ -1044,7 +1555,10 @@ public:
     signalRewriter.setTopFunctionName(topModuleName);
     if (failed(signalRewriter.rewriteAllSignals(modOp)))
       return signalPassFailure();
-    */
+
+    // Temporary return to test the first two steps before re-implementing step
+    // 3
+    return;
 
     // Step 3: Populate the hw module operations with the correspoding synth
     // operations. The description of the implementation is defined in the path
