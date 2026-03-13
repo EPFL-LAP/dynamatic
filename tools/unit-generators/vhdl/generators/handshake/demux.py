@@ -1,4 +1,4 @@
-from generators.support.signal_manager import generate_signal_manager
+from generators.support.signal_manager import generate_default_signal_manager
 from generators.handshake.join import generate_join
 
 
@@ -135,8 +135,7 @@ end architecture;
 
 
 def _generate_demux_signal_manager(name, size, data_bitwidth, index_bitwidth, extra_signals):
-  return generate_signal_manager(name, {
-      "type": "normal",
+  return generate_default_signal_manager(name, {
       "in_ports": [{
           "name": "ins",
           "bitwidth": data_bitwidth,
