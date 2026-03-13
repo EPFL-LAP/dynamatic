@@ -500,4 +500,5 @@ def HandshakeTreeHeightReduction : Pass<"handshake-tree-height-reduction"> {
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
+
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD
