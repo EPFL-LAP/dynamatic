@@ -1,0 +1,215 @@
+# Benchmark "xori" written by ABC on Sun Jul 13 20:23:59 2025
+.model xori
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs[10] lhs[11] lhs[12] lhs[13] lhs[14] lhs[15] lhs[16] \
+ lhs[17] lhs[18] lhs[19] lhs[20] lhs[21] lhs[22] lhs[23] lhs[24] lhs[25] \
+ lhs[26] lhs[27] lhs[28] lhs[29] lhs[30] lhs[31] lhs_valid rhs[0] rhs[1] \
+ rhs[2] rhs[3] rhs[4] rhs[5] rhs[6] rhs[7] rhs[8] rhs[9] rhs[10] rhs[11] \
+ rhs[12] rhs[13] rhs[14] rhs[15] rhs[16] rhs[17] rhs[18] rhs[19] rhs[20] \
+ rhs[21] rhs[22] rhs[23] rhs[24] rhs[25] rhs[26] rhs[27] rhs[28] rhs[29] \
+ rhs[30] rhs[31] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result[10] result[11] result[12] \
+ result[13] result[14] result[15] result[16] result[17] result[18] \
+ result[19] result[20] result[21] result[22] result[23] result[24] \
+ result[25] result[26] result[27] result[28] result[29] result[30] \
+ result[31] result_valid lhs_ready rhs_ready
+.names lhs[0] rhs[0] new_n105
+10 1
+.names lhs[0] rhs[0] new_n106
+01 1
+.names new_n105 new_n106 result[0]
+00 0
+.names lhs[1] rhs[1] new_n108
+10 1
+.names lhs[1] rhs[1] new_n109
+01 1
+.names new_n108 new_n109 result[1]
+00 0
+.names lhs[2] rhs[2] new_n111
+10 1
+.names lhs[2] rhs[2] new_n112
+01 1
+.names new_n111 new_n112 result[2]
+00 0
+.names lhs[3] rhs[3] new_n114
+10 1
+.names lhs[3] rhs[3] new_n115
+01 1
+.names new_n114 new_n115 result[3]
+00 0
+.names lhs[4] rhs[4] new_n117
+10 1
+.names lhs[4] rhs[4] new_n118
+01 1
+.names new_n117 new_n118 result[4]
+00 0
+.names lhs[5] rhs[5] new_n120
+10 1
+.names lhs[5] rhs[5] new_n121
+01 1
+.names new_n120 new_n121 result[5]
+00 0
+.names lhs[6] rhs[6] new_n123
+10 1
+.names lhs[6] rhs[6] new_n124
+01 1
+.names new_n123 new_n124 result[6]
+00 0
+.names lhs[7] rhs[7] new_n126
+10 1
+.names lhs[7] rhs[7] new_n127
+01 1
+.names new_n126 new_n127 result[7]
+00 0
+.names lhs[8] rhs[8] new_n129
+10 1
+.names lhs[8] rhs[8] new_n130
+01 1
+.names new_n129 new_n130 result[8]
+00 0
+.names lhs[9] rhs[9] new_n132
+10 1
+.names lhs[9] rhs[9] new_n133
+01 1
+.names new_n132 new_n133 result[9]
+00 0
+.names lhs[10] rhs[10] new_n135
+10 1
+.names lhs[10] rhs[10] new_n136
+01 1
+.names new_n135 new_n136 result[10]
+00 0
+.names lhs[11] rhs[11] new_n138
+10 1
+.names lhs[11] rhs[11] new_n139
+01 1
+.names new_n138 new_n139 result[11]
+00 0
+.names lhs[12] rhs[12] new_n141
+10 1
+.names lhs[12] rhs[12] new_n142
+01 1
+.names new_n141 new_n142 result[12]
+00 0
+.names lhs[13] rhs[13] new_n144
+10 1
+.names lhs[13] rhs[13] new_n145
+01 1
+.names new_n144 new_n145 result[13]
+00 0
+.names lhs[14] rhs[14] new_n147
+10 1
+.names lhs[14] rhs[14] new_n148
+01 1
+.names new_n147 new_n148 result[14]
+00 0
+.names lhs[15] rhs[15] new_n150
+10 1
+.names lhs[15] rhs[15] new_n151
+01 1
+.names new_n150 new_n151 result[15]
+00 0
+.names lhs[16] rhs[16] new_n153
+10 1
+.names lhs[16] rhs[16] new_n154
+01 1
+.names new_n153 new_n154 result[16]
+00 0
+.names lhs[17] rhs[17] new_n156
+10 1
+.names lhs[17] rhs[17] new_n157
+01 1
+.names new_n156 new_n157 result[17]
+00 0
+.names lhs[18] rhs[18] new_n159
+10 1
+.names lhs[18] rhs[18] new_n160
+01 1
+.names new_n159 new_n160 result[18]
+00 0
+.names lhs[19] rhs[19] new_n162
+10 1
+.names lhs[19] rhs[19] new_n163
+01 1
+.names new_n162 new_n163 result[19]
+00 0
+.names lhs[20] rhs[20] new_n165
+10 1
+.names lhs[20] rhs[20] new_n166
+01 1
+.names new_n165 new_n166 result[20]
+00 0
+.names lhs[21] rhs[21] new_n168
+10 1
+.names lhs[21] rhs[21] new_n169
+01 1
+.names new_n168 new_n169 result[21]
+00 0
+.names lhs[22] rhs[22] new_n171
+10 1
+.names lhs[22] rhs[22] new_n172
+01 1
+.names new_n171 new_n172 result[22]
+00 0
+.names lhs[23] rhs[23] new_n174
+10 1
+.names lhs[23] rhs[23] new_n175
+01 1
+.names new_n174 new_n175 result[23]
+00 0
+.names lhs[24] rhs[24] new_n177
+10 1
+.names lhs[24] rhs[24] new_n178
+01 1
+.names new_n177 new_n178 result[24]
+00 0
+.names lhs[25] rhs[25] new_n180
+10 1
+.names lhs[25] rhs[25] new_n181
+01 1
+.names new_n180 new_n181 result[25]
+00 0
+.names lhs[26] rhs[26] new_n183
+10 1
+.names lhs[26] rhs[26] new_n184
+01 1
+.names new_n183 new_n184 result[26]
+00 0
+.names lhs[27] rhs[27] new_n186
+10 1
+.names lhs[27] rhs[27] new_n187
+01 1
+.names new_n186 new_n187 result[27]
+00 0
+.names lhs[28] rhs[28] new_n189
+10 1
+.names lhs[28] rhs[28] new_n190
+01 1
+.names new_n189 new_n190 result[28]
+00 0
+.names lhs[29] rhs[29] new_n192
+10 1
+.names lhs[29] rhs[29] new_n193
+01 1
+.names new_n192 new_n193 result[29]
+00 0
+.names lhs[30] rhs[30] new_n195
+10 1
+.names lhs[30] rhs[30] new_n196
+01 1
+.names new_n195 new_n196 result[30]
+00 0
+.names lhs[31] rhs[31] new_n198
+10 1
+.names lhs[31] rhs[31] new_n199
+01 1
+.names new_n198 new_n199 result[31]
+00 0
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

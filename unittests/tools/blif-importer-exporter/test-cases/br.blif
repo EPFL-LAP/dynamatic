@@ -1,0 +1,80 @@
+# Benchmark "br" written by ABC on Sun Jul 13 20:31:55 2025
+.model br
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins[5] ins[6] ins[7] \
+ ins[8] ins[9] ins[10] ins[11] ins[12] ins[13] ins[14] ins[15] ins[16] \
+ ins[17] ins[18] ins[19] ins[20] ins[21] ins[22] ins[23] ins[24] ins[25] \
+ ins[26] ins[27] ins[28] ins[29] ins[30] ins[31] ins_valid outs_ready
+.outputs ins_ready outs[0] outs[1] outs[2] outs[3] outs[4] outs[5] outs[6] \
+ outs[7] outs[8] outs[9] outs[10] outs[11] outs[12] outs[13] outs[14] \
+ outs[15] outs[16] outs[17] outs[18] outs[19] outs[20] outs[21] outs[22] \
+ outs[23] outs[24] outs[25] outs[26] outs[27] outs[28] outs[29] outs[30] \
+ outs[31] outs_valid
+.names outs_ready ins_ready
+1 1
+.names ins[0] outs[0]
+1 1
+.names ins[1] outs[1]
+1 1
+.names ins[2] outs[2]
+1 1
+.names ins[3] outs[3]
+1 1
+.names ins[4] outs[4]
+1 1
+.names ins[5] outs[5]
+1 1
+.names ins[6] outs[6]
+1 1
+.names ins[7] outs[7]
+1 1
+.names ins[8] outs[8]
+1 1
+.names ins[9] outs[9]
+1 1
+.names ins[10] outs[10]
+1 1
+.names ins[11] outs[11]
+1 1
+.names ins[12] outs[12]
+1 1
+.names ins[13] outs[13]
+1 1
+.names ins[14] outs[14]
+1 1
+.names ins[15] outs[15]
+1 1
+.names ins[16] outs[16]
+1 1
+.names ins[17] outs[17]
+1 1
+.names ins[18] outs[18]
+1 1
+.names ins[19] outs[19]
+1 1
+.names ins[20] outs[20]
+1 1
+.names ins[21] outs[21]
+1 1
+.names ins[22] outs[22]
+1 1
+.names ins[23] outs[23]
+1 1
+.names ins[24] outs[24]
+1 1
+.names ins[25] outs[25]
+1 1
+.names ins[26] outs[26]
+1 1
+.names ins[27] outs[27]
+1 1
+.names ins[28] outs[28]
+1 1
+.names ins[29] outs[29]
+1 1
+.names ins[30] outs[30]
+1 1
+.names ins[31] outs[31]
+1 1
+.names ins_valid outs_valid
+1 1
+.end
