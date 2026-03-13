@@ -52,6 +52,10 @@ struct HandshakeMarkBLIFImplPass
     auto moduleOp = getOperation();
     // Walk through all handshake operations in the function
     moduleOp.walk([&](Operation *op) {
+      // Skip non-handshake ops (e.g. builtin.module, hw.module, etc.)
+      if (op->getDialect()->getNamespace() !=
+          handshake::HandshakeDialect::getDialectNamespace())
+        return;
       // Skip function operations
       if (isa<handshake::FuncOp>(op))
         return;
@@ -64,8 +68,13 @@ struct HandshakeMarkBLIFImplPass
           mlir::StringAttr::get(op->getContext(), blifFilePath);
       // Set the blif path attribute on the operation
       BLIFImplInterface blifImplInterface = dyn_cast<BLIFImplInterface>(op);
-      assert(blifImplInterface &&
-             "Operation does not implement BLIFImplInterface");
+      if (!blifImplInterface) {
+        // Print the operation type
+        llvm::errs() << "Operation " << getUniqueName(op)
+                     << " does not implement the BLIFImplInterface\n";
+        assert(false && "Check that all handshake operations implement the "
+                        "BLIFImplInterface");
+      }
       blifImplInterface.setBLIFImpl(blifPathAttr);
     });
   }
