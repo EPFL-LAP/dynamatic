@@ -928,11 +928,16 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 // instances to synth operations
 // ------------------------------------------------------------------
 
-// Function to replace an instance with synth operations
-// It manages the replacement of a single hw instance operation
+// Function to instantiate the synth operations in the hw module
 LogicalResult
-convertHWInstanceToSynthOps(ModuleOp modOp, hw::InstanceOp op,
-                            SmallVector<std::string> &modifiedHWModules) {
+populateHWModuleWithSynthOps(ModuleOp modOp, hw::InstanceOp op,
+                             SmallVector<std::string> &modifiedHWModules) {
+
+  // This function populates the hw module corresponding to the given hw
+  // instance with synth operations by importing the blif circuit described in
+  // the path specified by the blifPathAttrStr attribute on the hw module.
+  // It first imports the blif circuit as a new hw module, then it replaces the
+  // body of the original hw module with the body of the new hw module.
 
   // Ensure that the blif path is specified in the hw module of the hw
   // instance operation
@@ -979,15 +984,14 @@ convertHWInstanceToSynthOps(ModuleOp modOp, hw::InstanceOp op,
   return success();
 }
 
-// Function to convert hw instances into synth operations
-LogicalResult convertHWInstancesToSynthOps(mlir::ModuleOp modOp,
-                                           StringRef topModuleName,
-                                           MLIRContext *ctx) {
-  // The following function iterates through all the hw instances in the top
-  // module and convert them into synth operations like registers,
-  // combinational logic, etc. if possible. The description of the
-  // implementation is defined in the path specified by the attribute
-  // blifPathAttrStr on each hw module
+// Function to import the blif circuits corresponding to the original handshake
+// units
+LogicalResult populateHWModules(mlir::ModuleOp modOp, StringRef topModuleName,
+                                MLIRContext *ctx) {
+  // The following function iterates through all the hw modules and populate
+  // them with the synth operations like registers, combinational logic, etc. if
+  // possible. The description of the implementation is defined in the path
+  // specified by the attribute blifPathAttrStr on each hw module
 
   // Get hw module corresponding to the top module
   SymbolTable symTable(modOp);
@@ -1005,9 +1009,11 @@ LogicalResult convertHWInstancesToSynthOps(mlir::ModuleOp modOp,
   // Collect the list of modified hw modules to avoid modifying the same module
   // multiple times
   SmallVector<std::string> modifiedHWModules;
-  // Convert each hw instance into synth operations
+  // Iterate through each hw instance and populate the corresponding hw module
+  // with synth operations
   for (hw::InstanceOp hwInst : hwInstances) {
-    if (failed(convertHWInstanceToSynthOps(modOp, hwInst, modifiedHWModules))) {
+    if (failed(
+            populateHWModuleWithSynthOps(modOp, hwInst, modifiedHWModules))) {
       llvm::errs() << "Failed to convert hw instance to synth ops: " << hwInst
                    << "\n";
       return failure();
@@ -1031,10 +1037,9 @@ namespace {
 //    to follow the standard handshake protocol where ready signals go in the
 //    opposite direction with respect to data and valid signals. Additionally,
 //    data signals are unbundled into single-bit signals.
-// 3) Convert hw instances into other synth operations like registers,
-//    combinational logic, etc. if possible. The description of the
-//    implementation is defined in the path specified by the attribute
-//    blifPathAttrStr on each hw module
+// 3) Populate the hw module operations with the correspoding synth operations.
+//    The description of the implementation is defined in the path specified by
+//    the attribute blifPathAttrStr on each hw module
 class HandshakeToSynthPass
     : public dynamatic::impl::HandshakeToSynthBase<HandshakeToSynthPass> {
 public:
@@ -1102,11 +1107,10 @@ public:
       return signalPassFailure();
     */
 
-    // Step 3: Convert hw instances into other synth operations like
-    // registers, combinational logic, etc. if possible. The description of
-    // the implementation is defined in the path specified by the attribute
-    // blifPathAttrStr on each hw module
-    if (failed(convertHWInstancesToSynthOps(modOp, topModuleName, ctx)))
+    // Step 3: Populate the hw module operations with the correspoding synth
+    // operations. The description of the implementation is defined in the path
+    // specified by the attribute blifPathAttrStr on each hw module.
+    if (failed(populateHWModules(modOp, topModuleName, ctx)))
       return signalPassFailure();
     // Remove all hw modules that are different from the top function hw
     // module
