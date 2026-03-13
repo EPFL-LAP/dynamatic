@@ -72,6 +72,70 @@
 
 namespace dynamatic {
 
+// Function to enforce a specific ordering of the input and output pins for the
+// synth circuit
+LogicalResult BlifImporter::enforcePinsOrdering() {
+  // Check if there is any enforced pins ordering
+  if (!pinsOrdering.first.empty() && !pinsOrdering.second.empty()) {
+    // Check that the enforced pins match the ports read from the blif file
+    SmallVector<std::string> inputPinOrdering = pinsOrdering.first;
+    SmallVector<std::string> outputPinOrdering = pinsOrdering.second;
+    if (inputPinOrdering.size() != inputPorts.size()) {
+      llvm::errs() << "The number of input pins in the enforced pins ordering ("
+                   << inputPinOrdering.size()
+                   << ") does not match the number of input ports read from "
+                      "the blif file ("
+                   << inputPorts.size()
+                   << "). Please provide a valid pins "
+                      "ordering that matches the ports in the blif file."
+                   << "\n";
+      return failure();
+    }
+    if (outputPinOrdering.size() != outputPorts.size()) {
+      llvm::errs()
+          << "The number of output pins in the enforced pins ordering ("
+          << outputPinOrdering.size()
+          << ") does not match the number of output ports read from "
+             "the blif file ("
+          << outputPorts.size()
+          << "). Please provide a valid pins "
+             "ordering that matches the ports in the blif file."
+          << "\n";
+      return failure();
+    }
+    // Check that the enforced pins match the ports read from the blif file
+    for (const auto &pin : inputPinOrdering) {
+      if (std::find(inputPorts.begin(), inputPorts.end(), pin) ==
+          inputPorts.end()) {
+        llvm::errs()
+            << "Input pin '" << pin
+            << "' in the enforced pins ordering does not match any input "
+               "port read from the blif file. Please provide a valid pins "
+               "ordering that matches the ports in the blif file."
+            << "\n";
+        return failure();
+      }
+    }
+    for (const auto &pin : outputPinOrdering) {
+      if (std::find(outputPorts.begin(), outputPorts.end(), pin) ==
+          outputPorts.end()) {
+        llvm::errs()
+            << "Output pin '" << pin
+            << "' in the enforced pins ordering does not match any output "
+               "port read from the blif file. Please provide a valid pins "
+               "ordering that matches the ports in the blif file."
+            << "\n";
+        return failure();
+      }
+    }
+    // If the enforced pins ordering is valid, update the inputPorts and
+    // outputPorts to match the enforced ordering
+    inputPorts = inputPinOrdering;
+    outputPorts = outputPinOrdering;
+  }
+  return success();
+}
+
 // Function to get the module name and the input and output ports from the blif
 // file
 LogicalResult BlifImporter::extractBlifModuleHeader() {
@@ -165,6 +229,13 @@ LogicalResult BlifImporter::extractBlifModuleHeader() {
 
   // Close the file
   file.close();
+
+  // Enforce the desired pins ordering if specified
+  if (failed(enforcePinsOrdering())) {
+    llvm::errs() << "Failed to enforce the desired pins ordering for the "
+                    "synth circuit generated from the blif file: "
+                 << blifFilePath << "\n";
+  }
 
   return success();
 }
@@ -566,9 +637,18 @@ void BlifImporter::createSynthLogicGate(SmallVector<Value> inputValues,
 }
 
 // Function to create a new synth circuit from a blif file from an empty IR
-hw::HWModuleOp importBlifCircuit(ModuleOp moduleOp, StringRef blifFilePath) {
+hw::HWModuleOp
+importBlifCircuit(ModuleOp moduleOp, StringRef blifFilePath,
+                  std::pair<SmallVector<std::string>, SmallVector<std::string>>
+                      pinsOrdering) {
 
   BlifImporter blifImporter(blifFilePath, moduleOp);
+  // If the old pins ordering is not empty, set it in the blif importer so that
+  // the same ordering is preserved when generating the new synth circuit from
+  // the blif file.
+  if (!pinsOrdering.first.empty() && !pinsOrdering.second.empty()) {
+    blifImporter.setPinsOrdering(pinsOrdering);
+  }
   // Read input and output ports from the blif file
   if (failed(blifImporter.extractBlifModuleHeader())) {
     llvm::errs() << "Failed to read the blif file header." << "\n";
