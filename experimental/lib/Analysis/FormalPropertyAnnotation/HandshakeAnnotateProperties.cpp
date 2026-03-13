@@ -312,17 +312,192 @@ struct FlowEquationsMatrix {
   }
 };
 
-std::vector<FlowExpression>
-extractLocalEquations(ModuleOp modOp,
-                      const IndexChannelAnalysis &indexChannelAnalysis) {
-  std::vector<FlowExpression> equations{};
-  // annotate equations derived from operations
+struct EquationExtractor {
+  std::vector<FlowExpression> equations;
+  const IndexChannelAnalysis &indexChannelAnalysis;
+
+  EquationExtractor(ModuleOp modOp, const IndexChannelAnalysis &ica)
+      : equations(), indexChannelAnalysis(ica) {
+    extractAll(modOp);
+  }
+  void extractAll(ModuleOp modOp);
+  void extractControlMergeOp(ControlMergeOp cmergeOp);
+  void extractMergeLikeOp(MergeLikeOpInterface mergeOp, FlowVariable &after);
+  void extractMuxOpExtra(MuxOp muxOp, FlowVariable &after);
+  void extractJoinOp(Operation &op, FlowVariable &after);
+  void extractEagerFork(EagerForkLikeOpInterface forkOp, FlowVariable &before);
+};
+
+void EquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
+  size_t numInputs = cmergeOp.getDataOperands().size();
+
+  FlowVariable x0(InternalLambda(cmergeOp, 0));
+  x0.indexTokenConstraint = IndexTracker(numInputs);
+
+  for (auto [i, channel] : llvm::enumerate(cmergeOp.getDataOperands())) {
+    FlowVariable channelVar(indexChannelAnalysis, ChannelLambda(channel));
+    equations.push_back(channelVar - x0.setTrackedTokens(i));
+  }
+
+  auto slots = cmergeOp.getInternalSlotStateNamers();
+  std::shared_ptr<InternalStateNamer> slotNamer =
+      std::make_shared<BufferSlotFullNamer>(slots[0]);
+  FlowVariable slot(slotNamer);
+  slot.indexTokenConstraint = IndexTracker(numInputs);
+
+  FlowVariable indexChannel = x0.nextInternal();
+  for (size_t i = 0; i < numInputs; ++i) {
+    equations.push_back(x0.setTrackedTokens(i) -
+                        indexChannel.setTrackedTokens(i) -
+                        slot.setTrackedTokens(i));
+  }
+  FlowVariable dataChannel = indexChannel.nextInternal();
+  dataChannel.indexTokenConstraint.reset();
+  equations.push_back(x0 - dataChannel - slot);
+
+  auto sentNamers = cmergeOp.getInternalSentStateNamers();
+
+  std::shared_ptr<InternalStateNamer> dataNamer =
+      std::make_shared<EagerForkSentNamer>(sentNamers[0]);
+  std::shared_ptr<InternalStateNamer> indexNamer =
+      std::make_shared<EagerForkSentNamer>(sentNamers[1]);
+  FlowVariable dataSent(dataNamer);
+  FlowVariable indexSent(indexNamer);
+  indexSent.indexTokenConstraint = IndexTracker(numInputs);
+
+  auto outputs = cmergeOp.getResults();
+  FlowVariable data(indexChannelAnalysis, ChannelLambda(outputs[0]));
+  FlowVariable index(indexChannelAnalysis, ChannelLambda(outputs[1]));
+
+  for (size_t i = 0; i < numInputs; ++i) {
+    equations.push_back(index.setTrackedTokens(i) -
+                        indexSent.setTrackedTokens(i) -
+                        indexChannel.setTrackedTokens(i));
+  }
+  equations.push_back(data - dataSent - dataChannel);
+}
+
+void EquationExtractor::extractMergeLikeOp(MergeLikeOpInterface mergeOp,
+                                           FlowVariable &after) {
+  FlowExpression mergeEq = -after;
+  std::vector<FlowExpression> constrainedEqs;
+  size_t indexValue;
+  bool foundIndexed = false;
+  bool foundUnindexed = false;
+  auto channels = mergeOp.getDataOperands();
+  for (auto channel : channels) {
+    FlowVariable ch(indexChannelAnalysis, ChannelLambda(channel));
+    if (ch.isIndex()) {
+      if (!foundIndexed) {
+        indexValue = ch.indexTokenConstraint->numValues;
+        constrainedEqs.resize(indexValue);
+      }
+      foundIndexed = true;
+      assert(indexValue == ch.indexTokenConstraint->numValues &&
+             "found differing index");
+      for (size_t i = 0; i < indexValue; ++i) {
+        constrainedEqs[i] += ch.setTrackedTokens(i);
+      }
+    } else {
+      foundUnindexed = true;
+      assert(foundIndexed == false);
+      mergeEq += ch;
+    }
+  }
+  assert(!(foundIndexed && foundUnindexed) &&
+         "some index channels and some normal channels");
+  if (foundIndexed) {
+    after.indexTokenConstraint = IndexTracker(indexValue);
+    for (size_t i = 0; i < indexValue; ++i) {
+      constrainedEqs[i] -= after.setTrackedTokens(i);
+      equations.push_back(constrainedEqs[i]);
+    }
+  } else {
+    equations.push_back(mergeEq);
+  }
+}
+
+void EquationExtractor::extractMuxOpExtra(MuxOp muxOp, FlowVariable &after) {
+  // mux : select input has same as output lambda, data inputs act like
+  Value select = muxOp.getSelectOperand();
+  FlowVariable selectVar(indexChannelAnalysis, ChannelLambda(select));
+  if (selectVar.isIndex()) {
+    auto dataOperands = muxOp.getDataOperands();
+    assert(selectVar.indexTokenConstraint->numValues == dataOperands.size());
+    for (auto [i, operand] : llvm::enumerate(dataOperands)) {
+      FlowVariable var(indexChannelAnalysis, ChannelLambda(operand));
+      equations.push_back(selectVar.setTrackedTokens(i) - var);
+    }
+  } else {
+    assert(false && "muxOp select var should always be index");
+    FlowExpression dataEq = -after;
+    for (auto operand : muxOp.getDataOperands()) {
+      FlowVariable chVar(indexChannelAnalysis, ChannelLambda(operand));
+      dataEq += chVar;
+    }
+    equations.push_back(dataEq);
+  }
+}
+
+void EquationExtractor::extractJoinOp(Operation &op, FlowVariable &after) {
+  auto channels = op.getOperands();
+  if (channels.size() == 1) {
+    // Only 1 input channel
+    auto channel = channels[0];
+    FlowVariable chVar(indexChannelAnalysis, ChannelLambda(channel));
+    // If input is +-, then intermediate channel is as well
+    after.indexTokenConstraint = chVar.indexTokenConstraint;
+    if (chVar.isIndex()) {
+      for (size_t i = 0; i < chVar.indexTokenConstraint->numValues; ++i) {
+        equations.push_back(chVar.setTrackedTokens(i) -
+                            after.setTrackedTokens(i));
+      }
+    } else {
+      equations.push_back(chVar - after);
+    }
+  } else {
+    for (auto channel : channels) {
+      FlowVariable chVar(indexChannelAnalysis, ChannelLambda(channel));
+      equations.push_back(chVar - after);
+    }
+  }
+}
+
+void EquationExtractor::extractEagerFork(EagerForkLikeOpInterface forkOp,
+                                         FlowVariable &before) {
+  // eagerfork: for every channel, either same tokens in as out, or in
+  // `sent` state and in = out - 1
+  for (auto [i, sentVariable] :
+       llvm::enumerate(forkOp.getInternalSentStateNamers())) {
+    std::shared_ptr<InternalStateNamer> namer =
+        std::make_shared<EagerForkSentNamer>(sentVariable);
+    FlowVariable sent(namer);
+    FlowVariable result(indexChannelAnalysis,
+                        ChannelLambda(forkOp->getResults()[i]));
+    if (before.isIndex()) {
+      assert(result.isIndex());
+      FlowVariable constrainedSent = sent;
+      constrainedSent.indexTokenConstraint =
+          IndexTracker(before.indexTokenConstraint->numValues);
+      equations.push_back(sent - constrainedSent);
+      for (size_t i = 0; i < before.indexTokenConstraint->numValues; ++i) {
+        equations.push_back(before.setTrackedTokens(i) +
+                            constrainedSent.setTrackedTokens(i) -
+                            result.setTrackedTokens(i));
+      }
+    } else {
+      equations.push_back(before + sent - result);
+    }
+  }
+}
+
+void EquationExtractor::extractAll(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       // A general structure for an operation is assumed:
       // in1, in2, ... -> Join/Merge/Mux -> entry channel
-      // entry channel -> slots? -> exit channel
-      // exit channel 2 -> Fork/Branch -> out1, out2, ...
+      // entry channel -> pipeline? -> slots? -> exit channel
+      // exit channel -> Fork/Branch -> out1, out2, ...
       //
       // Some operations do not follow this structure, and should be handled
       // separately to avoid making false assumptions.
@@ -335,150 +510,26 @@ extractLocalEquations(ModuleOp modOp,
       if (auto controllerOp = dyn_cast<handshake::MemoryControllerOp>(op)) {
         continue;
       }
-
       if (auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op)) {
-        size_t numInputs = cmergeOp.getDataOperands().size();
-
-        FlowVariable x0(InternalLambda(&op, 0));
-        x0.indexTokenConstraint = IndexTracker(numInputs);
-
-        for (auto [i, channel] : llvm::enumerate(cmergeOp.getDataOperands())) {
-          FlowVariable channelVar(indexChannelAnalysis, ChannelLambda(channel));
-          equations.push_back(channelVar - x0.setTrackedTokens(i));
-        }
-
-        auto slots = cmergeOp.getInternalSlotStateNamers();
-        std::shared_ptr<InternalStateNamer> slotNamer =
-            std::make_shared<BufferSlotFullNamer>(slots[0]);
-        FlowVariable slot(slotNamer);
-        slot.indexTokenConstraint = IndexTracker(numInputs);
-
-        FlowVariable indexChannel = x0.nextInternal();
-        for (size_t i = 0; i < numInputs; ++i) {
-          equations.push_back(x0.setTrackedTokens(i) -
-                              indexChannel.setTrackedTokens(i) -
-                              slot.setTrackedTokens(i));
-        }
-        FlowVariable dataChannel = indexChannel.nextInternal();
-        dataChannel.indexTokenConstraint.reset();
-        equations.push_back(x0 - dataChannel - slot);
-
-        auto sentNamers = cmergeOp.getInternalSentStateNamers();
-
-        std::shared_ptr<InternalStateNamer> dataNamer =
-            std::make_shared<EagerForkSentNamer>(sentNamers[0]);
-        std::shared_ptr<InternalStateNamer> indexNamer =
-            std::make_shared<EagerForkSentNamer>(sentNamers[1]);
-        FlowVariable dataSent(dataNamer);
-        FlowVariable indexSent(indexNamer);
-        indexSent.indexTokenConstraint = IndexTracker(numInputs);
-
-        auto outputs = cmergeOp.getResults();
-        FlowVariable data(indexChannelAnalysis, ChannelLambda(outputs[0]));
-        FlowVariable index(indexChannelAnalysis, ChannelLambda(outputs[1]));
-
-        for (size_t i = 0; i < numInputs; ++i) {
-          equations.push_back(index.setTrackedTokens(i) -
-                              indexSent.setTrackedTokens(i) -
-                              indexChannel.setTrackedTokens(i));
-        }
-        equations.push_back(data - dataSent - dataChannel);
+        extractControlMergeOp(cmergeOp);
         continue;
       }
 
+      // in1, in2, ... -> Join/Merge/Mux -> entry channel
       FlowVariable entry = InternalLambda(&op, 0);
-      // Join operation, merge operation, or mux
       if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
+        extractMergeLikeOp(mergeOp, entry);
         if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
-          // mux : select input has same as output lambda, data inputs act like
-          Value select = muxOp.getSelectOperand();
-          FlowVariable selectVar(indexChannelAnalysis, ChannelLambda(select));
-          equations.push_back(selectVar - entry);
-          if (selectVar.isIndex()) {
-            auto dataOperands = muxOp.getDataOperands();
-            assert(selectVar.indexTokenConstraint->numValues ==
-                   dataOperands.size());
-            for (auto [i, operand] : llvm::enumerate(dataOperands)) {
-              FlowVariable var(indexChannelAnalysis, ChannelLambda(operand));
-              equations.push_back(selectVar.setTrackedTokens(i) - var);
-            }
-          } else {
-            assert(false && "muxOp select var should always be index");
-            FlowExpression dataEq = -entry;
-            for (auto operand : muxOp.getDataOperands()) {
-              FlowVariable chVar(indexChannelAnalysis, ChannelLambda(operand));
-              dataEq += chVar;
-            }
-            equations.push_back(dataEq);
-          }
-        } else {
-          // merge : the sum of input lambdas is the output lambda
-          FlowExpression mergeEq = -entry;
-          std::vector<FlowExpression> constrainedEqs;
-          size_t indexValue;
-          bool foundIndexed = false;
-          bool foundUnindexed = false;
-          auto channels = op.getOperands();
-          for (auto channel : channels) {
-            FlowVariable ch(indexChannelAnalysis, ChannelLambda(channel));
-            if (ch.isIndex()) {
-              if (!foundIndexed) {
-                indexValue = ch.indexTokenConstraint->numValues;
-                constrainedEqs.resize(indexValue);
-              }
-              foundIndexed = true;
-              assert(indexValue == ch.indexTokenConstraint->numValues &&
-                     "found differing index");
-              for (size_t i = 0; i < indexValue; ++i) {
-                constrainedEqs[i] += ch.setTrackedTokens(i);
-              }
-            } else {
-              foundUnindexed = true;
-              assert(foundIndexed == false);
-              mergeEq += ch;
-            }
-          }
-          assert(!(foundIndexed && foundUnindexed) &&
-                 "some index channels and some normal channels");
-          if (foundIndexed) {
-            entry.indexTokenConstraint = IndexTracker(indexValue);
-            for (size_t i = 0; i < indexValue; ++i) {
-              constrainedEqs[i] -= entry.setTrackedTokens(i);
-              equations.push_back(constrainedEqs[i]);
-            }
-          } else {
-            equations.push_back(mergeEq);
-          }
+          extractMuxOpExtra(muxOp, entry);
         }
       } else {
-        // join : for every input, lambda_in = lambda_out
-        auto channels = op.getOperands();
-        if (channels.size() == 1) {
-          // Only 1 input channel
-          auto channel = channels[0];
-          FlowVariable chVar(indexChannelAnalysis, ChannelLambda(channel));
-          // If input is +-, then intermediate channel is as well
-          entry.indexTokenConstraint = chVar.indexTokenConstraint;
-          if (chVar.isIndex()) {
-            for (size_t i = 0; i < chVar.indexTokenConstraint->numValues; ++i) {
-              equations.push_back(chVar.setTrackedTokens(i) -
-                                  entry.setTrackedTokens(i));
-            }
-          } else {
-            equations.push_back(chVar - entry);
-          }
-        } else {
-          for (auto channel : channels) {
-            FlowVariable chVar(indexChannelAnalysis, ChannelLambda(channel));
-            equations.push_back(chVar - entry);
-          }
-        }
+        extractJoinOp(op, entry);
       }
 
       FlowVariable exit = entry;
       if (auto arithOp = dyn_cast<handshake::ArithOpInterface>(op)) {
         // Arithmetic operations modify the channel - unless further analysis is
-        // done, information about the bit is lost
+        // done, information about the carried token is lost
         if (entry.isIndex()) {
           exit = entry.nextInternal();
           exit.indexTokenConstraint.reset();
@@ -495,20 +546,10 @@ extractLocalEquations(ModuleOp modOp,
 
           FlowVariable before = exit;
           FlowVariable after = before.nextInternal();
-          if (before.isIndex()) {
-            assert(after.isIndex());
-            FlowVariable fullPM = full;
-            size_t numValues = before.indexTokenConstraint->numValues;
-            fullPM.indexTokenConstraint = IndexTracker(numValues);
-            equations.push_back(full - fullPM);
-            for (size_t i = 0; i < numValues; ++i) {
-              equations.push_back(before.setTrackedTokens(i) -
-                                  fullPM.setTrackedTokens(i) -
-                                  after.setTrackedTokens(i));
-            }
-          } else {
-            equations.push_back(before - full - after);
-          }
+          assert(!before.isIndex() && "Pipeline slot's data cannot be "
+                                      "accessed, so it cannot be constrained");
+
+          equations.push_back(before - full - after);
           exit = after;
         }
       }
@@ -524,13 +565,14 @@ extractLocalEquations(ModuleOp modOp,
           FlowVariable after = before.nextInternal();
           if (before.isIndex()) {
             assert(after.isIndex());
-            FlowVariable fullPM = full;
+            FlowVariable constrainedFull = full;
             size_t numValues = before.indexTokenConstraint->numValues;
-            fullPM.indexTokenConstraint = IndexTracker(numValues);
-            equations.push_back(full - fullPM);
+            constrainedFull.indexTokenConstraint = IndexTracker(numValues);
+            // The slot contains one of the indices - never any other value
+            equations.push_back(full - constrainedFull);
             for (size_t i = 0; i < numValues; ++i) {
               equations.push_back(before.setTrackedTokens(i) -
-                                  fullPM.setTrackedTokens(i) -
+                                  constrainedFull.setTrackedTokens(i) -
                                   after.setTrackedTokens(i));
             }
           } else {
@@ -541,29 +583,7 @@ extractLocalEquations(ModuleOp modOp,
       }
 
       if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
-        // eagerfork: for every channel, either same tokens in as out, or in
-        // `sent` state and in = out - 1
-        for (auto [i, sentVariable] :
-             llvm::enumerate(forkOp.getInternalSentStateNamers())) {
-          std::shared_ptr<InternalStateNamer> namer =
-              std::make_shared<EagerForkSentNamer>(sentVariable);
-          FlowVariable sent(namer);
-          FlowVariable result(indexChannelAnalysis,
-                              ChannelLambda(op.getResults()[i]));
-          if (exit.isIndex()) {
-            assert(result.isIndex());
-            sent.indexTokenConstraint =
-                IndexTracker(exit.indexTokenConstraint->numValues);
-            // equations.push_back(sent - sentPM);
-            for (size_t i = 0; i < exit.indexTokenConstraint->numValues; ++i) {
-              equations.push_back(exit.setTrackedTokens(i) +
-                                  sent.setTrackedTokens(i) -
-                                  result.setTrackedTokens(i));
-            }
-          } else {
-            equations.push_back(exit + sent - result);
-          }
-        }
+        extractEagerFork(forkOp, exit);
       } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
         /*
         FlowVariable trueVar(ChannelLambda(branchOp.getTrueResult()), map);
@@ -588,7 +608,6 @@ extractLocalEquations(ModuleOp modOp,
       }
     }
   }
-  return equations;
 }
 } // namespace dynamatic
 
@@ -597,11 +616,12 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
 
   // The equations are represented by a FlowExpression that is equal to zero
-  std::vector<FlowExpression> equations =
-      extractLocalEquations(modOp, indexChannelAnalysis);
+  EquationExtractor extractor(modOp, indexChannelAnalysis);
+  llvm::errs() << llvm::formatv("{0} equations extracted!\n",
+                                extractor.equations.size());
 
   // Map all variables used in `equations` to an index in the matrix
-  FlowEquationsMatrix indices(equations);
+  FlowEquationsMatrix indices(extractor.equations);
   MatIntType &matrix = indices.matrix;
   indices.verify();
 
