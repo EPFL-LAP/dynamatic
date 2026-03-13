@@ -76,7 +76,7 @@ static cl::opt<LabelType>
                                     "type of the operation, default"),
                          clEnumValN(LabelType::UNAME, "uname",
                                     "unique name of the operation")),
-              cl::init(LabelType::TYPE), cl::cat(mainCategory));
+              cl::init(LabelType::UNAME), cl::cat(mainCategory));
 
 static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
     NORMAL("normal");

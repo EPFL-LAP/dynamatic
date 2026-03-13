@@ -11,7 +11,6 @@
 //
 //===-----------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #ifndef EXPERIMENTAL_SUPPORT_SUBJECT_GRAPH_H
 #define EXPERIMENTAL_SUPPORT_SUBJECT_GRAPH_H
 
@@ -63,7 +62,7 @@ protected:
   // Helper function to connect the input nodes of the current module
   // to the output nodes of the preceding module in the subject graph
   void connectInputNodesHelper(ChannelSignals &currentSignals,
-                               BaseSubjectGraph *moduleBeforeSubjectGraph);
+                               unsigned int inputIndex);
 
   // Function to assign signals to the ChannelSignals struct based on the
   // rules provided. It processes the nodes in the BLIF file and assigns them
@@ -138,6 +137,21 @@ private:
 
 public:
   ArithSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
+};
+
+class FloatingPointSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  ChannelSignals lhsNodes;
+  ChannelSignals rhsNodes;
+  ChannelSignals resultNodes;
+
+  void processOutOfRuleNodes();
+
+public:
+  FloatingPointSubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
@@ -220,6 +234,7 @@ private:
   unsigned int dataWidth = 0;
   unsigned int addrType = 0;
   ChannelSignals addrInSignals;
+  ChannelSignals dataFromMemSignals;
   ChannelSignals addrOutSignals;
   ChannelSignals dataOutSignals;
 
@@ -235,6 +250,7 @@ private:
   unsigned int addrType = 0;
   ChannelSignals dataInSignals;
   ChannelSignals addrInSignals;
+  ChannelSignals dataToMemSignals;
   ChannelSignals addrOutSignals;
 
 public:
@@ -282,6 +298,18 @@ public:
   ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
 
+class SIFPSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int dataWidth = 0;
+  ChannelSignals inputNodes;
+  ChannelSignals outputNodes;
+
+public:
+  SIFPSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int) override;
+};
+
 class MergeSubjectGraph : public BaseSubjectGraph {
 private:
   unsigned int dataWidth = 0;
@@ -307,6 +335,21 @@ public:
   BranchSinkSubjectGraph(Operation *op);
   void connectInputNodes() override;
   ChannelSignals &returnOutputNodes(unsigned int) override;
+};
+
+class BlackBoxSubjectGraph : public BaseSubjectGraph {
+private:
+  unsigned int numInputs = 0;
+  unsigned int numOutputs = 0;
+  std::vector<ChannelSignals> inputNodes;
+  std::vector<ChannelSignals> outputNodes;
+  std::vector<unsigned int> skippingInputIndices;
+  std::vector<unsigned int> skippingOutputIndices;
+
+public:
+  BlackBoxSubjectGraph(Operation *op);
+  void connectInputNodes() override;
+  ChannelSignals &returnOutputNodes(unsigned int channelIndex) override;
 };
 
 class BufferSubjectGraph : public BaseSubjectGraph {
@@ -364,4 +407,3 @@ LogicNetwork *connectSubjectGraphs();
 } // namespace dynamatic
 
 #endif // EXPERIMENTAL_SUPPORT_SUBJECT_GRAPH_H
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

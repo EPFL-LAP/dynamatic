@@ -254,7 +254,7 @@ struct MulReduceStrength : public OpRewritePattern<arith::MulIOp> {
   using OpRewritePattern<arith::MulIOp>::OpRewritePattern;
 
   MulReduceStrength(unsigned maxAdderDepth, MLIRContext *ctx)
-      : OpRewritePattern(ctx), maxAdderDepth(maxAdderDepth){};
+      : OpRewritePattern(ctx), maxAdderDepth(maxAdderDepth) {};
 
   LogicalResult matchAndRewrite(arith::MulIOp mulOp,
                                 PatternRewriter &rewriter) const override {
@@ -475,7 +475,11 @@ struct ArithReduceStrengthPass
     config.enableRegionSimplification = false;
 
     RewritePatternSet patterns{ctx};
-    patterns.add<ReplaceMulNegOneUsers, PromoteSignedCmp>(ctx);
+    patterns.add<ReplaceMulNegOneUsers
+                 // TODO (Jiahui17): This pattern doesn't work in CF, only works
+                 // in SCF (which we are not using now).
+                 //,PromoteSignedCmp
+                 >(ctx);
     /// TODO: (RamirezLucas) Any provided value is somewhat arbitrary here.
     /// Ultimately, this should be driven by models of component delays (same
     /// as for buffer placement) as well as a general optimization strategy

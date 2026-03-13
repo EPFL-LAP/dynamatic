@@ -4,6 +4,9 @@ DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
 F_HANDSHAKE_EXPORT=$4
+F_HANDSHAKE_RIGIDIFIED=$5
+
+source "$DYNAMATIC_DIR/tools/dynamatic/scripts/utils.sh"
 
 FORMAL_DIR="$OUTPUT_DIR/formal"
 MODEL_DIR="$FORMAL_DIR/model"
@@ -15,6 +18,15 @@ F_FORMAL_HW="$FORMAL_DIR/hw.mlir"
 F_FORMAL_PROP="$FORMAL_DIR/formal_properties.json"
 F_NUXMV_PROP="$FORMAL_DIR/property.rpt"
 F_NUXMV_CMD="$FORMAL_DIR/prove.cmd"
+
+NUSMV_BINARY="$DYNAMATIC_DIR/ext/NuSMV"
+NUXMV_BINARY="$DYNAMATIC_DIR/ext/nuXmv/bin/nuXmv"
+
+FORMAL_TESTBENCH_GEN="$DYNAMATIC_DIR/build/bin/rigidification-testbench"
+
+RTL_CONFIG_SMV="$DYNAMATIC_DIR/data/rtl-config-smv.json"
+
+SMV_RESULT_PARSER="$DYNAMATIC_DIR/experimental/tools/rigidification/parse_nuxmv_results.py"
 
 
 rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
@@ -30,10 +42,21 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
   > "$F_FORMAL_HW"
 
 # generate SMV
-"$DYNAMATIC_EXPORT_RTL_BIN" "$F_FORMAL_HW" $MODEL_DIR data/rtl-config-smv.json --hdl smv --property-database $F_FORMAL_PROP
+"$DYNAMATIC_EXPORT_RTL_BIN" \
+  "$F_FORMAL_HW" \
+  "$MODEL_DIR" \
+  "$RTL_CONFIG_SMV" \
+  --hdl smv \
+  --property-database "$F_FORMAL_PROP" \
+  --dynamatic-path "$DYNAMATIC_DIR"
 
 # create the testbench
-build/bin/rigidification-testbench -i $MODEL_DIR --name $KERNEL_NAME --mlir $F_FORMAL_HW
+"$FORMAL_TESTBENCH_GEN" \
+  -i $MODEL_DIR \
+  --name $KERNEL_NAME \
+  --mlir $F_FORMAL_HW
+exit_on_fail "Created formal testbench" \
+  "Failed to create formal testbench"
 
 # use the modelcheker
 echo "set verbose_level 0;
@@ -56,33 +79,21 @@ check_ctlspec;
 show_property -o $F_NUXMV_PROP;
 time;
 quit" > $F_NUXMV_CMD
-
-
-# progress bar animation
-
-# approximately count the number of properties we need to check by counting
-# the lines of the generated model
-file=$MODEL_DIR/$KERNEL_NAME.smv
-total=$(( $(awk '/-- properties/ {found=1; next} found' "$file" | wc -l) + 27))
-bar_length=30
-i=0
+exit_on_fail "Created SMV script" \
+  "Failed to create SMV script"
 
 # run nuXmv and increase the counter everytime it completes the check of a property
 echo "[INFO] Running nuXmv" >&2
-nuXmv -source $F_NUXMV_CMD | while IFS= read -r line; do
-  ((i++))
-  percent=$(( i * 100 / total ))
-  filled=$(( i * bar_length / total ))
-  bar=$(printf "%-${filled}s" "#" | tr ' ' '#') >&2
-  max_line_length=$(( $(tput cols) - bar_length - 20 ))
-  display_line="${line:0:max_line_length}"
-  printf "\r\033[K[%-${bar_length}s] %3d%% %s" "$bar" "$percent" "$display_line" >&2
-done
+$NUXMV_BINARY -source $F_NUXMV_CMD 
+exit_on_fail "Performed model checking to verify the formal property" \
+  "Failed to check formal properties"
 
 # parse the results
 printf "\n[INFO] Saving formal verification results\n" >&2
-python experimental/tools/rigidification/parse_nuxmv_results.py $F_FORMAL_PROP $F_NUXMV_PROP
+python "$SMV_RESULT_PARSER" "$F_FORMAL_PROP" "$F_NUXMV_PROP"
 
 # apply rigidification
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --handshake-rigidification=json-path=$F_FORMAL_PROP
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --handshake-rigidification=json-path=$F_FORMAL_PROP > "$F_HANDSHAKE_RIGIDIFIED"
+exit_on_fail "Applied formal properties to simplify the circuit" \
+  "Failed to apply formal properties to simplify the circuit"
 

@@ -116,8 +116,8 @@ HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop) {
   auto newOp = builder.create<handshake::ValidMergerOp>(loc, ownerChannel,
                                                         targetChannel);
 
-  ownerChannel.replaceAllUsesExcept(newOp.getLhs(), newOp);
-  targetChannel.replaceAllUsesExcept(newOp.getRhs(), newOp);
+  ownerChannel.replaceAllUsesExcept(newOp.getLhsOut(), newOp);
+  targetChannel.replaceAllUsesExcept(newOp.getRhsOut(), newOp);
   return success();
 }
 

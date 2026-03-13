@@ -13,6 +13,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -30,76 +31,80 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace {
 /// Helper data structure to hold mappings between each arch/basic block and the
 /// Gurobi variable that corresponds to it.
 struct MILPVars {
   /// Mapping between each arch and Gurobi variable.
-  std::map<ArchBB *, GRBVar> archs;
+  std::map<ArchBB *, CPVar> archs;
   /// Mapping between each basic block and Gurobi variable.
-  std::map<unsigned, GRBVar> bbs;
+  std::map<unsigned, CPVar> bbs;
   /// Holds the maximum number of executions achievable.
-  GRBVar numExecs;
+  CPVar numExecs;
 };
 } // namespace
 
 /// Initializes all variables in the MILP, one per arch and per basic block.
 /// Fills in the last argument with mappings between archs/BBs and their
 /// associated Gurobi variable.
-static void initMILPVariables(GRBModel &model, ArchSet &archs, BBSet &bbs,
-                              MILPVars &vars) {
+static void initMILPVariables(std::unique_ptr<CPSolver> &model, ArchSet &archs,
+                              BBSet &bbs, MILPVars &vars) {
   // Keep track of the maximum number of transitions in any arch
   unsigned maxTrans = 0;
 
   // Create a variable for each basic block
   for (unsigned bb : bbs)
     vars.bbs[bb] =
-        model.addVar(0.0, 1, 0.0, GRB_BINARY, "sBB_" + std::to_string(bb));
+        model->addVar("sBB_" + std::to_string(bb), CPVar::BOOLEAN, 0, 1);
 
   // Create a variable for each arch
   for (ArchBB *arch : archs) {
     std::string arcName = "sArc_" + std::to_string(arch->srcBB) + "_" +
                           std::to_string(arch->dstBB);
-    vars.archs[arch] = model.addVar(0.0, 1, 0.0, GRB_BINARY, arcName);
+    vars.archs[arch] = model->addVar(arcName, CPVar::BOOLEAN, 0, 1);
     maxTrans = std::max(maxTrans, arch->numTrans);
   }
 
   // Create a variable to hold the maximum number of CFDFC executions
-  vars.numExecs = model.addVar(0, maxTrans, 0.0, GRB_INTEGER, "varMaxExecs");
-
-  // Update the model before returning so that these variables can be referenced
-  // safely during the rest of model creation
-  model.update();
+  vars.numExecs = model->addVar("varMaxExecs", CPVar::INTEGER, 0, maxTrans);
 }
 
 /// Sets the MILP objective, which is to maximize the sum over all archs of
 /// sArc_<srcBB>_<dstBB> * varMaxTrans.
-static void setObjective(GRBModel &model, MILPVars &vars) {
-  GRBQuadExpr objExpr;
-  for (auto &[_, var] : vars.archs)
-    objExpr += vars.numExecs * var;
-  model.setObjective(objExpr, GRB_MAXIMIZE);
+static void setObjective(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
+  LinExpr objExpr = 0;
+  for (auto &[_, var] : vars.archs) {
+
+    // vars.numExecs * var is not a linear term, we should linearize it
+    auto numExecsTimesVar =
+        model->addVar("numExec*" + var.name, CPVar::INTEGER, 0, std::nullopt);
+    constexpr double bigM = 1e4;
+
+    // - If var == 0: 0 <= w <= 0
+    // - If var == 1: numExecs <= w <= numExecs
+    model->addConstr(numExecsTimesVar <= vars.numExecs);
+    model->addConstr(numExecsTimesVar >= vars.numExecs - bigM * (1 - var));
+    model->addConstr(numExecsTimesVar <= bigM * var);
+    objExpr += numExecsTimesVar;
+  }
+  model->setMaximizeObjective(objExpr);
 }
 
 /// Sets the MILP's edge constraints, one per arch to limit the number of times
 /// it can be taken plus one to force the number of selected backedges to be 1.
-static void setEdgeConstraints(GRBModel &model, MILPVars &vars) {
-  GRBLinExpr backedgeConstraint;
+static void setEdgeConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars,
+                               unsigned maxExecs) {
+  LinExpr backedgeConstraint;
 
   // Add a constraint for each arch
   for (auto &[arch, var] : vars.archs) {
     // For each arch, limit the output number of transitions to, if it is
     // selected, the arch's number of transitions, or, if it is not selected, to
     // the maximum number of transitions
-    unsigned maxExecsUB =
-        static_cast<unsigned>(vars.numExecs.get(GRB_DoubleAttr_UB));
     std::string name = "arch_" + std::to_string(arch->srcBB) + "_" +
                        std::to_string(arch->dstBB);
-    model.addConstr(
-        vars.numExecs <= var * arch->numTrans + (1 - var) * maxExecsUB, name);
+    model->addConstr(
+        vars.numExecs <= var * arch->numTrans + (1 - var) * maxExecs, name);
 
     // Only select one backedge
     if (arch->isBackEdge)
@@ -107,13 +112,13 @@ static void setEdgeConstraints(GRBModel &model, MILPVars &vars) {
   }
 
   // Finally, the backedge constraint
-  model.addConstr(backedgeConstraint == 1, "oneBackedge");
+  model->addConstr(backedgeConstraint == 1, "oneBackedge");
 }
 
 /// Get all variables corresponding to "predecessor archs" i.e., archs from
 /// predecessor blocks to the given block.
-static SmallVector<GRBVar> getPredArchVars(unsigned bb, MILPVars &vars) {
-  SmallVector<GRBVar> predVars;
+static SmallVector<CPVar> getPredArchVars(unsigned bb, MILPVars &vars) {
+  SmallVector<CPVar> predVars;
   for (auto &[arch, var] : vars.archs)
     if (arch->dstBB == bb)
       predVars.push_back(var);
@@ -122,8 +127,8 @@ static SmallVector<GRBVar> getPredArchVars(unsigned bb, MILPVars &vars) {
 
 /// Get all variables corresponding to "successor archs" i.e., archs from the
 /// given block to its successor blocks.
-static SmallVector<GRBVar> getSuccArchvars(unsigned bb, MILPVars &vars) {
-  SmallVector<GRBVar> succVars;
+static SmallVector<CPVar> getSuccArchvars(unsigned bb, MILPVars &vars) {
+  SmallVector<CPVar> succVars;
   for (auto &[arch, var] : vars.archs)
     if (arch->srcBB == bb)
       succVars.push_back(var);
@@ -134,23 +139,22 @@ static SmallVector<GRBVar> getSuccArchvars(unsigned bb, MILPVars &vars) {
 /// selection of (1) exactly one predecessor and successor arch if it is
 /// selected or (2) exactly zero predecessor and successor arch if it is not
 /// selected.
-static void setBBConstraints(GRBModel &model, MILPVars &vars) {
+static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   // Add two constraints for each arch
   for (auto &[bb, varBB] : vars.bbs) {
     // Set constraint for predecessor archs
-    GRBLinExpr predArchsConstr;
-    for (GRBVar &var : getPredArchVars(bb, vars))
+    LinExpr predArchsConstr;
+    for (CPVar &var : getPredArchVars(bb, vars))
       predArchsConstr += var;
-    model.addConstr(predArchsConstr == varBB, "in" + std::to_string(bb));
+    model->addConstr(predArchsConstr == varBB, "in" + std::to_string(bb));
 
     // Set constraint for successor archs
-    GRBLinExpr succArchsConstr;
-    for (GRBVar &var : getSuccArchvars(bb, vars))
+    LinExpr succArchsConstr;
+    for (CPVar &var : getSuccArchvars(bb, vars))
       succArchsConstr += var;
-    model.addConstr(succArchsConstr == varBB, "out" + std::to_string(bb));
+    model->addConstr(succArchsConstr == varBB, "out" + std::to_string(bb));
   }
 };
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     : numExecs(numExec) {
@@ -358,52 +362,46 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
                                               unsigned &numExecs,
                                               const std::string &logPath,
                                               int *milpStat) {
-#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-  return funcOp->emitError() << "Project was built without Gurobi, can't run "
-                                "CFDFC extraction";
-#else
-  // Create Gurobi MILP model for CFDFC extraction, suppressing stdout
-  GRBEnv env = GRBEnv(true);
-  env.set(GRB_IntParam_OutputFlag, 0);
-  env.start();
-  GRBModel model = GRBModel(env);
+  // Create an MILP model for CFDFC extraction (NOTE: since the problem is
+  // small, we could use CBC here).
+  std::unique_ptr<CPSolver> model = std::make_unique<CbcSolver>();
 
   // Create all MILP variables we need
   MILPVars vars;
   initMILPVariables(model, archs, bbs, vars);
 
+  unsigned maxExec = 0;
+
+  for (auto *arch : archs) {
+    maxExec = std::max(arch->numTrans, maxExec);
+  }
+
   // Set up the MILP and solve it
   setObjective(model, vars);
-  setEdgeConstraints(model, vars);
+  setEdgeConstraints(model, vars, maxExec);
   setBBConstraints(model, vars);
 
   if (!logPath.empty())
-    model.write(logPath + "_model.lp");
-  model.optimize();
-  if (!logPath.empty())
-    model.write(logPath + "_solutions.json");
+    model->write(logPath + "_model.lp");
+  model->optimize();
 
-  int stat = model.get(GRB_IntAttr_Status);
-  if (milpStat)
-    *milpStat = stat;
-  if (int status = model.get(GRB_IntAttr_Status) != GRB_OPTIMAL)
+  if (model->status != CPSolver::OPTIMAL)
     return failure();
 
   // Retrieve the maximum number of transitions identified by the MILP
   // solution
-  numExecs = static_cast<unsigned>(vars.numExecs.get(GRB_DoubleAttr_X));
+  numExecs = static_cast<unsigned>(model->getValue(vars.numExecs));
   if (numExecs == 0)
     return success();
 
   // Fill in the set of selected archs and decrease their associated number of
   // transitions
   for (auto &[arch, var] : vars.archs) {
-    if (archs.count(arch) > 0 && var.get(GRB_DoubleAttr_X) > 0) {
+    if (archs.count(arch) > 0 && model->getValue(var) > 0) {
       selectedArchs.insert(arch);
       arch->numTrans -= numExecs;
     }
   }
 
   return success();
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 }

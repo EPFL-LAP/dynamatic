@@ -45,11 +45,9 @@ using namespace dynamatic::experimental;
 
 /// Algorithms that do not require solving an MILP.
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    CostAware("costaware"), MAPBUF("mapbuf");
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+    COST_AWARE("costaware"), MAPBUF("mapbuf");
 
 namespace dynamatic {
 namespace buffer {
@@ -121,7 +119,6 @@ struct HandshakePlaceBuffersPass
   void runOnOperation() override;
 
 protected:
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   /// Called for all buffer placement strategies that not require Gurobi to
   /// be installed on the host system.
   LogicalResult placeUsingMILP();
@@ -152,7 +149,6 @@ protected:
                                            TimingDatabase &timingDB,
                                            Logger *logger,
                                            BufferPlacement &placement);
-#endif
   /// Called for all buffer placement strategies that do not require Gurobi to
   /// be installed on the host system.
   LogicalResult placeWithoutUsingMILP();
@@ -176,18 +172,6 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
   log = new Logger(fp + "placement.log", ec);
 }
 
-HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
-    StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
-  this->algorithm = algorithm.str();
-  this->frequencies = frequencies.str();
-  this->timingModels = timingModels.str();
-  this->firstCFDFC = firstCFDFC;
-  this->targetCP = targetCP;
-  this->timeout = timeout;
-  this->dumpLogs = dumpLogs;
-}
-
 void HandshakePlaceBuffersPass::runOnOperation() {
   // Buffer placement requires that all values are used exactly once
   mlir::ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
@@ -204,12 +188,10 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   llvm::MapVector<StringRef, LogicalResult (HandshakePlaceBuffersPass::*)()>
       allAlgorithms;
   allAlgorithms[ON_MERGES] = &HandshakePlaceBuffersPass::placeWithoutUsingMILP;
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   allAlgorithms[FPGA20] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[FPL22] = &HandshakePlaceBuffersPass::placeUsingMILP;
-  allAlgorithms[CostAware] = &HandshakePlaceBuffersPass::placeUsingMILP;
+  allAlgorithms[COST_AWARE] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
   if (!allAlgorithms.contains(algorithm)) {
@@ -217,13 +199,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
                  << "', possible choices are:\n";
     for (auto &algo : allAlgorithms)
       llvm::errs() << "\t- " << algo.first << "\n";
-#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
-    llvm::errs()
-        << "\tYou cannot use any of the MILP-based placement algorithms "
-           "because CMake did not detect a Gurobi installation on your "
-           "machine. Install Gurobi and rebuild to make these options "
-           "available.\n";
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
     return signalPassFailure();
   }
 
@@ -249,17 +224,31 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     llvm::errs() << "=== TimindDB read failed ===\n";
   modOp.walk([&](mlir::Operation *op) {
-    if (auto internalDelayInterface =
-            llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
+    if (auto fpuImplInterface =
+            llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
       double delay;
+
       if (!failed(timingDB.getInternalCombinationalDelay(op, SignalType::DATA,
                                                          delay, targetCP))) {
 
         std::string delayStr = std::to_string(delay);
         std::replace(delayStr.begin(), delayStr.end(), '.', '_');
-        internalDelayInterface.setInternalDelay(delayStr);
+        fpuImplInterface.setInternalDelay(delayStr);
       } else {
         op->emitError("Failed to get internal delay from timing model");
+        return signalPassFailure();
+      }
+    }
+    if (auto latencyInterface =
+            llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
+      double latency;
+      if (!failed(
+              timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
+
+        int64_t latency_int = static_cast<int64_t>(latency);
+        latencyInterface.setLatency(latency_int);
+      } else {
+        op->emitError("Failed to get latency from timing model");
         return signalPassFailure();
       }
     }
@@ -275,7 +264,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   markAnalysesPreserved<NameAnalysis>();
 }
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   // Make sure that all operations in the IR are named (used to generate
   // variable names in the MILP)
@@ -341,7 +329,13 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
     // Most operations should belong to a basic block for buffer placement to
     // work correctly. Don't outright fail in case one operation is outside of
     // all blocks but warn the user
-    if (!isa<handshake::SinkOp, handshake::MemoryOpInterface>(&op)) {
+    if (!isa<
+            // clang-format off
+            handshake::SinkOp,
+            handshake::MemoryOpInterface,
+            handshake::RAMOp
+            // clang-format on
+            >(&op)) {
       if (!getLogicBB(&op).has_value()) {
         op.emitWarning() << "Operation does not belong to any block, MILP "
                             "behavior may be suboptimal or incorrect.";
@@ -587,17 +581,41 @@ checkLoggerAndSolve(Logger *logger, StringRef milpName,
 LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     FuncInfo &info, TimingDatabase &timingDB, Logger *logger,
     BufferPlacement &placement) {
-  // Create Gurobi environment
-  GRBEnv env = GRBEnv(true);
-  env.set(GRB_IntParam_OutputFlag, 0);
-  if (timeout > 0)
-    env.set(GRB_DoubleParam_TimeLimit, timeout);
-  env.start();
+
+  // Create solver
+  if (dumpLogs) {
+    mlir::raw_indented_ostream &os = *(*logger);
+    os << "\n";
+    os << "# =========================== #\n";
+    os << "# Solver for buffer placement #\n";
+    os << "# =========================== #\n\n";
+    os << "Selected MILP solver: " << solver << "\n\n";
+  }
+
+  CPSolver::SolverKind solverKind;
+
+  if (solver == "gurobi") {
+#ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
+    llvm::report_fatal_error("Gurobi not installed!");
+#else
+    solverKind = CPSolver::GUROBI;
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+  } else if (solver == "cbc") {
+#ifdef DYNAMATIC_ENABLE_CBC
+    solverKind = CPSolver::CBC;
+#else
+    llvm::report_fatal_error("CBC not installed!");
+#endif // DYNAMATIC_ENABLE_CBC
+  } else {
+    llvm::errs() << "Solver type: " << solver << " is not supported!\n";
+    llvm::report_fatal_error("Unsupported solver type!");
+  }
 
   if (algorithm == FPGA20) {
     // Create and solve the MILP
     return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP);
+        logger, "placement", placement, solverKind, timeout, info, timingDB,
+        targetCP);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -615,31 +633,32 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     for (auto [idx, cfUnion] : llvm::enumerate(disjointUnions)) {
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
       if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
-              logger, milpName, placement, env, info, timingDB, targetCP,
-              cfUnion)))
+              logger, milpName, placement, solverKind, timeout, info, timingDB,
+              targetCP, cfUnion)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-        logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
+        logger, "out_of_cycle", placement, solverKind, timeout, info, timingDB,
+        targetCP);
   }
-  if (algorithm == CostAware) {
+  if (algorithm == COST_AWARE) {
     // Create and solve the MILP
     return checkLoggerAndSolve<costaware::CostAwareBuffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP);
+        logger, "placement", placement, solverKind, timeout, info, timingDB,
+        targetCP);
   }
 
   if (algorithm == MAPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<mapbuf::MAPBUFBuffers>(
-        logger, "placement", placement, env, info, timingDB, targetCP,
-        blifFiles, lutDelay, lutSize, acyclicType);
+        logger, "placement", placement, solverKind, timeout, info, timingDB,
+        targetCP, blifFiles, lutDelay, lutSize, acyclicType);
   }
 
   llvm_unreachable("unknown algorithm");
 }
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
   // The only strategy at this point is to place buffers on the output channels

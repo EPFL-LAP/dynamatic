@@ -32,7 +32,6 @@
 #include "dynamatic/Transforms/HandshakeMinimizeCstWidth.h"
 #include "dynamatic/Transforms/HandshakeOptimizeBitwidths.h"
 #include "dynamatic/Transforms/HandshakeReplaceMemoryInterfaces.h"
-#include "dynamatic/Transforms/LLVMMarkMemoryDependencies.h"
 #include "dynamatic/Transforms/MarkMemoryDependencies.h"
 #include "dynamatic/Transforms/MarkMemoryInterfaces.h"
 #include "dynamatic/Transforms/OperationNames.h"

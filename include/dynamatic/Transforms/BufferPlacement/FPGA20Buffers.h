@@ -26,9 +26,6 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 namespace dynamatic {
 namespace buffer {
 namespace fpga20 {
@@ -50,13 +47,15 @@ public:
   /// optimization. If a channel's buffering properties are provably
   /// unsatisfiable, the MILP will not be marked ready for optimization,
   /// ensuring that further calls to `optimize` fail.
-  FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
+  FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
+                FuncInfo &funcInfo, const TimingDatabase &timingDB,
                 double targetPeriod);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
-  FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo, const TimingDatabase &timingDB,
+  FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
+                FuncInfo &funcInfo, const TimingDatabase &timingDB,
                 double targetPeriod, Logger &logger,
                 StringRef milpName = "placement");
 
@@ -82,6 +81,5 @@ private:
 } // namespace fpga20
 } // namespace buffer
 } // namespace dynamatic
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
 #endif // DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_FPGA20BUFFERS_H

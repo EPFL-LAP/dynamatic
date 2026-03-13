@@ -4,6 +4,7 @@
 
 void test_memory_16(inout_int_t a[N], in_int_t b[N]) {
   for (unsigned i = 0; i < N; i++) {
+    // REMARK: this load a[i] can be moved into the "else" branch.
     int x = a[i];
     if (b[i] > 5) {
       x = 0;

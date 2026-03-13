@@ -11,10 +11,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -53,12 +54,25 @@ BaseSubjectGraph::BaseSubjectGraph(Operation *op) : op(op) {
 
 // Helper function to connect PIs of the Subject Graph with POs of the Subject
 // Graph of the preceding module.
-void BaseSubjectGraph::connectInputNodesHelper(
-    ChannelSignals &currentSignals,
-    BaseSubjectGraph *moduleBeforeSubjectGraph) {
+void BaseSubjectGraph::connectInputNodesHelper(ChannelSignals &currentSignals,
+                                               unsigned int inputIndex) {
+
+  if (inputIndex >= inputSubjectGraphs.size()) {
+    return;
+  }
+
+  BaseSubjectGraph *moduleBeforeSubjectGraph = inputSubjectGraphs[inputIndex];
 
   auto resultNumber = inputSubjectGraphToResultNumber[moduleBeforeSubjectGraph];
   Value channel = nullptr;
+
+  if (moduleBeforeSubjectGraph == nullptr) {
+    std::string errMsgStr = "Input Subject Graph for operation " + uniqueName +
+                            " at index " + std::to_string(inputIndex) +
+                            " is null! Aborting...";
+    llvm::StringRef errMsg = errMsgStr;
+    llvm::report_fatal_error(errMsg);
+  }
 
   if (moduleBeforeSubjectGraph->op != nullptr)
     channel = moduleBeforeSubjectGraph->op->getResult(resultNumber);
@@ -135,6 +149,16 @@ void BaseSubjectGraph::buildSubjectGraphConnections() {
   for (Value inputOperand : op->getOperands()) {
     // Block Arguments has no Defining Operation
     if (Operation *definingOp = inputOperand.getDefiningOp()) {
+      // Check if the definingOp exists in the moduleMap
+      if (moduleMap.find(definingOp) == moduleMap.end()) {
+        llvm::errs() << "definingOp: ";
+        definingOp->dump();
+        std::string errMsgStr = "Defining Op for input operand of operation " +
+                                uniqueName +
+                                " not found in moduleMap! Aborting...";
+        llvm::StringRef errMsg = errMsgStr;
+        llvm::report_fatal_error(errMsg);
+      }
       // Add the Subject Graph of the defining Op to the inputSubjectGraphs.
       auto *inputSubjectGraph = moduleMap[inputOperand.getDefiningOp()];
       inputSubjectGraphs.push_back(inputSubjectGraph);
@@ -164,8 +188,7 @@ void BaseSubjectGraph::processNodesWithRules(
       if (nodeName.find(rule.pattern) != std::string::npos &&
           (node->isInput || node->isOutput)) {
         assignSignals(rule.signals, node, nodeName);
-        if (rule.renameNode) // change the name of the node if set true
-          node->name = uniqueName + "_" + nodeName;
+        node->name = uniqueName + "_" + nodeName;
       } else if (nodeName.find(".") != std::string::npos ||
                  nodeName.find("dataReg") !=
                      std::string::npos) { // Nodes with "." and "dataReg"
@@ -265,8 +288,8 @@ ArithSubjectGraph::ArithSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
 // are connected to the Subject Graph with index 1.
 void ArithSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(lhsNodes, inputSubjectGraphs[0]);
-  connectInputNodesHelper(rhsNodes, inputSubjectGraphs[1]);
+  connectInputNodesHelper(lhsNodes, 0);
+  connectInputNodesHelper(rhsNodes, 1);
 }
 
 // Arith modules only have resultNodes as output.
@@ -378,7 +401,7 @@ void ForkSubjectGraph::connectInputNodes() {
   // In the cases where fork modules are Block Arguments, they
   // do not have any input Operations.
   if (!inputSubjectGraphs.empty()) {
-    connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+    connectInputNodesHelper(inputNodes, 0);
   }
 }
 
@@ -386,6 +409,64 @@ void ForkSubjectGraph::connectInputNodes() {
 // channelIndex provided.
 ChannelSignals &ForkSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
   return outputNodes[channelIndex];
+}
+
+void FloatingPointSubjectGraph::processOutOfRuleNodes() {
+  // Data signal nodes of blackbox modules need to be set as Blackbox Outputs.
+  // Valid and Ready signals are not blackboxed, so they are not set.
+  auto setBlackboxBool = [&](Node *node) {
+    std::string nodeName = node->name;
+    if (isBlackbox && (nodeName.find("valid") == std::string::npos &&
+                       nodeName.find("ready") == std::string::npos)) {
+      node->isBlackboxOutput = (true);
+    }
+  };
+
+  for (auto &node : blifData->getAllNodes()) {
+    std::string nodeName = node->name;
+    if (nodeName.find("result") != std::string::npos &&
+        (node->isInput || node->isOutput)) {
+      assignSignals(resultNodes, node, nodeName);
+      node->name = uniqueName + "_" + nodeName;
+      setBlackboxBool(node);
+    } else if (nodeName.find(".") != std::string::npos ||
+               nodeName.find("dataReg") !=
+                   std::string::npos) { // Nodes with "." and "dataReg"
+                                        // require unique naming to avoid
+                                        // naming conflicts
+      node->name = (uniqueName + "." + nodeName);
+    }
+  }
+}
+
+// FloatingPointSubjectGraph implementation
+FloatingPointSubjectGraph::FloatingPointSubjectGraph(Operation *op)
+    : BaseSubjectGraph(op) {
+  // Get datawidth of the operation
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+
+  loadBlifFile({dataWidth});
+  isBlackbox = true;
+
+  // "result" case does not obey the rules
+  processOutOfRuleNodes();
+
+  std::vector<NodeProcessingRule> rules = {{"lhs", lhsNodes, false},
+                                           {"rhs", rhsNodes, false}};
+
+  processNodesWithRules(rules);
+}
+
+// lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
+// are connected to the Subject Graph with index 1.
+void FloatingPointSubjectGraph::connectInputNodes() {
+  connectInputNodesHelper(lhsNodes, 0);
+  connectInputNodesHelper(rhsNodes, 1);
+}
+
+// Arith modules only have resultNodes as output.
+ChannelSignals &FloatingPointSubjectGraph::returnOutputNodes(unsigned int) {
+  return resultNodes;
 }
 
 void MuxSubjectGraph::processOutOfRuleNodes() {
@@ -435,10 +516,10 @@ MuxSubjectGraph::MuxSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // indexNodes are connected to the first inputSubjectGraph, and rest are
 // connected to the inputSubjectGraphs in the order they are defined.
 void MuxSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(indexNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(indexNodes, 0);
 
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i + 1]);
+    connectInputNodesHelper(inputNodes[i], i + 1);
   }
 }
 
@@ -505,7 +586,7 @@ ControlMergeSubjectGraph::ControlMergeSubjectGraph(Operation *op)
 // inputSubjectGraphs in the order that they are defined.
 void ControlMergeSubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
+    connectInputNodesHelper(inputNodes[i], i);
   }
 }
 
@@ -540,8 +621,10 @@ ConditionalBranchSubjectGraph::ConditionalBranchSubjectGraph(Operation *op)
 // conditionNodes are connected to the first inputSubjectGraph, and
 // inputNodes are connected to the second inputSubjectGraph.
 void ConditionalBranchSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(conditionNodes, inputSubjectGraphs[0]);
-  connectInputNodesHelper(inputNodes, inputSubjectGraphs[1]);
+  connectInputNodesHelper(conditionNodes, 0);
+  if (inputSubjectGraphs.size() != 1) {
+    connectInputNodesHelper(inputNodes, 1);
+  }
 }
 
 // trueOut are at channelIndex 0, and falseOut are at channelIndex 1.
@@ -579,16 +662,19 @@ LoadSubjectGraph::LoadSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   loadBlifFile({dataWidth, addrType});
 
-  std::vector<NodeProcessingRule> rules = {{"addrIn", addrInSignals, false},
-                                           {"addrOut", addrOutSignals, true},
-                                           {"dataOut", dataOutSignals, true}};
+  std::vector<NodeProcessingRule> rules = {
+      {"addrIn", addrInSignals, false},
+      {"dataFromMem", dataFromMemSignals, true},
+      {"addrOut", addrOutSignals, true},
+      {"dataOut", dataOutSignals, true}};
 
   processNodesWithRules(rules);
 }
 
 // Load Module has only addrInSignals as input.
 void LoadSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(addrInSignals, inputSubjectGraphs[0]);
+  // We do not consider the MC controller connection.
+  connectInputNodesHelper(addrInSignals, 0);
 }
 
 // addrOutSignals are connected to the output module with channelIndex 0,
@@ -608,9 +694,11 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 
   loadBlifFile({dataWidth, addrType});
 
-  std::vector<NodeProcessingRule> rules = {{"dataIn", dataInSignals, false},
-                                           {"addrIn", addrInSignals, false},
-                                           {"addrOut", addrOutSignals, true}};
+  std::vector<NodeProcessingRule> rules = {
+      {"dataIn", dataInSignals, false},
+      {"addrIn", addrInSignals, false},
+      {"dataToMem", dataToMemSignals, true},
+      {"addrOut", addrOutSignals, true}};
 
   processNodesWithRules(rules);
 }
@@ -618,13 +706,125 @@ StoreSubjectGraph::StoreSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // addrInSignals and dataInSignals are connected to the first and
 // second inputSubjectGraphs respectively.
 void StoreSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(addrInSignals, inputSubjectGraphs[0]);
-  connectInputNodesHelper(dataInSignals, inputSubjectGraphs[1]);
+  connectInputNodesHelper(addrInSignals, 0);
+  connectInputNodesHelper(dataInSignals, 1);
 }
 
 // Store module has only addrOutSignals as output.
-ChannelSignals &StoreSubjectGraph::returnOutputNodes(unsigned int) {
-  return addrOutSignals;
+ChannelSignals &
+StoreSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
+  return (channelIndex == 0) ? addrOutSignals : dataToMemSignals;
+}
+
+// BlackBoxSubjectGraph implementation
+BlackBoxSubjectGraph::BlackBoxSubjectGraph(Operation *op)
+    : BaseSubjectGraph(op) {
+  // Create empty nodes to represent inputs and outputs of blackbox modules.
+  LogicNetwork *logic_network = new LogicNetwork();
+  logic_network->moduleName = getUniqueName(op);
+  numInputs = op->getNumOperands();
+  numOutputs = op->getNumResults();
+  isBlackbox = true;
+  // Iterate over inputs to create input nodes for blackbox modules.
+  for (unsigned int i = 0; i < numInputs; i++) {
+    unsigned int inputDataWidth;
+    // Check if the input comes directly from top FuncOp, in which case it
+    // should be skipped.
+    if (auto blockArg = op->getOperand(i).dyn_cast<BlockArgument>()) {
+      llvm::TypeSwitch<Operation *, void>(
+          blockArg.getParentBlock()->getParentOp())
+          .Case<handshake::FuncOp>(
+              [&](auto funcOp) { skippingInputIndices.push_back(i); })
+          .Default([&](auto) {});
+    }
+    // Determine the data width of the input channel
+    if (op->getOperand(i).getType().isa<handshake::ChannelType>() ||
+        op->getOperand(i).getType().isa<handshake::ControlType>()) {
+      inputDataWidth =
+          handshake::getHandshakeTypeBitWidth(op->getOperand(i).getType());
+    } else {
+      if (!op->getOperand(i).getType().isa<MemRefType>()) {
+        llvm::errs() << "Operand Type: " << op->getOperand(i).getType() << "\n";
+        op->emitError("Unsupported Blackbox Input Type");
+      }
+      inputDataWidth = 1;
+    }
+    // Create input nodes for data signals
+    ChannelSignals newChannelSignals;
+    for (unsigned int j = 0; j < inputDataWidth; j++) {
+      Node *inputNodeData = logic_network->addIONode(
+          "blackbox_input_" + std::to_string(i) + "_" + std::to_string(j),
+          ".inputs");
+      inputNodeData->isBlackboxOutput = false;
+      newChannelSignals.dataSignals.push_back(inputNodeData);
+    }
+    // Create input nodes for valid signal
+    Node *inputNodeValid = logic_network->addIONode(
+        "blackbox_input_" + std::to_string(i) + "_valid", ".inputs");
+    inputNodeValid->isBlackboxOutput = false;
+    newChannelSignals.validSignal = inputNodeValid;
+    // Create input nodes for ready signal
+    Node *inputNodeReady = logic_network->addIONode(
+        "blackbox_input_" + std::to_string(i) + "_ready", ".outputs");
+    inputNodeReady->isBlackboxOutput = false;
+    newChannelSignals.readySignal = inputNodeReady;
+    inputNodes.push_back(newChannelSignals);
+  }
+  // Iterate over outputs to create output nodes for blackbox modules.
+  for (unsigned int i = 0; i < numOutputs; i++) {
+    unsigned int outputDataWidth;
+    // Determine the data width of the output channel
+    if (op->getResult(i).getType().isa<handshake::ChannelType>() ||
+        op->getResult(i).getType().isa<handshake::ControlType>()) {
+      outputDataWidth =
+          handshake::getHandshakeTypeBitWidth(op->getResult(i).getType());
+    } else {
+      if (!op->getResult(i).getType().isa<MemRefType>()) {
+        llvm::errs() << "Result Type: " << op->getResult(i).getType() << "\n";
+        op->emitError("Unsupported Blackbox Output Type");
+      }
+      outputDataWidth = 1;
+    }
+    ChannelSignals newChannelSignals;
+    // Create output nodes for data signals
+    for (unsigned int j = 0; j < outputDataWidth; j++) {
+      Node *outputNode = logic_network->addIONode(
+          "blackbox_output_" + std::to_string(i) + "_" + std::to_string(j),
+          ".outputs");
+      outputNode->isBlackboxOutput = true;
+      newChannelSignals.dataSignals.push_back(outputNode);
+    }
+    // Create output nodes for valid signal
+    Node *outputNodeValid = logic_network->addIONode(
+        "blackbox_output_" + std::to_string(i) + "_valid", ".outputs");
+    outputNodeValid->isBlackboxOutput = true;
+    newChannelSignals.validSignal = outputNodeValid;
+    // Create output nodes for ready signal
+    Node *outputNodeReady = logic_network->addIONode(
+        "blackbox_output_" + std::to_string(i) + "_ready", ".inputs");
+    outputNodeReady->isBlackboxOutput = true;
+    newChannelSignals.readySignal = outputNodeReady;
+    outputNodes.push_back(newChannelSignals);
+  }
+  // Generate topological order for the logic network
+  logic_network->generateTopologicalOrder();
+  // This is a fundamental step, since the blifData is used in other functions
+  blifData = logic_network;
+}
+
+void BlackBoxSubjectGraph::connectInputNodes() {
+  for (unsigned int i = 0; i < numInputs; i++) {
+    if (std::find(skippingInputIndices.begin(), skippingInputIndices.end(),
+                  i) != skippingInputIndices.end()) {
+      continue;
+    }
+    connectInputNodesHelper(inputNodes[i], i);
+  }
+}
+
+ChannelSignals &
+BlackBoxSubjectGraph::returnOutputNodes(unsigned int channelIndex) {
+  return outputNodes[channelIndex];
 }
 
 // ConstantSubjectGraph implementation
@@ -645,7 +845,7 @@ ConstantSubjectGraph::ConstantSubjectGraph(Operation *op)
 
 // Constant module has only controlSignals as input.
 void ConstantSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(controlSignals, inputSubjectGraphs[0]);
+  connectInputNodesHelper(controlSignals, 0);
 }
 
 // Constant module has only outputNodes as output.
@@ -676,7 +876,7 @@ ExtTruncSubjectGraph::ExtTruncSubjectGraph(Operation *op)
 
 // These modules only have a single input, inputNodes.
 void ExtTruncSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, 0);
 }
 
 // These modules only have a single output, outputNodes.
@@ -708,13 +908,38 @@ SelectSubjectGraph::SelectSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // connected to the second inputSubjectGraph, and falseValue are connected to
 // the third inputSubjectGraph.
 void SelectSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(condition, inputSubjectGraphs[0]);
-  connectInputNodesHelper(trueValue, inputSubjectGraphs[1]);
-  connectInputNodesHelper(falseValue, inputSubjectGraphs[2]);
+  connectInputNodesHelper(condition, 0);
+  connectInputNodesHelper(trueValue, 1);
+  connectInputNodesHelper(falseValue, 2);
 }
 
 // Select module has only outputNodes as output.
 ChannelSignals &SelectSubjectGraph::returnOutputNodes(unsigned int) {
+  return outputNodes;
+}
+
+// SIFPSubjectGraph implementation
+SIFPSubjectGraph::SIFPSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
+  // Get datawidth of the operation
+  dataWidth = handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
+
+  loadBlifFile({dataWidth});
+  isBlackbox = true;
+
+  std::vector<NodeProcessingRule> rules = {{"in", inputNodes, false},
+                                           {"out", outputNodes, true}};
+
+  processNodesWithRules(rules);
+}
+
+// lhsNodes are connected to the Subject Graph with index 0, and rhsNodes
+// are connected to the Subject Graph with index 1.
+void SIFPSubjectGraph::connectInputNodes() {
+  connectInputNodesHelper(inputNodes, 0);
+}
+
+// Arith modules only have resultNodes as output.
+ChannelSignals &SIFPSubjectGraph::returnOutputNodes(unsigned int) {
   return outputNodes;
 }
 
@@ -763,7 +988,7 @@ MergeSubjectGraph::MergeSubjectGraph(Operation *op) : BaseSubjectGraph(op) {
 // inputSubjectGraphs in the order that they are defined.
 void MergeSubjectGraph::connectInputNodes() {
   for (unsigned int i = 0; i < inputNodes.size(); i++) {
-    connectInputNodesHelper(inputNodes[i], inputSubjectGraphs[i]);
+    connectInputNodesHelper(inputNodes[i], i);
   }
 }
 
@@ -794,7 +1019,7 @@ BranchSinkSubjectGraph::BranchSinkSubjectGraph(Operation *op)
 void BranchSinkSubjectGraph::connectInputNodes() {
   // Block arguments do not have any input operations.
   if (!inputSubjectGraphs.empty()) {
-    connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+    connectInputNodesHelper(inputNodes, 0);
   }
 }
 
@@ -860,7 +1085,7 @@ BufferSubjectGraph::BufferSubjectGraph(unsigned int inputDataWidth,
 
 // Buffers only have inputNodes as input.
 void BufferSubjectGraph::connectInputNodes() {
-  connectInputNodesHelper(inputNodes, inputSubjectGraphs[0]);
+  connectInputNodesHelper(inputNodes, 0);
 }
 
 // Buffers only have outputNodes as output.
@@ -899,6 +1124,10 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
               handshake::ShRUIOp, handshake::SubIOp, handshake::XOrIOp,
               handshake::MulIOp, handshake::DivSIOp, handshake::DivUIOp>(
             [&](auto) { subjectGraphs.push_back(new ArithSubjectGraph(op)); })
+        .Case<handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
+              handshake::MulFOp, handshake::SubFOp>([&](auto) {
+          subjectGraphs.push_back(new BlackBoxSubjectGraph(op));
+        })
         .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
           subjectGraphs.push_back(new BranchSinkSubjectGraph(op));
         })
@@ -932,12 +1161,17 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
         .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
           subjectGraphs.push_back(new SelectSubjectGraph(op));
         })
+        .Case<handshake::SIToFPOp, handshake::FPToSIOp, handshake::ExtFOp,
+              handshake::TruncFOp>(
+            [&](auto) { subjectGraphs.push_back(new SIFPSubjectGraph(op)); })
         .Case<handshake::SourceOp>(
             [&](auto) { subjectGraphs.push_back(new SourceSubjectGraph(op)); })
         .Case<handshake::StoreOp>([&](handshake::StoreOp storeOp) {
           subjectGraphs.push_back(new StoreSubjectGraph(op));
         })
-        .Default([&](auto) { return; });
+        .Default([&](auto) {
+          subjectGraphs.push_back(new BlackBoxSubjectGraph(op));
+        });
   });
 
   // Populate Subject Graph vectors
@@ -985,5 +1219,3 @@ LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   // Return the resulting LogicNetwork object
   return mergedBlif;
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

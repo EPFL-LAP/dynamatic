@@ -18,29 +18,29 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/IR/Value.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
-
 using namespace llvm::sys;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::costaware;
 
-CostAwareBuffers::CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
+CostAwareBuffers::CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
+                                   FuncInfo &funcInfo,
                                    const TimingDatabase &timingDB,
                                    double targetPeriod)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
+    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
+                          targetPeriod) {
   if (!unsatisfiable)
     setup();
 }
 
-CostAwareBuffers::CostAwareBuffers(GRBEnv &env, FuncInfo &funcInfo,
+CostAwareBuffers::CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
+                                   FuncInfo &funcInfo,
                                    const TimingDatabase &timingDB,
                                    double targetPeriod, Logger &logger,
                                    StringRef milpName)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName) {
+    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
+                          logger, milpName) {
   if (!unsatisfiable)
     setup();
 }
@@ -50,18 +50,17 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
   for (auto &[channel, channelVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    unsigned numSlotsToPlace = static_cast<unsigned>(
-        channelVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+    unsigned numSlotsToPlace =
+        static_cast<unsigned>(model->getValue(channelVars.bufNumSlots) + 0.5);
     if (numSlotsToPlace == 0)
       continue;
 
-    unsigned dataLatency = static_cast<unsigned>(
-        channelVars.dataLatency.get(GRB_DoubleAttr_X) + 0.5);
+    unsigned dataLatency =
+        static_cast<unsigned>(model->getValue(channelVars.dataLatency) + 0.5);
     unsigned readyLatency = static_cast<unsigned>(
-        channelVars.signalVars[SignalType::READY].bufPresent.get(
-            GRB_DoubleAttr_X) +
+        model->getValue(channelVars.signalVars[SignalType::READY].bufPresent) +
         0.5);
-    bool useShiftReg = channelVars.shiftReg.get(GRB_DoubleAttr_X) > 0.5;
+    bool useShiftReg = model->getValue(channelVars.shiftReg) > 0.5;
 
     PlacementResult result;
     // See 'docs/Specs/Buffering/Buffering.md'.
@@ -83,7 +82,7 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
-    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+    double tmpThroughput = model->getValue(cfVars.throughput);
 
     cfdfcTPResult[idx] = tmpThroughput;
   }
@@ -99,7 +98,7 @@ void CostAwareBuffers::extractResult(BufferPlacement &placement) {
 void CostAwareBuffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
   handshake::ChannelBufProps &props = channelProps[channel];
-  GRBVar &dataLatency = chVars.dataLatency;
+  CPVar &dataLatency = chVars.dataLatency;
   for (mlir::Operation *user : channel.getUsers()) {
     if (isa<handshake::LoadOp>(user)) {
       props.minTrans = 0;
@@ -109,34 +108,34 @@ void CostAwareBuffers::addCustomChannelConstraints(Value channel) {
 
   if (props.minOpaque > 0) {
     // Force the MILP to place a minimum number of opaque slots
-    model.addConstr(dataLatency >= props.minOpaque, "custom_forceOpaque");
+    model->addConstr(dataLatency >= props.minOpaque, "custom_forceOpaque");
   }
   if (props.minTrans > 0) {
     // Force the MILP to place a minimum number of transparent slots
-    model.addConstr(chVars.bufNumSlots >= props.minTrans + dataLatency,
-                    "custom_minTrans");
+    model->addConstr(chVars.bufNumSlots >= props.minTrans + dataLatency,
+                     "custom_minTrans");
   }
   if (props.minSlots > 0) {
     // Force the MILP to place a minimum number of slots
-    model.addConstr(chVars.bufNumSlots >= props.minSlots, "custom_minSlots");
+    model->addConstr(chVars.bufNumSlots >= props.minSlots, "custom_minSlots");
   }
   if (props.minOpaque + props.minTrans + props.minSlots > 0)
-    model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
+    model->addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
 
   // Set a maximum number of slots to be placed
   if (props.maxOpaque.has_value()) {
     if (*props.maxOpaque == 0) {
       // Force the MILP to use transparent slots
-      model.addConstr(dataLatency == 0, "custom_forceTransparent");
+      model->addConstr(dataLatency == 0, "custom_forceTransparent");
     }
     if (props.maxTrans.has_value()) {
       // Force the MILP to use a maximum number of slots
       unsigned maxSlots = *props.maxTrans + *props.maxOpaque;
       if (maxSlots == 0) {
-        model.addConstr(chVars.bufPresent == 0, "custom_noBuffers");
-        model.addConstr(chVars.bufNumSlots == 0, "custom_noSlots");
+        model->addConstr(chVars.bufPresent == 0, "custom_noBuffers");
+        model->addConstr(chVars.bufNumSlots == 0, "custom_noSlots");
       } else {
-        model.addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
+        model->addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
       }
     }
   }
@@ -193,5 +192,3 @@ void CostAwareBuffers::setup() {
   addBufferAreaAwareObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

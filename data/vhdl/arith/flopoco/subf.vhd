@@ -183,7 +183,7 @@ begin
       R => result
     );
 
-  operator : entity work.FPAdd_64bit(arch)
+  operator : entity work.FloatingPointAdder_64bit(arch)
     port map(
       clk => clk,
       ce => oehb_ready,

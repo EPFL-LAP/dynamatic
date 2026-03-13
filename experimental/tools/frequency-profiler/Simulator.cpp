@@ -365,6 +365,12 @@ LogicalResult StdExecuter::execute(mlir::arith::DivFOp, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::arith::NegFOp, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = -any_cast<APFloat>(in[0]);
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::arith::RemFOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   out[0] = any_cast<APFloat>(in[0]).mod(any_cast<APFloat>(in[1]));
@@ -742,6 +748,7 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                 arith::IndexCastOp,
                 arith::MulFOp,
                 arith::MulIOp,
+                arith::NegFOp,
                 arith::OrIOp,
                 arith::RemFOp,
                 arith::RemSIOp,
