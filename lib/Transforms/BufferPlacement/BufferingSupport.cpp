@@ -75,7 +75,7 @@ Channel::Channel(Value value, bool updateProps)
   // Channel must be a block argument: make the parent operation the "producer"
   BlockArgument arg = cast<BlockArgument>(value);
   producer = arg.getParentBlock()->getParentOp();
-};
+}
 
 OpOperand &Channel::getOperand() const {
   for (OpOperand &oprd : consumer->getOpOperands()) {

@@ -6,5 +6,7 @@ add_dynamatic_library(DynamaticConstraintProgramming
   DynamaticSupportUtils
   DynamaticHW
   MLIRIR
-  LLVMSupport
+
+  LINK_COMPONENTS
+  Support
 )
