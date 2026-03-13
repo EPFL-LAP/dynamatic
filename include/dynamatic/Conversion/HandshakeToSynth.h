@@ -75,25 +75,72 @@
 
 namespace dynamatic {
 
-// Static map that contains the blif file path for each operation
-static DenseMap<Operation *, std::string> opToBlifPathMap;
+// ===----------------------------------------------------------------------===//
+// Signal kind enum
+// ===----------------------------------------------------------------------===//
 
-// Keywords for data and control signals when unbundling Handshake types using
-// enums.
+/// Identifies which component of a bundled Handshake channel a flat HW port
+/// corresponds to.
 enum SignalKind {
   DATA_SIGNAL = 0,
   VALID_SIGNAL = 1,
   READY_SIGNAL = 2,
 };
 
-// Strings representing the name of the clock and reset signals
+// ===----------------------------------------------------------------------===//
+// Global state shared across pass steps
+// ===----------------------------------------------------------------------===//
+
+/// Maps each hw::HWModuleOp (by Operation*) to the BLIF file path it should
+/// be populated from. An empty string means the module needs no replacement.
+/// Populated during Step 1 (unbundling) and consumed during Step 3.
+static mlir::DenseMap<mlir::Operation *, std::string> opToBlifPathMap;
+
+/// Port name string for the clock signal added to all rewritten hw modules.
 static const std::string clockSignal = "clk";
+
+/// Port name string for the reset signal added to all rewritten hw modules.
 static const std::string resetSignal = "rst";
 
-// Utility class to invert the ready signals and add reset and clock signals to
-// the HW modules created from Handshake operations
+// ===----------------------------------------------------------------------===//
+// SignalRewriter: Step 2 — invert ready signal directions and unbundle bits
+// ===----------------------------------------------------------------------===//
+
+/// Rewrites all HW modules produced in Step 1 to comply with the standard
+/// handshake convention:
+///   - ready signals travel in the opposite direction to data/valid signals
+///   - all multi-bit signals are split into individual i1 ports
+///   - clock and reset ports are added to every module
+///
+/// The rewriter works recursively: rewriting a module first rewrites any
+/// hw::HWModuleOps it instantiates, so that new instances can reference
+/// already-corrected module interfaces.
 class SignalRewriter {
+
 public:
+  /// Entry point: rewrites every hw::HWModuleOp in \p modOp, then removes
+  /// the originals and renames the rewritten copies back to the original
+  /// names so that the rest of the pipeline is unaffected.
+  mlir::LogicalResult rewriteAllSignals(mlir::ModuleOp modOp);
+
+  /// Sets the name of the top-level Handshake function. Must be called before
+  /// rewriteAllSignals(); the top module is special-cased to capture clk/rst.
+  void setTopFunctionName(llvm::StringRef name) {
+    assert(!name.empty() && "top function name must not be empty");
+    topFunction = name;
+  }
+
+  /// Returns the top function name (asserts it has been set).
+  llvm::StringRef getTopFunctionName() const {
+    assert(!topFunction.empty() && "top function name has not been set");
+    return topFunction;
+  }
+
+private:
+  // -----------------------------------------------------------------------
+  // Core rewriting helpers
+  // -----------------------------------------------------------------------
+
   /// Rewrite a HW module interface and body to apply signal-direction and
   /// bit-level rewrites (e.g., ready inversion and bit unbundling).
   void rewriteHWModule(hw::HWModuleOp oldMod, ModuleOp parent,
@@ -101,11 +148,17 @@ public:
                        DenseMap<StringRef, hw::HWModuleOp> &newHWModules,
                        DenseMap<StringRef, hw::HWModuleOp> &oldHWModules);
 
-  /// Rewrite a HW instance to use a rewritten module and updated operands.
+  /// Rewrites a single hw::InstanceOp inside a module that is being rewritten.
+  /// Looks up (or triggers) the rewrite of the referenced module, then builds
+  /// a new instance with corrected operand/result connections.
   void rewriteHWInstance(hw::InstanceOp oldInst, ModuleOp parent,
                          SymbolTable &symTable,
                          DenseMap<StringRef, hw::HWModuleOp> &newHWModules,
                          DenseMap<StringRef, hw::HWModuleOp> &oldHWModules);
+
+  // -----------------------------------------------------------------------
+  // Signal mapping helpers
+  // -----------------------------------------------------------------------
 
   /// Get the name of the rewritten HW module (e.g., by appending a suffix).
   mlir::StringAttr getRewrittenModuleName(hw::HWModuleOp oldMod,
@@ -121,26 +174,10 @@ public:
                                  int oldOutputIdx, hw::HWModuleOp oldMod,
                                  hw::HWModuleOp newMod, hw::InstanceOp newInst);
 
-  /// Rewrite all HW modules in the given MLIR module to apply signal
-  /// restructuring (direction changes, bit unbundling, etc.).
-  LogicalResult rewriteAllSignals(mlir::ModuleOp modOp);
+  // -----------------------------------------------------------------------
+  // Internal state
+  // -----------------------------------------------------------------------
 
-  // Function to set the name of the top function
-  void setTopFunctionName(StringRef topFunctionName) {
-    assert(topFunctionName != "" &&
-           "top function name cannot be set to an empty string");
-    topFunction = topFunctionName;
-  }
-
-  // Function to get the name of the top function
-  StringRef getTopFunctionName() {
-    assert(
-        topFunction != "" &&
-        "top function name should be set before being able to get its value");
-    return topFunction;
-  }
-
-private:
   // IMPORTANT: A fundamental assumption for these maps to work is that each
   // handshake channel connects uniquely one handshake unit to another one. If
   // this assumption is broken, the maps will not work correctly since one key
@@ -166,12 +203,14 @@ private:
   DenseMap<StringAttr, SmallVector<std::pair<unsigned, SmallVector<unsigned>>>>
       oldOutputIdxToNewOutputIdxMap;
 
-  // Name of the top function
-  StringRef topFunction = "";
-  // Signal of the top function that refers to the clock signal of the top func
-  Value clkSignalTop;
-  // Signal of the top function that refers to the reset signal of the top func
-  Value rstSignalTop;
+  /// Name of the top-level Handshake function/hw module.
+  llvm::StringRef topFunction;
+
+  /// Block argument of the new top module that carries the clock signal.
+  mlir::Value clkSignalTop;
+
+  /// Block argument of the new top module that carries the reset signal.
+  mlir::Value rstSignalTop;
 };
 
 } // namespace dynamatic
