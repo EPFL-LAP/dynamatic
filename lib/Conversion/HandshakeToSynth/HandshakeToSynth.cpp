@@ -11,62 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/HW/HWOpInterfaces.h"
-#include "dynamatic/Dialect/HW/HWOps.h"
-#include "dynamatic/Dialect/HW/HWTypes.h"
-#include "dynamatic/Dialect/HW/PortImplementation.h"
-#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
-#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
-#include "dynamatic/Dialect/Synth/SynthDialect.h"
-#include "dynamatic/Dialect/Synth/SynthOps.h"
-#include "dynamatic/Support/Attribute.h"
-#include "dynamatic/Support/Backedge.h"
-#include "dynamatic/Support/BlifImporter/BlifImporterSupport.h"
-#include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/Utils/Utils.h"
-#include "dynamatic/Transforms/HandshakeMaterialize.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/IR/Location.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
-#include "mlir/IR/TypeRange.h"
-#include "mlir/IR/Types.h"
-#include "mlir/IR/Value.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <bitset>
-#include <cctype>
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <iterator>
-#include <regex>
-#include <string>
-#include <utility>
+#include "dynamatic/Conversion/HandshakeToSynth.h"
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
@@ -79,18 +24,6 @@ namespace dynamatic {
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
-
-// Keywords for data and control signals when unbundling Handshake types using
-// enums.
-enum SignalKind {
-  DATA_SIGNAL = 0,
-  VALID_SIGNAL = 1,
-  READY_SIGNAL = 2,
-};
-
-// Strings representing the name of the clock and reset signals
-static const std::string clockSignal = "clk";
-static const std::string resetSignal = "rst";
 
 // ------------------------------------------------------------------
 // Utilities for unbundling Handshake types and operations into flat hw module
@@ -924,6 +857,13 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 }
 
 // ------------------------------------------------------------------
+// Inversion of ready signals in hw modules and hw instances to follow the
+// standard handshake protocol where ready signals go in the opposite direction
+// with respect to data and valid signals. Adding the clock and reset signals to
+// the hw modules.
+// ------------------------------------------------------------------
+
+// ------------------------------------------------------------------
 // Instantiation of the synth operations in the hw modules and conversion of hw
 // instances to synth operations
 // ------------------------------------------------------------------
@@ -1093,7 +1033,6 @@ public:
     if (failed(unbundleAllHandshakeTypes(modOp, ctx)))
       return signalPassFailure();
 
-    /*
     // Step 2: invert the direction of all ready signals in the hw modules
     // created from handshake operations. Additionally, unbundle data signals
     // into single-bit signals.
@@ -1105,7 +1044,6 @@ public:
     signalRewriter.setTopFunctionName(topModuleName);
     if (failed(signalRewriter.rewriteAllSignals(modOp)))
       return signalPassFailure();
-    */
 
     // Step 3: Populate the hw module operations with the correspoding synth
     // operations. The description of the implementation is defined in the path
