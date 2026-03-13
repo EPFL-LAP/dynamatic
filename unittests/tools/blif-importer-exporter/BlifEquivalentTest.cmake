@@ -3,7 +3,6 @@ function(add_blif_equiv_test)
   set(oneValueArgs NAME INPUT BLIF2MLIR MLIR2BLIF MODE)
   set(multiValueArgs)
   cmake_parse_arguments(BET "" "NAME;INPUT;BLIF2MLIR;MLIR2BLIF;MODE" "" ${ARGN})
-  message(STATUS "ARGN: ${ARGN}")
 
   if(NOT BET_NAME)
     message(FATAL_ERROR "add_blif_equiv_test requires NAME")
@@ -55,12 +54,6 @@ set(ABC_COMMAND \"${ABC_COMMAND}\")
 set(TMP_MLIR \"${CMAKE_CURRENT_BINARY_DIR}/${BET_NAME}.mlir\")
 set(OUTPUT_BLIF \"${CMAKE_CURRENT_BINARY_DIR}/${BET_NAME}_out.blif\")
 
-message(STATUS \"ABC_EXECUTABLE in test function: \${ABC_EXECUTABLE}\")
-message(STATUS \"ABC_COMMAND: \${ABC_COMMAND}\")
-message(STATUS \"BET_INPUT: \${BET_INPUT}\")
-message(STATUS \"BLIF2MLIR_PATH: \${BLIF2MLIR_PATH}\")
-message(STATUS \"MLIR2BLIF_PATH: \${MLIR2BLIF_PATH}\")
-
 execute_process(
   COMMAND \${BLIF2MLIR} \${TMP_MLIR} \${INPUT_BLIF}
   RESULT_VARIABLE RES1
@@ -87,7 +80,6 @@ execute_process(
   ERROR_STRIP_TRAILING_WHITESPACE
 )
 message(STATUS \"ABC output:\n\${ABC_OUT}\")
-message(STATUS \"ABC stderr:\n\${ABC_ERR}\")
 if(NOT RES3 EQUAL 0)
   message(FATAL_ERROR \"ABC equivalence command failed\")
 endif()

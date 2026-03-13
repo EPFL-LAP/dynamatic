@@ -3,7 +3,7 @@
 get_filename_component(DYNAMATIC_BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../.. ABSOLUTE)
 set(AIG_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test-cases)
 set(BIN_DIR ${DYNAMATIC_BASE_DIR}/bin)
-set(ABC_EXECUTABLE ${CMAKE_BINARY_DIR}/abc/abc)
+set(ABC_EXECUTABLE ${CMAKE_BINARY_DIR}/_deps/abc-build/abc)
 
 if(DYNAMATIC_ENABLE_ABC)
   include(BlifEquivalentTest.cmake)
