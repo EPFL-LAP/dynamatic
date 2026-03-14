@@ -141,3 +141,8 @@ class Configs:
         assert (len(self.gaLdOrder) == self.numGroups)
         assert (len(self.gaLdPortIdx) == self.numGroups)
         assert (len(self.gaStPortIdx) == self.numGroups)
+
+        # An LSQ with N load/store entries can only support up to N-1 loads/stores per group.
+        for i in range(self.numGroups):
+            assert self.gaNumLoads[i] < self.numLdqEntries, f"group {i}: too many loads ({self.gaNumLoads[i]}) for load queue with {self.numLdqEntries} entries!"
+            assert self.gaNumStores[i] < self.numStqEntries, f"group {i}: too many stores ({self.gaNumStores[i]}) for store queue with {self.numStqEntries} entries!"
