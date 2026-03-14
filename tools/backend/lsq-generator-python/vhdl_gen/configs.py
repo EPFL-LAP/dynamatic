@@ -8,6 +8,7 @@ import math
 import json
 import os
 import sys
+from pprint import pprint
 
 # read and parse the json file
 # example json format in README
@@ -132,6 +133,8 @@ class Configs:
         # Check the number of ports, if num*Ports == 0, set it to 1
         self.ldpAddrW = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
+
+        pprint(self.__dict__)
 
         assert (self.idW >= self.ldqAddrW)
 
