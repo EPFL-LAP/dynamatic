@@ -5,7 +5,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_DIR=$1
-LSQ_SIZES=(2 4 6 8 10 12 16 20)
+# minimum LSQ size of 4 required for some kernels
+LSQ_SIZES=(4 6 8 10 12 16 20)
 
 mkdir -p "$RESULTS_DIR"
 
