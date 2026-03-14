@@ -420,22 +420,19 @@ def MaskLess(din, size) -> str:
 
 def IntToBits(din, size=None) -> str:
     if size == None:
-        if din:
+        if din == 1:
             return "'1'"
-        else:
+        elif din == 0:
             return "'0'"
+        else:
+            raise ValueError("IntToBits: Invalid value for size=None! Cannot represent the value as a single bit!")
     else:
-        str_ret = '"'
-        for i in range(0, size):
-            if din % 2 == 0:
-                str_ret = "0" + str_ret
-            else:
-                str_ret = "1" + str_ret
-            din = din // 2
-        str_ret = '"' + str_ret
-        if din != 0:
-            raise ValueError("Unknown value!")
-        return str_ret
+        if din < 0:
+            raise ValueError("IntToBits: Negative value cannot be converted to bits!")
+        if din >= (1 << size):
+            raise ValueError(f"IntToBits: Value {din} cannot be represented with {size} bit(s)!")
+        bits = f"{din:0{size}b}"
+        return f'"{bits}"'
 
 
 def Zero(size) -> str:
