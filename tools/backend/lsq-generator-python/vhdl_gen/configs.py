@@ -125,16 +125,10 @@ class Configs:
         self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
         self.idW = max(self.ldqAddrW, self.stqAddrW)
 
-        # Original empty assignment assumes the size of load or store queue to be always a multiple of 2
-        if (self.numLdqEntries & (self.numLdqEntries % 2 == 0)):
-            self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
-        else:
-            self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries)) + 1
+        # Use one more bit to be able to represent the empty state of the queue when the number of entries is a power of 2
+        self.emptyLdAddrW = self.ldqAddrW + 1
+        self.emptyStAddrW = self.stqAddrW + 1
 
-        if (self.numStqEntries & (self.numStqEntries % 2 == 0)):
-            self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
-        else:
-            self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries)) + 1
         # Check the number of ports, if num*Ports == 0, set it to 1
         self.ldpAddrW = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
