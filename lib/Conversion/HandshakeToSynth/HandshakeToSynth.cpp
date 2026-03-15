@@ -41,21 +41,51 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
-// Step 1 helpers: unbundling Handshake types into flat HW ports
+// Step 1 — Unbundle Handshake types into flat HW ports
+//===----------------------------------------------------------------------===//
+//
+// Converts every Handshake operation inside a handshake::FuncOp into an
+// hw::HWModuleOp whose ports are flat i1/iN signals (data / valid / ready
+// split apart).  The conversion is wired together with temporary
+// UnrealizedConversionCastOps that are eliminated at the end of this step.
+//
+// The code is organised in four layers, each depending only on the layers
+// above it:
+//
+//   Layer 1 — TypeUnbundler   : knows how to split a Handshake type into its
+//                               component (SignalKind, Type) pairs.
+//
+//   Layer 2 — PortInfoBuilder : knows how to derive port names from a
+//                               Handshake op and zip them with unbundled types
+//                               to produce hw::ModulePortInfo.
+//
+//   Layer 3 — ConversionPatterns : the TypeConverter and OpConversionPatterns
+//                               that drive the DialectConversion framework.
+//                               Also contains the cast helpers and the synth
+//                               placeholder installer.
+//
+//   Layer 4 — Orchestrator   : unbundleAllHandshakeTypes(), the single entry
+//                               point of this step.  Runs the three
+//                               sequential phases and nothing else.
+//
+//===----------------------------------------------------------------------===//
+//
+//===----------------------------------------------------------------------===//
+// Layer 1 — TypeUnbundler
+//
+// Pure functions with no side effects and no dependencies on other code in
+// this file. They determine how a Handshake type expands into flat hardware
+// types and specify the role associated with each resulting signal.
+//
 //===----------------------------------------------------------------------===//
 
-// ---------------------------------------------------------------------------
-// Type unbundling
-// ---------------------------------------------------------------------------
-
-/// Function that splits a single Handshake type into its constituent
-/// (SignalKind, Type) pairs.  A ChannelType becomes {data, valid, ready}; a
-/// ControlType becomes {valid, ready}; anything else passes through as a single
-/// DATA_SIGNAL.
+/// Splits a single Handshake type into its constituent (SignalKind, Type)
+/// pairs:
+///   ChannelType  -> { DATA, dataType }, { VALID, i1 }, { READY, i1 }
+///   ControlType  ->                     { VALID, i1 }, { READY, i1 }
+///   MemRefType   -> { DATA, elemType }, { VALID, i1 }, { READY, i1 }
+///   anything else-> { DATA, type }   (pass-through)
 SmallVector<std::pair<SignalKind, Type>> unbundleType(Type type) {
-  // The reason for unbundling is that handshake channels are bundled
-  // types that contain data, valid and ready signals, while hw module
-  // ports are flat, so we need to unbundle the channel into its components
   return TypeSwitch<Type, SmallVector<std::pair<SignalKind, Type>>>(type)
       // Case for channel type where we unbundle into data, valid, ready
       .Case<handshake::ChannelType>([](handshake::ChannelType chanType) {
@@ -129,54 +159,14 @@ void unbundleOpPorts(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Port-name helpers
-// ---------------------------------------------------------------------------
-
-// Utility function to insert a string before the first occurrence of '['
-std::string insertBeforeBracket(const std::string &s,
-                                const std::string &toInsert) {
-  std::string result = s;
-  std::size_t pos = result.find('[');
-  // Find first occurrence of '[' and insert the string before it
-  if (pos != std::string::npos) {
-    result.insert(pos, toInsert);
-  } else {
-    // If no '[', just append at the end
-    result += toInsert;
-  }
-  return result;
-}
-
-// Utility function to get the string formatted in the desired portname[idx]
-// format
-// If the root name already contains an index, the old index is linearized and
-// added to the new one using the width input
-std::string formatPortName(const std::string &rootName,
-                           const std::optional<unsigned> &index,
-                           unsigned width = 0) {
-  if (index.has_value()) {
-    unsigned newIndex = index.value();
-    std::string newRootName = rootName;
-    // Check if there is already present an index
-    std::regex pattern(R"((\w+)\[(\d+)\])");
-    // We use regex to identify this pattern
-    std::smatch matches;
-    if (std::regex_match(rootName, matches, pattern)) {
-      // If the pattern matches, assert the width is not 0
-      assert(width != 0 &&
-             "the width of the signal cannot be 0 if it is an array");
-      // Linearize old index
-      std::string oldIndex = matches[2].str();
-      unsigned oldIndexLinearized = std::stoi(oldIndex) * width;
-      // Add it to new one
-      newIndex += oldIndexLinearized;
-      newRootName = matches[1].str();
-    }
-    return newRootName + "[" + std::to_string(newIndex) + "]";
-  }
-  return rootName;
-}
+//===----------------------------------------------------------------------===//
+// Layer 2 — PortInfoBuilder
+//
+// Knows how to turn a Handshake op into an hw::ModulePortInfo.
+// Uses Layer 1 for type splitting; uses the NamedIOInterface for names.
+// Two private helpers handle the string formatting; the single public
+// entry point is buildPortInfo().
+//===----------------------------------------------------------------------===//
 
 // ---------------------------------------------------------------------------
 // Private string helpers
@@ -335,6 +325,15 @@ hw::ModulePortInfo buildPortInfo(Operation *op) {
   return hw::ModulePortInfo(hwInputs, hwOutputs);
 }
 
+//===----------------------------------------------------------------------===//
+// Layer 3 — ConversionPatterns
+//
+// Contains the TypeConverter and OpConversionPatterns that drive the
+// DialectConversion framework.  Also contains the cast helpers and the synth
+// placeholder installer.
+//
+//===----------------------------------------------------------------------===//
+
 // ---------------------------------------------------------------------------
 // TypeConverter
 // ---------------------------------------------------------------------------
@@ -393,12 +392,12 @@ rebundleFlatValues(TypeRange originalTypes, ArrayRef<Value> flatValues,
 }
 
 // ---------------------------------------------------------------------------
-// Synth subcircuit instantiation
+// Synth placeholder installer
 // ---------------------------------------------------------------------------
 
-/// Fills the body of \p hwModule with a single synth::SubcktOp that consumes
-/// all module arguments and produces all module outputs, acting as a
-/// placeholder until Step 3 replaces it with the real netlist.
+/// Fills the body of a freshly created \p hwModule with a single
+/// synth::SubcktOp that consumes all inputs and produces all outputs.
+/// Acts as a placeholder until Step 3 replaces it with the real netlist.
 LogicalResult instantiateSynthPlaceholder(hw::HWModuleOp hwModule,
                                           ConversionPatternRewriter &rewriter) {
   rewriter.setInsertionPointToStart(hwModule.getBodyBlock());
@@ -567,63 +566,46 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
 }
 
 // ---------------------------------------------------------------------------
-// Conversion patterns
+// OpConversionPattern wrappers
 // ---------------------------------------------------------------------------
 
-// Conversion pattern to convert a generic handshake operation into an hw
-// module operation
-// This is used only for operation inside the handshake function, since the
-// function itself is converted separately
-namespace {
+/// Generic pattern: wraps convertOpToHWModule for any Handshake op T.
 template <typename T>
-class ConvertToHWMod : public OpConversionPattern<T> {
-public:
+struct ConvertToHWMod : public OpConversionPattern<T> {
   using OpConversionPattern<T>::OpConversionPattern;
   using OpAdaptor = typename T::Adaptor;
+
   LogicalResult
-  matchAndRewrite(T op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
+  matchAndRewrite(T op, OpAdaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return convertOpToHWModule(op, rewriter) ? success() : failure();
+  }
 };
-} // namespace
 
-template <typename T>
-LogicalResult
-ConvertToHWMod<T>::matchAndRewrite(T op, OpAdaptor adaptor,
-                                   ConversionPatternRewriter &rewriter) const {
-
-  // Convert the operation into an hw module operation
-  hw::HWModuleOp newOp = convertOpToHWModule(op, rewriter);
-  if (!newOp)
-    return failure();
-  return success();
-}
-
-// Conversion pattern to convert handshake function operation into an hw
-// module operation
-namespace {
-class ConvertFuncToHWMod : public OpConversionPattern<handshake::FuncOp> {
-public:
+/// Specialised pattern for handshake::FuncOp.
+struct ConvertFuncToHWMod : public OpConversionPattern<handshake::FuncOp> {
   using OpConversionPattern<handshake::FuncOp>::OpConversionPattern;
-  using OpAdaptor = typename handshake::FuncOp::Adaptor;
+
   LogicalResult
-  matchAndRewrite(handshake::FuncOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
+  matchAndRewrite(handshake::FuncOp op, handshake::FuncOp::Adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return convertFuncOpToHWModule(op, rewriter) ? success() : failure();
+  }
 };
-} // namespace
 
-LogicalResult
-ConvertFuncToHWMod::matchAndRewrite(handshake::FuncOp op, OpAdaptor adaptor,
-                                    ConversionPatternRewriter &rewriter) const {
-
-  // Convert the function operation into an hw module operation
-  hw::HWModuleOp newOp = convertFuncOpToHWModule(op, rewriter);
-  if (!newOp)
-    return failure();
-  return success();
-}
+//===----------------------------------------------------------------------===//
+// Layer 4 — Orchestrator
+//
+// unbundleAllHandshakeTypes() is the single entry point called by the pass.
+// It contains no conversion logic of its own — it just runs three sequential
+// phases and delegates everything else to the layers above.
+//===----------------------------------------------------------------------===//
 
 // ---------------------------------------------------------------------------
-// Unrealized-cast elimination
+// Phase 1c helper: unrealized-cast elimination
+//
+// Defined here rather than in Layer 3 because it is not used by patterns:
+// it is a post-processing step driven by the orchestrator.
 // ---------------------------------------------------------------------------
 
 /// Removes the pairs of UnrealizedConversionCastOps introduced during
@@ -711,17 +693,23 @@ LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
 }
 
 // ---------------------------------------------------------------------------
-// Top-level Step 1 driver
+// Entry point
 // ---------------------------------------------------------------------------
 
-/// Runs the three-phase unbundling:
-///   1a. Convert all Handshake ops (except FuncOp/EndOp) into hw modules.
-///   1b. Convert FuncOp (and its EndOp) into an hw module.
-///   1c. Eliminate all unrealized-conversion casts.
+/// Converts all Handshake ops in \p modOp into hw::HWModuleOps with flat
+/// i1/iN ports, then eliminates the temporary cast ops.
+///
+/// Three sequential phases:
+///   Phase 1a: convert all inner ops (everything except FuncOp / EndOp)
+///   Phase 1b: convert the FuncOp (and its inlined EndOp)
+///   Phase 1c: remove all UnrealizedConversionCastOps
+///
+/// Phases 1a and 1b are separate because FuncOp must be converted after all
+/// its child ops: the child conversions create hw instances that are placed
+/// inside the hw module that replaces FuncOp.
 LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 
-  // Step 1: Apply conversion patterns to convert each handshake operation
-  // into an hw module operation
+  // ---- Phase 1a: convert all inner Handshake ops --------------------------
   RewritePatternSet patterns(ctx);
   ChannelUnbundlingTypeConverter typeConverter;
   ConversionTarget target(*ctx);
@@ -730,9 +718,7 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
   // Add casting as legal
   target.addLegalOp<UnrealizedConversionCastOp>();
   target.addIllegalDialect<handshake::HandshakeDialect>();
-  // In the first step, we convert all handshake operations into hw module
-  // operations, except for the function and end operations which are kept
-  // to convert in the next step
+  // FuncOp and EndOp are handled in Phase 1b, so we mark them as legal here
   target.addLegalOp<handshake::FuncOp>();
   target.addLegalOp<handshake::EndOp>();
   patterns.insert<
@@ -779,9 +765,7 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
   if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
     return failure();
 
-  // Step 2: Convert the handshake function operation into
-  // an hw module operation and the corresponding terminator into an hw
-  // terminator
+  // ---- Phase 1b: convert the top-level FuncOp ----------------------------
   RewritePatternSet funcPatterns(ctx);
   ConversionTarget funcTarget(*ctx);
   funcTarget.addLegalDialect<synth::SynthDialect>();
@@ -794,8 +778,7 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
           applyPartialConversion(modOp, funcTarget, std::move(funcPatterns))))
     return failure();
 
-  // Step 3: remove all unrealized conversion casts
-  // Execute without conversion function but walking the module
+  // ---- Phase 1c: remove all unrealized conversion casts ------------------
   if (failed(removeUnrealizedConversionCasts(modOp)))
     return failure();
   return success();
@@ -804,6 +787,36 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 //===----------------------------------------------------------------------===//
 // Step 2 — SignalRewriter implementation
 //===----------------------------------------------------------------------===//
+
+// Utility function to get the string formatted in the desired portname[idx]
+// format
+// If the root name already contains an index, the old index is linearized and
+// added to the new one using the width input
+std::string formatPortName(const std::string &rootName,
+                           const std::optional<unsigned> &index,
+                           unsigned width = 0) {
+  if (index.has_value()) {
+    unsigned newIndex = index.value();
+    std::string newRootName = rootName;
+    // Check if there is already present an index
+    std::regex pattern(R"((\w+)\[(\d+)\])");
+    // We use regex to identify this pattern
+    std::smatch matches;
+    if (std::regex_match(rootName, matches, pattern)) {
+      // If the pattern matches, assert the width is not 0
+      assert(width != 0 &&
+             "the width of the signal cannot be 0 if it is an array");
+      // Linearize old index
+      std::string oldIndex = matches[2].str();
+      unsigned oldIndexLinearized = std::stoi(oldIndex) * width;
+      // Add it to new one
+      newIndex += oldIndexLinearized;
+      newRootName = matches[1].str();
+    }
+    return newRootName + "[" + std::to_string(newIndex) + "]";
+  }
+  return rootName;
+}
 
 // Function to get a new module name for the rewritten hw module
 mlir::StringAttr
