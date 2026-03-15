@@ -103,7 +103,7 @@ static const std::string clockSignal = "clk";
 static const std::string resetSignal = "rst";
 
 // ===----------------------------------------------------------------------===//
-// SignalRewriter: Step 2 — invert ready signal directions and unbundle bits
+// SignalRewriter: Step 2 - invert ready signal directions and unbundle bits
 // ===----------------------------------------------------------------------===//
 
 /// Rewrites all HW modules produced in Step 1 to comply with the standard
