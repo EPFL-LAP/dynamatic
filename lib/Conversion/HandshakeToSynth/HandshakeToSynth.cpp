@@ -7,7 +7,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Converts Handshake constructs into equivalent Synth constructs.
+// Implements the --handshake-to-synth conversion pass in three steps:
+//
+//   Step 1 - Unbundle: convert every Handshake op into an hw::HWModuleOp
+//            whose ports are flat integer signals (data/valid/ready split),
+//            connected through unrealized-conversion casts that are later
+//            eliminated.
+//
+//   Step 2 - Rewrite signals: invert the direction of all ready signals
+//            (ready travels opposite to data/valid), split multi-bit ports
+//            into individual i1 ports, and add clk/rst to every module.
+//
+//   Step 3 - Populate: replace each hw::HWModuleOp's placeholder body with
+//            the actual gate-level netlist imported from the BLIF file whose
+//            path was recorded during Step 1.
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,12 +40,18 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
-// ------------------------------------------------------------------
-// Utilities for unbundling Handshake types and operations into flat hw module
-// ports and operations
-// ------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
+// Step 1 helpers: unbundling Handshake types into flat HW ports
+//===----------------------------------------------------------------------===//
 
-// Function to unbundle a single handshake type into its subcomponents
+// ---------------------------------------------------------------------------
+// Type unbundling
+// ---------------------------------------------------------------------------
+
+/// Function that splits a single Handshake type into its constituent
+/// (SignalKind, Type) pairs.  A ChannelType becomes {data, valid, ready}; a
+/// ControlType becomes {valid, ready}; anything else passes through as a single
+/// DATA_SIGNAL.
 SmallVector<std::pair<SignalKind, Type>> unbundleType(Type type) {
   // The reason for unbundling is that handshake channels are bundled
   // types that contain data, valid and ready signals, while hw module
@@ -70,10 +89,19 @@ SmallVector<std::pair<SignalKind, Type>> unbundleType(Type type) {
             std::make_pair(DATA_SIGNAL, t)};
       });
 }
-// Function to unbundle the ports of an handshake operation into hw module
-// Unbundling handshake op ports into hw module ports since handshake ops
-// have bundled channel types (composed of data, valid, ready) while hw
-// modules have flat ports
+
+/// Function that returns only the flat Types (dropping the SignalKind tag).
+static SmallVector<Type> unbundleTypeFlat(Type type) {
+  SmallVector<Type> result;
+  for (auto [_, t] : unbundleType(type))
+    result.push_back(t);
+  return result;
+}
+
+/// Function that fills \p inputPorts and \p outputPorts with the unbundled
+/// (SignalKind,Type) groups for every operand/result of \p op.
+/// handshake::FuncOp is handled specially because its "operands" are block
+/// arguments rather than SSA uses.
 void unbundleOpPorts(
     Operation *op,
     SmallVector<SmallVector<std::pair<SignalKind, Type>>> &inputPorts,
@@ -84,64 +112,26 @@ void unbundleOpPorts(
     handshake::FuncOp funcOp = cast<handshake::FuncOp>(op);
     // Extract ports from the function type
     for (auto arg : funcOp.getArguments()) {
-      SmallVector<std::pair<SignalKind, Type>> inputUnbundled =
-          unbundleType(arg.getType());
-      inputPorts.push_back(inputUnbundled);
+      inputPorts.push_back(unbundleType(arg.getType()));
     }
     for (auto resultType : funcOp.getResultTypes()) {
-      SmallVector<std::pair<SignalKind, Type>> outputUnbundled =
-          unbundleType(resultType);
-      outputPorts.push_back(outputUnbundled);
+      outputPorts.push_back(unbundleType(resultType));
     }
     return;
   }
   for (auto input : op->getOperands()) {
     // Unbundle the input type depending on its actual type
-    SmallVector<std::pair<SignalKind, Type>> inputUnbundled =
-        unbundleType(input.getType());
-    inputPorts.push_back(inputUnbundled);
+    inputPorts.push_back(unbundleType(input.getType()));
   }
   for (auto result : op->getResults()) {
     // Unbundle the output type depending on its actual type
-    SmallVector<std::pair<SignalKind, Type>> outputUnbundled =
-        unbundleType(result.getType());
-    outputPorts.push_back(outputUnbundled);
+    outputPorts.push_back(unbundleType(result.getType()));
   }
 }
 
-// Type converter to unbundle Handshake types
-class ChannelUnbundlingTypeConverter : public TypeConverter {
-public:
-  ChannelUnbundlingTypeConverter() {
-    addConversion([](Type type,
-                     SmallVectorImpl<Type> &results) -> LogicalResult {
-      // Unbundle the type into its components
-      SmallVector<Type> unbundledTypes;
-      SmallVector<std::pair<SignalKind, Type>> unbundled = unbundleType(type);
-      for (auto &pair : unbundled) {
-        unbundledTypes.push_back(pair.second);
-      }
-      results.append(unbundledTypes.begin(), unbundledTypes.end());
-      return success();
-    });
-
-    addTargetMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
-      if (inputs.size() != 1)
-        return std::nullopt;
-      return inputs[0];
-    });
-
-    addSourceMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
-      if (inputs.size() != 1)
-        return std::nullopt;
-      return inputs[0];
-    });
-  }
-};
+// ---------------------------------------------------------------------------
+// Port-name helpers
+// ---------------------------------------------------------------------------
 
 // Utility function to insert a string before the first occurrence of '['
 std::string insertBeforeBracket(const std::string &s,
@@ -349,6 +339,10 @@ void getHWModulePortInfo(Operation *op, SmallVector<hw::PortInfo> &hwInputPorts,
   }
 }
 
+// ---------------------------------------------------------------------------
+// Unrealized-cast helpers
+// ---------------------------------------------------------------------------
+
 // Function to create a cast operation between a bundled type to an unbundled
 // type
 UnrealizedConversionCastOp
@@ -403,12 +397,87 @@ createCastResultsUnbundledOp(TypeRange originalOpResultType,
   return castsOps;
 }
 
-// Function to convert a handshake function operation into an hw module
-// operation
-// It is divided into three parts: first, create the hw module definition if
-// it does not already exist, then move the function body of the handshake
-// function into the hw module, and finally create the output operation for
-// the hw module
+// ---------------------------------------------------------------------------
+// TypeConverter
+// ---------------------------------------------------------------------------
+
+// Type converter to unbundle Handshake types
+class ChannelUnbundlingTypeConverter : public TypeConverter {
+public:
+  ChannelUnbundlingTypeConverter() {
+    addConversion([](Type type,
+                     SmallVectorImpl<Type> &results) -> LogicalResult {
+      // Unbundle the type into its components
+      SmallVector<Type> unbundledTypes;
+      SmallVector<std::pair<SignalKind, Type>> unbundled = unbundleType(type);
+      for (auto &pair : unbundled) {
+        unbundledTypes.push_back(pair.second);
+      }
+      results.append(unbundledTypes.begin(), unbundledTypes.end());
+      return success();
+    });
+
+    addTargetMaterialization([&](OpBuilder &builder, Type resultType,
+                                 ValueRange inputs,
+                                 Location loc) -> std::optional<Value> {
+      if (inputs.size() != 1)
+        return std::nullopt;
+      return inputs[0];
+    });
+
+    addSourceMaterialization([&](OpBuilder &builder, Type resultType,
+                                 ValueRange inputs,
+                                 Location loc) -> std::optional<Value> {
+      if (inputs.size() != 1)
+        return std::nullopt;
+      return inputs[0];
+    });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Synth subcircuit instantiation
+// ---------------------------------------------------------------------------
+
+/// Fills the body of \p hwModule with a single synth::SubcktOp that consumes
+/// all module arguments and produces all module outputs, acting as a
+/// placeholder until Step 3 replaces it with the real netlist.
+LogicalResult instantiateSynthPlaceholder(hw::HWModuleOp hwModule,
+                                          ConversionPatternRewriter &rewriter) {
+  // Set insertion point to the start of the hw module body
+  rewriter.setInsertionPointToStart(hwModule.getBodyBlock());
+  // Collect inputs values of the hw module
+  SmallVector<Value> synthInputs;
+  for (auto arg : hwModule.getBodyBlock()->getArguments()) {
+    synthInputs.push_back(arg);
+  }
+  // Collect the types of the hardware modules outputs
+  SmallVector<Type> synthOutputTypes;
+  for (auto &outputPort : hwModule.getPortList()) {
+    if (outputPort.isOutput())
+      synthOutputTypes.push_back(outputPort.type);
+  }
+  TypeRange synthOutputsTypeRange(synthOutputTypes);
+  // Connect the outputs of the synth operation to the outputs of the hw
+  // module
+  Operation *synthTerminator = hwModule.getBodyBlock()->getTerminator();
+  // Create the synth subcircuit operation inside the hw module
+  synth::SubcktOp synthInstOp = rewriter.create<synth::SubcktOp>(
+      synthTerminator->getLoc(), synthOutputsTypeRange, synthInputs,
+      "synth_subckt");
+  synthTerminator->setOperands(synthInstOp.getResults());
+  return success();
+}
+
+// ---------------------------------------------------------------------------
+// FuncOp to hw::HWModuleOp conversion
+// ---------------------------------------------------------------------------
+
+/// Converts \p funcOp into a top-level hw::HWModuleOp by:
+///   1. Creating the module with unbundled port types.
+///   2. Inlining the function body, inserting cast ops at the boundary to
+///      bridge bundled to flat types.
+///   3. Replacing the handshake::EndOp terminator with hw::OutputOp.
 hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
                                        ConversionPatternRewriter &rewriter) {
   MLIRContext *ctx = funcOp.getContext();
@@ -508,40 +577,18 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
   return hwModule;
 }
 
-// Function to instantiate synth or hw operations inside an hw module
-// describing the behavior of the original handshake operation
-LogicalResult
-instantiateSynthOpInHWModule(hw::HWModuleOp hwModule,
-                             ConversionPatternRewriter &rewriter) {
-  // Set insertion point to the start of the hw module body
-  rewriter.setInsertionPointToStart(hwModule.getBodyBlock());
-  // Collect inputs values of the hw module
-  SmallVector<Value> synthInputs;
-  for (auto arg : hwModule.getBodyBlock()->getArguments()) {
-    synthInputs.push_back(arg);
-  }
-  // Collect the types of the hardware modules outputs
-  SmallVector<Type> synthOutputTypes;
-  for (auto &outputPort : hwModule.getPortList()) {
-    if (outputPort.isOutput())
-      synthOutputTypes.push_back(outputPort.type);
-  }
-  TypeRange synthOutputsTypeRange(synthOutputTypes);
-  // Connect the outputs of the synth operation to the outputs of the hw
-  // module
-  Operation *synthTerminator = hwModule.getBodyBlock()->getTerminator();
-  // Create the synth subcircuit operation inside the hw module
-  synth::SubcktOp synthInstOp = rewriter.create<synth::SubcktOp>(
-      synthTerminator->getLoc(), synthOutputsTypeRange, synthInputs,
-      "synth_subckt");
-  synthTerminator->setOperands(synthInstOp.getResults());
-  return success();
-}
+// ---------------------------------------------------------------------------
+// Generic Handshake op to hw::HWModuleOp + hw::InstanceOp conversion
+// ---------------------------------------------------------------------------
 
-// Function to convert an handshake operation into an hw module operation
-// It is divided into two parts: first, create the hw module definition if it
-// does not already exist, then instantiate the hw instance of the module and
-// replace the original operation with it
+/// Converts a single Handshake \p op into:
+///   1. A new hw::HWModuleOp definition (created once per unique op name)
+///      containing a synth::SubcktOp placeholder body.
+///   2. An hw::InstanceOp that instantiates that module in place of \p op,
+///      connected via unrealized-conversion casts.
+///
+/// The BLIF path attribute from \p op is stored in opToBlifPathMap for
+/// later use in Step 3.
 hw::HWModuleOp convertOpToHWModule(Operation *op,
                                    ConversionPatternRewriter &rewriter) {
   MLIRContext *ctx = op->getContext();
@@ -566,7 +613,7 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
         rewriter.create<hw::HWModuleOp>(op->getLoc(), moduleName, portInfo);
     // Instantiate the corresponding synth operation inside the hw module
     // definition
-    if (failed(instantiateSynthOpInHWModule(hwModule, rewriter)))
+    if (failed(instantiateSynthPlaceholder(hwModule, rewriter)))
       return nullptr;
     // Copy attribute for blif data path from the original operation to the hw
     // module
@@ -629,6 +676,10 @@ hw::HWModuleOp convertOpToHWModule(Operation *op,
   return hwModule;
 }
 
+// ---------------------------------------------------------------------------
+// Conversion patterns
+// ---------------------------------------------------------------------------
+
 // Conversion pattern to convert a generic handshake operation into an hw
 // module operation
 // This is used only for operation inside the handshake function, since the
@@ -681,7 +732,17 @@ ConvertFuncToHWMod::matchAndRewrite(handshake::FuncOp op, OpAdaptor adaptor,
   return success();
 }
 
-// Function to remove unrealized conversion casts after conversion
+// ---------------------------------------------------------------------------
+// Unrealized-cast elimination
+// ---------------------------------------------------------------------------
+
+/// Removes the pairs of UnrealizedConversionCastOps introduced during
+/// unbundling.  The expected pattern is:
+///
+///   value -> cast1 (bundled -> flat) -> cast2 (flat -> bundled) -> user
+///
+/// cast1 and cast2 cancel out: each use of cast2's result is replaced with
+/// the corresponding operand of cast1, then both casts are erased.
 LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
   SmallVector<UnrealizedConversionCastOp> castsToErase;
   // Walk through all unrealized conversion casts in the module
@@ -767,16 +828,15 @@ LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
   return success();
 }
 
-// Function to unbundle all handshake type in a handshake function operation
-LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
+// ---------------------------------------------------------------------------
+// Top-level Step 1 driver
+// ---------------------------------------------------------------------------
 
-  // This function executes the unbundling conversion in three steps:
-  // 1) Convert all handshake operations (except for function and end ops)
-  //    into hw module operations connecting them with unrealized conversion
-  //    casts
-  // 2) Convert the handshake function operation into an hw module operation
-  // 3) Remove all unrealized conversion casts by connecting directly the
-  //    inputs and outputs of the hw module instances
+/// Runs the three-phase unbundling:
+///   1a. Convert all Handshake ops (except FuncOp/EndOp) into hw modules.
+///   1b. Convert FuncOp (and its EndOp) into an hw module.
+///   1c. Eliminate all unrealized-conversion casts.
+LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 
   // Step 1: Apply conversion patterns to convert each handshake operation
   // into an hw module operation
@@ -859,12 +919,9 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
   return success();
 }
 
-// ------------------------------------------------------------------
-// Inversion of ready signals in hw modules and hw instances to follow the
-// standard handshake protocol where ready signals go in the opposite direction
-// with respect to data and valid signals. Adding the clock and reset signals to
-// the hw modules.
-// ------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
+// Step 2 — SignalRewriter implementation
+//===----------------------------------------------------------------------===//
 
 // Function to get a new module name for the rewritten hw module
 mlir::StringAttr
@@ -1307,7 +1364,7 @@ void SignalRewriter::rewriteHWModule(
       }
     }
     ConversionPatternRewriter rewriter(ctx);
-    if (failed(instantiateSynthOpInHWModule(newMod, rewriter))) {
+    if (failed(instantiateSynthPlaceholder(newMod, rewriter))) {
       assert(false && "synth instantiation in hw module failed");
     }
     return;
@@ -1382,26 +1439,26 @@ LogicalResult SignalRewriter::rewriteAllSignals(mlir::ModuleOp modOp) {
   return success();
 }
 
-// ------------------------------------------------------------------
-// Instantiation of the synth operations in the hw modules and conversion of hw
-// instances to synth operations
-// ------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
+// Step 3 — Populate hw modules with BLIF-imported netlists
+//===----------------------------------------------------------------------===//
 
-// Function to instantiate the synth operations in the hw module
+/// Replaces the synth::SubcktOp placeholder body of the hw module referenced
+/// by \p instOp with the gate-level netlist imported from its BLIF file.
+/// If the module has already been populated (its name is in
+/// \p alreadyPopulatedHWMod) the function returns immediately.
 LogicalResult
 populateHWModuleWithSynthOps(ModuleOp modOp, hw::InstanceOp op,
-                             SmallVector<std::string> &modifiedHWModules) {
+                             SmallVector<std::string> &alreadyPopulatedHWMod) {
 
-  // This function populates the hw module corresponding to the given hw
-  // instance with synth operations by importing the blif circuit described in
-  // the path specified by the blifPathAttrStr attribute on the hw module.
-  // It first imports the blif circuit as a new hw module, then it replaces
-  // the body of the original hw module with the body of the new hw module.
+  // First, this function imports the blif circuit as a new hw module. Then, it
+  // replaces the body of the original hw module with the body of the new hw
+  // module.
 
   // Check if the hw module of the instance has already been modified to not
   // modify it multiple times
-  if (std::find(modifiedHWModules.begin(), modifiedHWModules.end(),
-                op.getModuleName().str()) != modifiedHWModules.end()) {
+  if (std::find(alreadyPopulatedHWMod.begin(), alreadyPopulatedHWMod.end(),
+                op.getModuleName().str()) != alreadyPopulatedHWMod.end()) {
     return success();
   }
 
@@ -1460,7 +1517,7 @@ populateHWModuleWithSynthOps(ModuleOp modOp, hw::InstanceOp op,
   symTable.erase(hwModule);
   symTable.insert(newHWModule);
   // Add the name of the modified module to the list to avoid modifying it
-  modifiedHWModules.push_back(originalModuleName);
+  alreadyPopulatedHWMod.push_back(originalModuleName);
 
   return success();
 }
@@ -1489,12 +1546,12 @@ LogicalResult populateHWModules(mlir::ModuleOp modOp, StringRef topModuleName,
   OpBuilder builder(ctx);
   // Collect the list of modified hw modules to avoid modifying the same
   // module multiple times
-  SmallVector<std::string> modifiedHWModules;
+  SmallVector<std::string> alreadyPopulatedHWMod;
   // Iterate through each hw instance and populate the corresponding hw module
   // with synth operations
   for (hw::InstanceOp hwInst : hwInstances) {
-    if (failed(
-            populateHWModuleWithSynthOps(modOp, hwInst, modifiedHWModules))) {
+    if (failed(populateHWModuleWithSynthOps(modOp, hwInst,
+                                            alreadyPopulatedHWMod))) {
       llvm::errs() << "Failed to convert hw instance to synth ops: " << hwInst
                    << "\n";
       return failure();
