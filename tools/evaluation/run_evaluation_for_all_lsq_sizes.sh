@@ -21,6 +21,6 @@ for LSQ_SIZE in "${LSQ_SIZES[@]}"; do
     # Allow errors when running evaluation script:
     # Required due to failures if LSQ is too small to hold a full group.
     python3 "$SCRIPT_DIR/run_evaluation.py" \
-        -j 24 --synth-lsqs \
+        -j 16 --synth-lsqs \
         --json "$RESULTS_DIR/lsq_${LSQ_SIZE}_${LSQ_SIZE}.json"
 done
