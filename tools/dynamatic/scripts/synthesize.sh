@@ -74,7 +74,7 @@ if {[regexp -nocase {2015\.1.*} $vivado_ver match]} {
 
 # Generate synthesis script
 echo -e \
-"set_param general.maxThreads 8
+"set_param general.maxThreads 2
 $VIVADO_CMDS
 $READ_VHDL
 $READ_VERILOG
