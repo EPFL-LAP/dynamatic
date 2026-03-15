@@ -601,6 +601,22 @@ struct ConvertFuncToHWMod : public OpConversionPattern<handshake::FuncOp> {
 // phases and delegates everything else to the layers above.
 //===----------------------------------------------------------------------===//
 
+// Register one pattern that fires for any op implementing BLIFImplInterface.
+// This covers every Handshake op except FuncOp and EndOp, which are excluded
+// by the ConversionTarget (addLegalOp above) rather than here. This is useful
+// to reduce the insertion of patterns for every handshake op.
+struct ConvertAnyHandshakeOp
+    : public OpInterfaceConversionPattern<BLIFImplInterface> {
+  using OpInterfaceConversionPattern::OpInterfaceConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(BLIFImplInterface op, ArrayRef<Value>,
+                  ConversionPatternRewriter &rewriter) const override {
+    return convertOpToHWModule(op.getOperation(), rewriter) ? success()
+                                                            : failure();
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Phase 1c helper: unrealized-cast elimination
 //
@@ -721,47 +737,7 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
   // FuncOp and EndOp are handled in Phase 1b, so we mark them as legal here
   target.addLegalOp<handshake::FuncOp>();
   target.addLegalOp<handshake::EndOp>();
-  patterns.insert<
-      ConvertToHWMod<handshake::BufferOp>, ConvertToHWMod<handshake::NDWireOp>,
-      ConvertToHWMod<handshake::ConditionalBranchOp>,
-      ConvertToHWMod<handshake::BranchOp>, ConvertToHWMod<handshake::MergeOp>,
-      ConvertToHWMod<handshake::ControlMergeOp>,
-      ConvertToHWMod<handshake::MuxOp>, ConvertToHWMod<handshake::JoinOp>,
-      ConvertToHWMod<handshake::BlockerOp>, ConvertToHWMod<handshake::SourceOp>,
-      ConvertToHWMod<handshake::ConstantOp>, ConvertToHWMod<handshake::SinkOp>,
-      ConvertToHWMod<handshake::ForkOp>, ConvertToHWMod<handshake::LazyForkOp>,
-      ConvertToHWMod<handshake::LoadOp>, ConvertToHWMod<handshake::StoreOp>,
-      ConvertToHWMod<handshake::ReadyRemoverOp>,
-      ConvertToHWMod<handshake::ValidMergerOp>,
-      ConvertToHWMod<handshake::SharingWrapperOp>,
-      ConvertToHWMod<handshake::MemoryControllerOp>,
-
-      // Arith operations
-      ConvertToHWMod<handshake::AddFOp>, ConvertToHWMod<handshake::AddIOp>,
-      ConvertToHWMod<handshake::AndIOp>, ConvertToHWMod<handshake::CmpFOp>,
-      ConvertToHWMod<handshake::CmpIOp>, ConvertToHWMod<handshake::DivFOp>,
-      ConvertToHWMod<handshake::DivSIOp>, ConvertToHWMod<handshake::DivUIOp>,
-      ConvertToHWMod<handshake::RemSIOp>, ConvertToHWMod<handshake::ExtSIOp>,
-      ConvertToHWMod<handshake::ExtUIOp>, ConvertToHWMod<handshake::MulFOp>,
-      ConvertToHWMod<handshake::MulIOp>, ConvertToHWMod<handshake::NegFOp>,
-      ConvertToHWMod<handshake::OrIOp>, ConvertToHWMod<handshake::SelectOp>,
-      ConvertToHWMod<handshake::ShLIOp>, ConvertToHWMod<handshake::ShRSIOp>,
-      ConvertToHWMod<handshake::ShRUIOp>, ConvertToHWMod<handshake::SubFOp>,
-      ConvertToHWMod<handshake::SubIOp>, ConvertToHWMod<handshake::TruncIOp>,
-      ConvertToHWMod<handshake::TruncFOp>, ConvertToHWMod<handshake::XOrIOp>,
-      ConvertToHWMod<handshake::SIToFPOp>, ConvertToHWMod<handshake::UIToFPOp>,
-      ConvertToHWMod<handshake::FPToSIOp>, ConvertToHWMod<handshake::ExtFOp>,
-      ConvertToHWMod<handshake::AbsFOp>, ConvertToHWMod<handshake::MaxSIOp>,
-      ConvertToHWMod<handshake::MaxUIOp>, ConvertToHWMod<handshake::MinSIOp>,
-      ConvertToHWMod<handshake::MinUIOp>,
-
-      // Speculative operations
-      ConvertToHWMod<handshake::SpecCommitOp>,
-      ConvertToHWMod<handshake::SpecSaveOp>,
-      ConvertToHWMod<handshake::SpecSaveCommitOp>,
-      ConvertToHWMod<handshake::SpeculatorOp>,
-      ConvertToHWMod<handshake::SpeculatingBranchOp>,
-      ConvertToHWMod<handshake::NonSpecOp>>(typeConverter, ctx);
+  patterns.insert<ConvertAnyHandshakeOp>(typeConverter, ctx);
   if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
     return failure();
 
