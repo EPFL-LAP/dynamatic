@@ -312,4 +312,43 @@ private:
   llvm::StringRef topFunction;
 };
 
+//===----------------------------------------------------------------------===//
+// Step 3: BlifPopulator
+//
+// Replaces the synth::SubcktOp placeholder body of each hw::HWModuleOp with
+// the gate-level netlist imported from its BLIF file.
+//
+// Owns the SymbolTable (built once at construction) and the deduplication
+// set (so populate() can be called once per hw::InstanceOp without worrying
+// about processing the same module definition twice).
+//===----------------------------------------------------------------------===//
+
+class BlifPopulator {
+public:
+  /// Constructs a populator for \p modOp, building the SymbolTable once.
+  explicit BlifPopulator(mlir::ModuleOp modOp);
+
+  /// Replaces the body of the hw::HWModuleOp referenced by \p inst with the
+  /// BLIF netlist stored in opToBlifPathMap.
+  ///
+  /// Returns success() immediately if:
+  ///   - the module has already been populated, or
+  ///   - the recorded BLIF path is empty (module needs no replacement).
+  /// Returns failure() if the module cannot be found or the import fails.
+  mlir::LogicalResult populate(hw::InstanceOp inst);
+
+private:
+  mlir::ModuleOp modOp;
+  mlir::SymbolTable symTable;
+
+  /// Names of hw modules that have already been populated, used to skip
+  /// duplicate processing when multiple instances reference the same module.
+  llvm::DenseSet<mlir::StringAttr> done;
+};
+
+/// Walks every hw::InstanceOp inside the top-level hw module named
+/// \p topModuleName and calls BlifPopulator::populate() for each one.
+mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
+                                         llvm::StringRef topModuleName);
+
 } // namespace dynamatic
