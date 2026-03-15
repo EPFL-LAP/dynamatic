@@ -398,42 +398,218 @@ createCastResultsUnbundledOp(TypeRange originalOpResultType,
 }
 
 // ---------------------------------------------------------------------------
+// Private string helpers
+// ---------------------------------------------------------------------------
+
+/// Inserts \p suffix immediately before the first '[' in \p name, or appends
+/// it at the end if no '[' is found.
+/// Example: insertSuffix("data[3]", "_valid") → "data_valid[3]"
+std::string insertSuffix(const std::string &name, const std::string &suffix) {
+  std::size_t pos = name.find('[');
+  if (pos != std::string::npos) {
+    std::string result = name;
+    result.insert(pos, suffix);
+    return result;
+  }
+  return name + suffix;
+}
+
+/// Converts a (root, index) pair into the canonical "root[index]" form.
+/// If \p root already contains "[N]", the old index is linearised with
+/// \p arrayWidth before adding \p index.
+/// Example: formatArrayName("data[2]", 3, 4) becomes "data[11]"  (2*4 + 3)
+std::string formatArrayName(const std::string &root, unsigned index,
+                            unsigned arrayWidth = 0) {
+  static const std::regex arrayPattern(R"((\w+)\[(\d+)\])");
+  std::smatch m;
+  if (std::regex_match(root, m, arrayPattern)) {
+    assert(arrayWidth != 0 && "arrayWidth required for already-indexed names");
+    unsigned linearised = std::stoi(m[2].str()) * arrayWidth + index;
+    return m[1].str() + "[" + std::to_string(linearised) + "]";
+  }
+  return root + "[" + std::to_string(index) + "]";
+}
+
+// ---------------------------------------------------------------------------
+// Private: derive per-operand/result base names from a Handshake op
+// ---------------------------------------------------------------------------
+
+/// Returns the base port names for every operand and result of \p op,
+/// in the "root[idx]" format expected by BLIF.
+///
+/// The Handshake NamedIOInterface produces names like "in_0", "in_1".
+/// This function converts them:
+///   - "in_0" alone stays as "in"    (no sibling with idx > 0 yet)
+///   - once "in_1" appears, "in" is back-patched to "in[0]",
+///     and "in_1" becomes "in[1]"
+///
+/// handshake::FuncOp has no NamedIOInterface so it gets generic names.
+std::pair<SmallVector<std::string>, SmallVector<std::string>>
+buildPortNames(Operation *op) {
+  SmallVector<std::string> inputNames, outputNames;
+
+  // FuncOp: generic fallback names.
+  if (auto funcOp = dyn_cast<handshake::FuncOp>(op)) {
+    for (auto [idx, _] : llvm::enumerate(funcOp.getArguments()))
+      inputNames.push_back("in" + std::to_string(idx));
+    for (auto [idx, _] : llvm::enumerate(funcOp.getResultTypes()))
+      outputNames.push_back("out" + std::to_string(idx));
+    return {inputNames, outputNames};
+  }
+
+  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
+  if (!namedIO) {
+    llvm::errs() << op->getName() << " does not implement NamedIOInterface\n";
+    assert(false && "cannot build port names without NamedIOInterface");
+  }
+
+  // Pattern "root_N": convert to "root[N]" with back-patching at N == 1.
+  static const std::regex indexPattern(R"((\w+)_(\d+))");
+
+  auto elaborateName = [&](StringRef raw, SmallVector<std::string> &names) {
+    std::string rawStr = raw.str();
+    std::smatch m;
+    if (!std::regex_match(rawStr, m, indexPattern)) {
+      // No index suffix: keep the name as-is.
+      names.push_back(rawStr);
+      return;
+    }
+    std::string root = m[1].str();
+    unsigned idx = std::stoi(m[2].str());
+
+    if (idx == 0) {
+      // First element: use the bare root for now; may be back-patched later.
+      names.push_back(root);
+    } else {
+      if (idx == 1) {
+        // Back-patch the first element from "root" to "root[0]".
+        auto it = llvm::find(names, root);
+        assert(it != names.end() &&
+               "could not find index-0 port to back-patch");
+        *it = formatArrayName(root, 0);
+      }
+      names.push_back(formatArrayName(root, idx));
+    }
+  };
+
+  for (auto [idx, _] : llvm::enumerate(op->getOperands()))
+    elaborateName(namedIO.getOperandName(idx), inputNames);
+  for (auto [idx, _] : llvm::enumerate(op->getResults()))
+    elaborateName(namedIO.getResultName(idx), outputNames);
+
+  return {inputNames, outputNames};
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
+/// Builds and returns the hw::ModulePortInfo for the flat HW module that
+/// will represent \p op.
+///
+/// For each operand/result group the function:
+///   1. Looks up the base name via buildPortNames().
+///   2. Looks up the unbundled (SignalKind, Type) pairs via unbundleOpPorts().
+///   3. Zips them: DATA keeps the base name; VALID appends "_valid"; READY
+///      appends "_ready" (both inserted before any "[" to preserve indexing).
+hw::ModulePortInfo buildPortInfo(Operation *op) {
+  MLIRContext *ctx = op->getContext();
+  auto [inputNames, outputNames] = buildPortNames(op);
+
+  SmallVector<SmallVector<std::pair<SignalKind, Type>>> unbundledIn,
+      unbundledOut;
+  unbundleOpPorts(op, unbundledIn, unbundledOut);
+
+  auto applyKind = [](const std::string &base, SignalKind kind) -> std::string {
+    switch (kind) {
+    case DATA_SIGNAL:
+      return base;
+    case VALID_SIGNAL:
+      return insertSuffix(base, "_valid");
+    case READY_SIGNAL:
+      return insertSuffix(base, "_ready");
+    }
+    llvm_unreachable("unknown SignalKind");
+  };
+
+  SmallVector<hw::PortInfo> hwInputs, hwOutputs;
+  for (auto [idx, portGroup] : llvm::enumerate(unbundledIn)) {
+    for (auto [kind, type] : portGroup) {
+      hwInputs.push_back(
+          {hw::ModulePort{
+               StringAttr::get(ctx, applyKind(inputNames[idx], kind)), type,
+               hw::ModulePort::Direction::Input},
+           idx});
+    }
+  }
+  for (auto [idx, portGroup] : llvm::enumerate(unbundledOut)) {
+    for (auto [kind, type] : portGroup) {
+      hwOutputs.push_back(
+          {hw::ModulePort{
+               StringAttr::get(ctx, applyKind(outputNames[idx], kind)), type,
+               hw::ModulePort::Direction::Output},
+           idx});
+    }
+  }
+  return hw::ModulePortInfo(hwInputs, hwOutputs);
+}
+
+// ---------------------------------------------------------------------------
 // TypeConverter
 // ---------------------------------------------------------------------------
 
-// Type converter to unbundle Handshake types
+/// Teaches the DialectConversion framework how to convert bundled Handshake
+/// types to their flat HW equivalents.  Materialization is pass-through
+/// because the cast ops inserted by the conversion patterns handle the actual
+/// value bridging.
 class ChannelUnbundlingTypeConverter : public TypeConverter {
 public:
   ChannelUnbundlingTypeConverter() {
-    addConversion([](Type type,
-                     SmallVectorImpl<Type> &results) -> LogicalResult {
-      // Unbundle the type into its components
-      SmallVector<Type> unbundledTypes;
-      SmallVector<std::pair<SignalKind, Type>> unbundled = unbundleType(type);
-      for (auto &pair : unbundled) {
-        unbundledTypes.push_back(pair.second);
-      }
-      results.append(unbundledTypes.begin(), unbundledTypes.end());
+    addConversion([](Type type, SmallVectorImpl<Type> &results) {
+      results.append(unbundleTypeFlat(type));
       return success();
     });
-
-    addTargetMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
-      if (inputs.size() != 1)
-        return std::nullopt;
-      return inputs[0];
-    });
-
-    addSourceMaterialization([&](OpBuilder &builder, Type resultType,
-                                 ValueRange inputs,
-                                 Location loc) -> std::optional<Value> {
-      if (inputs.size() != 1)
-        return std::nullopt;
-      return inputs[0];
-    });
+    auto passThrough = [](OpBuilder &, Type, ValueRange inputs,
+                          Location) -> std::optional<Value> {
+      return inputs.size() == 1 ? std::optional<Value>(inputs[0])
+                                : std::nullopt;
+    };
+    addTargetMaterialization(passThrough);
+    addSourceMaterialization(passThrough);
   }
 };
+
+// ---------------------------------------------------------------------------
+// Cast helpers
+// ---------------------------------------------------------------------------
+
+/// Splits \p bundledValue into its flat components by inserting an
+/// UnrealizedConversionCastOp.  Produces one result per flat type.
+UnrealizedConversionCastOp splitBundledValue(Value bundledValue, Location loc,
+                                             PatternRewriter &rewriter) {
+  return rewriter.create<UnrealizedConversionCastOp>(
+      loc, TypeRange(unbundleTypeFlat(bundledValue.getType())), bundledValue);
+}
+
+/// For each type in \p originalTypes, groups the corresponding slice of
+/// \p flatValues and re-bundles it with an UnrealizedConversionCastOp.
+/// Returns one cast per original type.
+SmallVector<UnrealizedConversionCastOp>
+rebundleFlatValues(TypeRange originalTypes, ArrayRef<Value> flatValues,
+                   Location loc, PatternRewriter &rewriter) {
+  assert(flatValues.size() >= originalTypes.size());
+  SmallVector<UnrealizedConversionCastOp> casts;
+  unsigned offset = 0;
+  for (Type origType : originalTypes) {
+    unsigned numFlat = unbundleTypeFlat(origType).size();
+    SmallVector<Value> slice(flatValues.begin() + offset,
+                             flatValues.begin() + offset + numFlat);
+    casts.push_back(rewriter.create<UnrealizedConversionCastOp>(
+        loc, TypeRange{origType}, slice));
+    offset += numFlat;
+  }
+  return casts;
+}
 
 // ---------------------------------------------------------------------------
 // Synth subcircuit instantiation
@@ -444,28 +620,17 @@ public:
 /// placeholder until Step 3 replaces it with the real netlist.
 LogicalResult instantiateSynthPlaceholder(hw::HWModuleOp hwModule,
                                           ConversionPatternRewriter &rewriter) {
-  // Set insertion point to the start of the hw module body
   rewriter.setInsertionPointToStart(hwModule.getBodyBlock());
-  // Collect inputs values of the hw module
-  SmallVector<Value> synthInputs;
-  for (auto arg : hwModule.getBodyBlock()->getArguments()) {
-    synthInputs.push_back(arg);
-  }
-  // Collect the types of the hardware modules outputs
-  SmallVector<Type> synthOutputTypes;
-  for (auto &outputPort : hwModule.getPortList()) {
-    if (outputPort.isOutput())
-      synthOutputTypes.push_back(outputPort.type);
-  }
-  TypeRange synthOutputsTypeRange(synthOutputTypes);
-  // Connect the outputs of the synth operation to the outputs of the hw
-  // module
-  Operation *synthTerminator = hwModule.getBodyBlock()->getTerminator();
-  // Create the synth subcircuit operation inside the hw module
-  synth::SubcktOp synthInstOp = rewriter.create<synth::SubcktOp>(
-      synthTerminator->getLoc(), synthOutputsTypeRange, synthInputs,
-      "synth_subckt");
-  synthTerminator->setOperands(synthInstOp.getResults());
+  SmallVector<Value> inputs(hwModule.getBodyBlock()->getArguments());
+  SmallVector<Type> outputTypes;
+  for (auto &port : hwModule.getPortList())
+    if (port.isOutput())
+      outputTypes.push_back(port.type);
+
+  Operation *terminator = hwModule.getBodyBlock()->getTerminator();
+  auto subckt = rewriter.create<synth::SubcktOp>(
+      terminator->getLoc(), TypeRange(outputTypes), inputs, "synth_subckt");
+  terminator->setOperands(subckt.getResults());
   return success();
 }
 
@@ -473,107 +638,72 @@ LogicalResult instantiateSynthPlaceholder(hw::HWModuleOp hwModule,
 // FuncOp to hw::HWModuleOp conversion
 // ---------------------------------------------------------------------------
 
-/// Converts \p funcOp into a top-level hw::HWModuleOp by:
-///   1. Creating the module with unbundled port types.
-///   2. Inlining the function body, inserting cast ops at the boundary to
-///      bridge bundled to flat types.
-///   3. Replacing the handshake::EndOp terminator with hw::OutputOp.
+/// Converts the top-level \p funcOp into an hw::HWModuleOp by:
+///   1. Creating the module with ports built by buildPortInfo().
+///   2. Re-bundling the flat block arguments and inlining the function body.
+///   3. Splitting the bundled operands of handshake::EndOp and replacing it
+///      with hw::OutputOp.
 hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
                                        ConversionPatternRewriter &rewriter) {
   MLIRContext *ctx = funcOp.getContext();
-  // Obtain the hw module port info by unbundling the function ports
-  SmallVector<hw::PortInfo> hwInputPorts;
-  SmallVector<hw::PortInfo> hwOutputPorts;
-  getHWModulePortInfo(funcOp, hwInputPorts, hwOutputPorts);
-  hw::ModulePortInfo portInfo(hwInputPorts, hwOutputPorts);
-  // Create the hw module operation if it does not already exist
   auto modOp = funcOp->getParentOfType<mlir::ModuleOp>();
   SymbolTable symbolTable(modOp);
   StringRef uniqueOpName = getUniqueName(funcOp);
   StringAttr moduleName = StringAttr::get(ctx, uniqueOpName);
-  hw::HWModuleOp hwModule = symbolTable.lookup<hw::HWModuleOp>(moduleName);
 
-  // If it does not exist, create it
-  if (!hwModule) {
-    // IMPORTANT: modules must be created at module scope
-    rewriter.setInsertionPointToStart(modOp.getBody());
+  // Re-use an existing module if the pattern fires more than once.
+  if (auto existing = symbolTable.lookup<hw::HWModuleOp>(moduleName))
+    return existing;
 
-    hwModule =
-        rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), moduleName, portInfo);
+  // --- 1. Create the hw module ---
+  rewriter.setInsertionPointToStart(modOp.getBody());
+  auto hwModule = rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), moduleName,
+                                                  buildPortInfo(funcOp));
 
-    // Inline the function body of the handshake function into the hw module
-    // body
-    Block *funcBlock = funcOp.getBodyBlock();
-    Block *modBlock = hwModule.getBodyBlock();
-    Operation *termOp = modBlock->getTerminator();
-    ValueRange modBlockArgs = modBlock->getArguments();
-    // Set insertion point inside the module body
-    rewriter.setInsertionPointToStart(modBlock);
-    // There must be a match between the arguments of the hw module and the
-    // handshake function to be able to inline the function body of the
-    // handshake function in the hw module. However, the arguments of the
-    // handshake function are bundled and the ones of the hw module are
-    // unbundled. For this reason, create a cast for each argument of the hw
-    // module. The output of the casts will be used to inline the function
-    // body First create casts for each argument of the hw module
-    SmallVector<Value> castedArgs;
-    TypeRange funcArgTypes = funcOp.getArgumentTypes();
-    SmallVector<UnrealizedConversionCastOp> castsArgs =
-        createCastResultsUnbundledOp(funcArgTypes, modBlockArgs,
-                                     funcOp.getLoc(), rewriter);
-    // Collect the results of the casts
-    for (auto castOp : castsArgs) {
-      // Assert that each cast has only one result
-      assert(castOp.getNumResults() == 1 &&
-             "each cast operation must have only one result");
-      castedArgs.push_back(castOp.getResult(0));
-    }
-    // Inline the function body before the terminator of the hw module using
-    // the casted arguments
-    rewriter.inlineBlockBefore(funcBlock, termOp, castedArgs);
+  // --- 2. Re-bundle flat block args to bundled args expected by the body ---
+  Block *modBlock = hwModule.getBodyBlock();
+  Operation *terminator = modBlock->getTerminator();
+  rewriter.setInsertionPointToStart(modBlock);
 
-    // Finally, create the output operation for the hw module
-    // Find the handshake.end operation in the inlined body which is the
-    // terminator for handshake functions
-    handshake::EndOp endOp;
-    for (Operation &op : *hwModule.getBodyBlock()) {
-      if (auto e = dyn_cast<handshake::EndOp>(op)) {
-        endOp = e;
-        break;
-      }
-    }
-
-    assert(endOp && "Expected handshake.end after inlining");
-
-    // Create a cast for each operand of the end operation to unbundle the
-    // types which were previously handshake bundled types
-    SmallVector<Value> hwOutputs;
-    for (Value operand : endOp.getOperands()) {
-      // Unbundle the operand type depending by creating a cast from the
-      // original type to the unbundled types
-      auto cast =
-          createCastBundledToUnbundled(operand, endOp->getLoc(), rewriter);
-      hwOutputs.append(cast.getResults().begin(), cast.getResults().end());
-    }
-    // Create the output operation for the hw module
-    rewriter.setInsertionPointToEnd(endOp->getBlock());
-    rewriter.replaceOpWithNewOp<hw::OutputOp>(endOp, hwOutputs);
-    // Remove any old output operation if present (should not be the case
-    // after replacing the end op)
-    Operation *oldOutput = nullptr;
-    for (Operation &op : *hwModule.getBodyBlock()) {
-      if (auto out = dyn_cast<hw::OutputOp>(op)) {
-        if (out.getOperands().empty()) {
-          oldOutput = out;
-          break;
-        }
-      }
-    }
-    if (oldOutput)
-      rewriter.eraseOp(oldOutput);
-    // Remove the original handshake function operation
-    rewriter.eraseOp(funcOp);
+  SmallVector<Value> bundledArgs;
+  for (auto &cast :
+       rebundleFlatValues(funcOp.getArgumentTypes(),
+                          SmallVector<Value>(modBlock->getArguments()),
+                          funcOp.getLoc(), rewriter)) {
+    assert(cast.getNumResults() == 1);
+    bundledArgs.push_back(cast.getResult(0));
   }
+
+  // Inline the function body before the hw terminator.
+  rewriter.inlineBlockBefore(funcOp.getBodyBlock(), terminator, bundledArgs);
+
+  // --- 3. Replace handshake::EndOp with hw::OutputOp ---
+  handshake::EndOp endOp;
+  for (Operation &op : *hwModule.getBodyBlock()) {
+    if ((endOp = dyn_cast<handshake::EndOp>(op))) {
+      break;
+    }
+  }
+  assert(endOp && "Expected handshake.end after inlining");
+
+  SmallVector<Value> flatOutputs;
+  for (Value operand : endOp.getOperands()) {
+    auto split = splitBundledValue(operand, endOp->getLoc(), rewriter);
+    flatOutputs.append(split.getResults().begin(), split.getResults().end());
+  }
+  rewriter.setInsertionPointToEnd(endOp->getBlock());
+  rewriter.replaceOpWithNewOp<hw::OutputOp>(endOp, flatOutputs);
+  // Erase the empty hw::OutputOp placeholder that hw::HWModuleOp auto-inserts.
+  for (Operation &op : *hwModule.getBodyBlock()) {
+    if (auto out = dyn_cast<hw::OutputOp>(op);
+        out && out.getOperands().empty()) {
+      rewriter.eraseOp(out);
+      break;
+    }
+  }
+  // Remove the original handshake function operation
+  rewriter.eraseOp(funcOp);
+
   return hwModule;
 }
 
@@ -581,97 +711,76 @@ hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
 // Generic Handshake op to hw::HWModuleOp + hw::InstanceOp conversion
 // ---------------------------------------------------------------------------
 
-/// Converts a single Handshake \p op into:
-///   1. A new hw::HWModuleOp definition (created once per unique op name)
-///      containing a synth::SubcktOp placeholder body.
-///   2. An hw::InstanceOp that instantiates that module in place of \p op,
-///      connected via unrealized-conversion casts.
-///
-/// The BLIF path attribute from \p op is stored in opToBlifPathMap for
-/// later use in Step 3.
+/// Converts a single inner Handshake \p op into:
+///   1. An hw::HWModuleOp definition (created once per unique op name).
+///      Its body contains a synth::SubcktOp placeholder.
+///      The op's BLIF path is recorded in opToBlifPathMap for Step 3.
+///   2. An hw::InstanceOp that instantiates the module in place of \p op.
+///      Bundled operands are split with splitBundledValue(); flat instance
+///      results are re-bundled with rebundleFlatValues() so downstream ops
+///      still see the expected bundled types.
+
 hw::HWModuleOp convertOpToHWModule(Operation *op,
                                    ConversionPatternRewriter &rewriter) {
   MLIRContext *ctx = op->getContext();
-  // Obtain the hw module port info by unbundling the operation ports
-  SmallVector<hw::PortInfo> hwInputPorts;
-  SmallVector<hw::PortInfo> hwOutputPorts;
-  getHWModulePortInfo(op, hwInputPorts, hwOutputPorts);
-  hw::ModulePortInfo portInfo(hwInputPorts, hwOutputPorts);
-  // Create the hw module operation if it does not already exist
   auto modOp = op->getParentOfType<mlir::ModuleOp>();
   SymbolTable symbolTable(modOp);
   StringRef uniqueOpName = getUniqueName(op);
   StringAttr moduleName = StringAttr::get(ctx, uniqueOpName);
-  hw::HWModuleOp hwModule = symbolTable.lookup<hw::HWModuleOp>(moduleName);
 
-  // If it does not exist, create it
+  // --- 1. Look up or create the hw module definition ---
+  hw::HWModuleOp hwModule = symbolTable.lookup<hw::HWModuleOp>(moduleName);
   if (!hwModule) {
-    // IMPORTANT: modules must be created at module scope
+    // Create it
     rewriter.setInsertionPointToStart(modOp.getBody());
 
-    hwModule =
-        rewriter.create<hw::HWModuleOp>(op->getLoc(), moduleName, portInfo);
-    // Instantiate the corresponding synth operation inside the hw module
-    // definition
+    hwModule = rewriter.create<hw::HWModuleOp>(op->getLoc(), moduleName,
+                                               buildPortInfo(op));
+    // Instantiate synth placeholder in the HW module body
     if (failed(instantiateSynthPlaceholder(hwModule, rewriter)))
       return nullptr;
-    // Copy attribute for blif data path from the original operation to the hw
-    // module
-    BLIFImplInterface blifInterfaceOp = dyn_cast<BLIFImplInterface>(op);
-    if (auto blifAttr = blifInterfaceOp.getBLIFImpl()) {
-      opToBlifPathMap[hwModule.getOperation()] = blifAttr.getValue().str();
+    // Record the BLIF path for Step 3
+    BLIFImplInterface blifIface = dyn_cast<BLIFImplInterface>(op);
+    StringAttr blifAttr = blifIface ? blifIface.getBLIFImpl() : StringAttr{};
+    opToBlifPathMap[hwModule.getOperation()] = blifAttr.getValue().str();
+  }
+
+  // --- 2. Build flat operands for the instance ---
+  rewriter.setInsertionPointAfter(op);
+  SmallVector<Value> flatOperands;
+  for (auto operand : op->getOperands()) {
+    // Check if the operand is bundled (i.e., a block argument or defined by a
+    // Handshake op)
+    bool isBundled = isa<BlockArgument>(operand) ||
+                     (operand.getDefiningOp() &&
+                      operand.getDefiningOp()->getDialect()->getNamespace() ==
+                          handshake::HandshakeDialect::getDialectNamespace());
+    if (isBundled) {
+      // Split the bundled operand
+      auto split = splitBundledValue(operand, op->getLoc(), rewriter);
+      flatOperands.append(split.getResults().begin(), split.getResults().end());
     } else {
-      // Mark it with empty string
-      opToBlifPathMap[hwModule.getOperation()] = "";
+      flatOperands.push_back(operand);
     }
   }
 
-  // Create the hw instance and replace the original operation with it
-  rewriter.setInsertionPointAfter(op);
-  // First, collect the operands for the hw instance
-  SmallVector<Value> operandValues;
-  for (auto operand : op->getOperands()) {
-    auto definingOp = operand.getDefiningOp();
-    // Check if the operation generating the operand is a handshake operation
-    // or a block argument
-    bool isBlockArg = isa<BlockArgument>(operand);
-    if ((definingOp &&
-         definingOp->getDialect()->getNamespace() ==
-             handshake::HandshakeDialect::getDialectNamespace()) ||
-        isBlockArg) {
-      // If so, create an unrealized conversion cast to unbundle the operand
-      // into its components to connect it to the input ports of the hw
-      // instance
-      auto cast = createCastBundledToUnbundled(operand, op->getLoc(), rewriter);
-      // Append all cast results to the operand values
-      operandValues.append(cast.getResults().begin(), cast.getResults().end());
-      continue;
-    }
-    // If the operand is already unbundled, just use it directly
-    operandValues.push_back(operand);
-  }
-  // Then, create the hw instance operation
+  // --- 3. Create the instance and re-bundle its flat results ---
   hw::InstanceOp hwInstOp = rewriter.create<hw::InstanceOp>(
       op->getLoc(), hwModule,
-      StringAttr::get(ctx, uniqueOpName.str() + "_inst"), operandValues);
-  // Create a cast for each group of unbundled results
-  SmallVector<UnrealizedConversionCastOp> castsOpResults =
-      createCastResultsUnbundledOp(op->getResultTypes(), hwInstOp->getResults(),
-                                   op->getLoc(), rewriter);
-  // Collect the results of the casts
-  SmallVector<Value> castsResults;
-  for (auto castOp : castsOpResults) {
-    // Assert that each cast has only one result
-    assert(castOp.getNumResults() == 1 &&
-           "each cast operation must have only one result");
-    castsResults.push_back(castOp.getResult(0));
+      StringAttr::get(ctx, uniqueOpName.str() + "_inst"), flatOperands);
+  SmallVector<Value> bundledResults;
+  for (auto &cast :
+       rebundleFlatValues(op->getResultTypes(),
+                          SmallVector<Value>(hwInstOp->getResults().begin(),
+                                             hwInstOp->getResults().end()),
+                          op->getLoc(), rewriter)) {
+    assert(cast.getNumResults() == 1);
+    bundledResults.push_back(cast.getResult(0));
   }
-  // Assert that the number of cast results matches the number of original
-  // operation results
-  assert(castsResults.size() == op->getNumResults());
+  assert(bundledResults.size() == op->getNumResults());
 
   //  Replace all uses of the original operation with the new hw module
-  rewriter.replaceOp(op, castsResults);
+  rewriter.replaceOp(op, bundledResults);
 
   return hwModule;
 }
