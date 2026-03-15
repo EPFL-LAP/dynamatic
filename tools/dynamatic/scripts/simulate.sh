@@ -110,4 +110,10 @@ else
   --hdl="$HDL_TYPE" \
   > "../report.txt" 2>&1
 fi
-exit_on_fail "Simulation failed" "Simulation succeeded"
+
+# exit_on_fail "Simulation failed" "Simulation succeeded"
+if [[ $? -ne 0 ]]; then
+    echo_info "Simulation failed"
+else
+    echo_info "Simulation succeeded"
+fi

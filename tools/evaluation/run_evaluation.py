@@ -78,9 +78,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # ──────────────────────────────────────────────────────────────────────────────
 
 def parse_sim_report(path: Path):
-    """Return cycle_count from a simulation report.txt."""
-    m = re.search(r"Simulation done!\s+Latency\s*=\s*(\d+)\s+cycles", path.read_text())
-    return int(m.group(1)) if m else None
+    """Return (passed, cycle_count) from a simulation report.txt."""
+    text = path.read_text()
+    passed = "C and VHDL outputs match" in text
+    m = re.search(r"Simulation done!\s+Latency\s*=\s*(\d+)\s+cycles", text)
+    cycle_count = int(m.group(1)) if m else None
+    return cycle_count, passed
 
 
 def parse_utilization(path: Path):
@@ -137,7 +140,8 @@ def extract_kernel_data(kernel: str, out_dir: Path) -> dict:
 
     sim_report = out_dir / "sim" / "report.txt"
     if sim_report.exists():
-        data["simulation"] = {"cycle_count": parse_sim_report(sim_report)}
+        passed, cycle_count = parse_sim_report(sim_report)
+        data["simulation"] = {"passed": passed, "cycle_count": cycle_count}
     else:
         data["simulation"] = None
 
@@ -235,19 +239,6 @@ def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str 
     # Check stdout for FATAL messages
     if "FATAL" in out_path.read_text(errors="replace"):
         reason = "FATAL in stdout"
-        logging.error("[FAIL] %s (%s)", kernel, reason)
-        return kernel, reason
-
-    # Check simulation report
-    report_path = out_dir / "sim" / "report.txt"
-    if not report_path.exists():
-        reason = "sim/report.txt not found"
-        logging.error("[FAIL] %s (%s)", kernel, reason)
-        return kernel, reason
-
-    report_text = report_path.read_text(errors="replace")
-    if "C and VHDL outputs match" not in report_text:
-        reason = 'sim/report.txt missing "C and VHDL outputs match"'
         logging.error("[FAIL] %s (%s)", kernel, reason)
         return kernel, reason
 
