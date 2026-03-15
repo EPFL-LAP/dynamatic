@@ -41,7 +41,7 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
-// Step 1 — Unbundle Handshake types into flat HW ports
+// Step 1 Unbundle Handshake types into flat HW ports
 //===----------------------------------------------------------------------===//
 //
 // Converts every Handshake operation inside a handshake::FuncOp into an
@@ -52,26 +52,26 @@ using namespace dynamatic::handshake;
 // The code is organised in four layers, each depending only on the layers
 // above it:
 //
-//   Layer 1 — TypeUnbundler   : knows how to split a Handshake type into its
+//   Layer 1 TypeUnbundler   : knows how to split a Handshake type into its
 //                               component (SignalKind, Type) pairs.
 //
-//   Layer 2 — PortInfoBuilder : knows how to derive port names from a
+//   Layer 2 PortInfoBuilder : knows how to derive port names from a
 //                               Handshake op and zip them with unbundled types
 //                               to produce hw::ModulePortInfo.
 //
-//   Layer 3 — ConversionPatterns : the TypeConverter and OpConversionPatterns
+//   Layer 3 ConversionPatterns : the TypeConverter and OpConversionPatterns
 //                               that drive the DialectConversion framework.
 //                               Also contains the cast helpers and the synth
 //                               placeholder installer.
 //
-//   Layer 4 — Orchestrator   : unbundleAllHandshakeTypes(), the single entry
+//   Layer 4 Orchestrator   : unbundleAllHandshakeTypes(), the single entry
 //                               point of this step.  Runs the three
 //                               sequential phases and nothing else.
 //
 //===----------------------------------------------------------------------===//
 //
 //===----------------------------------------------------------------------===//
-// Layer 1 — TypeUnbundler
+// Layer 1 TypeUnbundler
 //
 // Pure functions with no side effects and no dependencies on other code in
 // this file. They determine how a Handshake type expands into flat hardware
@@ -160,7 +160,7 @@ void unbundleOpPorts(
 }
 
 //===----------------------------------------------------------------------===//
-// Layer 2 — PortInfoBuilder
+// Layer 2 PortInfoBuilder
 //
 // Knows how to turn a Handshake op into an hw::ModulePortInfo.
 // Uses Layer 1 for type splitting; uses the NamedIOInterface for names.
@@ -326,7 +326,7 @@ hw::ModulePortInfo buildPortInfo(Operation *op) {
 }
 
 //===----------------------------------------------------------------------===//
-// Layer 3 — ConversionPatterns
+// Layer 3 ConversionPatterns
 //
 // Contains the TypeConverter and OpConversionPatterns that drive the
 // DialectConversion framework.  Also contains the cast helpers and the synth
@@ -594,10 +594,10 @@ struct ConvertFuncToHWMod : public OpConversionPattern<handshake::FuncOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// Layer 4 — Orchestrator
+// Layer 4 Orchestrator
 //
 // unbundleAllHandshakeTypes() is the single entry point called by the pass.
-// It contains no conversion logic of its own — it just runs three sequential
+// It contains no conversion logic of its own it just runs three sequential
 // phases and delegates everything else to the layers above.
 //===----------------------------------------------------------------------===//
 
@@ -761,7 +761,7 @@ LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
 }
 
 //===----------------------------------------------------------------------===//
-// Step 2 — SignalRewriter implementation
+// Step 2 SignalRewriter implementation
 //===----------------------------------------------------------------------===//
 
 // Utility function to get the string formatted in the desired portname[idx]
@@ -1311,7 +1311,7 @@ LogicalResult SignalRewriter::rewriteAllSignals(mlir::ModuleOp modOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// Step 3 — Populate hw modules with BLIF-imported netlists
+// Step 3 Populate hw modules with BLIF-imported netlists
 //===----------------------------------------------------------------------===//
 
 /// Replaces the synth::SubcktOp placeholder body of the hw module referenced
