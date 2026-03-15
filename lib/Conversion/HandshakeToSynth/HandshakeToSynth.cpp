@@ -747,17 +747,12 @@ LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
   SmallVector<UnrealizedConversionCastOp> castsToErase;
   // Walk through all unrealized conversion casts in the module
   modOp.walk([&](UnrealizedConversionCastOp castOp1) {
-    // Consider only the following pattern op/arg -> cast (1) -> cast (2)
-    // -> op where there could be multiple cast2
-    // Check if the input of the cast is another unrealized
-    // conversion cast
-    auto inputCastOp =
-        castOp1.getOperand(0).getDefiningOp<UnrealizedConversionCastOp>();
-    if (inputCastOp) {
-      // Skip this cast since it will be handled when processing the
-      // input cast but first assert that it is not followed by any other
-      // cast. If this is the case, there is a issue in the code since there
-      // are 3 casts in chain and this break the assumption of the code
+    // Check if the input of the cast 1 is another unrealized
+    // conversion cast. If yes, skip it since it does not match the expected
+    // pattern.
+    if (castOp1.getOperand(0).getDefiningOp<UnrealizedConversionCastOp>()) {
+      // Assert that it is not followed by any other cast since a chain of 3
+      // casts is unexpected.
       assert(llvm::none_of(castOp1->getUsers(),
                            [](Operation *user) {
                              return isa<UnrealizedConversionCastOp>(user);
@@ -765,16 +760,15 @@ LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
              "unrealized conversion cast removal failed due to chained casts");
       return;
     }
-    // Check that the output/s of the cast are used by only unrealized
-    // conversion casts
+    // Gather the inner casts that consume cast1's results.
     bool allUsersAreCasts = true;
-    SmallVector<UnrealizedConversionCastOp> vecCastOps2;
+    SmallVector<UnrealizedConversionCastOp> innerCasts;
     for (auto result : castOp1.getResults()) {
       for (auto &use : result.getUses()) {
         if (!isa<UnrealizedConversionCastOp>(use.getOwner())) {
           allUsersAreCasts = false;
         } else {
-          vecCastOps2.push_back(
+          innerCasts.push_back(
               cast<UnrealizedConversionCastOp>(use.getOwner()));
         }
       }
@@ -788,10 +782,8 @@ LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
              "usage pattern";
       return;
     }
-    // Replace all uses of the user cast op results with the original
-    // cast op inputs
-    // Assert that the number of inputs and outputs match
-    for (auto castOp2 : vecCastOps2) {
+    // Bypass each inner cast: redirect its result uses to cast1's operands.
+    for (auto castOp2 : innerCasts) {
       if (castOp1->getNumOperands() != castOp2->getNumResults()) {
         castOp1.emitError()
             << "unrealized conversion cast removal failed due to "
