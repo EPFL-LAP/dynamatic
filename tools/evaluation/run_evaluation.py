@@ -90,7 +90,7 @@ def parse_sim_report(path: Path):
     passed = "C and VHDL outputs match" in text
     m = re.search(r"Simulation done!\s+Latency\s*=\s*(\d+)\s+cycles", text)
     cycle_count = int(m.group(1)) if m else None
-    return cycle_count, passed
+    return passed, cycle_count
 
 
 def parse_utilization(path: Path):
@@ -383,7 +383,7 @@ def main() -> None:
         for kernel in KERNELS:
             out_dir = REPO_ROOT / "integration-test" / kernel / "out"
             failure_reason = next((r for k, r in failed if k == kernel), None)
-            entry: dict = {"passed": failure_reason is None, "failure_reason": failure_reason}
+            entry: dict = {"failure_reason": failure_reason}
             if failure_reason is None:
                 entry.update(extract_kernel_data(kernel, out_dir))
             results[kernel] = entry
