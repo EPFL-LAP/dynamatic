@@ -74,8 +74,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Constants
+# ──────────────────────────────────────────────────────────────────────────────
+TIMEOUT_DYNAMATIC_SECONDS = 60 * 60
+TIMEOUT_SYNTH_LSQ_SECONDS = 30 * 60
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Data extraction helpers
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def parse_sim_report(path: Path):
     """Return (passed, cycle_count) from a simulation report.txt."""
@@ -222,14 +229,20 @@ def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str 
     err_path = out_dir / "dynamatic_err.txt"
 
     with open(out_path, "w") as out_f, open(err_path, "w") as err_f:
-        result = subprocess.run(
-            ["bin/dynamatic"],
-            input=script,
-            text=True,
-            stdout=out_f,
-            stderr=err_f,
-            cwd=REPO_ROOT,
-        )
+        try:
+            result = subprocess.run(
+                ["bin/dynamatic"],
+                input=script,
+                text=True,
+                stdout=out_f,
+                stderr=err_f,
+                cwd=REPO_ROOT,
+                timeout=TIMEOUT_DYNAMATIC_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            reason = f"Dynamatic timed out after {TIMEOUT_DYNAMATIC_SECONDS // 60} minutes"
+            logging.error("[FAIL] %s (%s)", kernel, reason)
+            return kernel, reason
 
     if result.returncode != 0:
         reason = f"exit code {result.returncode}"
@@ -255,18 +268,24 @@ def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str 
             lsq_out_path = lsq_synth_dir / "vivado_out.txt"
             lsq_err_path = lsq_synth_dir / "vivado_err.txt"
             with open(lsq_out_path, "w") as out_f, open(lsq_err_path, "w") as err_f:
-                result = subprocess.run(
-                    ["tools/dynamatic/scripts/synthesize.sh",
-                     REPO_ROOT,
-                     out_dir,
-                     lsq_top,
-                     f"{CLOCK_PERIOD:.3f}", f"{CLOCK_PERIOD/2:.3f}",
-                     lsq_synth_dir],
-                    text=True,
-                    stdout=out_f,
-                    stderr=err_f,
-                    cwd=REPO_ROOT,
-                )
+                try:
+                    result = subprocess.run(
+                        ["tools/dynamatic/scripts/synthesize.sh",
+                         REPO_ROOT,
+                         out_dir,
+                         lsq_top,
+                         f"{CLOCK_PERIOD:.3f}", f"{CLOCK_PERIOD/2:.3f}",
+                         lsq_synth_dir],
+                        text=True,
+                        stdout=out_f,
+                        stderr=err_f,
+                        cwd=REPO_ROOT,
+                        timeout=TIMEOUT_SYNTH_LSQ_SECONDS,
+                    )
+                except subprocess.TimeoutExpired:
+                    reason = f"LSQ synthesis ({lsq_name}) timed out after {TIMEOUT_SYNTH_LSQ_SECONDS // 60} minutes"
+                    logging.error("[FAIL] %s (%s)", kernel, reason)
+                    return kernel, reason
 
             if result.returncode != 0:
                 reason = f"LSQ synthesis ({lsq_name}): exit code {result.returncode}"
