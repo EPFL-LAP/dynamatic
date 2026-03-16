@@ -80,6 +80,7 @@ if (DYNAMATIC_BUILD_LLVM)
   set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang")
   list(APPEND CMAKE_MODULE_PATH ${CLANG_CMAKE_DIR})
   set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py")
+  set(LLVM_TABLEGEN_EXE "llvm-tblgen")
   set(LLVM_INCLUDE_DIRS
           llvm-project/llvm/include
           ${CMAKE_BINARY_DIR}/llvm-project/include
