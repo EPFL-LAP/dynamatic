@@ -148,7 +148,8 @@ def extract_kernel_data(kernel: str, out_dir: Path) -> dict:
     sim_report = out_dir / "sim" / "report.txt"
     if sim_report.exists():
         passed, cycle_count = parse_sim_report(sim_report)
-        data["simulation"] = {"passed": passed, "cycle_count": cycle_count}
+        assert passed, "should not get here on failure"
+        data["simulation"] = {"cycle_count": cycle_count}
     else:
         data["simulation"] = None
 
@@ -252,6 +253,19 @@ def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str 
     # Check stdout for FATAL messages
     if "FATAL" in out_path.read_text(errors="replace"):
         reason = "FATAL in stdout"
+        logging.error("[FAIL] %s (%s)", kernel, reason)
+        return kernel, reason
+
+    # Check simulation report
+    report_path = out_dir / "sim" / "report.txt"
+    if not report_path.exists():
+        reason = "sim/report.txt not found"
+        logging.error("[FAIL] %s (%s)", kernel, reason)
+        return kernel, reason
+
+    report_text = report_path.read_text(errors="replace")
+    if "C and VHDL outputs match" not in report_text:
+        reason = 'sim/report.txt missing "C and VHDL outputs match"'
         logging.error("[FAIL] %s (%s)", kernel, reason)
         return kernel, reason
 
