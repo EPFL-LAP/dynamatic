@@ -72,9 +72,6 @@ void FlattenModulesPass::runOnOperation() {
   // Record which modules are instantiated before we start inlining, so we
   // know which ones to erase afterwards.
   DenseSet<StringAttr> instantiated;
-  top->walk([&](hw::InstanceOp inst) {
-    instantiated.insert(inst.getModuleNameAttr().getAttr());
-  });
 
   // Inline every hw.instance, restarting the walk after each mutation until
   // no instances remain.
@@ -87,6 +84,9 @@ void FlattenModulesPass::runOnOperation() {
           SymbolTable::lookupNearestSymbolFrom(inst, inst.getModuleNameAttr()));
       if (!target)
         return WalkResult::advance();
+
+      // Mark this module as instantiated so we know to erase it later.
+      instantiated.insert(target.getNameAttr());
 
       if (failed(mlir::inlineRegion(inliner, &target.getBody(), inst,
                                     inst.getOperands(), inst.getResults(),
