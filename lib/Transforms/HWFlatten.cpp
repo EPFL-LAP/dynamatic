@@ -103,10 +103,10 @@ void FlattenModulesPass::runOnOperation() {
   }
 
   // Erase all modules that have been inlined away.
-  SmallVector<hw::HWModuleOp> toErase;
-  for (auto module : top->getRegion(0).getOps<hw::HWModuleOp>())
-    if (instantiated.count(module.getNameAttr()))
-      toErase.push_back(module);
-  for (auto module : toErase)
-    module.erase();
+  for (auto module :
+       llvm::make_early_inc_range(top->getRegion(0).getOps<hw::HWModuleOp>())) {
+    if (instantiated.count(module.getNameAttr())) {
+      module.erase();
+    }
+  }
 }
