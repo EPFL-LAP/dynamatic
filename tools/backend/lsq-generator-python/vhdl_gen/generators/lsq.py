@@ -1016,6 +1016,92 @@ class LSQ:
         arch += Op(ctx, stq_resp_en, wresp_valid_i[0])
         arch += Op(ctx, wresp_ready_o[0], '\'1\'')
 
+        ###### Occupancy Monitor ######
+        if True:
+            monitor_ldq_occupancy_diff = LogicVec(ctx, 'monitor_ldq_occupancy_diff', 'w', self.configs.ldqAddrW)
+            arch += WrapSub(ctx, monitor_ldq_occupancy_diff, ldq_tail, ldq_head, self.configs.numLdqEntries)
+            monitor_ldq_occupancy = LogicVec(ctx, 'monitor_ldq_occupancy', 'w', self.configs.ldqAddrW + 1)
+            arch += Op(ctx, monitor_ldq_occupancy,
+                       (self.configs.numLdqEntries, self.configs.ldqAddrW + 1), 'when',
+                       'not', ldq_empty, 'and', '(', monitor_ldq_occupancy_diff, '=', (0, self.configs.ldqAddrW), ')',
+                       'else', "'0'", '&', monitor_ldq_occupancy_diff)
+
+            monitor_stq_occupancy_diff = LogicVec(ctx, 'monitor_stq_occupancy_diff', 'w', self.configs.stqAddrW)
+            arch += WrapSub(ctx, monitor_stq_occupancy_diff, stq_tail, stq_head, self.configs.numStqEntries)
+            monitor_stq_occupancy = LogicVec(ctx, 'monitor_stq_occupancy', 'w', self.configs.stqAddrW + 1)
+            arch += Op(ctx, monitor_stq_occupancy,
+                       (self.configs.numStqEntries, self.configs.stqAddrW + 1), 'when',
+                       'not', stq_empty, 'and', '(', monitor_stq_occupancy_diff, '=', (0, self.configs.stqAddrW), ')',
+                       'else', "'0'", '&', monitor_stq_occupancy_diff)
+
+            monitor_total_occupancy = LogicVec(ctx, 'monitor_total_occupancy', 'w', max(self.configs.ldqAddrW, self.configs.stqAddrW) + 2)
+            arch += ctx.get_current_indent() + f'{monitor_ldq_occupancy.getNameWrite()} <= ' + \
+                f'std_logic_vector(unsigned({monitor_ldq_occupancy.getNameRead()}) + unsigned({monitor_ldq_occupancy.getNameRead()}));\n'
+
+            # monitor_start pulses high in any cycle where a group-init handshake occurs
+            monitor_ga_hs = LogicArray(ctx, 'monitor_ga_hs', 'w', self.configs.numGroups)
+            for i in range(self.configs.numGroups):
+                arch += Op(ctx, monitor_ga_hs[i], group_init_valid_i[i], 'and', group_init_ready_o[i])
+            monitor_start = Logic(ctx, 'monitor_start', 'w')
+            arch += Reduce(ctx, monitor_start, monitor_ga_hs, 'or')
+
+            monitor_finish = Logic(ctx, 'monitor_finish', 'w')
+            arch += Op(ctx, monitor_finish, memEndValid)
+
+            ldq_occupancy_name = monitor_ldq_occupancy.getNameRead()
+            stq_occupancy_name = monitor_stq_occupancy.getNameRead()
+            total_occupancy_name = monitor_total_occupancy.getNameRead()
+            start_name = monitor_start.getNameRead()
+            finish_name = monitor_finish.getNameRead()
+
+            ind = ctx.get_current_indent()
+            arch += ind + 'monitor_proc : process(clk) is\n'
+            arch += ind + '\tvariable monitor_started     : boolean := false;\n'
+            arch += ind + '\tvariable monitor_finished    : boolean := false;\n'
+            arch += ind + '\tvariable monitor_cycle_count : natural := 0;\n'
+            arch += ind + '\tvariable monitor_ldq_sum     : natural := 0;\n'
+            arch += ind + '\tvariable monitor_stq_sum     : natural := 0;\n'
+            arch += ind + '\tvariable monitor_ldq_max     : natural := 0;\n'
+            arch += ind + '\tvariable monitor_stq_max     : natural := 0;\n'
+            arch += ind + '\tvariable monitor_total_max   : natural := 0;\n'
+            arch += ind + 'begin\n'
+            arch += ind + '\tif rising_edge(clk) then\n'
+            arch += ind + '\t\tif rst = \'1\' then\n'
+            arch += ind + '\t\t\tmonitor_started     := false;\n'
+            arch += ind + '\t\t\tmonitor_finished    := false;\n'
+            arch += ind + '\t\t\tmonitor_cycle_count := 0;\n'
+            arch += ind + '\t\t\tmonitor_ldq_sum     := 0;\n'
+            arch += ind + '\t\t\tmonitor_stq_sum     := 0;\n'
+            arch += ind + '\t\t\tmonitor_ldq_max     := 0;\n'
+            arch += ind + '\t\t\tmonitor_stq_max     := 0;\n'
+            arch += ind + '\t\t\tmonitor_total_max   := 0;\n'
+            arch += ind + '\t\telse\n'
+            arch += ind + f'\t\t\tif {start_name} = \'1\' then\n'
+            arch += ind + '\t\t\t\tmonitor_started := true;\n'
+            arch += ind + '\t\t\tend if;\n'
+            arch += ind + f'\t\t\tif monitor_started or {start_name} = \'1\' then\n'
+            arch += ind + '\t\t\t\tmonitor_cycle_count := monitor_cycle_count + 1;\n'
+            arch += ind + f'\t\t\t\tmonitor_ldq_sum     := monitor_ldq_sum + to_integer(unsigned({ldq_occupancy_name}));\n'
+            arch += ind + f'\t\t\t\tmonitor_stq_sum     := monitor_stq_sum + to_integer(unsigned({stq_occupancy_name}));\n'
+            arch += ind + f'\t\t\t\tif to_integer(unsigned({ldq_occupancy_name}))   > monitor_ldq_max   then monitor_ldq_max   := to_integer(unsigned({ldq_occupancy_name}));   end if;\n'
+            arch += ind + f'\t\t\t\tif to_integer(unsigned({stq_occupancy_name}))   > monitor_stq_max   then monitor_stq_max   := to_integer(unsigned({stq_occupancy_name}));   end if;\n'
+            arch += ind + f'\t\t\t\tif to_integer(unsigned({total_occupancy_name})) > monitor_total_max then monitor_total_max := to_integer(unsigned({total_occupancy_name})); end if;\n'
+            arch += ind + '\t\t\tend if;\n'
+            arch += ind + f'\t\t\tif {finish_name} = \'1\' and not monitor_finished then\n'
+            arch += ind + '\t\t\t\tmonitor_finished := true;\n'
+            arch += ind + '\t\t\t\treport "LSQ  " & natural\'image(monitor_cycle_count) & " cycles:";\n'
+            arch += ind + '\t\t\t\treport "LDQ occupancy:      cycles=" & natural\'image(monitor_cycle_count)\n'
+            arch += ind + '\t\t\t\t' + '& " sum=" & natural\'image(monitor_ldq_sum)\n'
+            arch += ind + '\t\t\t\t' + '& " max=" & natural\'image(monitor_ldq_max);\n'
+            arch += ind + '\t\t\t\treport "STQ occupancy:      cycles=" & natural\'image(monitor_cycle_count)\n'
+            arch += ind + '\t\t\t\t' + '& " sum=" & natural\'image(monitor_stq_sum)\n'
+            arch += ind + '\t\t\t\t' + '& " max=" & natural\'image(monitor_stq_max);\n'
+            arch += ind + '\t\t\t\treport "Combined occupancy: max=" & natural\'image(monitor_total_max);\n'
+            arch += ind + '\t\t\tend if;\n'
+            arch += ind + '\t\tend if;\n'
+            arch += ind + '\tend if;\n'
+            arch += ind + 'end process monitor_proc;\n'
+
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
         ctx.regInitString += '\tend process;\n'
