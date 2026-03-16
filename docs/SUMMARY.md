@@ -87,6 +87,7 @@
 
 - [Specs]()
   - [Floating Point Units](DeveloperGuide/Specs/FloatingPointUnits.md)
+  - [HW Flattening Pass](DeveloperGuide/Specs/HWFlattening.md)
   - [Timing Characterization](DeveloperGuide/Specs/TimingCharacterization.md)
 
 - [XLS](DeveloperGuide/Xls/XlsIntegration.md)

@@ -349,6 +349,14 @@ def HandshakeMarkBLIFImpl : DynamaticPass<"handshake-mark-blif-impl"> {
 // Other passes
 //===----------------------------------------------------------------------===//
 
+def FlattenModules : Pass<"hw-flatten-modules", "mlir::ModuleOp"> {
+  let summary = "Eagerly inline HW modules";
+  let description = [{
+    This pass eagerly inlines HW modules into their instantiation sites.
+  }];
+}
+
+
 def BackAnnotate : DynamaticPass<"back-annotate"> {
   let summary = "Back-annotates IR from JSON-formatted attributes";
   let description = [{
