@@ -270,7 +270,9 @@ public:
 
   /// Construct an 'Expression' implicitly from any concrete AST-node.
   template <class T,
-            std::enable_if_t<std::is_constructible_v<Variant, T>> * = nullptr>
+            std::enable_if_t<std::conjunction_v<
+                std::negation<std::is_same<T, std::decay_t<Expression>>>,
+                std::is_constructible<Variant, T>>> * = nullptr>
   /*implicit*/ Expression(T &&arg)
       : expression(std::make_shared<Variant>(std::forward<T>(arg))) {}
 

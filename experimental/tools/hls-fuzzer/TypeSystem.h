@@ -119,13 +119,13 @@ class TypeSystem : public AbstractTypeSystem {
 public:
   // Implementation of methods in 'AbstractTypeSystem'.
 #define IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK(ASTNode, methodName)               \
-  MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(                \
+  dynamatic::MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(     \
       const OpaqueContext &context) final {                                    \
     return convert(self().methodName(context.cast<TypingContext>()));          \
   }                                                                            \
   static_assert(true, "forcing a semicolon")
 #define IMPLEMENT_TERMINAL_OPAQUE_CHECK(ASTNode, methodName)                   \
-  MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(                \
+  dynamatic::MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(     \
       const ASTNode &node, const OpaqueContext &context) final {               \
     return convert(self().methodName(node, context.cast<TypingContext>()));    \
   }                                                                            \
@@ -133,7 +133,7 @@ public:
 
   IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK(ast::Function, checkFunction);
 
-  MaybeConclusionOf<ast::BinaryExpression, OpaqueContext>
+  dynamatic::MaybeConclusionOf<ast::BinaryExpression, OpaqueContext>
   checkBinaryExpressionOpaque(ast::BinaryExpression::Op op,
                               const OpaqueContext &context) final {
     return convert(
