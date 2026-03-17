@@ -19,10 +19,9 @@ static std::mutex errorMutex;
 static std::atomic_uint64_t testCaseCounter = 0;
 static std::atomic_uint64_t bugCounter = 0;
 
-static void
-threadWork(const std::unique_ptr<dynamatic::AbstractWorker> &target,
-           const std::filesystem::path &workingDirectory,
-           const std::string &functionName) {
+static void threadWork(const std::unique_ptr<dynamatic::AbstractWorker> &target,
+                       const std::filesystem::path &workingDirectory,
+                       const std::string &functionName) {
   while (!quit) {
     std::filesystem::remove_all(workingDirectory);
     std::filesystem::create_directories(workingDirectory);

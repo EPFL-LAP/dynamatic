@@ -25,8 +25,8 @@ public:
   /// 'generate'.
   template <class TypingContext, class Self>
   explicit BasicCGenerator(Randomly &random,
-                          TypeSystem<TypingContext, Self> &typeSystem,
-                          const TypingContext &entryContext = {})
+                           TypeSystem<TypingContext, Self> &typeSystem,
+                           const TypingContext &entryContext = {})
       : random(random), typeSystem(typeSystem), entryContext(entryContext) {}
 
   /// Returns a new function with the given function name.
