@@ -104,11 +104,14 @@ def parse_sim_report(path: Path):
         stq = re.search(rf"Note: {name} STQ occupancy:\s+cycles=(\d+) sum=(\d+) max=(\d+)", text)
         combined = re.search(rf"Note: {name} combined occupancy: max=(\d+)", text)
         cycles = int(ldq.group(1))
-        lsq_occupancy[name] = {
-            "ldq_occupancy": {"mean": int(ldq.group(2)) / cycles, "max": int(ldq.group(3))},
-            "stq_occupancy": {"mean": int(stq.group(2)) / int(stq.group(1)), "max": int(stq.group(3))},
-            "combined_occupancy": {"max": int(combined.group(1))},
-        }
+        if cycles == 0:
+            lsq_occupancy[name] = None
+        else:
+            lsq_occupancy[name] = {
+                "ldq_occupancy": {"mean": int(ldq.group(2)) / cycles, "max": int(ldq.group(3))},
+                "stq_occupancy": {"mean": int(stq.group(2)) / cycles, "max": int(stq.group(3))},
+                "combined_occupancy": {"max": int(combined.group(1))},
+            }
 
     return passed, cycle_count, lsq_occupancy
 
