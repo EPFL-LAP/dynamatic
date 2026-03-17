@@ -1,6 +1,6 @@
 #include "RandomCTarget.h"
 
-#include "../BaseGenerator.h"
+#include "../BasicCProducer.h"
 #include "../TargetRegistry.h"
 #include "DynamaticTypeSystem.h"
 #include "llvm/Support/Process.h"
@@ -33,7 +33,7 @@ dynamatic::RandomCTarget::createGenerator(const Options &options,
 void RandomCGenerator::generate(llvm::raw_ostream &os,
                                 llvm::StringRef functionName) const {
   gen::DynamaticTypeSystem dynamaticTypeSystem(random);
-  gen::BaseGenerator generator(
+  gen::BasicCProducer generator(
       random, dynamaticTypeSystem,
       /*entryContext=*/
       {random.fromEnum<gen::DynamaticTypingContext::Constraint>()});
