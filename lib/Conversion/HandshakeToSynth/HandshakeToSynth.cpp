@@ -10,15 +10,13 @@
 // Implements the --handshake-to-synth conversion pass in three steps:
 //
 //   Step 1 - Unbundle: convert every Handshake op into an hw::HWModuleOp
-//            whose ports are flat integer signals (data/valid/ready split),
-//            connected through unrealized-conversion casts that are later
-//            eliminated.
+//            whose ports are flat integer signals (data/valid/ready split). The
+//            ready is inverted compared to the handshake port. The data signals
+//            are split into individual bits. The clock and reset signals are
+//            added. In the body of the hw::HWModuleOp, we insert a
+//            synth::SubcktOp as a placeholder.
 //
-//   Step 2 - Rewrite signals: invert the direction of all ready signals
-//            (ready travels opposite to data/valid), split multi-bit ports
-//            into individual i1 ports, and add clk/rst to every module.
-//
-//   Step 3 - Populate: replace each hw::HWModuleOp's placeholder body with
+//   Step 2 - Populate: replace each hw::HWModuleOp's placeholder body with
 //            the actual gate-level netlist imported from the BLIF file whose
 //            path was recorded during Step 1.
 //
@@ -27,7 +25,12 @@
 #include "dynamatic/Conversion/HandshakeToSynth.h"
 
 // [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
+#include "dynamatic/Dialect/HW/PortImplementation.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
 namespace dynamatic {
@@ -41,141 +44,10 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 
 namespace dynamatic {
-//===----------------------------------------------------------------------===//
-// Step 1 Unbundle Handshake types into flat HW ports
-//===----------------------------------------------------------------------===//
-//
-// Converts every Handshake operation inside a handshake::FuncOp into an
-// hw::HWModuleOp whose ports are flat i1/iN signals (data / valid / ready
-// split apart).  The conversion is wired together with temporary
-// UnrealizedConversionCastOps that are eliminated at the end of this step.
-//
-// The code is organised in four layers, each depending only on the layers
-// above it:
-//
-//   Layer 1 TypeUnbundler   : knows how to split a Handshake type into its
-//                               component (SignalKind, Type) pairs.
-//
-//   Layer 2 PortInfoBuilder : knows how to derive port names from a
-//                               Handshake op and zip them with unbundled types
-//                               to produce hw::ModulePortInfo.
-//
-//   Layer 3 ConversionPatterns : the TypeConverter and OpConversionPatterns
-//                               that drive the DialectConversion framework.
-//                               Also contains the cast helpers and the synth
-//                               placeholder installer.
-//
-//   Layer 4 Orchestrator   : unbundleAllHandshakeTypes(), the single entry
-//                               point of this step.  Runs the three
-//                               sequential phases and nothing else.
-//
-//===----------------------------------------------------------------------===//
-//
-//===----------------------------------------------------------------------===//
-// Layer 1 TypeUnbundler
-//
-// Pure functions with no side effects and no dependencies on other code in
-// this file. They determine how a Handshake type expands into flat hardware
-// types and specify the role associated with each resulting signal.
-//
-//===----------------------------------------------------------------------===//
 
-/// Splits a single Handshake type into its constituent (SignalKind, Type)
-/// pairs:
-///   ChannelType  -> { DATA, dataType }, { VALID, i1 }, { READY, i1 }
-///   ControlType  ->                     { VALID, i1 }, { READY, i1 }
-///   MemRefType   -> { DATA, elemType }, { VALID, i1 }, { READY, i1 }
-///   anything else-> { DATA, type }   (pass-through)
-SmallVector<std::pair<SignalKind, Type>> unbundleType(Type type) {
-  return TypeSwitch<Type, SmallVector<std::pair<SignalKind, Type>>>(type)
-      // Case for channel type where we unbundle into data, valid, ready
-      .Case<handshake::ChannelType>([](handshake::ChannelType chanType) {
-        return SmallVector<std::pair<SignalKind, Type>>{
-            std::make_pair(DATA_SIGNAL, chanType.getDataType()),
-            std::make_pair(VALID_SIGNAL,
-                           IntegerType::get(chanType.getContext(), 1)),
-            std::make_pair(READY_SIGNAL,
-                           IntegerType::get(chanType.getContext(), 1))};
-      })
-      // Case for control type where we unbundle into valid, ready
-      .Case<handshake::ControlType>([](handshake::ControlType ctrlType) {
-        return SmallVector<std::pair<SignalKind, Type>>{
-            std::make_pair(VALID_SIGNAL,
-                           IntegerType::get(ctrlType.getContext(), 1)),
-            std::make_pair(READY_SIGNAL,
-                           IntegerType::get(ctrlType.getContext(), 1))};
-      })
-      // Case for memref type where we extract the element type as data,
-      // valid, ready
-      .Case<MemRefType>([](MemRefType memType) {
-        return SmallVector<std::pair<SignalKind, Type>>{
-            std::make_pair(DATA_SIGNAL, memType.getElementType()),
-            std::make_pair(VALID_SIGNAL,
-                           IntegerType::get(memType.getContext(), 1)),
-            std::make_pair(READY_SIGNAL,
-                           IntegerType::get(memType.getContext(), 1))};
-      })
-      .Default([&](Type t) {
-        return SmallVector<std::pair<SignalKind, Type>>{
-            std::make_pair(DATA_SIGNAL, t)};
-      });
-}
-
-/// Function that returns only the flat Types (dropping the SignalKind tag).
-static SmallVector<Type> unbundleTypeFlat(Type type) {
-  SmallVector<Type> result;
-  for (auto [_, t] : unbundleType(type))
-    result.push_back(t);
-  return result;
-}
-
-/// Function that fills \p inputPorts and \p outputPorts with the unbundled
-/// (SignalKind,Type) groups for every operand/result of \p op.
-/// handshake::FuncOp is handled specially because its "operands" are block
-/// arguments rather than SSA uses.
-void unbundleOpPorts(
-    Operation *op,
-    SmallVector<SmallVector<std::pair<SignalKind, Type>>> &inputPorts,
-    SmallVector<SmallVector<std::pair<SignalKind, Type>>> &outputPorts) {
-  // If the operation is a handshake function, the ports are extracted
-  // differently
-  if (isa<handshake::FuncOp>(op)) {
-    handshake::FuncOp funcOp = cast<handshake::FuncOp>(op);
-    // Extract ports from the function type
-    for (auto arg : funcOp.getArguments()) {
-      inputPorts.push_back(unbundleType(arg.getType()));
-    }
-    for (auto resultType : funcOp.getResultTypes()) {
-      outputPorts.push_back(unbundleType(resultType));
-    }
-    return;
-  }
-  for (auto input : op->getOperands()) {
-    // Unbundle the input type depending on its actual type
-    inputPorts.push_back(unbundleType(input.getType()));
-  }
-  for (auto result : op->getResults()) {
-    // Unbundle the output type depending on its actual type
-    outputPorts.push_back(unbundleType(result.getType()));
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Layer 2 PortInfoBuilder
-//
-// Knows how to turn a Handshake op into an hw::ModulePortInfo.
-// Uses Layer 1 for type splitting; uses the NamedIOInterface for names.
-// Two private helpers handle the string formatting; the single public
-// entry point is buildPortInfo().
-//===----------------------------------------------------------------------===//
-
-// ---------------------------------------------------------------------------
-// Private string helpers
-// ---------------------------------------------------------------------------
-
-/// Inserts \p suffix immediately before the first '[' in \p name, or appends
-/// it at the end if no '[' is found.
-/// Example: insertSuffix("data[3]", "_valid") -> "data_valid[3]"
+// Inserts a suffix string before the first '[' in the input name, or appends
+// it at the end if no '[' is found.
+// Example: insertSuffix("data[3]", "_valid") -> "data_valid[3]"
 std::string insertSuffix(const std::string &name, const std::string &suffix) {
   std::size_t pos = name.find('[');
   if (pos != std::string::npos) {
@@ -186,10 +58,10 @@ std::string insertSuffix(const std::string &name, const std::string &suffix) {
   return name + suffix;
 }
 
-/// Converts a (root, index) pair into the canonical "root[index]" form.
-/// If \p root already contains "[N]", the old index is linearised with
-/// \p arrayWidth before adding \p index.
-/// Example: formatArrayName("data[2]", 3, 4) becomes "data[11]"  (2*4 + 3)
+// Converts a (root, index) pair into the canonical "root[index]" form.
+// If root already contains "[N]", the old index is linearised with
+//  arrayWidth before adding index.
+// Example: formatArrayName("data[2]", 3, 4) becomes "data[11]"  (2*4 + 3)
 std::string formatArrayName(const std::string &root, unsigned index,
                             unsigned arrayWidth = 0) {
   static const std::regex arrayPattern(R"((\w+)\[(\d+)\])");
@@ -202,592 +74,9 @@ std::string formatArrayName(const std::string &root, unsigned index,
   return root + "[" + std::to_string(index) + "]";
 }
 
-// ---------------------------------------------------------------------------
-// Private: derive per-operand/result base names from a Handshake op
-// ---------------------------------------------------------------------------
-
-/// Returns the base port names for every operand and result of \p op,
-/// in the "root[idx]" format expected by BLIF.
-///
-/// The Handshake NamedIOInterface produces names like "in_0", "in_1".
-/// This function converts them:
-///   - "in_0" alone stays as "in"    (no sibling with idx > 0 yet)
-///   - once "in_1" appears, "in" is back-patched to "in[0]",
-///     and "in_1" becomes "in[1]"
-///
-/// handshake::FuncOp has no NamedIOInterface so it gets generic names.
-std::pair<SmallVector<std::string>, SmallVector<std::string>>
-buildPortNames(Operation *op) {
-  SmallVector<std::string> inputNames, outputNames;
-
-  // FuncOp: generic fallback names.
-  if (auto funcOp = dyn_cast<handshake::FuncOp>(op)) {
-    for (auto [idx, _] : llvm::enumerate(funcOp.getArguments()))
-      inputNames.push_back("in" + std::to_string(idx));
-    for (auto [idx, _] : llvm::enumerate(funcOp.getResultTypes()))
-      outputNames.push_back("out" + std::to_string(idx));
-    return {inputNames, outputNames};
-  }
-
-  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
-  if (!namedIO) {
-    llvm::errs() << op->getName() << " does not implement NamedIOInterface\n";
-    assert(false && "cannot build port names without NamedIOInterface");
-  }
-
-  // Pattern "root_N": convert to "root[N]" with back-patching at N == 1.
-  static const std::regex indexPattern(R"((\w+)_(\d+))");
-
-  auto elaborateName = [&](StringRef raw, SmallVector<std::string> &names) {
-    std::string rawStr = raw.str();
-    std::smatch m;
-    if (!std::regex_match(rawStr, m, indexPattern)) {
-      // No index suffix: keep the name as-is.
-      names.push_back(rawStr);
-      return;
-    }
-    std::string root = m[1].str();
-    unsigned idx = std::stoi(m[2].str());
-
-    if (idx == 0) {
-      // First element: use the bare root for now; may be back-patched later.
-      names.push_back(root);
-    } else {
-      if (idx == 1) {
-        // Back-patch the first element from "root" to "root[0]".
-        auto it = llvm::find(names, root);
-        assert(it != names.end() &&
-               "could not find index-0 port to back-patch");
-        *it = formatArrayName(root, 0);
-      }
-      names.push_back(formatArrayName(root, idx));
-    }
-  };
-
-  for (auto [idx, _] : llvm::enumerate(op->getOperands()))
-    elaborateName(namedIO.getOperandName(idx), inputNames);
-  for (auto [idx, _] : llvm::enumerate(op->getResults()))
-    elaborateName(namedIO.getResultName(idx), outputNames);
-
-  return {inputNames, outputNames};
-}
-
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
-
-/// Builds and returns the hw::ModulePortInfo for the flat HW module that
-/// will represent \p op.
-///
-/// For each operand/result group the function:
-///   1. Looks up the base name via buildPortNames().
-///   2. Looks up the unbundled (SignalKind, Type) pairs via unbundleOpPorts().
-///   3. Zips them: DATA keeps the base name; VALID appends "_valid"; READY
-///      appends "_ready" (both inserted before any "[" to preserve indexing).
-hw::ModulePortInfo buildPortInfo(Operation *op) {
-  MLIRContext *ctx = op->getContext();
-  auto [inputNames, outputNames] = buildPortNames(op);
-
-  SmallVector<SmallVector<std::pair<SignalKind, Type>>> unbundledIn,
-      unbundledOut;
-  unbundleOpPorts(op, unbundledIn, unbundledOut);
-
-  auto applyKind = [](const std::string &base, SignalKind kind) -> std::string {
-    switch (kind) {
-    case DATA_SIGNAL:
-      return base;
-    case VALID_SIGNAL:
-      return insertSuffix(base, "_valid");
-    case READY_SIGNAL:
-      return insertSuffix(base, "_ready");
-    }
-    llvm_unreachable("unknown SignalKind");
-  };
-
-  SmallVector<hw::PortInfo> hwInputs, hwOutputs;
-  for (auto [idx, portGroup] : llvm::enumerate(unbundledIn)) {
-    for (auto [kind, type] : portGroup) {
-      hwInputs.push_back(
-          {hw::ModulePort{
-               StringAttr::get(ctx, applyKind(inputNames[idx], kind)), type,
-               hw::ModulePort::Direction::Input},
-           idx});
-    }
-  }
-  for (auto [idx, portGroup] : llvm::enumerate(unbundledOut)) {
-    for (auto [kind, type] : portGroup) {
-      hwOutputs.push_back(
-          {hw::ModulePort{
-               StringAttr::get(ctx, applyKind(outputNames[idx], kind)), type,
-               hw::ModulePort::Direction::Output},
-           idx});
-    }
-  }
-  return hw::ModulePortInfo(hwInputs, hwOutputs);
-}
-
-//===----------------------------------------------------------------------===//
-// Layer 3 ConversionPatterns
-//
-// Contains the TypeConverter and OpConversionPatterns that drive the
-// DialectConversion framework.  Also contains the cast helpers and the synth
-// placeholder installer.
-//
-//===----------------------------------------------------------------------===//
-
-// ---------------------------------------------------------------------------
-// TypeConverter
-// ---------------------------------------------------------------------------
-
-/// Teaches the DialectConversion framework how to convert bundled Handshake
-/// types to their flat HW equivalents.  Materialization is pass-through
-/// because the cast ops inserted by the conversion patterns handle the actual
-/// value bridging.
-class ChannelUnbundlingTypeConverter : public TypeConverter {
-public:
-  ChannelUnbundlingTypeConverter() {
-    addConversion([](Type type, SmallVectorImpl<Type> &results) {
-      results.append(unbundleTypeFlat(type));
-      return success();
-    });
-    auto passThrough = [](OpBuilder &, Type, ValueRange inputs,
-                          Location) -> std::optional<Value> {
-      return inputs.size() == 1 ? std::optional<Value>(inputs[0])
-                                : std::nullopt;
-    };
-    addTargetMaterialization(passThrough);
-    addSourceMaterialization(passThrough);
-  }
-};
-
-// ---------------------------------------------------------------------------
-// Cast helpers
-// ---------------------------------------------------------------------------
-
-/// Splits \p bundledValue into its flat components by inserting an
-/// UnrealizedConversionCastOp.  Produces one result per flat type.
-UnrealizedConversionCastOp splitBundledValue(Value bundledValue, Location loc,
-                                             PatternRewriter &rewriter) {
-  return rewriter.create<UnrealizedConversionCastOp>(
-      loc, TypeRange(unbundleTypeFlat(bundledValue.getType())), bundledValue);
-}
-
-/// For each type in \p originalTypes, groups the corresponding slice of
-/// \p flatValues and re-bundles it with an UnrealizedConversionCastOp.
-/// Returns one cast per original type.
-SmallVector<UnrealizedConversionCastOp>
-rebundleFlatValues(TypeRange originalTypes, ArrayRef<Value> flatValues,
-                   Location loc, PatternRewriter &rewriter) {
-  assert(flatValues.size() >= originalTypes.size());
-  SmallVector<UnrealizedConversionCastOp> casts;
-  unsigned offset = 0;
-  for (Type origType : originalTypes) {
-    unsigned numFlat = unbundleTypeFlat(origType).size();
-    SmallVector<Value> slice(flatValues.begin() + offset,
-                             flatValues.begin() + offset + numFlat);
-    casts.push_back(rewriter.create<UnrealizedConversionCastOp>(
-        loc, TypeRange{origType}, slice));
-    offset += numFlat;
-  }
-  return casts;
-}
-
-// ---------------------------------------------------------------------------
-// Synth placeholder installer
-// ---------------------------------------------------------------------------
-
-/// Fills the body of a freshly created \p hwModule with a single
-/// synth::SubcktOp that consumes all inputs and produces all outputs.
-/// Acts as a placeholder until Step 3 replaces it with the real netlist.
-LogicalResult instantiateSynthPlaceholder(hw::HWModuleOp hwModule,
-                                          ConversionPatternRewriter &rewriter) {
-  rewriter.setInsertionPointToStart(hwModule.getBodyBlock());
-  SmallVector<Value> inputs(hwModule.getBodyBlock()->getArguments());
-  SmallVector<Type> outputTypes;
-  for (auto &port : hwModule.getPortList())
-    if (port.isOutput())
-      outputTypes.push_back(port.type);
-
-  Operation *terminator = hwModule.getBodyBlock()->getTerminator();
-  auto subckt = rewriter.create<synth::SubcktOp>(
-      terminator->getLoc(), TypeRange(outputTypes), inputs, "synth_subckt");
-  terminator->setOperands(subckt.getResults());
-  return success();
-}
-
-// ---------------------------------------------------------------------------
-// FuncOp to hw::HWModuleOp conversion
-// ---------------------------------------------------------------------------
-
-/// Converts the top-level \p funcOp into an hw::HWModuleOp by:
-///   1. Creating the module with ports built by buildPortInfo().
-///   2. Re-bundling the flat block arguments and inlining the function body.
-///   3. Splitting the bundled operands of handshake::EndOp and replacing it
-///      with hw::OutputOp.
-hw::HWModuleOp convertFuncOpToHWModule(handshake::FuncOp funcOp,
-                                       ConversionPatternRewriter &rewriter) {
-  MLIRContext *ctx = funcOp.getContext();
-  auto modOp = funcOp->getParentOfType<mlir::ModuleOp>();
-  SymbolTable symbolTable(modOp);
-  StringRef uniqueOpName = getUniqueName(funcOp);
-  StringAttr moduleName = StringAttr::get(ctx, uniqueOpName);
-
-  // Re-use an existing module if the pattern fires more than once.
-  if (auto existing = symbolTable.lookup<hw::HWModuleOp>(moduleName))
-    return existing;
-
-  // --- 1. Create the hw module ---
-  rewriter.setInsertionPointToStart(modOp.getBody());
-  auto hwModule = rewriter.create<hw::HWModuleOp>(funcOp.getLoc(), moduleName,
-                                                  buildPortInfo(funcOp));
-
-  // --- 2. Re-bundle flat block args to bundled args expected by the body ---
-  Block *modBlock = hwModule.getBodyBlock();
-  Operation *terminator = modBlock->getTerminator();
-  rewriter.setInsertionPointToStart(modBlock);
-
-  SmallVector<Value> bundledArgs;
-  for (auto &cast :
-       rebundleFlatValues(funcOp.getArgumentTypes(),
-                          SmallVector<Value>(modBlock->getArguments()),
-                          funcOp.getLoc(), rewriter)) {
-    assert(cast.getNumResults() == 1);
-    bundledArgs.push_back(cast.getResult(0));
-  }
-
-  // Inline the function body before the hw terminator.
-  rewriter.inlineBlockBefore(funcOp.getBodyBlock(), terminator, bundledArgs);
-
-  // --- 3. Replace handshake::EndOp with hw::OutputOp ---
-  handshake::EndOp endOp;
-  for (Operation &op : *hwModule.getBodyBlock()) {
-    if ((endOp = dyn_cast<handshake::EndOp>(op))) {
-      break;
-    }
-  }
-  assert(endOp && "Expected handshake.end after inlining");
-
-  SmallVector<Value> flatOutputs;
-  for (Value operand : endOp.getOperands()) {
-    auto split = splitBundledValue(operand, endOp->getLoc(), rewriter);
-    flatOutputs.append(split.getResults().begin(), split.getResults().end());
-  }
-  rewriter.setInsertionPointToEnd(endOp->getBlock());
-  rewriter.replaceOpWithNewOp<hw::OutputOp>(endOp, flatOutputs);
-  // Erase the empty hw::OutputOp placeholder that hw::HWModuleOp auto-inserts.
-  for (Operation &op : *hwModule.getBodyBlock()) {
-    if (auto out = dyn_cast<hw::OutputOp>(op);
-        out && out.getOperands().empty()) {
-      rewriter.eraseOp(out);
-      break;
-    }
-  }
-  // Remove the original handshake function operation
-  rewriter.eraseOp(funcOp);
-
-  return hwModule;
-}
-
-// ---------------------------------------------------------------------------
-// Generic Handshake op to hw::HWModuleOp + hw::InstanceOp conversion
-// ---------------------------------------------------------------------------
-
-/// Converts a single inner Handshake \p op into:
-///   1. An hw::HWModuleOp definition (created once per unique op name).
-///      Its body contains a synth::SubcktOp placeholder.
-///      The op's BLIF path is recorded in opToBlifPathMap for Step 3.
-///   2. An hw::InstanceOp that instantiates the module in place of \p op.
-///      Bundled operands are split with splitBundledValue(); flat instance
-///      results are re-bundled with rebundleFlatValues() so downstream ops
-///      still see the expected bundled types.
-
-hw::HWModuleOp convertOpToHWModule(Operation *op,
-                                   ConversionPatternRewriter &rewriter) {
-  MLIRContext *ctx = op->getContext();
-  auto modOp = op->getParentOfType<mlir::ModuleOp>();
-  SymbolTable symbolTable(modOp);
-  StringRef uniqueOpName = getUniqueName(op);
-  StringAttr moduleName = StringAttr::get(ctx, uniqueOpName);
-
-  // --- 1. Look up or create the hw module definition ---
-  hw::HWModuleOp hwModule = symbolTable.lookup<hw::HWModuleOp>(moduleName);
-  if (!hwModule) {
-    // Create it
-    rewriter.setInsertionPointToStart(modOp.getBody());
-
-    hwModule = rewriter.create<hw::HWModuleOp>(op->getLoc(), moduleName,
-                                               buildPortInfo(op));
-    // Instantiate synth placeholder in the HW module body
-    if (failed(instantiateSynthPlaceholder(hwModule, rewriter)))
-      return nullptr;
-    // Record the BLIF path for Step 3
-    BLIFImplInterface blifIface = dyn_cast<BLIFImplInterface>(op);
-    StringAttr blifAttr = blifIface ? blifIface.getBLIFImpl() : StringAttr{};
-    opToBlifPathMap[hwModule.getOperation()] = blifAttr.getValue().str();
-  }
-
-  // --- 2. Build flat operands for the instance ---
-  rewriter.setInsertionPointAfter(op);
-  SmallVector<Value> flatOperands;
-  for (auto operand : op->getOperands()) {
-    // Check if the operand is bundled (i.e., a block argument or defined by a
-    // Handshake op)
-    bool isBundled = isa<BlockArgument>(operand) ||
-                     (operand.getDefiningOp() &&
-                      operand.getDefiningOp()->getDialect()->getNamespace() ==
-                          handshake::HandshakeDialect::getDialectNamespace());
-    if (isBundled) {
-      // Split the bundled operand
-      auto split = splitBundledValue(operand, op->getLoc(), rewriter);
-      flatOperands.append(split.getResults().begin(), split.getResults().end());
-    } else {
-      flatOperands.push_back(operand);
-    }
-  }
-
-  // --- 3. Create the instance and re-bundle its flat results ---
-  hw::InstanceOp hwInstOp = rewriter.create<hw::InstanceOp>(
-      op->getLoc(), hwModule,
-      StringAttr::get(ctx, uniqueOpName.str() + "_inst"), flatOperands);
-  SmallVector<Value> bundledResults;
-  for (auto &cast :
-       rebundleFlatValues(op->getResultTypes(),
-                          SmallVector<Value>(hwInstOp->getResults().begin(),
-                                             hwInstOp->getResults().end()),
-                          op->getLoc(), rewriter)) {
-    assert(cast.getNumResults() == 1);
-    bundledResults.push_back(cast.getResult(0));
-  }
-  assert(bundledResults.size() == op->getNumResults());
-
-  //  Replace all uses of the original operation with the new hw module
-  rewriter.replaceOp(op, bundledResults);
-
-  return hwModule;
-}
-
-// ---------------------------------------------------------------------------
-// OpConversionPattern wrappers
-// ---------------------------------------------------------------------------
-
-/// Generic pattern: wraps convertOpToHWModule for any Handshake op T.
-template <typename T>
-struct ConvertToHWMod : public OpConversionPattern<T> {
-  using OpConversionPattern<T>::OpConversionPattern;
-  using OpAdaptor = typename T::Adaptor;
-
-  LogicalResult
-  matchAndRewrite(T op, OpAdaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    return convertOpToHWModule(op, rewriter) ? success() : failure();
-  }
-};
-
-/// Specialised pattern for handshake::FuncOp.
-struct ConvertFuncToHWMod : public OpConversionPattern<handshake::FuncOp> {
-  using OpConversionPattern<handshake::FuncOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(handshake::FuncOp op, handshake::FuncOp::Adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    return convertFuncOpToHWModule(op, rewriter) ? success() : failure();
-  }
-};
-
-//===----------------------------------------------------------------------===//
-// Layer 4 Orchestrator
-//
-// unbundleAllHandshakeTypes() is the single entry point called by the pass.
-// It contains no conversion logic of its own it just runs three sequential
-// phases and delegates everything else to the layers above.
-//===----------------------------------------------------------------------===//
-
-// Register one pattern that fires for any op implementing BLIFImplInterface.
-// This covers every Handshake op except FuncOp and EndOp, which are excluded
-// by the ConversionTarget (addLegalOp above) rather than here. This is useful
-// to reduce the insertion of patterns for every handshake op.
-struct ConvertAnyHandshakeOp
-    : public OpInterfaceConversionPattern<BLIFImplInterface> {
-  using OpInterfaceConversionPattern::OpInterfaceConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(BLIFImplInterface op, ArrayRef<Value>,
-                  ConversionPatternRewriter &rewriter) const override {
-    return convertOpToHWModule(op.getOperation(), rewriter) ? success()
-                                                            : failure();
-  }
-};
-
-// ---------------------------------------------------------------------------
-// Phase 1c helper: unrealized-cast elimination
-//
-// Defined here rather than in Layer 3 because it is not used by patterns:
-// it is a post-processing step driven by the orchestrator.
-// ---------------------------------------------------------------------------
-
-/// Removes the pairs of UnrealizedConversionCastOps introduced during
-/// unbundling.  The expected pattern is:
-///
-///   value -> cast1 (bundled -> flat) -> cast2 (flat -> bundled) -> user
-///
-/// cast1 and cast2 cancel out: each use of cast2's result is replaced with
-/// the corresponding operand of cast1, then both casts are erased.
-LogicalResult removeUnrealizedConversionCasts(mlir::ModuleOp modOp) {
-  SmallVector<UnrealizedConversionCastOp> castsToErase;
-  // Walk through all unrealized conversion casts in the module
-  modOp.walk([&](UnrealizedConversionCastOp castOp1) {
-    // Check if the input of the cast 1 is another unrealized
-    // conversion cast. If yes, skip it since it does not match the expected
-    // pattern.
-    if (castOp1.getOperand(0).getDefiningOp<UnrealizedConversionCastOp>()) {
-      // Assert that it is not followed by any other cast since a chain of 3
-      // casts is unexpected.
-      assert(llvm::none_of(castOp1->getUsers(),
-                           [](Operation *user) {
-                             return isa<UnrealizedConversionCastOp>(user);
-                           }) &&
-             "unrealized conversion cast removal failed due to chained casts");
-      return;
-    }
-    // Gather the inner casts that consume cast1's results.
-    bool allUsersAreCasts = true;
-    SmallVector<UnrealizedConversionCastOp> innerCasts;
-    for (auto result : castOp1.getResults()) {
-      for (auto &use : result.getUses()) {
-        if (!isa<UnrealizedConversionCastOp>(use.getOwner())) {
-          allUsersAreCasts = false;
-        } else {
-          innerCasts.push_back(
-              cast<UnrealizedConversionCastOp>(use.getOwner()));
-        }
-      }
-      if (!allUsersAreCasts)
-        break;
-    }
-    if (!allUsersAreCasts) {
-      // This breaks assumption that casts are chained in pairs
-      castOp1.emitError()
-          << "unrealized conversion cast removal failed due to complex "
-             "usage pattern";
-      return;
-    }
-    // Bypass each inner cast: redirect its result uses to cast1's operands.
-    for (auto castOp2 : innerCasts) {
-      if (castOp1->getNumOperands() != castOp2->getNumResults()) {
-        castOp1.emitError()
-            << "unrealized conversion cast removal failed due to "
-               "mismatched number of operands and results";
-        return;
-      }
-      for (auto [idx, result] : llvm::enumerate(castOp2.getResults())) {
-        result.replaceAllUsesWith(castOp1->getOperand(idx));
-      }
-      // Add the cast to the list of casts to remove
-      castsToErase.push_back(castOp2);
-    }
-    // Add the cast to the list of casts to remove
-    castsToErase.push_back(castOp1);
-  });
-  // Erase all collected casts
-  for (auto castOp : castsToErase) {
-    castOp.erase();
-  }
-
-  // Check that there are no more unrealized conversion casts
-  bool hasCasts = false;
-  modOp.walk([&](UnrealizedConversionCastOp castOp) {
-    hasCasts = true;
-    llvm::errs() << "Remaining unrealized conversion cast: " << castOp << "\n";
-  });
-
-  if (hasCasts) {
-    modOp.emitError()
-        << "unrealized conversion cast removal failed due to remaining "
-           "casts";
-    return failure();
-  }
-  return success();
-}
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
-
-/// Converts all Handshake ops in \p modOp into hw::HWModuleOps with flat
-/// i1/iN ports, then eliminates the temporary cast ops.
-///
-/// Three sequential phases:
-///   Phase 1a: convert all inner ops (everything except FuncOp / EndOp)
-///   Phase 1b: convert the FuncOp (and its inlined EndOp)
-///   Phase 1c: remove all UnrealizedConversionCastOps
-///
-/// Phases 1a and 1b are separate because FuncOp must be converted after all
-/// its child ops: the child conversions create hw instances that are placed
-/// inside the hw module that replaces FuncOp.
-LogicalResult unbundleAllHandshakeTypes(ModuleOp modOp, MLIRContext *ctx) {
-
-  // ---- Phase 1a: convert all inner Handshake ops --------------------------
-  RewritePatternSet patterns(ctx);
-  ChannelUnbundlingTypeConverter typeConverter;
-  ConversionTarget target(*ctx);
-  target.addLegalDialect<synth::SynthDialect>();
-  target.addLegalDialect<hw::HWDialect>();
-  // Add casting as legal
-  target.addLegalOp<UnrealizedConversionCastOp>();
-  target.addIllegalDialect<handshake::HandshakeDialect>();
-  // FuncOp and EndOp are handled in Phase 1b, so we mark them as legal here
-  target.addLegalOp<handshake::FuncOp>();
-  target.addLegalOp<handshake::EndOp>();
-  patterns.insert<ConvertAnyHandshakeOp>(typeConverter, ctx);
-  if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
-    return failure();
-
-  // ---- Phase 1b: convert the top-level FuncOp ----------------------------
-  RewritePatternSet funcPatterns(ctx);
-  ConversionTarget funcTarget(*ctx);
-  funcTarget.addLegalDialect<synth::SynthDialect>();
-  funcTarget.addLegalDialect<hw::HWDialect>();
-  // Add casting as legal
-  funcTarget.addLegalOp<UnrealizedConversionCastOp>();
-  funcTarget.addIllegalDialect<handshake::HandshakeDialect>();
-  funcPatterns.insert<ConvertFuncToHWMod>(typeConverter, ctx);
-  if (failed(
-          applyPartialConversion(modOp, funcTarget, std::move(funcPatterns))))
-    return failure();
-
-  // ---- Phase 1c: remove all unrealized conversion casts ------------------
-  if (failed(removeUnrealizedConversionCasts(modOp)))
-    return failure();
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-//
-// Step 2: Rewrite HW module signal directions
-//
-// After Step 1 every Handshake op has become an hw::HWModuleOp whose ready
-// signals travel in the same direction as data/valid.  Step 2 corrects this:
-//
-//   - ready ports swap direction  (input <-> output)
-//   - all multi-bit ports are split into individual i1 ports
-//   - clk and rst ports are added to every module
-//
-// Sub-component A (PortLayout), sub-component B (SignalTracker), and
-// sub-component C (ModuleRewriter) are declared in HandshakeToSynth.h.
-// This file contains all method implementations.
-//
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// Shared port-name helper (used by both A and C)
-//===----------------------------------------------------------------------===//
-
-/// Returns true when port \p name carries a ready signal.
-static bool isReadyPort(StringRef name) { return name.contains("ready"); }
-
-/// Formats a bit-indexed port name: "sig[bit]".
-/// When \p width == 1 the name is returned unchanged (no "[0]" suffix).
-/// If \p baseName already ends with "[N]" the indices are linearised.
+// Formats a bit-indexed port name: "sig[bit]".
+// When width == 1 the name is returned unchanged (no "[0]" suffix).
+// If baseName already ends with "[N]" the indices are linearised.
 static std::string bitPortName(StringRef baseName, unsigned bit,
                                unsigned width) {
   if (width == 1)
@@ -797,417 +86,8 @@ static std::string bitPortName(StringRef baseName, unsigned bit,
 }
 
 //===----------------------------------------------------------------------===//
-// Sub-component A: PortLayout implementation
-//===----------------------------------------------------------------------===//
-
-PortLayout computePortLayout(hw::HWModuleOp oldMod) {
-  PortLayout layout;
-  unsigned inIdx = 0, outIdx = 0;
-
-  for (auto &port : oldMod.getPortList()) {
-    bool ready = isReadyPort(port.name.getValue());
-    bool becomesOutput =
-        (port.isInput() && ready) || (port.isOutput() && !ready);
-    auto dir = becomesOutput ? hw::ModulePort::Direction::Output
-                             : hw::ModulePort::Direction::Input;
-    unsigned &counter = becomesOutput ? outIdx : inIdx;
-    unsigned width = port.type.cast<IntegerType>().getWidth();
-
-    // Resolve the old Value this port corresponds to.
-    // Inputs live as block arguments; outputs live as terminator operands.
-    Value oldSignal;
-    if (becomesOutput)
-      oldSignal =
-          ready
-              ? oldMod.getBodyBlock()->getArgument(port.argNum)
-              : oldMod.getBodyBlock()->getTerminator()->getOperand(port.argNum);
-    else
-      oldSignal =
-          ready
-              ? oldMod.getBodyBlock()->getTerminator()->getOperand(port.argNum)
-              : oldMod.getBodyBlock()->getArgument(port.argNum);
-
-    for (unsigned bit = 0; bit < width; ++bit) {
-      RewrittenPort rp;
-      rp.name = bitPortName(port.name.getValue(), bit, width);
-      rp.direction = dir;
-      rp.newIndex = counter++;
-      rp.oldSignal = oldSignal;
-      // Mark only the first bit of non-ready outputs so the index map is
-      // populated exactly once per original port (not once per bit).
-      rp.wasNonReadyOutput = becomesOutput && !ready && (bit == 0);
-      rp.oldOutputIdx = port.argNum;
-      layout.ports.push_back(rp);
-    }
-  }
-
-  // Reserve the last two input slots for clk and rst.
-  layout.clkNewIndex = inIdx++;
-  layout.rstNewIndex = inIdx++;
-  return layout;
-}
-
-hw::ModulePortInfo buildModulePortInfo(const PortLayout &layout,
-                                       MLIRContext *ctx) {
-  SmallVector<hw::PortInfo> hwIn, hwOut;
-  Type i1 = IntegerType::get(ctx, 1);
-
-  for (auto &rp : layout.ports) {
-    hw::PortInfo pi{{StringAttr::get(ctx, rp.name), i1, rp.direction},
-                    rp.newIndex};
-    (rp.direction == hw::ModulePort::Direction::Input ? hwIn : hwOut)
-        .push_back(pi);
-  }
-
-  // Append clk and rst inputs.
-  hwIn.push_back({{StringAttr::get(ctx, clockSignal), i1,
-                   hw::ModulePort::Direction::Input},
-                  layout.clkNewIndex});
-  hwIn.push_back({{StringAttr::get(ctx, resetSignal), i1,
-                   hw::ModulePort::Direction::Input},
-                  layout.rstNewIndex});
-
-  return hw::ModulePortInfo(hwIn, hwOut);
-}
-
-//===----------------------------------------------------------------------===//
-// Sub-component B: SignalTracker implementation
-//===----------------------------------------------------------------------===//
-
-void SignalTracker::recordInputs(const PortLayout &layout,
-                                 hw::HWModuleOp newMod) {
-  // Group consecutive RewrittenPorts that share the same old signal
-  // (a multi-bit old port expands to N entries with identical oldSignal)
-  // and map them together to the new block arguments.
-  DenseMap<Value, SmallVector<Value>> groups;
-  for (auto &rp : layout.ports) {
-    if (rp.direction != hw::ModulePort::Direction::Input)
-      continue;
-    groups[rp.oldSignal].push_back(
-        newMod.getBodyBlock()->getArgument(rp.newIndex));
-  }
-  for (auto &[oldSig, newVals] : groups)
-    resolvedMap[oldSig] = newVals;
-}
-
-void SignalTracker::recordClkRst(const PortLayout &layout,
-                                 hw::HWModuleOp newMod) {
-  clk = newMod.getBodyBlock()->getArgument(layout.clkNewIndex);
-  rst = newMod.getBodyBlock()->getArgument(layout.rstNewIndex);
-  // clk and rst are stable for the whole pass; map them to themselves.
-  resolvedMap[clk] = {clk};
-  resolvedMap[rst] = {rst};
-}
-
-void SignalTracker::recordOutputIndexMap(
-    StringAttr modName,
-    SmallVector<std::pair<unsigned, SmallVector<unsigned>>> mapping) {
-  outputIdxMap[modName] = std::move(mapping);
-}
-
-SmallVector<Value> SignalTracker::resolve(Value oldSignal, OpBuilder &builder,
-                                          Location loc) {
-  if (auto it = resolvedMap.find(oldSignal); it != resolvedMap.end())
-    return it->second;
-  if (auto it = placeholderMap.find(oldSignal); it != placeholderMap.end())
-    return it->second;
-
-  // No mapping yet. Insert an i1 placeholder constant for each bit.
-  unsigned width = oldSignal.getType().cast<IntegerType>().getWidth();
-  SmallVector<Value> placeholders;
-  for (unsigned i = 0; i < width; ++i) {
-    auto c = builder.create<hw::ConstantOp>(
-        loc, oldSignal.getType(),
-        builder.getIntegerAttr(oldSignal.getType(), 0));
-    placeholders.push_back(c.getResult());
-  }
-  placeholderMap[oldSignal] = placeholders;
-  return placeholders;
-}
-
-void SignalTracker::commit(Value oldResult, StringRef portName,
-                           int oldOutputIdx, hw::HWModuleOp oldMod,
-                           hw::HWModuleOp newMod, hw::InstanceOp newInst) {
-  SmallVector<unsigned> newIdxs =
-      findNewResultIndices(portName, oldOutputIdx, oldMod, newMod);
-  assert(!newIdxs.empty() && "could not locate result in new module");
-
-  SmallVector<Value> newVals;
-  for (unsigned idx : newIdxs)
-    newVals.push_back(newInst->getResult(idx));
-  resolvedMap[oldResult] = newVals;
-
-  // Patch any placeholders that were created while waiting for this result.
-  if (auto it = placeholderMap.find(oldResult); it != placeholderMap.end()) {
-    assert(newVals.size() == it->second.size() &&
-           "placeholder count does not match new result count");
-    for (size_t i = 0; i < newVals.size(); ++i)
-      it->second[i].replaceAllUsesWith(newVals[i]);
-    for (Value ph : it->second)
-      ph.getDefiningOp()->erase();
-    placeholderMap.erase(it);
-  }
-}
-
-Value SignalTracker::getClk() const {
-  assert(clk && "clk has not been recorded. Call recordClkRst() first");
-  return clk;
-}
-
-Value SignalTracker::getRst() const {
-  assert(rst && "rst has not been recorded. Call recordClkRst() first");
-  return rst;
-}
-
-SmallVector<Value> SignalTracker::get(Value oldSignal) const {
-  auto it = resolvedMap.find(oldSignal);
-  assert(it != resolvedMap.end() && "signal not yet resolved");
-  return it->second;
-}
-
-SmallVector<unsigned>
-SignalTracker::findNewResultIndices(StringRef portName, int oldOutputIdx,
-                                    hw::HWModuleOp oldMod,
-                                    hw::HWModuleOp newMod) {
-  // For non-ready outputs use the pre-built index map.
-  if (oldOutputIdx != -1) {
-    StringAttr key = StringAttr::get(oldMod.getContext(), oldMod.getName());
-    for (auto &[oldIdx, newIdxs] : outputIdxMap[key])
-      if (oldIdx == static_cast<unsigned>(oldOutputIdx))
-        return newIdxs;
-  }
-  // For ready signals (which have no index entry) fall back to name lookup.
-  assert(portName.contains("_ready") &&
-         "index lookup failed for a non-ready port");
-  SmallVector<unsigned> idxs;
-  for (auto &port : newMod.getPortList())
-    if (port.name.getValue() == portName)
-      idxs.push_back(port.argNum);
-  return idxs;
-}
-
-//===----------------------------------------------------------------------===//
-// Sub-component C: ModuleRewriter implementation
-//===----------------------------------------------------------------------===//
-
-ModuleRewriter::ModuleRewriter(StringRef topFunctionName)
-    : topName(topFunctionName) {}
-
-void ModuleRewriter::rewriteModule(
-    hw::HWModuleOp oldMod, ModuleOp parent, SymbolTable &symTable,
-    DenseMap<StringRef, hw::HWModuleOp> &newMods,
-    DenseMap<StringRef, hw::HWModuleOp> &oldMods) {
-
-  if (newMods.count(oldMod.getName()))
-    return; // already processed (guard against re-entrance)
-
-  MLIRContext *ctx = parent.getContext();
-  OpBuilder builder(parent);
-
-  // --- A: compute the new port layout ---
-  PortLayout layout = computePortLayout(oldMod);
-
-  // Build and register the oldOutputIdx -> newOutputIdx index map *before*
-  // creating the new module so the tracker has it ready for rewriteInstance().
-  SmallVector<std::pair<unsigned, SmallVector<unsigned>>> idxMapping;
-  unsigned runningOutIdx = 0;
-  for (auto &port : oldMod.getPortList()) {
-    unsigned width = port.type.cast<IntegerType>().getWidth();
-    bool ready = isReadyPort(port.name.getValue());
-    if (port.isOutput() && !ready) {
-      SmallVector<unsigned> newIdxs;
-      for (unsigned b = 0; b < width; ++b)
-        newIdxs.push_back(runningOutIdx++);
-      idxMapping.push_back({port.argNum, newIdxs});
-    } else if (port.isInput() && ready) {
-      // ready input -> becomes output in new module
-      runningOutIdx += width;
-    }
-    // Other combinations (ready output, non-ready input) contribute
-    // nothing to the output-index map.
-  }
-  tracker.recordOutputIndexMap(StringAttr::get(ctx, oldMod.getName()),
-                               std::move(idxMapping));
-
-  // --- Create the new hw::HWModuleOp ---
-  builder.setInsertionPointAfter(oldMod);
-  StringAttr newName =
-      StringAttr::get(ctx, oldMod.getName().str() + "_rewritten");
-  auto newMod = builder.create<hw::HWModuleOp>(
-      oldMod.getLoc(), newName, buildModulePortInfo(layout, ctx));
-  newMods[oldMod.getName()] = newMod;
-
-  // Transfer the BLIF path annotation to the new module.
-  if (opToBlifPathMap.contains(oldMod.getOperation())) {
-    opToBlifPathMap[newMod.getOperation()] =
-        opToBlifPathMap[oldMod.getOperation()];
-    opToBlifPathMap.erase(oldMod.getOperation());
-  }
-
-  // --- B: seed the tracker ---
-  tracker.recordInputs(layout, newMod);
-  if (oldMod.getName() == topName)
-    tracker.recordClkRst(layout, newMod);
-
-  // --- Dispatch the body ---
-  // Determine whether this is a leaf (synth placeholder only) or a
-  // hierarchy module (contains hw::InstanceOps).
-  bool isLeaf = llvm::none_of(oldMod.getBody().getOps(), [](Operation &op) {
-    return isa<hw::InstanceOp>(op);
-  });
-
-  if (isLeaf) {
-    // Leaf module: verify the body is only a synth placeholder, then install
-    // a fresh one in the new module.
-    for (auto &op : oldMod.getBody().getOps())
-      assert((isa<hw::OutputOp>(op) || isa<synth::SubcktOp>(op)) &&
-             "unexpected op in leaf hw module body");
-    ConversionPatternRewriter cpr(ctx);
-    LogicalResult ok = instantiateSynthPlaceholder(newMod, cpr);
-    assert(succeeded(ok) && "synth placeholder instantiation failed");
-    (void)ok;
-    return; // leaf terminator is already wired by the placeholder
-  }
-
-  // Non-leaf: rewrite every instance in the old body.
-  for (auto &op : oldMod.getBody().getOps())
-    if (auto inst = dyn_cast<hw::InstanceOp>(op))
-      rewriteInstance(inst, parent, symTable, newMods, oldMods);
-
-  // --- Wire the new module's terminator ---
-  wireTerminator(layout, newMod);
-}
-
-void ModuleRewriter::rewriteInstance(
-    hw::InstanceOp oldInst, ModuleOp parent, SymbolTable &symTable,
-    DenseMap<StringRef, hw::HWModuleOp> &newMods,
-    DenseMap<StringRef, hw::HWModuleOp> &oldMods) {
-
-  StringRef moduleName = oldInst.getModuleName();
-
-  // Ensure the referenced module has been rewritten before building an
-  // instance of it (triggers recursive rewrite if needed).
-  if (!newMods.count(moduleName))
-    if (auto ref = symTable.lookup<hw::HWModuleOp>(moduleName))
-      rewriteModule(ref, parent, symTable, newMods, oldMods);
-
-  hw::HWModuleOp newMod = newMods[moduleName];
-  hw::HWModuleOp oldMod = oldMods[moduleName];
-  assert(newMod && oldMod && "missing old or new HW module for instance");
-
-  // Insert into the new parent module (the rewritten version of the module
-  // that contains this instance).
-  hw::HWModuleOp oldParent = oldInst->getParentOfType<hw::HWModuleOp>();
-  hw::HWModuleOp newParent = newMods[oldParent.getName()];
-  assert(newParent && "parent module has not been rewritten yet");
-
-  OpBuilder builder(parent);
-  builder.setInsertionPoint(newParent.getBodyBlock()->getTerminator());
-  Location loc = newParent.getBodyBlock()->getTerminator()->getLoc();
-
-  // Classify ports and build the operand list.
-  SmallVector<std::pair<StringRef, Value>> readyInputsToCommit;
-  SmallVector<std::pair<StringRef, unsigned>> nonReadyOutputsToCommit;
-  SmallVector<Value> newOperands;
-
-  for (auto &port : oldMod.getPortList()) {
-    bool ready = isReadyPort(port.name.getValue());
-    if (port.isInput() && ready) {
-      // Was input in old -> becomes output in new.
-      // Record for commit() after the new instance is created.
-      readyInputsToCommit.push_back(
-          {port.name.getValue(), oldInst.getOperand(port.argNum)});
-
-    } else if (port.isOutput() && ready) {
-      // Was output in old -> becomes input in new.
-      auto vals =
-          tracker.resolve(oldInst->getResult(port.argNum), builder, loc);
-      assert(vals.size() == 1 && "ready signal must be exactly i1");
-      newOperands.push_back(vals[0]);
-
-    } else if (port.isInput()) {
-      // Non-ready input: stays input, possibly multi-bit after splitting.
-      auto vals =
-          tracker.resolve(oldInst.getOperand(port.argNum), builder, loc);
-      newOperands.append(vals.begin(), vals.end());
-
-    } else {
-      // Non-ready output: stays output. Record for commit() after creation.
-      nonReadyOutputsToCommit.push_back({port.name.getValue(), port.argNum});
-    }
-  }
-
-  // clk and rst are always the last two operands.
-  newOperands.push_back(tracker.getClk());
-  newOperands.push_back(tracker.getRst());
-
-  auto newInst = builder.create<hw::InstanceOp>(
-      loc, newMod, oldInst.getInstanceNameAttr(), newOperands);
-
-  // Commit all result mappings back to the tracker.
-  for (auto [name, oldIdx] : nonReadyOutputsToCommit)
-    tracker.commit(oldInst.getResult(oldIdx), name, static_cast<int>(oldIdx),
-                   oldMod, newMod, newInst);
-  for (auto [name, oldVal] : readyInputsToCommit)
-    tracker.commit(oldVal, name, /*oldOutputIdx=*/-1, oldMod, newMod, newInst);
-}
-
-void ModuleRewriter::wireTerminator(const PortLayout &layout,
-                                    hw::HWModuleOp newMod) {
-  // Collect (newIndex, old signal) for every output port, sorted by index
-  // so the operands match the declared port order.
-  SmallVector<std::pair<unsigned, Value>> outputs;
-  for (auto &rp : layout.ports)
-    if (rp.direction == hw::ModulePort::Direction::Output)
-      outputs.push_back({rp.newIndex, rp.oldSignal});
-  llvm::sort(outputs, [](auto &a, auto &b) { return a.first < b.first; });
-
-  SmallVector<Value> operands;
-  for (auto &[idx, oldSig] : outputs) {
-    auto vals = tracker.get(oldSig);
-    operands.append(vals.begin(), vals.end());
-  }
-  newMod.getBodyBlock()->getTerminator()->setOperands(operands);
-}
-
-//===----------------------------------------------------------------------===//
-// Entry point: SignalRewriter::rewriteAllSignals()
-//===----------------------------------------------------------------------===//
-
-LogicalResult SignalRewriter::rewriteAllSignals(mlir::ModuleOp modOp) {
-  DenseMap<StringRef, hw::HWModuleOp> oldMods, newMods;
-  SymbolTable symTable(modOp);
-
-  // Collect all existing hw modules.
-  modOp.walk([&](hw::HWModuleOp m) { oldMods.insert({m.getName(), m}); });
-
-  // Rewrite each module (ModuleRewriter handles the recursion internally).
-  ModuleRewriter rewriter(getTopFunctionName());
-  for (auto &[name, mod] : oldMods)
-    rewriter.rewriteModule(mod, modOp, symTable, newMods, oldMods);
-
-  // Erase the originals.
-  for (auto &[name, mod] : oldMods)
-    mod.erase();
-
-  // Rename rewritten copies back to the original names and update all
-  // hw::InstanceOp references that still point to the temporary "_rewritten"
-  // name.
-  for (auto &[origName, newMod] : newMods) {
-    StringRef currentName = newMod.getName();
-    StringAttr origAttr = StringAttr::get(modOp.getContext(), origName);
-    modOp.walk([&](hw::InstanceOp inst) {
-      if (inst.getModuleName() == currentName)
-        inst.setModuleName(origAttr);
-    });
-    newMod.setName(origName);
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 //
-// Step 3: Populate hw modules with BLIF-imported netlists
+// Step 2: Populate hw modules with BLIF-imported netlists
 //
 // Replaces the synth::SubcktOp placeholder body that Step 1 inserted into
 // each hw::HWModuleOp with the real gate-level netlist imported from the
@@ -1316,6 +196,591 @@ mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
 }
 } // namespace dynamatic
 
+namespace dynamatic {
+
+// Step 1: Convert handshake ops into hw modules and unbundle their ports
+
+// Function to unbundle a handshake port into its constituent signals (ready,
+// valid, data)
+SmallVector<UnbundledPort>
+unbundleHandshakePort(Type type, std::string handshakePortName,
+                      hw::ModulePort::Direction handshakePortDir,
+                      Value handshakePort) {
+
+  SmallVector<UnbundledPort> unbundledPorts;
+
+  // Flipped direction: input becomes output and vice versa.
+  auto flip = [](hw::ModulePort::Direction d) {
+    return d == hw::ModulePort::Direction::Input
+               ? hw::ModulePort::Direction::Output
+               : hw::ModulePort::Direction::Input;
+  };
+
+  auto addPort = [&](StringRef name, hw::ModulePort::Direction dir, Value val,
+                     PortBitType bitType, unsigned bitIdx = 0,
+                     unsigned nBits = 1) {
+    unbundledPorts.push_back({name.str(), dir, val, bitIdx, nBits, bitType});
+  };
+
+  // Depending on the type, the unbundling will be different
+  if (auto channel = dyn_cast<handshake::ChannelType>(type)) {
+    // For a channel type, we unbundle into ready, valid, and data ports
+    unsigned dataWidth = channel.getDataType().cast<IntegerType>().getWidth();
+    for (unsigned bit = 0; bit < dataWidth; ++bit) {
+      addPort(bitPortName(handshakePortName, bit, dataWidth), handshakePortDir,
+              handshakePort, PortBitType::DATA, bit, dataWidth);
+    }
+    // valid: keep direction, always i1
+    addPort(insertSuffix(handshakePortName, "_valid"), handshakePortDir,
+            handshakePort, PortBitType::VALID);
+    // ready: flip direction, always i1
+    addPort(insertSuffix(handshakePortName, "_ready"), flip(handshakePortDir),
+            handshakePort, PortBitType::READY);
+  } else if (isa<handshake::ControlType>(type)) {
+    // valid: keep direction, always i1
+    addPort(insertSuffix(handshakePortName, "_valid"), handshakePortDir,
+            handshakePort, PortBitType::VALID);
+    // ready: flip direction, always i1
+    addPort(insertSuffix(handshakePortName, "_ready"), flip(handshakePortDir),
+            handshakePort, PortBitType::READY);
+  } else if (auto mem = dyn_cast<MemRefType>(type)) {
+    unsigned dataWidth = mem.getElementType().cast<IntegerType>().getWidth();
+    for (unsigned bit = 0; bit < dataWidth; ++bit) {
+      addPort(bitPortName(handshakePortName, bit, dataWidth), handshakePortDir,
+              handshakePort, PortBitType::DATA, bit, dataWidth);
+    }
+    // valid: keep direction, always i1
+    addPort(insertSuffix(handshakePortName, "_valid"), handshakePortDir,
+            handshakePort, PortBitType::VALID);
+    // ready: flip direction, always i1
+    addPort(insertSuffix(handshakePortName, "_ready"), flip(handshakePortDir),
+            handshakePort, PortBitType::READY);
+  } else {
+    // Pass-through: split multi-bit integer types into i1 ports.
+    if (auto intTy = dyn_cast<IntegerType>(type)) {
+      unsigned width = intTy.getWidth();
+      for (unsigned b = 0; b < width; ++b)
+        addPort(bitPortName(handshakePortName, b, width), handshakePortDir,
+                handshakePort, PortBitType::DATA, b, width);
+    } else {
+      addPort(handshakePortName, handshakePortDir, handshakePort,
+              PortBitType::DATA);
+    }
+  }
+  return unbundledPorts;
+}
+
+// Function to build the hw::ModulePortInfo for a given handshake operation by
+// unbundling its ports
+std::pair<hw::ModulePortInfo, SmallVector<UnbundledPort>>
+buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
+
+  SmallVector<UnbundledPort> unbundledPorts;
+
+  // First, we have to derive the base names from NamedIOInterface
+  SmallVector<std::string> handshakeInPortNames, handshakeOutPortNames;
+  // Check if it is a funcOp
+  if (auto funcOp = dyn_cast<handshake::FuncOp>(handshakeOp)) {
+    // In this case the naming convention is generic
+    for (auto [i, _] : llvm::enumerate(funcOp.getArguments()))
+      handshakeInPortNames.push_back("in" + std::to_string(i));
+    for (auto [i, _] : llvm::enumerate(funcOp.getResultTypes()))
+      handshakeOutPortNames.push_back("out" + std::to_string(i));
+  } else {
+    // For other ops we use the op name as base for the port names
+    // We have to fix the names of the ports so that the root_N pattern is
+    // converted to root[N] to be compatible with the BLIF importer
+    auto namedIO = dyn_cast<handshake::NamedIOInterface>(handshakeOp);
+    assert(namedIO && "op must implement NamedIOInterface");
+
+    // Pattern "root_N": convert to "root[N]"
+    static const std::regex indexPat(R"((\w+)_(\d+))");
+    auto elaborateName = [&](std::string operandName,
+                             SmallVector<std::string> &operandNames) {
+      std::smatch m;
+      if (!std::regex_match(operandName, m, indexPat)) {
+        operandNames.push_back(operandName);
+        return;
+      }
+      // If the name matches the pattern, elaborate it into an array name.
+      std::string root = m[1].str();
+      unsigned idx = std::stoi(m[2].str());
+      if (idx == 0) {
+        operandNames.push_back(root);
+      } else {
+        if (idx == 1) {
+          // The first time we see this pattern, we need to back-patch the root
+          // name to have the "[0]" suffix, since the original name was used for
+          // the first element.
+          auto it = llvm::find(operandNames, root);
+          assert(it != operandNames.end() &&
+                 "index-0 port not found for back-patch");
+          *it = formatArrayName(root, 0);
+        }
+        operandNames.push_back(formatArrayName(root, idx));
+      }
+    };
+    // Iterate over the operand and result names and fix the ones that match the
+    // pattern
+    for (auto [i, _] : llvm::enumerate(handshakeOp->getOperands()))
+      elaborateName(namedIO.getOperandName(i), handshakeInPortNames);
+    for (auto [i, _] : llvm::enumerate(handshakeOp->getResults()))
+      elaborateName(namedIO.getResultName(i), handshakeOutPortNames);
+  }
+
+  // Second, we use the base names to unbundle the ports and build the
+  // hw::ModulePortInfo
+  // Check if the op is a funcOp
+  if (auto funcOp = dyn_cast<handshake::FuncOp>(handshakeOp)) {
+    // Unbundle the input ports
+    for (auto [i, val] : llvm::enumerate(funcOp.getArguments())) {
+      auto unbundled =
+          unbundleHandshakePort(val.getType(), handshakeInPortNames[i],
+                                hw::ModulePort::Direction::Input, val);
+      unbundledPorts.append(unbundled.begin(), unbundled.end());
+    }
+    // Unbundle the output ports
+    for (auto [i, val] : llvm::enumerate(funcOp.getResultTypes())) {
+      auto unbundled = unbundleHandshakePort(
+          val, handshakeOutPortNames[i], hw::ModulePort::Direction::Output, {});
+      unbundledPorts.append(unbundled.begin(), unbundled.end());
+    }
+  } else {
+    // Unbundle the input ports
+    for (auto [i, val] : llvm::enumerate(handshakeOp->getOperands())) {
+      auto unbundled =
+          unbundleHandshakePort(val.getType(), handshakeInPortNames[i],
+                                hw::ModulePort::Direction::Input, val);
+      unbundledPorts.append(unbundled.begin(), unbundled.end());
+    }
+    // Unbundle the output ports
+    for (auto [i, val] : llvm::enumerate(handshakeOp->getResults())) {
+      auto unbundled =
+          unbundleHandshakePort(val.getType(), handshakeOutPortNames[i],
+                                hw::ModulePort::Direction::Output, val);
+      unbundledPorts.append(unbundled.begin(), unbundled.end());
+    }
+  }
+  // Build the hw::ModulePortInfo from the unbundled ports
+  SmallVector<hw::PortInfo> hwInputs, hwOutputs;
+  Type i1 = IntegerType::get(ctx, 1);
+  unsigned inIdx = 0, outIdx = 0;
+  for (auto &port : unbundledPorts) {
+    unsigned &counter =
+        port.direction == hw::ModulePort::Direction::Input ? inIdx : outIdx;
+    hw::PortInfo pi{{StringAttr::get(ctx, port.name), i1, port.direction},
+                    counter++};
+    (port.direction == hw::ModulePort::Direction::Input ? hwInputs : hwOutputs)
+        .push_back(pi);
+  }
+  // Add clk and rst ports
+  unsigned clkIdx = inIdx++;
+  unsigned rstIdx = inIdx++;
+  hwInputs.push_back({{StringAttr::get(ctx, clockSignal), i1,
+                       hw::ModulePort::Direction::Input},
+                      clkIdx});
+  hwInputs.push_back({{StringAttr::get(ctx, resetSignal), i1,
+                       hw::ModulePort::Direction::Input},
+                      rstIdx});
+
+  return {hw::ModulePortInfo(hwInputs, hwOutputs), unbundledPorts};
+}
+
+LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
+  MLIRContext *ctx = modOp.getContext();
+  // Get top function
+  topFunction = nullptr;
+  for (auto op : modOp.getOps<handshake::FuncOp>()) {
+    if (op.isExternal())
+      continue;
+    if (topFunction) {
+      modOp->emitOpError() << "we currently only support one non-external "
+                              "handshake function per module";
+      return failure();
+    }
+    topFunction = op;
+  }
+  assert(topFunction && "expected to find a non-external handshake function");
+  // Get the port info for the top function and build the corresponding hw
+  // module
+  auto [topHWPortInfo, unbundledPortsTop] = buildPortInfo(topFunction, ctx);
+  builder.setInsertionPointToStart(modOp.getBody());
+  StringAttr topName = StringAttr::get(ctx, getUniqueName(topFunction));
+  topHWModule = builder.create<hw::HWModuleOp>(topFunction.getLoc(), topName,
+                                               topHWPortInfo);
+
+  // Record the clk and rst from the top module block args which are the last
+  // two ports in the port list
+  Block *topBlock = topHWModule.getBodyBlock();
+  unsigned numArgs = topBlock->getNumArguments();
+  rst = topBlock->getArgument(numArgs - 1);
+  clk = topBlock->getArgument(numArgs - 2);
+
+  // Save the mapping between the old handshake channels of the func and the new
+  // hw module ports
+  unsigned argIdx = 0;
+  for (auto [i, arg] : llvm::enumerate(topFunction.getArguments())) {
+    // Collect all unbundled ports that correspond to this argument only for
+    // data and valid bits
+    // For the ready signals, coming from the output channels, we will collect
+    // them later when we convert the terminator
+    for (auto portType : {PortBitType::DATA, PortBitType::VALID}) {
+      SmallVector<Value> unbundledValues;
+      for (auto &unbundledPort : unbundledPortsTop) {
+        if (unbundledPort.handshakeSignal == arg &&
+            unbundledPort.direction == hw::ModulePort::Direction::Input &&
+            unbundledPort.bitType == portType) {
+          unbundledValues.push_back(topBlock->getArgument(argIdx++));
+        }
+      }
+      if (!unbundledValues.empty())
+        saveUnbundledValues(arg, portType, unbundledValues);
+    }
+  }
+
+  // Save the mapping for the input ready signals that belong to the output of
+  // the top func
+  // These values correspond to the inputs of the terminator
+  handshake::EndOp endOp =
+      *topFunction.getBody().getOps<handshake::EndOp>().begin();
+  unsigned endOpIdx = 0;
+  // For each operand, extract the ready signal and save it
+  for (auto &unbundledPort : unbundledPortsTop) {
+    if (unbundledPort.direction == hw::ModulePort::Direction::Input &&
+        unbundledPort.bitType == PortBitType::READY) {
+      assert(endOpIdx < endOp.getNumOperands() &&
+             "not enough operands in the terminator for the ready signals");
+      Value operand = endOp.getOperand(endOpIdx++);
+      saveUnbundledValues(operand, PortBitType::READY,
+                          {topBlock->getArgument(argIdx++)});
+    }
+  }
+  // Now, we unbundle the channels of each inner handshake op
+  for (Operation &op : *topFunction.getBodyBlock()) {
+    if (isa<handshake::EndOp>(op))
+      continue; // handled as part of convertFuncOp
+    if (failed(convertHandshakeOp(&op)))
+      return failure();
+  }
+
+  // Connect the top module's output to the terminator
+  return convertHandshakeFunc();
+}
+
+// Helper function to format tuple from map
+UnbundledValuesTuple
+HandshakeUnbundler::updateTuple(UnbundledValuesTuple oldTuple,
+                                SmallVector<Value> newValues,
+                                PortBitType bitType) {
+  SmallVector<Value> dataValues = std::get<0>(oldTuple);
+  Value validValue = std::get<1>(oldTuple);
+  Value readyValue = std::get<2>(oldTuple);
+  if (bitType == PortBitType::DATA)
+    dataValues = newValues;
+  else if (bitType == PortBitType::VALID) {
+    if (!newValues.empty())
+      validValue = newValues[0];
+    else
+      validValue = Value();
+  } else if (bitType == PortBitType::READY) {
+    if (!newValues.empty())
+      readyValue = newValues[0];
+    else
+      readyValue = Value();
+  }
+  return {dataValues, validValue, readyValue};
+}
+
+// Helper function to get newValues from a tuple
+SmallVector<Value>
+HandshakeUnbundler::getValuesFromTuple(UnbundledValuesTuple valTuple,
+                                       PortBitType bitType) {
+  if (bitType == PortBitType::DATA)
+    return std::get<0>(valTuple);
+  if (bitType == PortBitType::VALID) {
+    Value v = std::get<1>(valTuple);
+    return v ? SmallVector<Value>{v} : SmallVector<Value>{};
+  }
+  if (bitType == PortBitType::READY) {
+    Value v = std::get<2>(valTuple);
+    return v ? SmallVector<Value>{v} : SmallVector<Value>{};
+  }
+  return {};
+}
+
+// Function to save the unbundled values for a given handshake
+// signal, which will be used as operands for the new hw instance
+void HandshakeUnbundler::saveUnbundledValues(
+    Value handshakeSignal, PortBitType bitType,
+    SmallVector<Value> unbundledValues) {
+
+  UnbundledValuesTuple valTuple;
+  // Check if a tuple already exists for this signal
+  if (auto it = unbundledValuesMap.find(handshakeSignal);
+      it != unbundledValuesMap.end()) {
+    valTuple = it->second;
+  }
+  // Update the tuple with the new values
+  valTuple = updateTuple(valTuple, unbundledValues, bitType);
+  unbundledValuesMap[handshakeSignal] = valTuple;
+
+  // Remove the placeholder if it exists, since we now have the real unbundled
+  // values
+  if (placeholderMap.contains(handshakeSignal)) {
+    // Check if the placeholder has the same bit type as the new unbundled
+    // values
+    SmallVector<Value> placeholderValues =
+        getValuesFromTuple(placeholderMap[handshakeSignal], bitType);
+    if (!placeholderValues.empty()) {
+      // Assert the size of the placeholder values is the same as the new
+      // unbundled values
+      assert(placeholderValues.size() == unbundledValues.size() &&
+             "placeholder values size should be the same as the new unbundled "
+             "values");
+      // Replace all its uses
+      for (unsigned i = 0; i < placeholderValues.size(); ++i) {
+        placeholderValues[i].replaceAllUsesWith(unbundledValues[i]);
+        // Erase the placeholder
+        if (auto defOp = placeholderValues[i].getDefiningOp())
+          defOp->erase();
+      }
+      // Update the map by removing the placeholder entry for that bit type
+      UnbundledValuesTuple placeholderTuple =
+          updateTuple(placeholderMap[handshakeSignal], {}, bitType);
+      // If all the values in the tuple are empty, we can erase the entry from
+      // the map
+      if (std::get<0>(placeholderTuple).empty() &&
+          std::get<1>(placeholderTuple) == Value() &&
+          std::get<2>(placeholderTuple) == Value()) {
+        placeholderMap.erase(handshakeSignal);
+      } else {
+        // If not empty, update the tuple in the map
+        placeholderMap[handshakeSignal] = placeholderTuple;
+      }
+    }
+  }
+}
+
+// Function to get the unbundled values for a given handshake signal, which
+// will be used as operands for the new hw instance
+SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
+                                                          unsigned totalBits,
+                                                          PortBitType bitType,
+                                                          Location loc) {
+
+  // Check if the unbundled values for this signal have already been
+  // computed
+  if (auto it = unbundledValuesMap.find(handshakeSignal);
+      it != unbundledValuesMap.end()) {
+    // Check per bit type
+    SmallVector<Value> extractedValues =
+        getValuesFromTuple(it->second, bitType);
+    if (!extractedValues.empty())
+      return extractedValues;
+  }
+  std::tuple<SmallVector<Value>, Value, Value> valTuple;
+  // Check if a placeholder exists for this signal
+  if (auto it = placeholderMap.find(handshakeSignal);
+      it != placeholderMap.end()) {
+    valTuple = it->second;
+    // Check per bit type
+    SmallVector<Value> extractedValues =
+        getValuesFromTuple(it->second, bitType);
+    if (!extractedValues.empty())
+      return extractedValues;
+  }
+  // If not, create a new placeholder and return it
+  SmallVector<Value> placeholders;
+  builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
+  for (unsigned i = 0; i < totalBits; ++i) {
+    auto c = builder.create<hw::ConstantOp>(
+        loc, builder.getIntegerType(1),
+        builder.getIntegerAttr(builder.getIntegerType(1), 0));
+    placeholders.push_back(c.getResult());
+  }
+  placeholderMap[handshakeSignal] =
+      updateTuple(valTuple, placeholders, bitType);
+  return placeholders;
+}
+
+// Function to convert a handshake operation by unbundling its channels and
+// replacing it with the corresponding hw instance.
+mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
+  MLIRContext *ctx = modOp.getContext();
+  Location loc = topHWModule.getBodyBlock()->getTerminator()->getLoc();
+  StringRef opName = getUniqueName(op);
+  StringAttr moduleName = StringAttr::get(ctx, opName);
+
+  // Check if an hw module for this operation already exists (e.g. because of
+  // multiple instances of the same op)
+  hw::HWModuleOp hwModDef = symTable.lookup<hw::HWModuleOp>(moduleName);
+  if (!hwModDef) {
+    // If it does not exist, create it
+    auto [portInfo, unbundledPorts] = buildPortInfo(op, ctx);
+
+    // Insert submodule definitions before the top module.
+    builder.setInsertionPointToEnd(modOp.getBody());
+    hwModDef =
+        builder.create<hw::HWModuleOp>(op->getLoc(), moduleName, portInfo);
+
+    // Create subckt placeholder body for the new module
+    OpBuilder bodyBuilder(hwModDef.getBodyBlock(),
+                          hwModDef.getBodyBlock()->begin());
+    SmallVector<Value> bodyInputs(hwModDef.getBodyBlock()->getArguments());
+    SmallVector<Type> outputTypes;
+    for (auto &port : hwModDef.getPortList())
+      if (port.isOutput())
+        outputTypes.push_back(port.type);
+    Operation *term = hwModDef.getBodyBlock()->getTerminator();
+    auto subckt = bodyBuilder.create<synth::SubcktOp>(
+        term->getLoc(), TypeRange(outputTypes), bodyInputs, "synth_subckt");
+    term->setOperands(subckt.getResults());
+
+    // Record BLIF path for this handshake op
+    auto blifIface = dyn_cast<BLIFImplInterface>(op);
+    StringAttr blifAttr = blifIface ? blifIface.getBLIFImpl() : StringAttr{};
+    opToBlifPathMap[hwModDef.getOperation()] =
+        (blifAttr && !blifAttr.getValue().empty()) ? blifAttr.getValue().str()
+                                                   : "";
+  }
+  assert(hwModDef && "failed to create or find hw module for handshake op");
+
+  // Build the instance inside the top hw module
+  builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
+  // Collect the unbundled operands
+  SmallVector<Value> hwInstOperands;
+  auto [portInfo, unbundledPorts] = buildPortInfo(op, ctx);
+  for (auto &port : unbundledPorts) {
+    if (port.direction != hw::ModulePort::Direction::Input)
+      continue;
+    // Check if the port is clk or rst
+    if (port.name == clockSignal || port.name == resetSignal) {
+      // We will connect them later, for now we can skip them
+      continue;
+    }
+    auto unbundledValues = getUnbundledValues(
+        port.handshakeSignal, port.totalBits, port.bitType, loc);
+    assert(port.bitIndex < unbundledValues.size() &&
+           "Unbundled values size should be the same at the bit index of the "
+           "original port");
+    hwInstOperands.push_back(unbundledValues[port.bitIndex]);
+  }
+  // Add clk and rst signals as operands
+  hwInstOperands.push_back(clk);
+  hwInstOperands.push_back(rst);
+
+  // Assert the number of input operands match the number of inputs of the hw
+  // mod def
+  unsigned numInputs = 0;
+  for (auto &port : hwModDef.getPortList())
+    if (port.isInput())
+      numInputs++;
+  assert(
+      hwInstOperands.size() == numInputs &&
+      "number of instance operands should match the number of module inputs");
+  builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
+
+  // Create the instance
+  auto instOp = builder.create<hw::InstanceOp>(
+      loc, hwModDef, StringAttr::get(ctx, opName.str() + "_inst"),
+      hwInstOperands);
+
+  // Save the mapping between the old handshake channels for the op output and
+  // the new hw module ports output
+  // Create a map from handshake result to the list of (instance result index,
+  // bit index) pairs that correspond to it. We need to group by handshake
+  // result first because multiple hw module outputs. This is done only for
+  // data signals. For the other signals we can directly save the mapping
+  // since they are single bit
+  DenseMap<Value, SmallVector<std::pair<unsigned, unsigned>>> outputPortsBitMap;
+  unsigned outIdx = 0;
+  for (auto &port : unbundledPorts) {
+    if (port.direction != hw::ModulePort::Direction::Output)
+      continue;
+    if (port.bitType == PortBitType::DATA) {
+      outputPortsBitMap[port.handshakeSignal].push_back(
+          {outIdx++, port.bitIndex});
+    } else {
+      saveUnbundledValues(port.handshakeSignal, port.bitType,
+                          {instOp->getResult(outIdx++)});
+    }
+  }
+  for (auto &[handshakeValue, bitIdxPairs] : outputPortsBitMap) {
+    // Sort by bitIndex to reconstruct the correct bit order.
+    llvm::sort(bitIdxPairs,
+               [](auto &a, auto &b) { return a.second < b.second; });
+    SmallVector<Value> unbundledValues;
+    for (auto [instIdx, _] : bitIdxPairs)
+      unbundledValues.push_back(instOp->getResult(instIdx));
+    saveUnbundledValues(handshakeValue, PortBitType::DATA, unbundledValues);
+  }
+
+  return success();
+}
+
+LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
+  assert(topHWModule && "Top hw module must exist before convertHandshakeFunc");
+  // Get the terminator handshake::EndOp
+  handshake::EndOp endOp;
+  for (Operation &op : *topFunction.getBodyBlock()) {
+    if ((endOp = dyn_cast<handshake::EndOp>(op)))
+      break;
+  }
+  assert(endOp && "handshake::FuncOp must contain an EndOp");
+
+  // Collect the unbundled operands for the terminator
+  SmallVector<Value> hwTermOperands;
+  for (Value operand : endOp.getOperands()) {
+    // Get the data bitwidth of the operand
+    unsigned dataBitwidth = 0;
+    if (auto channelType = operand.getType().dyn_cast<handshake::ChannelType>())
+      dataBitwidth = channelType.getDataType().cast<IntegerType>().getWidth();
+    else if (auto memType = operand.getType().dyn_cast<MemRefType>())
+      dataBitwidth = memType.getElementType().cast<IntegerType>().getWidth();
+    else if (auto intType = operand.getType().dyn_cast<IntegerType>())
+      dataBitwidth = intType.getWidth();
+    else
+      dataBitwidth =
+          0; // For control types and other types, we treat them as 0 bits
+    SmallVector<Value> unbundledValues;
+    if (dataBitwidth > 0) {
+      // Add data signals
+      unbundledValues = getUnbundledValues(operand, dataBitwidth,
+                                           PortBitType::DATA, endOp.getLoc());
+      hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
+    }
+    // Add valid signals
+    unbundledValues =
+        getUnbundledValues(operand, 1, PortBitType::VALID, endOp.getLoc());
+    hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
+  }
+  // Check also the inputs of the topFuncOp whose ready signals are connected
+  // to the terminator
+  for (auto [i, arg] : llvm::enumerate(topFunction.getArguments())) {
+    auto unbundledValues =
+        getUnbundledValues(arg, 1, PortBitType::READY, endOp.getLoc());
+    hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
+  }
+  topHWModule.getBodyBlock()->getTerminator()->setOperands(hwTermOperands);
+
+  // Check there are no more placeholders left, which would indicate some
+  // signals were not properly connected
+  if (!placeholderMap.empty()) {
+    llvm::errs() << "Error: there are still placeholders left after converting "
+                    "the handshake function. This indicates some signals were "
+                    "not properly connected.\n";
+    return failure();
+  }
+
+  // Erase the original terminator and the handshake function
+  endOp.erase();
+  topFunction.erase();
+
+  return success();
+}
+
+} // namespace dynamatic
+
 // ------------------------------------------------------------------
 // Main pass definition
 // ------------------------------------------------------------------
@@ -1326,12 +791,11 @@ namespace {
 // 0) Check each handshake operation is marked with the path of the blif file
 //    where its definition is located. This is done in a separate pass
 //    (--mark-handshake-blif-impl).
-// 1) Unbundle all handshake types used in the handshake function
-// 2) Invert the direction of ready signals in all hw modules and hw instances
-//    to follow the standard handshake protocol where ready signals go in the
-//    opposite direction with respect to data and valid signals. Additionally,
-//    data signals are unbundled into single-bit signals.
-// 3) Populate the hw module operations with the correspoding synth operations.
+// 1) Unbundle all handshake types used in the handshake function and the
+//    inner handshake operations into their constituent signals (ready, valid,
+//    data) and create a new hw module for the top-level handshake function with
+//    ports corresponding to the unbundled signals.
+// 2) Populate the hw module operations with the correspoding synth operations.
 //    The description of the implementation is defined in the path specified
 //    by the attribute blifPathAttrStr on each hw module
 class HandshakeToSynthPass
@@ -1384,22 +848,11 @@ public:
     });
 
     // Step 1: unbundle all handshake types in the handshake operations
-    if (failed(unbundleAllHandshakeTypes(modOp, ctx)))
+    HandshakeUnbundler unbundler(modOp);
+    if (failed(unbundler.unbundleHandshakeChannels()))
       return signalPassFailure();
 
-    // Step 2: invert the direction of all ready signals in the hw modules
-    // created from handshake operations. Additionally, unbundle data signals
-    // into single-bit signals.
-    //
-    // Create on object of the SignalRewriter class to manage the
-    // inversion
-    SignalRewriter signalRewriter;
-    // Set the name of the top function
-    signalRewriter.setTopFunctionName(topModuleName);
-    if (failed(signalRewriter.rewriteAllSignals(modOp)))
-      return signalPassFailure();
-
-    // Step 3: Populate the hw module operations with the correspoding synth
+    // Step 2: Populate the hw module operations with the correspoding synth
     // operations. The description of the implementation is defined in the
     // path specified by the attribute blifPathAttrStr on each hw module.
     if (failed(populateAllHWModules(modOp, topModuleName)))

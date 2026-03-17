@@ -81,7 +81,7 @@ namespace dynamatic {
 
 /// Maps each hw::HWModuleOp (by Operation*) to the BLIF file path it should
 /// be populated from.  An empty string means the module needs no replacement.
-/// Written during Step 1 (unbundling) and consumed during Step 3 (populate).
+/// Written during Step 1 (unbundling) and consumed during Step 2 (populate).
 static mlir::DenseMap<mlir::Operation *, std::string> opToBlifPathMap;
 
 /// Port name for the clock signal added to every rewritten hw module.
@@ -90,230 +90,8 @@ static const std::string clockSignal = "clk";
 /// Port name for the reset signal added to every rewritten hw module.
 static const std::string resetSignal = "rst";
 
-/// Identifies which component of a bundled Handshake channel a flat HW port
-/// corresponds to (used in Step 1).
-enum SignalKind { DATA_SIGNAL = 0, VALID_SIGNAL = 1, READY_SIGNAL = 2 };
-
 //===----------------------------------------------------------------------===//
-// Step 2 - Sub-component A: PortLayout
-//
-// Describes the new port list that results from applying the ready-direction
-// flip and bit-splitting to an old hw::HWModuleOp. Callers use the result to
-// create new modules and to seed the SignalTracker.
-//===----------------------------------------------------------------------===//
-
-/// Describes one flat i1 port in the rewritten module.
-struct RewrittenPort {
-  std::string name; ///< final port name (bit-indexed if needed)
-  hw::ModulePort::Direction direction; ///< direction in the *new* module
-  unsigned newIndex; ///< position in the new module's port list
-
-  /// The Value in the *old* module that this port corresponds to
-  mlir::Value oldSignal;
-
-  /// True only for non-ready ports that were outputs in the old module.
-  /// Used to populate the oldOutputIdx -> newOutputIdx index table.
-  bool wasNonReadyOutput = false;
-  unsigned oldOutputIdx = 0; ///< valid only when wasNonReadyOutput
-};
-
-/// The complete result of computePortLayout(): everything needed to create
-/// the new hw::HWModuleOp and to seed the SignalTracker.
-struct PortLayout {
-  llvm::SmallVector<RewrittenPort> ports; ///< one entry per flat i1 port
-  unsigned clkNewIndex;                   ///< port index of the added clk input
-  unsigned rstNewIndex;                   ///< port index of the added rst input
-};
-
-/// Analyses \p oldMod's port list and returns a PortLayout describing the
-/// new module's ports.
-///
-/// Direction rules:
-///   ready input   ->  output  (flipped)
-///   ready output  ->  input   (flipped)
-///   non-ready input  ->  input   (unchanged)
-///   non-ready output ->  output  (unchanged)
-///
-/// Multi-bit ports are expanded into individual i1 ports.
-/// clk and rst index slots are recorded in the layout; the actual
-/// hw::PortInfo entries are added by buildModulePortInfo().
-PortLayout computePortLayout(hw::HWModuleOp oldMod);
-
-/// Converts \p layout into the hw::ModulePortInfo needed to construct the
-/// new hw::HWModuleOp.  clk and rst inputs are appended automatically.
-hw::ModulePortInfo buildModulePortInfo(const PortLayout &layout,
-                                       mlir::MLIRContext *ctx);
-
-//===----------------------------------------------------------------------===//
-// Step 2 - Sub-component B: SignalTracker
-//
-// Maintains the mapping from old-module Values to new-module Values as
-// modules are rewritten one by one.
-//
-// Intended three-phase usage per module:
-//   1. recordInputs()          - seed with the new module's block arguments
-//   2. resolve()               - look up (or create placeholders for) operand
-//                                values when building new hw::InstanceOps
-//   3. commit()                - record definitive result values and patch
-//                                any outstanding placeholders
-//===----------------------------------------------------------------------===//
-
-class SignalTracker {
-public:
-  // -----------------------------------------------------------------------
-  // Seeding - called when a new hw::HWModuleOp has just been created
-  // -----------------------------------------------------------------------
-
-  /// Records the mapping from each new input block argument of \p newMod back
-  /// to the corresponding old-module Value described by \p layout.
-  void recordInputs(const PortLayout &layout, hw::HWModuleOp newMod);
-
-  /// Captures the clk and rst block arguments of the top module.
-  /// Must be called exactly once, for the top-level module only.
-  void recordClkRst(const PortLayout &layout, hw::HWModuleOp newMod);
-
-  /// Stores the oldOutputIdx -> newOutputIdx mapping for \p modName so that
-  /// commit() can locate the right result slots on new instances.
-  void recordOutputIndexMap(
-      mlir::StringAttr modName,
-      llvm::SmallVector<std::pair<unsigned, llvm::SmallVector<unsigned>>>
-          mapping);
-
-  // -----------------------------------------------------------------------
-  // Resolution - called while building hw::InstanceOp operands
-  // -----------------------------------------------------------------------
-
-  /// Returns the new-module Value(s) corresponding to \p oldSignal.
-  ///
-  /// If no resolved mapping exists yet a hw::ConstantOp(0) placeholder is
-  /// inserted for each bit; commit() will replace it with the real Value.
-  llvm::SmallVector<mlir::Value>
-  resolve(mlir::Value oldSignal, mlir::OpBuilder &builder, mlir::Location loc);
-
-  // -----------------------------------------------------------------------
-  // Committing - called after a new hw::InstanceOp has been created
-  // -----------------------------------------------------------------------
-
-  /// Records that \p oldResult maps to the corresponding result(s) of
-  /// \p newInst, and patches any placeholders previously inserted for it.
-  ///
-  /// Pass \p oldOutputIdx = -1 for ready signals (no index-based mapping).
-  void commit(mlir::Value oldResult, llvm::StringRef portName, int oldOutputIdx,
-              hw::HWModuleOp oldMod, hw::HWModuleOp newMod,
-              hw::InstanceOp newInst);
-
-  // -----------------------------------------------------------------------
-  // Accessors
-  // -----------------------------------------------------------------------
-
-  /// Returns the clock Value for the top module.  Asserts it has been set.
-  mlir::Value getClk() const;
-
-  /// Returns the reset Value for the top module.  Asserts it has been set.
-  mlir::Value getRst() const;
-
-  /// Returns the resolved Value(s) for \p oldSignal.
-  /// Asserts a definitive mapping already exists (i.e. after commit()).
-  llvm::SmallVector<mlir::Value> get(mlir::Value oldSignal) const;
-
-private:
-  /// Finds the result indices on \p newInst that correspond to \p oldOutputIdx.
-  /// Falls back to port-name lookup for ready signals (oldOutputIdx == -1).
-  llvm::SmallVector<unsigned> findNewResultIndices(llvm::StringRef portName,
-                                                   int oldOutputIdx,
-                                                   hw::HWModuleOp oldMod,
-                                                   hw::HWModuleOp newMod);
-
-  mlir::DenseMap<mlir::Value, llvm::SmallVector<mlir::Value>> resolvedMap;
-  mlir::DenseMap<mlir::Value, llvm::SmallVector<mlir::Value>> placeholderMap;
-  mlir::DenseMap<
-      mlir::StringAttr,
-      llvm::SmallVector<std::pair<unsigned, llvm::SmallVector<unsigned>>>>
-      outputIdxMap;
-
-  mlir::Value clk; ///< clk argument of the rewritten top module
-  mlir::Value rst; ///< rst argument of the rewritten top module
-};
-
-//===----------------------------------------------------------------------===//
-// Step 2 - Sub-component C: ModuleRewriter
-//
-// Orchestrates PortLayout (A) and SignalTracker (B).  Contains three focused
-// methods so that rewriteModule() is a readable high-level coordinator:
-//
-//   rewriteModule()    builds the new hw::HWModuleOp, seeds the tracker,
-//                      dispatches the body (instances or leaf), and wires
-//                      the terminator.
-//
-//   rewriteInstance()  classifies ports, resolves operands via the tracker,
-//                      creates the new hw::InstanceOp, and commits results.
-//
-//   wireTerminator()   collects resolved output Values from the tracker and
-//                      sets them on the new module's hw::OutputOp.
-//===----------------------------------------------------------------------===//
-
-class ModuleRewriter {
-public:
-  explicit ModuleRewriter(llvm::StringRef topFunctionName);
-
-  /// Rewrites \p oldMod and stores the result in \p newMods.
-  /// Recursively rewrites any modules referenced by instances inside
-  /// \p oldMod before processing it.
-  void rewriteModule(hw::HWModuleOp oldMod, mlir::ModuleOp parent,
-                     mlir::SymbolTable &symTable,
-                     mlir::DenseMap<llvm::StringRef, hw::HWModuleOp> &newMods,
-                     mlir::DenseMap<llvm::StringRef, hw::HWModuleOp> &oldMods);
-
-private:
-  /// Rewrites a single hw::InstanceOp from the old body into the new module.
-  void
-  rewriteInstance(hw::InstanceOp oldInst, mlir::ModuleOp parent,
-                  mlir::SymbolTable &symTable,
-                  mlir::DenseMap<llvm::StringRef, hw::HWModuleOp> &newMods,
-                  mlir::DenseMap<llvm::StringRef, hw::HWModuleOp> &oldMods);
-
-  /// Sets the operands of \p newMod's hw::OutputOp using \p layout and the
-  /// tracker's resolved output Values.
-  void wireTerminator(const PortLayout &layout, hw::HWModuleOp newMod);
-
-  SignalTracker tracker;
-  llvm::StringRef topName;
-};
-
-//===----------------------------------------------------------------------===//
-// Step 2 - Public entry point: SignalRewriter
-//
-// The only class the pass itself needs to interact with for Step 2.
-// Wraps ModuleRewriter and owns the top-function name.
-//===----------------------------------------------------------------------===//
-
-class SignalRewriter {
-public:
-  /// Rewrites every hw::HWModuleOp in \p modOp to invert ready-signal
-  /// directions, split multi-bit ports to i1, and add clk/rst.
-  /// Erases the originals and renames the rewritten copies back to the
-  /// original names so the rest of the pipeline is unaffected.
-  mlir::LogicalResult rewriteAllSignals(mlir::ModuleOp modOp);
-
-  /// Sets the name of the top-level Handshake / HW function.
-  /// Must be called before rewriteAllSignals().
-  void setTopFunctionName(llvm::StringRef name) {
-    assert(!name.empty() && "top function name must not be empty");
-    topFunction = name;
-  }
-
-  /// Returns the stored top function name.  Asserts it has been set.
-  llvm::StringRef getTopFunctionName() const {
-    assert(!topFunction.empty() && "top function name has not been set");
-    return topFunction;
-  }
-
-private:
-  llvm::StringRef topFunction;
-};
-
-//===----------------------------------------------------------------------===//
-// Step 3: BlifPopulator
+// Step 2: BlifPopulator
 //
 // Replaces the synth::SubcktOp placeholder body of each hw::HWModuleOp with
 // the gate-level netlist imported from its BLIF file.
@@ -350,5 +128,88 @@ private:
 /// \p topModuleName and calls BlifPopulator::populate() for each one.
 mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
                                          llvm::StringRef topModuleName);
+
+// Add new type for the tuple
+using UnbundledValuesTuple = std::tuple<SmallVector<Value>, Value, Value>;
+
+// Port bit types
+enum PortBitType { DATA, VALID, READY };
+
+// Struct to hold the new unbundled port information
+struct UnbundledPort {
+  std::string name;
+  // Direction in the *new* module after unbundling (ready signals are flipped).
+  hw::ModulePort::Direction direction;
+  // The Value in the *old* handshake module that this port corresponds to
+  Value handshakeSignal;
+  unsigned bitIndex;  // for data signals, indicates which bit of the original
+                      // channel this port corresponds to
+  unsigned totalBits; // for data signals, indicates the total number of bits in
+                      // the original channel (used for naming)
+  PortBitType bitType; // indicates whether this port corresponds to data,
+                       // valid, or ready component of the original channel
+};
+
+// Class that controls the unbundling of handshake channel types into integer
+// types
+class HandshakeUnbundler {
+public:
+  HandshakeUnbundler(ModuleOp modOp)
+      : modOp(modOp), symTable(modOp), builder(modOp) {}
+
+  // Top-level entry point for unbundling funcOp and all ops inside it
+  mlir::LogicalResult unbundleHandshakeChannels();
+
+private:
+  // Converts one Handshake op inside the funcop into an hw instance inside the
+  // top function
+  mlir::LogicalResult convertHandshakeOp(Operation *op);
+
+  // Converts one Handshake function into an hw module
+  mlir::LogicalResult convertHandshakeFunc();
+
+  // Function that returns unbundled values from a channel value. If the channel
+  // value has not been unbundled yet, creates hw constant placeholders for each
+  // bit and saves them.
+  llvm::SmallVector<Value> getUnbundledValues(Value channelVal,
+                                              unsigned totalBits,
+                                              PortBitType bitType,
+                                              Location loc);
+
+  // Function that saves the mapping from a channel value to its unbundled bit
+  // values. If there were placeholders for the channel value, replaces them
+  // with the real bit values.
+  void saveUnbundledValues(Value channelVal, PortBitType bitType,
+                           llvm::SmallVector<Value> bitValues);
+
+  // Helper function to format tuple from map
+  UnbundledValuesTuple updateTuple(UnbundledValuesTuple oldTuple,
+                                   SmallVector<Value> newValues,
+                                   PortBitType bitType);
+
+  SmallVector<Value> getValuesFromTuple(UnbundledValuesTuple valTuple,
+                                        PortBitType bitType);
+
+  // Module op
+  ModuleOp modOp;
+  handshake::FuncOp topFunction;
+  // Symbol table for looking up functions and modules
+  SymbolTable symTable;
+  // Builder for creating new operations
+  OpBuilder builder;
+  // Top HW Module
+  hw::HWModuleOp topHWModule;
+
+  // Maps handshake channel values to their unbundled bit values. The tuple is
+  // data bits, valid bit, ready bit
+  llvm::DenseMap<Value, UnbundledValuesTuple> unbundledValuesMap;
+  // Maps handshake channel values to any placeholder constants created for
+  // their unbundled bits. The tuple is data bits, valid bit, ready bit
+  llvm::DenseMap<Value, UnbundledValuesTuple> placeholderMap;
+
+  // clk and rst values from the top module
+  Value clk;
+  Value rst;
+};
 
 } // namespace dynamatic
