@@ -85,12 +85,32 @@ TIMEOUT_SYNTH_LSQ_SECONDS = 30 * 60
 
 
 def parse_sim_report(path: Path):
-    """Return (passed, cycle_count) from a simulation report.txt."""
+    """Return (passed, cycle_count, lsq_occupancy) from a simulation report.txt.
+
+    lsq_occupancy maps lsq_name -> {ldq_occupancy, stq_occupancy, combined_occupancy}.
+    """
     text = path.read_text()
     passed = "C and VHDL outputs match" in text
     m = re.search(r"Simulation done!\s+Latency\s*=\s*(\d+)\s+cycles", text)
     cycle_count = int(m.group(1)) if m else None
-    return passed, cycle_count
+
+    lsq_names = re.findall(r"Note: (\w+) LDQ occupancy:", text)
+    if not lsq_names:
+        return passed, cycle_count, None
+
+    lsq_occupancy: dict = {}
+    for name in lsq_names:
+        ldq = re.search(rf"Note: {name} LDQ occupancy:\s+cycles=(\d+) sum=(\d+) max=(\d+)", text)
+        stq = re.search(rf"Note: {name} STQ occupancy:\s+cycles=(\d+) sum=(\d+) max=(\d+)", text)
+        combined = re.search(rf"Note: {name} combined occupancy: max=(\d+)", text)
+        cycles = int(ldq.group(1))
+        lsq_occupancy[name] = {
+            "ldq_occupancy": {"mean": int(ldq.group(2)) / cycles, "max": int(ldq.group(3))},
+            "stq_occupancy": {"mean": int(stq.group(2)) / int(stq.group(1)), "max": int(stq.group(3))},
+            "combined_occupancy": {"max": int(combined.group(1))},
+        }
+
+    return passed, cycle_count, lsq_occupancy
 
 
 def parse_utilization(path: Path):
@@ -147,9 +167,9 @@ def extract_kernel_data(kernel: str, out_dir: Path) -> dict:
 
     sim_report = out_dir / "sim" / "report.txt"
     if sim_report.exists():
-        passed, cycle_count = parse_sim_report(sim_report)
+        passed, cycle_count, lsq_occupancy = parse_sim_report(sim_report)
         assert passed, "should not get here on failure"
-        data["simulation"] = {"cycle_count": cycle_count}
+        data["simulation"] = {"cycle_count": cycle_count, "lsqs": lsq_occupancy or None}
     else:
         data["simulation"] = None
 
