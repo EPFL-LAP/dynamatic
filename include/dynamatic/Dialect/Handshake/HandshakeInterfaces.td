@@ -68,7 +68,7 @@ def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
   }];
   let methods = [
    InterfaceMethod<[{
-       Get the internal state of each slot.
+       Get the internal state namer of each slot.
      }],
      "std::vector<BufferSlotFullNamer>", "getInternalSlotStateNamers", (ins)
    >,

@@ -9,9 +9,26 @@
 #include "llvm/Support/JSON.h"
 #include <variant>
 
+// FlowExpression together with FlowVariable implements a DSL for combining flow
+// variables, i.e. variables that track the flow and state of tokens, into
+// equations. A similar DSL exists for constraint programming in
+// `ConstraintProgramming.h`, but it is not reused for the following reasons:
+// 1. FlowExpression uses integer coefficients, whereas CPVars have doubles as
+// coefficients
+// 2. Metadata that is only necessary for FlowExpressions can easily be added
+// (variant, index tracker)
+// 3. No name is necessary, as each variable is uniquely defined by the metadata
+// 4. Dedicated conversion function to put multiple flow expressions into a
+// matrix, with an ordering according to whether the variables are annotatable
+// in SMV for use with Gaussian elimination
+
 namespace dynamatic {
 namespace handshake {
 
+// IndexTracker is used to represent flow variables that, instead of tracking
+// any token, only track tokens of a specific index. It is automatically added
+// for channel lambdas using IndexChannelAnalysis to determine if the channel
+// deals with indices.
 struct IndexTracker {
   size_t numValues;
   // Which token value does this variable track?

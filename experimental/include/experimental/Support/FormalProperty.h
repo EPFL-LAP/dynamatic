@@ -232,40 +232,21 @@ private:
   inline static const StringLiteral COPIED_SLOT_LIT = "copied_slot";
 };
 
-#ifdef false
-struct PathEquation {
-  std::vector<int> coefficients;
-  std::vector<std::string> names;
-  inline static const StringLiteral COEFFICIENTS_LIT = "coefficients";
-  inline static const StringLiteral NAMES_LIT = "names";
-};
-
-inline bool fromJSON(const llvm::json::Value &value, PathEquation &out,
-                     llvm::json::Path path) {
-  llvm::json::ObjectMapper mapper(value, path);
-  if (!mapper) {
-    return false;
-  }
-  if (!mapper.map(PathEquation::COEFFICIENTS_LIT, out.coefficients)) {
-    return false;
-  }
-  if (!mapper.map(PathEquation::NAMES_LIT, out.names)) {
-    return false;
-  }
-  return true;
-  /*
-  return (!mapper ||
-      !mapper.map(PathEquation::COEFFICIENTS_LIT, out.coefficients) ||
-      !mapper.map(PathEquation::NAMES_LIT, out.names));
-      */
-}
-
-inline llvm::json::Value toJSON(const PathEquation &out) {
-  return llvm::json::Object({{PathEquation::COEFFICIENTS_LIT, out.coefficients},
-                             {PathEquation::NAMES_LIT, out.names}});
-}
-#endif
-
+// A pair of two paths is called reconvergent if they split at the same fork,
+// and later reconverge at some join. Both of these paths will contain the same
+// number of tokens (although one needs to account for eager forks "generating"
+// new tokens when eagerly forwarding a token). Rather than starting at each
+// fork and following each path until they reconverge, these reconvergent paths
+// are annotated using Gaussian elimination: Each operation describes a local
+// equation about the number of tokens that have arrived at each operand, the
+// number of tokens that have left at each result, and the number of tokens
+// stored within internal state (e.g. a buffer slot or eager fork sent). If, for
+// every operation, these local equations are put into a matrix and Gaussian
+// elimination is performed, many variables can be eliminated, leaving a few
+// equations relating only the internal states. These equations correspond
+// exactly to the reconvergent paths.
+// See https://ieeexplore.ieee.org/document/10323796 Invariants from
+// Reconvergent Paths
 class ReconvergentPathFlow : public FormalProperty {
 public:
   std::vector<FlowExpression> getEquations() { return equations; }

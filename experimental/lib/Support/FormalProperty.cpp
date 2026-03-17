@@ -245,8 +245,6 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
-// Invariant 1 -- see https://ieeexplore.ieee.org/document/10323796
-
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
     uint64_t id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
     : FormalProperty(id, tag, TYPE::EFNAO) {
@@ -258,21 +256,30 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
   // std::string opName = sentStateNamers[0].opName;
   for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
     channels.push_back(state.toInnerJSON());
-    // assert(state.opName == opName);
-    // channels[i] = state.channelName;
   }
   // Example JSON:
-  // {
-  //   "owner_op": "fork0",
-  //   "channels": ["out0", "out1", "out2"]
-  // }
-  //
-  // or
-  //
-  // {
-  //   "owner_op": "control_merge0",
-  //   "channels": ["outs", "index"]
-  // }
+  // [
+  //   {
+  //     "channel_name": "outs_0",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   },
+  //   {
+  //     "channel_name": "outs_1",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   },
+  //   {
+  //     "channel_name": "outs_2",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   },
+  //   {
+  //     "channel_name": "outs_3",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   }
+  // ]
   return llvm::json::Array(channels);
 }
 
