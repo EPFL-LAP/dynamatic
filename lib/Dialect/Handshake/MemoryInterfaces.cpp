@@ -336,8 +336,10 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   unsigned loadIdx = 0, storeIdx = 0;
   for (GroupMemoryPorts &groupPorts : ports.groups) {
     // Number of load and store ports per block
-    loadsPerGroup.push_back(groupPorts.getNumPorts<LoadPort>());
-    storesPerGroup.push_back(groupPorts.getNumPorts<StorePort>());
+    unsigned numLoadsInGroup = groupPorts.getNumPorts<LoadPort>();
+    unsigned numStoresInGroup = groupPorts.getNumPorts<StorePort>();
+    loadsPerGroup.push_back(numLoadsInGroup);
+    storesPerGroup.push_back(numStoresInGroup);
 
     // Track the numebr of stores and ld idx within a group
     unsigned numStoresCount = 0, ldIdx = 0;
@@ -346,16 +348,13 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     // each load/store port
     std::optional<unsigned> firstLoadOffset, firstStoreOffset;
     SmallVector<unsigned> groupLoadPorts, groupStorePorts;
-    unsigned numLoadEntries = groupPorts.getNumPorts<LoadPort>()
-                                  ? groupPorts.getNumPorts<LoadPort>()
-                                  : 1;
 
     // ldOrderOfOneGroup: the ldOrder of all the loads in one group
     // Example: ldOrder = [
     //    [1, 2], <--- for the first group: ldOrderOfOneGroup prepares this
     //    vector [1]
     // ]
-    SmallVector<unsigned> ldOrderOfOneGroup(numLoadEntries, 0);
+    SmallVector<unsigned> ldOrderOfOneGroup(numLoadsInGroup, 0);
 
     // This for loop has two purposes:
     // 1. It iterates through all the LDs/STs in a group, for each LD/ST:
@@ -411,24 +410,11 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
       capArray(array, depth);
   };
 
-  // Add only 1 0 if the size of the array is 0
-  auto extendArray = [&](SmallVector<SmallVector<unsigned>> &inArray) -> void {
-    for (size_t i = 0; i < inArray.size(); i++) {
-      if (inArray[i].size() == 0) {
-        inArray[i].push_back(0);
-      }
-    }
-  };
-
   // Port offsets and index arrays must have length equal to the depth
   capBiArray(loadOffsets, depthLoad);
   capBiArray(storeOffsets, depthStore);
   capBiArray(loadPorts, depthLoad);
   capBiArray(storePorts, depthStore);
-
-  // Expand arrays defined for the new lsq config file
-  extendArray(ldPortIdx);
-  extendArray(stPortIdx);
 
   // Update the index width
   indexWidth = llvm::Log2_64_Ceil(depthLoad);
