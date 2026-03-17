@@ -650,12 +650,14 @@ LogicalResult
 HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
 
-  // The equations are represented by a FlowExpression that is equal to zero
+  // Local equations extracted in constructor
   EquationExtractor extractor(modOp, indexChannelAnalysis);
 
-  // Map all variables used in `equations` to an index in the matrix
+  // Create a matrix, and map all variables to an column index
   FlowEquationsMatrix indices(extractor.equations);
   MatIntType &matrix = indices.matrix;
+
+  // Verify that the FlowEquationsMatrix data structure is correct
   indices.verify();
 
   // bring to row-echelon form

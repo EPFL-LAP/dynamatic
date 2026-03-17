@@ -18,7 +18,7 @@ struct ConstrainedBufferSlotFullNamer;
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
-// -> Latency Slots
+// -> Pipeline Slots
 // -> Slots
 // -> Fork/Branch -> out1, out2, ...
 //
@@ -28,7 +28,7 @@ struct InternalStateNamer {
   enum class TYPE {
     EagerForkSent,
     BufferSlotFull,
-    LatencyInducedSlot,
+    PipelineSlot,
     Constrained,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
@@ -60,8 +60,7 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral EAGER_FORK_SENT = "EagerForkSent";
   static constexpr llvm::StringLiteral BUFFER_SLOT_FULL = "BufferSlotFull";
   static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
-  static constexpr llvm::StringLiteral LATENCY_INDUCED_SLOT =
-      "LatencyInducedSlot";
+  static constexpr llvm::StringLiteral PIPELINE_SLOT = "PipelineSlot";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -244,12 +243,12 @@ struct ConstrainedBufferSlotFullNamer : ConstrainedNamer {
 struct PipelineSlotNamer : InternalStateNamer {
   PipelineSlotNamer() = default;
   PipelineSlotNamer(const std::string &opName, unsigned slotIndex)
-      : InternalStateNamer(TYPE::LatencyInducedSlot), opName(opName),
+      : InternalStateNamer(TYPE::PipelineSlot), opName(opName),
         slotIndex(slotIndex) {}
   ~PipelineSlotNamer() = default;
 
   static inline bool classof(const InternalStateNamer *fp) {
-    return fp->type == TYPE::LatencyInducedSlot;
+    return fp->type == TYPE::PipelineSlot;
   }
 
   inline std::string getSMVName() const override {

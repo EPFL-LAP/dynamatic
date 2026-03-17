@@ -8,8 +8,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::EagerForkSent;
   if (s == BUFFER_SLOT_FULL)
     return TYPE::BufferSlotFull;
-  if (s == LATENCY_INDUCED_SLOT)
-    return TYPE::LatencyInducedSlot;
+  if (s == PIPELINE_SLOT)
+    return TYPE::PipelineSlot;
   if (s == CONSTRAINED)
     return TYPE::Constrained;
   return std::nullopt;
@@ -21,8 +21,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return EAGER_FORK_SENT.str();
   case TYPE::BufferSlotFull:
     return BUFFER_SLOT_FULL.str();
-  case TYPE::LatencyInducedSlot:
-    return LATENCY_INDUCED_SLOT.str();
+  case TYPE::PipelineSlot:
+    return PIPELINE_SLOT.str();
   case TYPE::Constrained:
     return CONSTRAINED.str();
   }
@@ -56,7 +56,7 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
     prop = BufferSlotFullNamer::fromInnerJSON(inner, path);
     assert(prop && "inner buffer slot failed");
     break;
-  case TYPE::LatencyInducedSlot:
+  case TYPE::PipelineSlot:
     prop = PipelineSlotNamer::fromInnerJSON(inner, path);
     assert(prop && "inner latency slot failed");
     break;
