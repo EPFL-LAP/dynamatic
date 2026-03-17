@@ -1136,6 +1136,8 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   auto getWidth = [](Type type) -> unsigned {
+    if (auto chanTy = dyn_cast<handshake::ChannelType>(type))
+      type = chanTy.getDataType();
     if (isa<IndexType>(type))
       return 32;
     return type.getIntOrFloatBitWidth();
