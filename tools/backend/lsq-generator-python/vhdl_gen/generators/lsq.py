@@ -1019,31 +1019,33 @@ class LSQ:
         if True:
             monitor_ldq_occupancy_diff = LogicVec(ctx, 'monitor_ldq_occupancy_diff', 'w', self.configs.ldqAddrW)
             arch += WrapSub(ctx, monitor_ldq_occupancy_diff, ldq_tail, ldq_head, self.configs.numLdqEntries)
+            monitor_ldq_full = Logic(ctx, 'monitor_ldq_full', 'w')
+            arch += Op(ctx, monitor_ldq_full, ldq_not_empty, 'when', '(', monitor_ldq_occupancy_diff, '=', (0, self.configs.ldqAddrW), ')', 'else', "'0'")
             monitor_ldq_occupancy = LogicVec(ctx, 'monitor_ldq_occupancy', 'w', self.configs.ldqAddrW + 1)
             arch += Op(ctx, monitor_ldq_occupancy,
-                       (self.configs.numLdqEntries, self.configs.ldqAddrW + 1), 'when',
-                       'not', ldq_empty, 'and', '(', monitor_ldq_occupancy_diff, '=', (0, self.configs.ldqAddrW), ')',
-                       'else', "'0'", '&', monitor_ldq_occupancy_diff)
+                       (self.configs.numLdqEntries, self.configs.ldqAddrW + 1),
+                       'when', monitor_ldq_full,
+                       'else', '(', "'0'", '&', monitor_ldq_occupancy_diff, ')')
 
             monitor_stq_occupancy_diff = LogicVec(ctx, 'monitor_stq_occupancy_diff', 'w', self.configs.stqAddrW)
             arch += WrapSub(ctx, monitor_stq_occupancy_diff, stq_tail, stq_head, self.configs.numStqEntries)
+            monitor_stq_full = Logic(ctx, 'monitor_stq_full', 'w')
+            arch += Op(ctx, monitor_stq_full, stq_not_empty, 'when', '(', monitor_stq_occupancy_diff, '=', (0, self.configs.stqAddrW), ')', 'else', "'0'")
             monitor_stq_occupancy = LogicVec(ctx, 'monitor_stq_occupancy', 'w', self.configs.stqAddrW + 1)
             arch += Op(ctx, monitor_stq_occupancy,
-                       (self.configs.numStqEntries, self.configs.stqAddrW + 1), 'when',
-                       'not', stq_empty, 'and', '(', monitor_stq_occupancy_diff, '=', (0, self.configs.stqAddrW), ')',
-                       'else', "'0'", '&', monitor_stq_occupancy_diff)
+                       (self.configs.numStqEntries, self.configs.stqAddrW + 1),
+                       'when', monitor_stq_full,
+                       'else', '(', "'0'", '&', monitor_stq_occupancy_diff, ')')
 
             monitor_total_occupancy = LogicVec(ctx, 'monitor_total_occupancy', 'w', max(self.configs.ldqAddrW, self.configs.stqAddrW) + 2)
-            arch += ctx.get_current_indent() + f'{monitor_ldq_occupancy.getNameWrite()} <= ' + \
-                f'std_logic_vector(unsigned({monitor_ldq_occupancy.getNameRead()}) + unsigned({monitor_ldq_occupancy.getNameRead()}));\n'
+            arch += ctx.get_current_indent() + f'{monitor_total_occupancy.getNameWrite()} <= ' + \
+                f'std_logic_vector(unsigned("0" & {monitor_ldq_occupancy.getNameRead()}) + unsigned("0" & {monitor_stq_occupancy.getNameRead()}));\n'
 
-            # monitor_start pulses high in any cycle where a group-init handshake occurs
-            monitor_ga_hs = LogicArray(ctx, 'monitor_ga_hs', 'w', self.configs.numGroups)
-            for i in range(self.configs.numGroups):
-                arch += Op(ctx, monitor_ga_hs[i], group_init_valid_i[i], 'and', group_init_ready_o[i])
+            # monitor_start rises (the first time) when the first group init is requested
             monitor_start = Logic(ctx, 'monitor_start', 'w')
-            arch += Reduce(ctx, monitor_start, monitor_ga_hs, 'or')
+            arch += Reduce(ctx, monitor_start, group_init_valid_i, 'or')
 
+            # monitor_finish rises when the LSQ has finished the last memory operation
             monitor_finish = Logic(ctx, 'monitor_finish', 'w')
             arch += Op(ctx, monitor_finish, memEndValid)
 
@@ -1052,8 +1054,10 @@ class LSQ:
             total_occupancy_name = monitor_total_occupancy.getNameRead()
             start_name = monitor_start.getNameRead()
             finish_name = monitor_finish.getNameRead()
+            lsq_name = self.configs.name.split("_")[-1]
 
             ind = ctx.get_current_indent()
+            arch += ind + '-- synthesis translate_off\n';
             arch += ind + 'monitor_proc : process(clk) is\n'
             arch += ind + '\tvariable monitor_started     : boolean := false;\n'
             arch += ind + '\tvariable monitor_finished    : boolean := false;\n'
@@ -1088,18 +1092,18 @@ class LSQ:
             arch += ind + '\t\t\tend if;\n'
             arch += ind + f'\t\t\tif {finish_name} = \'1\' and not monitor_finished then\n'
             arch += ind + '\t\t\t\tmonitor_finished := true;\n'
-            arch += ind + '\t\t\t\treport "LSQ  " & natural\'image(monitor_cycle_count) & " cycles:";\n'
-            arch += ind + '\t\t\t\treport "LDQ occupancy:      cycles=" & natural\'image(monitor_cycle_count)\n'
+            arch += ind + f'\t\t\t\treport "{lsq_name} LDQ occupancy:      cycles=" & natural\'image(monitor_cycle_count)\n'
             arch += ind + '\t\t\t\t' + '& " sum=" & natural\'image(monitor_ldq_sum)\n'
             arch += ind + '\t\t\t\t' + '& " max=" & natural\'image(monitor_ldq_max);\n'
-            arch += ind + '\t\t\t\treport "STQ occupancy:      cycles=" & natural\'image(monitor_cycle_count)\n'
+            arch += ind + f'\t\t\t\treport "{lsq_name} STQ occupancy:      cycles=" & natural\'image(monitor_cycle_count)\n'
             arch += ind + '\t\t\t\t' + '& " sum=" & natural\'image(monitor_stq_sum)\n'
             arch += ind + '\t\t\t\t' + '& " max=" & natural\'image(monitor_stq_max);\n'
-            arch += ind + '\t\t\t\treport "Combined occupancy: max=" & natural\'image(monitor_total_max);\n'
+            arch += ind + f'\t\t\t\treport "{lsq_name} combined occupancy: max=" & natural\'image(monitor_total_max);\n'
             arch += ind + '\t\t\tend if;\n'
             arch += ind + '\t\tend if;\n'
             arch += ind + '\tend if;\n'
             arch += ind + 'end process monitor_proc;\n'
+            arch += ind + '-- synthesis translate_on\n';
 
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
