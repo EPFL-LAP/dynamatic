@@ -9,8 +9,13 @@
 namespace dynamatic::gen {
 
 /// Opaque wrapper which type-erases a context used during type checking.
-/// This should only be used by users of 'AbstractTypeSystem'.
-/// Type system implementations should subclass 'TypeSystem' instead.
+/// It allows users of 'AbstractTypeSystem' to pass contexts returned by
+/// 'check*' methods, to other 'check*' methods without needing to know the
+/// real context type used by the underlying type system.
+///
+/// We call the type opaque since it does not implement any behavior based
+/// on the contained context beyond being able to pass it around.
+/// For an explanation of contexts, see the doc string for 'TypeSystem'.
 class OpaqueContext {
 public:
   template <
@@ -65,6 +70,10 @@ public:
 };
 
 /// CRTP-Base class for all implementations of a type system.
+/// See https://en.cppreference.com/w/cpp/language/crtp.html for an explanation
+/// of CRTP.
+/// The 'Self' template type parameter should be the class deriving from
+/// 'TypeSystem'.
 ///
 /// Type systems are used to "guide" the generator by either forwarding
 /// constraints to sub-elements of an AST-node or rejecting AST-nodes entirely.

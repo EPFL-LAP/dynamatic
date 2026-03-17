@@ -10,12 +10,21 @@ namespace dynamatic {
 /// Class that provides meta-information about how 'ASTNode' is used in the type
 /// system.
 /// Specializations should provide two definitions:
+///
 /// * constexpr static bool CAN_DISCARD: to denote whether a node is
-/// discardable.
+///   discardable.
+///
 /// * template <typename TypingContext> ... Conclusion: The conclusion type of
 ///   the 'ASTNode' that can be instantiated with any typing contexts.
 ///   If this is a struct, it should be a tuple-like struct, i.e., specialize
 ///   'std::tuple_size' and implement a 'get<std::size_t>' method.
+///   The conclusion type is the return type of the corresponding 'check*'
+///   method of 'ASTNode' within 'TypeSystem' and usually contains contexts
+///   that are forwarded to sub-elements of 'ASTNode'.
+///   The conclusion type of conditional expressions is e.g.
+///   'std::tuple<TypingContext, TypingContext, TypingContext>' which are the
+///   contexts used to type check the condition, true-expression and
+///   false-expression respectively.
 template <typename ASTNode>
 struct TypeSystemTraits {
   // Always false.

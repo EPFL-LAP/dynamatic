@@ -1,5 +1,5 @@
-#ifndef DYNAMATIC_HLS_FUZZER_BASEGENERATOR
-#define DYNAMATIC_HLS_FUZZER_BASEGENERATOR
+#ifndef DYNAMATIC_HLS_FUZZER_BasicCProducer
+#define DYNAMATIC_HLS_FUZZER_BasicCProducer
 
 #include "AST.h"
 #include "Randomly.h"
@@ -17,16 +17,16 @@ namespace dynamatic::gen {
 /// output.
 ///
 /// Generating new C constructs should be implemented in this class.
-class BaseGenerator {
+class BasicCProducer {
 public:
   /// Constructs a new base generator which generates programs that adhere to
   /// the given type system.
   /// 'entryContext' is entry state used to type check the function returned by
   /// 'generate'.
   template <class TypingContext, class Self>
-  explicit BaseGenerator(Randomly &random,
-                         TypeSystem<TypingContext, Self> &typeSystem,
-                         const TypingContext &entryContext = {})
+  explicit BasicCProducer(Randomly &random,
+                          TypeSystem<TypingContext, Self> &typeSystem,
+                          const TypingContext &entryContext = {})
       : random(random), typeSystem(typeSystem), entryContext(entryContext) {}
 
   /// Returns a new function with the given function name.

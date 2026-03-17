@@ -13,14 +13,14 @@ add_llvm_executable(hls-fuzzer
         AbstractTarget.cpp
         AbstractGenerator.cpp
         AST.cpp
-        BaseGenerator.cpp
+        BasicCProducer.cpp
         Options.cpp
         OptionsParser.cpp
         Randomly.cpp
         TargetRegistry.cpp
         TypeSystem.cpp
-        targets/RandomCTarget.cpp
         targets/DynamaticTypeSystem.cpp
+        targets/RandomCTarget.cpp
 )
 llvm_update_compile_flags(hls-fuzzer)
 target_link_libraries(hls-fuzzer PRIVATE MLIRSupport)
