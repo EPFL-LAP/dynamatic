@@ -46,61 +46,161 @@ constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 /// Annotation for condition variable placeholders.
 constexpr llvm::StringLiteral FTD_COND_VAR("ftd.cvar");
 
-/// Get or create a SourceOp placeholder marked with FTD_COND_VAR in the given
-/// block. Uses InsertionGuard so the caller's insertion point is not disturbed.
-static Value getOrCreateCondPlaceholder(Block *block, OpBuilder &builder) {
-  for (Operation &op : *block) {
-    if (op.hasAttr(FTD_COND_VAR))
+/// Compute the positional index of `block` in its parent region and set
+/// the handshake.bb attribute on `op`.
+static void setBBAttr(Operation *op, Block *block, OpBuilder &builder) {
+  unsigned idx = 0;
+  for (Block &blk : *block->getParent()) {
+    if (&blk == block)
+      break;
+    idx++;
+  }
+  op->setAttr("handshake.bb",
+              IntegerAttr::get(IntegerType::get(builder.getContext(), 32,
+                                                IntegerType::Unsigned),
+                               idx));
+}
+
+/// Get or create a SourceOp placeholder in `condBlock` representing the
+/// condition of that block's terminator. Reuses existing placeholder if one
+/// exists. Tagged with FTD_COND_VAR and FTD_OP_TO_SKIP so that FTD skips it.
+static Value getOrCreateCondPlaceholder(Block *condBlock, OpBuilder &builder) {
+  for (Operation &op : *condBlock) {
+    if (isa<handshake::ConstantOp>(&op) && op.hasAttr(FTD_COND_VAR))
       return op.getResult(0);
   }
   OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointToStart(block);
+  builder.setInsertionPointToStart(condBlock);
   auto sourceOp =
       builder.create<handshake::SourceOp>(builder.getUnknownLoc());
-  sourceOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
-  // SourceOp defaults to !handshake.control<>, but condition values must be
-  // !handshake.channel<i1>. Cast to Value to avoid templated setType issue.
-  Value result = sourceOp.getResult();
-  result.setType(ftd::channelifyType(builder.getI1Type()));
-  return result;
+  sourceOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+  setBBAttr(sourceOp, condBlock, builder);
+
+  auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 0);
+  auto constOp = builder.create<handshake::ConstantOp>(
+      builder.getUnknownLoc(), cstAttr, sourceOp.getResult());
+  constOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
+  constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+  setBBAttr(constOp, condBlock, builder);
+
+  return constOp.getResult();
+}
+
+void ftd::createAllCondPlaceholders(Region &region, OpBuilder &builder) {
+  for (Block &block : region) {
+    if (isa<cf::CondBranchOp>(block.getTerminator()))
+      getOrCreateCondPlaceholder(&block, builder);
+  }
+}
+
+/// Resolves all SourceOp condition placeholders into NotOp pass-throughs
+/// connected to the real handshake condition values from ShadowCFG.
+void ftd::resolveCondPlaceholders(handshake::FuncOp funcOp,
+                                  OpBuilder &builder,
+                                  ftd::ShadowCFG &shadow) {
+  Block &entryBlock = funcOp.getBody().front();
+
+  SmallVector<Operation *> placeholders;
+  for (Operation &op : entryBlock) {
+    if (isa<handshake::ConstantOp>(&op) && op.hasAttr(FTD_COND_VAR))
+      placeholders.push_back(&op);
+  }
+
+  for (Operation *ph : placeholders) {
+    auto bbAttr = ph->getAttrOfType<IntegerAttr>("handshake.bb");
+    if (!bbAttr)
+      continue;
+    unsigned bbIdx = bbAttr.getUInt();
+
+    Value realCond = shadow.getCondition(bbIdx);
+    if (!realCond)
+      continue;
+
+    if (auto *defOp = realCond.getDefiningOp())
+      builder.setInsertionPointAfter(defOp);
+    else
+      builder.setInsertionPointToStart(&entryBlock);
+
+    Location loc = ph->getLoc();
+    Type chanI1 = ftd::channelifyType(builder.getI1Type());
+
+    auto sourceOp = builder.create<handshake::SourceOp>(loc);
+    sourceOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+    sourceOp->setAttr("handshake.bb", bbAttr);
+
+    auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 0);
+    auto constOp = builder.create<handshake::ConstantOp>(
+        loc, cstAttr, sourceOp.getResult());
+    constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+    constOp->setAttr("handshake.bb", bbAttr);
+
+    auto xorOp = builder.create<handshake::XOrIOp>(
+        loc, chanI1, ValueRange{realCond, constOp.getResult()});
+    xorOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
+    xorOp->setAttr("handshake.bb", bbAttr);
+
+    // Kill the old ConstantOp placeholder and its SourceOp
+    Operation *phSourceOp = ph->getOperand(0).getDefiningOp();
+    ph->getResult(0).replaceAllUsesWith(xorOp.getResult());
+    ph->erase();
+    if (phSourceOp && phSourceOp->use_empty())
+      phSourceOp->erase();
+  }
+}
+
+/// Short-circuits all NotOp condition placeholders and erases them.
+void ftd::finalizeCondPlaceholders(handshake::FuncOp funcOp) {
+  SmallVector<handshake::XOrIOp> xorOps;
+  for (auto xorOp : funcOp.getOps<handshake::XOrIOp>()) {
+    if (xorOp->hasAttr(FTD_COND_VAR))
+      xorOps.push_back(xorOp);
+  }
+  for (auto xorOp : xorOps) {
+    // XOR(realCond, 0) — operand 0 is the real condition
+    xorOp.getResult().replaceAllUsesWith(xorOp.getOperand(0));
+
+    // Collect and erase the constant-0 and source feeding operand 1
+    Operation *constOp = xorOp.getOperand(1).getDefiningOp();
+    Operation *sourceOp =
+        constOp ? constOp->getOperand(0).getDefiningOp() : nullptr;
+
+    xorOp->erase();
+    if (constOp && constOp->use_empty())
+      constOp->erase();
+    if (sourceOp && sourceOp->use_empty())
+      sourceOp->erase();
+  }
 }
 
 /// Identify the block that has muxCondition as its terminator condition
 /// Note that it is not necessarily the same block defining the muxCondition
-static Block *returnMuxConditionBlock(Value muxCondition) {
-  Block *muxConditionBlock = nullptr;
-
-  // The mux condition should ultimately be connected to the condition input of
-  // a conditional branch. However, during suppression, the condition value may
-  // be rerouted through intermediate suppression branches, changing the actual
-  // Value. To handle this, we place a SourceOp placeholder (FTD_COND_VAR) in
-  // the target block. Once suppression is complete, all uses of the placeholder
-  // will be reconnected to the correct condition input.
-  while (!muxConditionBlock) {
+static Block *returnMuxConditionBlock(Value muxCondition,
+                                      ftd::ShadowCFG &shadow) {
+  while (true) {
     Operation *defOp = muxCondition.getDefiningOp();
-    if (defOp && defOp->hasAttr(FTD_COND_VAR)) {
-      muxConditionBlock = defOp->getBlock();
+    if (!defOp)
+      return shadow.getBlock(0);
+
+    // Found the NotOp placeholder — read its BB attribute.
+    if (defOp->hasAttr(FTD_COND_VAR)) {
+      auto bbAttr = defOp->getAttrOfType<IntegerAttr>("handshake.bb");
+      assert(bbAttr && "Condition placeholder missing handshake.bb");
+      return shadow.getBlock(bbAttr.getUInt());
     }
 
-    // If no valid target block was found, attempt to trace
-    // backward through the suppression branch, if it exists.
-    if (!muxConditionBlock) {
-      if (defOp && isa_and_nonnull<handshake::ConditionalBranchOp>(defOp) &&
-          defOp->hasAttr(FTD_OP_TO_SKIP)) {
-        muxCondition = defOp->getOperand(1);
-      } else {
-        break;
-      }
+    // Trace backward through suppression branches (marked FTD_OP_TO_SKIP).
+    if (isa<handshake::ConditionalBranchOp>(defOp) &&
+        defOp->hasAttr(FTD_OP_TO_SKIP)) {
+      muxCondition = defOp->getOperand(1);
+      continue;
     }
-  }
 
-  if (!muxConditionBlock) {
-    llvm::errs() << "Warning: Could not find a block with a terminator ";
-    llvm::errs() << "condition matching the mux condition. This may lead ";
-    llvm::errs() << "to incorrect FTD analysis results.\n";
-    muxConditionBlock = muxCondition.getParentBlock();
+    // Fallback: use handshake.bb on the defining op.
+    if (auto bbAttr = defOp->getAttrOfType<IntegerAttr>("handshake.bb"))
+      return shadow.getBlock(bbAttr.getUInt());
+
+    return shadow.getBlock(0);
   }
-  return muxConditionBlock;
 }
 
 /// Given a block, get its immediate dominator if exists
@@ -164,22 +264,28 @@ getDominanceFrontier(Region &region) {
 
 /// Get a list of all the loops in which the consumer is but the producer is
 /// not, starting from the innermost.
-static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
-                                                    mlir::CFGLoopInfo &li) {
+static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *consBlock,
+                                                    Block *prodBlock,
+                                                    CFGLoopInfo &loopInfo) {
+
   SmallVector<CFGLoop *> result;
 
-  // Get all the loops in which the consumer is but the producer is
-  // not, starting from the innermost
-  for (CFGLoop *loop = li.getLoopFor(cons); loop;
-       loop = loop->getParentLoop()) {
-    if (!loop->contains(prod))
+  CFGLoop *consLoop = loopInfo.getLoopFor(consBlock);
+  if (!consLoop)
+    return result;
+
+  // Walk outward from the consumer's innermost loop.
+  // Collect every loop that does NOT contain the producer.
+  for (CFGLoop *loop = consLoop; loop; loop = loop->getParentLoop()) {
+    if (!loop->contains(prodBlock))
       result.push_back(loop);
   }
 
-  // Reverse to the get the loops from outermost to innermost
+  // Reverse to ensure the loops from outermost to innermost
   std::reverse(result.begin(), result.end());
+
   return result;
-};
+}
 
 /// A lightweight DFS to check if 'end' is reachable from 'start'.
 static bool isReachable(Block *start, Block *end) {
@@ -684,8 +790,10 @@ struct SignalRegistry {
 };
 
 /// Retrieves the initial value from BlockIndexing.
-static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
-                              const ftd::BlockIndexing &bi) {
+static Value getOriginalValue(mlir::OpBuilder &builder, StringRef varName,
+                              const ftd::BlockIndexing &bi,
+                              DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+                              ftd::ShadowCFG *shadow = nullptr) {
   StringRef lookupName = varName;
   if (lookupName.startswith("~")) {
     llvm::errs() << "[FTD Error] Negated variable '" << varName << "'.\n";
@@ -696,21 +804,30 @@ static Value getOriginalValue(PatternRewriter &rewriter, StringRef varName,
   if (!conditionOpt.has_value())
     return nullptr;
 
-  Operation *term = conditionOpt.value()->getTerminator();
-  if (!term || term->getNumOperands() == 0)
-    return nullptr;
-  
-  // Use a SourceOp placeholder for the condition value, which will be
-  // replaced with the actual condition input after every suppression
-  // is done.
-  return getOrCreateCondPlaceholder(conditionOpt.value(), rewriter);
+  Value condition;
+  if (shadow) {
+    // conditionOpt is the shadow Block* looked up by BlockIndexing.
+    // Convert it to enumeration index for conditionMap lookup.
+    Block *shadowBlock = conditionOpt.value();
+    unsigned enumIdx = shadow->getBlockIndex(shadowBlock);
+    condition = shadow->getCondition(enumIdx);
+  } else if (pendingMuxOperands) {
+    // Pre-flatten CfToHandshake path: use a SourceOp placeholder instead of
+    // the real terminator condition. This avoids creating backedges for
+    // condition values (which caused null-Value crashes in bddToCircuit).
+    condition = getOrCreateCondPlaceholder(conditionOpt.value(), builder);
+  }
+
+  return condition;
 }
 
 /// Converts a boolean expression node to a circuit signal.
 static Value boolExpressionToCircuit(
-    PatternRewriter &rewriter, experimental::boolean::BoolExpression *expr,
+    mlir::OpBuilder &builder, experimental::boolean::BoolExpression *expr,
     Block *block, SignalRegistry &registry, const PathContext &currentPath,
-    const ftd::BlockIndexing &bi) {
+    const ftd::BlockIndexing &bi,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    ftd::ShadowCFG *shadow = nullptr) {
 
   // Case 1: Variable
   if (expr->type == ExpressionType::Variable) {
@@ -722,7 +839,7 @@ static Value boolExpressionToCircuit(
 
     // 2. Fallback
     if (!val) {
-      val = getOriginalValue(rewriter, varName, bi);
+      val = getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
 
       if (!val) {
         llvm::errs() << "[FTD Error] Variable '" << varName
@@ -737,36 +854,57 @@ static Value boolExpressionToCircuit(
 
     // 3. Handle Negation
     if (singleCond->isNegated) {
-      auto notOp =
-          rewriter.create<handshake::NotOp>(val.getLoc(), val.getType(), val);
-      notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-      return notOp.getResult();
+      builder.setInsertionPointToStart(block);
+      Location loc = block->getOperations().front().getLoc();
+      Type chanI1 = ftd::channelifyType(builder.getI1Type());
+
+      // Create constant 1 triggered by a source
+      auto sourceOp = builder.create<handshake::SourceOp>(loc);
+      sourceOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      setBBAttr(sourceOp, block, builder);
+
+      auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 1);
+      auto constOp =
+          builder.create<handshake::ConstantOp>(loc, cstAttr, sourceOp.getResult());
+      constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      setBBAttr(constOp, block, builder);
+
+      // XOR with 1 == NOT
+      auto xorOp = builder.create<handshake::XOrIOp>(
+          loc, chanI1, ValueRange{val, constOp.getResult()});
+      xorOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      setBBAttr(xorOp, block, builder);
+      return xorOp->getResult(0);
     }
     return val;
   }
 
   // Case 2: Constant
-  auto sourceOp = rewriter.create<handshake::SourceOp>(block->front().getLoc());
-  auto intType = rewriter.getIntegerType(1);
+  auto sourceOp = builder.create<handshake::SourceOp>(block->front().getLoc());
+  setBBAttr(sourceOp, block, builder);
+  auto intType = builder.getIntegerType(1);
   int constVal = (expr->type == ExpressionType::One ? 1 : 0);
-  auto cstAttr = rewriter.getIntegerAttr(intType, constVal);
-  auto constOp = rewriter.create<handshake::ConstantOp>(
+  auto cstAttr = builder.getIntegerAttr(intType, constVal);
+  auto constOp = builder.create<handshake::ConstantOp>(
       block->front().getLoc(), cstAttr, sourceOp.getResult());
-  constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+  constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+  setBBAttr(constOp, block, builder);
 
   return constOp.getResult();
 }
 
 /// Recursively converts a BDD to a Mux Tree.
-static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
+static Value bddToCircuit(mlir::OpBuilder &builder, BDD *bdd, Block *block,
                           SignalRegistry &registry, PathContext currentPath,
-                          const ftd::BlockIndexing &bi) {
+                          const ftd::BlockIndexing &bi,
+                          DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+                          ftd::ShadowCFG *shadow = nullptr) {
   using namespace experimental::boolean;
 
   // 1. Leaf Node
   if (!bdd->successors.has_value()) {
-    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, registry,
-                                   currentPath, bi);
+    return boolExpressionToCircuit(builder, bdd->boolVariable, block, registry,
+                                   currentPath, bi, pendingMuxOperands, shadow);
   }
 
   // 2. Mux Node
@@ -774,7 +912,7 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
 
   Value muxCond = registry.lookup(varName, currentPath);
   if (!muxCond) {
-    muxCond = getOriginalValue(rewriter, varName, bi);
+    muxCond = getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
     assert(muxCond && "Mux condition not found");
     if (!muxCond.getType().isa<handshake::ChannelType>())
       muxCond.setType(ftd::channelifyType(muxCond.getType()));
@@ -786,17 +924,20 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
   // signals
   PathContext falsePath = currentPath;
   falsePath.push_back({varName, false});
-  muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().first,
-                                     block, registry, falsePath, bi));
+  muxOperands.push_back(bddToCircuit(builder, bdd->successors.value().first,
+                                     block, registry, falsePath, bi,
+                                     pendingMuxOperands, shadow));
 
   PathContext truePath = currentPath;
   truePath.push_back({varName, true});
-  muxOperands.push_back(bddToCircuit(rewriter, bdd->successors.value().second,
-                                     block, registry, truePath, bi));
+  muxOperands.push_back(bddToCircuit(builder, bdd->successors.value().second,
+                                     block, registry, truePath, bi,
+                                     pendingMuxOperands, shadow));
 
-  auto muxOp = rewriter.create<handshake::MuxOp>(
+  auto muxOp = builder.create<handshake::MuxOp>(
       muxCond.getLoc(), muxOperands[0].getType(), muxCond, muxOperands);
-  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+  muxOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+  setBBAttr(muxOp, block, builder);
 
   return muxOp.getResult();
 }
@@ -805,11 +946,13 @@ static Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
 /// It constructs the logic for the "UNREACHABLE" condition.
 /// F_suppress = NOT( OR( All Valid Paths ) )
 static Value
-generateReachabilityLogic(PatternRewriter &rewriter, Block *block,
+generateReachabilityLogic(mlir::OpBuilder &builder, Block *block,
                           const std::vector<VariableRequirement> &requirements,
                           const PathContext &currentPath,
                           SignalRegistry &registry,
-                          const ftd::BlockIndexing &bi, size_t startIndex) {
+                          const ftd::BlockIndexing &bi, size_t startIndex,
+                          DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+                          ftd::ShadowCFG *shadow = nullptr) {
 
   using namespace experimental::boolean;
 
@@ -854,15 +997,17 @@ generateReachabilityLogic(PatternRewriter &rewriter, Block *block,
 
   // Note: bddToCircuit uses registry.lookup. If the suppression logic involves
   // variables distributed earlier (like c3a), it will correctly find them.
-  return bddToCircuit(rewriter, bdd, block, registry, currentPath, bi);
+  return bddToCircuit(builder, bdd, block, registry, currentPath, bi, pendingMuxOperands, shadow);
 }
 
 /// Recursively builds the Branch Tree.
 static void
-buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
+buildBranchTreeRecursive(mlir::OpBuilder &builder, StringRef currentVar,
                          std::vector<VariableRequirement> &requirements,
                          PathContext currentPath, SignalRegistry &registry,
-                         const ftd::BlockIndexing &bi) {
+                         const ftd::BlockIndexing &bi,
+                         DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+                         ftd::ShadowCFG *shadow = nullptr) {
 
   // 1. Retrieve Data Signal
   // Look up the current data signal to be distributed from the registry using
@@ -916,7 +1061,7 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
   if (!conditionVal) {
     // Fallback: If not in registry, get the original value from the IR
     // (BlockIndexing).
-    conditionVal = getOriginalValue(rewriter, splitVar, bi);
+    conditionVal = getOriginalValue(builder, splitVar, bi, pendingMuxOperands, shadow);
   }
   assert(conditionVal && "Splitter condition value not found");
 
@@ -948,8 +1093,8 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
   // Step 2 (which are implicitly valid). The logic checks the entire future
   // path to ensure reachability.
   Value suppressCondition = generateReachabilityLogic(
-      rewriter, sourceVal.getParentBlock(), requirements, baseNextPath,
-      registry, bi, scanDepth);
+      builder, sourceVal.getParentBlock(), requirements, baseNextPath,
+      registry, bi, scanDepth, pendingMuxOperands, shadow);
 
   if (!suppressCondition.getType().isa<handshake::ChannelType>())
     suppressCondition.setType(ftd::channelifyType(suppressCondition.getType()));
@@ -961,9 +1106,10 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
   // 'activeSelectSignal' (Pass Token).
   SmallVector<Type> suppResultTypes = {conditionVal.getType(),
                                        conditionVal.getType()};
-  auto suppBranch = rewriter.create<handshake::ConditionalBranchOp>(
+  auto suppBranch = builder.create<handshake::ConditionalBranchOp>(
       conditionVal.getLoc(), suppResultTypes, suppressCondition, conditionVal);
-  suppBranch->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+  suppBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+  setBBAttr(suppBranch, conditionVal.getParentBlock(), builder);
 
   // False Output -> Active Select (Pass to Main Branch)
   Value activeSelectSignal = suppBranch.getFalseResult();
@@ -973,9 +1119,10 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
 
   // Create the branch that splits the 'sourceVal' based on the (possibly
   // filtered) 'activeSelectSignal'.
-  auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+  auto branchOp = builder.create<handshake::ConditionalBranchOp>(
       sourceVal.getLoc(), resultTypes, activeSelectSignal, sourceVal);
-  branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+  branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+  setBBAttr(branchOp, sourceVal.getParentBlock(), builder);
 
   Value trueResult = branchOp.getTrueResult();
   Value falseResult = branchOp.getFalseResult();
@@ -985,8 +1132,8 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
     PathContext truePath = baseNextPath;
     truePath.push_back({splitVar, true});
     registry.registerSignal(currentVar, truePath, trueResult);
-    buildBranchTreeRecursive(rewriter, currentVar, groups[{splitVar, true}],
-                             truePath, registry, bi);
+    buildBranchTreeRecursive(builder, currentVar, groups[{splitVar, true}],
+                             truePath, registry, bi, pendingMuxOperands, shadow);
   }
 
   // Handle the False branch recursion
@@ -994,16 +1141,18 @@ buildBranchTreeRecursive(PatternRewriter &rewriter, StringRef currentVar,
     PathContext falsePath = baseNextPath;
     falsePath.push_back({splitVar, false});
     registry.registerSignal(currentVar, falsePath, falseResult);
-    buildBranchTreeRecursive(rewriter, currentVar, groups[{splitVar, false}],
-                             falsePath, registry, bi);
+    buildBranchTreeRecursive(builder, currentVar, groups[{splitVar, false}],
+                             falsePath, registry, bi, pendingMuxOperands, shadow);
   }
 }
 
 /// Main entry point of distribution logic.
-static void buildDistributionNetwork(PatternRewriter &rewriter,
+static void buildDistributionNetwork(mlir::OpBuilder &builder,
                                      const ftd::LocalCFG &lcfg,
                                      const ftd::BlockIndexing &bi,
-                                     SignalRegistry &registry) {
+                                     SignalRegistry &registry,
+                                     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+                                     ftd::ShadowCFG *shadow = nullptr) {
   using namespace experimental::boolean;
 
   // 1. Collect Variable Requirements
@@ -1079,7 +1228,7 @@ static void buildDistributionNetwork(PatternRewriter &rewriter,
     // Use pre-registered value if available (e.g. demoted high-level variable)
     Value rawVal = registry.lookup(var, {});
     if (!rawVal) {
-      rawVal = getOriginalValue(rewriter, var, bi);
+      rawVal = getOriginalValue(builder, var, bi, pendingMuxOperands, shadow);
       if (!rawVal) {
         llvm::errs() << "[FTD Error] Variable '" << var
                      << "' not found in BlockIndexing during registration.\n";
@@ -1090,8 +1239,8 @@ static void buildDistributionNetwork(PatternRewriter &rewriter,
       registry.registerSignal(var, {}, rawVal);
     }
     if (varNeeds[var].size() > 1) {
-      buildBranchTreeRecursive(rewriter, var, varNeeds[var], {}, registry,
-                               bi);
+      buildBranchTreeRecursive(builder, var, varNeeds[var], {}, registry,
+                               bi, pendingMuxOperands, shadow);
     }
   }
 }
@@ -1495,24 +1644,30 @@ static std::unique_ptr<ftd::LocalCFG> buildDecisionGraph(
 /// Helper struct encapsulating cyclic demotion logic for reuse across
 /// different suppression contexts (direct suppression and MU gate exit).
 struct CyclicDemotionHelper {
-  PatternRewriter &rewriter;
+  mlir::OpBuilder &builder;
   handshake::FuncOp &funcOp;
   const ftd::BlockIndexing &bi;
   ftd::CyclicGraphManager &cyclicMgr;
   DenseMap<Block *, Block *> &origToFullDG;
   Location loc;
   Block *insertBlock;
+  DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands;
+  ftd::ShadowCFG *shadow;
   std::map<std::pair<std::string, unsigned>, Value> demotionCache;
 
-  CyclicDemotionHelper(PatternRewriter &rewriter,
+  CyclicDemotionHelper(mlir::OpBuilder &builder,
                         handshake::FuncOp &funcOp,
                         const ftd::BlockIndexing &bi,
                         ftd::CyclicGraphManager &cyclicMgr,
                         DenseMap<Block *, Block *> &origToFullDG,
-                        Location loc, Block *insertBlock)
-      : rewriter(rewriter), funcOp(funcOp), bi(bi),
+                        Location loc, Block *insertBlock,
+                        DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+                        ftd::ShadowCFG *shadow = nullptr)
+      : builder(builder), funcOp(funcOp), bi(bi),
         cyclicMgr(cyclicMgr), origToFullDG(origToFullDG),
-        loc(loc), insertBlock(insertBlock) {}
+        loc(loc), insertBlock(insertBlock),
+        pendingMuxOperands(pendingMuxOperands),
+        shadow(shadow) {}
 
   /// Get the nesting level of a condition variable
   unsigned getVarNativeLevel(const std::string &var) {
@@ -1579,7 +1734,7 @@ struct CyclicDemotionHelper {
       Value depValue;
       if (depNative <= fromLevel) {
         // Variable is at this level or outer — use original value
-        depValue = getOriginalValue(rewriter, depVar, bi);
+        depValue = getOriginalValue(builder, depVar, bi, pendingMuxOperands, shadow);
       } else {
         // Variable is from a deeper loop — demote to this level
         depValue = getValueAtLevel(depVar, fromLevel);
@@ -1592,7 +1747,7 @@ struct CyclicDemotionHelper {
     }
 
     // 4. Distribution on levelCFG
-    buildDistributionNetwork(rewriter, *levelCFG, bi, levelRegistry);
+    buildDistributionNetwork(builder, *levelCFG, bi, levelRegistry, pendingMuxOperands, shadow);
 
     // 5. Main suppression expression: header -> loop exit
     BoolExpression *fCons = enumeratePaths(*levelCFG, bi, levelDeps);
@@ -1625,7 +1780,7 @@ struct CyclicDemotionHelper {
             unsigned vNative = getVarNativeLevel(v);
             Value vVal;
             if (vNative <= fromLevel)
-              vVal = getOriginalValue(rewriter, v, bi);
+              vVal = getOriginalValue(builder, v, bi, pendingMuxOperands, shadow);
             else
               vVal = getValueAtLevel(v, fromLevel);
             if (vVal) {
@@ -1650,8 +1805,9 @@ struct CyclicDemotionHelper {
       std::set<std::string> vars = fSup->getVariables();
       std::vector<std::string> cofactorList(vars.begin(), vars.end());
       BDD *bdd = buildBDD(fSup, cofactorList);
-      Value branchCond = bddToCircuit(rewriter, bdd, insertBlock,
-                                       levelRegistry, {}, bi);
+      Value branchCond = bddToCircuit(builder, bdd, insertBlock,
+                                      levelRegistry, {}, bi,
+                                      pendingMuxOperands, shadow);
 
       // Cascaded DP filter
       if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
@@ -1659,19 +1815,22 @@ struct CyclicDemotionHelper {
         std::vector<std::string> dpCofactorList(dpVarsSet.begin(),
                                                  dpVarsSet.end());
         BDD *dpBdd = buildBDD(fSupDP, dpCofactorList);
-        Value dpCond = bddToCircuit(rewriter, dpBdd, insertBlock,
-                                     levelRegistry, {}, bi);
-        auto dpBranch = rewriter.create<handshake::ConditionalBranchOp>(
+        Value dpCond = bddToCircuit(builder, dpBdd, insertBlock,
+                                    levelRegistry, {}, bi,
+                                    pendingMuxOperands, shadow);
+        auto dpBranch = builder.create<handshake::ConditionalBranchOp>(
             loc, ftd::getListTypes(branchCond.getType()),
             dpCond, branchCond);
-        dpBranch->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+        dpBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+        setBBAttr(dpBranch, insertBlock, builder);
         branchCond = dpBranch.getFalseResult();
       }
 
-      auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+      auto branchOp = builder.create<handshake::ConditionalBranchOp>(
           loc, ftd::getListTypes(currentValue.getType()),
           branchCond, currentValue);
-      branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+      branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      setBBAttr(branchOp, insertBlock, builder);
       result = branchOp.getFalseResult();
     }
 
@@ -1691,7 +1850,7 @@ struct CyclicDemotionHelper {
     Value val;
     if (native <= targetLevel) {
       // Variable is at or below target level — use original value
-      val = getOriginalValue(rewriter, varName, bi);
+      val = getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
       if (val && !val.getType().isa<handshake::ChannelType>())
         val.setType(ftd::channelifyType(val.getType()));
     } else {
@@ -1730,13 +1889,24 @@ struct CyclicDemotionHelper {
 /// Apply the algorithm from FPL'22 to handle a non-loop situation of
 /// producer and consumer
 static void insertDirectSuppression(
-    PatternRewriter &rewriter, handshake::FuncOp &funcOp, Operation *consumer,
-    Value connection, const ftd::BlockIndexing &bi,
-    ControlDependenceAnalysis::BlockControlDepsMap &cdAnalysis) {
+    mlir::OpBuilder &builder, handshake::FuncOp &funcOp, Operation *consumer,
+    Value connection, ftd::ShadowCFG &shadow) {
 
-  Block *entryBlock = &funcOp.getBody().front();
-  Block *producerBlock = connection.getParentBlock();
-  Block *consumerBlock = consumer->getBlock();
+  Region &shadowRegion = shadow.getRegion();
+  ftd::BlockIndexing bi(shadowRegion);
+
+  // Map producer and consumer to shadow blocks via handshake.bb
+  unsigned prodBBIdx = 0;
+  if (auto *defOp = connection.getDefiningOp())
+    if (auto attr = defOp->getAttrOfType<IntegerAttr>("handshake.bb"))
+      prodBBIdx = attr.getUInt();
+  unsigned consBBIdx = 0;
+  if (auto attr = consumer->getAttrOfType<IntegerAttr>("handshake.bb"))
+    consBBIdx = attr.getUInt();
+
+  Block *entryBlock = shadow.getBlock(0);
+  Block *producerBlock = shadow.getBlock(prodBBIdx);
+  Block *consumerBlock = shadow.getBlock(consBBIdx);
   Block *dominatorBlock = producerBlock;
 
   bool debuglog = false;
@@ -1774,6 +1944,11 @@ static void insertDirectSuppression(
     return;
   }
 
+  auto getBB = [](Operation *op) -> unsigned {
+    auto attr = op->getAttrOfType<IntegerAttr>("handshake.bb");
+    return attr ? attr.getUInt() : 0;
+  };
+
   // If deliverToGamma is true, we need to trace down the mux chain to find the
   // root condition block that effectively controls the delivery.
   if (deliverToGamma) {
@@ -1790,7 +1965,7 @@ static void insertDirectSuppression(
         // Condition: User is a Gamma gate in the Same Block
         if (llvm::isa<handshake::MuxOp>(user) &&
             user->hasAttr(FTD_EXPLICIT_GAMMA) &&
-            user->getBlock() == lastMuxInChain->getBlock()) {
+            getBB(user) == getBB(lastMuxInChain)) {
 
           // Skip if both data inputs use the connection
           unsigned connectionCount = 0;
@@ -1818,7 +1993,7 @@ static void insertDirectSuppression(
     // 2. Update dominatorBlock to be the block defining the condition of the
     // last Mux
     Value finalCondition = lastMuxInChain->getOperand(0);
-    dominatorBlock = returnMuxConditionBlock(finalCondition);
+    dominatorBlock = returnMuxConditionBlock(finalCondition, shadow);
     if (bi.isLess(producerBlock, dominatorBlock)) {
       dominatorBlock = producerBlock;
     }
@@ -1832,7 +2007,7 @@ static void insertDirectSuppression(
   }
 
   // Create a temporary builder to isolate the LocalCFG creation from the
-  // main PatternRewriter. This prevents the rewriter from tracking the
+  // main OpBuilder. This prevents the OpBuilder from tracking the
   // temporary operations which are later erased manually.
   OpBuilder tmpBuilder(funcOp.getContext());
   auto locGraph =
@@ -1882,7 +2057,7 @@ static void insertDirectSuppression(
         if (debuglog) {
           out << "[MUX] Mux Condition Block: ";
           Block *muxConditionBlock =
-              returnMuxConditionBlock(currentMuxOp->getOperand(0));
+              returnMuxConditionBlock(currentMuxOp->getOperand(0), shadow);
           if (muxConditionBlock)
             muxConditionBlock->printAsOperand(out);
           else
@@ -1912,7 +2087,7 @@ static void insertDirectSuppression(
 
         // 2. Identify the Original Block defining this condition variable
         // (Using the provided helper function)
-        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition);
+        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, shadow);
         muxConditionSet.insert(muxConditionBlock);
 
         // 3. Find the corresponding Block in the Local CFG
@@ -1955,7 +2130,7 @@ static void insertDirectSuppression(
         // Check if user is a Mux in the same block marked as Gamma
         if (llvm::isa<handshake::MuxOp>(user) &&
             user->hasAttr(FTD_EXPLICIT_GAMMA) &&
-            user->getBlock() == currentMuxOp->getBlock()) {
+            getBB(user) == getBB(currentMuxOp)) {
           // Count how many data inputs use currentResult
           unsigned connectionCount = 0;
           if (user->getOperand(1) == currentResult)
@@ -2006,7 +2181,7 @@ static void insertDirectSuppression(
   // path. If deliverToGamma is false, muxConstraints will be empty, so both
   // graphs are identical.
   SignalRegistry registry;
-  rewriter.setInsertionPointToStart(consumer->getBlock());
+  builder.setInsertionPointToStart(consumer->getBlock());
   auto fullDecisionGraph =
       buildDecisionGraph(*locGraph, locConsControlDepsFull);
 
@@ -2020,9 +2195,9 @@ static void insertDirectSuppression(
       origToFullDG[origBlock] = dgBlock;
 
   // Create the cyclic demotion helper
-  CyclicDemotionHelper demotionHelper(rewriter, funcOp, bi, cyclicMgr,
+  CyclicDemotionHelper demotionHelper(builder, funcOp, bi, cyclicMgr,
                                        origToFullDG, consumer->getLoc(),
-                                       consumer->getBlock());
+                                       consumer->getBlock(), nullptr, &shadow);
 
   // Level 0: distribution graph (no constraints)
   auto level0FullDG = buildDecisionGraph(*locGraph, locConsAcyclicDeps);
@@ -2031,7 +2206,7 @@ static void insertDirectSuppression(
   demotionHelper.preRegisterDemotedValues(level0FullDG, registry);
 
   // Build distribution on level 0
-  buildDistributionNetwork(rewriter, *level0FullDG, bi, registry);
+  buildDistributionNetwork(builder, *level0FullDG, bi, registry, nullptr, &shadow);
 
   // Level 0: constrained graph (for expression)
   auto level0ConstrainedDG =
@@ -2054,11 +2229,6 @@ static void insertDirectSuppression(
   if (debuglog) {
     out << "fSupmin  = " << fSup->toString() << "\n\n\n";
   }
-
-  level0FullDG->containerOp->erase();
-  level0ConstrainedDG->containerOp->erase();
-  fullDecisionGraph->containerOp->erase();
-  locGraph->containerOp->erase();
 
   // Suppression Logic between Dominator and Producer (locGraphDP)
   BoolExpression *fSupDP = BoolExpression::boolZero();
@@ -2109,6 +2279,11 @@ static void insertDirectSuppression(
     }
   }
 
+  level0FullDG->containerOp->erase();
+  level0ConstrainedDG->containerOp->erase();
+  fullDecisionGraph->containerOp->erase();
+  locGraph->containerOp->erase();
+
   // If the activation function is not zero, then a suppress block is to be
   // inserted
   if (fSup->type != experimental::boolean::ExpressionType::Zero) {
@@ -2116,7 +2291,11 @@ static void insertDirectSuppression(
     std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
     BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond =
-        bddToCircuit(rewriter, bdd, consumer->getBlock(), registry, {}, bi);
+        bddToCircuit(builder, bdd, consumer->getBlock(), registry, {}, bi,
+                     nullptr, &shadow);
+    auto consBBAttr = IntegerAttr::get(
+        IntegerType::get(builder.getContext(), 32, IntegerType::Unsigned),
+        consBBIdx);
 
     // Cascaded Upstream Filter
     if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
@@ -2124,23 +2303,26 @@ static void insertDirectSuppression(
       std::vector<std::string> cofactorListDP(blocksDP.begin(), blocksDP.end());
       BDD *bddDP = buildBDD(fSupDP, cofactorListDP);
       Value dpBranchCond =
-          bddToCircuit(rewriter, bddDP, consumer->getBlock(), registry, {}, bi);
+          bddToCircuit(builder, bddDP, consumer->getBlock(), registry, {}, bi,
+                       nullptr, &shadow);
 
       // Upstream logic filters the SUPPRESSION SIGNAL.
       // Create an Intermediate Branch on the 'branchCond' wire.
       // Data Input: branchCond (The Downstream suppression signal)
       // Condition: dpBranchCond (from Upstream logic)
-      auto dpBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
+      auto dpBranchOp = builder.create<handshake::ConditionalBranchOp>(
           consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
           dpBranchCond, branchCond);
-      dpBranchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+      dpBranchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      dpBranchOp->setAttr("handshake.bb", consBBAttr);
       branchCond = dpBranchOp.getFalseResult();
     }
 
-    auto branchOp = rewriter.create<handshake::ConditionalBranchOp>(
+    auto branchOp = builder.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), ftd::getListTypes(supData.getType()), branchCond,
         supData);
-    branchOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+    branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+    branchOp->setAttr("handshake.bb", consBBAttr);
     supData = branchOp.getFalseResult();
 
     // Take into account the possibility of a mux to get the condition input
@@ -2153,14 +2335,16 @@ static void insertDirectSuppression(
       if (llvm::isa<handshake::MuxOp>(consumer) &&
           consumer->getOperand(0) == connection &&
           use.getOperandNumber() != 0) {
-        auto src = rewriter.create<handshake::SourceOp>(consumer->getLoc());
+        auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
+        setBBAttr(src, consumer->getBlock(), builder);
         auto innerType =
             connection.getType().cast<handshake::ChannelType>().getDataType();
         auto attr =
-            rewriter.getIntegerAttr(innerType, (use.getOperandNumber() == 2));
-        auto cst = rewriter.create<handshake::ConstantOp>(
+            builder.getIntegerAttr(innerType, (use.getOperandNumber() == 2));
+        auto cst = builder.create<handshake::ConstantOp>(
             consumer->getLoc(), connection.getType(), attr, src.getResult());
-        cst->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+        cst->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+        setBBAttr(cst, consumer->getBlock(), builder);
         use.set(cst.getResult());
         continue;
       }
@@ -2169,13 +2353,16 @@ static void insertDirectSuppression(
   }
 }
 
-void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
+void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
                                   handshake::FuncOp &funcOp,
-                                  Operation *consumerOp, Value operand) {
+                                  Operation *consumerOp, Value operand,
+                                  ftd::ShadowCFG &shadow) {
 
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&funcOp.getBody()));
-  BlockIndexing bi(funcOp.getBody());
+  // All analysis runs on the shadow Region (multi-block, real CF terminators)
+  Region &shadowRegion = shadow.getRegion();
+  BlockIndexing bi(shadowRegion);
+  DominanceInfo domInfo(shadow.shadowFunc);
+  CFGLoopInfo loopInfo(domInfo.getDomTree(&shadowRegion));
   auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
@@ -2197,6 +2384,17 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
 
   mlir::Operation *producerOp = operand.getDefiningOp();
 
+  uint32_t prodId = 0, consId = 0;
+  if (operand.getDefiningOp())
+    if (auto intAttr =
+            producerOp->getAttrOfType<mlir::IntegerAttr>("handshake.bb")) {
+      prodId = intAttr.getUInt();
+    }
+  if (auto intAttr =
+          consumerOp->getAttrOfType<mlir::IntegerAttr>("handshake.bb")) {
+    consId = intAttr.getUInt();
+  }
+
   // Skip if the producer was added by this function or if it is an op to skip
   if (producerOp &&
       (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
@@ -2207,21 +2405,34 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
       llvm::isa_and_nonnull<MemRefType>(operand.getType()))
     return;
 
-  // Last regenerated value
-  Value regeneratedValue = operand;
+  // Map BB indices to shadow blocks for loop analysis
+  Block *prodBlock = shadow.getBlock(prodId);
+  Block *consBlock = shadow.getBlock(consId);
 
   // Get all the loops for which we need to regenerate the
   // corresponding value
   SmallVector<CFGLoop *> loops = getLoopsConsNotInProd(
-      consumerOp->getBlock(), operand.getParentBlock(), loopInfo);
+      consBlock, prodBlock, loopInfo);
   unsigned numberOfLoops = loops.size();
 
-  auto cstType = rewriter.getIntegerType(1);
+  if (numberOfLoops == 0)
+    return;
+
+  Value regeneratedValue = operand;
+  auto cstType = builder.getIntegerType(1);
   auto cstAttr = IntegerAttr::get(cstType, 0);
 
+  // The real (flattened) block where new ops are inserted
+  Block *realBlock = &funcOp.getBody().front();
+
   auto createRegenMux = [&](CFGLoop *loop) -> handshake::MuxOp {
-    rewriter.setInsertionPointToStart(loop->getHeader());
-    regeneratedValue.setType(channelifyType(regeneratedValue.getType()));
+    builder.setInsertionPointToStart(realBlock);
+
+    // BB index of the loop header (for handshake.bb tagging)
+    unsigned headerBBIdx = shadow.getBlockIndex(loop->getHeader());
+    auto headerBBAttr = IntegerAttr::get(
+        IntegerType::get(builder.getContext(), 32, IntegerType::Unsigned),
+        headerBBIdx);
 
     // Determine the loop exit condition:
     Value conditionValue;
@@ -2250,8 +2461,8 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
 
     // 3. Create the cyclic demotion helper
     CyclicDemotionHelper demotionHelper(
-        rewriter, funcOp, bi, cyclicMgr, origToFullDG,
-        consumerOp->getLoc(), loopHeader);
+        builder, funcOp, bi, cyclicMgr, origToFullDG,
+        consumerOp->getLoc(), realBlock, nullptr, &shadow);
 
     // 4. Build acyclic decision graph for distribution and expression
     auto acyclicDG =
@@ -2262,7 +2473,7 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     demotionHelper.preRegisterDemotedValues(acyclicDG, registry);
 
     // 6. Construct distribution circuit
-    buildDistributionNetwork(rewriter, *acyclicDG, bi, registry);
+    buildDistributionNetwork(builder, *acyclicDG, bi, registry, nullptr, &shadow);
 
     // 7. Control Dependence Analysis on the acyclic Decision Graph
     ControlDependenceAnalysis locCDA(*acyclicDG->region);
@@ -2281,7 +2492,7 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     BDD *bdd = buildBDD(fBackedge, cofactorList);
     // 10. Convert to Circuit.
     conditionValue =
-        bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi);
+        bddToCircuit(builder, bdd, realBlock, registry, {}, bi, nullptr, &shadow);
 
     // Clean up temporary graphs
     acyclicDG->containerOp->erase();
@@ -2289,29 +2500,32 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
     locGraph->containerOp->erase();
 
     // Create the false constant to feed `init`
-    auto constOp = rewriter.create<handshake::ConstantOp>(consumerOp->getLoc(),
+    auto constOp = builder.create<handshake::ConstantOp>(consumerOp->getLoc(),
                                                           cstAttr, startValue);
-    constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-
+    constOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
+    constOp->setAttr("handshake.bb", headerBBAttr);
+  
     // Create the `init` operation
     SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-    auto initMergeOp = rewriter.create<handshake::MergeOp>(consumerOp->getLoc(),
+    auto initMergeOp = builder.create<handshake::MergeOp>(consumerOp->getLoc(),
                                                            mergeOperands);
-    initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-
+    initMergeOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
+    initMergeOp->setAttr("handshake.bb", headerBBAttr);
+  
     // The multiplexer is to be fed by the init block, and takes as inputs the
     // regenerated value and the result itself (to be set after) it was created.
     auto selectSignal = initMergeOp.getResult();
     selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
-    auto muxOp = rewriter.create<handshake::MuxOp>(regeneratedValue.getLoc(),
+    auto muxOp = builder.create<handshake::MuxOp>(regeneratedValue.getLoc(),
                                                    regeneratedValue.getType(),
                                                    selectSignal, muxOperands);
 
     muxOp->setOperand(2, muxOp->getResult(0));
-    muxOp->setAttr(FTD_REGEN, rewriter.getUnitAttr());
-
+    muxOp->setAttr(FTD_REGEN, builder.getUnitAttr());
+    muxOp->setAttr("handshake.bb", headerBBAttr);
+  
     return muxOp;
   };
 
@@ -2332,15 +2546,10 @@ void ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 }
 
-void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
+void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
                                  handshake::FuncOp &funcOp,
-                                 Operation *consumerOp, Value operand) {
-
-  Region &region = funcOp.getBody();
-  mlir::DominanceInfo domInfo;
-  mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
-  BlockIndexing bi(region);
-  auto cda = ControlDependenceAnalysis(region).getAllBlockDeps();
+                                 Operation *consumerOp, Value operand,
+                                 ShadowCFG &shadow) {
 
   // Skip the prod-cons if the producer is part of the operations related to
   // the BDD expansion or INIT merges
@@ -2353,14 +2562,19 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
       consumerOp->getOperand(0) != operand)
     return;
 
-  // The consumer block is the block which contains the consumer
-  Block *consumerBlock = consumerOp->getBlock();
+  // Read BB indices from handshake.bb attributes
+  unsigned consBBIdx = 0;
+  if (auto attr = consumerOp->getAttrOfType<IntegerAttr>("handshake.bb"))
+    consBBIdx = attr.getUInt();
 
-  // The producer block is the block which contains the producer, and it
-  // corresponds to the parent block of the operand. Since the operand might
-  // have no producer operation (if it is a function argument) then this is the
-  // only way to get the relevant information.
-  Block *producerBlock = operand.getParentBlock();
+  unsigned prodBBIdx = 0;
+  if (Operation *producerOp = operand.getDefiningOp())
+    if (auto attr = producerOp->getAttrOfType<IntegerAttr>("handshake.bb"))
+      prodBBIdx = attr.getUInt();
+
+  // Map to shadow blocks for analysis
+  Block *consumerBlock = shadow.getBlock(consBBIdx);
+  Block *producerBlock = shadow.getBlock(prodBBIdx);
 
   // If the consumer and the producer are in the same block without the
   // consumer being a multiplexer skip because no delivery is needed
@@ -2407,15 +2621,16 @@ void ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
     // Handle the suppression in all the other cases (including the operand
     // being a function argument)
-    insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
+    insertDirectSuppression(builder, funcOp, consumerOp, operand, shadow);
 
     // Handle the suppression in all the other cases (including the operand
     // being a function argument)
-    insertDirectSuppression(rewriter, funcOp, consumerOp, operand, bi, cda);
+    insertDirectSuppression(builder, funcOp, consumerOp, operand, shadow);
   }
 }
 
-void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
+void ftd::addSupp(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
+                  ShadowCFG &shadow) {
 
   // Set of original operations in the IR
   std::vector<Operation *> consumersToCover;
@@ -2424,42 +2639,12 @@ void ftd::addSupp(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
 
   for (auto *consumerOp : consumersToCover) {
     for (auto operand : consumerOp->getOperands())
-      addSuppOperandConsumer(rewriter, funcOp, consumerOp, operand);
-  }
-
-  // During suppression, SourceOp placeholders marked with FTD_COND_VAR were
-  // used in place of the condition input. Now that suppression is complete,
-  // replace all uses of each placeholder with the actual condition input
-  // (operand 0 of the conditional branch), then erase the placeholder.
-  for (Block &block : funcOp.getBody()) {
-    Operation *terminator = block.getTerminator();
-    auto cbr = dyn_cast<cf::CondBranchOp>(terminator);
-    auto hsCbr = dyn_cast<handshake::ConditionalBranchOp>(terminator);
-    if (!cbr && !hsCbr) {
-      continue;
-    }
-
-    Operation *placeholderOp = nullptr;
-    for (Operation &op : block) {
-      if (op.hasAttr(FTD_COND_VAR)) {
-        placeholderOp = &op;
-        break;
-      }
-    }
-    if (!placeholderOp)
-      continue;
-
-    Value condInput;
-    if (cbr)
-      condInput = cbr.getOperand(0);
-    else 
-      condInput = hsCbr.getOperand(0);
-    placeholderOp->getResult(0).replaceAllUsesWith(condInput);
-    rewriter.eraseOp(placeholderOp);
+      addSuppOperandConsumer(builder, funcOp, consumerOp, operand, shadow);
   }
 }
 
-void ftd::addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
+void ftd::addRegen(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
+                   ShadowCFG &shadow) {
 
   // Set of original operations in the IR
   std::vector<Operation *> consumersToCover;
@@ -2469,15 +2654,15 @@ void ftd::addRegen(handshake::FuncOp &funcOp, PatternRewriter &rewriter) {
   // For each producer/consumer relationship
   for (Operation *consumerOp : consumersToCover) {
     for (Value operand : consumerOp->getOperands())
-      addRegenOperandConsumer(rewriter, funcOp, consumerOp, operand);
+      addRegenOperandConsumer(builder, funcOp, consumerOp, operand, shadow);
   }
 }
 
-LogicalResult experimental::ftd::addGsaGates(Region &region,
-                                             PatternRewriter &rewriter,
-                                             const gsa::GSAAnalysis &gsa,
-                                             Backedge startValue,
-                                             bool removeTerminators) {
+LogicalResult experimental::ftd::addGsaGates(
+    Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
+    Backedge startValue,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    bool removeTerminators) {
 
   using namespace experimental::gsa;
   BlockIndexing bi(region);
@@ -2494,6 +2679,25 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
   //
   // To simplify the way GSA functions are handled, each of them has an unique
   // index.
+
+  // This function operates in two modes:
+  // (1) Called from handshake transformation passes where all values are
+  // already handshake channels.
+  // (2) Called early in CF-to-handshake conversion
+  // when some CF values are still present.
+  // The last two parameters distinguish the modes: for (1) they are
+  // nullptr/false, for (2) they are non-null/true.
+  //
+  // In mode (1), no special management is needed: Muxes are inserted with all
+  // connections finalized immediately.
+  //
+  // In mode (2), Mux operands are created as backedge placeholders. We maintain
+  // a side structure mapping these placeholders to their corresponding
+  // handshake values, which allows us to replace the backedges later, once the
+  // handshake values are fully finalized. In case of Mux fed from a Mux tree,
+  // the pendingMuxOperands is propoagated to the Mux decomposition tree to
+  // store all cf values involved. In case the Mux is fed from a Merge only the
+  // cf values feeding the Merge will be pushed to the pendingMuxOperands
 
   struct MissingGsa {
     // Index of the GSA function to modify
@@ -2533,7 +2737,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       // Checks whether one index is empty
       int nullOperand = -1;
 
-      // For each of its operand
+      // For each of its operands
       for (auto *operand : gate->operands) {
         // If the input is another GSA function, then a dummy value is used as
         // operand and the operations will be reconnected later on.
@@ -2549,7 +2753,19 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
           operands.emplace_back(nullptr);
         } else {
           auto val = std::get<Value>(operand->input);
-          operands.emplace_back(val);
+          // If there is no risk that values are not finalized yet,
+          // pendingMuxOperands will be a nullptr
+          if (pendingMuxOperands == nullptr)
+            operands.emplace_back(val);
+          else {
+            // Create backedge of the same type
+            BackedgeBuilder beb(rewriter, block.front().getLoc());
+            Backedge be = beb.get(ftd::channelifyType(val.getType()));
+            // Use backedge as mux operand
+            operands.emplace_back(be);
+            // Remember how to resolve it later
+            (*pendingMuxOperands)[val].push_back(be);
+          }
         }
         operandIndex++;
       }
@@ -2589,7 +2805,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         auto funcOp = region.getParentOfType<handshake::FuncOp>();
         CyclicDemotionHelper demotionHelper(
             rewriter, funcOp, bi, cyclicMgr, origToDG,
-            loc, loopHeader);
+            loc, loopHeader, pendingMuxOperands, nullptr);
 
         // 4. Build acyclic decision graph for distribution and expression
         auto acyclicDG =
@@ -2600,7 +2816,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         demotionHelper.preRegisterDemotedValues(acyclicDG, registry);
 
         // 6. Construct distribution circuit
-        buildDistributionNetwork(rewriter, *acyclicDG, bi, registry);
+        buildDistributionNetwork(rewriter, *acyclicDG, bi, registry, pendingMuxOperands);
 
         // 7. Control Dependence Analysis on the acyclic Decision Graph
         ControlDependenceAnalysis locCDA(*acyclicDG->region);
@@ -2620,7 +2836,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
         BDD *bdd = buildBDD(fBackedge, cofactorList);
         // 10. Convert to Circuit.
         conditionValue =
-            bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi);
+            bddToCircuit(rewriter, bdd, loopHeader, registry, {}, bi, pendingMuxOperands);
 
         // Clean up temporary graphs
         acyclicDG->containerOp->erase();
@@ -2638,7 +2854,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
           // suppression and does not require distribution.
           SignalRegistry emptyRegistry;
           conditionValue = bddToCircuit(rewriter, bdd, gate->getBlock(),
-                                        emptyRegistry, {}, bi);
+                                        emptyRegistry, {}, bi, pendingMuxOperands);
         } else {
           // Use a SourceOp placeholder for the condition value, which will be
           // replaced with the actual condition input after every suppression
@@ -2668,6 +2884,7 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
             rewriter.create<handshake::MergeOp>(loc, mergeOperands);
 
         initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+        setBBAttr(initMergeOp, gate->getBlock(), rewriter);
 
         // Replace the new condition value
         conditionValue = initMergeOp->getResult(0);
@@ -2693,8 +2910,9 @@ LogicalResult experimental::ftd::addGsaGates(Region &region,
       }
 
       // Create the multiplexer
-      auto mux = rewriter.create<handshake::MuxOp>(loc, gate->result.getType(),
-                                                   conditionValue, operands);
+      auto mux = rewriter.create<handshake::MuxOp>(
+        loc, ftd::channelifyType(gate->result.getType()),
+        conditionValue, operands);
 
       // The one input gamma is marked at an operation to skip in the IR and
       // later removed
@@ -2785,7 +3003,7 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
       continue;
     gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
     if (failed(ftd::addGsaGates(funcOp.getRegion(), rewriter, gsa,
-                                startValueBackedge, false)))
+                                startValueBackedge, nullptr, false)))
       return failure();
 
     // Get rid of the merge

@@ -13,21 +13,29 @@
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/SmallVector.h"
+
 #include <utility>
 
 using namespace mlir;
@@ -35,6 +43,216 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 using namespace dynamatic::experimental::ftd;
+
+struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
+  using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
+
+  // Construct a dense element attribute with everything zeroes.
+  DenseElementsAttr getZeroAttr(ShapedType type) const {
+    auto elemType = type.getElementType();
+    if (auto intTy = dyn_cast<IntegerType>(elemType)) {
+      return DenseElementsAttr::get(type, APInt(intTy.getWidth(), 0));
+    }
+    if (auto floatTy = dyn_cast<FloatType>(type)) {
+      if (floatTy.isF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEhalf(), /*negative=*/false));
+      if (floatTy.isBF16())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::BFloat(), /*negative=*/false));
+      if (floatTy.isF32())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEsingle(), /*negative=*/false));
+      if (floatTy.isF64())
+        return DenseElementsAttr::get(
+            type, APFloat::getZero(APFloat::IEEEdouble(), /*negative=*/false));
+      llvm::report_fatal_error("Unhandled float element type!");
+    }
+    llvm::report_fatal_error("Unknown base element type!");
+  }
+
+  LogicalResult
+  matchAndRewrite(memref::AllocaOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    // HACK: By default, we initialize the memory with all zeros. According to
+    // the C standard, this only happens for arrays.
+    rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                  getZeroAttr(op.getType()));
+    return success();
+  }
+};
+
+struct GetGlobalOpConversion
+    : public DynOpConversionPattern<memref::GetGlobalOp> {
+  using DynOpConversionPattern<memref::GetGlobalOp>::DynOpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GetGlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    // clang-format off
+    // Example:
+    //  memref.global "external" constant @internal_array : memref<...> = dense<...>
+    //  ....
+    //  %4 = memref.get_global @internal_array : memref<...>
+    //
+    // In this case, we remove the global constant and rewrite the addressof
+    // node into a RAMOp (and we put an attribute to describe its constant
+    // value).
+    // clang-format on
+    SymbolTableCollection symbolTableCollection;
+
+    auto symNameOfGetGlobal = op.getNameAttr();
+
+    memref::GlobalOp global;
+    auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
+    moduleOp.walk([&global, symNameOfGetGlobal](memref::GlobalOp gbl) {
+      if (gbl.getSymName() == symNameOfGetGlobal.getValue()) {
+        global = gbl;
+      }
+    });
+
+    if (!global) {
+      // No corresponding Global (maybe emit pass failure is better)
+      return failure();
+    }
+
+    /// The initial value doesn't have any type constraints. Therefore we need
+    /// to check if it is stored as dense elements.
+    mlir::Attribute initValueAttr = global.getInitialValueAttr();
+    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+      rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
+                                                    denseAttr);
+    } else {
+      llvm::report_fatal_error(
+          "The initial value must be denoted in DenseElementsAttr.");
+    }
+    return success();
+  }
+};
+
+// TODO: Here we simply erase all the global variables and attach the initial
+// values to the RAMOps inside the handshake function.
+struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
+  using DynOpConversionPattern<memref::GlobalOp>::DynOpConversionPattern;
+  LogicalResult
+  matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+/// Per-block edge information captured from CF-level IR before conversion.
+struct BlockEdgeInfo {
+  bool isConditional = false;
+  bool hasSuccessors = false;
+  unsigned trueSuccIdx = 0;
+  unsigned falseSuccIdx = 0;
+  unsigned uncondSuccIdx = 0;
+};
+
+/// Complete CFG topology of one function, captured before conversion.
+struct OriginalCFGInfo {
+  unsigned numBlocks = 0;
+  SmallVector<BlockEdgeInfo> blockEdges;
+};
+
+/// Walk every func::FuncOp in the module and capture its CFG topology.
+/// Must be called BEFORE applyFullConversion.
+static DenseMap<StringRef, OriginalCFGInfo>
+captureAllCFGTopologies(ModuleOp moduleOp) {
+  DenseMap<StringRef, OriginalCFGInfo> result;
+
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+    if (funcOp.isExternal() || funcOp.getSymName().startswith("__init"))
+      continue;
+
+    Region &region = funcOp.getBody();
+    if (region.empty())
+      continue;
+
+    OriginalCFGInfo info;
+
+    DenseMap<Block *, unsigned> blockIdx;
+    for (auto [idx, block] : llvm::enumerate(region))
+      blockIdx[&block] = idx;
+
+    info.numBlocks = blockIdx.size();
+    info.blockEdges.resize(info.numBlocks);
+
+    for (auto &[block, idx] : blockIdx) {
+      BlockEdgeInfo &edge = info.blockEdges[idx];
+      Operation *term = block->getTerminator();
+
+      if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+        edge.isConditional = true;
+        edge.hasSuccessors = true;
+        edge.trueSuccIdx = blockIdx.lookup(condBr.getTrueDest());
+        edge.falseSuccIdx = blockIdx.lookup(condBr.getFalseDest());
+      } else if (auto br = dyn_cast<cf::BranchOp>(term)) {
+        edge.hasSuccessors = true;
+        edge.uncondSuccIdx = blockIdx.lookup(br.getDest());
+      }
+    }
+
+    result[funcOp.getSymName()] = std::move(info);
+  }
+
+  return result;
+}
+
+/// Create a ShadowCFG for a given handshake::FuncOp using the topology
+/// captured before conversion.
+static ftd::ShadowCFG buildShadowCFG(OpBuilder &builder,
+                                     handshake::FuncOp realFuncOp,
+                                     const OriginalCFGInfo &info) {
+  ftd::ShadowCFG shadow;
+  Location loc = realFuncOp.getLoc();
+
+  // 1. Create a temporary func::FuncOp with blocks + CF terminators
+  {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointAfter(realFuncOp);
+    auto funcType = builder.getFunctionType({}, {});
+    shadow.shadowFunc =
+        builder.create<func::FuncOp>(loc, "__ftd_shadow_cfg__", funcType);
+
+    Region &R = shadow.shadowFunc.getBody();
+    SmallVector<Block *> blocks;
+    for (unsigned i = 0; i < info.numBlocks; ++i)
+      blocks.push_back(builder.createBlock(&R, R.end()));
+
+    for (unsigned i = 0; i < info.numBlocks; ++i) {
+      const BlockEdgeInfo &edge = info.blockEdges[i];
+      builder.setInsertionPointToEnd(blocks[i]);
+
+      if (edge.isConditional) {
+        auto dummyCond =
+            builder.create<arith::ConstantOp>(loc, builder.getBoolAttr(true));
+        builder.create<cf::CondBranchOp>(
+            loc, dummyCond, blocks[edge.trueSuccIdx], ValueRange{},
+            blocks[edge.falseSuccIdx], ValueRange{});
+      } else if (edge.hasSuccessors) {
+        builder.create<cf::BranchOp>(loc, blocks[edge.uncondSuccIdx]);
+      } else {
+        builder.create<func::ReturnOp>(loc);
+      }
+    }
+  }
+
+  // 2. Scan the real funcOp to map BB index -> real condition Value
+  realFuncOp.walk([&](handshake::ConditionalBranchOp brOp) {
+    if (brOp->hasAttr("ftd.skip"))
+      return;
+    auto bbAttr = brOp->getAttrOfType<IntegerAttr>("handshake.bb");
+    if (!bbAttr)
+      return;
+    unsigned bbIdx = bbAttr.getUInt();
+    if (!shadow.conditionMap.contains(bbIdx))
+      shadow.conditionMap[bbIdx] = brOp.getConditionOperand();
+  });
+
+  return shadow;
+}
 
 namespace {
 
@@ -49,45 +267,53 @@ struct FtdCfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
+    // Capture CFG topology before conversion flattens everything.
+    auto cfgTopologies = captureAllCFGTopologies(modOp);
+
     patterns.add<experimental::ftd::FtdLowerFuncToHandshake>(
         getAnalysis<ControlDependenceAnalysis>(),
         getAnalysis<gsa::GSAAnalysis>(), getAnalysis<NameAnalysis>(), converter,
         ctx);
 
-    patterns
-        .add<ConvertCalls,
-             FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
-             FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
-             FtdOneToOneConversion<arith::AddFOp, handshake::AddFOp>,
-             FtdOneToOneConversion<arith::AddIOp, handshake::AddIOp>,
-             FtdOneToOneConversion<arith::AndIOp, handshake::AndIOp>,
-             FtdOneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
-             FtdOneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
-             FtdOneToOneConversion<arith::DivFOp, handshake::DivFOp>,
-             FtdOneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
-             FtdOneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
-             FtdOneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
-             FtdOneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
-             FtdOneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
-             FtdOneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
-             FtdOneToOneConversion<arith::MulFOp, handshake::MulFOp>,
-             FtdOneToOneConversion<arith::MulIOp, handshake::MulIOp>,
-             FtdOneToOneConversion<arith::NegFOp, handshake::NegFOp>,
-             FtdOneToOneConversion<arith::OrIOp, handshake::OrIOp>,
-             FtdOneToOneConversion<arith::SelectOp, handshake::SelectOp>,
-             FtdOneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
-             FtdOneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
-             FtdOneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
-             FtdOneToOneConversion<arith::SubFOp, handshake::SubFOp>,
-             FtdOneToOneConversion<arith::SubIOp, handshake::SubIOp>,
-             FtdOneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-             FtdOneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
-             FtdOneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
-             FtdOneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
-             FtdOneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
-             FtdOneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-             FtdOneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
-            getAnalysis<NameAnalysis>(), converter, ctx);
+    patterns.add<
+        // LowerFuncToHandshake,
+        ConvertConstants, AllocaOpConversion, ConvertCalls,
+        ConvertUndefinedValues, GetGlobalOpConversion, GlobalOpConversion,
+        ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+        ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
+        OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+        OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
+        OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
+        OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+        OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
+        OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
+        OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+        OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
+        OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
+        OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
+        OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
+        OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+        OneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
+        OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
+        OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
+        OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
+        OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
+        OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
+        OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
+        OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
+        OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
+        OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
+        OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
+        OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+        OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+        OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+        OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+        OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
+        OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+        OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
+        getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
@@ -97,144 +323,93 @@ struct FtdCfToHandshakePass
                              arith::ArithDialect, math::MathDialect,
                              BuiltinDialect>();
 
+    target.addDynamicallyLegalOp<func::CallOp>([](func::CallOp op) {
+      // If the call is to __init, consider it legal for now.
+      // This allows the pass to continue so that __placeholder conversion can
+      // later erase these __init calls.
+      // All other func.CallOp (not calling __init) remain illegal due to the
+      // addIllegalDialect rule above and must be converted by a pattern.
+      if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
+              SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
+        return calledFn.getSymName().startswith("__init");
+      }
+      // If symbol lookup fails or it's not a func::FuncOp, treat as default
+      // (illegal)
+      return false;
+    });
+    target.addDynamicallyLegalOp<func::FuncOp>(
+        [](func::FuncOp op) { return op.getSymName().startswith("__init"); });
+
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // Clean up: Remove the definition of each __init* function, but only if it
+    // has no remaining uses. This is safe because all valid calls to __init*
+    // were tracked and deleted earlier.
+    for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
+      if (func.getSymName().startswith("__init")) {
+        assert(func.use_empty() &&
+               "__init function should not have users after transformation");
+        func.erase();
+      }
+    }
+
+    for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+      mlir::OpBuilder builder(funcOp.getContext());
+
+      auto topoIt = cfgTopologies.find(funcOp.getName());
+      if (topoIt == cfgTopologies.end())
+        continue;
+      const OriginalCFGInfo &info = topoIt->second;
+
+      if (info.numBlocks <= 1)
+        continue;
+
+      // Build the shadow CFG — one struct, everything inside.
+      ftd::ShadowCFG shadow = buildShadowCFG(builder, funcOp, info);
+
+      ftd::resolveCondPlaceholders(funcOp, builder, shadow);
+
+      // Populate conditionMap from XorOp placeholders
+      for (auto xorOp : funcOp.getOps<handshake::XOrIOp>()) {
+        if (!xorOp->hasAttr("ftd.cvar"))
+          continue;
+        auto bbAttr = xorOp->getAttrOfType<IntegerAttr>("handshake.bb");
+        if (!bbAttr)
+          continue;
+        shadow.conditionMap[bbAttr.getUInt()] = xorOp.getResult();
+      }
+
+      ftd::addRegen(funcOp, builder, shadow);
+      ftd::addSupp(funcOp, builder, shadow);
+      ftd::finalizeCondPlaceholders(funcOp);
+
+      shadow.destroy();
+    }
   }
 };
 } // namespace
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
-static void channelifyMuxes(handshake::FuncOp &funcOp) {
-  // Considering each mux that was added, the inputs and output values must be
-  // channellified
-  for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
-    assert(muxOp.getDataOperands().size() == 2 &&
-           "Multiplexers should have two data inputs");
-    muxOp.getDataOperands()[0].setType(
-        channelifyType(muxOp.getDataOperands()[0].getType()));
-    muxOp.getDataOperands()[1].setType(
-        channelifyType(muxOp.getDataOperands()[1].getType()));
-    muxOp.getDataResult().setType(
-        channelifyType(muxOp.getDataResult().getType()));
-  }
-}
-
-/// Converts undefined operations (LLVM::UndefOp) with a default "0"
-/// constant triggered by the start signal of the corresponding function.
-/// This is usually associated to uninitialized variables in the code
-static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
-                                            handshake::FuncOp &funcOp,
-                                            NameAnalysis &namer) {
-
-  // Get the start value of the current function
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  // For each undefined value
-  auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
-
-  for (auto undefOp : undefinedValues) {
-    // Create an attribute of the appropriate type for the constant
-    auto resType = undefOp.getRes().getType();
-    TypedAttr cstAttr;
-    if (isa<IndexType>(resType)) {
-      auto intType = rewriter.getIntegerType(32);
-      cstAttr = rewriter.getIntegerAttr(intType, 0);
-    } else if (isa<IntegerType>(resType)) {
-      cstAttr = rewriter.getIntegerAttr(resType, 0);
-    } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
-      cstAttr = rewriter.getFloatAttr(floatType, 0.0);
-    } else {
-      auto intType = rewriter.getIntegerType(32);
-      cstAttr = rewriter.getIntegerAttr(intType, 0);
-    }
-
-    // Create a constant with a default value and replace the undefined value
-    rewriter.setInsertionPoint(undefOp);
-    auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
-                                                        cstAttr, startValue);
-    cstOp->setDialectAttrs(undefOp->getAttrDictionary());
-    undefOp.getResult().replaceAllUsesWith(cstOp.getResult());
-    namer.replaceOp(cstOp, cstOp);
-    rewriter.replaceOp(undefOp, cstOp.getResult());
-  }
-
-  return success();
-}
-
-/// Convers arith-level constants to handshake-level constants. Constants are
-/// triggered by the start value of the corresponding function. The FTD
-/// algorithm is then in charge of connecting the constants to the rest of the
-/// network, in order for them to be re-generated
-static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
-                                      handshake::FuncOp &funcOp,
-                                      NameAnalysis &namer) {
-
-  // Get the start value of the current function
-  auto startValue = (Value)funcOp.getArguments().back();
-  llvm::DenseMap<Block *, Value> sourcesPerBlock;
-
-  // For each constant
-  auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
-  for (auto cstOp : constants) {
-
-    rewriter.setInsertionPoint(cstOp);
-
-    // This variable will work as activation value for the constant. If the
-    // constant is considered as sourcable, this will be the output of a source
-    // component, otherwise it remains startValue
-    auto controlValue = startValue;
-
-    // Continue the conversion by obtaining the size of the constnat
-    TypedAttr valueAttr = cstOp.getValue();
-
-    if (isa<IndexType>(valueAttr.getType())) {
-      auto intType = rewriter.getIntegerType(32);
-      valueAttr = IntegerAttr::get(
-          intType, cast<IntegerAttr>(valueAttr).getValue().trunc(32));
-    }
-
-    auto newCstOp = rewriter.create<handshake::ConstantOp>(
-        cstOp.getLoc(), valueAttr, controlValue);
-
-    newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
-
-    // Replace the constant and the usage of its result
-    namer.replaceOp(cstOp, newCstOp);
-    cstOp.getResult().replaceAllUsesWith(newCstOp.getResult());
-    rewriter.replaceOp(cstOp, newCstOp->getResults());
-  }
-  return success();
-}
-
-template <typename SrcOp, typename DstOp>
-LogicalResult FtdOneToOneConversion<SrcOp, DstOp>::matchAndRewrite(
-    SrcOp srcOp, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
-  rewriter.setInsertionPoint(srcOp);
-  SmallVector<Type> newTypes;
-  for (Type resType : srcOp->getResultTypes())
-    newTypes.push_back(channelifyType(resType));
-  auto newOp =
-      rewriter.create<DstOp>(srcOp->getLoc(), newTypes, adaptor.getOperands(),
-                             srcOp->getAttrDictionary().getValue());
-
-  // /!\ This is the main difference from the base function. Without such
-  // replacement, a "null operand found" error is present at the end of the
-  // transformation pass in almost any test. This is due to the way FTD tweaks
-  // the coexistence of `cf` and `handshake` dialect to obtain a final circuit:
-  // without such explicit replacement, deleted operations still provide values
-  // to new operations. However, this should be fixed by understanding what is
-  // causing MLIR to complain.
-  for (auto [from, to] : llvm::zip(srcOp->getResults(), newOp->getResults()))
-    from.replaceAllUsesWith(to);
-
-  this->namer.replaceOp(srcOp, newOp);
-  rewriter.replaceOp(srcOp, newOp);
-  return success();
-}
+// static void channelifyMuxes(handshake::FuncOp &funcOp) {
+//   // Considering each mux that was added, the inputs and output values must
+//   be
+//   // channellified
+//   for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
+//     assert(muxOp.getDataOperands().size() == 2 &&
+//            "Multiplexers should have two data inputs");
+//     muxOp.getDataOperands()[0].setType(
+//         channelifyType(muxOp.getDataOperands()[0].getType()));
+//     muxOp.getDataOperands()[1].setType(
+//         channelifyType(muxOp.getDataOperands()[1].getType()));
+//     muxOp.getDataResult().setType(
+//         channelifyType(muxOp.getDataResult().getType()));
+//   }
+// }
 
 LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
-    func::FuncOp lowerFuncOp, OpAdaptor adaptor,
+    func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {
   // Map all memory accesses in the matched function to the index of their
   // memref in the function's arguments
@@ -244,14 +419,22 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-  // Add the muxes as obtained by the GSA analysis pass. This requires the start
-  // value, as init merges need it as one of their output. However, the start
-  // value is not available yet here, so a backedge is adopted instead.
+  ftd::createAllCondPlaceholders(lowerFuncOp.getRegion(), rewriter);
+
+  // Structure used inside addGsaGates to temporarily map a cf value to a
+  // backedge until the proper handshake values are created; in which case, the
+  // backedge is replaced with the corresponding hanshake values
+  static DenseMap<Value, SmallVector<Backedge, 2>> pendingMuxOperands;
+
+  // Add the muxes as obtained by the GSA analysis pass. This requires the
+  // start value, as init merges need it as one of their output. However,
+  // the start value is not available yet here, so a backedge is adopted
+  // instead.
   BackedgeBuilder edgeBuilderStart(rewriter, lowerFuncOp.getRegion().getLoc());
   Backedge startValueBackedge =
       edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
   if (failed(addGsaGates(lowerFuncOp.getRegion(), rewriter, gsaAnalysis,
-                         startValueBackedge)))
+                         startValueBackedge, &pendingMuxOperands)))
     return failure();
 
   // First lower the parent function itself, without modifying its body
@@ -269,6 +452,15 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // it.
   startValueBackedge.setValue((Value)funcOp.getArguments().back());
 
+  for (auto &[originalValue, backedges] : pendingMuxOperands) {
+    Value newVal = rewriter.getRemappedValue(originalValue);
+    assert(newVal && "Failed to remap GSA mux operand!");
+
+    for (Backedge &be : backedges)
+      be.setValue(newVal);
+  }
+  pendingMuxOperands.clear();
+
   // Stores mapping from each value that passes through a merge-like
   // operation to the data result of that merge operation
   ArgReplacements argReplacements;
@@ -282,12 +474,36 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   addMergeOps(funcOp, rewriter, argReplacements);
   addBranchOps(funcOp, rewriter);
 
+  // addBranchOps only creates handshake::ConditionalBranchOp for live-out
+  // values.  If a conditional block has no live-outs, no ConditionalBranchOp
+  // is created and the condition value is lost after flattening.
+  // Create one using the block's control signal so that buildShadowCFG's
+  // walk can always find the condition.
+  for (Block &block : funcOp) {
+    auto condBr = dyn_cast<cf::CondBranchOp>(block.getTerminator());
+    if (!condBr)
+      continue;
+
+    bool hasHandshakeCondBr = llvm::any_of(block, [](Operation &op) {
+      return isa<handshake::ConditionalBranchOp>(&op);
+    });
+
+    if (!hasHandshakeCondBr) {
+      Value cond = rewriter.getRemappedValue(condBr.getCondition());
+      assert(cond && "Failed to remap condition");
+      Value ctrl = block.getArguments().back();
+      rewriter.setInsertionPoint(condBr);
+      rewriter.create<handshake::ConditionalBranchOp>(
+          condBr.getLoc(), cond, ctrl);
+    }
+  }
+
   // The memory operations are converted to the corresponding handshake
   // counterparts. No LSQ interface is created yet.
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
   if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
-                              memInfo, true)))
+                              memInfo)))
     return failure();
 
   // First round of bb-tagging so that newly inserted Dynamatic memory ports
@@ -304,19 +520,19 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // Convert the constants and undefined values from the `arith` dialect to
   // the `handshake` dialect, while also using the start value as their
   // control value
-  if (failed(::convertConstants(rewriter, funcOp, namer)) ||
-      failed(::convertUndefinedValues(rewriter, funcOp, namer)))
-    return failure();
+  // if (failed(::convertConstants(rewriter, funcOp, namer)) ||
+  //  failed(::convertUndefinedValues(rewriter, funcOp, namer)))
+  // return failure();
 
-  if (funcOp.getBlocks().size() != 1) {
+  // if (funcOp.getBlocks().size() != 1) {
 
-    // Add muxes for regeneration of values in loop
-    addRegen(funcOp, rewriter);
-    channelifyMuxes(funcOp);
+  //   // Add muxes for regeneration of values in loop
+  //   // addRegen(funcOp, rewriter);
+  //   // channelifyMuxes(funcOp);
 
-    // Add suppression blocks between each pair of producer and consumer
-    addSupp(funcOp, rewriter);
-  }
+  //   // Add suppression blocks between each pair of producer and consumer
+  //   addSupp(funcOp, rewriter);
+  // }
 
   // id basic block
   idBasicBlocks(funcOp, rewriter);
@@ -327,50 +543,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(flattenAndTerminate(funcOp, rewriter, argReplacements)))
     return failure();
 
-  return success();
-}
-
-template <typename CastOp, typename ExtOp>
-LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
-    CastOp castOp, OpAdaptor adaptor,
-    ConversionPatternRewriter &rewriter) const {
-
-  auto getWidth = [](Type type) -> unsigned {
-    // In Fast Token Delivery the type of the element might be already a
-    // channel, rather than a simple type. In this case, the type should be
-    // extracted. We also make sure that no extra bits are present at this
-    // compilation stage.
-    if (auto dataType = dyn_cast<handshake::ChannelType>(type)) {
-      assert(dataType.getNumExtraSignals() == 0 &&
-             "expected type to have no extra signals");
-      type = dataType.getDataType();
-    }
-    if (isa<IndexType>(type))
-      return 32;
-    return type.getIntOrFloatBitWidth();
-  };
-
-  unsigned srcWidth = getWidth(castOp.getOperand().getType());
-  unsigned dstWidth = getWidth(castOp.getResult().getType());
-  Type dstType = handshake::ChannelType::get(rewriter.getIntegerType(dstWidth));
-  Operation *newOp;
-  if (srcWidth < dstWidth) {
-    // This is an extension
-    newOp =
-        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
-                               castOp->getAttrDictionary().getValue());
-  } else {
-    // This is a truncation
-    newOp = rewriter.create<handshake::TruncIOp>(
-        castOp.getLoc(), dstType, adaptor.getOperands(),
-        castOp->getAttrDictionary().getValue());
-  }
-  this->namer.replaceOp(castOp, newOp);
-  rewriter.replaceOp(castOp, newOp);
-
-  // /!\ This is again the main difference from the normal flow. See the comment
-  // in FtdOneToOneConversion.
-  castOp.getResult().replaceAllUsesWith(newOp->getResult(0));
   return success();
 }
 
