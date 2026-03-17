@@ -3,7 +3,6 @@ add_dynamatic_library(DynamaticSupport
   Backedge.cpp
   CFG.cpp
   DOT.cpp
-  Logging.cpp
   MILP.cpp
   System.cpp
   TimingModels.cpp
@@ -21,3 +20,6 @@ add_subdirectory(Espresso)
 add_subdirectory(JSON)
 add_subdirectory(RTL)
 add_subdirectory(Utils)
+add_subdirectory(ConstraintProgramming)
+add_subdirectory(BlifImporter)
+add_subdirectory(BlifExporter)

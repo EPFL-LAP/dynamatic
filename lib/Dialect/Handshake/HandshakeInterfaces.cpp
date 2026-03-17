@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
@@ -361,6 +362,116 @@ TypedValue<ControlType> LSQOp::getCtrlEnd() {
   if (MemoryControllerOp mcOp = getConnectedMC())
     return mcOp.getCtrlEnd();
   return cast<TypedValue<ControlType>>(getOperands().back());
+}
+
+//===----------------------------------------------------------------------===//
+// EagerForkLikeOpInterface
+//===----------------------------------------------------------------------===//
+
+int ForkOp::getNumEagerOutputs() { return getNumResults(); }
+std::vector<EagerForkSentNamer> ForkOp::getInternalSentStateNamers() {
+  std::vector<EagerForkSentNamer> ret;
+  StringAttr nameAttr =
+      getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(nameAttr &&
+         "Cannot get names of sent states for operation without name");
+  for (size_t i = 0; i < getNumResults(); ++i) {
+    EagerForkSentNamer state(nameAttr.str(), getResultName(i));
+    ret.push_back(state);
+  }
+  return ret;
+}
+
+int ControlMergeOp::getNumEagerOutputs() { return 2; }
+std::vector<EagerForkSentNamer> ControlMergeOp::getInternalSentStateNamers() {
+  std::vector<EagerForkSentNamer> ret;
+  StringAttr nameAttr =
+      getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(nameAttr &&
+         "Cannot get names of sent states for operation without name");
+  for (size_t i = 0; i < getNumResults(); ++i) {
+    EagerForkSentNamer state(nameAttr.str(), getResultName(i));
+    ret.push_back(state);
+  }
+  return ret;
+}
+
+//===----------------------------------------------------------------------===//
+// BufferLikeOpInterface
+//===----------------------------------------------------------------------===//
+
+std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStateNamers() {
+  std::vector<BufferSlotFullNamer> ret(1);
+  StringAttr nameAttr =
+      getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(nameAttr &&
+         "Cannot get names of slot states for operation without name");
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot");
+  return ret;
+}
+
+std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStateNamers() {
+  std::vector<BufferSlotFullNamer> ret(2);
+  StringAttr nameAttr =
+      getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(nameAttr &&
+         "Cannot get names of slot states for operation without name");
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str());
+  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str());
+  return ret;
+}
+
+std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
+  std::vector<BufferSlotFullNamer> ret(getNumSlots());
+  StringAttr nameAttr =
+      getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(nameAttr &&
+         "Cannot get names of slot states for operation without name");
+  for (size_t i = 0; i < getNumSlots(); ++i) {
+    ret[i] = BufferSlotFullNamer(nameAttr.str(), "slot_" + std::to_string(i));
+  }
+  return ret;
+}
+
+//===----------------------------------------------------------------------===//
+// ShiftLikeArithOpInterface
+//===----------------------------------------------------------------------===//
+
+static bool isShiftByConstantImpl(Operation *op) {
+  auto rhs = op->getOperand(1);
+  // Recursively visit the predecessor
+  std::function<bool(Operation *)> isShiftByConstantRecursive =
+      [&](Operation *op) {
+        if (isa<
+                // clang-format off
+                handshake::TruncIOp,
+                handshake::ExtSIOp,
+                handshake::ExtUIOp,
+                handshake::ForkOp
+                // clang-format on
+                >(op)) {
+
+          Value oprd = op->getOperand(0);
+          if (Operation *defOp = oprd.getDefiningOp(); defOp)
+            return isShiftByConstantRecursive(defOp);
+          assert(isa<BlockArgument>(oprd));
+          return false;
+        }
+        return isa<handshake::ConstantOp>(op);
+      };
+  return isShiftByConstantRecursive(rhs.getDefiningOp());
+}
+
+bool ShLIOp::isShiftByConstant() {
+  return isShiftByConstantImpl(this->getOperation());
+}
+
+bool ShRSIOp::isShiftByConstant() {
+  return isShiftByConstantImpl(this->getOperation());
+}
+
+bool ShRUIOp::isShiftByConstant() {
+  return isShiftByConstantImpl(this->getOperation());
 }
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

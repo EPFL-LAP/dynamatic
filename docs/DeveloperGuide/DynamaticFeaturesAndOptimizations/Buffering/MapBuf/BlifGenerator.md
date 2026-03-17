@@ -95,6 +95,12 @@ If a new hardware module is added to Dynamatic, for most cases, it is sufficient
 $ python3 tools/blif-generator.py {new_module}
 ```
 
+Additionally, it is possible to specify also the range of parameters through which the module should be generated. For instance, the following command:
+```
+$ python3 tools/blif-generator.py --parameter DATA_TYPE=4,65 --parameter SELECT_TYPE=1,3 handshake.mux
+```
+generates the handshake multiplexer with parameters DATA_TYPE from 4 to 65 and SELECT_TYPE from 1 to 3.
+
 ### Yosys Commands
 ```
 yosys -p

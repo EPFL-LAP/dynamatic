@@ -13,8 +13,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeOptimizeBitwidths.cpp
   HandshakeInferBasicBlocks.cpp
   HandshakeReplaceMemoryInterfaces.cpp
-  HandshakeMarkFPUImpl.cpp
-  MarkMemoryDependencies.cpp
+  HandshakeRemoveUnusedMemRefs.cpp
   MarkMemoryInterfaces.cpp
   OperationNames.cpp
   PushConstants.cpp
@@ -22,7 +21,8 @@ add_dynamatic_library(DynamaticTransforms
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
-  LLVMMarkMemoryDependencies.cpp
+  HandshakeTreeHeightReduction.cpp
+  HandshakeSetUnitImplAttributes.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
@@ -39,3 +39,5 @@ add_dynamatic_library(DynamaticTransforms
 )
 
 add_subdirectory(BufferPlacement)
+add_subdirectory(ResourceSharing)
+add_subdirectory(LLVMIR)

@@ -24,10 +24,6 @@ namespace handshake {
 class FuncOp;
 } // namespace handshake
 
-#define GEN_PASS_DECL_HANDSHAKEMATERIALIZE
-#define GEN_PASS_DEF_HANDSHAKEMATERIALIZE
-#include "dynamatic/Transforms/Passes.h.inc"
-
 /// Error message to display when the Handshake function is not materialized.
 constexpr llvm::StringLiteral ERR_NON_MATERIALIZED_FUNC(
     "This step requires that all values in the Handshake functions are used "
@@ -51,8 +47,6 @@ constexpr llvm::StringLiteral ERR_NON_MATERIALIZED_MOD(
 /// function in the module is materialized. Fails and emits an error if a value
 /// does not have exactly one use within a Handshake function.
 LogicalResult verifyIRMaterialized(mlir::ModuleOp modOp);
-
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeMaterialize();
 
 } // namespace dynamatic
 

@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "dynamatic/Analysis/NumericAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -22,6 +21,14 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_SCFFORLOOPROTATION
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
@@ -141,9 +148,3 @@ struct ScfForLoopRotationPass
   };
 };
 } // namespace
-
-namespace dynamatic {
-std::unique_ptr<dynamatic::DynamaticPass> createScfRotateForLoops() {
-  return std::make_unique<ScfForLoopRotationPass>();
-}
-} // namespace dynamatic

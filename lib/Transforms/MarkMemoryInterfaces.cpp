@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/MarkMemoryInterfaces.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
@@ -26,6 +25,14 @@
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_MARKMEMORYINTERFACES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 /// If the operartions is load/store-like, returns the memref value it
 /// references. Otherwise returns nullptr.
@@ -162,9 +169,4 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
     for (auto &[lsqMemOp, groupID] : regionInterfaces.connectToLSQ)
       setDialectAttr<MemInterfaceAttr>(lsqMemOp, ctx, groupID);
   }
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createMarkMemoryInterfaces() {
-  return std::make_unique<MarkMemoryInterfacesPass>();
 }

@@ -4,11 +4,19 @@ on:
   # Make sure that settings are set to require permission
   # to run workflows by external contributors!
   pull_request:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
     types: [opened, synchronize, reopened, ready_for_review]
   
   push:
+    paths-ignore:
+      - 'docs/**'
     branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check-format:
@@ -76,7 +84,7 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
 
       - name: build
-        run: ./build.sh --release --force
+        run: ./build.sh --release --enable-cbc --force 
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
@@ -85,6 +93,10 @@ jobs:
       - name: check-dynamatic-experimental
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic-experimental
+
+      - name: check-constraint-programming-library
+        if: steps.build.outputs.exit_code == 0
+        run: ninja -C build run-constraint-programming-test
 
       - name: integration-test
         if: steps.build.outputs.exit_code == 0
@@ -122,4 +134,9 @@ jobs:
             integration-test/*/out*/comp
             integration-test/*/out*/sim/report.txt
             integration-test/*/out/dynamatic_out.txt
+            integration-test/*/out/dynamatic_err.txt
+            integration-test/memory/*/out*/comp
+            integration-test/memory/*/out*/sim/report.txt
+            integration-test/memory/*/out/dynamatic_out.txt
+            integration-test/memory/*/out/dynamatic_err.txt
 

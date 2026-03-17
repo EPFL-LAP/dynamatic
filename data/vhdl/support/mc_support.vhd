@@ -522,35 +522,69 @@ entity mc_control is
 end entity;
 
 architecture arch of mc_control is
+  type fsm_state_t is (
+    IDLE,
+    RUNNING
+  );
+  signal fsm_q : fsm_state_t := IDLE;
+  signal no_more_requests_q : std_logic := '0';
+  signal function_return : std_logic := '0';
+
+  signal fsm_running : std_logic;
 begin
-  process (clk) begin
+
+  fsm_running <= '1' when fsm_q = RUNNING else '0';
+
+  -- Function is returning if:
+  -- 1. There are no more requests (from the circuit)
+  -- 2. All pending requests are done (from the controller's counter)
+  -- 3. MemEnd pin is ready
+  -- 4. The function is running
+  function_return <= no_more_requests_q and allRequestsDone and memEnd_ready and fsm_running;
+
+  -- We can start the memory only if it is not started yet (IDLE).
+  -- During the IDLE state, it can always start.
+  memStart_ready <= '1' when fsm_q = IDLE else '0';
+
+  -- The memory is okay to return if:
+  -- 1. There is no more requests
+  -- 2. All pending requests are done
+  memEnd_valid <= no_more_requests_q and allRequestsDone and fsm_running;
+
+  -- We can accept that a control end once per function execution.
+  -- It cannot accept it again before we return.
+  ctrlEnd_ready <= not no_more_requests_q;
+
+  process (clk)
+  begin
     if rising_edge(clk) then
       if (rst = '1') then
-        memStart_ready <= '1';
-        memEnd_valid   <= '0';
-        ctrlEnd_ready  <= '0';
+        fsm_q <= IDLE;
       else
-        memStart_ready <= memStart_ready;
-        memEnd_valid   <= memEnd_valid;
-        ctrlEnd_ready  <= ctrlEnd_ready;
-        -- determine when the memory has completed all requests
-        if ctrlEnd_valid and allRequestsDone then
-          memEnd_valid  <= '1';
-          ctrlEnd_ready <= '1';
-        end if;
-        -- acknowledge the 'ctrlEnd' control
-        if ctrlEnd_valid and ctrlEnd_ready then
-          ctrlEnd_ready <= '0';
-        end if;
-        -- determine when the memory is idle
-        if memStart_valid and memStart_ready then
-          memStart_ready <= '0';
-        end if;
-        if memEnd_valid and memEnd_ready then
-          memStart_ready <= '1';
-          memEnd_valid   <= '0';
+        if (fsm_q = IDLE) then
+          if (memStart_valid = '1') then
+            fsm_q <= RUNNING;
+          end if;
+        elsif (function_return = '1') then
+          fsm_q <= IDLE;
         end if;
       end if;
     end if;
   end process;
+
+  process (clk)
+  begin
+    if rising_edge(clk) then
+      if (rst = '1') then
+        no_more_requests_q <= '0';
+      else
+        if (function_return = '1') then
+          no_more_requests_q <= '0';
+        elsif (ctrlEnd_valid = '1') then
+          no_more_requests_q <= '1';
+        end if;
+      end if;
+    end if;
+  end process;
+
 end architecture;

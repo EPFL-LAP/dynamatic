@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/Speculation/HandshakeSpeculation.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -34,26 +33,24 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::speculation;
 
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 namespace experimental {
-namespace speculation {
-
-// Implement the base class and auto-generated create functions.
-// Must be called from the .cpp file to avoid multiple definitions
 #define GEN_PASS_DEF_HANDSHAKESPECULATION
 #include "experimental/Transforms/Passes.h.inc"
-
-} // namespace speculation
 } // namespace experimental
 } // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
+namespace {
 
 struct HandshakeSpeculationPass
-    : public dynamatic::experimental::speculation::impl::
-          HandshakeSpeculationBase<HandshakeSpeculationPass> {
-  using HandshakeSpeculationBase<
-      HandshakeSpeculationPass>::HandshakeSpeculationBase;
+    : public dynamatic::experimental::impl::HandshakeSpeculationBase<
+          HandshakeSpeculationPass> {
+
+  using HandshakeSpeculationBase::HandshakeSpeculationBase;
 
   void runDynamaticPass() override;
 
@@ -863,3 +860,5 @@ void HandshakeSpeculationPass::runDynamaticPass() {
     }
   }
 }
+
+} // namespace

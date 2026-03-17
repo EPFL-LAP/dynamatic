@@ -11,12 +11,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/RemovePolygeistAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 
 using namespace mlir;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_REMOVEPOLYGEISTATTRIBUTES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
@@ -40,8 +47,3 @@ struct RemovePolygeistAttributesPass
 };
 
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createRemovePolygeistAttributes() {
-  return std::make_unique<RemovePolygeistAttributesPass>();
-}

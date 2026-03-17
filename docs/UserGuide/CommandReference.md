@@ -16,16 +16,19 @@ This document provides an overview of the different commands available in the Dy
 > The `compile` command does not require Gurobi by default, but it is needed for [smart buffer placement options](OptimizationsAndDirectives.md#optimization-algorithms-in-dynamatic).  
 
 The `--buffer-algorithm` flag allows users to use smart buffer placement algorithms notably `fpga20` and `fpl22` for throughput and timing optimizations.
+
+The `--fast-token-delivery` flag enables the *Fast Token Delivery (FTD)* algorithm during the CF → Handshake lowering stage. Note that this option is currently incompatible with smart buffer placement algorithms.
+
 - `write-hdl [--hdl <vhdl|verilog|smv>]`: Convert results from `compile` to a VHDL, Verilog or SMV file.
-- `simulate`: Simulates the HDL produced by `write-hdl`. 
+- `simulate [--simulator <vsim|xsim|ghdl|verilator]`: Simulates the HDL produced by `write-hdl`. 
 > [!NOTE]  
-> Requires a ModelSim/Questa installation!
+> Requires a ModelSim/Questa (`vsim`), Vivado (`xsim`), GHDL (`ghdl`) or Verilator (`verilator`) installation.
 
 - `synthesize`: Synthesizes the HDL result from `write-hdl` using Vivado. 
 > [!NOTE]  
 > Requires a Vivado installation! 
 
-- `visualize`: Visualizes the execution of the circuit simulated by `ModelSim`/`Questa`. 
+- `visualize`: Visualizes the execution of the simulated circuit. 
 > [!NOTE]  
 > Requires Godot Engine and [the visualizer component must be built!](AdvancedBuild.md#4-interactive-dataflow-circuit-visualizer)
 

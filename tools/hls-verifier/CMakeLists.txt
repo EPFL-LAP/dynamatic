@@ -8,7 +8,7 @@ add_llvm_tool(hls-verifier
   hls-verifier.cpp
   lib/Help.cpp
   lib/HlsLogging.cpp
-  lib/HlsVhdlTb.cpp
+  lib/HlsTb.cpp
   lib/Utilities.cpp
 )
 

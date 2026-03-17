@@ -4,6 +4,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   CFDFC.cpp
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
+  LatencyAndOccupancyBalancingSupport.cpp
   CostAwareBuffers.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
@@ -21,6 +22,8 @@ add_dynamatic_library(DynamaticBufferPlacement
   DynamaticHandshake
   DynamaticSupport
   DynamaticExperimentalSupport
+  DynamaticConstraintProgramming
+
   )
 
 if (GUROBI_FOUND)
@@ -30,3 +33,4 @@ if (GUROBI_FOUND)
     ${GUROBI_LIBRARY}
   )
 endif()
+

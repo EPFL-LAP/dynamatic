@@ -60,6 +60,14 @@ using namespace mlir::affine;
 using namespace mlir::memref;
 using namespace dynamatic;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_CFTOHANDSHAKE
+#include "dynamatic/Conversion/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 //===-----------------------------------------------------------------------==//
 // Helper functions
 //===-----------------------------------------------------------------------==//
@@ -1642,6 +1650,9 @@ struct CfToHandshakePass
         OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
         OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
         OneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
+        OneToOneConversion<arith::MaxUIOp, handshake::MaxUIOp>,
+        OneToOneConversion<arith::MinSIOp, handshake::MinSIOp>,
+        OneToOneConversion<arith::MinUIOp, handshake::MinUIOp>,
         OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
         OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
         OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
@@ -1704,7 +1715,3 @@ struct CfToHandshakePass
   }
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createCfToHandshake() {
-  return std::make_unique<CfToHandshakePass>();
-}

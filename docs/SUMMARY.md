@@ -33,15 +33,22 @@
     - [2. Writing A Simple Pass](DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/2.WritingASimplePass.md)
     - [3. Greedy Pattern Rewriting](DeveloperGuide/IntroductoryMaterial/Tutorials/CreatingPasses/3.GreedyPatternRewriting.md)
 
+- [Testing & CI]()
+  - [Introduction](DeveloperGuide/TestingCI/Introduction.md)
+  - [Integration Tests](DeveloperGuide/TestingCI/IntegrationTests.md)
+  - [Formatting Checks](DeveloperGuide/TestingCI/Formatting.md)
+  - [GitHub Actions](DeveloperGuide/TestingCI/Actions.md)
   
 - [Compiler Intrinsics]()
   - [Backend](DeveloperGuide/CompilerIntrinsics/Backend.md)
+  - [Full Backend](DeveloperGuide/CompilerIntrinsics/FullBackend.md)
   - [Extra Signals Type Verification](DeveloperGuide/CompilerIntrinsics/ExtraSignalsTypeVerification.md)
   - [MLIR Op Instantiation C Level](DeveloperGuide/CompilerIntrinsics/MLIROpInstantiationCLevel.md)
   - [MLIR Primer](DeveloperGuide/CompilerIntrinsics/MLIRPrimer.md)
   - [Signal Manager](DeveloperGuide/CompilerIntrinsics/SignalManager.md)
   - [Timing Information](DeveloperGuide/CompilerIntrinsics/TimingInformation.md)
   - [Tutorial: Adding New MLIR Operations](DeveloperGuide/CompilerIntrinsics/Tutorials/AddNewMLIROperation.md)
+  - [Cosimulation](DeveloperGuide/CompilerIntrinsics/Cosimulation.md)
 
 - [Design Decision Proposals]()
   - [Add/Remove/Promote Extra Signals](DeveloperGuide/DesignDecisionProposals/AddRemovePromoteExtraSignals.md)
@@ -70,6 +77,10 @@
     - [Commit Unit Placement Algorithm](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/CommitUnitPlacementAlgorithm.md)
     - [Integration Tests](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/IntegrationTests.md)
     - [Save Commit Behavior](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/SaveCommitBehavior.md)
+  - [Synth]()
+    - [Synth Dialect](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/Synth.md)
+    - [Blif Importer](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifImporter.md)
+    - [Blif Exporter](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifExporter.md)
 
 - [Specs]()
   - [Floating Point Units](DeveloperGuide/Specs/FloatingPointUnits.md)

@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -62,7 +63,7 @@ static int executeWithRedirect(const std::string &command,
                                const std::filesystem::path &stdoutFile) {
 
   std::istringstream cmdStream(command);
-  std::vector<StringRef> stringRefVec;
+  SmallVector<StringRef> stringRefVec;
 
   // Parse the command token by token
   std::string word;
@@ -76,11 +77,11 @@ static int executeWithRedirect(const std::string &command,
   for (const auto &arg : argsVector) {
     stringRefVec.emplace_back(arg);
   }
-  ArrayRef<StringRef> argsArrayRef(stringRefVec);
+  SmallVector<StringRef> argsArrayRef(stringRefVec);
 
   // Redirect stdout, keep default of stdin and stderr
   std::string stdoutFileString = stdoutFile.string();
-  ArrayRef<std::optional<StringRef>> redirects = {
+  SmallVector<std::optional<StringRef>> redirects = {
       std::nullopt, stdoutFileString, std::nullopt};
 
   std::string errMsg;

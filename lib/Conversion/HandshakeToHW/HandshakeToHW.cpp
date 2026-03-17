@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -23,6 +22,7 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -51,9 +51,19 @@
 #include <string>
 #include <utility>
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKETOHW
+#include "dynamatic/Conversion/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+#define DEBUG_TYPE "handshake-to-hw"
 
 /// Converts all ExtraSignal types to signless integer.
 static SmallVector<ExtraSignal>
@@ -137,8 +147,8 @@ public:
   /// ports.
   void addClkAndRst() {
     Type i1Type = IntegerType::get(ctx, 1);
-    addInput(dynamatic::hw::CLK_PORT, i1Type);
-    addInput(dynamatic::hw::RST_PORT, i1Type);
+    addInput(CLK_PORT, i1Type);
+    addInput(RST_PORT, i1Type);
   }
 
   /// Returns the MLIR context used by the builder.
@@ -321,7 +331,7 @@ void MemLoweringState::connectWithCircuit(ModuleBuilder &modBuilder) {
 
   numInputs = modBuilder.getNumInputs() - inputIdx;
   numOutputs = modBuilder.getNumOutputs() - outputIdx;
-};
+}
 
 SmallVector<hw::ModulePort>
 MemLoweringState::getMemInputPorts(hw::HWModuleOp modOp) {
@@ -347,7 +357,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {}
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -694,7 +704,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::MulFOp,
           handshake::MulIOp,
           handshake::NegFOp,
-          handshake::NotOp,
+          handshake::NotIOp,
           handshake::OrIOp,
           handshake::ShLIOp,
           handshake::ShRSIOp,
@@ -706,7 +716,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::UIToFPOp,
           handshake::FPToSIOp,
           handshake::AbsFOp,
-          handshake::MaxSIOp
+          handshake::MaxSIOp,
+          handshake::MaxUIOp,
+          handshake::MinSIOp,
+          handshake::MinUIOp
           // clang-format on
           >([&](auto) {
         // Bitwidth
@@ -746,22 +759,35 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
       })
+      .Case<handshake::RAMOp>([&](handshake::RAMOp ramOp) {
+        MemRefType resType = ramOp.getResult().getType();
+        addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
+        addUnsigned("SIZE", resType.getNumElements());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
         unsupported = true;
       });
 
-  if (auto internalDelayInterface =
-          llvm::dyn_cast<dynamatic::handshake::InternalDelayInterface>(op)) {
-    auto delayAttr = internalDelayInterface.getInternalDelay();
-    addParam("INTERNAL_DELAY", delayAttr);
-  }
-
   if (auto fpuImplInterface =
           llvm::dyn_cast<dynamatic::handshake::FPUImplInterface>(op)) {
     auto impl = fpuImplInterface.getFPUImpl();
     addString("FPU_IMPL", stringifyEnum(impl));
+
+    auto delayAttr = fpuImplInterface.getInternalDelay();
+    addParam("INTERNAL_DELAY", delayAttr);
+  }
+
+  if (auto latencyInterface =
+          llvm::dyn_cast<dynamatic::handshake::LatencyInterface>(op)) {
+    auto latency = latencyInterface.getLatency();
+    if (failed(latency)) {
+      op->emitError() << "Missing required latency value on operation";
+      unsupported = true;
+      return;
+    }
+    addUnsigned("LATENCY", latency.value());
   }
 }
 
@@ -865,13 +891,14 @@ ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
   addUnsigned("ADDR_WIDTH", ports.addrWidth);
   addUnsigned("SIZE", resType.getNumElements());
 
-  if (auto initialValueAttr = op->getInitialValueAttr()) {
+  if (auto initialValueAttr =
+          dyn_cast<DenseElementsAttr>(op->getInitialValueAttr())) {
     Type elemType = initialValueAttr.getElementType();
     std::vector<std::string> strValues;
     strValues.reserve(initialValueAttr.getNumElements());
     if (isa<IntegerType>(elemType)) {
-      for (auto val : initialValueAttr.getValues<int32_t>()) {
-        strValues.push_back(std::to_string(val));
+      for (auto val : initialValueAttr.getValues<APInt>()) {
+        strValues.push_back(std::to_string(val.getSExtValue()));
       }
     } else if (isa<Float32Type>(elemType)) {
       for (auto val : initialValueAttr.getValues<float>()) {
@@ -880,7 +907,7 @@ ModuleDiscriminator::ModuleDiscriminator(handshake::RAMOp *op,
     } else {
       assert(false && "Unsupported constant type!");
     }
-    addString("INITIAL_VALUES", llvm::join(strValues, " "));
+    addString("INITIAL_VALUES", llvm::join(strValues, ","));
   }
 }
 
@@ -1055,10 +1082,9 @@ static std::pair<Value, Value> getClkAndRst(hw::HWModuleOp hwModOp) {
   unsigned numInputs = hwModOp.getNumInputPorts();
   assert(numInputs >= 2 && "module should have at least clock and reset");
   size_t lastIdx = hwModOp.getPortIdForInputId(numInputs - 1);
-  assert(hwModOp.getPort(lastIdx - 1).getName() == dynamatic::hw::CLK_PORT &&
+  assert(hwModOp.getPort(lastIdx - 1).getName() == CLK_PORT &&
          "expected clock");
-  assert(hwModOp.getPort(lastIdx).getName() == dynamatic::hw::RST_PORT &&
-         "expected reset");
+  assert(hwModOp.getPort(lastIdx).getName() == RST_PORT && "expected reset");
 
   // Add clock and reset to the instance's operands
   ValueRange blockArgs = hwModOp.getBodyBlock()->getArguments();
@@ -1138,8 +1164,8 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 /// Handshake function. Fills in the lowering state object with information
 /// that will allow the conversion pass to connect memory interface to their
 /// top-level IO later on.
-hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
-                                   ModuleLoweringState &state) {
+static hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
+                                          ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
   handshake::PortNamer portNames(funcOp);
 
@@ -1245,6 +1271,15 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
       if (auto memInterface = dyn_cast<MemoryOpInterface>(userOp)) {
         InternalMemLoweringState memLoweringState(ramOp, memInterface);
         state.internalMemInterfaces.insert({memInterface, memLoweringState});
+
+        // Also add the LSQs connected to this interface:
+        for (auto *user : memInterface->getUsers()) {
+          if (auto slaveInterface = dyn_cast<MemoryOpInterface>(user)) {
+            InternalMemLoweringState slaveLoweringState(ramOp, slaveInterface);
+            state.internalMemInterfaces.insert(
+                {slaveInterface, slaveLoweringState});
+          }
+        }
       }
     }
   }
@@ -1368,7 +1403,7 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
     // The memory interface is not in the set of memInterfaces, this means:
     // - The memory interface is connected to an internal array (assert below).
     // - The IR is malformed.
-
+    LLVM_DEBUG(memOp.dump(););
     assert(modState.internalMemInterfaces.contains(memOp) &&
            "The memory interface op is not registered as an internal one nor "
            "external one!");
@@ -1549,7 +1584,10 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
   memInterfaceConverter.convertToInstance(memState, rewriter,
                                           memInterfaceToBRAMChannels);
 
-  rewriter.eraseOp(memState.ramOp);
+  // Avoid erasing the ramOp twice.
+  if (memOp.isMasterInterface()) {
+    rewriter.eraseOp(memState.ramOp);
+  }
   return success();
 }
 
@@ -1903,7 +1941,7 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
 /// index inside the `circuitBackedges` vector.
 static hw::HWModuleOp createEmptyWrapperMod(
     hw::HWModuleOp circuitOp, LoweringState &state, OpBuilder &builder,
-    DenseMap<const MemLoweringState *, ConverterBuilder> &memConverters,
+    llvm::MapVector<const MemLoweringState *, ConverterBuilder> &memConverters,
     SmallVector<std::pair<size_t, Backedge>> &circuitBackedges) {
 
   ModuleLoweringState &modState = state.modState[circuitOp];
@@ -1987,7 +2025,7 @@ static hw::HWModuleOp createEmptyWrapperMod(
   Operation *outputOp = wrapperOp.getBodyBlock()->getTerminator();
   outputOp->setOperands(modOutputs);
   return wrapperOp;
-};
+}
 
 /// Creates a wrapper module made up of the hardware module that resulted from
 /// Handshake lowering and of memory converters sitting between the latter's
@@ -1996,7 +2034,7 @@ static hw::HWModuleOp createEmptyWrapperMod(
 static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
                           OpBuilder &builder) {
 
-  DenseMap<const MemLoweringState *, ConverterBuilder> memConverters;
+  llvm::MapVector<const MemLoweringState *, ConverterBuilder> memConverters;
   SmallVector<std::pair<size_t, Backedge>> circuitBackedges;
   hw::HWModuleOp wrapperOp = createEmptyWrapperMod(
       circuitOp, state, builder, memConverters, circuitBackedges);
@@ -2048,6 +2086,8 @@ namespace {
 class HandshakeToHWPass
     : public dynamatic::impl::HandshakeToHWBase<HandshakeToHWPass> {
 public:
+  using HandshakeToHWBase::HandshakeToHWBase;
+
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -2109,7 +2149,7 @@ public:
         ConvertToHWInstance<handshake::LazyForkOp>,
         ConvertToHWInstance<handshake::LoadOp>,
         ConvertToHWInstance<handshake::StoreOp>,
-        ConvertToHWInstance<handshake::NotOp>,
+        ConvertToHWInstance<handshake::NotIOp>,
         ConvertToHWInstance<handshake::ReadyRemoverOp>,
         ConvertToHWInstance<handshake::ValidMergerOp>,
         ConvertToHWInstance<handshake::SharingWrapperOp>,
@@ -2145,6 +2185,9 @@ public:
         ConvertToHWInstance<handshake::ExtFOp>,
         ConvertToHWInstance<handshake::AbsFOp>,
         ConvertToHWInstance<handshake::MaxSIOp>,
+        ConvertToHWInstance<handshake::MaxUIOp>,
+        ConvertToHWInstance<handshake::MinSIOp>,
+        ConvertToHWInstance<handshake::MinUIOp>,
 
         // Speculative operations
         ConvertToHWInstance<handshake::SpecCommitOp>,
@@ -2193,7 +2236,3 @@ private:
 };
 
 } // end anonymous namespace
-
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createHandshakeToHWPass() {
-  return std::make_unique<HandshakeToHWPass>();
-}

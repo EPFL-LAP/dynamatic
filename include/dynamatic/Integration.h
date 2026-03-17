@@ -124,6 +124,14 @@ static std::enable_if_t<std::rank_v<T> != 0> dumpArg(const T &argArray,
 #include <sstream>
 #include <string>
 
+#ifndef __clang__
+#error "This code requires Clang (for _BitInt builtins)"
+#endif
+
+#if !__has_builtin(__is_integral)
+#error "Your Clang version does not support __is_integral!"
+#endif
+
 // Dummy template for generating a compile-time error when the branch is
 // initiantiated.
 template <typename T>
@@ -139,14 +147,41 @@ std::string formatElement(const T &element) {
   } else if constexpr (std::is_same_v<T, int8_t> ||
                        std::is_same_v<T, uint8_t> ||
                        std::is_same_v<T, int16_t> ||
-                       std::is_same_v<T, uint16_t>) {
+                       std::is_same_v<T, uint16_t> || std::is_same_v<T, bool>) {
     // C++ can correctly print the value of int, float, double, etc..  However,
     // int8_t might be interpreted and printed as a char, so we need to convert
     // it to an int before printing it to stdout.
     oss << static_cast<int>(element);
   } else if constexpr (std::is_same_v<T, char>) {
     // A char can be directly printed as a integer (i.e., its ASCII code)
-    oss << int(element);
+    oss << static_cast<unsigned int>(static_cast<unsigned char>(element));
+  } else if constexpr (__is_integral(T) && !std::is_same_v<T, bool>) {
+    // This is for the bit-precise integer type "_BitInt(N)" introduced in C23
+    // standard. We can use it to represent integer with arbitrary precisions
+    // e.g., a 18-bit integer.
+    //
+    // Example:
+    //
+    // _BitInt(7) foo = 3;
+    // signed _BitInt(19) bar = -16;
+    //
+    // Please checkout also the detailed documentation.
+    // https://en.cppreference.com/w/c/language/arithmetic_types.html
+    //
+    // NOTE: __is_integral() is a type trait in the clang extension.
+    // (https://clang.llvm.org/docs/LanguageExtensions.html#type-trait-primitives)
+    //
+    // NOTE: This is a fallback case for the other integral types (e.g.,
+    // _BitInt(N) introduced in C23). In this case, we simply cast it to "long
+    // long"
+    //
+    // TODO: maybe check if "long long" actually fits the value?
+    //
+    // TODO: the clang website says that __is_integral() should not be used by
+    // the user code as they are subject to change. For safety reason, maybe we
+    // could add some unittests to make sure that __is_integral(_BitInt(N) var)
+    // always evaluates to `true` (and also for other gcc/clang type traits)?
+    oss << static_cast<long long>(element);
   } else {
     static_assert(always_false<T>, "Unsupported type!");
   }
@@ -223,12 +258,21 @@ static std::string _outPrefix_;
 
 // NOLINTEND(readability-identifier-naming)
 
+/// Specialization of the scalar printer for bool.
+template <>
+void scalarPrinter<bool>(const bool &arg, OS &os) {
+  // Print the char as a 2-digit hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(1)
+     << (static_cast<unsigned int>(arg)) << std::endl;
+}
+
 /// Specialization of the scalar printer for char.
 template <>
 void scalarPrinter<char>(const char &arg, OS &os) {
   // Print the char as a 2-digit hexadecimal number.
   os << "0x" << std::hex << std::setfill('0') << std::setw(2)
-     << (static_cast<int>(arg)) << std::endl;
+     << (static_cast<unsigned int>(static_cast<unsigned char>(arg)))
+     << std::endl;
 }
 
 /// Specialization of the scalar printer for int8_t.
@@ -249,6 +293,13 @@ void scalarPrinter<uint8_t>(const uint8_t &arg, OS &os) {
      << static_cast<uint16_t>(static_cast<uint8_t>(arg)) << std::endl;
 }
 
+/// Specialization of the scalar printer for int16_t.
+template <>
+void scalarPrinter<int16_t>(const int16_t &arg, OS &os) {
+  os << "0x" << std::hex << std::setfill('0') << std::setw(4) << arg
+     << std::endl;
+}
+
 template <>
 void scalarPrinter<float>(const float &arg, OS &os) {
   uint32_t bits;
@@ -260,16 +311,26 @@ void scalarPrinter<float>(const float &arg, OS &os) {
 /// Specialization of the scalar printer for double.
 template <>
 void scalarPrinter<double>(const double &arg, OS &os) {
-  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
-     << *((const unsigned int *)(&arg)) << std::endl;
+  uint64_t bits;
+  std::memcpy(&bits, &arg, sizeof(bits));
+  os << "0x" << std::hex << std::setfill('0') << std::setw(16) << bits
+     << std::endl;
+}
+
+/// Specialization of the scalar printer for int.
+template <>
+void scalarPrinter<int>(const int &arg, OS &os) {
+  // Print the char as a 8-digit hexadecimal number.
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << arg
+     << std::endl;
 }
 
 /// Writes the argument's as an 8-digits hexadecimal number padded with zeros
 /// directly to stdout.
 template <typename T>
 static void scalarPrinter(const T &arg, OS &os) {
-  os << "0x" << std::hex << std::setfill('0') << std::setw(8) << arg
-     << std::endl;
+  os << "0x" << std::hex << std::setfill('0') << std::setw(8)
+     << static_cast<unsigned long long>(arg) << std::endl;
 }
 
 /// Writes the array's content in row-major-order; one element per line,

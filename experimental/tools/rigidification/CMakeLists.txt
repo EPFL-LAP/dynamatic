@@ -11,6 +11,7 @@ target_link_libraries(rigidification-testbench
   PRIVATE
   DynamaticHandshake
   DynamaticExperimentalSupport
+  DynamaticSynth
 
   MLIRIR
   MLIRMemRefTransforms

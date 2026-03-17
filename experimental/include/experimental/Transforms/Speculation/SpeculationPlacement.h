@@ -16,7 +16,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Support/Logging.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/OperationSupport.h"
@@ -31,7 +30,6 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace speculation {
 
 struct PlacementOperand {
   std::string opName;
@@ -54,7 +52,7 @@ public:
 
   /// Initializer with operand specifying the speculator position
   SpeculationPlacements(OpOperand &speculatorPosition)
-      : speculator(&speculatorPosition){};
+      : speculator(&speculatorPosition) {};
 
   /// Set the speculator operations positions according to a JSON file
   static LogicalResult readFromJSON(const std::string &jsonPath,
@@ -101,7 +99,6 @@ public:
   void setSaveCommitsFifoDepth(unsigned int depth);
 };
 
-} // namespace speculation
 } // namespace experimental
 } // namespace dynamatic
 

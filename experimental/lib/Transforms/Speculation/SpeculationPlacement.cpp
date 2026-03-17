@@ -14,7 +14,6 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/Logging.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Pass/PassManager.h"
@@ -27,7 +26,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::speculation;
 
 // SpeculationPlacements Methods
 

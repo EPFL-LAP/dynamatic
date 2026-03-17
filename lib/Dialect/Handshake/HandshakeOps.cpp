@@ -675,7 +675,7 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
            << " bits but got signal with " << inputWidth << " bits.";
   }
   return success();
-};
+}
 
 //===----------------------------------------------------------------------===//
 // MemoryControllerOp
@@ -1318,7 +1318,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE){};
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {}
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1351,7 +1351,7 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort) {}
 
 unsigned GroupMemoryPorts::getNumInputs() const {
   unsigned numInputs = hasControl() ? 1 : 0;
@@ -1468,9 +1468,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group){};
+    : blockID(blockID), group(group) {}
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {}
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1506,7 +1506,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {}
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1951,34 +1951,18 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
     return getIn();
   return nullptr;
 }
-/// Extension operations can only extend to a channel with a wider data type and
-/// identical extra signals.
-template <typename Op>
-static LogicalResult verifyTruncOp(Op op) {
-  ChannelType srcType = op.getIn().getType();
-  ChannelType dstType = op.getOut().getType();
+
+LogicalResult TruncIOp::verify() {
+  ChannelType srcType = getIn().getType();
+  ChannelType dstType = getOut().getType();
 
   if (srcType.getDataBitWidth() < dstType.getDataBitWidth()) {
-    return op.emitError() << "result channel's data type "
-                          << dstType.getDataType()
-                          << " must be narrower than operand type "
-                          << srcType.getDataType();
+    return emitError() << "result channel's data type " << dstType.getDataType()
+                       << " must be narrower than operand type "
+                       << srcType.getDataType();
   }
   return success();
 }
-
-LogicalResult TruncIOp::verify() { return verifyTruncOp(*this); }
-
-//===----------------------------------------------------------------------===//
-// TruncFOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult TruncFOp::verify() { return verifyTruncOp(*this); }
-
-//===----------------------------------------------------------------------===//
-// ExtFOp
-//===----------------------------------------------------------------------===//
-LogicalResult ExtFOp::verify() { return verifyExtOp(*this); }
 
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"

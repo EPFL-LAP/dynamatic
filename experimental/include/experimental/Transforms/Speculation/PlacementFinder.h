@@ -22,7 +22,6 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace speculation {
 
 class PlacementFinder {
 
@@ -63,7 +62,6 @@ private:
   LogicalResult findSaveCommitsTraversal(llvm::DenseSet<Operation *> &visited,
                                          Operation *currOp);
 };
-} // namespace speculation
 } // namespace experimental
 } // namespace dynamatic
 

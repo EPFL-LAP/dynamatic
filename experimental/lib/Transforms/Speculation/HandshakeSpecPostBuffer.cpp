@@ -1,4 +1,13 @@
-#include "HandshakeSpecPostBuffer.h"
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKESPECPOSTBUFFER
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
@@ -19,26 +28,13 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::speculation;
 
-namespace dynamatic {
-namespace experimental {
-namespace speculation {
-
-// Implement the base class and auto-generated create functions.
-// Must be called from the .cpp file to avoid multiple definitions
-#define GEN_PASS_DEF_HANDSHAKESPECPOSTBUFFER
-#include "experimental/Transforms/Passes.h.inc"
-
-} // namespace speculation
-} // namespace experimental
-} // namespace dynamatic
+namespace {
 
 struct HandshakeSpecPostBufferPass
-    : public dynamatic::experimental::speculation::impl::
+    : public dynamatic::experimental::impl::
           HandshakeSpecPostBufferBase<HandshakeSpecPostBufferPass> {
-  using HandshakeSpecPostBufferBase<
-      HandshakeSpecPostBufferPass>::HandshakeSpecPostBufferBase;
+  using HandshakeSpecPostBufferBase::HandshakeSpecPostBufferBase;
   void runDynamaticPass() override;
 };
 
@@ -231,3 +227,5 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   if (failed(placeAdditionalBuffers(speculator)))
     return signalPassFailure();
 }
+
+} // namespace

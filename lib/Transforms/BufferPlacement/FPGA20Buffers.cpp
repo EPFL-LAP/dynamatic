@@ -18,8 +18,10 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "mlir/IR/Value.h"
 
-#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
-#include "gurobi_c++.h"
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
+#define DEBUG_TYPE "fpga20-buffers"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -27,20 +29,11 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::buffer::fpga20;
 
-FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
-                             double targetPeriod)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod) {
-  if (!unsatisfiable)
-    setup();
-}
-
-FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
-                             const TimingDatabase &timingDB,
-                             double targetPeriod, Logger &logger,
-                             StringRef milpName)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName) {
+FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
+                             FuncInfo &funcInfo, const TimingDatabase &timingDB,
+                             double targetPeriod, StringRef writeTo)
+    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
+                          writeTo) {
   if (!unsatisfiable)
     setup();
 }
@@ -51,12 +44,12 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
     unsigned numSlotsToPlace =
-        static_cast<unsigned>(chVars.bufNumSlots.get(GRB_DoubleAttr_X) + 0.5);
+        static_cast<unsigned>(model->getValue(chVars.bufNumSlots) + 0.5);
 
     // forceBreakDV == 1 means break D, V; forceBreakDV == 0 means break
     // nothing.
-    bool forceBreakDV = chVars.signalVars[SignalType::DATA].bufPresent.get(
-                            GRB_DoubleAttr_X) > 0;
+    bool forceBreakDV =
+        model->getValue(chVars.signalVars[SignalType::DATA].bufPresent) > 0;
 
     PlacementResult result;
     // 1. If breaking DV:
@@ -86,13 +79,12 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     placement[channel] = result;
   }
 
-  if (logger)
-    logResults(placement);
+  LLVM_DEBUG(logResults(placement););
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
     auto [cf, cfVars] = cfdfcWithVars;
-    double tmpThroughput = cfVars.throughput.get(GRB_DoubleAttr_X);
+    double tmpThroughput = model->getValue(cfVars.throughput);
 
     cfdfcTPResult[idx] = tmpThroughput;
   }
@@ -108,48 +100,48 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
   ChannelVars &chVars = vars.channelVars[channel];
   handshake::ChannelBufProps &props = channelProps[channel];
-  GRBVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+  CPVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
 
   if (props.minOpaque > 0) {
     // Force the MILP to use opaque slots
-    model.addConstr(dataBuf == 1, "custom_forceOpaque");
+    model->addConstr(dataBuf == 1, "custom_forceOpaque");
     if (props.minTrans > 0) {
       // If the properties ask for both opaque and transparent slots, let
       // opaque slots take over. Transparents slots will be placed "manually"
       // from the total number of slots indicated by the MILP's result
       unsigned minTotalSlots = props.minOpaque + props.minTrans;
-      model.addConstr(chVars.bufNumSlots >= minTotalSlots,
-                      "custom_minOpaqueAndTrans");
+      model->addConstr(chVars.bufNumSlots >= minTotalSlots,
+                       "custom_minOpaqueAndTrans");
     } else {
       // Force the MILP to place a minimum number of opaque slots
-      model.addConstr(chVars.bufNumSlots >= props.minOpaque,
-                      "custom_minOpaque");
+      model->addConstr(chVars.bufNumSlots >= props.minOpaque,
+                       "custom_minOpaque");
     }
   } else if (props.minTrans > 0) {
     // Force the MILP to place a minimum number of transparent slots
-    model.addConstr(chVars.bufNumSlots >= props.minTrans + dataBuf,
-                    "custom_minTrans");
+    model->addConstr(chVars.bufNumSlots >= props.minTrans + dataBuf,
+                     "custom_minTrans");
   } else if (props.minSlots > 0) {
     // Force the MILP to place a minimum number of slots
-    model.addConstr(chVars.bufNumSlots >= props.minSlots, "custom_minSlots");
+    model->addConstr(chVars.bufNumSlots >= props.minSlots, "custom_minSlots");
   }
   if (props.minOpaque + props.minTrans + props.minSlots > 0)
-    model.addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
+    model->addConstr(chVars.bufPresent == 1, "custom_forceBuffers");
 
   // Set a maximum number of slots to be placed
   if (props.maxOpaque.has_value()) {
     if (*props.maxOpaque == 0) {
       // Force the MILP to use transparent slots
-      model.addConstr(dataBuf == 0, "custom_forceTransparent");
+      model->addConstr(dataBuf == 0, "custom_forceTransparent");
     }
     if (props.maxTrans.has_value()) {
       // Force the MILP to use a maximum number of slots
       unsigned maxSlots = *props.maxTrans + *props.maxOpaque;
       if (maxSlots == 0) {
-        model.addConstr(chVars.bufPresent == 0, "custom_noBuffers");
-        model.addConstr(chVars.bufNumSlots == 0, "custom_noSlots");
+        model->addConstr(chVars.bufPresent == 0, "custom_noBuffers");
+        model->addConstr(chVars.bufNumSlots == 0, "custom_noSlots");
       } else {
-        model.addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
+        model->addConstr(chVars.bufNumSlots <= maxSlots, "custom_maxSlots");
       }
     }
   }
@@ -209,5 +201,3 @@ void FPGA20Buffers::setup() {
   addMaxThroughputObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }
-
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED

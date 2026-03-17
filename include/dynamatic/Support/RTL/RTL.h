@@ -28,6 +28,8 @@
 
 namespace dynamatic {
 
+static constexpr llvm::StringLiteral CLK_PORT("clk"), RST_PORT("rst");
+
 /// Hardware description languages.
 enum class HDL { VHDL, VERILOG, SMV };
 
@@ -91,7 +93,7 @@ public:
   RTLParameter &operator=(const RTLParameter &) = delete;
 
   RTLParameter(RTLParameter &&other) noexcept
-      : name(std::move(other.name)), type(std::move(other.type)){};
+      : name(std::move(other.name)), type(std::move(other.type)) {};
 
   RTLParameter &operator=(RTLParameter &&other) noexcept {
     name = std::move(other.name);
@@ -156,7 +158,7 @@ protected:
   /// Construts a parameter match object from the state and an optional
   /// serialization for the parameter value.
   ParamMatch(State state, const llvm::Twine &serial = "")
-      : state(state), serialized(serial.str()){};
+      : state(state), serialized(serial.str()) {};
 };
 
 /// A parameterized request for RTL components that match certain properties.
@@ -169,7 +171,7 @@ public:
   Location loc;
 
   /// Creates an RTL request reporting errors at the provided location.
-  RTLRequest(Location loc) : loc(loc){};
+  RTLRequest(Location loc) : loc(loc) {};
 
   /// Returns the MLIR attribute holding the RTL parameter's value if it exists;
   /// otherwise returns nullptr.
@@ -292,20 +294,15 @@ public:
   /// Registers different parameters for each type of extern op.
   /// Temporary function. These parameters should be added to hw.parameters
   /// (generation_params in the future)
-  void registerParameters(hw::HWModuleExternOp &modOp);
+  LogicalResult registerParameters(hw::HWModuleExternOp &modOp);
 
-  void registerBitwidthParameter(hw::HWModuleExternOp &modOp,
-                                 llvm::StringRef modName,
-                                 hw::ModuleType &modType);
-  void registerTransparentParameter(hw::HWModuleExternOp &modOp,
-                                    llvm::StringRef modName,
-                                    hw::ModuleType &modType);
-  void registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
-                                     llvm::StringRef modName,
-                                     hw::ModuleType &modType);
-  void registerSelectedDelayParameter(hw::HWModuleExternOp &modOp,
-                                      llvm::StringRef modName,
-                                      hw::ModuleType &modType);
+  LogicalResult registerBitwidthParameter(hw::HWModuleExternOp &modOp,
+                                          llvm::StringRef modName,
+                                          hw::ModuleType &modType);
+
+  LogicalResult registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
+                                              llvm::StringRef modName,
+                                              hw::ModuleType &modType);
 
   /// Attempts to concretize the matched RTL component using the original RTL
   /// request that created the match. Generic components are copied to the
