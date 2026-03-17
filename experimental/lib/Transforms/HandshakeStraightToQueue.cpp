@@ -531,8 +531,8 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     return failure();
 
   // Run fast token delivery on the newly inserted operations
-  experimental::ftd::addRegen(funcOp, rewriter);
-  experimental::ftd::addSupp(funcOp, rewriter);
+  // experimental::ftd::addRegen(funcOp, rewriter);
+  // experimental::ftd::addSupp(funcOp, rewriter);
   experimental::cfg::markBasicBlocks(funcOp, rewriter);
 
   // Try to remove the network of cmerges if possible (i.e. if the function was

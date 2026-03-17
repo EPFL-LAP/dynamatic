@@ -527,23 +527,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
     return failure();
 
-  // Convert the constants and undefined values from the `arith` dialect to
-  // the `handshake` dialect, while also using the start value as their
-  // control value
-  // if (failed(::convertConstants(rewriter, funcOp, namer)) ||
-  //  failed(::convertUndefinedValues(rewriter, funcOp, namer)))
-  // return failure();
-
-  // if (funcOp.getBlocks().size() != 1) {
-
-  //   // Add muxes for regeneration of values in loop
-  //   // addRegen(funcOp, rewriter);
-  //   // channelifyMuxes(funcOp);
-
-  //   // Add suppression blocks between each pair of producer and consumer
-  //   addSupp(funcOp, rewriter);
-  // }
-
   // id basic block
   idBasicBlocks(funcOp, rewriter);
 
@@ -554,8 +537,4 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   return success();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass> ftd::createFtdCfToHandshake() {
-  return std::make_unique<FtdCfToHandshakePass>();
 }
