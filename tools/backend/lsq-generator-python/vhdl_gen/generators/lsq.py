@@ -784,10 +784,9 @@ class LSQ:
             store_req_valid_p0.regInit(init=0)
             st_ld_conflict_p0.regInit()
 
-        # next issue pointer (needed for look-ahead when pipelining is enabled)
-        if self.configs.pipe0:
-            stq_issue_next = LogicVec(ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
-            arch += WrapAddConst(ctx, stq_issue_next, stq_issue, 1, self.configs.numStqEntries)
+        # next issue pointer (needed for look-ahead when pipelining is enabled and for stalling store issue)
+        stq_issue_next = LogicVec(ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
+        arch += WrapAddConst(ctx, stq_issue_next, stq_issue, 1, self.configs.numStqEntries)
 
         # checks for current and next (if needed) store entry
         store_req_valid_curr = Logic(ctx, 'store_req_valid_curr', 'w')
