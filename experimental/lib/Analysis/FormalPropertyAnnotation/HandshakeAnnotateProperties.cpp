@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Analysis/FormalPropertyAnnotation/HandshakeAnnotateProperties.h"
 #include "dynamatic/Analysis/IndexChannelAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -680,7 +679,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     if (expr.terms.size() == 0) {
       continue;
     }
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::OPT);
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
     p.addEquation(expr);
     if (p.getEquations().size() > 0) {
       uid++;
