@@ -11,12 +11,12 @@ namespace dynamatic {
 /// Base class representing an instance of a generator + oracle.
 /// The methods of this class are continuously used per worker thread to
 /// discover bugs.
-class AbstractGenerator {
+class AbstractWorker {
 public:
-  explicit AbstractGenerator(const Options &options, Randomly &&random)
+  explicit AbstractWorker(const Options &options, Randomly &&random)
       : options(options), random(random) {}
 
-  virtual ~AbstractGenerator();
+  virtual ~AbstractWorker();
 
   /// Creates a random C program that should be written to 'os'.
   /// 'os' writes to a file called 'functionName.c'.

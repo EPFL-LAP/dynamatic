@@ -20,7 +20,7 @@ static std::atomic_uint64_t testCaseCounter = 0;
 static std::atomic_uint64_t bugCounter = 0;
 
 static void
-threadWork(const std::unique_ptr<dynamatic::AbstractGenerator> &target,
+threadWork(const std::unique_ptr<dynamatic::AbstractWorker> &target,
            const std::filesystem::path &workingDirectory,
            const std::string &functionName) {
   while (!quit) {
@@ -34,13 +34,13 @@ threadWork(const std::unique_ptr<dynamatic::AbstractGenerator> &target,
           return llvm::Error::success();
         }));
 
-    dynamatic::AbstractGenerator::VerificationResult result =
+    dynamatic::AbstractWorker::VerificationResult result =
         target->verify(sourceFile);
     ++testCaseCounter;
     switch (result) {
-    case dynamatic::AbstractGenerator::Success:
+    case dynamatic::AbstractWorker::Success:
       break;
-    case dynamatic::AbstractGenerator::Bug:
+    case dynamatic::AbstractWorker::Bug:
       ++bugCounter;
       std::filesystem::path destination;
       std::size_t i = 0;

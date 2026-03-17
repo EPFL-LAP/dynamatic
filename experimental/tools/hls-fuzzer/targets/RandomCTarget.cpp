@@ -1,6 +1,6 @@
 #include "RandomCTarget.h"
 
-#include "../BasicCProducer.h"
+#include "../BasicCGenerator.h"
 #include "../TargetRegistry.h"
 #include "DynamaticTypeSystem.h"
 #include "llvm/Support/Process.h"
@@ -10,10 +10,10 @@ REGISTER_TARGET("random-c", dynamatic::RandomCTarget);
 using namespace dynamatic;
 
 namespace {
-class RandomCGenerator : public AbstractGenerator {
+class RandomCWorker : public AbstractWorker {
 public:
-  explicit RandomCGenerator(const Options &options, Randomly &&random)
-      : AbstractGenerator(options, std::move(random)) {}
+  explicit RandomCWorker(const Options &options, Randomly &&random)
+      : AbstractWorker(options, std::move(random)) {}
 
   void generate(llvm::raw_ostream &os,
                 llvm::StringRef functionName) const override;
@@ -24,16 +24,16 @@ public:
 
 } // namespace
 
-std::unique_ptr<dynamatic::AbstractGenerator>
-dynamatic::RandomCTarget::createGenerator(const Options &options,
-                                          Randomly randomly) const {
-  return std::make_unique<RandomCGenerator>(options, std::move(randomly));
+std::unique_ptr<AbstractWorker>
+RandomCTarget::createGenerator(const Options &options,
+                               Randomly randomly) const {
+  return std::make_unique<RandomCWorker>(options, std::move(randomly));
 }
 
-void RandomCGenerator::generate(llvm::raw_ostream &os,
-                                llvm::StringRef functionName) const {
+void RandomCWorker::generate(llvm::raw_ostream &os,
+                             llvm::StringRef functionName) const {
   gen::DynamaticTypeSystem dynamaticTypeSystem(random);
-  gen::BasicCProducer generator(
+  gen::BasicCGenerator generator(
       random, dynamaticTypeSystem,
       /*entryContext=*/
       {random.fromEnum<gen::DynamaticTypingContext::Constraint>()});
@@ -49,8 +49,8 @@ void RandomCGenerator::generate(llvm::raw_ostream &os,
   os << generator.generateTestBench(function);
 }
 
-AbstractGenerator::VerificationResult
-RandomCGenerator::verify(const std::filesystem::path &sourceFile) const {
+AbstractWorker::VerificationResult
+RandomCWorker::verify(const std::filesystem::path &sourceFile) const {
 
   // Create an 'execute.sh' that can additionally be used as a nice reproducer
   // for e.g. 'cvise'.

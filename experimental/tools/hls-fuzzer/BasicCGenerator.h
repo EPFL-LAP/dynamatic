@@ -17,14 +17,14 @@ namespace dynamatic::gen {
 /// output.
 ///
 /// Generating new C constructs should be implemented in this class.
-class BasicCProducer {
+class BasicCGenerator {
 public:
   /// Constructs a new base generator which generates programs that adhere to
   /// the given type system.
   /// 'entryContext' is entry state used to type check the function returned by
   /// 'generate'.
   template <class TypingContext, class Self>
-  explicit BasicCProducer(Randomly &random,
+  explicit BasicCGenerator(Randomly &random,
                           TypeSystem<TypingContext, Self> &typeSystem,
                           const TypingContext &entryContext = {})
       : random(random), typeSystem(typeSystem), entryContext(entryContext) {}

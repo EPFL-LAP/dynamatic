@@ -11,7 +11,7 @@ set(LLVM_LINK_COMPONENTS
 add_llvm_executable(hls-fuzzer
         hls-fuzzer.cpp
         AbstractTarget.cpp
-        AbstractGenerator.cpp
+        AbstractWorker.cpp
         AST.cpp
         BasicCProducer.cpp
         Options.cpp

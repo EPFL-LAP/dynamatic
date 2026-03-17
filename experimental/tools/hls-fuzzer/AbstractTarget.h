@@ -1,7 +1,7 @@
 #ifndef DYNAMATIC_HLS_FUZZER_ABSTRACTTARGET
 #define DYNAMATIC_HLS_FUZZER_ABSTRACTTARGET
 
-#include "AbstractGenerator.h"
+#include "AbstractWorker.h"
 #include "Options.h"
 #include "Randomly.h"
 
@@ -22,7 +22,7 @@ public:
 
   /// Creates a new generator with the given options and randomness source.
   /// This method is called for every worker thread.
-  virtual std::unique_ptr<AbstractGenerator>
+  virtual std::unique_ptr<AbstractWorker>
   createGenerator(const Options &options, Randomly randomly) const = 0;
 };
 

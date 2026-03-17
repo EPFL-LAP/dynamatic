@@ -10,7 +10,7 @@ namespace dynamatic {
 /// dynamatic is known not to be able to compile.
 class RandomCTarget : public AbstractTarget {
 public:
-  std::unique_ptr<AbstractGenerator>
+  std::unique_ptr<AbstractWorker>
   createGenerator(const Options &options, Randomly randomly) const override;
 };
 
