@@ -1045,19 +1045,30 @@ class LSQ:
             monitor_start = Logic(ctx, 'monitor_start', 'w')
             arch += Reduce(ctx, monitor_start, group_init_valid_i, 'or')
 
-            # monitor_finish rises when the LSQ has finished the last memory operation
+            # latched start signal
+            monitor_started = Logic(ctx, 'monitor_started', 'r')
+            monitor_started.regInit(init=0)
+            arch += Op(ctx, monitor_started, monitor_start, 'or', monitor_started)
+
+            # monitor_finish rises when the monitor LSQ is empty (both queues are empty)
             monitor_finish = Logic(ctx, 'monitor_finish', 'w')
-            arch += Op(ctx, monitor_finish, memEndValid)
+            arch += Op(ctx, monitor_finish, monitor_started, 'and', ldq_empty, 'and', stq_empty, 'and', 'not', monitor_start)
+
+            # latched finish signal
+            monitor_finished = Logic(ctx, 'monitor_finished', 'r')
+            monitor_finished.regInit(init=0)
+            arch += Op(ctx, monitor_finished, monitor_finish, 'or', monitor_finished)
 
             ldq_occupancy_name = monitor_ldq_occupancy.getNameRead()
             stq_occupancy_name = monitor_stq_occupancy.getNameRead()
             total_occupancy_name = monitor_total_occupancy.getNameRead()
-            start_name = monitor_start.getNameRead()
+            started_name = monitor_started.getNameRead()
             finish_name = monitor_finish.getNameRead()
+            finished_name = monitor_finished.getNameRead()
             lsq_name = self.configs.name.split("_")[-1]
 
             ind = ctx.get_current_indent()
-            arch += ind + '-- synthesis translate_off\n';
+            arch += ind + '-- synthesis translate_off\n'
             arch += ind + 'monitor_proc : process(clk) is\n'
             arch += ind + '\tvariable monitor_started     : boolean := false;\n'
             arch += ind + '\tvariable monitor_finished    : boolean := false;\n'
@@ -1070,8 +1081,6 @@ class LSQ:
             arch += ind + 'begin\n'
             arch += ind + '\tif rising_edge(clk) then\n'
             arch += ind + '\t\tif rst = \'1\' then\n'
-            arch += ind + '\t\t\tmonitor_started     := false;\n'
-            arch += ind + '\t\t\tmonitor_finished    := false;\n'
             arch += ind + '\t\t\tmonitor_cycle_count := 0;\n'
             arch += ind + '\t\t\tmonitor_ldq_sum     := 0;\n'
             arch += ind + '\t\t\tmonitor_stq_sum     := 0;\n'
@@ -1079,10 +1088,7 @@ class LSQ:
             arch += ind + '\t\t\tmonitor_stq_max     := 0;\n'
             arch += ind + '\t\t\tmonitor_total_max   := 0;\n'
             arch += ind + '\t\telse\n'
-            arch += ind + f'\t\t\tif {start_name} = \'1\' then\n'
-            arch += ind + '\t\t\t\tmonitor_started := true;\n'
-            arch += ind + '\t\t\tend if;\n'
-            arch += ind + f'\t\t\tif monitor_started or {start_name} = \'1\' then\n'
+            arch += ind + f'\t\t\tif {started_name} = \'1\' then\n'
             arch += ind + '\t\t\t\tmonitor_cycle_count := monitor_cycle_count + 1;\n'
             arch += ind + f'\t\t\t\tmonitor_ldq_sum     := monitor_ldq_sum + to_integer(unsigned({ldq_occupancy_name}));\n'
             arch += ind + f'\t\t\t\tmonitor_stq_sum     := monitor_stq_sum + to_integer(unsigned({stq_occupancy_name}));\n'
@@ -1090,8 +1096,7 @@ class LSQ:
             arch += ind + f'\t\t\t\tif to_integer(unsigned({stq_occupancy_name}))   > monitor_stq_max   then monitor_stq_max   := to_integer(unsigned({stq_occupancy_name}));   end if;\n'
             arch += ind + f'\t\t\t\tif to_integer(unsigned({total_occupancy_name})) > monitor_total_max then monitor_total_max := to_integer(unsigned({total_occupancy_name})); end if;\n'
             arch += ind + '\t\t\tend if;\n'
-            arch += ind + f'\t\t\tif {finish_name} = \'1\' and not monitor_finished then\n'
-            arch += ind + '\t\t\t\tmonitor_finished := true;\n'
+            arch += ind + f'\t\t\tif {finish_name} = \'1\' and {finished_name} = \'0\' then\n'
             arch += ind + f'\t\t\t\treport "{lsq_name} LDQ occupancy:      cycles=" & natural\'image(monitor_cycle_count)\n'
             arch += ind + '\t\t\t\t' + '& " sum=" & natural\'image(monitor_ldq_sum)\n'
             arch += ind + '\t\t\t\t' + '& " max=" & natural\'image(monitor_ldq_max);\n'
@@ -1103,7 +1108,7 @@ class LSQ:
             arch += ind + '\t\tend if;\n'
             arch += ind + '\tend if;\n'
             arch += ind + 'end process monitor_proc;\n'
-            arch += ind + '-- synthesis translate_on\n';
+            arch += ind + '-- synthesis translate_on\n'
 
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
