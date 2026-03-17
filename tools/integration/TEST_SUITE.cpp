@@ -284,6 +284,7 @@ INSTANTIATE_TEST_SUITE_P(
       "sumi3_mem",
       "symm_float",
       "syr2k_float",
+      "test_memory_deps",
       "test_stdint",
       "threshold",
       "triangular",
@@ -329,7 +330,7 @@ INSTANTIATE_TEST_SUITE_P(
       "matvec"
       ),
       [](const auto &info) { return info.param; });
-#endif 
+#endif
 
 INSTANTIATE_TEST_SUITE_P(
     MemoryBenchmarks, MemoryFixture,
