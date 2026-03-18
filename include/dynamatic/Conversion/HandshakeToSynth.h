@@ -93,19 +93,19 @@ static mlir::DenseMap<mlir::Operation *, std::string> opToBlifPathMap;
 // Add new type for the tuple
 using UnbundledValuesTuple = std::tuple<SmallVector<Value>, Value, Value>;
 
-// Port bit types
-enum PortBitType { DATA, VALID, READY };
-
 // Represents a single unbundled bit of a data signal
 struct DataPortInfo {
   unsigned bitIndex;  // which bit of the original channel
   unsigned totalBits; // total bits in the channel
 };
 
-// Represents a valid or ready signal (no extra fields needed)
-struct ControlPortInfo {};
+// Represents a valid signal (no extra fields needed)
+struct ValidPortInfo {};
 
-using PortKind = std::variant<DataPortInfo, ControlPortInfo>;
+// Represents a ready signal (no extra fields needed)
+struct ReadyPortInfo {};
+
+using PortKind = std::variant<DataPortInfo, ValidPortInfo, ReadyPortInfo>;
 
 // Struct to hold the new unbundled port information
 struct UnbundledPort {
@@ -114,10 +114,8 @@ struct UnbundledPort {
   hw::ModulePort::Direction direction;
   // The Value in the *old* handshake module that this port corresponds to
   Value handshakeSignal;
-  PortBitType bitType; // indicates whether this port corresponds to data,
-                       // valid, or ready component of the original channel
-  PortKind kind;       // additional info about the port, e.g. which bit of the
-                       // original channel it corresponds to if it's a data port
+  PortKind kind; // additional info about the port, e.g. which bit of the
+                 // original channel it corresponds to if it's a data port
 };
 
 // Class that controls the unbundling of handshake channel types into integer
@@ -143,24 +141,23 @@ private:
   // bit and saves them.
   llvm::SmallVector<Value> getUnbundledValues(Value handshakeSignal,
                                               unsigned totalBits,
-                                              PortBitType bitType,
-                                              Location loc);
+                                              PortKind portKind, Location loc);
 
   // Function that saves the mapping from a channel value to its unbundled bit
   // values. If there were placeholders for the channel value, replaces them
   // with the real bit values.
-  void saveUnbundledValues(Value handshakeSignal, PortBitType bitType,
+  void saveUnbundledValues(Value handshakeSignal, PortKind portKind,
                            llvm::SmallVector<Value> unbundledValues);
 
   // Helper function to update the old tuple of unbundled values
   UnbundledValuesTuple updateTuple(UnbundledValuesTuple oldTuple,
                                    SmallVector<Value> newValues,
-                                   PortBitType bitType);
+                                   PortKind portKind);
 
   // Helper function to extract the relevant values from a tuple based on the
   // bit type
   SmallVector<Value> getValuesFromTuple(UnbundledValuesTuple valTuple,
-                                        PortBitType bitType);
+                                        PortKind portKind);
 
   // Module op
   ModuleOp modOp;
