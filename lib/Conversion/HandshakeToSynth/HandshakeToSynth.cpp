@@ -642,11 +642,8 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
     return failure();
   }
   // Get the terminator handshake::EndOp
-  handshake::EndOp endOp;
-  for (Operation &op : *topFunction.getBodyBlock()) {
-    if ((endOp = dyn_cast<handshake::EndOp>(op)))
-      break;
-  }
+  handshake::EndOp endOp =
+      *topFunction.getBody().getOps<handshake::EndOp>().begin();
   if (!endOp) {
     topFunction.emitOpError()
         << "handshake::FuncOp must contain a handshake::EndOp terminator";
