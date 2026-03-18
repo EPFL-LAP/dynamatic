@@ -250,6 +250,11 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   topHWModule = builder.create<hw::HWModuleOp>(topFunction.getLoc(), topName,
                                                topHWPortInfo);
 
+  // Initialize the backedge builder for creating placeholders for unbundled
+  // bits
+  backedgeBuilder =
+      std::make_unique<BackedgeBuilder>(builder, topHWModule.getLoc());
+
   // Record the clk and rst from the top module block args which are the last
   // two ports in the port list
   Block *topBlock = topHWModule.getBodyBlock();
@@ -369,9 +374,6 @@ void HandshakeUnbundler::saveUnbundledValues(
       // Replace all its uses
       for (unsigned i = 0; i < placeholderValues.size(); ++i) {
         placeholderValues[i].replaceAllUsesWith(unbundledValues[i]);
-        // Erase the placeholder
-        if (auto *defOp = placeholderValues[i].getDefiningOp())
-          defOp->erase();
       }
       // Update the map by removing the placeholder entry for that bit type
       UnbundledValuesTuple placeholderTuple =
@@ -430,14 +432,13 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
       return extractedValues;
     }
   }
-  // If not, create a new placeholder and return it
+  // If not, create a new placeholder and return it. We use backedges as
+  // placeholders
   SmallVector<Value> placeholders;
   builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
   for (unsigned i = 0; i < totalBits; ++i) {
-    auto c = builder.create<hw::ConstantOp>(
-        loc, builder.getIntegerType(1),
-        builder.getIntegerAttr(builder.getIntegerType(1), 0));
-    placeholders.push_back(c.getResult());
+    auto backedge = backedgeBuilder->get(builder.getIntegerType(1));
+    placeholders.push_back(backedge);
   }
   pendingValuesMap[handshakeSignal] =
       updateTuple(valTuple, placeholders, bitType);

@@ -130,7 +130,7 @@ private:
   mlir::LogicalResult convertHandshakeFunc();
 
   // Function that returns unbundled values from a channel value. If the channel
-  // value has not been unbundled yet, creates hw constant placeholders for each
+  // value has not been unbundled yet, creates backedge placeholders for each
   // bit and saves them.
   llvm::SmallVector<Value> getUnbundledValues(Value handshakeSignal,
                                               unsigned totalBits,
@@ -166,13 +166,16 @@ private:
   // Maps handshake channel values to their unbundled bit values. The tuple is
   // data bits, valid bit, ready bit
   llvm::DenseMap<Value, UnbundledValuesTuple> unbundledValuesMap;
-  // Maps handshake channel values to any placeholder constants created for
+  // Maps handshake channel values to any placeholder backedges created for
   // their unbundled bits. The tuple is data bits, valid bit, ready bit
   llvm::DenseMap<Value, UnbundledValuesTuple> pendingValuesMap;
 
   // clk and rst values from the top module
   Value clk;
   Value rst;
+
+  // Backedge builder for creating placeholders for unbundled bits
+  std::unique_ptr<BackedgeBuilder> backedgeBuilder;
 };
 
 //===----------------------------------------------------------------------===//
