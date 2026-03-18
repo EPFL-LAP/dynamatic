@@ -96,6 +96,17 @@ using UnbundledValuesTuple = std::tuple<SmallVector<Value>, Value, Value>;
 // Port bit types
 enum PortBitType { DATA, VALID, READY };
 
+// Represents a single unbundled bit of a data signal
+struct DataPortInfo {
+  unsigned bitIndex;  // which bit of the original channel
+  unsigned totalBits; // total bits in the channel
+};
+
+// Represents a valid or ready signal (no extra fields needed)
+struct ControlPortInfo {};
+
+using PortKind = std::variant<DataPortInfo, ControlPortInfo>;
+
 // Struct to hold the new unbundled port information
 struct UnbundledPort {
   std::string name;
@@ -103,12 +114,10 @@ struct UnbundledPort {
   hw::ModulePort::Direction direction;
   // The Value in the *old* handshake module that this port corresponds to
   Value handshakeSignal;
-  unsigned bitIndex;  // for data signals, indicates which bit of the original
-                      // channel this port corresponds to
-  unsigned totalBits; // for data signals, indicates the total number of bits in
-                      // the original channel (used for naming)
   PortBitType bitType; // indicates whether this port corresponds to data,
                        // valid, or ready component of the original channel
+  PortKind kind;       // additional info about the port, e.g. which bit of the
+                       // original channel it corresponds to if it's a data port
 };
 
 // Class that controls the unbundling of handshake channel types into integer

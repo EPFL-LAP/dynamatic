@@ -61,9 +61,8 @@ unbundleChannel(const std::string &handshakePortName,
   };
 
   auto addPort = [&](StringRef name, hw::ModulePort::Direction dir, Value val,
-                     PortBitType bitType, unsigned bitIdx = 0,
-                     unsigned nBits = 1) {
-    unbundledPorts.push_back({name.str(), dir, val, bitIdx, nBits, bitType});
+                     PortBitType bitType, PortKind kind) {
+    unbundledPorts.push_back({name.str(), dir, val, bitType, kind});
   };
 
   // Depending on the type, the unbundling will be different
@@ -72,45 +71,52 @@ unbundleChannel(const std::string &handshakePortName,
     unsigned dataWidth = channel.getDataType().cast<IntegerType>().getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
       addPort(legalizeDataPortName(handshakePortName, bit, dataWidth),
-              handshakePortDir, handshakePort, PortBitType::DATA, bit,
-              dataWidth);
+              handshakePortDir, handshakePort, PortBitType::DATA,
+              DataPortInfo{bit, dataWidth});
     }
     // valid: keep direction, always i1
     addPort(legalizeControlPortName(handshakePortName, "_valid"),
-            handshakePortDir, handshakePort, PortBitType::VALID);
+            handshakePortDir, handshakePort, PortBitType::VALID,
+            ControlPortInfo{});
     // ready: flip direction, always i1
     addPort(legalizeControlPortName(handshakePortName, "_ready"),
-            flip(handshakePortDir), handshakePort, PortBitType::READY);
+            flip(handshakePortDir), handshakePort, PortBitType::READY,
+            ControlPortInfo{});
   } else if (isa<handshake::ControlType>(type)) {
     // valid: keep direction, always i1
     addPort(legalizeControlPortName(handshakePortName, "_valid"),
-            handshakePortDir, handshakePort, PortBitType::VALID);
+            handshakePortDir, handshakePort, PortBitType::VALID,
+            ControlPortInfo{});
     // ready: flip direction, always i1
     addPort(legalizeControlPortName(handshakePortName, "_ready"),
-            flip(handshakePortDir), handshakePort, PortBitType::READY);
+            flip(handshakePortDir), handshakePort, PortBitType::READY,
+            ControlPortInfo{});
   } else if (auto mem = dyn_cast<MemRefType>(type)) {
     unsigned dataWidth = mem.getElementType().cast<IntegerType>().getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
       addPort(legalizeDataPortName(handshakePortName, bit, dataWidth),
-              handshakePortDir, handshakePort, PortBitType::DATA, bit,
-              dataWidth);
+              handshakePortDir, handshakePort, PortBitType::DATA,
+              DataPortInfo{bit, dataWidth});
     }
     // valid: keep direction, always i1
     addPort(legalizeControlPortName(handshakePortName, "_valid"),
-            handshakePortDir, handshakePort, PortBitType::VALID);
+            handshakePortDir, handshakePort, PortBitType::VALID,
+            ControlPortInfo{});
     // ready: flip direction, always i1
     addPort(legalizeControlPortName(handshakePortName, "_ready"),
-            flip(handshakePortDir), handshakePort, PortBitType::READY);
+            flip(handshakePortDir), handshakePort, PortBitType::READY,
+            ControlPortInfo{});
   } else {
     // Pass-through: split multi-bit integer types into i1 ports.
     if (auto intTy = dyn_cast<IntegerType>(type)) {
       unsigned width = intTy.getWidth();
       for (unsigned b = 0; b < width; ++b)
         addPort(legalizeDataPortName(handshakePortName, b, width),
-                handshakePortDir, handshakePort, PortBitType::DATA, b, width);
+                handshakePortDir, handshakePort, PortBitType::DATA,
+                DataPortInfo{b, width});
     } else {
       addPort(handshakePortName, handshakePortDir, handshakePort,
-              PortBitType::DATA);
+              PortBitType::DATA, ControlPortInfo{});
     }
   }
   return unbundledPorts;
@@ -267,8 +273,10 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
         if (llvm::is_contained(visitedDataArgs, unbundledPort.handshakeSignal))
           continue;
         SmallVector<Value> unbundledValues;
+        unsigned totalBits =
+            std::get_if<DataPortInfo>(&unbundledPort.kind)->totalBits;
         // Collect all the bits for this channel
-        for (unsigned bit = 0; bit < unbundledPort.totalBits; ++bit) {
+        for (unsigned bit = 0; bit < totalBits; ++bit) {
           unbundledValues.push_back(topBlock->getArgument(argIdx++));
         }
         saveUnbundledValues(unbundledPort.handshakeSignal, PortBitType::DATA,
@@ -497,17 +505,22 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
       // We will connect them later, for now we can skip them
       continue;
     }
-    auto unbundledValues = getUnbundledValues(
-        port.handshakeSignal, port.totalBits, port.bitType, loc);
-    if (port.bitIndex >= unbundledValues.size()) {
-      llvm::errs() << "Error: bit index " << port.bitIndex
+    unsigned totalBits = 1, bitIndex = 0;
+    if (auto *dataPortInfo = std::get_if<DataPortInfo>(&port.kind)) {
+      totalBits = dataPortInfo->totalBits;
+      bitIndex = dataPortInfo->bitIndex;
+    }
+    auto unbundledValues =
+        getUnbundledValues(port.handshakeSignal, totalBits, port.bitType, loc);
+    if (bitIndex >= unbundledValues.size()) {
+      llvm::errs() << "Error: bit index " << bitIndex
                    << " is out of bounds for unbundled values of signal "
                    << port.handshakeSignal << "\n";
       llvm::errs() << "Unbundled values size: " << unbundledValues.size()
                    << "\n";
       return failure();
     }
-    hwInstOperands.push_back(unbundledValues[port.bitIndex]);
+    hwInstOperands.push_back(unbundledValues[bitIndex]);
   }
   // Add clk and rst signals as operands
   hwInstOperands.push_back(clk);
@@ -546,8 +559,8 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
     if (port.direction != hw::ModulePort::Direction::Output)
       continue;
     if (port.bitType == PortBitType::DATA) {
-      outputPortsBitMap[port.handshakeSignal].push_back(
-          {outIdx++, port.bitIndex});
+      unsigned bitIndex = std::get_if<DataPortInfo>(&port.kind)->bitIndex;
+      outputPortsBitMap[port.handshakeSignal].push_back({outIdx++, bitIndex});
     } else {
       saveUnbundledValues(port.handshakeSignal, port.bitType,
                           {instOp->getResult(outIdx++)});
