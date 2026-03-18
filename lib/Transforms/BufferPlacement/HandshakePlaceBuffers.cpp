@@ -172,7 +172,8 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   } else if (
       // clang-format off
       algorithm == FPGA20 ||
-      algorithm == FPL22 ||
+      algorithm == FPL22 || 
+      algorithm == FPGA24 ||
       algorithm == COST_AWARE ||
       algorithm == MAPBUF
       // clang-format on
