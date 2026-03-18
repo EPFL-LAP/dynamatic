@@ -25,14 +25,7 @@
 #include "dynamatic/Conversion/HandshakeToSynth.h"
 
 // [START Boilerplate code for the MLIR pass]
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
-#include "dynamatic/Dialect/HW/PortImplementation.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/Support/raw_ostream.h"
+#include "dynamatic/Conversion/Passes.h"
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKETOSYNTH
 #include "dynamatic/Conversion/Passes.h.inc"
