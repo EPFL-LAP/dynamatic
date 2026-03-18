@@ -194,6 +194,6 @@ mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
 // of the corresponding BLIF file
 mlir::LogicalResult
 populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
-                 llvm::DenseSet<std::string> &populatedModules);
+                 llvm::DenseSet<StringRef> &populatedModules);
 
 } // namespace dynamatic

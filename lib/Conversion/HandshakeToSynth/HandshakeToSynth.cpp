@@ -681,7 +681,7 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
 // netlist and swapping the module body.
 mlir::LogicalResult
 populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
-                 llvm::DenseSet<std::string> &populatedModules) {
+                 llvm::DenseSet<StringRef> &populatedModules) {
   mlir::SymbolTable symTable(modOp);
   // Look up the hw module definition referenced by this instance.
   hw::HWModuleOp hwModule =
@@ -751,15 +751,12 @@ mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
     return mlir::failure();
   }
 
-  // Collect all instances up front to avoid iterator invalidation when
-  // populate() swaps module bodies in the symbol table.
+  // Collect all instances
   mlir::SmallVector<hw::InstanceOp> instances;
   topMod.walk([&](hw::InstanceOp inst) { instances.push_back(inst); });
 
-  // A single BlifPopulator owns the SymbolTable and dedup set for the whole
-  // walk; populate() can be called once per instance without any
-  // "already done" bookkeeping at the call site.
-  llvm::DenseSet<std::string> populatedModules;
+  // Collect all already populated modules to avoid duplicate work
+  llvm::DenseSet<StringRef> populatedModules;
   for (hw::InstanceOp inst : instances)
     if (mlir::failed(populateHWModule(modOp, inst, populatedModules)))
       return mlir::failure();
