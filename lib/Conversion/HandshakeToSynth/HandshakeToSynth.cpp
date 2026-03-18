@@ -90,10 +90,6 @@ static std::string bitPortName(StringRef baseName, unsigned bit,
   return formatArrayName(baseName.str(), bit, width);
 }
 
-//===----------------------------------------------------------------------===//
-// unbundleHandshakePort: entry point for step 1
-//===----------------------------------------------------------------------===//
-
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
 SmallVector<UnbundledPort>
@@ -280,6 +276,12 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
   return {hw::ModulePortInfo(hwInputs, hwOutputs), unbundledPorts};
 }
 
+//===----------------------------------------------------------------------===//
+// unbundleHandshakePort: entry point for step 1
+//===----------------------------------------------------------------------===//
+
+// Function to unbundle all handshake channels in the module and create the
+// corresponding hw modules with placeholder bodies
 LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   MLIRContext *ctx = modOp.getContext();
   // Get top function
