@@ -46,7 +46,14 @@ private:
 // Formats a bit-indexed port name: "sig[bit]".
 // When width == 1 the name is returned unchanged (no "[0]" suffix).
 // If baseName already ends with "[N]" the indices are linearised.
-std::string bitPortName(mlir::StringRef baseName, unsigned bit, unsigned width);
+std::string legalizeDataPortName(mlir::StringRef baseName, unsigned bit,
+                                 unsigned width);
+
+// Inserts a suffix string before the first '[' in the input name, or appends
+// it at the end if no '[' is found.
+// Example: legalizeControlPortName("data[3]", "_valid") -> "data_valid[3]"
+std::string legalizeControlPortName(const std::string &name,
+                                    const std::string &suffix);
 
 // Converts a (root, index) pair into the canonical "root[index]" form.
 // If root already contains "[N]", the old index is linearised with

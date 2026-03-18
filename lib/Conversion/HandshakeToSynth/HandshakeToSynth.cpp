@@ -50,19 +50,6 @@ namespace dynamatic {
 // placeholder hw modules
 //===----------------------------------------------------------------------===//
 
-// Inserts a suffix string before the first '[' in the input name, or appends
-// it at the end if no '[' is found.
-// Example: insertSuffix("data[3]", "_valid") -> "data_valid[3]"
-std::string insertSuffix(const std::string &name, const std::string &suffix) {
-  std::size_t pos = name.find('[');
-  if (pos != std::string::npos) {
-    std::string result = name;
-    result.insert(pos, suffix);
-    return result;
-  }
-  return name + suffix;
-}
-
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
 SmallVector<UnbundledPort>
@@ -90,41 +77,43 @@ unbundleHandshakePort(Type type, const std::string &handshakePortName,
     // For a channel type, we unbundle into ready, valid, and data ports
     unsigned dataWidth = channel.getDataType().cast<IntegerType>().getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
-      addPort(bitPortName(handshakePortName, bit, dataWidth), handshakePortDir,
-              handshakePort, PortBitType::DATA, bit, dataWidth);
+      addPort(legalizeDataPortName(handshakePortName, bit, dataWidth),
+              handshakePortDir, handshakePort, PortBitType::DATA, bit,
+              dataWidth);
     }
     // valid: keep direction, always i1
-    addPort(insertSuffix(handshakePortName, "_valid"), handshakePortDir,
-            handshakePort, PortBitType::VALID);
+    addPort(legalizeControlPortName(handshakePortName, "_valid"),
+            handshakePortDir, handshakePort, PortBitType::VALID);
     // ready: flip direction, always i1
-    addPort(insertSuffix(handshakePortName, "_ready"), flip(handshakePortDir),
-            handshakePort, PortBitType::READY);
+    addPort(legalizeControlPortName(handshakePortName, "_ready"),
+            flip(handshakePortDir), handshakePort, PortBitType::READY);
   } else if (isa<handshake::ControlType>(type)) {
     // valid: keep direction, always i1
-    addPort(insertSuffix(handshakePortName, "_valid"), handshakePortDir,
-            handshakePort, PortBitType::VALID);
+    addPort(legalizeControlPortName(handshakePortName, "_valid"),
+            handshakePortDir, handshakePort, PortBitType::VALID);
     // ready: flip direction, always i1
-    addPort(insertSuffix(handshakePortName, "_ready"), flip(handshakePortDir),
-            handshakePort, PortBitType::READY);
+    addPort(legalizeControlPortName(handshakePortName, "_ready"),
+            flip(handshakePortDir), handshakePort, PortBitType::READY);
   } else if (auto mem = dyn_cast<MemRefType>(type)) {
     unsigned dataWidth = mem.getElementType().cast<IntegerType>().getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
-      addPort(bitPortName(handshakePortName, bit, dataWidth), handshakePortDir,
-              handshakePort, PortBitType::DATA, bit, dataWidth);
+      addPort(legalizeDataPortName(handshakePortName, bit, dataWidth),
+              handshakePortDir, handshakePort, PortBitType::DATA, bit,
+              dataWidth);
     }
     // valid: keep direction, always i1
-    addPort(insertSuffix(handshakePortName, "_valid"), handshakePortDir,
-            handshakePort, PortBitType::VALID);
+    addPort(legalizeControlPortName(handshakePortName, "_valid"),
+            handshakePortDir, handshakePort, PortBitType::VALID);
     // ready: flip direction, always i1
-    addPort(insertSuffix(handshakePortName, "_ready"), flip(handshakePortDir),
-            handshakePort, PortBitType::READY);
+    addPort(legalizeControlPortName(handshakePortName, "_ready"),
+            flip(handshakePortDir), handshakePort, PortBitType::READY);
   } else {
     // Pass-through: split multi-bit integer types into i1 ports.
     if (auto intTy = dyn_cast<IntegerType>(type)) {
       unsigned width = intTy.getWidth();
       for (unsigned b = 0; b < width; ++b)
-        addPort(bitPortName(handshakePortName, b, width), handshakePortDir,
-                handshakePort, PortBitType::DATA, b, width);
+        addPort(legalizeDataPortName(handshakePortName, b, width),
+                handshakePortDir, handshakePort, PortBitType::DATA, b, width);
     } else {
       addPort(handshakePortName, handshakePortDir, handshakePort,
               PortBitType::DATA);

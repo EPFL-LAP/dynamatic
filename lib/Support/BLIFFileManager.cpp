@@ -182,11 +182,26 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
 // Formats a bit-indexed port name: "sig[bit]".
 // When width == 1 the name is returned unchanged (no "[0]" suffix).
 // If baseName already ends with "[N]" the indices are linearised.
-std::string bitPortName(StringRef baseName, unsigned bit, unsigned width) {
+std::string legalizeDataPortName(StringRef baseName, unsigned bit,
+                                 unsigned width) {
   if (width == 1)
     return baseName.str();
   // Reuse the formatArrayName() helper from Step 1 / Layer 2.
   return formatArrayName(baseName.str(), bit, width);
+}
+
+// Inserts a suffix string before the first '[' in the input name, or appends
+// it at the end if no '[' is found.
+// Example: legalizeControlPortName("data[3]", "_valid") -> "data_valid[3]"
+std::string legalizeControlPortName(const std::string &name,
+                                    const std::string &suffix) {
+  std::size_t pos = name.find('[');
+  if (pos != std::string::npos) {
+    std::string result = name;
+    result.insert(pos, suffix);
+    return result;
+  }
+  return name + suffix;
 }
 
 // Converts a (root, index) pair into the canonical "root[index]" form.
