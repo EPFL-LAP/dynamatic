@@ -171,11 +171,13 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
   SmallVector<std::string> handshakeInPortNames, handshakeOutPortNames;
   // Check if it is a funcOp
   if (auto funcOp = dyn_cast<handshake::FuncOp>(handshakeOp)) {
-    // In this case the naming convention is generic
-    for (auto [i, _] : llvm::enumerate(funcOp.getArguments()))
-      handshakeInPortNames.push_back("in" + std::to_string(i));
-    for (auto [i, _] : llvm::enumerate(funcOp.getResultTypes()))
-      handshakeOutPortNames.push_back("out" + std::to_string(i));
+    // Extract the port names from the function argument
+    for (auto [i, argNameAttr] : llvm::enumerate(funcOp.getArgNames()))
+      handshakeInPortNames.push_back(argNameAttr.dyn_cast<StringAttr>().data());
+    // Extract the port names from the function results
+    for (auto [i, resNameAttr] : llvm::enumerate(funcOp.getResNames()))
+      handshakeOutPortNames.push_back(
+          resNameAttr.dyn_cast<StringAttr>().data());
   } else {
     // For other ops we use the op name as base for the port names
     // We have to fix the names of the ports so that the root_N pattern is
