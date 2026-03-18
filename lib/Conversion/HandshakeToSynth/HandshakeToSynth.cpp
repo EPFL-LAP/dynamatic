@@ -433,11 +433,11 @@ void HandshakeUnbundler::saveUnbundledValues(
 
   // Remove the placeholder if it exists, since we now have the real unbundled
   // values
-  if (placeholderMap.contains(handshakeSignal)) {
+  if (pendingValuesMap.contains(handshakeSignal)) {
     // Check if the placeholder has the same bit type as the new unbundled
     // values
     SmallVector<Value> placeholderValues =
-        getValuesFromTuple(placeholderMap[handshakeSignal], bitType);
+        getValuesFromTuple(pendingValuesMap[handshakeSignal], bitType);
     if (!placeholderValues.empty()) {
       // Assert the size of the placeholder values is the same as the new
       // unbundled values
@@ -453,16 +453,16 @@ void HandshakeUnbundler::saveUnbundledValues(
       }
       // Update the map by removing the placeholder entry for that bit type
       UnbundledValuesTuple placeholderTuple =
-          updateTuple(placeholderMap[handshakeSignal], {}, bitType);
+          updateTuple(pendingValuesMap[handshakeSignal], {}, bitType);
       // If all the values in the tuple are empty, we can erase the entry from
       // the map
       if (std::get<0>(placeholderTuple).empty() &&
           std::get<1>(placeholderTuple) == Value() &&
           std::get<2>(placeholderTuple) == Value()) {
-        placeholderMap.erase(handshakeSignal);
+        pendingValuesMap.erase(handshakeSignal);
       } else {
         // If not empty, update the tuple in the map
-        placeholderMap[handshakeSignal] = placeholderTuple;
+        pendingValuesMap[handshakeSignal] = placeholderTuple;
       }
     }
   }
@@ -487,8 +487,8 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
   }
   std::tuple<SmallVector<Value>, Value, Value> valTuple;
   // Check if a placeholder exists for this signal
-  if (auto it = placeholderMap.find(handshakeSignal);
-      it != placeholderMap.end()) {
+  if (auto it = pendingValuesMap.find(handshakeSignal);
+      it != pendingValuesMap.end()) {
     valTuple = it->second;
     // Check per bit type
     SmallVector<Value> extractedValues =
@@ -505,7 +505,7 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
         builder.getIntegerAttr(builder.getIntegerType(1), 0));
     placeholders.push_back(c.getResult());
   }
-  placeholderMap[handshakeSignal] =
+  pendingValuesMap[handshakeSignal] =
       updateTuple(valTuple, placeholders, bitType);
   return placeholders;
 }
@@ -689,7 +689,7 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
 
   // Check there are no more placeholders left, which would indicate some
   // signals were not properly connected
-  if (!placeholderMap.empty()) {
+  if (!pendingValuesMap.empty()) {
     llvm::errs() << "Error: there are still placeholders left after converting "
                     "the handshake function. This indicates some signals were "
                     "not properly connected.\n";

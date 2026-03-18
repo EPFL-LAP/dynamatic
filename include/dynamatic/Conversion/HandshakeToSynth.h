@@ -168,7 +168,7 @@ private:
   llvm::DenseMap<Value, UnbundledValuesTuple> unbundledValuesMap;
   // Maps handshake channel values to any placeholder constants created for
   // their unbundled bits. The tuple is data bits, valid bit, ready bit
-  llvm::DenseMap<Value, UnbundledValuesTuple> placeholderMap;
+  llvm::DenseMap<Value, UnbundledValuesTuple> pendingValuesMap;
 
   // clk and rst values from the top module
   Value clk;
