@@ -43,30 +43,32 @@ class AbstractTypeSystem {
 public:
   virtual ~AbstractTypeSystem();
 
-#define DECLARE_NON_ATOMIC_OPAQUE_CHECK(ASTNode, methodName)                   \
-  virtual MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(        \
-      const OpaqueContext &context) = 0
+  virtual ConclusionOf<ast::Function, OpaqueContext>
+  checkFunctionOpaque(const OpaqueContext &context) = 0;
 
-#define DECLARE_ATOMIC_OPAQUE_CHECK(ASTNode, methodName)                       \
-  virtual MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(        \
-      const ASTNode &, const OpaqueContext &context) = 0
-
-  DECLARE_NON_ATOMIC_OPAQUE_CHECK(ast::Function, checkFunction);
-
-  virtual MaybeConclusionOf<ast::BinaryExpression, OpaqueContext>
+  virtual std::optional<ConclusionOf<ast::BinaryExpression, OpaqueContext>>
   checkBinaryExpressionOpaque(ast::BinaryExpression::Op op,
                               const OpaqueContext &context) = 0;
 
-  DECLARE_NON_ATOMIC_OPAQUE_CHECK(ast::Variable, checkVariable);
-  DECLARE_NON_ATOMIC_OPAQUE_CHECK(ast::CastExpression, checkCastExpression);
-  DECLARE_NON_ATOMIC_OPAQUE_CHECK(ast::ConditionalExpression,
-                                  checkConditionalExpression);
-  DECLARE_ATOMIC_OPAQUE_CHECK(ast::ScalarType, checkScalarType);
-  DECLARE_ATOMIC_OPAQUE_CHECK(ast::Constant, checkConstant);
-  DECLARE_ATOMIC_OPAQUE_CHECK(ast::Parameter, checkParameter);
+  virtual std::optional<ConclusionOf<ast::Variable, OpaqueContext>>
+  checkVariableOpaque(const OpaqueContext &context) = 0;
 
-#undef DECLARE_NON_ATOMIC_OPAQUE_CHECK
-#undef DECLARE_ATOMIC_OPAQUE_CHECK
+  virtual std::optional<ConclusionOf<ast::CastExpression, OpaqueContext>>
+  checkCastExpressionOpaque(const OpaqueContext &context) = 0;
+
+  virtual std::optional<ConclusionOf<ast::ConditionalExpression, OpaqueContext>>
+  checkConditionalExpressionOpaque(const OpaqueContext &context) = 0;
+
+  virtual std::optional<ConclusionOf<ast::ScalarType, OpaqueContext>>
+  checkScalarTypeOpaque(const ast::ScalarType &,
+                        const OpaqueContext &context) = 0;
+
+  virtual std::optional<ConclusionOf<ast::Constant, OpaqueContext>>
+  checkConstantOpaque(const ast::Constant &, const OpaqueContext &context) = 0;
+
+  virtual std::optional<ConclusionOf<ast::Parameter, OpaqueContext>>
+  checkParameterOpaque(const ast::Parameter &,
+                       const OpaqueContext &context) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -126,46 +128,9 @@ template <typename TypingContext, class Self>
 class TypeSystem : public AbstractTypeSystem {
 
 public:
-  // Implementation of methods in 'AbstractTypeSystem'.
-#define IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK(ASTNode, methodName)               \
-  dynamatic::MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(     \
-      const OpaqueContext &context) final {                                    \
-    return convert(self().methodName(context.cast<TypingContext>()));          \
-  }                                                                            \
-  static_assert(true, "forcing a semicolon")
-#define IMPLEMENT_TERMINAL_OPAQUE_CHECK(ASTNode, methodName)                   \
-  dynamatic::MaybeConclusionOf<ASTNode, OpaqueContext> methodName##Opaque(     \
-      const ASTNode &node, const OpaqueContext &context) final {               \
-    return convert(self().methodName(node, context.cast<TypingContext>()));    \
-  }                                                                            \
-  static_assert(true, "forcing a semicolon")
-
-  IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK(ast::Function, checkFunction);
-
-  dynamatic::MaybeConclusionOf<ast::BinaryExpression, OpaqueContext>
-  checkBinaryExpressionOpaque(ast::BinaryExpression::Op op,
-                              const OpaqueContext &context) final {
-    return convert(
-        self().checkBinaryExpression(op, context.cast<TypingContext>()));
-  }
-
-  IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK(ast::Variable, checkVariable);
-  IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK(ast::CastExpression, checkCastExpression);
-  IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK(ast::ConditionalExpression,
-                                      checkConditionalExpression);
-  IMPLEMENT_TERMINAL_OPAQUE_CHECK(ast::ScalarType, checkScalarType);
-  IMPLEMENT_TERMINAL_OPAQUE_CHECK(ast::Constant, checkConstant);
-  IMPLEMENT_TERMINAL_OPAQUE_CHECK(ast::Parameter, checkParameter);
-#undef IMPLEMENT_NON_TERMINAL_OPAQUE_CHECK
-
   /// The conclusion type of 'ASTNode' with the given context.
   template <typename ASTNode>
   using ConclusionOf = ConclusionOf<ASTNode, TypingContext>;
-
-  /// The conclusion type of 'ASTNode', possibly wrapped in a 'std::optional'
-  /// if 'ASTNode' is discardable.
-  template <typename ASTNode>
-  using MaybeConclusionOf = MaybeConclusionOf<ASTNode, TypingContext>;
 
   /// Shorthand for derived classes to be able to call the default
   /// implementation of methods.
@@ -214,6 +179,58 @@ public:
   static ConclusionOf<ast::Parameter> checkParameter(const ast::Parameter &,
                                                      const TypingContext &) {
     return {};
+  }
+
+  // Implementations of the virtual methods in 'AbstractTypeSystem'.
+  // These are automatically implemented to unbox the 'TypingContext's out of
+  // the opaque contexts, calling the corresponding non-opaque 'check*' method
+  // and boxing the result into an opaque context again.
+
+  dynamatic::ConclusionOf<ast::Function, OpaqueContext>
+  checkFunctionOpaque(const OpaqueContext &context) final {
+    return convert(self().checkFunction(context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::BinaryExpression, OpaqueContext>>
+  checkBinaryExpressionOpaque(ast::BinaryExpression::Op op,
+                              const OpaqueContext &context) final {
+    return convert(
+        self().checkBinaryExpression(op, context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::Variable, OpaqueContext>>
+  checkVariableOpaque(const OpaqueContext &context) final {
+    return convert(self().checkVariable(context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::CastExpression, OpaqueContext>>
+  checkCastExpressionOpaque(const OpaqueContext &context) final {
+    return convert(self().checkCastExpression(context.cast<TypingContext>()));
+  }
+
+  std::optional<
+      dynamatic::ConclusionOf<ast::ConditionalExpression, OpaqueContext>>
+  checkConditionalExpressionOpaque(const OpaqueContext &context) final {
+    return convert(
+        self().checkConditionalExpression(context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::ScalarType, OpaqueContext>>
+  checkScalarTypeOpaque(const ast::ScalarType &node,
+                        const OpaqueContext &context) final {
+    return convert(self().checkScalarType(node, context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::Constant, OpaqueContext>>
+  checkConstantOpaque(const ast::Constant &node,
+                      const OpaqueContext &context) final {
+    return convert(self().checkConstant(node, context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::Parameter, OpaqueContext>>
+  checkParameterOpaque(const ast::Parameter &node,
+                       const OpaqueContext &context) final {
+    return convert(self().checkParameter(node, context.cast<TypingContext>()));
   }
 
 private:

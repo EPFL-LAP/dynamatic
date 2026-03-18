@@ -30,18 +30,18 @@ public:
   explicit DynamaticTypeSystem(Randomly &random) : random(random) {}
 
   /// Discard 'scalarType' based on the mode in 'context'.
-  static MaybeConclusionOf<ast::ScalarType>
+  static std::optional<ConclusionOf<ast::ScalarType>>
   checkScalarType(const ast::ScalarType &scalarType,
                   DynamaticTypingContext context);
 
   /// Discard 'constant' based on the mode in 'context'.
-  static MaybeConclusionOf<ast::Constant>
+  static std::optional<ConclusionOf<ast::Constant>>
   checkConstant(const ast::Constant &constant, DynamaticTypingContext context) {
     return checkScalarType(constant.getType(), context);
   }
 
   /// Discard 'parameter' based on the mode in 'context'.
-  static MaybeConclusionOf<ast::Parameter>
+  static std::optional<ConclusionOf<ast::Parameter>>
   checkParameter(const ast::Parameter &parameter,
                  DynamaticTypingContext context) {
     if (!checkScalarType(parameter.datatype, context))
@@ -52,11 +52,11 @@ public:
 
   /// Discard 'op' based on the mode in 'context' and forward constraint to
   /// the operands as required.
-  MaybeConclusionOf<ast::BinaryExpression>
+  std::optional<ConclusionOf<ast::BinaryExpression>>
   checkBinaryExpression(ast::BinaryExpression::Op op,
                         DynamaticTypingContext context) const;
 
-  MaybeConclusionOf<ast::CastExpression>
+  std::optional<ConclusionOf<ast::CastExpression>>
   checkCastExpression(DynamaticTypingContext context) {
     // Pick a specific constraints such that the 'to' type and the expression
     // are both integers or both floating point types.
@@ -64,13 +64,12 @@ public:
     return Super::checkCastExpression(context);
   }
 
-  MaybeConclusionOf<ast::Function>
-  checkFunction(DynamaticTypingContext context) {
+  ConclusionOf<ast::Function> checkFunction(DynamaticTypingContext context) {
     context = eliminateNone(context);
     return Super::checkFunction(context);
   }
 
-  static MaybeConclusionOf<ast::ConditionalExpression>
+  static ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(DynamaticTypingContext context) {
     // Condition can be either a floating point type or integer type.
     // Either converts to a bool type without issues.

@@ -1,10 +1,8 @@
 #include "DynamaticTypeSystem.h"
 
-dynamatic::gen::TypeSystem<dynamatic::gen::DynamaticTypingContext,
-                           dynamatic::gen::DynamaticTypeSystem>::
-    MaybeConclusionOf<dynamatic::ast::ScalarType>
-    dynamatic::gen::DynamaticTypeSystem::checkScalarType(
-        const ast::ScalarType &scalarType, DynamaticTypingContext context) {
+auto dynamatic::gen::DynamaticTypeSystem::checkScalarType(
+    const ast::ScalarType &scalarType, DynamaticTypingContext context)
+    -> std::optional<ConclusionOf<ast::ScalarType>> {
   switch (context.constraint) {
   case DynamaticTypingContext::FloatRequired:
     if (scalarType != ast::PrimitiveType::Float &&
@@ -24,11 +22,9 @@ dynamatic::gen::TypeSystem<dynamatic::gen::DynamaticTypingContext,
   llvm_unreachable("all enum cases handled");
 }
 
-dynamatic::gen::TypeSystem<dynamatic::gen::DynamaticTypingContext,
-                           dynamatic::gen::DynamaticTypeSystem>::
-    MaybeConclusionOf<dynamatic::ast::BinaryExpression>
-    dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
-        ast::BinaryExpression::Op op, DynamaticTypingContext context) const {
+auto dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
+    ast::BinaryExpression::Op op, DynamaticTypingContext context) const
+    -> std::optional<ConclusionOf<ast::BinaryExpression>> {
   switch (op) {
   case ast::BinaryExpression::BitAnd:
   case ast::BinaryExpression::BitOr:

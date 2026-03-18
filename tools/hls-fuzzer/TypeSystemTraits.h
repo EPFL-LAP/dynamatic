@@ -9,10 +9,7 @@ namespace dynamatic {
 
 /// Class that provides meta-information about how 'ASTNode' is used in the type
 /// system.
-/// Specializations should provide two definitions:
-///
-/// * constexpr static bool CAN_DISCARD: to denote whether a node is
-///   discardable.
+/// Specializations should provide the following definitions:
 ///
 /// * template <typename TypingContext> ... Conclusion: The conclusion type of
 ///   the 'ASTNode' that can be instantiated with any typing contexts.
@@ -42,20 +39,8 @@ template <typename ASTNode, typename TypingContext>
 using ConclusionOf =
     typename TypeSystemTraits<ASTNode>::template Conclusions<TypingContext>;
 
-/// Conclusion type of 'ASTNode', possible wrapped in a 'std::optional' if the
-/// node is discardable.
-template <typename ASTNode, typename TypingContext,
-          bool discardable = TypeSystemTraits<ASTNode>::CAN_DISCARD>
-using MaybeConclusionOf = std::conditional_t<
-    discardable,
-    std::optional<typename TypeSystemTraits<ASTNode>::template Conclusions<
-        TypingContext>>,
-    typename TypeSystemTraits<ASTNode>::template Conclusions<TypingContext>>;
-
 /// Struct implementing common defaults.
 struct TypeSystemTraitsDefaults {
-  constexpr static bool CAN_DISCARD = true;
-
   /// No conclusion values forwarded. This is common for terminal nodes.
   template <typename>
   using Conclusions = std::tuple<>;
@@ -68,8 +53,6 @@ struct TypeSystemTraits<ast::Function> : TypeSystemTraitsDefaults {
     TypingContext returnType;
     TypingContext returnStatement;
   };
-
-  constexpr static bool CAN_DISCARD = false;
 };
 
 template <>
