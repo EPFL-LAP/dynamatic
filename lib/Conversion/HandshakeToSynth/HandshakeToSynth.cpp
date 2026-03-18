@@ -45,6 +45,11 @@ using namespace dynamatic::handshake;
 
 namespace dynamatic {
 
+//===----------------------------------------------------------------------===//
+// Step 1: Unbundle handshake channels into individual bits and create
+// placeholder hw modules
+//===----------------------------------------------------------------------===//
+
 // Inserts a suffix string before the first '[' in the input name, or appends
 // it at the end if no '[' is found.
 // Example: insertSuffix("data[3]", "_valid") -> "data_valid[3]"
@@ -85,98 +90,9 @@ static std::string bitPortName(StringRef baseName, unsigned bit,
   return formatArrayName(baseName.str(), bit, width);
 }
 
-// Step 2: Populate the hw modules with BLIF netlists
-
-mlir::LogicalResult
-populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
-                 llvm::DenseSet<std::string> &populatedModules) {
-  mlir::SymbolTable symTable(modOp);
-  // Look up the hw module definition referenced by this instance.
-  hw::HWModuleOp hwModule =
-      symTable.lookup<hw::HWModuleOp>(inst.getModuleName());
-  if (!hwModule) {
-    llvm::errs() << "could not find hw module for instance: " << inst << "\n";
-    return mlir::failure();
-  }
-
-  // Skip modules that have already been populated.
-  mlir::StringAttr moduleNameAttr = hwModule.getNameAttr();
-  if (populatedModules.count(moduleNameAttr.getValue().str()))
-    return mlir::success();
-
-  // Every hw module created in Step 1 must have an entry in opToBlifPathMap.
-  assert(opToBlifPathMap.contains(hwModule.getOperation()) &&
-         "hw module is missing its BLIF path. Check Step 1 for correct path "
-         "recording.");
-  llvm::StringRef blifPath = opToBlifPathMap[hwModule.getOperation()];
-
-  // An empty path means this module should be left with subkct op inside
-  if (blifPath.empty()) {
-    populatedModules.insert(moduleNameAttr.getValue().str());
-    return mlir::success();
-  }
-
-  // Collect the existing port names in declaration order so that the BLIF
-  // importer can match them to the netlist's pin names.
-  mlir::SmallVector<std::string> inputPins, outputPins;
-  for (auto &port : hwModule.getPortList())
-    (port.isInput() ? inputPins : outputPins)
-        .push_back(port.name.getValue().str());
-
-  // Import the BLIF netlist as a new hw::HWModuleOp.
-  hw::HWModuleOp imported =
-      importBlifCircuit(modOp, blifPath, {inputPins, outputPins});
-  if (!imported) {
-    llvm::errs() << "failed to import BLIF circuit for instance: " << inst
-                 << "\n";
-    return mlir::failure();
-  }
-
-  // Swap the placeholder module out and the imported one in, keeping the
-  // original name so all existing hw::InstanceOp references stay valid.
-  std::string origName = hwModule.getName().str();
-  imported.setName(origName);
-  symTable.erase(hwModule);
-  symTable.insert(imported);
-
-  populatedModules.insert(origName);
-  return mlir::success();
-}
-
-// ---------------------------------------------------------------------------
-// populateAllHWModules(): entry point
-// ---------------------------------------------------------------------------
-
-mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
-                                         llvm::StringRef topModuleName) {
-  // Locate the top-level hw module.
-  mlir::SymbolTable symTable(modOp);
-  hw::HWModuleOp topMod = symTable.lookup<hw::HWModuleOp>(topModuleName);
-  if (!topMod) {
-    llvm::errs() << "could not find top hw module: " << topModuleName << "\n";
-    return mlir::failure();
-  }
-
-  // Collect all instances up front to avoid iterator invalidation when
-  // populate() swaps module bodies in the symbol table.
-  mlir::SmallVector<hw::InstanceOp> instances;
-  topMod.walk([&](hw::InstanceOp inst) { instances.push_back(inst); });
-
-  // A single BlifPopulator owns the SymbolTable and dedup set for the whole
-  // walk; populate() can be called once per instance without any
-  // "already done" bookkeeping at the call site.
-  llvm::DenseSet<std::string> populatedModules;
-  for (hw::InstanceOp inst : instances)
-    if (mlir::failed(populateHWModule(modOp, inst, populatedModules)))
-      return mlir::failure();
-
-  return mlir::success();
-}
-} // namespace dynamatic
-
-namespace dynamatic {
-
-// Step 1: Convert handshake ops into hw modules and unbundle their ports
+//===----------------------------------------------------------------------===//
+// unbundleHandshakePort: entry point for step 1
+//===----------------------------------------------------------------------===//
 
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
@@ -755,6 +671,100 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
   topFunction.erase();
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Step 2: Populate the hw modules with BLIF content
+//===----------------------------------------------------------------------===//
+
+// Function to populate a single hw module by importing the corresponding BLIF
+// netlist and swapping the module body.
+mlir::LogicalResult
+populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
+                 llvm::DenseSet<std::string> &populatedModules) {
+  mlir::SymbolTable symTable(modOp);
+  // Look up the hw module definition referenced by this instance.
+  hw::HWModuleOp hwModule =
+      symTable.lookup<hw::HWModuleOp>(inst.getModuleName());
+  if (!hwModule) {
+    llvm::errs() << "could not find hw module for instance: " << inst << "\n";
+    return mlir::failure();
+  }
+
+  // Skip modules that have already been populated.
+  mlir::StringAttr moduleNameAttr = hwModule.getNameAttr();
+  if (populatedModules.count(moduleNameAttr.getValue().str()))
+    return mlir::success();
+
+  // Every hw module created in Step 1 must have an entry in opToBlifPathMap.
+  assert(opToBlifPathMap.contains(hwModule.getOperation()) &&
+         "hw module is missing its BLIF path. Check Step 1 for correct path "
+         "recording.");
+  llvm::StringRef blifPath = opToBlifPathMap[hwModule.getOperation()];
+
+  // An empty path means this module should be left with subkct op inside
+  if (blifPath.empty()) {
+    populatedModules.insert(moduleNameAttr.getValue().str());
+    return mlir::success();
+  }
+
+  // Collect the existing port names in declaration order so that the BLIF
+  // importer can match them to the netlist's pin names.
+  mlir::SmallVector<std::string> inputPins, outputPins;
+  for (auto &port : hwModule.getPortList())
+    (port.isInput() ? inputPins : outputPins)
+        .push_back(port.name.getValue().str());
+
+  // Import the BLIF netlist as a new hw::HWModuleOp.
+  hw::HWModuleOp imported =
+      importBlifCircuit(modOp, blifPath, {inputPins, outputPins});
+  if (!imported) {
+    llvm::errs() << "failed to import BLIF circuit for instance: " << inst
+                 << "\n";
+    return mlir::failure();
+  }
+
+  // Swap the placeholder module out and the imported one in, keeping the
+  // original name so all existing hw::InstanceOp references stay valid.
+  std::string origName = hwModule.getName().str();
+  imported.setName(origName);
+  symTable.erase(hwModule);
+  symTable.insert(imported);
+
+  populatedModules.insert(origName);
+  return mlir::success();
+}
+
+// ---------------------------------------------------------------------------
+// populateAllHWModules: entry point for step 2
+// ---------------------------------------------------------------------------
+
+// Function to populate all hw modules in the module by walking the instance
+// hierarchy starting from the top-level module.
+mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
+                                         llvm::StringRef topModuleName) {
+  // Locate the top-level hw module.
+  mlir::SymbolTable symTable(modOp);
+  hw::HWModuleOp topMod = symTable.lookup<hw::HWModuleOp>(topModuleName);
+  if (!topMod) {
+    llvm::errs() << "could not find top hw module: " << topModuleName << "\n";
+    return mlir::failure();
+  }
+
+  // Collect all instances up front to avoid iterator invalidation when
+  // populate() swaps module bodies in the symbol table.
+  mlir::SmallVector<hw::InstanceOp> instances;
+  topMod.walk([&](hw::InstanceOp inst) { instances.push_back(inst); });
+
+  // A single BlifPopulator owns the SymbolTable and dedup set for the whole
+  // walk; populate() can be called once per instance without any
+  // "already done" bookkeeping at the call site.
+  llvm::DenseSet<std::string> populatedModules;
+  for (hw::InstanceOp inst : instances)
+    if (mlir::failed(populateHWModule(modOp, inst, populatedModules)))
+      return mlir::failure();
+
+  return mlir::success();
 }
 
 } // namespace dynamatic
