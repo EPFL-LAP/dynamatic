@@ -296,7 +296,11 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
     }
     topFunction = op;
   }
-  assert(topFunction && "expected to find a non-external handshake function");
+  if (!topFunction) {
+    modOp->emitOpError()
+        << "expected to find a non-external handshake function";
+    return failure();
+  }
   // Get the port info for the top function and build the corresponding hw
   // module
   auto [topHWPortInfo, unbundledPortsTop] = buildPortInfo(topFunction, ctx);
@@ -344,8 +348,13 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   for (auto &unbundledPort : unbundledPortsTop) {
     if (unbundledPort.direction == hw::ModulePort::Direction::Input &&
         unbundledPort.bitType == PortBitType::READY) {
-      assert(endOpIdx < endOp.getNumOperands() &&
-             "not enough operands in the terminator for the ready signals");
+      if (endOpIdx >= endOp.getNumOperands()) {
+        llvm::errs() << "Not enough operands in the terminator for the ready "
+                        "signals. Expected at least "
+                     << (endOpIdx + 1) << " but got " << endOp.getNumOperands()
+                     << "\n";
+        return failure();
+      }
       Value operand = endOp.getOperand(endOpIdx++);
       saveUnbundledValues(operand, PortBitType::READY,
                           {topBlock->getArgument(argIdx++)});
@@ -539,7 +548,11 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
         (blifAttr && !blifAttr.getValue().empty()) ? blifAttr.getValue().str()
                                                    : "";
   }
-  assert(hwModDef && "failed to create or find hw module for handshake op");
+  if (!hwModDef) {
+    llvm::errs() << "failed to create or find hw module for op: " << *op
+                 << "\n";
+    return failure();
+  }
 
   // Build the instance inside the top hw module
   builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
@@ -556,9 +569,14 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
     }
     auto unbundledValues = getUnbundledValues(
         port.handshakeSignal, port.totalBits, port.bitType, loc);
-    assert(port.bitIndex < unbundledValues.size() &&
-           "Unbundled values size should be the same at the bit index of the "
-           "original port");
+    if (port.bitIndex >= unbundledValues.size()) {
+      llvm::errs() << "Error: bit index " << port.bitIndex
+                   << " is out of bounds for unbundled values of signal "
+                   << port.handshakeSignal << "\n";
+      llvm::errs() << "Unbundled values size: " << unbundledValues.size()
+                   << "\n";
+      return failure();
+    }
     hwInstOperands.push_back(unbundledValues[port.bitIndex]);
   }
   // Add clk and rst signals as operands
@@ -571,9 +589,13 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   for (auto &port : hwModDef.getPortList())
     if (port.isInput())
       numInputs++;
-  assert(
-      hwInstOperands.size() == numInputs &&
-      "number of instance operands should match the number of module inputs");
+  if (hwInstOperands.size() != numInputs) {
+    llvm::errs() << "Error: number of instance operands ("
+                 << hwInstOperands.size()
+                 << ") does not match the number of module inputs ("
+                 << numInputs << ") for op: " << *op << "\n";
+    return failure();
+  }
   builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
 
   // Create the instance
@@ -615,14 +637,21 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
 }
 
 LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
-  assert(topHWModule && "Top hw module must exist before convertHandshakeFunc");
+  if (!topHWModule) {
+    llvm::errs() << "Top hw module must exist before convertHandshakeFunc\n";
+    return failure();
+  }
   // Get the terminator handshake::EndOp
   handshake::EndOp endOp;
   for (Operation &op : *topFunction.getBodyBlock()) {
     if ((endOp = dyn_cast<handshake::EndOp>(op)))
       break;
   }
-  assert(endOp && "handshake::FuncOp must contain an EndOp");
+  if (!endOp) {
+    topFunction.emitOpError()
+        << "handshake::FuncOp must contain a handshake::EndOp terminator";
+    return failure();
+  }
 
   // Collect the unbundled operands for the terminator
   SmallVector<Value> hwTermOperands;
@@ -699,9 +728,11 @@ populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
     return mlir::success();
 
   // Every hw module created in Step 1 must have an entry in opToBlifPathMap.
-  assert(opToBlifPathMap.contains(hwModule.getOperation()) &&
-         "hw module is missing its BLIF path. Check Step 1 for correct path "
-         "recording.");
+  if (!opToBlifPathMap.contains(hwModule.getOperation())) {
+    llvm::errs() << "hw module is missing its BLIF path: " << hwModule
+                 << "\nCheck Step 1 for correct path recording.\n";
+    return mlir::failure();
+  }
   llvm::StringRef blifPath = opToBlifPathMap[hwModule.getOperation()];
 
   // An empty path means this module should be left with subkct op inside
@@ -820,8 +851,11 @@ public:
       if (!blifImplInterface) {
         llvm::errs() << "Handshake operation " << getUniqueName(op)
                      << " does not implement the BLIFImplInterface\n";
-        assert(false && "Check the pass that marks handshake operations with "
-                        "BLIF file paths is executed correctly");
+        llvm::errs()
+            << "Make sure to run the pass that marks handshake operations "
+               "with BLIF file paths (--mark-handshake-blif-impl) before "
+               "this pass\n";
+        return signalPassFailure();
       }
       std::string blifFilePath = blifImplInterface.getBLIFImpl().str();
       if (blifFilePath.empty()) {
