@@ -53,11 +53,12 @@ namespace dynamatic {
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
 SmallVector<UnbundledPort>
-unbundleHandshakePort(Type type, const std::string &handshakePortName,
-                      hw::ModulePort::Direction handshakePortDir,
-                      Value handshakePort) {
+unbundleChannel(const std::string &handshakePortName,
+                hw::ModulePort::Direction handshakePortDir,
+                Value handshakePort) {
 
   SmallVector<UnbundledPort> unbundledPorts;
+  Type type = handshakePort.getType();
 
   // Flipped direction: input becomes output and vice versa.
   auto flip = [](hw::ModulePort::Direction d) {
@@ -163,9 +164,8 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
   if (auto funcOp = dyn_cast<handshake::FuncOp>(handshakeOp)) {
     // Unbundle the input ports
     for (auto [i, val] : llvm::enumerate(funcOp.getArguments())) {
-      auto unbundled =
-          unbundleHandshakePort(val.getType(), handshakeInPortNames[i],
-                                hw::ModulePort::Direction::Input, val);
+      auto unbundled = unbundleChannel(handshakeInPortNames[i],
+                                       hw::ModulePort::Direction::Input, val);
       unbundledPorts.append(unbundled.begin(), unbundled.end());
     }
     // Unbundle the output ports
@@ -173,24 +173,22 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
       // Collect the terminator operands corresponding to the function result
       handshake::EndOp terminator =
           dyn_cast<handshake::EndOp>(funcOp.getBodyBlock()->getTerminator());
-      auto unbundled = unbundleHandshakePort(val, handshakeOutPortNames[i],
-                                             hw::ModulePort::Direction::Output,
-                                             terminator.getOperand(i));
+      auto unbundled = unbundleChannel(handshakeOutPortNames[i],
+                                       hw::ModulePort::Direction::Output,
+                                       terminator.getOperand(i));
       unbundledPorts.append(unbundled.begin(), unbundled.end());
     }
   } else {
     // Unbundle the input ports
     for (auto [i, val] : llvm::enumerate(handshakeOp->getOperands())) {
-      auto unbundled =
-          unbundleHandshakePort(val.getType(), handshakeInPortNames[i],
-                                hw::ModulePort::Direction::Input, val);
+      auto unbundled = unbundleChannel(handshakeInPortNames[i],
+                                       hw::ModulePort::Direction::Input, val);
       unbundledPorts.append(unbundled.begin(), unbundled.end());
     }
     // Unbundle the output ports
     for (auto [i, val] : llvm::enumerate(handshakeOp->getResults())) {
-      auto unbundled =
-          unbundleHandshakePort(val.getType(), handshakeOutPortNames[i],
-                                hw::ModulePort::Direction::Output, val);
+      auto unbundled = unbundleChannel(handshakeOutPortNames[i],
+                                       hw::ModulePort::Direction::Output, val);
       unbundledPorts.append(unbundled.begin(), unbundled.end());
     }
   }
