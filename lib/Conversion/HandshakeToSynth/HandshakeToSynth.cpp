@@ -233,8 +233,12 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
     }
     // Unbundle the output ports
     for (auto [i, val] : llvm::enumerate(funcOp.getResultTypes())) {
-      auto unbundled = unbundleHandshakePort(
-          val, handshakeOutPortNames[i], hw::ModulePort::Direction::Output, {});
+      // Collect the terminator operands corresponding to the function result
+      handshake::EndOp terminator =
+          dyn_cast<handshake::EndOp>(funcOp.getBodyBlock()->getTerminator());
+      auto unbundled = unbundleHandshakePort(val, handshakeOutPortNames[i],
+                                             hw::ModulePort::Direction::Output,
+                                             terminator.getOperand(i));
       unbundledPorts.append(unbundled.begin(), unbundled.end());
     }
   } else {
@@ -320,48 +324,31 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
 
   // Save the mapping between the old handshake channels of the func and the new
   // hw module ports
+  SmallVector<Value> visitedDataArgs;
   unsigned argIdx = 0;
-  for (auto [i, arg] : llvm::enumerate(topFunction.getArguments())) {
-    // Collect all unbundled ports that correspond to this argument only for
-    // data and valid bits
-    // For the ready signals, coming from the output channels, we will collect
-    // them later when we convert the terminator
-    for (auto portType : {PortBitType::DATA, PortBitType::VALID}) {
-      SmallVector<Value> unbundledValues;
-      for (auto &unbundledPort : unbundledPortsTop) {
-        if (unbundledPort.handshakeSignal == arg &&
-            unbundledPort.direction == hw::ModulePort::Direction::Input &&
-            unbundledPort.bitType == portType) {
+  for (auto &unbundledPort : unbundledPortsTop) {
+    if (unbundledPort.direction == hw::ModulePort::Direction::Input) {
+      // If port type is DATA
+      if (unbundledPort.bitType == PortBitType::DATA) {
+        // If the channel has been visited already, skip it
+        if (llvm::is_contained(visitedDataArgs, unbundledPort.handshakeSignal))
+          continue;
+        SmallVector<Value> unbundledValues;
+        // Collect all the bits for this channel
+        for (unsigned bit = 0; bit < unbundledPort.totalBits; ++bit) {
           unbundledValues.push_back(topBlock->getArgument(argIdx++));
         }
+        saveUnbundledValues(unbundledPort.handshakeSignal, PortBitType::DATA,
+                            unbundledValues);
+        visitedDataArgs.push_back(unbundledPort.handshakeSignal);
+      } else {
+        auto newArg = topBlock->getArgument(argIdx++);
+        saveUnbundledValues(unbundledPort.handshakeSignal,
+                            unbundledPort.bitType, {newArg});
       }
-      if (!unbundledValues.empty())
-        saveUnbundledValues(arg, portType, unbundledValues);
     }
   }
 
-  // Save the mapping for the input ready signals that belong to the output of
-  // the top func
-  // These values correspond to the inputs of the terminator
-  handshake::EndOp endOp =
-      *topFunction.getBody().getOps<handshake::EndOp>().begin();
-  unsigned endOpIdx = 0;
-  // For each operand, extract the ready signal and save it
-  for (auto &unbundledPort : unbundledPortsTop) {
-    if (unbundledPort.direction == hw::ModulePort::Direction::Input &&
-        unbundledPort.bitType == PortBitType::READY) {
-      if (endOpIdx >= endOp.getNumOperands()) {
-        llvm::errs() << "Not enough operands in the terminator for the ready "
-                        "signals. Expected at least "
-                     << (endOpIdx + 1) << " but got " << endOp.getNumOperands()
-                     << "\n";
-        return failure();
-      }
-      Value operand = endOp.getOperand(endOpIdx++);
-      saveUnbundledValues(operand, PortBitType::READY,
-                          {topBlock->getArgument(argIdx++)});
-    }
-  }
   // Now, we unbundle the channels of each inner handshake op
   for (Operation &op : *topFunction.getBodyBlock()) {
     if (isa<handshake::EndOp>(op))
@@ -482,8 +469,14 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
     // Check per bit type
     SmallVector<Value> extractedValues =
         getValuesFromTuple(it->second, bitType);
-    if (!extractedValues.empty())
+    if (!extractedValues.empty()) {
+      // Assert the size of the extracted values is the same as the total bits
+      // expected
+      assert(extractedValues.size() == totalBits &&
+             "extracted values size should be the same as the total bits "
+             "expected");
       return extractedValues;
+    }
   }
   std::tuple<SmallVector<Value>, Value, Value> valTuple;
   // Check if a placeholder exists for this signal
@@ -493,8 +486,14 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
     // Check per bit type
     SmallVector<Value> extractedValues =
         getValuesFromTuple(it->second, bitType);
-    if (!extractedValues.empty())
+    if (!extractedValues.empty()) {
+      // Assert the size of the extracted values is the same as the total bits
+      // expected
+      assert(extractedValues.size() == totalBits &&
+             "extracted values size should be the same as the total bits"
+             "expected");
       return extractedValues;
+    }
   }
   // If not, create a new placeholder and return it
   SmallVector<Value> placeholders;
