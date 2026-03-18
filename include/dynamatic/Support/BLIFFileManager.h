@@ -21,6 +21,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <filesystem>
+#include <regex>
 
 class BLIFFileManager {
 public:
@@ -41,3 +42,21 @@ private:
   // String containing the base path of the blif files
   std::string blifDirPath;
 };
+
+// Formats a bit-indexed port name: "sig[bit]".
+// When width == 1 the name is returned unchanged (no "[0]" suffix).
+// If baseName already ends with "[N]" the indices are linearised.
+std::string bitPortName(mlir::StringRef baseName, unsigned bit, unsigned width);
+
+// Converts a (root, index) pair into the canonical "root[index]" form.
+// If root already contains "[N]", the old index is linearised with
+//  arrayWidth before adding index.
+// Example: formatArrayName("data[2]", 3, 4) becomes "data[11]"  (2*4 + 3)
+std::string formatArrayName(const std::string &root, unsigned index,
+                            unsigned arrayWidth = 0);
+
+// Legalizes a list of handshake port names by converting the "root_N" index
+// pattern (used internally by NamedIOInterface) into the "root[N]" array
+// notation expected by the BLIF importer
+// Example: ["data_0", "data_1", "valid"] -> ["data[0]", "data[1]", "valid"]
+void legalizeBlifPortNames(mlir::SmallVector<std::string> &names);

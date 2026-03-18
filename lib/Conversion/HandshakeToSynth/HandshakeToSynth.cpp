@@ -63,33 +63,6 @@ std::string insertSuffix(const std::string &name, const std::string &suffix) {
   return name + suffix;
 }
 
-// Converts a (root, index) pair into the canonical "root[index]" form.
-// If root already contains "[N]", the old index is linearised with
-//  arrayWidth before adding index.
-// Example: formatArrayName("data[2]", 3, 4) becomes "data[11]"  (2*4 + 3)
-std::string formatArrayName(const std::string &root, unsigned index,
-                            unsigned arrayWidth = 0) {
-  static const std::regex arrayPattern(R"((\w+)\[(\d+)\])");
-  std::smatch m;
-  if (std::regex_match(root, m, arrayPattern)) {
-    assert(arrayWidth != 0 && "arrayWidth required for already-indexed names");
-    unsigned linearised = std::stoi(m[2].str()) * arrayWidth + index;
-    return m[1].str() + "[" + std::to_string(linearised) + "]";
-  }
-  return root + "[" + std::to_string(index) + "]";
-}
-
-// Formats a bit-indexed port name: "sig[bit]".
-// When width == 1 the name is returned unchanged (no "[0]" suffix).
-// If baseName already ends with "[N]" the indices are linearised.
-static std::string bitPortName(StringRef baseName, unsigned bit,
-                               unsigned width) {
-  if (width == 1)
-    return baseName.str();
-  // Reuse the formatArrayName() helper from Step 1 / Layer 2.
-  return formatArrayName(baseName.str(), bit, width);
-}
-
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
 SmallVector<UnbundledPort>
@@ -185,39 +158,14 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
     auto namedIO = dyn_cast<handshake::NamedIOInterface>(handshakeOp);
     assert(namedIO && "op must implement NamedIOInterface");
 
-    // Pattern "root_N": convert to "root[N]"
-    static const std::regex indexPat(R"((\w+)_(\d+))");
-    auto elaborateName = [&](const std::string &operandName,
-                             SmallVector<std::string> &operandNames) {
-      std::smatch m;
-      if (!std::regex_match(operandName, m, indexPat)) {
-        operandNames.push_back(operandName);
-        return;
-      }
-      // If the name matches the pattern, elaborate it into an array name.
-      std::string root = m[1].str();
-      unsigned idx = std::stoi(m[2].str());
-      if (idx == 0) {
-        operandNames.push_back(root);
-      } else {
-        if (idx == 1) {
-          // The first time we see this pattern, we need to back-patch the root
-          // name to have the "[0]" suffix, since the original name was used for
-          // the first element.
-          auto *it = llvm::find(operandNames, root);
-          assert(it != operandNames.end() &&
-                 "index-0 port not found for back-patch");
-          *it = formatArrayName(root, 0);
-        }
-        operandNames.push_back(formatArrayName(root, idx));
-      }
-    };
-    // Iterate over the operand and result names and fix the ones that match the
-    // pattern
+    // Iterate over the operand and result names
     for (auto [i, _] : llvm::enumerate(handshakeOp->getOperands()))
-      elaborateName(namedIO.getOperandName(i), handshakeInPortNames);
+      handshakeInPortNames.push_back(namedIO.getOperandName(i));
     for (auto [i, _] : llvm::enumerate(handshakeOp->getResults()))
-      elaborateName(namedIO.getResultName(i), handshakeOutPortNames);
+      handshakeOutPortNames.push_back(namedIO.getResultName(i));
+    // Legalize the port names following BLIF expected format
+    legalizeBlifPortNames(handshakeInPortNames);
+    legalizeBlifPortNames(handshakeOutPortNames);
   }
 
   // Second, we use the base names to unbundle the ports and build the

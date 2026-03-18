@@ -25,6 +25,7 @@
 #include "dynamatic/Dialect/Synth/SynthDialect.h"
 #include "dynamatic/Dialect/Synth/SynthOps.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/BLIFFileManager.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/BlifImporter/BlifImporterSupport.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -70,7 +71,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
-#include <regex>
 #include <string>
 #include <utility>
 

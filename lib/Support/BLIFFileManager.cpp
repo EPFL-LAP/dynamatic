@@ -178,3 +178,62 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
   }
   return blifFileName;
 }
+
+// Formats a bit-indexed port name: "sig[bit]".
+// When width == 1 the name is returned unchanged (no "[0]" suffix).
+// If baseName already ends with "[N]" the indices are linearised.
+std::string bitPortName(StringRef baseName, unsigned bit, unsigned width) {
+  if (width == 1)
+    return baseName.str();
+  // Reuse the formatArrayName() helper from Step 1 / Layer 2.
+  return formatArrayName(baseName.str(), bit, width);
+}
+
+// Converts a (root, index) pair into the canonical "root[index]" form.
+// If root already contains "[N]", the old index is linearised with
+//  arrayWidth before adding index.
+// Example: formatArrayName("data[2]", 3, 4) becomes "data[11]"  (2*4 + 3)
+std::string formatArrayName(const std::string &root, unsigned index,
+                            unsigned arrayWidth) {
+  static const std::regex arrayPattern(R"((\w+)\[(\d+)\])");
+  std::smatch m;
+  if (std::regex_match(root, m, arrayPattern)) {
+    assert(arrayWidth != 0 && "arrayWidth required for already-indexed names");
+    unsigned linearised = std::stoi(m[2].str()) * arrayWidth + index;
+    return m[1].str() + "[" + std::to_string(linearised) + "]";
+  }
+  return root + "[" + std::to_string(index) + "]";
+}
+
+// Legalizes a list of handshake port names by converting the "root_N" index
+// pattern (used internally by NamedIOInterface) into the "root[N]" array
+// notation expected by the BLIF importer.
+// Example: ["data_0", "data_1", "valid"] -> ["data[0]", "data[1]", "valid"]
+void legalizeBlifPortNames(SmallVector<std::string> &names) {
+  static const std::regex indexPat(R"((\w+)_(\d+))");
+  SmallVector<std::string> result;
+  result.reserve(names.size());
+
+  for (auto &name : names) {
+    std::smatch m;
+    if (!std::regex_match(name, m, indexPat)) {
+      result.push_back(name);
+      continue;
+    }
+    std::string root = m[1].str();
+    unsigned idx = std::stoi(m[2].str());
+    if (idx == 0) {
+      result.push_back(root);
+    } else {
+      if (idx == 1) {
+        // Back-patch the root entry (index 0) to have the "[0]" suffix,
+        // since it was originally stored without an index.
+        auto *it = std::find(result.begin(), result.end(), root);
+        assert(it != result.end() && "index-0 port not found for back-patch");
+        *it = formatArrayName(root, 0);
+      }
+      result.push_back(formatArrayName(root, idx));
+    }
+  }
+  names = std::move(result);
+}
