@@ -788,9 +788,6 @@ namespace {
 class HandshakeToSynthPass
     : public dynamatic::impl::HandshakeToSynthBase<HandshakeToSynthPass> {
 public:
-  HandshakeToSynthPass(std::string blifDirPath);
-  using HandshakeToSynthBase::HandshakeToSynthBase;
-
   void runDynamaticPass() override {
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
