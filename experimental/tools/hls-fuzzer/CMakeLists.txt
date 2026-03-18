@@ -13,7 +13,7 @@ add_llvm_executable(hls-fuzzer
         AbstractTarget.cpp
         AbstractWorker.cpp
         AST.cpp
-        BasicCProducer.cpp
+        BasicCGenerator.cpp
         Options.cpp
         OptionsParser.cpp
         Randomly.cpp
