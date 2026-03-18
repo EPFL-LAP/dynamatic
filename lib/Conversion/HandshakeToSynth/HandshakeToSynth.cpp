@@ -93,7 +93,7 @@ static std::string bitPortName(StringRef baseName, unsigned bit,
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
 SmallVector<UnbundledPort>
-unbundleHandshakePort(Type type, std::string handshakePortName,
+unbundleHandshakePort(Type type, const std::string &handshakePortName,
                       hw::ModulePort::Direction handshakePortDir,
                       Value handshakePort) {
 
@@ -185,7 +185,7 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
 
     // Pattern "root_N": convert to "root[N]"
     static const std::regex indexPat(R"((\w+)_(\d+))");
-    auto elaborateName = [&](std::string operandName,
+    auto elaborateName = [&](const std::string &operandName,
                              SmallVector<std::string> &operandNames) {
       std::smatch m;
       if (!std::regex_match(operandName, m, indexPat)) {
@@ -202,7 +202,7 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
           // The first time we see this pattern, we need to back-patch the root
           // name to have the "[0]" suffix, since the original name was used for
           // the first element.
-          auto it = llvm::find(operandNames, root);
+          auto *it = llvm::find(operandNames, root);
           assert(it != operandNames.end() &&
                  "index-0 port not found for back-patch");
           *it = formatArrayName(root, 0);
@@ -277,7 +277,7 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
 }
 
 //===----------------------------------------------------------------------===//
-// unbundleHandshakePort: entry point for step 1
+// unbundleHandshakeChannels: entry point for step 1
 //===----------------------------------------------------------------------===//
 
 // Function to unbundle all handshake channels in the module and create the
@@ -446,7 +446,7 @@ void HandshakeUnbundler::saveUnbundledValues(
       for (unsigned i = 0; i < placeholderValues.size(); ++i) {
         placeholderValues[i].replaceAllUsesWith(unbundledValues[i]);
         // Erase the placeholder
-        if (auto defOp = placeholderValues[i].getDefiningOp())
+        if (auto *defOp = placeholderValues[i].getDefiningOp())
           defOp->erase();
       }
       // Update the map by removing the placeholder entry for that bit type

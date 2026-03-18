@@ -132,7 +132,7 @@ private:
   // Function that returns unbundled values from a channel value. If the channel
   // value has not been unbundled yet, creates hw constant placeholders for each
   // bit and saves them.
-  llvm::SmallVector<Value> getUnbundledValues(Value channelVal,
+  llvm::SmallVector<Value> getUnbundledValues(Value handshakeSignal,
                                               unsigned totalBits,
                                               PortBitType bitType,
                                               Location loc);
@@ -140,8 +140,8 @@ private:
   // Function that saves the mapping from a channel value to its unbundled bit
   // values. If there were placeholders for the channel value, replaces them
   // with the real bit values.
-  void saveUnbundledValues(Value channelVal, PortBitType bitType,
-                           llvm::SmallVector<Value> bitValues);
+  void saveUnbundledValues(Value handshakeSignal, PortBitType bitType,
+                           llvm::SmallVector<Value> unbundledValues);
 
   // Helper function to update the old tuple of unbundled values
   UnbundledValuesTuple updateTuple(UnbundledValuesTuple oldTuple,
