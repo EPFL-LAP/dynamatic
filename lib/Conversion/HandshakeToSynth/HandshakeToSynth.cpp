@@ -266,12 +266,12 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
   // Add clk and rst ports
   unsigned clkIdx = inIdx++;
   unsigned rstIdx = inIdx++;
-  hwInputs.push_back({{StringAttr::get(ctx, clockSignal), i1,
-                       hw::ModulePort::Direction::Input},
-                      clkIdx});
-  hwInputs.push_back({{StringAttr::get(ctx, resetSignal), i1,
-                       hw::ModulePort::Direction::Input},
-                      rstIdx});
+  hwInputs.push_back(
+      {{StringAttr::get(ctx, CLK_PORT), i1, hw::ModulePort::Direction::Input},
+       clkIdx});
+  hwInputs.push_back(
+      {{StringAttr::get(ctx, RST_PORT), i1, hw::ModulePort::Direction::Input},
+       rstIdx});
 
   return {hw::ModulePortInfo(hwInputs, hwOutputs), unbundledPorts};
 }
@@ -563,7 +563,7 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
     if (port.direction != hw::ModulePort::Direction::Input)
       continue;
     // Check if the port is clk or rst
-    if (port.name == clockSignal || port.name == resetSignal) {
+    if (port.name == CLK_PORT || port.name == RST_PORT) {
       // We will connect them later, for now we can skip them
       continue;
     }

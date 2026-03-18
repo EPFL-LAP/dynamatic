@@ -29,6 +29,7 @@
 #include "dynamatic/Support/BlifImporter/BlifImporterSupport.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -83,12 +84,6 @@ namespace dynamatic {
 /// be populated from.  An empty string means the module needs no replacement.
 /// Written during Step 1 (unbundling) and consumed during Step 2 (populate).
 static mlir::DenseMap<mlir::Operation *, std::string> opToBlifPathMap;
-
-/// Port name for the clock signal added to every rewritten hw module.
-static const std::string clockSignal = "clk";
-
-/// Port name for the reset signal added to every rewritten hw module.
-static const std::string resetSignal = "rst";
 
 //===----------------------------------------------------------------------===//
 // Step 1: Unbundle handshake channels into individual bits and create
