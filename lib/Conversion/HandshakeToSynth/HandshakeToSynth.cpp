@@ -268,12 +268,12 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
   // Add clk and rst ports
   unsigned clkIdx = inIdx++;
   unsigned rstIdx = inIdx++;
-  hwInputs.push_back(
-      {{StringAttr::get(ctx, CLK_PORT), i1, hw::ModulePort::Direction::Input},
-       clkIdx});
-  hwInputs.push_back(
-      {{StringAttr::get(ctx, RST_PORT), i1, hw::ModulePort::Direction::Input},
-       rstIdx});
+  hwInputs.emplace_back(hw::PortInfo{
+      {StringAttr::get(ctx, CLK_PORT), i1, hw::ModulePort::Direction::Input},
+      clkIdx});
+  hwInputs.emplace_back(hw::PortInfo{
+      {StringAttr::get(ctx, RST_PORT), i1, hw::ModulePort::Direction::Input},
+      rstIdx});
 
   return {hw::ModulePortInfo(hwInputs, hwOutputs), unbundledPorts};
 }
