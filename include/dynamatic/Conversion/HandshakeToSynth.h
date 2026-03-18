@@ -91,43 +91,9 @@ static const std::string clockSignal = "clk";
 static const std::string resetSignal = "rst";
 
 //===----------------------------------------------------------------------===//
-// Step 2: BlifPopulator
-//
-// Replaces the synth::SubcktOp placeholder body of each hw::HWModuleOp with
-// the gate-level netlist imported from its BLIF file.
-//
-// Owns the SymbolTable (built once at construction) and the deduplication
-// set (so populate() can be called once per hw::InstanceOp without worrying
-// about processing the same module definition twice).
+// Step 1: Unbundle handshake channels into individual bits and create
+// placeholder hw modules
 //===----------------------------------------------------------------------===//
-
-class BlifPopulator {
-public:
-  /// Constructs a populator for \p modOp, building the SymbolTable once.
-  explicit BlifPopulator(mlir::ModuleOp modOp);
-
-  /// Replaces the body of the hw::HWModuleOp referenced by \p inst with the
-  /// BLIF netlist stored in opToBlifPathMap.
-  ///
-  /// Returns success() immediately if:
-  ///   - the module has already been populated, or
-  ///   - the recorded BLIF path is empty (module needs no replacement).
-  /// Returns failure() if the module cannot be found or the import fails.
-  mlir::LogicalResult populate(hw::InstanceOp inst);
-
-private:
-  mlir::ModuleOp modOp;
-  mlir::SymbolTable symTable;
-
-  /// Names of hw modules that have already been populated, used to skip
-  /// duplicate processing when multiple instances reference the same module.
-  llvm::DenseSet<mlir::StringAttr> done;
-};
-
-/// Walks every hw::InstanceOp inside the top-level hw module named
-/// \p topModuleName and calls BlifPopulator::populate() for each one.
-mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
-                                         llvm::StringRef topModuleName);
 
 // Add new type for the tuple
 using UnbundledValuesTuple = std::tuple<SmallVector<Value>, Value, Value>;
@@ -182,11 +148,13 @@ private:
   void saveUnbundledValues(Value channelVal, PortBitType bitType,
                            llvm::SmallVector<Value> bitValues);
 
-  // Helper function to format tuple from map
+  // Helper function to update the old tuple of unbundled values
   UnbundledValuesTuple updateTuple(UnbundledValuesTuple oldTuple,
                                    SmallVector<Value> newValues,
                                    PortBitType bitType);
 
+  // Helper function to extract the relevant values from a tuple based on the
+  // bit type
   SmallVector<Value> getValuesFromTuple(UnbundledValuesTuple valTuple,
                                         PortBitType bitType);
 
@@ -211,5 +179,21 @@ private:
   Value clk;
   Value rst;
 };
+
+//===----------------------------------------------------------------------===//
+// Step 2: Populate the hw modules with BLIF content
+//===----------------------------------------------------------------------===//
+
+// Top function for this step. For each hw module created in Step 1, look up the
+// corresponding BLIF file and populate the module body with the content of the
+// BLIF file.
+mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
+                                         llvm::StringRef topModuleName);
+
+// Function that populates one hw module by replacing its body with the content
+// of the corresponding BLIF file
+mlir::LogicalResult
+populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
+                 llvm::DenseSet<std::string> &populatedModules);
 
 } // namespace dynamatic

@@ -85,33 +85,12 @@ static std::string bitPortName(StringRef baseName, unsigned bit,
   return formatArrayName(baseName.str(), bit, width);
 }
 
-//===----------------------------------------------------------------------===//
-//
-// Step 2: Populate hw modules with BLIF-imported netlists
-//
-// Replaces the synth::SubcktOp placeholder body that Step 1 inserted into
-// each hw::HWModuleOp with the real gate-level netlist imported from the
-// BLIF file whose path was recorded in opToBlifPathMap during Step 1.
-//
-// BlifPopulator owns all mutable state (the SymbolTable and the dedup set)
-// so that populate() is a clean, stateless-looking method from the caller's
-// perspective.  The entry point populateAllHWModules() constructs a single
-// BlifPopulator and drives it over every instance in the top module.
-//
-//===----------------------------------------------------------------------===//
+// Step 2: Populate the hw modules with BLIF netlists
 
-// ---------------------------------------------------------------------------
-// BlifPopulator: constructor
-// ---------------------------------------------------------------------------
-
-BlifPopulator::BlifPopulator(mlir::ModuleOp modOp)
-    : modOp(modOp), symTable(modOp) {}
-
-// ---------------------------------------------------------------------------
-// BlifPopulator::populate()
-// ---------------------------------------------------------------------------
-
-mlir::LogicalResult BlifPopulator::populate(hw::InstanceOp inst) {
+mlir::LogicalResult
+populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
+                 llvm::DenseSet<std::string> &populatedModules) {
+  mlir::SymbolTable symTable(modOp);
   // Look up the hw module definition referenced by this instance.
   hw::HWModuleOp hwModule =
       symTable.lookup<hw::HWModuleOp>(inst.getModuleName());
@@ -122,7 +101,7 @@ mlir::LogicalResult BlifPopulator::populate(hw::InstanceOp inst) {
 
   // Skip modules that have already been populated.
   mlir::StringAttr moduleNameAttr = hwModule.getNameAttr();
-  if (done.count(moduleNameAttr))
+  if (populatedModules.count(moduleNameAttr.getValue().str()))
     return mlir::success();
 
   // Every hw module created in Step 1 must have an entry in opToBlifPathMap.
@@ -131,10 +110,9 @@ mlir::LogicalResult BlifPopulator::populate(hw::InstanceOp inst) {
          "recording.");
   llvm::StringRef blifPath = opToBlifPathMap[hwModule.getOperation()];
 
-  // An empty path means this module is already expressed in hw/synth ops
-  // (e.g. a memory controller whose body was inlined directly).
+  // An empty path means this module should be left with subkct op inside
   if (blifPath.empty()) {
-    done.insert(moduleNameAttr);
+    populatedModules.insert(moduleNameAttr.getValue().str());
     return mlir::success();
   }
 
@@ -161,7 +139,7 @@ mlir::LogicalResult BlifPopulator::populate(hw::InstanceOp inst) {
   symTable.erase(hwModule);
   symTable.insert(imported);
 
-  done.insert(mlir::StringAttr::get(modOp.getContext(), origName));
+  populatedModules.insert(origName);
   return mlir::success();
 }
 
@@ -187,9 +165,9 @@ mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
   // A single BlifPopulator owns the SymbolTable and dedup set for the whole
   // walk; populate() can be called once per instance without any
   // "already done" bookkeeping at the call site.
-  BlifPopulator populator(modOp);
+  llvm::DenseSet<std::string> populatedModules;
   for (hw::InstanceOp inst : instances)
-    if (mlir::failed(populator.populate(inst)))
+    if (mlir::failed(populateHWModule(modOp, inst, populatedModules)))
       return mlir::failure();
 
   return mlir::success();
