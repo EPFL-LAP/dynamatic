@@ -16,6 +16,7 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/BLIFFileManager.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <filesystem>
 
@@ -40,7 +41,7 @@ struct HandshakeMarkBLIFImplPass
   // use tblgen constructors from base class
   using HandshakeMarkBLIFImplBase::HandshakeMarkBLIFImplBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
     // Check blifDirPath is not empty
     if (blifDirPath.empty()) {
       llvm::errs() << "BLIF directory path is empty\n";
@@ -49,7 +50,7 @@ struct HandshakeMarkBLIFImplPass
     // Generate blif manager with the provided directory path
     BLIFFileManager blifFileManager(blifDirPath);
     // Get the module op
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = cast<mlir::ModuleOp>(getOperation());
     // Walk through all handshake operations in the function
     moduleOp.walk([&](Operation *op) {
       // Skip non-handshake ops (e.g. builtin.module, hw.module, etc.)

@@ -23,6 +23,8 @@
 #include <filesystem>
 #include <regex>
 
+namespace dynamatic {
+
 class BLIFFileManager {
 public:
   // Constructor for the BLIFFileManager class
@@ -67,3 +69,5 @@ std::string formatArrayName(const std::string &root, unsigned index,
 // notation expected by the BLIF importer
 // Example: ["data_0", "data_1", "valid"] -> ["data[0]", "data[1]", "valid"]
 void legalizeBlifPortNames(mlir::SmallVector<std::string> &names);
+
+} // namespace dynamatic

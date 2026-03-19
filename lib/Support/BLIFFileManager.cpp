@@ -21,6 +21,8 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+namespace dynamatic {
+
 // Function to combine parameter values, module type and blif directory path
 // to create the blif file path
 std::string
@@ -252,3 +254,5 @@ void legalizeBlifPortNames(SmallVector<std::string> &names) {
   }
   names = std::move(result);
 }
+
+} // namespace dynamatic

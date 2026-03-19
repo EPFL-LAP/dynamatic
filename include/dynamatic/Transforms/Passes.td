@@ -329,7 +329,7 @@ def HandshakeSetUnitImplAttributes : Pass<
   let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
-def HandshakeMarkBLIFImpl : DynamaticPass<"handshake-mark-blif-impl"> {
+def HandshakeMarkBLIFImpl : Pass<"handshake-mark-blif-impl"> {
   let summary = "Sets the BLIF file path for each Handshake operation.";
   let description = [{
     This pass takes as input the directory containing the AIG 

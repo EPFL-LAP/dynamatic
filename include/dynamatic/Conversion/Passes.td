@@ -83,12 +83,13 @@ def HandshakeToHW
 //===----------------------------------------------------------------------===//
 
 def HandshakeToSynth
-    : DynamaticPass<"lower-handshake-to-synth", ["dynamatic::synth::SynthDialect", "dynamatic::hw::HWDialect"]> {
+    : Pass<"lower-handshake-to-synth"> {
   let summary = "Lowers Handshake to Synth.";
   let description = [{
     Lowers Handshake IR into Synth IR, which is a hardware representation
     that focuses on logic synthesis constructs.
   }];
+  let dependentDialects = ["dynamatic::hw::HWDialect", "dynamatic::synth::SynthDialect"];
 }
 
 

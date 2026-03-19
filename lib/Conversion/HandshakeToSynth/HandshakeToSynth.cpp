@@ -732,8 +732,8 @@ namespace {
 class HandshakeToSynthPass
     : public dynamatic::impl::HandshakeToSynthBase<HandshakeToSynthPass> {
 public:
-  void runDynamaticPass() override {
-    mlir::ModuleOp modOp = getOperation();
+  void runOnOperation() override {
+    mlir::ModuleOp modOp = cast<mlir::ModuleOp>(getOperation());
     MLIRContext *ctx = &getContext();
     OpBuilder builder(ctx);
     // We only support one function per module
