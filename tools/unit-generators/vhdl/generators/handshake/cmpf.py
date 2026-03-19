@@ -96,13 +96,14 @@ def _get_flopoco_expression_from_predicate(predicate):
         "olt": "not unordered and XltY",
         "ole": "not unordered and XleY",
         "one": "not unordered and not XeqY",
+        "ord": "not unordered",
         "ueq": "unordered or XeqY",
         "ugt": "unordered or XgtY",
         "uge": "unordered or XgeY",
         "ult": "unordered or XltY",
         "ule": "unordered or XleY",
         "une": "unordered or not XeqY",
-        "uno": "unordered"
+        "uno": "unordered",
     }
     if predicate not in expressions:
         raise ValueError(f"Unsupported flopoco predicate: {predicate}")
