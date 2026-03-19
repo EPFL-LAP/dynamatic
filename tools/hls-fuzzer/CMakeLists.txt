@@ -17,6 +17,7 @@ add_llvm_library(DynamaticHLSFuzzer
 )
 llvm_update_compile_flags(DynamaticHLSFuzzer)
 target_link_libraries(DynamaticHLSFuzzer PUBLIC MLIRSupport)
+target_include_directories(DynamaticHLSFuzzer INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>)
 
 add_llvm_executable(hls-fuzzer
         hls-fuzzer.cpp

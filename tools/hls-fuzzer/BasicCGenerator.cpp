@@ -25,6 +25,9 @@ static ast::Expression generateMaxExpression(const ast::Expression &lhs,
 static ast::Expression safeCastAsNeeded(const ast::ScalarType &to,
                                         ast::Expression input) {
   ast::ScalarType inputType = input.getType();
+  if (inputType == to)
+    return input;
+
   // Only casts that can cause undefined behavior are casts from floating point
   // types to integers.
   auto *inputPrim = llvm::dyn_cast<ast::PrimitiveType>(inputType);
@@ -77,7 +80,7 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
     // Keep expressions interesting by making terminators less likely.
     if (depth > MAX_DEPTH || random.getSmallProbabilityBool())
       generators.emplace_back(&BasicCGenerator::generateConstant);
-    if (depth > 2)
+    if (depth > 2 || random.getRatherLowProbabilityBool())
       generators.emplace_back(&BasicCGenerator::generateScalarParameter);
 
     // Avoid stack overflows by restricting to a maximum expression depth.
