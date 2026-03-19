@@ -11,17 +11,26 @@ namespace dynamatic {
 /// system.
 /// Specializations should provide the following definitions:
 ///
-/// * template <typename TypingContext> ... Conclusion: The conclusion type of
-///   the 'ASTNode' that can be instantiated with any typing contexts.
-///   If this is a struct, it should be a tuple-like struct, i.e., specialize
-///   'std::tuple_size' and implement a 'get<std::size_t>' method.
+/// * template <typename TypingContext> ... Conclusion:
+///   The conclusion type of the 'ASTNode' that can be instantiated with any
+///   typing contexts.
+///
 ///   The conclusion type is the return type of the corresponding 'check*'
 ///   method of 'ASTNode' within 'TypeSystem' and usually contains contexts
-///   that are forwarded to sub-elements of 'ASTNode'.
+///   that are used to generate the sub-elements of the 'ASTNode' and are
+///   derived from the input context.
+///
+///   Templating the type allows it to be used for 'OpaqueContext's in the
+///   'AbstractTypeSystem' as well as for any custom typing context type used
+///   in a subclass of 'TypeSystem'.
+///
 ///   The conclusion type of conditional expressions is e.g.
 ///   'std::tuple<TypingContext, TypingContext, TypingContext>' which are the
 ///   contexts used to type check the condition, true-expression and
 ///   false-expression respectively.
+///
+///   If this is a struct, it should be a tuple-like struct, i.e., specialize
+///   'std::tuple_size' and implement a 'get<std::size_t>' method.
 template <typename ASTNode>
 struct TypeSystemTraits {
   // Always false.
@@ -35,6 +44,9 @@ struct TypeSystemTraits {
 };
 
 /// Concrete conclusion type of 'ASTNode' with the given typing context.
+/// Allows the C++ code to use a consistent typename to refer to conclusion
+/// types, regardless of the 'ASTNode' used.
+/// See the documentation of 'TypeSystemTraits::Conclusion'.
 template <typename ASTNode, typename TypingContext>
 using ConclusionOf =
     typename TypeSystemTraits<ASTNode>::template Conclusions<TypingContext>;

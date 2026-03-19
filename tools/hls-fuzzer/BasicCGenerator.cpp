@@ -55,8 +55,8 @@ gen::BasicCGenerator::generateFreshParameter(ast::ScalarType datatype,
 }
 
 ast::ReturnStatement
-gen::BasicCGenerator::generateFunctionBody(const OpaqueContext &constraints) {
-  ast::Expression expression = generateExpression(constraints, 0);
+gen::BasicCGenerator::generateFunctionBody(const OpaqueContext &context) {
+  ast::Expression expression = generateExpression(context, 0);
   return ast::ReturnStatement{
       safeCastAsNeeded(returnType, std::move(expression))};
 }
@@ -64,7 +64,7 @@ gen::BasicCGenerator::generateFunctionBody(const OpaqueContext &constraints) {
 constexpr std::size_t MAX_DEPTH = 8;
 
 ast::Expression
-gen::BasicCGenerator::generateExpression(const OpaqueContext &constraint,
+gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
                                          std::size_t depth) {
   using Constructor = std::function<std::optional<ast::Expression>(
       BasicCGenerator *, const OpaqueContext &, std::size_t)>;
@@ -91,17 +91,17 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &constraint,
 
     std::vector<Constructor> subset = random.getNonEmptySubset(generators);
     for (const Constructor &iter : subset)
-      if (std::optional<ast::Expression> result = iter(this, constraint, depth))
+      if (std::optional<ast::Expression> result = iter(this, context, depth))
         return std::move(*result);
   }
 }
 
 std::optional<ast::Expression>
-gen::BasicCGenerator::generateBinaryExpression(const OpaqueContext &constraints,
+gen::BasicCGenerator::generateBinaryExpression(const OpaqueContext &context,
                                                std::size_t depth) {
 
   auto op = random.fromEnum<ast::BinaryExpression::Op>();
-  auto conclusion = typeSystem.checkBinaryExpressionOpaque(op, constraints);
+  auto conclusion = typeSystem.checkBinaryExpressionOpaque(op, context);
   if (!conclusion)
     return std::nullopt;
   auto [lhsCons, rhsCons] = *conclusion;
@@ -117,7 +117,7 @@ gen::BasicCGenerator::generateBinaryExpression(const OpaqueContext &constraints,
       !ast::BinaryExpression::isLegalOperandType(op, rhs.getType())) {
     ast::ScalarType scalarType;
     do {
-      scalarType = generateScalarType(constraints);
+      scalarType = generateScalarType(context);
     } while (!ast::BinaryExpression::isLegalOperandType(op, scalarType));
     lhs = safeCastAsNeeded(scalarType, std::move(lhs));
     rhs = safeCastAsNeeded(scalarType, std::move(rhs));
@@ -174,11 +174,11 @@ gen::BasicCGenerator::generateBinaryExpression(const OpaqueContext &constraints,
 
 std::optional<ast::ConditionalExpression>
 gen::BasicCGenerator::generateConditionalExpression(
-    const OpaqueContext &constraint, std::size_t depth) {
-  auto subConstraints = typeSystem.checkConditionalExpressionOpaque(constraint);
-  if (!subConstraints)
+    const OpaqueContext &context, std::size_t depth) {
+  auto subcontext = typeSystem.checkConditionalExpressionOpaque(context);
+  if (!subcontext)
     return std::nullopt;
-  auto &&[cond, trueExpr, falseExpr] = *subConstraints;
+  auto &&[cond, trueExpr, falseExpr] = *subcontext;
 
   return ast::ConditionalExpression{generateExpression(cond, depth + 1),
                                     generateExpression(trueExpr, depth + 1),
@@ -186,12 +186,12 @@ gen::BasicCGenerator::generateConditionalExpression(
 }
 
 std::optional<ast::CastExpression>
-gen::BasicCGenerator::generateCastExpression(const OpaqueContext &constraint,
+gen::BasicCGenerator::generateCastExpression(const OpaqueContext &context,
                                              std::size_t depth) {
-  auto subConstraints = typeSystem.checkCastExpressionOpaque(constraint);
-  if (!subConstraints)
+  auto subcontext = typeSystem.checkCastExpressionOpaque(context);
+  if (!subcontext)
     return std::nullopt;
-  auto &&[typeCon, exprCon] = *subConstraints;
+  auto &&[typeCon, exprCon] = *subcontext;
 
   ast::Expression expression = generateExpression(exprCon, depth + 1);
   ast::ScalarType expressionType = expression.getType();
@@ -205,7 +205,7 @@ gen::BasicCGenerator::generateCastExpression(const OpaqueContext &constraint,
 }
 
 std::optional<ast::Constant>
-gen::BasicCGenerator::generateConstant(const OpaqueContext &constraints,
+gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
                                        std::size_t) const {
   ast::Constant constant = [&] {
     switch (random.fromEnum<ast::PrimitiveType::Type>()) {
@@ -233,23 +233,22 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &constraints,
     }
     llvm_unreachable("all enum cases handled");
   }();
-  if (typeSystem.checkConstantOpaque(constant, constraints))
+  if (typeSystem.checkConstantOpaque(constant, context))
     return constant;
 
   return std::nullopt;
 }
 
 std::optional<ast::Variable>
-gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &constraints,
+gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
                                               std::size_t) {
-  auto conclusion = typeSystem.checkVariableOpaque(constraints);
+  auto conclusion = typeSystem.checkVariableOpaque(context);
   if (!conclusion)
     return std::nullopt;
 
   ast::Parameter parameter = [&] {
     if (parameters.empty() || random.getRatherLowProbabilityBool())
-      return generateFreshParameter(generateScalarType(*conclusion),
-                                    constraints);
+      return generateFreshParameter(generateScalarType(*conclusion), context);
 
     // Attempt to find a random parameter that makes the type system happy.
     // The current number of parameter is used as an arbitrary heuristic as to
@@ -261,17 +260,17 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &constraints,
     }
 
     // Otherwise we fall back to a random parameter.
-    return generateFreshParameter(generateScalarType(*conclusion), constraints);
+    return generateFreshParameter(generateScalarType(*conclusion), context);
   }();
 
   return ast::Variable{parameter.datatype, parameter.name};
 }
 
-ast::ScalarType gen::BasicCGenerator::generateScalarType(
-    const OpaqueContext &constraints) const {
+ast::ScalarType
+gen::BasicCGenerator::generateScalarType(const OpaqueContext &context) const {
   while (true) {
     ast::ScalarType datatype = random.fromEnum<ast::PrimitiveType::Type>();
-    if (typeSystem.checkScalarTypeOpaque(datatype, constraints))
+    if (typeSystem.checkScalarTypeOpaque(datatype, context))
       return datatype;
   }
 }
@@ -297,10 +296,10 @@ gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
   ss << "\nint main() {\n";
   mlir::raw_indented_ostream os(ss);
   os.indent();
-  for (const auto &[parameter, constraint] : parameters) {
+  for (const auto &[parameter, context] : parameters) {
     std::optional<ast::Constant> constant;
     while (!constant) {
-      constant = generateConstant(constraint);
+      constant = generateConstant(context);
     }
 
     auto &[datatype, name] = parameter;

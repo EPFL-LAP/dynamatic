@@ -35,10 +35,25 @@ private:
   std::any container;
 };
 
-/// Abstract base class for all type systems. Users of type systems should
-/// use the methods here.
-/// Implementations of type systems should derive from 'TypeSystem' which
-/// implements all methods in this class.
+/// Abstract base class for all type systems. Users of a type system such as
+/// the C generator use this interface in conjunction with 'OpaqueContext' to be
+/// able to pass on contexts for generating AST elements without needing to know
+/// about the concrete context type used by the type system.
+///
+/// Without this abstract interface, generators would need to be almost entirely
+/// C++ templates instantiated with a type system instance.
+///
+/// While it is possible for a type system to directly inherit from
+/// 'AbstractTypeSystem', implementing the various 'check*' methods would
+/// require manual boxing and unboxing of 'OpaqueContext's to the
+/// type system's 'TypingContext'.
+///
+/// The 'TypeSystem' base class below should be used instead to automate this by
+/// overriding all the methods in  'AbstractTypeSystem' that box and unbox
+/// 'OpaqueContext's and dispatch to corresponding (non-opaque) 'check*' methods
+/// in the derived class.
+/// It also offers common and convenient default implementations of 'check*'
+/// methods.
 class AbstractTypeSystem {
 public:
   virtual ~AbstractTypeSystem();
@@ -77,20 +92,31 @@ public:
 /// The 'Self' template type parameter should be the class deriving from
 /// 'TypeSystem'.
 ///
-/// Type systems are used to "guide" the generator by either forwarding
-/// constraints to sub-elements of an AST-node or rejecting AST-nodes entirely.
+/// Type systems are used to "guide" the generator by 1) deriving new contexts
+/// used when generating sub-elements of an AST-node or 2) rejecting AST-nodes
+/// entirely based on the current type context.
 ///
 /// All type checking is performed under a given context specified as the
 /// 'TypingContext' template parameter.
 /// For every AST construct a corresponding 'check*' method exists.
 /// The input to this method is always the context used to type check the given
 /// AST construct.
+/// Based on the input context the 'check*' method can then derive new contexts
+/// for its subelements or discard the AST-node entirely.
 /// The return type is the so-called conclusion and is different for every
 /// AST construct. It is specified using the 'TypeSystemTraits'.
+///
 /// E.g. the conclusion of a binary expression are the contexts that should be
 /// used to type check the left and right operands.
 /// Most 'check*' methods support discarding the AST node entirely, in which
 /// case the conclusion type is wrapped in an optional.
+///
+/// Note: We call it contexts rather than constraints to match literature, and
+/// as it more generally informs an AST-node generation about the type-system
+/// state rather than necessarily putting requirements on an AST-node
+/// generation. In the future, it'll likely be possible to also output contexts
+/// from sub-expressions to parent-expressions.
+/// An example of such a context would e.g. be the set of all variables used.
 ///
 /// The logic that should be implemented in the 'check*' methods can be thought
 /// of as inversions of the usual type checking rules seen in literature.
@@ -124,7 +150,7 @@ public:
 /// expression, otherwise the generator loops forever.
 /// * For any given context, it must always be possible to generate some scalar
 /// datatype, otherwise the generator loops forever.
-template <typename TypingContext, class Self>
+template <typename TypingContext, typename Self>
 class TypeSystem : public AbstractTypeSystem {
 
 public:
