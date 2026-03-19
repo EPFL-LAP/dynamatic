@@ -329,6 +329,22 @@ def HandshakeSetUnitImplAttributes : Pass<
   let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
+def HandshakeMarkBLIFImpl : Pass<"handshake-mark-blif-impl"> {
+  let summary = "Sets the BLIF file path for each Handshake operation.";
+  let description = [{
+    This pass takes as input the directory containing the AIG 
+    implementations of handshake operations in BLIF format. It annotates 
+    each handshake operation with the path to its corresponding BLIF file. 
+    This information is subsequently used during the conversion from 
+    Handshake to Synth.
+  }];
+  let options = [
+    Option<"blifDirPath", "blif-dir-path", "std::string", "",
+            "Path to directory containing BLIF files for AIG implementations of "
+            "Handshake operations.">
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//

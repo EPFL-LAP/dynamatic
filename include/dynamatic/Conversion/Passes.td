@@ -77,5 +77,20 @@ def HandshakeToHW
     instances of external modules interconnected by dataflow channels.
   }];
 }
-  
+
+//===----------------------------------------------------------------------===//
+// HandshakeToSynth
+//===----------------------------------------------------------------------===//
+
+def HandshakeToSynth
+    : Pass<"lower-handshake-to-synth"> {
+  let summary = "Lowers Handshake to Synth.";
+  let description = [{
+    Lowers Handshake IR into Synth IR, which is a hardware representation
+    that focuses on logic synthesis constructs.
+  }];
+  let dependentDialects = ["dynamatic::hw::HWDialect", "dynamatic::synth::SynthDialect"];
+}
+
+
 #endif // DYNAMATIC_CONVERSION_PASSES_TD
