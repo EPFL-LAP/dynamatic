@@ -303,63 +303,20 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   return convertHandshakeFunc();
 }
 
-// Helper function to format tuple from map
-UnbundledValuesTuple
-HandshakeUnbundler::updateTuple(UnbundledValuesTuple oldTuple,
-                                SmallVector<Value> newValues,
-                                PortKind portKind) {
-  SmallVector<Value> dataValues = std::get<0>(oldTuple);
-  Value validValue = std::get<1>(oldTuple);
-  Value readyValue = std::get<2>(oldTuple);
-  if (auto *dataPortInfo = std::get_if<DataPortInfo>(&portKind)) {
-    dataValues = newValues;
-  } else if (auto *validPortInfo = std::get_if<ValidPortInfo>(&portKind)) {
-    if (!newValues.empty())
-      validValue = newValues[0];
-    else
-      validValue = Value();
-  } else if (auto *readyPortInfo = std::get_if<ReadyPortInfo>(&portKind)) {
-    if (!newValues.empty())
-      readyValue = newValues[0];
-    else
-      readyValue = Value();
-  }
-  return {dataValues, validValue, readyValue};
-}
-
-// Helper function to get newValues from a tuple
-SmallVector<Value>
-HandshakeUnbundler::getValuesFromTuple(UnbundledValuesTuple valTuple,
-                                       PortKind portKind) {
-  // Check the kind of the port
-  if (auto *dataPortInfo = std::get_if<DataPortInfo>(&portKind)) {
-    return std::get<0>(valTuple);
-  }
-  if (auto *validPortInfo = std::get_if<ValidPortInfo>(&portKind)) {
-    Value v = std::get<1>(valTuple);
-    return v ? SmallVector<Value>{v} : SmallVector<Value>{};
-  }
-  if (auto *readyPortInfo = std::get_if<ReadyPortInfo>(&portKind)) {
-    Value v = std::get<2>(valTuple);
-    return v ? SmallVector<Value>{v} : SmallVector<Value>{};
-  }
-  return {};
-}
-
 // Function to save the unbundled values for a given handshake
 // signal, which will be used as operands for the new hw instance
 void HandshakeUnbundler::saveUnbundledValues(
     Value handshakeSignal, PortKind portKind,
     SmallVector<Value> unbundledValues) {
 
-  UnbundledValuesTuple valTuple;
+  UnbundledHandshakeChannel valTuple;
   // Check if a tuple already exists for this signal
   if (auto it = unbundledValuesMap.find(handshakeSignal);
       it != unbundledValuesMap.end()) {
     valTuple = it->second;
   }
   // Update the tuple with the new values
-  valTuple = updateTuple(valTuple, unbundledValues, portKind);
+  valTuple.setValues(portKind, unbundledValues);
   unbundledValuesMap[handshakeSignal] = valTuple;
 
   // Remove the placeholder if it exists, since we now have the real unbundled
@@ -368,7 +325,7 @@ void HandshakeUnbundler::saveUnbundledValues(
     // Check if the placeholder has the same bit type as the new unbundled
     // values
     SmallVector<Value> placeholderValues =
-        getValuesFromTuple(pendingValuesMap[handshakeSignal], portKind);
+        pendingValuesMap[handshakeSignal].getValues(portKind);
     if (!placeholderValues.empty()) {
       // Assert the size of the placeholder values is the same as the new
       // unbundled values
@@ -380,13 +337,12 @@ void HandshakeUnbundler::saveUnbundledValues(
         placeholderValues[i].replaceAllUsesWith(unbundledValues[i]);
       }
       // Update the map by removing the placeholder entry for that bit type
-      UnbundledValuesTuple placeholderTuple =
-          updateTuple(pendingValuesMap[handshakeSignal], {}, portKind);
-      // If all the values in the tuple are empty, we can erase the entry from
+      UnbundledHandshakeChannel placeholderTuple =
+          pendingValuesMap[handshakeSignal];
+      placeholderTuple.setValues(portKind, {});
+      // If the tuple is empty, we can erase the entry from
       // the map
-      if (std::get<0>(placeholderTuple).empty() &&
-          std::get<1>(placeholderTuple) == Value() &&
-          std::get<2>(placeholderTuple) == Value()) {
+      if (placeholderTuple.empty()) {
         pendingValuesMap.erase(handshakeSignal);
       } else {
         // If not empty, update the tuple in the map
@@ -408,8 +364,7 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
   if (auto it = unbundledValuesMap.find(handshakeSignal);
       it != unbundledValuesMap.end()) {
     // Check per bit type
-    SmallVector<Value> extractedValues =
-        getValuesFromTuple(it->second, portKind);
+    SmallVector<Value> extractedValues = it->second.getValues(portKind);
     if (!extractedValues.empty()) {
       // Assert the size of the extracted values is the same as the total bits
       // expected
@@ -419,14 +374,13 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
       return extractedValues;
     }
   }
-  std::tuple<SmallVector<Value>, Value, Value> valTuple;
+  UnbundledHandshakeChannel valTuple;
   // Check if a placeholder exists for this signal
   if (auto it = pendingValuesMap.find(handshakeSignal);
       it != pendingValuesMap.end()) {
     valTuple = it->second;
     // Check per bit type
-    SmallVector<Value> extractedValues =
-        getValuesFromTuple(it->second, portKind);
+    SmallVector<Value> extractedValues = valTuple.getValues(portKind);
     if (!extractedValues.empty()) {
       // Assert the size of the extracted values is the same as the total bits
       // expected
@@ -444,14 +398,13 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
     auto backedge = backedgeBuilder->get(builder.getIntegerType(1));
     placeholders.push_back(backedge);
   }
-  pendingValuesMap[handshakeSignal] =
-      updateTuple(valTuple, placeholders, portKind);
+  pendingValuesMap[handshakeSignal].setValues(portKind, placeholders);
   return placeholders;
 }
 
 // Function to create hw module
 hw::HWModuleOp HandshakeUnbundler::createHWModuleHandshakeOp(
-    std::string moduleName, Operation *handshakeOp, MLIRContext *ctx) {
+    StringRef moduleName, Operation *handshakeOp, MLIRContext *ctx) {
 
   hw::HWModuleOp hwModRes;
   SmallVector<HandshakeUnitPort> unbundledPorts =
@@ -559,6 +512,9 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
 
   // Create the instance
+  // The input of the instance should be the unbundled operands we collected
+  // The output of the instance are specified by the hw module definition we
+  // created or looked up (hwModDef)
   auto instOp = builder.create<hw::InstanceOp>(
       loc, hwModDef, StringAttr::get(ctx, opName.str() + "_inst"),
       hwInstOperands);

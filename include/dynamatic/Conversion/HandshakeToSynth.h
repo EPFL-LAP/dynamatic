@@ -90,9 +90,6 @@ static mlir::DenseMap<mlir::Operation *, std::string> opToBlifPathMap;
 // placeholder hw modules
 //===----------------------------------------------------------------------===//
 
-// Add new type for the tuple
-using UnbundledValuesTuple = std::tuple<SmallVector<Value>, Value, Value>;
-
 // Represents a single unbundled bit of a data signal
 struct DataPortInfo {
   unsigned bitIndex;  // which bit of the original channel
@@ -123,6 +120,44 @@ struct HandshakeUnitPort {
         handshakeSignal(handshakeSignal), kind(kind) {}
 };
 
+// Struct to hold the unbundled values for a handshake channel
+struct UnbundledHandshakeChannel {
+  SmallVector<Value> dataBits;
+  Value valid;
+  Value ready;
+
+  bool empty() const { return dataBits.empty() && !valid && !ready; }
+
+  // Function to set the values in the tuple based on the port kind
+  void setValues(PortKind portKind, SmallVector<Value> newValues) {
+    std::visit(llvm::makeVisitor(
+                   [&](DataPortInfo &) { dataBits = std::move(newValues); },
+                   [&](ValidPortInfo &) {
+                     valid = newValues.empty() ? Value() : newValues[0];
+                   },
+                   [&](ReadyPortInfo &) {
+                     ready = newValues.empty() ? Value() : newValues[0];
+                   }),
+               portKind);
+  }
+
+  // Function to get the values from the tuple based on the port kind
+  SmallVector<Value> getValues(PortKind portKind) {
+    return std::visit(
+        llvm::makeVisitor(
+            [&](const DataPortInfo &) -> SmallVector<Value> {
+              return dataBits;
+            },
+            [&](const ValidPortInfo &) -> SmallVector<Value> {
+              return valid ? SmallVector<Value>{valid} : SmallVector<Value>{};
+            },
+            [&](const ReadyPortInfo &) -> SmallVector<Value> {
+              return ready ? SmallVector<Value>{ready} : SmallVector<Value>{};
+            }),
+        portKind);
+  }
+};
+
 // Class that controls the unbundling of handshake channel types into integer
 // types
 class HandshakeUnbundler {
@@ -142,7 +177,7 @@ private:
   mlir::LogicalResult convertHandshakeFunc();
 
   // Function to create hw module from a handshake operation
-  hw::HWModuleOp createHWModuleHandshakeOp(std::string moduleName,
+  hw::HWModuleOp createHWModuleHandshakeOp(StringRef moduleName,
                                            Operation *handshakeOp,
                                            MLIRContext *ctx);
 
@@ -159,16 +194,6 @@ private:
   void saveUnbundledValues(Value handshakeSignal, PortKind portKind,
                            llvm::SmallVector<Value> unbundledValues);
 
-  // Helper function to update the old tuple of unbundled values
-  UnbundledValuesTuple updateTuple(UnbundledValuesTuple oldTuple,
-                                   SmallVector<Value> newValues,
-                                   PortKind portKind);
-
-  // Helper function to extract the relevant values from a tuple based on the
-  // bit type
-  SmallVector<Value> getValuesFromTuple(UnbundledValuesTuple valTuple,
-                                        PortKind portKind);
-
   // Module op
   ModuleOp modOp;
   handshake::FuncOp topFunction;
@@ -181,10 +206,10 @@ private:
 
   // Maps handshake channel values to their unbundled bit values. The tuple is
   // data bits, valid bit, ready bit
-  llvm::DenseMap<Value, UnbundledValuesTuple> unbundledValuesMap;
+  llvm::DenseMap<Value, UnbundledHandshakeChannel> unbundledValuesMap;
   // Maps handshake channel values to any placeholder backedges created for
   // their unbundled bits. The tuple is data bits, valid bit, ready bit
-  llvm::DenseMap<Value, UnbundledValuesTuple> pendingValuesMap;
+  llvm::DenseMap<Value, UnbundledHandshakeChannel> pendingValuesMap;
 
   // clk and rst values from the top module
   Value clk;
