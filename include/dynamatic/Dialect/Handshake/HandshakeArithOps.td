@@ -315,6 +315,7 @@ def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
 
 def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"> {
   let summary = "Integer signed width extension.";
+  let hasCanonicalizer = 1;
 }
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
