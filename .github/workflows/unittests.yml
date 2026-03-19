@@ -61,7 +61,7 @@ jobs:
         run: ninja run-blif-equiv-tests
         working-directory: build
 
-      - name: check-blif-importer-exporter
+      - name: check-hls-fuzzer-tests
         if: steps.build.outputs.exit_code == 0
         run: ninja run-hls-fuzzer-tests
         working-directory: build
