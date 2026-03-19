@@ -77,35 +77,70 @@ static mlir::DenseMap<mlir::Operation *, std::string> opToBlifPathMap;
 // placeholder hw modules
 //===----------------------------------------------------------------------===//
 
-// Represents a single unbundled bit of a data signal
-struct DataPortInfo {
-  unsigned bitIndex;  // which bit of the original channel
-  unsigned totalBits; // total bits in the channel
-};
+class HandshakeUnitPortInfo {
+public:
+  enum class PortType { DATA, VALID, READY };
 
-// Represents a valid signal (no extra fields needed)
-struct ValidPortInfo {};
-
-// Represents a ready signal (no extra fields needed)
-struct ReadyPortInfo {};
-
-using PortKind = std::variant<DataPortInfo, ValidPortInfo, ReadyPortInfo>;
-
-// Struct to hold the new unbundled port information
-struct HandshakeUnitPort {
-  std::string name;
-  // Direction in the *new* module after unbundling (ready signals are flipped).
-  hw::ModulePort::Direction direction;
-  // The Value in the *old* handshake module that this port corresponds to
-  Value handshakeSignal;
-  PortKind kind; // additional info about the port, e.g. which bit of the
-                 // original channel it corresponds to if it's a data port
-
-  HandshakeUnitPort(std::string name, hw::ModulePort::Direction direction,
-                    Value handshakeSignal, PortKind kind)
+  HandshakeUnitPortInfo(std::string name, hw::ModulePort::Direction direction,
+                        Value handshakeSignal, PortType portType)
       : name(std::move(name)), direction(direction),
-        handshakeSignal(handshakeSignal), kind(kind) {}
+        handshakeSignal(handshakeSignal), portType(portType) {}
+
+  virtual ~HandshakeUnitPortInfo() = default;
+
+  const std::string &getName() const { return name; }
+  hw::ModulePort::Direction getDirection() const { return direction; }
+  Value getHandshakeSignal() const { return handshakeSignal; }
+  PortType getPortType() const { return portType; }
+
+  bool isData() const { return portType == PortType::DATA; }
+  bool isValid() const { return portType == PortType::VALID; }
+  bool isReady() const { return portType == PortType::READY; }
+
+private:
+  std::string name;
+  hw::ModulePort::Direction direction;
+  Value handshakeSignal;
+  PortType portType;
 };
+
+// Represents a single unbundled bit of a data signal
+class DataPortInfo : public HandshakeUnitPortInfo {
+public:
+  DataPortInfo(std::string name, hw::ModulePort::Direction direction,
+               Value handshakeSignal, unsigned bitIndex, unsigned totalBits)
+      : HandshakeUnitPortInfo(std::move(name), direction, handshakeSignal,
+                              PortType::DATA),
+        bitIndex(bitIndex), totalBits(totalBits) {}
+
+  unsigned getBitIndex() const { return bitIndex; }
+  unsigned getTotalBits() const { return totalBits; }
+
+private:
+  unsigned bitIndex;
+  unsigned totalBits;
+};
+
+// Represents a valid signal
+class ValidPortInfo : public HandshakeUnitPortInfo {
+public:
+  ValidPortInfo(std::string name, hw::ModulePort::Direction direction,
+                Value handshakeSignal)
+      : HandshakeUnitPortInfo(std::move(name), direction, handshakeSignal,
+                              PortType::VALID) {}
+};
+
+// Represents a ready signal
+class ReadyPortInfo : public HandshakeUnitPortInfo {
+public:
+  ReadyPortInfo(std::string name, hw::ModulePort::Direction direction,
+                Value handshakeSignal)
+      : HandshakeUnitPortInfo(std::move(name), direction, handshakeSignal,
+                              PortType::READY) {}
+};
+
+using HandshakeUnitPortList =
+    SmallVector<std::unique_ptr<HandshakeUnitPortInfo>>;
 
 // Struct to hold the unbundled values for a handshake channel
 struct UnbundledHandshakeChannel {
@@ -116,32 +151,36 @@ struct UnbundledHandshakeChannel {
   bool empty() const { return dataBits.empty() && !valid && !ready; }
 
   // Function to set the values in the tuple based on the port kind
-  void setValues(PortKind portKind, SmallVector<Value> newValues) {
-    std::visit(llvm::makeVisitor(
-                   [&](DataPortInfo &) { dataBits = std::move(newValues); },
-                   [&](ValidPortInfo &) {
-                     valid = newValues.empty() ? Value() : newValues[0];
-                   },
-                   [&](ReadyPortInfo &) {
-                     ready = newValues.empty() ? Value() : newValues[0];
-                   }),
-               portKind);
+  void setValues(const HandshakeUnitPortInfo *portInfo,
+                 SmallVector<Value> newValues) {
+    switch (portInfo->getPortType()) {
+    case HandshakeUnitPortInfo::PortType::DATA:
+      dataBits = std::move(newValues);
+      break;
+    case HandshakeUnitPortInfo::PortType::VALID:
+      valid = newValues.empty() ? Value() : newValues[0];
+      break;
+    case HandshakeUnitPortInfo::PortType::READY:
+      ready = newValues.empty() ? Value() : newValues[0];
+      break;
+    }
   }
 
   // Function to get the values from the tuple based on the port kind
-  SmallVector<Value> getValues(PortKind portKind) {
-    return std::visit(
-        llvm::makeVisitor(
-            [&](const DataPortInfo &) -> SmallVector<Value> {
-              return dataBits;
-            },
-            [&](const ValidPortInfo &) -> SmallVector<Value> {
-              return valid ? SmallVector<Value>{valid} : SmallVector<Value>{};
-            },
-            [&](const ReadyPortInfo &) -> SmallVector<Value> {
-              return ready ? SmallVector<Value>{ready} : SmallVector<Value>{};
-            }),
-        portKind);
+  SmallVector<Value> getValues(const HandshakeUnitPortInfo *portInfo) const {
+    switch (portInfo->getPortType()) {
+    case HandshakeUnitPortInfo::PortType::DATA:
+      return dataBits;
+    case HandshakeUnitPortInfo::PortType::VALID:
+      return valid ? SmallVector<Value>{valid} : SmallVector<Value>{};
+    case HandshakeUnitPortInfo::PortType::READY:
+      return ready ? SmallVector<Value>{ready} : SmallVector<Value>{};
+    }
+    return {};
+  }
+
+  void clearValues(const HandshakeUnitPortInfo *portInfo) {
+    setValues(portInfo, {});
   }
 };
 
@@ -171,14 +210,14 @@ private:
   // Function that returns unbundled values from a channel value. If the channel
   // value has not been unbundled yet, creates backedge placeholders for each
   // bit and saves them.
-  llvm::SmallVector<Value> getUnbundledValues(Value handshakeSignal,
-                                              unsigned totalBits,
-                                              PortKind portKind, Location loc);
+  llvm::SmallVector<Value> getUnbundledValues(unsigned totalBits,
+                                              HandshakeUnitPortInfo *portKind,
+                                              Location loc);
 
   // Function that saves the mapping from a channel value to its unbundled bit
   // values. If there were placeholders for the channel value, replaces them
   // with the real bit values.
-  void saveUnbundledValues(Value handshakeSignal, PortKind portKind,
+  void saveUnbundledValues(HandshakeUnitPortInfo *portKind,
                            llvm::SmallVector<Value> unbundledValues);
 
   // Module op
@@ -221,12 +260,12 @@ namespace dynamatic {
 
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
-SmallVector<HandshakeUnitPort>
+HandshakeUnitPortList
 unbundleChannel(const std::string &handshakePortName,
                 hw::ModulePort::Direction handshakePortDir,
                 Value handshakePort) {
 
-  SmallVector<HandshakeUnitPort> unbundledPorts;
+  HandshakeUnitPortList unbundledPorts;
   Type type = handshakePort.getType();
 
   // Flipped direction: input becomes output and vice versa.
@@ -236,64 +275,69 @@ unbundleChannel(const std::string &handshakePortName,
                : hw::ModulePort::Direction::Input;
   };
 
-  auto addPort = [&](StringRef name, hw::ModulePort::Direction dir, Value val,
-                     PortKind kind) {
-    unbundledPorts.emplace_back(name.str(), dir, val, kind);
-  };
-
   // Depending on the type, the unbundling will be different
   if (auto channel = dyn_cast<handshake::ChannelType>(type)) {
     // For a channel type, we unbundle into ready, valid, and data ports
     unsigned dataWidth = channel.getDataType().cast<IntegerType>().getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
-      addPort(legalizeDataPortName(handshakePortName, bit, dataWidth),
-              handshakePortDir, handshakePort, DataPortInfo{bit, dataWidth});
+      unbundledPorts.push_back(std::make_unique<DataPortInfo>(
+          legalizeDataPortName(handshakePortName, bit, dataWidth),
+          handshakePortDir, handshakePort, bit, dataWidth));
     }
     // valid: keep direction, always i1
-    addPort(legalizeControlPortName(handshakePortName, "_valid"),
-            handshakePortDir, handshakePort, ValidPortInfo{});
+    unbundledPorts.push_back(std::make_unique<ValidPortInfo>(
+        legalizeControlPortName(handshakePortName, "_valid"), handshakePortDir,
+        handshakePort));
     // ready: flip direction, always i1
-    addPort(legalizeControlPortName(handshakePortName, "_ready"),
-            flip(handshakePortDir), handshakePort, ReadyPortInfo{});
+    unbundledPorts.push_back(std::make_unique<ReadyPortInfo>(
+        legalizeControlPortName(handshakePortName, "_ready"),
+        flip(handshakePortDir), handshakePort));
   } else if (isa<handshake::ControlType>(type)) {
     // valid: keep direction, always i1
-    addPort(legalizeControlPortName(handshakePortName, "_valid"),
-            handshakePortDir, handshakePort, ValidPortInfo{});
+    unbundledPorts.push_back(std::make_unique<ValidPortInfo>(
+        legalizeControlPortName(handshakePortName, "_valid"), handshakePortDir,
+        handshakePort));
     // ready: flip direction, always i1
-    addPort(legalizeControlPortName(handshakePortName, "_ready"),
-            flip(handshakePortDir), handshakePort, ReadyPortInfo{});
+    unbundledPorts.push_back(std::make_unique<ReadyPortInfo>(
+        legalizeControlPortName(handshakePortName, "_ready"),
+        flip(handshakePortDir), handshakePort));
   } else if (auto mem = dyn_cast<MemRefType>(type)) {
     unsigned dataWidth = mem.getElementType().cast<IntegerType>().getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
-      addPort(legalizeDataPortName(handshakePortName, bit, dataWidth),
-              handshakePortDir, handshakePort, DataPortInfo{bit, dataWidth});
+      unbundledPorts.push_back(std::make_unique<DataPortInfo>(
+          legalizeDataPortName(handshakePortName, bit, dataWidth),
+          handshakePortDir, handshakePort, bit, dataWidth));
     }
     // valid: keep direction, always i1
-    addPort(legalizeControlPortName(handshakePortName, "_valid"),
-            handshakePortDir, handshakePort, ValidPortInfo{});
+    unbundledPorts.push_back(std::make_unique<ValidPortInfo>(
+        legalizeControlPortName(handshakePortName, "_valid"), handshakePortDir,
+        handshakePort));
     // ready: flip direction, always i1
-    addPort(legalizeControlPortName(handshakePortName, "_ready"),
-            flip(handshakePortDir), handshakePort, ReadyPortInfo{});
+    unbundledPorts.push_back(std::make_unique<ReadyPortInfo>(
+        legalizeControlPortName(handshakePortName, "_ready"),
+        flip(handshakePortDir), handshakePort));
   } else {
     // Pass-through: split multi-bit integer types into i1 ports.
     if (auto intTy = dyn_cast<IntegerType>(type)) {
       unsigned width = intTy.getWidth();
       for (unsigned b = 0; b < width; ++b)
-        addPort(legalizeDataPortName(handshakePortName, b, width),
-                handshakePortDir, handshakePort, DataPortInfo{b, width});
+        unbundledPorts.push_back(std::make_unique<DataPortInfo>(
+            legalizeDataPortName(handshakePortName, b, width), handshakePortDir,
+            handshakePort, b, width));
     } else {
-      addPort(handshakePortName, handshakePortDir, handshakePort,
-              ValidPortInfo{});
+      unbundledPorts.push_back(std::make_unique<ValidPortInfo>(
+          legalizeControlPortName(handshakePortName, "_valid"),
+          handshakePortDir, handshakePort));
     }
   }
   return unbundledPorts;
 }
 
 // Function to unbundle handshake channels of an handshake op
-static SmallVector<HandshakeUnitPort> unbundlePorts(Operation *handshakeOp,
-                                                    MLIRContext *ctx) {
+static HandshakeUnitPortList unbundlePorts(Operation *handshakeOp,
+                                           MLIRContext *ctx) {
 
-  SmallVector<HandshakeUnitPort> unbundledPorts;
+  HandshakeUnitPortList unbundledPorts;
 
   // First, we have to derive the base names from NamedIOInterface
   SmallVector<std::string> handshakeInPortNames, handshakeOutPortNames;
@@ -331,7 +375,8 @@ static SmallVector<HandshakeUnitPort> unbundlePorts(Operation *handshakeOp,
     for (auto [i, val] : llvm::enumerate(funcOp.getArguments())) {
       auto unbundled = unbundleChannel(handshakeInPortNames[i],
                                        hw::ModulePort::Direction::Input, val);
-      unbundledPorts.append(unbundled.begin(), unbundled.end());
+      for (auto &port : unbundled)
+        unbundledPorts.push_back(std::move(port));
     }
     // Unbundle the output ports
     for (auto [i, val] : llvm::enumerate(funcOp.getResultTypes())) {
@@ -341,39 +386,46 @@ static SmallVector<HandshakeUnitPort> unbundlePorts(Operation *handshakeOp,
       auto unbundled = unbundleChannel(handshakeOutPortNames[i],
                                        hw::ModulePort::Direction::Output,
                                        terminator.getOperand(i));
-      unbundledPorts.append(unbundled.begin(), unbundled.end());
+      for (auto &port : unbundled)
+        unbundledPorts.push_back(std::move(port));
     }
   } else {
     // Unbundle the input ports
     for (auto [i, val] : llvm::enumerate(handshakeOp->getOperands())) {
       auto unbundled = unbundleChannel(handshakeInPortNames[i],
                                        hw::ModulePort::Direction::Input, val);
-      unbundledPorts.append(unbundled.begin(), unbundled.end());
+      for (auto &port : unbundled)
+        unbundledPorts.push_back(std::move(port));
     }
     // Unbundle the output ports
     for (auto [i, val] : llvm::enumerate(handshakeOp->getResults())) {
       auto unbundled = unbundleChannel(handshakeOutPortNames[i],
                                        hw::ModulePort::Direction::Output, val);
-      unbundledPorts.append(unbundled.begin(), unbundled.end());
+      for (auto &port : unbundled)
+        unbundledPorts.push_back(std::move(port));
     }
   }
   return unbundledPorts;
 }
 
 // Function to build the hw::ModulePortInfo from the unbundled ports
-static hw::ModulePortInfo buildPortInfoFromHandshakeUnitPorts(
-    SmallVector<HandshakeUnitPort> unbundledPorts, MLIRContext *ctx) {
+static hw::ModulePortInfo
+buildPortInfoFromHandshakeUnitPorts(const HandshakeUnitPortList &unbundledPorts,
+                                    MLIRContext *ctx) {
 
   // Build the hw::ModulePortInfo from the unbundled ports
   SmallVector<hw::PortInfo> hwInputs, hwOutputs;
   Type i1 = IntegerType::get(ctx, 1);
   unsigned inIdx = 0, outIdx = 0;
   for (auto &port : unbundledPorts) {
-    unsigned &counter =
-        port.direction == hw::ModulePort::Direction::Input ? inIdx : outIdx;
-    hw::PortInfo pi{{StringAttr::get(ctx, port.name), i1, port.direction},
-                    counter++};
-    (port.direction == hw::ModulePort::Direction::Input ? hwInputs : hwOutputs)
+    unsigned &counter = port->getDirection() == hw::ModulePort::Direction::Input
+                            ? inIdx
+                            : outIdx;
+    hw::PortInfo pi{
+        {StringAttr::get(ctx, port->getName()), i1, port->getDirection()},
+        counter++};
+    (port->getDirection() == hw::ModulePort::Direction::Input ? hwInputs
+                                                              : hwOutputs)
         .push_back(pi);
   }
   // Add clk and rst ports
@@ -416,7 +468,7 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   }
   // Get the port info for the top function and build the corresponding hw
   // module
-  SmallVector<HandshakeUnitPort> handshakeUnbundledPortsTop =
+  HandshakeUnitPortList handshakeUnbundledPortsTop =
       unbundlePorts(topFunction, ctx);
   hw::ModulePortInfo topHWPortInfo =
       buildPortInfoFromHandshakeUnitPorts(handshakeUnbundledPortsTop, ctx);
@@ -442,26 +494,25 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   SmallVector<Value> visitedDataArgs;
   unsigned argIdx = 0;
   for (auto &unbundledPort : handshakeUnbundledPortsTop) {
-    if (unbundledPort.direction == hw::ModulePort::Direction::Input) {
+    if (unbundledPort->getDirection() == hw::ModulePort::Direction::Input) {
       // If port type is DATA (check the kind)
-      auto *dataPortInfo = std::get_if<DataPortInfo>(&unbundledPort.kind);
-      if (dataPortInfo) {
+      if (unbundledPort->isData()) {
+        auto *dataPortInfo = static_cast<DataPortInfo *>(unbundledPort.get());
         // If the channel has been visited already, skip it
-        if (llvm::is_contained(visitedDataArgs, unbundledPort.handshakeSignal))
+        if (llvm::is_contained(visitedDataArgs,
+                               unbundledPort->getHandshakeSignal()))
           continue;
         SmallVector<Value> unbundledValues;
-        unsigned totalBits = dataPortInfo->totalBits;
+        unsigned totalBits = dataPortInfo->getTotalBits();
         // Collect all the bits for this channel
         for (unsigned bit = 0; bit < totalBits; ++bit) {
           unbundledValues.push_back(topBlock->getArgument(argIdx++));
         }
-        saveUnbundledValues(unbundledPort.handshakeSignal, unbundledPort.kind,
-                            unbundledValues);
-        visitedDataArgs.push_back(unbundledPort.handshakeSignal);
+        saveUnbundledValues(unbundledPort.get(), unbundledValues);
+        visitedDataArgs.push_back(unbundledPort->getHandshakeSignal());
       } else {
         auto newArg = topBlock->getArgument(argIdx++);
-        saveUnbundledValues(unbundledPort.handshakeSignal, unbundledPort.kind,
-                            {newArg});
+        saveUnbundledValues(unbundledPort.get(), {newArg});
       }
     }
   }
@@ -481,9 +532,9 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
 // Function to save the unbundled values for a given handshake
 // signal, which will be used as operands for the new hw instance
 void HandshakeUnbundler::saveUnbundledValues(
-    Value handshakeSignal, PortKind portKind,
-    SmallVector<Value> unbundledValues) {
+    HandshakeUnitPortInfo *portKind, SmallVector<Value> unbundledValues) {
 
+  Value handshakeSignal = portKind->getHandshakeSignal();
   UnbundledHandshakeChannel valTuple;
   // Check if a tuple already exists for this signal
   if (auto it = unbundledValuesMap.find(handshakeSignal);
@@ -529,11 +580,10 @@ void HandshakeUnbundler::saveUnbundledValues(
 
 // Function to get the unbundled values for a given handshake signal, which
 // will be used as operands for the new hw instance
-SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
-                                                          unsigned totalBits,
-                                                          PortKind portKind,
-                                                          Location loc) {
+SmallVector<Value> HandshakeUnbundler::getUnbundledValues(
+    unsigned totalBits, HandshakeUnitPortInfo *portKind, Location loc) {
 
+  Value handshakeSignal = portKind->getHandshakeSignal();
   // Check if the unbundled values for this signal have already been
   // computed
   if (auto it = unbundledValuesMap.find(handshakeSignal);
@@ -582,8 +632,7 @@ hw::HWModuleOp HandshakeUnbundler::createHWModuleHandshakeOp(
     StringRef moduleName, Operation *handshakeOp, MLIRContext *ctx) {
 
   hw::HWModuleOp hwModRes;
-  SmallVector<HandshakeUnitPort> unbundledPorts =
-      unbundlePorts(handshakeOp, ctx);
+  HandshakeUnitPortList unbundledPorts = unbundlePorts(handshakeOp, ctx);
   hw::ModulePortInfo portInfo =
       buildPortInfoFromHandshakeUnitPorts(unbundledPorts, ctx);
 
@@ -639,28 +688,28 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
   // Collect the unbundled operands
   SmallVector<Value> hwInstOperands;
-  SmallVector<HandshakeUnitPort> unbundledPorts = unbundlePorts(op, ctx);
+  HandshakeUnitPortList unbundledPorts = unbundlePorts(op, ctx);
   hw::ModulePortInfo portInfo =
       buildPortInfoFromHandshakeUnitPorts(unbundledPorts, ctx);
   for (auto &port : unbundledPorts) {
-    if (port.direction != hw::ModulePort::Direction::Input)
+    if (port->getDirection() != hw::ModulePort::Direction::Input)
       continue;
     // Check if the port is clk or rst
-    if (port.name == CLK_PORT || port.name == RST_PORT) {
+    if (port->getName() == CLK_PORT || port->getName() == RST_PORT) {
       // We will connect them later, for now we can skip them
       continue;
     }
     unsigned totalBits = 1, bitIndex = 0;
-    if (auto *dataPortInfo = std::get_if<DataPortInfo>(&port.kind)) {
-      totalBits = dataPortInfo->totalBits;
-      bitIndex = dataPortInfo->bitIndex;
+    if (port->isData()) {
+      auto *dataPortInfo = static_cast<DataPortInfo *>(port.get());
+      totalBits = dataPortInfo->getTotalBits();
+      bitIndex = dataPortInfo->getBitIndex();
     }
-    auto unbundledValues =
-        getUnbundledValues(port.handshakeSignal, totalBits, port.kind, loc);
+    auto unbundledValues = getUnbundledValues(totalBits, port.get(), loc);
     if (bitIndex >= unbundledValues.size()) {
       llvm::errs() << "Error: bit index " << bitIndex
                    << " is out of bounds for unbundled values of signal "
-                   << port.handshakeSignal << "\n";
+                   << port->getHandshakeSignal() << "\n";
       llvm::errs() << "Unbundled values size: " << unbundledValues.size()
                    << "\n";
       return failure();
@@ -704,14 +753,15 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   DenseMap<Value, SmallVector<std::pair<unsigned, unsigned>>> outputPortsBitMap;
   unsigned outIdx = 0;
   for (auto &port : unbundledPorts) {
-    if (port.direction != hw::ModulePort::Direction::Output)
+    if (port->getDirection() != hw::ModulePort::Direction::Output)
       continue;
-    if (auto *dataPortInfo = std::get_if<DataPortInfo>(&port.kind)) {
-      unsigned bitIndex = dataPortInfo->bitIndex;
-      outputPortsBitMap[port.handshakeSignal].push_back({outIdx++, bitIndex});
+    if (port->isData()) {
+      auto *dataPortInfo = static_cast<DataPortInfo *>(port.get());
+      unsigned bitIndex = dataPortInfo->getBitIndex();
+      outputPortsBitMap[port->getHandshakeSignal()].push_back(
+          {outIdx++, bitIndex});
     } else {
-      saveUnbundledValues(port.handshakeSignal, port.kind,
-                          {instOp->getResult(outIdx++)});
+      saveUnbundledValues(port.get(), {instOp->getResult(outIdx++)});
     }
   }
   for (auto &[handshakeValue, bitIdxPairs] : outputPortsBitMap) {
@@ -721,7 +771,10 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
     SmallVector<Value> unbundledValues;
     for (auto [instIdx, _] : bitIdxPairs)
       unbundledValues.push_back(instOp->getResult(instIdx));
-    saveUnbundledValues(handshakeValue, DataPortInfo{}, unbundledValues);
+    DataPortInfo portInfo{legalizeDataPortName("", 0, unbundledValues.size()),
+                          hw::ModulePort::Direction::Output, handshakeValue, 0,
+                          (unsigned)unbundledValues.size()};
+    saveUnbundledValues(&portInfo, unbundledValues);
   }
 
   return success();
@@ -758,20 +811,22 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
     SmallVector<Value> unbundledValues;
     if (dataBitwidth > 0) {
       // Add data signals
-      unbundledValues = getUnbundledValues(operand, dataBitwidth,
-                                           DataPortInfo{}, endOp.getLoc());
+      DataPortInfo portInfo{"", hw::ModulePort::Direction::Output, operand, 0,
+                            dataBitwidth};
+      unbundledValues =
+          getUnbundledValues(dataBitwidth, &portInfo, endOp.getLoc());
       hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
     }
     // Add valid signals
-    unbundledValues =
-        getUnbundledValues(operand, 1, ValidPortInfo{}, endOp.getLoc());
+    ValidPortInfo validPortInfo{"", hw::ModulePort::Direction::Output, operand};
+    unbundledValues = getUnbundledValues(1, &validPortInfo, endOp.getLoc());
     hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
   }
   // Check also the inputs of the topFuncOp whose ready signals are connected
   // to the terminator
   for (auto [i, arg] : llvm::enumerate(topFunction.getArguments())) {
-    auto unbundledValues =
-        getUnbundledValues(arg, 1, ReadyPortInfo{}, endOp.getLoc());
+    ReadyPortInfo portInfo{"", hw::ModulePort::Direction::Input, arg};
+    auto unbundledValues = getUnbundledValues(1, &portInfo, endOp.getLoc());
     hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
   }
   topHWModule.getBodyBlock()->getTerminator()->setOperands(hwTermOperands);
