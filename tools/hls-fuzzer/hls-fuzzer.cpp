@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
     std::filesystem::path workingDirectory =
         std::filesystem::current_path() / ("thread" + std::to_string(i));
     threads[i] = std::thread(
-        threadWork, target->createGenerator(options, dynamatic::Randomly(seed)),
+        threadWork, target->createWorker(options, dynamatic::Randomly(seed)),
         std::move(workingDirectory), "test" + std::to_string(i));
   }
 

@@ -25,8 +25,7 @@ public:
 } // namespace
 
 std::unique_ptr<AbstractWorker>
-RandomCTarget::createGenerator(const Options &options,
-                               Randomly randomly) const {
+RandomCTarget::createWorker(const Options &options, Randomly randomly) const {
   return std::make_unique<RandomCWorker>(options, std::move(randomly));
 }
 
@@ -85,12 +84,27 @@ EOF
       executeCWDFile, [&](llvm::raw_ostream &os) -> llvm::Error {
         os << R"a(SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR && bash )a"
-           << executeFile << '\n';
+           << executeFile
+           // Canonicalize all error exists to exit code 1, even if dynamatic
+           // crashed with e.g. SIGSEGV. We need this to differentiate between
+           // bash exiting with a signal and dynamatic exiting with a signal.
+           << "|| exit 1\n";
         return llvm::Error::success();
       }));
 
   int exitCode = llvm::sys::ExecuteAndWait(
       "/usr/bin/bash", {"bash", executeCWDFile}, /*Env=*/std::nullopt,
       /*Redirects=*/{"", "", ""});
-  return exitCode == 0 ? Success : Bug;
+
+  switch (exitCode) {
+    // Normal exit.
+  case 0:
+    // bash (not dynamatic!) exited due to a signal. This is not a bug but the
+    // user requesting our fuzzer (and its subprocesses) to exit via CTRL+C.
+    // Count it as success rather than denoting it as a bug.
+  case -2:
+    return Success;
+  default:
+    return Bug;
+  }
 }

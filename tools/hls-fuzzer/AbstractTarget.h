@@ -23,7 +23,7 @@ public:
   /// Creates a new generator with the given options and randomness source.
   /// This method is called for every worker thread.
   virtual std::unique_ptr<AbstractWorker>
-  createGenerator(const Options &options, Randomly randomly) const = 0;
+  createWorker(const Options &options, Randomly randomly) const = 0;
 };
 
 } // namespace dynamatic
