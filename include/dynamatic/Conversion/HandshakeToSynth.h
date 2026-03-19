@@ -108,7 +108,7 @@ struct ReadyPortInfo {};
 using PortKind = std::variant<DataPortInfo, ValidPortInfo, ReadyPortInfo>;
 
 // Struct to hold the new unbundled port information
-struct UnbundledPort {
+struct HandshakeUnitPort {
   std::string name;
   // Direction in the *new* module after unbundling (ready signals are flipped).
   hw::ModulePort::Direction direction;
@@ -116,6 +116,11 @@ struct UnbundledPort {
   Value handshakeSignal;
   PortKind kind; // additional info about the port, e.g. which bit of the
                  // original channel it corresponds to if it's a data port
+
+  HandshakeUnitPort(std::string name, hw::ModulePort::Direction direction,
+                    Value handshakeSignal, PortKind kind)
+      : name(std::move(name)), direction(direction),
+        handshakeSignal(handshakeSignal), kind(kind) {}
 };
 
 // Class that controls the unbundling of handshake channel types into integer

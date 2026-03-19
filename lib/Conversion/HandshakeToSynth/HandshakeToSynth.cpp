@@ -45,12 +45,12 @@ namespace dynamatic {
 
 // Function to unbundle a handshake port into its constituent signals (ready,
 // valid, data)
-SmallVector<UnbundledPort>
+SmallVector<HandshakeUnitPort>
 unbundleChannel(const std::string &handshakePortName,
                 hw::ModulePort::Direction handshakePortDir,
                 Value handshakePort) {
 
-  SmallVector<UnbundledPort> unbundledPorts;
+  SmallVector<HandshakeUnitPort> unbundledPorts;
   Type type = handshakePort.getType();
 
   // Flipped direction: input becomes output and vice versa.
@@ -62,7 +62,7 @@ unbundleChannel(const std::string &handshakePortName,
 
   auto addPort = [&](StringRef name, hw::ModulePort::Direction dir, Value val,
                      PortKind kind) {
-    unbundledPorts.push_back({name.str(), dir, val, kind});
+    unbundledPorts.emplace_back(name.str(), dir, val, kind);
   };
 
   // Depending on the type, the unbundling will be different
@@ -113,12 +113,11 @@ unbundleChannel(const std::string &handshakePortName,
   return unbundledPorts;
 }
 
-// Function to build the hw::ModulePortInfo for a given handshake operation by
-// unbundling its ports
-std::pair<hw::ModulePortInfo, SmallVector<UnbundledPort>>
-buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
+// Function to unbundle handshake channels of an handshake op
+static SmallVector<HandshakeUnitPort> unbundlePorts(Operation *handshakeOp,
+                                                    MLIRContext *ctx) {
 
-  SmallVector<UnbundledPort> unbundledPorts;
+  SmallVector<HandshakeUnitPort> unbundledPorts;
 
   // First, we have to derive the base names from NamedIOInterface
   SmallVector<std::string> handshakeInPortNames, handshakeOutPortNames;
@@ -182,6 +181,13 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
       unbundledPorts.append(unbundled.begin(), unbundled.end());
     }
   }
+  return unbundledPorts;
+}
+
+// Function to build the hw::ModulePortInfo from the unbundled ports
+static hw::ModulePortInfo buildPortInfoFromHandshakeUnitPorts(
+    SmallVector<HandshakeUnitPort> unbundledPorts, MLIRContext *ctx) {
+
   // Build the hw::ModulePortInfo from the unbundled ports
   SmallVector<hw::PortInfo> hwInputs, hwOutputs;
   Type i1 = IntegerType::get(ctx, 1);
@@ -204,7 +210,7 @@ buildPortInfo(Operation *handshakeOp, MLIRContext *ctx) {
       {StringAttr::get(ctx, RST_PORT), i1, hw::ModulePort::Direction::Input},
       rstIdx});
 
-  return {hw::ModulePortInfo(hwInputs, hwOutputs), unbundledPorts};
+  return hw::ModulePortInfo(hwInputs, hwOutputs);
 }
 
 //===----------------------------------------------------------------------===//
@@ -234,7 +240,10 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   }
   // Get the port info for the top function and build the corresponding hw
   // module
-  auto [topHWPortInfo, unbundledPortsTop] = buildPortInfo(topFunction, ctx);
+  SmallVector<HandshakeUnitPort> handshakeUnbundledPortsTop =
+      unbundlePorts(topFunction, ctx);
+  hw::ModulePortInfo topHWPortInfo =
+      buildPortInfoFromHandshakeUnitPorts(handshakeUnbundledPortsTop, ctx);
   builder.setInsertionPointToStart(modOp.getBody());
   StringAttr topName = StringAttr::get(ctx, getUniqueName(topFunction));
   topHWModule = builder.create<hw::HWModuleOp>(topFunction.getLoc(), topName,
@@ -256,7 +265,7 @@ LogicalResult HandshakeUnbundler::unbundleHandshakeChannels() {
   // hw module ports
   SmallVector<Value> visitedDataArgs;
   unsigned argIdx = 0;
-  for (auto &unbundledPort : unbundledPortsTop) {
+  for (auto &unbundledPort : handshakeUnbundledPortsTop) {
     if (unbundledPort.direction == hw::ModulePort::Direction::Input) {
       // If port type is DATA (check the kind)
       auto *dataPortInfo = std::get_if<DataPortInfo>(&unbundledPort.kind);
@@ -452,7 +461,9 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   hw::HWModuleOp hwModDef = symTable.lookup<hw::HWModuleOp>(moduleName);
   if (!hwModDef) {
     // If it does not exist, create it
-    auto [portInfo, unbundledPorts] = buildPortInfo(op, ctx);
+    SmallVector<HandshakeUnitPort> unbundledPorts = unbundlePorts(op, ctx);
+    hw::ModulePortInfo portInfo =
+        buildPortInfoFromHandshakeUnitPorts(unbundledPorts, ctx);
 
     // Insert submodule definitions before the top module.
     builder.setInsertionPointToEnd(modOp.getBody());
@@ -489,7 +500,9 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   builder.setInsertionPoint(topHWModule.getBodyBlock()->getTerminator());
   // Collect the unbundled operands
   SmallVector<Value> hwInstOperands;
-  auto [portInfo, unbundledPorts] = buildPortInfo(op, ctx);
+  SmallVector<HandshakeUnitPort> unbundledPorts = unbundlePorts(op, ctx);
+  hw::ModulePortInfo portInfo =
+      buildPortInfoFromHandshakeUnitPorts(unbundledPorts, ctx);
   for (auto &port : unbundledPorts) {
     if (port.direction != hw::ModulePort::Direction::Input)
       continue;
