@@ -110,6 +110,7 @@ else ()
   find_package(MLIR REQUIRED CONFIG)
 endif ()
 
+set(LLVM_TABLEGEN_EXE "llvm-tblgen")
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 
