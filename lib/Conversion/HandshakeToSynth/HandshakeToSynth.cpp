@@ -210,9 +210,9 @@ private:
   // Function that returns unbundled values from a channel value. If the channel
   // value has not been unbundled yet, creates backedge placeholders for each
   // bit and saves them.
-  llvm::SmallVector<Value> getUnbundledValues(unsigned totalBits,
-                                              HandshakeUnitPortInfo *portKind,
-                                              Location loc);
+  llvm::SmallVector<Value>
+  FindOrCreateUnbundledValues(unsigned totalBits,
+                              HandshakeUnitPortInfo *portKind, Location loc);
 
   // Function that saves the mapping from a channel value to its unbundled bit
   // values. If there were placeholders for the channel value, replaces them
@@ -580,7 +580,7 @@ void HandshakeUnbundler::saveUnbundledValues(
 
 // Function to get the unbundled values for a given handshake signal, which
 // will be used as operands for the new hw instance
-SmallVector<Value> HandshakeUnbundler::getUnbundledValues(
+SmallVector<Value> HandshakeUnbundler::FindOrCreateUnbundledValues(
     unsigned totalBits, HandshakeUnitPortInfo *portKind, Location loc) {
 
   Value handshakeSignal = portKind->getHandshakeSignal();
@@ -705,7 +705,8 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
       totalBits = dataPortInfo->getTotalBits();
       bitIndex = dataPortInfo->getBitIndex();
     }
-    auto unbundledValues = getUnbundledValues(totalBits, port.get(), loc);
+    auto unbundledValues =
+        FindOrCreateUnbundledValues(totalBits, port.get(), loc);
     if (bitIndex >= unbundledValues.size()) {
       llvm::errs() << "Error: bit index " << bitIndex
                    << " is out of bounds for unbundled values of signal "
@@ -814,19 +815,21 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
       DataPortInfo portInfo{"", hw::ModulePort::Direction::Output, operand, 0,
                             dataBitwidth};
       unbundledValues =
-          getUnbundledValues(dataBitwidth, &portInfo, endOp.getLoc());
+          FindOrCreateUnbundledValues(dataBitwidth, &portInfo, endOp.getLoc());
       hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
     }
     // Add valid signals
     ValidPortInfo validPortInfo{"", hw::ModulePort::Direction::Output, operand};
-    unbundledValues = getUnbundledValues(1, &validPortInfo, endOp.getLoc());
+    unbundledValues =
+        FindOrCreateUnbundledValues(1, &validPortInfo, endOp.getLoc());
     hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
   }
   // Check also the inputs of the topFuncOp whose ready signals are connected
   // to the terminator
   for (auto [i, arg] : llvm::enumerate(topFunction.getArguments())) {
     ReadyPortInfo portInfo{"", hw::ModulePort::Direction::Input, arg};
-    auto unbundledValues = getUnbundledValues(1, &portInfo, endOp.getLoc());
+    auto unbundledValues =
+        FindOrCreateUnbundledValues(1, &portInfo, endOp.getLoc());
     hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
   }
   topHWModule.getBodyBlock()->getTerminator()->setOperands(hwTermOperands);
