@@ -141,6 +141,11 @@ private:
   // Converts one Handshake function into an hw module
   mlir::LogicalResult convertHandshakeFunc();
 
+  // Function to create hw module from a handshake operation
+  hw::HWModuleOp createHWModuleHandshakeOp(std::string moduleName,
+                                           Operation *handshakeOp,
+                                           MLIRContext *ctx);
+
   // Function that returns unbundled values from a channel value. If the channel
   // value has not been unbundled yet, creates backedge placeholders for each
   // bit and saves them.

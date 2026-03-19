@@ -26,6 +26,7 @@
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Conversion/Passes.h"
+#include "dynamatic/Dialect/HW/HWOps.h"
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKETOSYNTH
 #include "dynamatic/Conversion/Passes.h.inc"
@@ -448,6 +449,43 @@ SmallVector<Value> HandshakeUnbundler::getUnbundledValues(Value handshakeSignal,
   return placeholders;
 }
 
+// Function to create hw module
+hw::HWModuleOp HandshakeUnbundler::createHWModuleHandshakeOp(
+    std::string moduleName, Operation *handshakeOp, MLIRContext *ctx) {
+
+  hw::HWModuleOp hwModRes;
+  SmallVector<HandshakeUnitPort> unbundledPorts =
+      unbundlePorts(handshakeOp, ctx);
+  hw::ModulePortInfo portInfo =
+      buildPortInfoFromHandshakeUnitPorts(unbundledPorts, ctx);
+
+  // Insert submodule definitions before the top module.
+  builder.setInsertionPointToEnd(modOp.getBody());
+  hwModRes = builder.create<hw::HWModuleOp>(
+      handshakeOp->getLoc(), StringAttr::get(ctx, moduleName), portInfo);
+
+  // Create subckt placeholder body for the new module
+  OpBuilder bodyBuilder(hwModRes.getBodyBlock(),
+                        hwModRes.getBodyBlock()->begin());
+  SmallVector<Value> bodyInputs(hwModRes.getBodyBlock()->getArguments());
+  SmallVector<Type> outputTypes;
+  for (auto &port : hwModRes.getPortList())
+    if (port.isOutput())
+      outputTypes.push_back(port.type);
+  Operation *term = hwModRes.getBodyBlock()->getTerminator();
+  auto subckt = bodyBuilder.create<synth::SubcktOp>(
+      term->getLoc(), TypeRange(outputTypes), bodyInputs, "synth_subckt");
+  term->setOperands(subckt.getResults());
+
+  // Record BLIF path for this handshake op
+  auto blifIface = dyn_cast<BLIFImplInterface>(handshakeOp);
+  StringAttr blifAttr = blifIface ? blifIface.getBLIFImpl() : StringAttr{};
+  opToBlifPathMap[hwModRes.getOperation()] =
+      (blifAttr && !blifAttr.getValue().empty()) ? blifAttr.getValue().str()
+                                                 : "";
+  return hwModRes;
+}
+
 // Function to convert a handshake operation by unbundling its channels and
 // replacing it with the corresponding hw instance.
 mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
@@ -461,34 +499,7 @@ mlir::LogicalResult HandshakeUnbundler::convertHandshakeOp(Operation *op) {
   hw::HWModuleOp hwModDef = symTable.lookup<hw::HWModuleOp>(moduleName);
   if (!hwModDef) {
     // If it does not exist, create it
-    SmallVector<HandshakeUnitPort> unbundledPorts = unbundlePorts(op, ctx);
-    hw::ModulePortInfo portInfo =
-        buildPortInfoFromHandshakeUnitPorts(unbundledPorts, ctx);
-
-    // Insert submodule definitions before the top module.
-    builder.setInsertionPointToEnd(modOp.getBody());
-    hwModDef =
-        builder.create<hw::HWModuleOp>(op->getLoc(), moduleName, portInfo);
-
-    // Create subckt placeholder body for the new module
-    OpBuilder bodyBuilder(hwModDef.getBodyBlock(),
-                          hwModDef.getBodyBlock()->begin());
-    SmallVector<Value> bodyInputs(hwModDef.getBodyBlock()->getArguments());
-    SmallVector<Type> outputTypes;
-    for (auto &port : hwModDef.getPortList())
-      if (port.isOutput())
-        outputTypes.push_back(port.type);
-    Operation *term = hwModDef.getBodyBlock()->getTerminator();
-    auto subckt = bodyBuilder.create<synth::SubcktOp>(
-        term->getLoc(), TypeRange(outputTypes), bodyInputs, "synth_subckt");
-    term->setOperands(subckt.getResults());
-
-    // Record BLIF path for this handshake op
-    auto blifIface = dyn_cast<BLIFImplInterface>(op);
-    StringAttr blifAttr = blifIface ? blifIface.getBLIFImpl() : StringAttr{};
-    opToBlifPathMap[hwModDef.getOperation()] =
-        (blifAttr && !blifAttr.getValue().empty()) ? blifAttr.getValue().str()
-                                                   : "";
+    hwModDef = createHWModuleHandshakeOp(opName.str(), op, ctx);
   }
   if (!hwModDef) {
     llvm::errs() << "failed to create or find hw module for op: " << *op
