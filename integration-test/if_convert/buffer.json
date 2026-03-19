@@ -26,12 +26,5 @@
     "slots": 2,
     "type": "fifo_break_none",
     "comment": "To achieve better II"
-  },
-  {
-    "pred": "extsi2",
-    "outid": 0,
-    "slots": 4,
-    "type": "fifo_break_none",
-    "comment": "To absorb latency for spec_commit1 (data)"
   }
 ]

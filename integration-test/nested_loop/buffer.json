@@ -35,13 +35,6 @@
     "comment": "Buffer non-spec token to prevent II=2 locking"
   },
   {
-    "pred": "extsi3",
-    "outid": 0,
-    "slots": 4,
-    "type": "fifo_break_none",
-    "comment": "To absorb latency for spec_commit1 (data)"
-  },
-  {
     "pred": "addi0",
     "outid": 0,
     "slots": 4,

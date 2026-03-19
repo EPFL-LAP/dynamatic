@@ -14,13 +14,6 @@
     "comment": "To absorb latency for spec_commit4 (data)"
   },
   {
-    "pred": "extsi1",
-    "outid": 0,
-    "slots": 5,
-    "type": "fifo_break_none",
-    "comment": "To absorb latency for spec_commit1 (data)"
-  },
-  {
     "pred": "fork9",
     "outid": 0,
     "slots": 2,
