@@ -94,6 +94,15 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
   }
   random.shuffle(generators);
 
+  // If no other expression is allowed, then attempt to generate constants or
+  // parameters rather than fail.
+  // TODO: The entire logic here is a bit ad-hoc. We probably want probability
+  //       tables that can be influenced by type systems somehow.
+  generators.emplace_back(&BasicCGenerator::generateConstant);
+  generators.emplace_back(&BasicCGenerator::generateScalarParameter);
+  if (random.getBool())
+    std::swap(generators.back(), generators[generators.size() - 2]);
+
   // Continuously generate an expression until one passes the type checker.
   for (Constructor &con : generators)
     if (std::optional<ast::Expression> result = con(this, context, depth))
