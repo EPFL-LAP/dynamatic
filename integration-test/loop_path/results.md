@@ -7,5 +7,5 @@ The II is only 2, even in the non-speculation case. This is because the break co
 |                      | No Speculation   | Speculation       |
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 6                | 1                 |
-| II                   | 2                | 1                 |
-| Cycles (Test Bench)  | 341 (End: 339)   | 175 (End: 173)    |
+| II                   | 3                | 1                 |
+| Cycles (Test Bench)  | 508   | 176    |

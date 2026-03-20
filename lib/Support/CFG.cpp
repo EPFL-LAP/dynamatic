@@ -153,7 +153,7 @@ static bool followToBlock(Operation *op, unsigned &bb,
 /// outside blocks during backedge identification.
 static inline bool canGoThroughOutsideBlocks(Operation *op) {
   return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
-             handshake::TruncIOp>(op);
+             handshake::TruncIOp, handshake::BufferOp>(op);
 }
 
 /// Attempts to backtrack through forks and bitwidth modification operations

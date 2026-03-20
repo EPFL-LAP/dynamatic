@@ -5,5 +5,5 @@ Since the variables `x0` and `x1` depend on values from previous iterations, the
 |                      | No Speculation   | Speculation       |
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 16               | 6                 |
-| II                   | 14               | 5                 |
-| Cycles (Test Bench)  | 705 (End: 704)   | 270 (End: 265)    |
+| II                   | 13               | 4                 |
+| Cycles (Test Bench)  | 657   | 216    |

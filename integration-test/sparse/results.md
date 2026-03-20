@@ -5,5 +5,5 @@ Although Haoran's thesis attempted data speculation and achieved an II of 1, it 
 |                      | No Speculation   | Speculation       |
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 16               | 1                 |
-| II                   | 15               | 10                |
-| Cycles (Test Bench)  | 1237 (End: 1235) | 835 (End: 831)    |
+| II                   | 14               | 9                |
+| Cycles (Test Bench)  | 1155 | 750 |

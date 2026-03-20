@@ -7,5 +7,5 @@ Additionally, the current implementation of `cmpf` seems to generate output with
 |                      | No Speculation   | Speculation       |
 |----------------------|------------------|-------------------|
 | II (Haoran’s thesis) | 15               | 1                 |
-| II                   | 16               | 2                 |
-| Cycles (Test Bench)  | 1623 (End: 1621) | 228 (End: 222)    |
+| II                   | 15               | 2                 |
+| Cycles (Test Bench)  | 1522 | 223    |

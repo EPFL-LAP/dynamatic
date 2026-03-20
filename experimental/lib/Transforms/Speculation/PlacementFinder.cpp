@@ -27,7 +27,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::speculation;
 
 PlacementFinder::PlacementFinder(SpeculationPlacements &placements)
     : placements(placements) {

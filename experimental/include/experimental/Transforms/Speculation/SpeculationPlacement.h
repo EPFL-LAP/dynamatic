@@ -30,7 +30,6 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace speculation {
 
 struct PlacementOperand {
   std::string opName;
@@ -100,7 +99,6 @@ public:
   void setSaveCommitsFifoDepth(unsigned int depth);
 };
 
-} // namespace speculation
 } // namespace experimental
 } // namespace dynamatic
 
