@@ -110,7 +110,12 @@ template <>
 struct TypeSystemTraits<ast::ScalarType> : TypeSystemTraitsDefaults {};
 
 template <>
-struct TypeSystemTraits<ast::Constant> : TypeSystemTraitsDefaults {};
+struct TypeSystemTraits<ast::Constant> : TypeSystemTraitsDefaults {
+
+  /// A possibly-modified constant that should be used instead by the generator.
+  template <typename TypingContext>
+  using Conclusions = ast::Constant;
+};
 
 template <>
 struct TypeSystemTraits<ast::Parameter> : TypeSystemTraitsDefaults {

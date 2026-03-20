@@ -34,22 +34,6 @@ public:
   checkScalarType(const ast::ScalarType &scalarType,
                   DynamaticTypingContext context);
 
-  /// Discard 'constant' based on the mode in 'context'.
-  static std::optional<ConclusionOf<ast::Constant>>
-  checkConstant(const ast::Constant &constant, DynamaticTypingContext context) {
-    return checkScalarType(constant.getType(), context);
-  }
-
-  /// Discard 'parameter' based on the mode in 'context'.
-  static std::optional<ConclusionOf<ast::Parameter>>
-  checkParameter(const ast::Parameter &parameter,
-                 DynamaticTypingContext context) {
-    if (!checkScalarType(parameter.datatype, context))
-      return std::nullopt;
-
-    return context;
-  }
-
   /// Discard 'op' based on the mode in 'context' and forward constraint to
   /// the operands as required.
   std::optional<ConclusionOf<ast::BinaryExpression>>
