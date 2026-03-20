@@ -79,7 +79,6 @@ if (DYNAMATIC_BUILD_LLVM)
   list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
   set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang")
   list(APPEND CMAKE_MODULE_PATH ${CLANG_CMAKE_DIR})
-  set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py")
   set(LLVM_INCLUDE_DIRS
           llvm-project/llvm/include
           ${CMAKE_BINARY_DIR}/llvm-project/include
@@ -111,6 +110,7 @@ else ()
 endif ()
 
 set(LLVM_TABLEGEN_EXE "llvm-tblgen")
+set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py")
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 
