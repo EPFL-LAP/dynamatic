@@ -9,6 +9,7 @@ set(DYNAMATIC_TEST_DEPENDS
   FileCheck count not
   split-file
   dynamatic-opt
+  export-rtl
   )
 
 add_lit_testsuite(check-dynamatic "Running the Dynamatic regression tests"
