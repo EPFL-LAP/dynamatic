@@ -64,7 +64,7 @@ gen::BasicCGenerator::generateFunctionBody(const OpaqueContext &context) {
       safeCastAsNeeded(returnType, std::move(expression))};
 }
 
-constexpr std::size_t MAX_DEPTH = 8;
+constexpr std::size_t MAX_DEPTH = 4;
 
 ast::Expression
 gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
@@ -73,37 +73,39 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
       BasicCGenerator *, const OpaqueContext &, std::size_t)>;
   std::vector<Constructor> generators;
 
-  // Continuously generate an expression until one passes the type checker.
-  while (true) {
-    generators.clear();
+  // Keep expressions interesting by making terminators less likely.
+  if (depth > MAX_DEPTH || random.getSmallProbabilityBool())
+    generators.emplace_back(&BasicCGenerator::generateConstant);
+  if (depth > 2 || random.getRatherLowProbabilityBool())
+    generators.emplace_back(&BasicCGenerator::generateScalarParameter);
 
-    // Keep expressions interesting by making terminators less likely.
-    if (depth > MAX_DEPTH || random.getSmallProbabilityBool())
-      generators.emplace_back(&BasicCGenerator::generateConstant);
-    if (depth > 2 || random.getRatherLowProbabilityBool())
-      generators.emplace_back(&BasicCGenerator::generateScalarParameter);
-
-    // Avoid stack overflows by restricting to a maximum expression depth.
-    if (depth <= MAX_DEPTH) {
-      generators.emplace_back(&BasicCGenerator::generateBinaryExpression);
-      generators.emplace_back(&BasicCGenerator::generateCastExpression);
-      if (random.getRatherLowProbabilityBool())
-        generators.emplace_back(
-            &BasicCGenerator::generateConditionalExpression);
+  // Avoid stack overflows by restricting to a maximum expression depth.
+  if (depth <= MAX_DEPTH) {
+    for (auto op : enumRange<ast::BinaryExpression::Op>()) {
+      generators.emplace_back([op](BasicCGenerator *self,
+                                   const OpaqueContext &context,
+                                   std::size_t depth) {
+        return self->generateBinaryExpression(op, context, depth);
+      });
     }
-
-    std::vector<Constructor> subset = random.getNonEmptySubset(generators);
-    for (const Constructor &iter : subset)
-      if (std::optional<ast::Expression> result = iter(this, context, depth))
-        return std::move(*result);
+    generators.emplace_back(&BasicCGenerator::generateCastExpression);
+    if (random.getRatherLowProbabilityBool())
+      generators.emplace_back(&BasicCGenerator::generateConditionalExpression);
   }
+  random.shuffle(generators);
+
+  // Continuously generate an expression until one passes the type checker.
+  for (Constructor &con : generators)
+    if (std::optional<ast::Expression> result = con(this, context, depth))
+      return std::move(*result);
+
+  llvm_unreachable("it should always be possible to generate an expression");
 }
 
 std::optional<ast::Expression>
-gen::BasicCGenerator::generateBinaryExpression(const OpaqueContext &context,
+gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
+                                               const OpaqueContext &context,
                                                std::size_t depth) {
-
-  auto op = random.fromEnum<ast::BinaryExpression::Op>();
   auto conclusion = typeSystem.checkBinaryExpressionOpaque(op, context);
   if (!conclusion)
     return std::nullopt;
@@ -210,35 +212,42 @@ gen::BasicCGenerator::generateCastExpression(const OpaqueContext &context,
 std::optional<ast::Constant>
 gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
                                        std::size_t) const {
-  ast::Constant constant = [&] {
-    switch (random.fromEnum<ast::PrimitiveType::Type>()) {
-    case ast::PrimitiveType::Int8:
-      return ast::Constant{random.getInterestingInteger<std::int8_t>()};
-    case ast::PrimitiveType::UInt8:
-      return ast::Constant{random.getInterestingInteger<std::uint8_t>()};
+  std::array<ast::PrimitiveType::Type, ast::PrimitiveType::MAX_VALUE + 1>
+      candidates;
+  llvm::copy(enumRange<ast::PrimitiveType::Type>(), candidates.begin());
+  random.shuffle(candidates);
 
-    case ast::PrimitiveType::Int16:
-      return ast::Constant{random.getInterestingInteger<std::int16_t>()};
+  for (ast::PrimitiveType::Type iter : candidates) {
+    ast::Constant constant = [&] {
+      switch (iter) {
+      case ast::PrimitiveType::Int8:
+        return ast::Constant{random.getInterestingInteger<std::int8_t>()};
+      case ast::PrimitiveType::UInt8:
+        return ast::Constant{random.getInterestingInteger<std::uint8_t>()};
 
-    case ast::PrimitiveType::UInt16:
-      return ast::Constant{random.getInterestingInteger<std::uint16_t>()};
+      case ast::PrimitiveType::Int16:
+        return ast::Constant{random.getInterestingInteger<std::int16_t>()};
 
-    case ast::PrimitiveType::Int32:
-      return ast::Constant{random.getInterestingInteger<std::int32_t>()};
+      case ast::PrimitiveType::UInt16:
+        return ast::Constant{random.getInterestingInteger<std::uint16_t>()};
 
-    case ast::PrimitiveType::UInt32:
-      return ast::Constant{random.getInterestingInteger<std::uint32_t>()};
+      case ast::PrimitiveType::Int32:
+        return ast::Constant{random.getInterestingInteger<std::int32_t>()};
 
-    case ast::PrimitiveType::Float:
-      return ast::Constant{random.getInterestingFloat()};
-    case ast::PrimitiveType::Double:
-      return ast::Constant{random.getInterestingDouble()};
-    }
-    llvm_unreachable("all enum cases handled");
-  }();
-  if (typeSystem.checkConstantOpaque(constant, context))
-    return constant;
+      case ast::PrimitiveType::UInt32:
+        return ast::Constant{random.getInterestingInteger<std::uint32_t>()};
 
+      case ast::PrimitiveType::Float:
+        return ast::Constant{random.getInterestingFloat()};
+
+      case ast::PrimitiveType::Double:
+        return ast::Constant{random.getInterestingDouble()};
+      }
+      llvm_unreachable("all enum cases handled");
+    }();
+    if (typeSystem.checkConstantOpaque(constant, context))
+      return constant;
+  }
   return std::nullopt;
 }
 

@@ -51,7 +51,8 @@ private:
                                      std::size_t depth);
 
   std::optional<ast::Expression>
-  generateBinaryExpression(const OpaqueContext &constraints, std::size_t depth);
+  generateBinaryExpression(ast::BinaryExpression::Op op,
+                           const OpaqueContext &constraints, std::size_t depth);
 
   std::optional<ast::ConditionalExpression>
   generateConditionalExpression(const OpaqueContext &constraint,
