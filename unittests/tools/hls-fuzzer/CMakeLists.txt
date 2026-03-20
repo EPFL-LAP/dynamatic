@@ -25,3 +25,4 @@ add_custom_target(
   USES_TERMINAL
   DEPENDS hls-fuzzer-unit-tests
 )
+add_to_unit_testing(run-hls-fuzzer-tests)
