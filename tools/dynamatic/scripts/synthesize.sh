@@ -10,8 +10,9 @@ source "$1"/tools/dynamatic/scripts/utils.sh
 DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
-FULL_CLOCK=$4
-HALF_CLOCK=$5
+FULL_CLOCK="${SYNTHESIS_CLOCK_PERIOD_NS:-$4}"
+FULL_CLOCK=$(awk "BEGIN {printf \"%.3f\", $FULL_CLOCK}")
+HALF_CLOCK=$(awk "BEGIN {printf \"%.3f\", $FULL_CLOCK / 2}")
 SYNTH_DIR="${6:-$OUTPUT_DIR/synth}"
 
 # Generated directories/files
