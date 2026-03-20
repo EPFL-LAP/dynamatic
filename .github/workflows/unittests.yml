@@ -56,14 +56,8 @@ jobs:
       - name: build
         run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
 
-      - name: check-blif-importer-exporter
+      - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
-        run: ninja run-blif-equiv-tests
+        run: ninja check-dynamatic
         working-directory: build
-
-      - name: check-hls-fuzzer-tests
-        if: steps.build.outputs.exit_code == 0
-        run: ninja run-hls-fuzzer-tests
-        working-directory: build
-
 

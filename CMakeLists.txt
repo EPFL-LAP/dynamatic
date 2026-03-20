@@ -363,9 +363,18 @@ FetchContent_MakeAvailable(json)
 #-------------------------------------------------------------------------------
 
 add_subdirectory(${DYNAMATIC_INCLUDE_DIR}/dynamatic)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
+
+# CMake macro to add a custom new unit test to dynamatic.
+# A unit test should be a test target that does not require any special
+# environment setup beyond what is performed by CMake.
+# All unit tests are performed as part of the 'check-dynamatic' target.
+macro(add_to_unit_testing target)
+  add_dependencies(check-dynamatic ${target})
+endmacro()
+
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/experimental)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
-add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)
