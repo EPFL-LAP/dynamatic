@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -51,21 +52,30 @@ KERNELS = [
 # ──────────────────────────────────────────────────────────────────────────────
 # .dyn script template: {src} is substituted with the kernel source path
 # ──────────────────────────────────────────────────────────────────────────────
-CLOCK_PERIOD = 5
 DYN_SCRIPT = """\
 set-src {src}
-set-clock-period %d
+set-clock-period {clock_period}
 compile --buffer-algorithm fpga20
 write-hdl --hdl vhdl
 simulate
 synthesize
 exit
-""" % (CLOCK_PERIOD,)
+"""
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Paths
 # ──────────────────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Run configuration
+# ──────────────────────────────────────────────────────────────────────────────
+@dataclass
+class RunConfig:
+    no_synth: bool
+    synth_lsqs: bool
+    clock_period: float
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -225,7 +235,7 @@ def build() -> None:
     logging.info("Build succeeded.")
 
 
-def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str | None]:
+def run_kernel(kernel: str, cfg: RunConfig) -> tuple[str, str | None]:
     """
     Run the .dyn script for *kernel*, writing stdout/stderr directly to
     integration-test/{kernel}/out/dynamatic_{out,err}.txt, and return
@@ -233,8 +243,8 @@ def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str 
     """
     logging.info("Running kernel %s...", kernel)
     src = f"integration-test/{kernel}/{kernel}.c"
-    script = DYN_SCRIPT.format(src=src)
-    if no_synth:
+    script = DYN_SCRIPT.format(src=src, clock_period=cfg.clock_period)
+    if cfg.no_synth:
         # Remove the "synthesize" command from the script
         script = "\n".join(l for l in script.splitlines() if not l.startswith("synthesize")) + "\n"
 
@@ -288,7 +298,7 @@ def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str 
         return kernel, reason
 
     # Run out-of-context synthesis for LSQs
-    if synth_lsqs:
+    if cfg.synth_lsqs:
         hdl_dir = out_dir / "hdl"
         for lsq_file in hdl_dir.glob("*_lsq*_core.vhd"):
             lsq_top = lsq_file.stem
@@ -306,7 +316,7 @@ def run_kernel(kernel: str, no_synth: bool, synth_lsqs: bool) -> tuple[str, str 
                          REPO_ROOT,
                          out_dir,
                          lsq_top,
-                         f"{CLOCK_PERIOD:.3f}", f"{CLOCK_PERIOD/2:.3f}",
+                         f"{cfg.clock_period:.3f}", f"{cfg.clock_period/2:.3f}",
                          lsq_synth_dir],
                         text=True,
                         stdout=out_f,
@@ -353,6 +363,13 @@ def main() -> None:
         help="Number of kernels to run in parallel (default: 1).",
     )
     parser.add_argument(
+        "--clock-period",
+        type=float,
+        default=6.0,
+        metavar="NS",
+        help="Target clock period in nanoseconds (default: 6).",
+    )
+    parser.add_argument(
         "--json",
         type=Path,
         default=None,
@@ -367,6 +384,12 @@ def main() -> None:
 
     build()
 
+    cfg = RunConfig(
+        no_synth=args.no_synth,
+        synth_lsqs=args.synth_lsqs,
+        clock_period=args.clock_period,
+    )
+
     logging.info("Running %d kernel(s) with %d parallel job(s)...", len(KERNELS), args.jobs)
     start_time = time.time()
 
@@ -374,7 +397,7 @@ def main() -> None:
     failed: list[tuple[str, str | None]] = []
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-        futures = {executor.submit(run_kernel, k, args.no_synth, args.synth_lsqs): k for k in KERNELS}
+        futures = {executor.submit(run_kernel, k, cfg): k for k in KERNELS}
         for future in as_completed(futures):
             kernel, failure_reason = future.result()
             if failure_reason is None:
