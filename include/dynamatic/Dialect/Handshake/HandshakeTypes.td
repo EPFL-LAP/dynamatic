@@ -447,6 +447,8 @@ class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
   "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
 >;
 
+// Constraints for out-of-order tags
+
 class HasUniqueTagInSecondOperand<string op0, string op1> : PredOpTrait<
   op1 # " should have exactly one tag not present in operand " # op0 # " and all other tags should match",
   CPred<[{
