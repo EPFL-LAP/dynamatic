@@ -316,6 +316,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.uitofp" ||
       handshakeOp == "handshake.sitofp" ||
       handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.extract" ||
       handshakeOp == "handshake.rigidifier" ||
       handshakeOp == "handshake.ori" ||
       handshakeOp == "handshake.shrsi" ||
@@ -476,6 +477,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.sitofp" ||
       handshakeOp == "handshake.fptosi" ||
       handshakeOp == "handshake.lazy_fork" ||
+      handshakeOp == "handshake.extract" ||
       handshakeOp == "handshake.divf" ||
       handshakeOp == "handshake.ori" ||
       handshakeOp == "handshake.shrsi" ||
