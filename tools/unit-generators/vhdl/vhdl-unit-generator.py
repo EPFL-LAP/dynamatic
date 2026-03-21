@@ -134,6 +134,7 @@ if __name__ == "__main__":
     generators.add("handshake", "minsi")
     generators.add("handshake", "minui")
     generators.add("handshake", "fptosi")
+    generators.add("handshake", "extract")
     generators.add("handshake", "ready_remover")
     generators.add("handshake", "valid_merger")
     generators.add("handshake", "top_join")

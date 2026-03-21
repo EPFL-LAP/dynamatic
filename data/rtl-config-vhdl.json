@@ -455,6 +455,10 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shli -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.extract",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t extract -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "name": "handshake.shrsi",
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shrsi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
