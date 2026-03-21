@@ -77,9 +77,17 @@
     - [Commit Unit Placement Algorithm](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/CommitUnitPlacementAlgorithm.md)
     - [Integration Tests](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/IntegrationTests.md)
     - [Save Commit Behavior](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/SaveCommitBehavior.md)
+  - [Synth]()
+    - [Blif Exporter](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifExporter.md)
+    - [Blif File Manager](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BLIFFileManager.md)
+    - [Blif Importer](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifImporter.md)
+    - [Handshake To Synth Conversion](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/HandshakeToSynthConversion.md)
+    - [Mark Blif File](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/MarkBlifFile.md)
+    - [Synth Dialect](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/Synth.md)
 
 - [Specs]()
   - [Floating Point Units](DeveloperGuide/Specs/FloatingPointUnits.md)
+  - [HW Flattening Pass](DeveloperGuide/Specs/HWFlattening.md)
   - [Timing Characterization](DeveloperGuide/Specs/TimingCharacterization.md)
 
 - [XLS](DeveloperGuide/Xls/XlsIntegration.md)

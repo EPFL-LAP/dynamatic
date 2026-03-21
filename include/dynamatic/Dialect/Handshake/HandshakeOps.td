@@ -32,7 +32,8 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
          DeclareOpInterfaceMethods<NamedIOInterface>,
-         DeclareOpInterfaceMethods<ControlInterface>]> {
+         DeclareOpInterfaceMethods<ControlInterface>,
+         DeclareOpInterfaceMethods<BLIFImplInterface>]> {
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some

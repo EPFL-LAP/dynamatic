@@ -172,7 +172,7 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
   }
 
   return result;
-};
+}
 
 /// A dataflow graph specialized for reconvergent path analysis.
 /// IMPORTANT: This class assumes the graph an ACYCLIC transition sequence.
