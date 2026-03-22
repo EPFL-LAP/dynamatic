@@ -71,7 +71,7 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
                                          std::size_t depth) {
   using Constructor = std::function<std::optional<ast::Expression>(
       BasicCGenerator *, const OpaqueContext &, std::size_t)>;
-  std::vector<Constructor> generators;
+  llvm::SmallVector<Constructor> generators;
 
   // Keep expressions interesting by making terminators less likely.
   if (depth > MAX_DEPTH || random.getSmallProbabilityBool())
