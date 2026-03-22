@@ -79,7 +79,7 @@ if (DYNAMATIC_BUILD_LLVM)
   list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
   set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang")
   list(APPEND CMAKE_MODULE_PATH ${CLANG_CMAKE_DIR})
-  set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py")
+  set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py" CACHE STRING "" FORCE)
   set(LLVM_INCLUDE_DIRS
           llvm-project/llvm/include
           ${CMAKE_BINARY_DIR}/llvm-project/include
@@ -100,6 +100,7 @@ if (DYNAMATIC_BUILD_LLVM)
           ${CMAKE_BINARY_DIR}/llvm-project/tools/polly/lib/External/isl/include
   )
 else ()
+  set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py" CACHE STRING "" FORCE)
   message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
   message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
   message(STATUS "Using ClangConfig.cmake in: ${CLANG_DIR}")
@@ -110,6 +111,7 @@ else ()
   find_package(MLIR REQUIRED CONFIG)
 endif ()
 
+set(LLVM_TABLEGEN_EXE "llvm-tblgen")
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 
@@ -246,6 +248,32 @@ if(DYNAMATIC_ENABLE_CBC)
 endif()
 
 #-------------------------------------------------------------------------------
+# ABC setup
+#-------------------------------------------------------------------------------
+
+if(DYNAMATIC_ENABLE_ABC)
+  if (UNIX)
+
+    # Disable reproducibility warning for third-party code
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=date-time -Wno-date-time")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=date-time -Wno-date-time")
+
+    FetchContent_Declare(
+      abc
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+      SOURCE_DIR ${CMAKE_BINARY_DIR}/abc
+      URL https://github.com/ETHZ-DYNAMO/abc/archive/refs/tags/v1.0.0.tar.gz
+      SYSTEM
+    )
+
+    FetchContent_MakeAvailable(abc)
+    add_compile_definitions(DYNAMATIC_ENABLE_ABC)
+  else()
+    message(FATAL_ERROR "ABC integration is not tested on the OS you use!")
+  endif()
+endif()
+
+#-------------------------------------------------------------------------------
 # Python (Virtual Environment)
 #-------------------------------------------------------------------------------
 
@@ -336,9 +364,18 @@ FetchContent_MakeAvailable(json)
 #-------------------------------------------------------------------------------
 
 add_subdirectory(${DYNAMATIC_INCLUDE_DIR}/dynamatic)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
+
+# CMake macro to add a custom new unit test to dynamatic.
+# A unit test should be a test target that does not require any special
+# environment setup beyond what is performed by CMake.
+# All unit tests are performed as part of the 'check-dynamatic' target.
+macro(add_to_unit_testing target)
+  add_dependencies(check-dynamatic ${target})
+endmacro()
+
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/experimental)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
-add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)
