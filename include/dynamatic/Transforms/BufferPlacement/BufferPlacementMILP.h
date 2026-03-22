@@ -36,7 +36,13 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace dynamatic {
+struct SynchronizingCyclePair;
+class SynchronizingCyclesFinderGraph;
+
 namespace buffer {
+namespace fpga24 {
+struct ReconvergentPathWithGraph;
+}
 
 /// Pair of Gurobi variables meant to represent the arrival times of a signal at
 /// a channel's endpoints.
@@ -391,6 +397,29 @@ protected:
   /// 'addBufferAreaAwareObjective'.
   void addBufferAreaAwareObjective(ValueRange channels,
                                    ArrayRef<CFDFC *> cfdfcs);
+
+  /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
+  void addReconvergentPathConstraints(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
+
+  /// [FPGA24] Adds imbalance constraints for synchronizing cycle pairs in LP1.
+  void addSyncCycleConstraints(
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
+      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// [FPGA24] Propagates pattern imbalance to per-channel stall variables.
+  void addStallPropagationConstraints(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
+      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// [FPGA24] Adds cycle-time constraints and computes required II values.
+  void addCycleTimeConstraints(ArrayRef<CFDFC *> cfdfcs, double &computedII,
+                               llvm::MapVector<CFDFC *, double> &iiMap);
+
+  /// [FPGA24] Sets LP1 objective prioritizing stall removal and low latency.
+  void setLatencyBalancingObjective();
+
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
   void forEachIOPair(Operation *op,

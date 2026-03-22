@@ -37,16 +37,31 @@ namespace dynamatic {
 namespace buffer {
 namespace fpga24 {
 
+/// Constants ///
+
+/// Big-M constant for imbalance constraints.
+// (Paper: Section 4, Equation 2)
+static constexpr double BIG_M = 1000.0;
+
+/// Weight for stall penalty vs latency cost (>> LATENCY_WEIGHT to prioritize
+/// stalls). See usage in (Paper: Section 4, Equation 7)
+static constexpr double LATENCY_WEIGHT = 1.0;
+static constexpr double STALL_WEIGHT = 1000.0;
+
+/// Upper bound for occupancy
+static constexpr double MAX_OCCUPANCY = 100.0;
+
+
 /// Latency Balancing MILP ///
 
 /// Holds the result of the first LP for usage in the LP.
 struct LatencyBalancingResult {
   /// Map from channel to its computed extra latency.
-  DenseMap<Value, unsigned> channelExtraLatency;
+  llvm::MapVector<Value, unsigned> channelExtraLatency;
   /// Target intiation interval.
   double targetII;
   /// Target intiation interval per CFDFC.
-  DenseMap<CFDFC *, double> cfdfcTargetIIs;
+  llvm::MapVector<CFDFC *, double> cfdfcTargetIIs;
 };
 
 /// Helper struct that pairs a reconvergent path with its corresponding
@@ -94,23 +109,9 @@ private:
   double computedII = 1.0;
 
   /// Computed minimum feasible Initiation Interval per CFDFC.
-  DenseMap<CFDFC *, double> computedCFDFCIIs;
+  llvm::MapVector<CFDFC *, double> computedCFDFCIIs;
 
   void addLatencyVariables();
-
-  /// Add pattern imbalance constraints for reconvergent paths.
-  void addReconvergentPathConstraints();
-
-  /// Add pattern imbalance constraints for synchronizing cycles.
-  void addSyncCycleConstraints();
-
-  void addStallPropagationConstraints();
-
-  /// Add cycle time (II) constraints for each CFDFC cycle.
-  void addCycleTimeConstraints();
-
-  /// Minimize stalls first, then latency cost.
-  void setLatencyBalancingObjective();
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
