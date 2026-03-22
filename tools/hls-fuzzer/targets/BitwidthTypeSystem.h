@@ -18,6 +18,10 @@ struct BitwidthTypingContext {
   /// * satisfy the local invariant for some "maxBitwidth < globalMaxBitwidth".
   /// This property is applied recursively for any sub-expression in the first
   /// case.
+  ///
+  /// The empty optionals are introduced by bitand operations and mainly
+  /// enables the use of parameters as well as computation done on higher
+  /// bitwidths (such as addition or multiplication) to be capped.
   std::optional<std::uint8_t> maxBitwidth;
 };
 
@@ -30,105 +34,28 @@ public:
   /// Disallows floats and doubles.
   static std::optional<ConclusionOf<ast::ScalarType>>
   checkScalarType(const ast::ScalarType &scalarType,
-                  const BitwidthTypingContext &) {
-    if (scalarType == ast::PrimitiveType::Double ||
-        scalarType == ast::PrimitiveType::Float)
-      return std::nullopt;
-
-    return ConclusionOf<ast::ScalarType>{};
-  }
+                  const BitwidthTypingContext &);
 
   std::optional<ConclusionOf<ast::Parameter>>
   checkParameter(const ast::Parameter &parameter,
-                 const BitwidthTypingContext &context) {
-    if (!Super::checkParameter(parameter, context))
-      return std::nullopt;
+                 const BitwidthTypingContext &context);
 
-    // Only allow a parameter if either: We have no bitwidth requirement OR
-    // the parameter type restricts it to fit in the given bitwidth.
-    if (!context.maxBitwidth ||
-        *context.maxBitwidth >= parameter.getDataType().getBitwidth())
-      return ConclusionOf<ast::Parameter>{};
-
-    return std::nullopt;
-  }
-
-  // Forces constants to fit in the given bitwidth requirement.
+  /// Forces constants to fit in the given bitwidth requirement.
   std::optional<ConclusionOf<ast::Constant>>
   checkConstant(const ast::Constant &constant,
                 const BitwidthTypingContext &context);
 
   std::optional<ConclusionOf<ast::BinaryExpression>>
   checkBinaryExpression(ast::BinaryExpression::Op op,
-                        const BitwidthTypingContext &context) const {
-    switch (op) {
-    case ast::BinaryExpression::BitAnd: {
-      // Bitand is distributive: Sub-expressions can be unconstrained as well.
-      if (!context.maxBitwidth)
-        return ConclusionOf<ast::BinaryExpression>{context, context};
-
-      // Otherwise, one operand is constrained to of the given maximum bitwidth
-      // while the other can be unconstrained.
-      // The choice of whether the left or right-hand-side is constrained is
-      // arbitrary.
-      return ConclusionOf<ast::BinaryExpression>{
-          BitwidthTypingContext{std::nullopt},
-          BitwidthTypingContext{getInterestingBitWidth(*context.maxBitwidth)}};
-    }
-    case ast::BinaryExpression::ShiftLeft:
-      // TODO: Left shift is distributive for the shifted operand but not the
-      //       shift-amount.
-      //       Under a fixed bitwidth, we can also choose bitwidths for both
-      //       operands such that it fits within a fixed bitwidth.
-      return std::nullopt;
-
-    case ast::BinaryExpression::Plus:
-    case ast::BinaryExpression::Mul:
-    case ast::BinaryExpression::Minus:
-      if (!context.maxBitwidth)
-        return ConclusionOf<ast::BinaryExpression>{context, context};
-
-      // TODO: We can choose bitwidths for the left and right operands of these
-      //       expressions here to fit a maximum bitwidth.
-      return std::nullopt;
-
-    case ast::BinaryExpression::ShiftRight:
-    case ast::BinaryExpression::Greater:
-    case ast::BinaryExpression::GreaterEqual:
-    case ast::BinaryExpression::Less:
-    case ast::BinaryExpression::LessEqual:
-    case ast::BinaryExpression::Equal:
-    case ast::BinaryExpression::NotEqual:
-      // These operations consume all bits to produce its result, we cannot
-      // leave it unconstrained, otherwise the input expressions must be done
-      // with higher bitwidths.
-      return ConclusionOf<ast::BinaryExpression>{
-          {getInterestingBitWidth(globalMaxBitwidth)},
-          {getInterestingBitWidth(globalMaxBitwidth)}};
-
-    case ast::BinaryExpression::BitOr:
-    case ast::BinaryExpression::BitXor:
-      // Distribute regarding the mod operator.
-      return ConclusionOf<ast::BinaryExpression>{context, context};
-    }
-    llvm_unreachable("all enum cases handled");
-  }
+                        const BitwidthTypingContext &context) const;
 
   ConclusionOf<ast::ConditionalExpression>
-  checkConditionalExpression(const BitwidthTypingContext &context) const {
-    // The condition must be constrained to fit within the global max bitwidth.
-    return {{getInterestingBitWidth(globalMaxBitwidth)}, context, context};
-  }
+  checkConditionalExpression(const BitwidthTypingContext &context) const;
 
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range
   /// [1, bitWidth].
-  std::uint32_t getInterestingBitWidth(std::uint32_t bitWidth) const {
-    if (random.getRatherLowProbabilityBool())
-      return random.getInteger<std::uint32_t>(1, bitWidth);
-
-    return bitWidth;
-  }
+  std::uint32_t getInterestingBitWidthInRange(std::uint32_t bitWidth) const;
 
   uint8_t globalMaxBitwidth;
   Randomly &random;

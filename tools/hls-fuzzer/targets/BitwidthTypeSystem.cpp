@@ -1,5 +1,30 @@
 #include "BitwidthTypeSystem.h"
 
+auto dynamatic::gen::BitwidthTypeSystem::checkScalarType(
+    const ast::ScalarType &scalarType, const BitwidthTypingContext &)
+    -> std::optional<ConclusionOf<ast::ScalarType>> {
+  if (scalarType == ast::PrimitiveType::Double ||
+      scalarType == ast::PrimitiveType::Float)
+    return std::nullopt;
+
+  return ConclusionOf<ast::ScalarType>{};
+}
+
+auto dynamatic::gen::BitwidthTypeSystem::checkParameter(
+    const ast::Parameter &parameter, const BitwidthTypingContext &context)
+    -> std::optional<ConclusionOf<ast::Parameter>> {
+  if (!Super::checkParameter(parameter, context))
+    return std::nullopt;
+
+  // Only allow a parameter if either: We have no bitwidth requirement OR
+  // the parameter type restricts it to fit in the given bitwidth.
+  if (!context.maxBitwidth ||
+      *context.maxBitwidth >= parameter.getDataType().getBitwidth())
+    return ConclusionOf<ast::Parameter>{};
+
+  return std::nullopt;
+}
+
 auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
     const ast::Constant &constant, const BitwidthTypingContext &context)
     -> std::optional<ConclusionOf<ast::Constant>> {
@@ -23,4 +48,76 @@ auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
         llvm_unreachable("double and float handled above");
       },
       constant.value);
+}
+
+auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
+    ast::BinaryExpression::Op op, const BitwidthTypingContext &context) const
+    -> std::optional<ConclusionOf<ast::BinaryExpression>> {
+  switch (op) {
+  case ast::BinaryExpression::BitAnd: {
+    // Bitand is distributive: Sub-expressions can be unconstrained as well.
+    if (!context.maxBitwidth)
+      return ConclusionOf<ast::BinaryExpression>{context, context};
+
+    // Otherwise, one operand is constrained to of the given maximum bitwidth
+    // while the other can be unconstrained.
+    // The choice of whether the left or right-hand-side is constrained is
+    // arbitrary.
+    return ConclusionOf<ast::BinaryExpression>{
+        BitwidthTypingContext{std::nullopt},
+        BitwidthTypingContext{
+            getInterestingBitWidthInRange(*context.maxBitwidth)}};
+  }
+  case ast::BinaryExpression::ShiftLeft:
+    // TODO: Left shift is distributive for the shifted operand but not the
+    //       shift-amount.
+    //       Under a fixed bitwidth, we can also choose bitwidths for both
+    //       operands such that it fits within a fixed bitwidth.
+    return std::nullopt;
+
+  case ast::BinaryExpression::Plus:
+  case ast::BinaryExpression::Mul:
+  case ast::BinaryExpression::Minus:
+    if (!context.maxBitwidth)
+      return ConclusionOf<ast::BinaryExpression>{context, context};
+
+    // TODO: We can choose bitwidths for the left and right operands of these
+    //       expressions here to fit a maximum bitwidth.
+    return std::nullopt;
+
+  case ast::BinaryExpression::ShiftRight:
+  case ast::BinaryExpression::Greater:
+  case ast::BinaryExpression::GreaterEqual:
+  case ast::BinaryExpression::Less:
+  case ast::BinaryExpression::LessEqual:
+  case ast::BinaryExpression::Equal:
+  case ast::BinaryExpression::NotEqual:
+    // These operations consume all bits to produce its result, we cannot
+    // leave it unconstrained, otherwise the input expressions must be done
+    // with higher bitwidths.
+    return ConclusionOf<ast::BinaryExpression>{
+        {getInterestingBitWidthInRange(globalMaxBitwidth)},
+        {getInterestingBitWidthInRange(globalMaxBitwidth)}};
+
+  case ast::BinaryExpression::BitOr:
+  case ast::BinaryExpression::BitXor:
+    // Distribute regarding the mod operator.
+    return ConclusionOf<ast::BinaryExpression>{context, context};
+  }
+  llvm_unreachable("all enum cases handled");
+}
+
+auto dynamatic::gen::BitwidthTypeSystem::checkConditionalExpression(
+    const BitwidthTypingContext &context) const
+    -> ConclusionOf<ast::ConditionalExpression> {
+  // The condition must be constrained to fit within the global max bitwidth.
+  return {{getInterestingBitWidthInRange(globalMaxBitwidth)}, context, context};
+}
+
+std::uint32_t dynamatic::gen::BitwidthTypeSystem::getInterestingBitWidthInRange(
+    std::uint32_t bitWidth) const {
+  if (random.getRatherLowProbabilityBool())
+    return random.getInteger<std::uint32_t>(1, bitWidth);
+
+  return bitWidth;
 }
