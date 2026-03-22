@@ -39,11 +39,6 @@
 
 #include <boost/throw_exception.hpp>
 
-// See https://github.com/EPFL-LAP/dynamatic/issues/690
-namespace boost {
-void throw_exception(std::exception const &e) { std::abort(); }
-} // namespace boost
-
 using namespace llvm;
 using namespace polly;
 
