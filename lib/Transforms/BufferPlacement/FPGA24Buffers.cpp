@@ -284,7 +284,7 @@ void LatencyBalancingMILP::addLatencyVariables() {
 
     /// L_c: extra latency to add to the channel for balancing (integer >= 0).
     /// (Paper: Section 4, Table 1)
-    chVars.extraLatency = model->addVar("L_" + name, INTEGER, 0, std::nullopt);
+    chVars.dataLatency = model->addVar("L_" + name, INTEGER, 0, std::nullopt);
 
     /// S_c: whether the channel is stalled due to imbalance (binary).
     /// (Paper: Section 4, Table 1)
@@ -303,10 +303,10 @@ void LatencyBalancingMILP::addLatencyVariables() {
   for (auto &[channel, chVars] : vars.channelVars) {
     std::string name = getUniqueName(*channel.getUses().begin());
     /// L_c >= R_c (if R_c=1, then L_c >= 1)
-    model->addConstr(chVars.extraLatency >= chVars.bufPresent,
+    model->addConstr(chVars.dataLatency >= chVars.bufPresent,
                      "R_lower_" + name);
     /// M*R_c >= L_c (if L_c > 0, then R_c must be 1)
-    model->addConstr(BIG_M * chVars.bufPresent >= chVars.extraLatency,
+    model->addConstr(BIG_M * chVars.bufPresent >= chVars.dataLatency,
                      "R_upper_" + name);
   }
 
@@ -396,7 +396,7 @@ void LatencyBalancingMILP::addReconvergentPathConstraints() {
       for (EdgeIdType edgeId : simplePath.edges) {
         Value channel = graph->edges[edgeId].channel;
         if (vars.channelVars.count(channel)) {
-          pathLatency += vars.channelVars[channel].extraLatency;
+          pathLatency += vars.channelVars[channel].dataLatency;
         }
       }
 
@@ -454,7 +454,7 @@ static LinExpr computeCycleLatency(const SimpleCycle &cycle,
       if (graph.edges[edgeId].dstId == dst) {
         Value channel = graph.edges[edgeId].channel;
         if (vars.channelVars.count(channel)) {
-          latency += vars.channelVars.lookup(channel).extraLatency;
+          latency += vars.channelVars.lookup(channel).dataLatency;
         }
         break;
       }
@@ -682,7 +682,7 @@ void LatencyBalancingMILP::setLatencyBalancingObjective() {
     unsigned bitwidth = getChannelBitwidth(channel);
     objective += LATENCY_WEIGHT * (bitwidth * chVars.bufPresent);
     /// L_c: linear cost of extra latency
-    objective += LATENCY_WEIGHT * chVars.extraLatency;
+    objective += LATENCY_WEIGHT * chVars.dataLatency;
   }
 
   model->setMaximizeObjective(-objective);
@@ -697,13 +697,13 @@ LatencyBalancingResult LatencyBalancingMILP::extractLatencyResults() {
   LatencyBalancingResult result;
 
   for (auto &[channel, chVars] : vars.channelVars) {
-    unsigned extraLatency =
-        static_cast<unsigned>(model->getValue(chVars.extraLatency) + 0.5);
-    result.channelExtraLatency[channel] = extraLatency;
+    unsigned dataLatency =
+        static_cast<unsigned>(model->getValue(chVars.dataLatency) + 0.5);
+    result.channelExtraLatency[channel] = dataLatency;
 
     LLVM_DEBUG(llvm::errs()
                << "Channel " << getUniqueName(*channel.getUses().begin())
-               << ": extra_latency=" << extraLatency
+               << ": extra_latency=" << dataLatency
                << ", stalled=" << model->getValue(chVars.stalled) << "\n");
   }
 

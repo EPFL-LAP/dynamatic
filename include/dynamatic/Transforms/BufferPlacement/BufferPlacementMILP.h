@@ -82,8 +82,6 @@ struct ChannelVars {
   /// Usage of a shift register on the channel (binary).
   CPVar shiftReg;
 
-  /// [FPGA24] Extra latency to insert on this channel for balancing (integer).
-  CPVar extraLatency;
   /// [FPGA24] Whether the channel is stalled due to pattern imbalance (binary).
   CPVar stalled;
   /// [FPGA24] Maximum token occupancy for this channel (real).
