@@ -402,22 +402,6 @@ struct FtdCfToHandshakePass
 
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
-// static void channelifyMuxes(handshake::FuncOp &funcOp) {
-//   // Considering each mux that was added, the inputs and output values must
-//   be
-//   // channellified
-//   for (handshake::MuxOp muxOp : funcOp.getOps<handshake::MuxOp>()) {
-//     assert(muxOp.getDataOperands().size() == 2 &&
-//            "Multiplexers should have two data inputs");
-//     muxOp.getDataOperands()[0].setType(
-//         channelifyType(muxOp.getDataOperands()[0].getType()));
-//     muxOp.getDataOperands()[1].setType(
-//         channelifyType(muxOp.getDataOperands()[1].getType()));
-//     muxOp.getDataResult().setType(
-//         channelifyType(muxOp.getDataResult().getType()));
-//   }
-// }
-
 LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     func::FuncOp lowerFuncOp, OpAdaptor /*adaptor*/,
     ConversionPatternRewriter &rewriter) const {

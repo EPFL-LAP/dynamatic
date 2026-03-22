@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 #include "experimental/Support/FtdCycleAnalysis.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -134,6 +135,12 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
   DenseMap<Block *, Block *> clonedMap;
   clonedMap[scope->header] = clonedHeader;
 
+  // Build topo position map from the input graph for residual back-edge
+  // detection (handles irreducible cycles not captured by CFGLoopInfo).
+  DenseMap<Block *, unsigned> inputTopoPos;
+  for (unsigned i = 0; i < lcfg.topoOrder.size(); ++i)
+    inputTopoPos[lcfg.topoOrder[i]] = i;
+
   // At level 0, map the original consumer and sink to the terminals
   // so that in-scope edges targeting them are resolved correctly.
   if (scope->level == 0) {
@@ -145,6 +152,13 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
   for (Block *b : scope->allBlocksInclusive) {
     if (b == scope->header || b == lcfg.newCons || b == lcfg.sinkBB)
       continue;
+    // Skip the artificial dummyStart block created by buildDecisionGraph.
+    // It has no predecessors (it IS the region entry), unconditionally
+    // branches to scope->header (newProd), and carries no decision logic.
+    // Cloning it would create an orphan that ends up as region.front(),
+    // corrupting downstream CDA which uses region.front() as its entry.
+    if (b->hasNoPredecessors() && b != scope->header)
+      continue;
     Block *nb = new Block();
     R.push_back(nb);
     clonedMap[b] = nb;
@@ -153,7 +167,7 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
 
   // Reconstruct edges and terminators for each cloned block.
   for (auto [origBlock, newBlock] : clonedMap) {
-    // Skip terminal blocks; they receive their terminators later.
+    // Skip terminal blocks; they receive their terminators below.
     if (origBlock == lcfg.newCons || origBlock == lcfg.sinkBB)
       continue;
 
@@ -191,8 +205,18 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
         keepSuccessor.push_back(false);
       } else if (clonedMap.count(origSucc)) {
         // Standard in-scope edge.
-        validSuccessors.push_back(clonedMap[origSucc]);
-        keepSuccessor.push_back(true);
+        // Check for residual back-edges (irreducible cycles) using the
+        // input graph's topological order. These are not natural loop
+        // back-edges and thus not in allBackEdges, but still form cycles.
+        if (inputTopoPos.count(origSucc) && inputTopoPos.count(origBlock) &&
+            inputTopoPos[origSucc] <= inputTopoPos[origBlock]) {
+          // Residual back-edge — redirect to sink.
+          validSuccessors.push_back(falseTerm);
+          keepSuccessor.push_back(true);
+        } else {
+          validSuccessors.push_back(clonedMap[origSucc]);
+          keepSuccessor.push_back(true);
+        }
       } else {
         // Edge leaving the current scope.
         if (scope->level == 0) {
@@ -209,8 +233,9 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
     if (auto cbr = dyn_cast<cf::CondBranchOp>(origTerm)) {
       if (keepSuccessor[0] && keepSuccessor[1]) {
         // Both paths survived; keep conditional branch.
+        Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
         builder.create<cf::CondBranchOp>(
-            loc, cbr.getCondition(), validSuccessors[0], validSuccessors[1]);
+            loc, cond, validSuccessors[0], validSuccessors[1]);
       } else if (keepSuccessor[0] && !keepSuccessor[1]) {
         // Only the true path survived.
         builder.create<cf::BranchOp>(loc, validSuccessors[0]);
@@ -226,6 +251,11 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
       // If the sole successor was cut, no terminator is created (dead).
     }
   }
+
+  builder.setInsertionPointToEnd(trueTerm);
+  builder.create<cf::BranchOp>(loc, falseTerm);
+  builder.setInsertionPointToEnd(falseTerm);
+  builder.create<func::ReturnOp>(loc);
 
   // Graph simplification.
   //
@@ -254,8 +284,10 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
       // Disconnect its predecessors so the removal can propagate.
       if (!term) {
         SmallVector<Operation *, 4> predTerms;
+        DenseSet<Operation *> predTermSeen;
         for (auto &use : block.getUses())
-          predTerms.push_back(use.getOwner());
+          if (predTermSeen.insert(use.getOwner()).second)
+            predTerms.push_back(use.getOwner());
 
         for (Operation *predTerm : predTerms) {
           OpBuilder localBuilder(predTerm->getContext());
@@ -290,6 +322,7 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
 
       // The remaining optimizations only apply to level > 0.
       if (scope->level == 0)
+      // if (true)
         continue;
 
       // Merge duplicate successors: CondBranch(A, A) becomes Branch(A).
@@ -317,14 +350,6 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
     }
   }
 
-  // Finalize the terminal blocks with proper terminators.
-  // The consumer terminal (True) falls through to the sink (False).
-  builder.setInsertionPointToEnd(trueTerm);
-  builder.create<cf::BranchOp>(loc, falseTerm);
-  // The sink terminal ends the region.
-  builder.setInsertionPointToEnd(falseTerm);
-  builder.create<func::ReturnOp>(loc);
-
   // Compute topological order starting from the producer.
   DenseSet<Block *> visited;
   std::function<void(Block *)> topo = [&](Block *u) {
@@ -336,8 +361,33 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
         topo(*it);
     newGraph->topoOrder.push_back(u);
   };
+
   topo(newGraph->newProd);
   std::reverse(newGraph->topoOrder.begin(), newGraph->topoOrder.end());
+
+  // Erase orphan blocks: any block not reachable from newProd (i.e. not in
+  // the visited set) is structural debris.  If left in the region it may
+  // end up before newProd in the block list, becoming region.front() and
+  // corrupting downstream analyses (CDA, dominance) that assume
+  // region.front() is the entry.
+  for (Block &block : llvm::make_early_inc_range(R)) {
+    if (!visited.contains(&block)) {
+      // Erase the terminator first to drop outgoing BlockOperand refs.
+      if (Operation *term = block.getTerminator())
+        term->erase();
+      // The orphan is unreachable, so no other terminator references it.
+      block.erase();
+    }
+  }
+
+  // Physical reordering: ensure region.front() == newProd so that
+  // downstream CDA (which starts DFS from region.front()) uses the
+  // correct entry block.
+  for (Block *b : newGraph->topoOrder) {
+    if (b != newGraph->sinkBB) {
+      b->moveBefore(newGraph->sinkBB);
+    }
+  }
 
   return newGraph;
 }

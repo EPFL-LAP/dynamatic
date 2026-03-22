@@ -1042,7 +1042,7 @@ buildBranchTreeRecursive(mlir::OpBuilder &builder, StringRef currentVar,
       groups[{step.var, step.value}].push_back(req);
     }
 
-    // Divergence found: We have both True and False branches.
+    // Divergence found.
     if (groups.size() > 1) {
       splitFound = true;
       llvm::errs() << "[FTD] Split Variable Found: " << splitVar
@@ -1606,8 +1606,8 @@ static std::unique_ptr<ftd::LocalCFG> buildDecisionGraph(
         }
       }
 
-      builder.create<cf::CondBranchOp>(loc, condBr.getCondition(), newTrue,
-                                       newFalse);
+      Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
+      builder.create<cf::CondBranchOp>(loc, cond, newTrue, newFalse);
     } else {
       // Non-CondBranch nodes in the decision set (rare)
       // Wire to nearest valid successor or Sink
@@ -1765,7 +1765,7 @@ struct CyclicDemotionHelper {
       if (dpLocGraph->newCons) {
         ControlDependenceAnalysis dpCDA(*dpLocGraph->region);
         auto dpDepsTmp =
-            dpCDA.getAllBlockDeps()[dpLocGraph->newCons].forwardControlDeps;
+            dpCDA.getAllBlockDeps()[dpLocGraph->newCons].allControlDeps;
         auto dpDG = buildDecisionGraph(*dpLocGraph, dpDepsTmp);
         ControlDependenceAnalysis dpDGCDA(*dpDG->region);
         auto dpDeps =
@@ -1909,7 +1909,8 @@ static void insertDirectSuppression(
   Block *consumerBlock = shadow.getBlock(consBBIdx);
   Block *dominatorBlock = producerBlock;
 
-  bool debuglog = false;
+  bool debuglog = true;
+  bool debugGraphDump = false;
   std::string funcName = funcOp.getName().str();
   std::string dir = "/home/yuqin/dynamatic-scripts/TempOutputs/";
   std::string logFile = dir + funcName + "_debuglog.txt";
@@ -1918,12 +1919,74 @@ static void insertDirectSuppression(
                            static_cast<llvm::sys::fs::OpenFlags>(0x0004));
   llvm::raw_ostream &out = EC_log ? llvm::errs() : log;
 
+  // Helper: translate a local block to a readable orig-block name
+  auto blockName = [](const ftd::LocalCFG &cfg, Block *b) -> std::string {
+    if (!b)
+      return "(null)";
+    if (b == cfg.sinkBB)
+      return "sink";
+    if (b == cfg.secondVisitBB)
+      return "secondVisit";
+    auto it = cfg.origMap.find(b);
+    if (it != cfg.origMap.end() && it->second) {
+      std::string name;
+      llvm::raw_string_ostream ss(name);
+      it->second->printAsOperand(ss);
+      return ss.str();
+    }
+    std::string name;
+    llvm::raw_string_ostream ss(name);
+    b->printAsOperand(ss);
+    return "local(" + ss.str() + ")";
+  };
+
+  // Concise topology dump: roles, topo order, and edges in orig-block names
+  auto dumpLocalCFG = [&](const ftd::LocalCFG &cfg, llvm::StringRef name) {
+    if (!debugGraphDump)
+      return;
+    out << "===== " << name << " =====\n";
+    out << "  prod=" << blockName(cfg, cfg.newProd)
+        << "  cons=" << blockName(cfg, cfg.newCons)
+        << "  sink=" << blockName(cfg, cfg.sinkBB);
+    if (cfg.secondVisitBB)
+      out << "  secondVisit=" << blockName(cfg, cfg.secondVisitBB);
+    out << "\n  topo: ";
+    for (unsigned i = 0; i < cfg.topoOrder.size(); ++i) {
+      if (i > 0)
+        out << " -> ";
+      out << blockName(cfg, cfg.topoOrder[i]);
+    }
+    out << "\n  edges:\n";
+    if (cfg.region) {
+      for (Block *b : cfg.topoOrder) {
+        Operation *term = b->getTerminator();
+        if (!term || term->getNumSuccessors() == 0)
+          continue;
+        std::string src = blockName(cfg, b);
+        if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+          out << "    " << src
+              << " -T-> " << blockName(cfg, condBr.getTrueDest())
+              << ", -F-> " << blockName(cfg, condBr.getFalseDest()) << "\n";
+        } else {
+          for (unsigned i = 0; i < term->getNumSuccessors(); ++i) {
+            out << "    " << src
+                << " -> " << blockName(cfg, term->getSuccessor(i)) << "\n";
+          }
+        }
+      }
+    }
+    out << "\n";
+  };
+
   // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
   // gate and the producer is one of its data inputs
   bool deliverToGamma = llvm::isa<handshake::MuxOp>(consumer) &&
                         consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
                         (producerBlock != consumerBlock ||
                          connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_MU));
+
+  // Activate graph dumps when deliverToGamma is true (user-adjustable)
+  // debugGraphDump = deliverToGamma;
 
   if (debuglog) {
     out << "[FTD] Producer block: ";
@@ -1997,6 +2060,25 @@ static void insertDirectSuppression(
     if (bi.isLess(producerBlock, dominatorBlock)) {
       dominatorBlock = producerBlock;
     }
+
+    if (dominatorBlock != producerBlock) {
+      std::function<unsigned(Block *, DenseSet<Block *> &)> countPaths;
+      countPaths = [&](Block *curr, DenseSet<Block *> &vis) -> unsigned {
+        if (curr == producerBlock)
+          return 1;
+        if (!vis.insert(curr).second)
+          return 0;
+        unsigned total = 0;
+        for (Block *succ : curr->getSuccessors())
+          total += countPaths(succ, vis);
+        vis.erase(curr);
+        return total;
+      };
+      DenseSet<Block *> vis;
+      unsigned paths = countPaths(dominatorBlock, vis);
+      if (paths <= 1)
+        dominatorBlock = producerBlock;
+    }
   }
 
   if (debuglog && deliverToGamma) {
@@ -2013,6 +2095,8 @@ static void insertDirectSuppression(
   auto locGraph =
       buildLocalCFGRegion(tmpBuilder, dominatorBlock, consumerBlock, bi);
 
+  dumpLocalCFG(*locGraph, "locGraph (Dominator -> Consumer)");
+
   ControlDependenceAnalysis locCDA(*locGraph->region);
   // Full Set: contains consumer dependences, Mux Conditions and their
   // dependences.
@@ -2020,8 +2104,6 @@ static void insertDirectSuppression(
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
   // The set containing Mux Conditions
   DenseSet<Block *> muxConditionSet;
-  DenseSet<Block *> locConsAcyclicDeps =
-      locCDA.getAllBlockDeps()[locGraph->newCons].forwardControlDeps;
 
   // Map to store specific constraints for Mux Conditions (LocalBlock ->
   // RequiredValue)
@@ -2103,10 +2185,11 @@ static void insertDirectSuppression(
 
         // 4. Add to dependencies and record requirement
         if (condBlockLocal) {
+          if (bi.isLess(muxConditionBlock, dominatorBlock))
+            continue;
           // Add this block and its all-dependency blocks to the dependency set
           // so path enumeration observes it.
           locConsControlDepsFull.insert(condBlockLocal);
-          locConsAcyclicDeps.insert(condBlockLocal);
           for (Block *dep :
                locCDA.getAllBlockDeps()[condBlockLocal].allControlDeps) {
             locConsControlDepsFull.insert(dep);
@@ -2163,16 +2246,39 @@ static void insertDirectSuppression(
     }
   }
 
-  // Ensure producer block is in decision graph for nesting level detection
-  Block *prodInLocGraph = nullptr;
-  for (auto [locBlock, origBlock] : locGraph->origMap) {
-    if (origBlock == producerBlock) {
-      prodInLocGraph = locBlock;
-      break;
+  if (locConsControlDepsFull.empty()) {
+    if (locGraph->newCons == locGraph->sinkBB) {
+      builder.setInsertionPointToStart(consumer->getBlock());
+      auto consBBAttr = IntegerAttr::get(
+          IntegerType::get(builder.getContext(), 32, IntegerType::Unsigned),
+          consBBIdx);
+      auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
+      src->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      src->setAttr("handshake.bb", consBBAttr);
+      auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 1);
+      auto constOp = builder.create<handshake::ConstantOp>(
+          consumer->getLoc(), cstAttr, src.getResult());
+      constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      constOp->setAttr("handshake.bb", consBBAttr);
+
+      Value supData = connection;
+      auto branchOp = builder.create<handshake::ConditionalBranchOp>(
+          consumer->getLoc(), ftd::getListTypes(supData.getType()),
+          constOp.getResult(), supData);
+      branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      branchOp->setAttr("handshake.bb", consBBAttr);
+
+      for (auto &use : llvm::make_early_inc_range(connection.getUses())) {
+        if (use.getOwner() != consumer)
+          continue;
+        use.set(branchOp.getFalseResult());
+      }
+      locGraph->containerOp->erase();
+      return;
     }
+    locGraph->containerOp->erase();
+    return;
   }
-  if (prodInLocGraph)
-    locConsControlDepsFull.insert(prodInLocGraph);
 
   // Common Logic for Building Suppression.
   // If deliverToGamma is true, we use the empty constraints to build the
@@ -2184,6 +2290,8 @@ static void insertDirectSuppression(
   builder.setInsertionPointToStart(consumer->getBlock());
   auto fullDecisionGraph =
       buildDecisionGraph(*locGraph, locConsControlDepsFull);
+
+  dumpLocalCFG(*fullDecisionGraph, "fullDecisionGraph (locGraph + FullDeps)");
 
   // Cycle Analysis Integration
   ftd::CyclicGraphManager cyclicMgr(*fullDecisionGraph);
@@ -2199,8 +2307,53 @@ static void insertDirectSuppression(
                                        origToFullDG, consumer->getLoc(),
                                        consumer->getBlock(), nullptr, &shadow);
 
-  // Level 0: distribution graph (no constraints)
-  auto level0FullDG = buildDecisionGraph(*locGraph, locConsAcyclicDeps);
+  // Level 0: Extract acyclic layered CFG from the full decision graph.
+  // This cuts all back-edges, giving a DAG where CDA produces correct
+  // forward dependencies without the findNearest-through-backedge problem.
+  OpBuilder level0Builder(funcOp.getContext());
+  auto level0CFG = cyclicMgr.extractLayeredCFG(
+      cyclicMgr.getTopLevelScope(), level0Builder);
+
+  dumpLocalCFG(*level0CFG, "level0CFG (Acyclic Layered from fullDG)");
+
+  // CDA on the acyclic level 0 CFG — allControlDeps == forwardControlDeps
+  // because the graph is a DAG.
+  ControlDependenceAnalysis level0CDA(*level0CFG->region);
+  DenseSet<Block *> level0Deps =
+      level0CDA.getAllBlockDeps()[level0CFG->newCons].allControlDeps;
+
+  // Translate mux condition blocks (original IR) into level0CFG and insert
+  // them into the dependency set — mirrors locConsAcyclicDeps.insert(condBlockLocal).
+  for (Block *muxCondOrigIR : muxConditionSet) {
+    for (auto &[l0Block, l0Orig] : level0CFG->origMap) {
+      if (l0Orig == muxCondOrigIR) {
+        level0Deps.insert(l0Block);
+        for (Block *dep :
+             level0CDA.getAllBlockDeps()[l0Block].allControlDeps)
+          level0Deps.insert(dep);
+        break;
+      }
+    }
+  }
+
+  // Translate mux constraints from locGraph blocks to level0CFG blocks.
+  DenseMap<Block *, bool> level0MuxConstraints;
+  for (auto &[locBlock, reqVal] : muxConstraints) {
+    Block *origIR = locGraph->origMap.lookup(locBlock);
+    if (!origIR)
+      continue;
+    for (auto &[l0Block, l0Orig] : level0CFG->origMap) {
+      if (l0Orig == origIR) {
+        level0MuxConstraints[l0Block] = reqVal;
+        break;
+      }
+    }
+  }
+
+  // Level 0: distribution graph (unconstrained, covers all paths)
+  auto level0FullDG = buildDecisionGraph(*level0CFG, level0Deps);
+
+  dumpLocalCFG(*level0FullDG, "level0FullDG (level0CFG + Deps)");
 
   // Pre-register demoted values for high-level variables in level 0
   demotionHelper.preRegisterDemotedValues(level0FullDG, registry);
@@ -2208,9 +2361,23 @@ static void insertDirectSuppression(
   // Build distribution on level 0
   buildDistributionNetwork(builder, *level0FullDG, bi, registry, nullptr, &shadow);
 
-  // Level 0: constrained graph (for expression)
+  // Level 0: constrained graph (for suppression expression)
   auto level0ConstrainedDG =
-      buildDecisionGraph(*locGraph, locConsAcyclicDeps, muxConstraints);
+      buildDecisionGraph(*level0CFG, level0Deps, level0MuxConstraints);
+
+  dumpLocalCFG(*level0ConstrainedDG,
+               "level0ConstrainedDG (level0CFG + muxConstraints)");
+
+  if (debugGraphDump && !muxConstraints.empty()) {
+    out << "  muxConstraints (" << muxConstraints.size() << "):\n";
+    for (auto &entry : muxConstraints) {
+      out << "    ";
+      if (entry.first)
+        entry.first->printAsOperand(out);
+      out << " requires " << (entry.second ? "TRUE" : "FALSE") << "\n";
+    }
+    out << "\n";
+  }
 
   ControlDependenceAnalysis decCDA(*level0ConstrainedDG->region);
   DenseSet<Block *> constrainedDeps =
@@ -2238,12 +2405,16 @@ static void insertDirectSuppression(
     auto locGraphDP = buildLocalCFGRegion(tmpBuilder2, dominatorBlock,
                                           producerBlock, bi);
 
+    dumpLocalCFG(*locGraphDP, "locGraphDP (Dominator -> Producer)");
+
     if (locGraphDP->newCons) {
       // Build fullDecisionGraph for DP path
       ControlDependenceAnalysis dpLocCDA(*locGraphDP->region);
       DenseSet<Block *> dpDepsTmp =
-          dpLocCDA.getAllBlockDeps()[locGraphDP->newCons].forwardControlDeps;
+          dpLocCDA.getAllBlockDeps()[locGraphDP->newCons].allControlDeps;
       auto dpFullDG = buildDecisionGraph(*locGraphDP, dpDepsTmp);
+
+      dumpLocalCFG(*dpFullDG, "dpFullDG (locGraphDP + dpDeps)");
 
       ControlDependenceAnalysis finalDpCDA(*dpFullDG->region);
       DenseSet<Block *> dpDeps =
@@ -2261,24 +2432,9 @@ static void insertDirectSuppression(
     locGraphDP->containerOp->erase();
   }
 
-  // Producer data demotion
-  // If producer is inside a loop, demote the data token to level 0
   Value supData = connection;
-  if (prodInLocGraph) {
-    auto prodIt = origToFullDG.find(producerBlock);
-    if (prodIt != origToFullDG.end()) {
-      unsigned prodNative = cyclicMgr.getNestingLevel(prodIt->second);
-      if (prodNative > 0) {
-        if (!supData.getType().isa<handshake::ChannelType>())
-          supData.setType(ftd::channelifyType(supData.getType()));
-        for (unsigned lvl = prodNative; lvl > 0; --lvl) {
-          supData =
-              demotionHelper.demoteOneLevel(supData, producerBlock, lvl);
-        }
-      }
-    }
-  }
 
+  level0CFG->containerOp->erase();
   level0FullDG->containerOp->erase();
   level0ConstrainedDG->containerOp->erase();
   fullDecisionGraph->containerOp->erase();
@@ -2447,7 +2603,7 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
     DenseSet<Block *> locConsControlDepsFull =
         locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
     DenseSet<Block *> locConsAcyclicDeps =
-        locCDATmp.getAllBlockDeps()[locGraph->newCons].forwardControlDeps;
+        locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
 
     // 2. Build full decision graph for CyclicGraphManager
     auto fullDecisionGraph =
@@ -2579,8 +2735,10 @@ void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
   // If the consumer and the producer are in the same block without the
   // consumer being a multiplexer skip because no delivery is needed
   if (consumerBlock == producerBlock &&
-      !llvm::isa<handshake::MuxOp>(consumerOp))
+      (!llvm::isa<handshake::MuxOp>(consumerOp) || 
+      operand.getDefiningOp()->hasAttr(FTD_EXPLICIT_GAMMA))) {
     return;
+  }
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
@@ -2618,10 +2776,6 @@ void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
         (consumerOp != consumerBlock->getTerminator() ||
          operand != consumerOp->getOperand(0)))
       return;
-
-    // Handle the suppression in all the other cases (including the operand
-    // being a function argument)
-    insertDirectSuppression(builder, funcOp, consumerOp, operand, shadow);
 
     // Handle the suppression in all the other cases (including the operand
     // being a function argument)
@@ -2788,7 +2942,7 @@ LogicalResult experimental::ftd::addGsaGates(
         DenseSet<Block *> locConsControlDepsTmp =
             locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
         DenseSet<Block *> locConsAcyclicDeps =
-            locCDATmp.getAllBlockDeps()[locGraph->newCons].forwardControlDeps;
+            locCDATmp.getAllBlockDeps()[locGraph->newCons].allControlDeps;
 
         // 2. Build decision graph for CyclicGraphManager
         auto decisionGraph =
@@ -2954,7 +3108,94 @@ LogicalResult experimental::ftd::addGsaGates(
                            ? 1
                            : 2;
     op->getResult(0).replaceAllUsesWith(op->getOperand(operandToUse));
+    
+    for (auto &[idx, mappedOp] : gsaList) {
+      if (mappedOp == op) mappedOp = nullptr;
+    }
     rewriter.eraseOp(op);
+  }
+
+  // Simplify the generated GSA Mux tree by applying common subexpression
+  // elimination and reduction rules from the bottom up. A reverse mapping
+  // resolves temporary backedge placeholders to their original CFG values
+  // ensuring equivalent inputs are correctly identified across different branches.
+  DenseMap<Value, Value> backedgeToOriginal;
+  if (pendingMuxOperands) {
+    for (auto &[orig, bes] : *pendingMuxOperands) {
+      for (auto &be : bes) {
+        backedgeToOriginal[Value(be)] = orig;
+      }
+    }
+  }
+
+  // Helper functions evaluate the structural equivalence of two values.
+  // Equivalence is based on Value identity (SSA identity): two Values are
+  // equivalent iff they are the same SSA wire. Backedge placeholders are
+  // resolved to their original CF values first.
+  auto getEffectiveValue = [&](Value v) -> Value {
+    if (!v) return v;
+    auto it = backedgeToOriginal.find(v);
+    if (it != backedgeToOriginal.end()) return it->second;
+    return v;
+  };
+
+  auto areEquivalentValues = [&](Value a, Value b) {
+    if (a == b) return true;
+    if (!a || !b) return false;
+    
+    Value effA = getEffectiveValue(a);
+    Value effB = getEffectiveValue(b);
+    return effA == effB;
+  };
+
+  // Iterate through the generated operations until the tree structure fully
+  // converges. The first step performs common subexpression elimination by
+  // scanning horizontally across all generated multiplexers. Whenever two
+  // distinct multiplexers share identical selection conditions and data
+  // inputs, they are merged into a single operation to eliminate structural
+  // duplication.
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    
+    for (auto it1 = gsaList.begin(); it1 != gsaList.end(); ++it1) {
+      if (!it1->second) continue;
+      auto mux1 = dyn_cast<handshake::MuxOp>(it1->second);
+      if (!mux1 || mux1.getNumOperands() != 3) continue;
+      
+      for (auto it2 = std::next(it1); it2 != gsaList.end(); ++it2) {
+        if (!it2->second) continue;
+        auto mux2 = dyn_cast<handshake::MuxOp>(it2->second);
+        if (!mux2 || mux2.getNumOperands() != 3) continue;
+        
+        if (areEquivalentValues(mux1.getSelectOperand(), mux2.getSelectOperand()) &&
+            areEquivalentValues(mux1.getDataOperands()[0], mux2.getDataOperands()[0]) &&
+            areEquivalentValues(mux1.getDataOperands()[1], mux2.getDataOperands()[1])) {
+          
+          mux2.getResult().replaceAllUsesWith(mux1.getResult());
+          rewriter.eraseOp(mux2);
+          it2->second = nullptr; 
+          changed = true;
+        }
+      }
+    }
+
+    // The second step applies the reduction rule by scanning vertically
+    // through the tree. Any multiplexer whose true and false data inputs
+    // resolve to the same underlying value is fundamentally redundant and
+    // is bypassed entirely by routing its data input directly to its users.
+    for (auto &[idx, op] : gsaList) {
+      if (!op) continue;
+      auto mux = dyn_cast<handshake::MuxOp>(op);
+      if (!mux || mux.getNumOperands() != 3) continue;
+      
+      if (areEquivalentValues(mux.getDataOperands()[0], mux.getDataOperands()[1])) {
+        mux.getResult().replaceAllUsesWith(mux.getDataOperands()[0]);
+        rewriter.eraseOp(mux);
+        op = nullptr;
+        changed = true;
+      }
+    }
   }
 
   if (!removeTerminators)
