@@ -313,10 +313,11 @@ DimInfoOfAllDimensions extractDimInfo(const isl::set &range,
       assert(reachableIndices.size() == 1);
       info.emplace_back(reachableIndices.front(), 1, reachableIndices.size());
     } else if (diffs.size() != 1) {
-      LLVM_DEBUG(
-          llvm::errs() << "Dim " << i << " doesn't a single step!\nIndices:\n";
-          for (auto idx
-               : reachableIndices) { llvm::errs() << "Index" << idx << "\n"; });
+      LLVM_DEBUG(llvm::errs()
+                     << "Dim " << i << " doesn't a single step!\nIndices:\n";
+                 for (auto idx : reachableIndices) {
+                   llvm::errs() << "Index" << idx << "\n";
+                 });
       info.emplace_back(0,
                         /* step = 1 indicates that we can't squash the array
                            into a smaller one currently */
