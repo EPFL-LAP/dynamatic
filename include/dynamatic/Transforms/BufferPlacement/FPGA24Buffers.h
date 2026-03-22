@@ -51,7 +51,6 @@ static constexpr double STALL_WEIGHT = 1000.0;
 /// Upper bound for occupancy
 static constexpr double MAX_OCCUPANCY = 100.0;
 
-
 /// Latency Balancing MILP ///
 
 /// Holds the result of the first LP for usage in the LP.

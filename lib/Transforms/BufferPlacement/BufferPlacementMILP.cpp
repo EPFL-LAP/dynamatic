@@ -105,9 +105,8 @@ static bool hasVariableLatencyUnit(Operation *unit) {
 }
 
 /// [FPGA24] Returns whether any node in the path has variable latency.
-static bool
-hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
-                       const DataflowSubgraphBase &graph) {
+static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
+                                   const DataflowSubgraphBase &graph) {
   return std::any_of(nodeIds.begin(), nodeIds.end(), [&](NodeIdType nodeId) {
     return hasVariableLatencyUnit(graph.nodes[nodeId].op);
   });
@@ -155,10 +154,11 @@ static void enumerateSimplePaths(const DataflowSubgraphBase &graph,
 }
 
 /// [FPGA24] Computes cycle latency expression.
-static LinExpr computeCycleLatency(
-    const SimpleCycle &cycle,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
-    const MILPVars &vars, const TimingDatabase &timingDB, double targetPeriod) {
+static LinExpr
+computeCycleLatency(const SimpleCycle &cycle,
+                    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
+                    const MILPVars &vars, const TimingDatabase &timingDB,
+                    double targetPeriod) {
   LinExpr latency;
 
   for (NodeIdType nodeId : cycle.nodes) {
@@ -1249,18 +1249,19 @@ void BufferPlacementMILP::addSyncCycleConstraints(
     const ::dynamatic::SynchronizingCyclePair &pair = syncCyclePairs[pairIdx];
     CPVar &patternImbalanced = vars.syncCycleVars[pairIdx].imbalanced;
 
-    bool hasVarLatency = hasVariableLatencyPath(pair.cycleOne.nodes, syncGraph) ||
-                         hasVariableLatencyPath(pair.cycleTwo.nodes, syncGraph);
+    bool hasVarLatency =
+        hasVariableLatencyPath(pair.cycleOne.nodes, syncGraph) ||
+        hasVariableLatencyPath(pair.cycleTwo.nodes, syncGraph);
     if (hasVarLatency) {
       model->addConstr(patternImbalanced == 1,
                        "varLatency_sc_" + std::to_string(pairIdx));
       continue;
     }
 
-    LinExpr latencyCycleOne = computeCycleLatency(
-        pair.cycleOne, syncGraph, vars, timingDB, targetPeriod);
-    LinExpr latencyCycleTwo = computeCycleLatency(
-        pair.cycleTwo, syncGraph, vars, timingDB, targetPeriod);
+    LinExpr latencyCycleOne = computeCycleLatency(pair.cycleOne, syncGraph,
+                                                  vars, timingDB, targetPeriod);
+    LinExpr latencyCycleTwo = computeCycleLatency(pair.cycleTwo, syncGraph,
+                                                  vars, timingDB, targetPeriod);
 
     std::string baseName = "imbalance_sc_" + std::to_string(pairIdx);
     model->addConstr(latencyCycleOne - latencyCycleTwo <=
@@ -1282,7 +1283,8 @@ void BufferPlacementMILP::addStallPropagationConstraints(
   };
 
   for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
-    const fpga24::ReconvergentPathWithGraph &pathWithGraph = reconvergentPaths[i];
+    const fpga24::ReconvergentPathWithGraph &pathWithGraph =
+        reconvergentPaths[i];
     const ReconvergentPath &path = pathWithGraph.path;
     const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     for (NodeIdType nodeId : path.nodeIds) {
@@ -1377,8 +1379,8 @@ void BufferPlacementMILP::addCycleTimeConstraints(
         llvm::errs() << "\n";
       });
 
-      LinExpr cycleLatency = computeCycleLatency(
-          cycle, cfdfcGraph, vars, timingDB, targetPeriod);
+      LinExpr cycleLatency =
+          computeCycleLatency(cycle, cfdfcGraph, vars, timingDB, targetPeriod);
       std::string baseName = "cycleTime_cfdfc" + std::to_string(cfdfcIdx) +
                              "_cycle" + std::to_string(cycleIdx);
       model->addConstr(cycleLatency >= iiCFC, baseName + "_min");
