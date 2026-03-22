@@ -30,6 +30,7 @@ List of options:
                                          checking
   --use-prebuilt-llvm                  : download and use the prebuilt LLVM
   --enable-cbc                         : enable the CBC milp solver
+  --enable-abc                         : enable the ABC logic synthesis tool
   --build-legacy-lsq                   : build the legacy chisel-based lsq
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
@@ -143,6 +144,7 @@ PREBUILT_LLVM=0
 BUILD_CHIESEL_LSQ=0
 ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
+CMAKE_DYNAMATIC_ENABLE_ABC=""
 LLVM_DIR="$PWD/llvm-project/build"
 
 # Loop over command line arguments and update script variables
@@ -206,6 +208,9 @@ do
               CMAKE_DYNAMATIC_ENABLE_CBC="-DDYNAMATIC_ENABLE_CBC=ON"
               ENABLE_CBC=1
               ;;
+          "--enable-abc")
+              CMAKE_DYNAMATIC_ENABLE_ABC="-DDYNAMATIC_ENABLE_ABC=ON"
+              ;;
           "--build-legacy-lsq")
               BUILD_CHIESEL_LSQ=1
               ;;
@@ -231,36 +236,7 @@ echo "##########################################################################
 echo "############# DYNAMATIC - DHLS COMPILER INFRASTRUCTURE - EPFL/LAP ##############"
 echo "################################################################################"
 
-if [[ $PREBUILT_LLVM -eq 0 ]]; then
-
-  #### llvm-project ####
-
-  prepare_to_build_project "LLVM" "$LLVM_DIR"
-
-  # CMake
-  if should_run_cmake ; then
-    cmake -G Ninja ../llvm \
-        -DLLVM_ENABLE_PROJECTS="mlir;clang;polly" \
-        -DLLVM_TARGETS_TO_BUILD="host" \
-        -DLLVM_ENABLE_RTTI=ON \
-        -DLLVM_ENABLE_EH=ON \
-        -DBUILD_SHARED_LIBS=ON \
-        -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-        -DLLVM_PARALLEL_LINK_JOBS=$LLVM_PARALLEL_LINK_JOBS \
-        $CMAKE_COMPILERS $CMAKE_LLVM_BUILD_OPTIMIZATIONS
-    exit_on_fail "Failed to cmake llvm-project"
-  fi
-
-  # Build
-  run_ninja
-  exit_on_fail "Failed to build llvm-project"
-  if [[ ENABLE_TESTS -eq 1 ]]; then
-      ninja check-mlir
-      exit_on_fail "Tests for llvm-project failed"
-  fi
-
-else
-
+if [[ $PREBUILT_LLVM -eq 1 ]]; then
   #### llvm-project (prebuilt) ####
   prepare_to_build_project "Dynamatic (prebuilt-llvm)" "build"
 
@@ -388,6 +364,7 @@ if should_run_cmake ; then
             $CMAKE_LLVM_BUILD_OPTIMIZATIONS \
             $CMAKE_DYNAMATIC_ENABLE_XLS \
             $CMAKE_DYNAMATIC_ENABLE_CBC \
+            $CMAKE_DYNAMATIC_ENABLE_ABC \
             $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
 
     LLVM_DIR="../build/llvm-project"
@@ -404,6 +381,7 @@ if should_run_cmake ; then
         $CMAKE_DYNAMATIC_BUILD_OPTIMIZATIONS \
         $CMAKE_DYNAMATIC_ENABLE_XLS \
         $CMAKE_DYNAMATIC_ENABLE_CBC \
+        $CMAKE_DYNAMATIC_ENABLE_ABC \
         $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   fi
   exit_on_fail "Failed to cmake dynamatic"
@@ -487,12 +465,14 @@ create_symlink ../build/bin/dynamatic
 create_symlink ../build/bin/dynamatic-mlir-lsp-server
 create_symlink ../build/bin/dynamatic-opt
 create_symlink ../build/bin/elastic-miter
+create_symlink ../build/bin/export-blif
 create_symlink ../build/bin/export-dot
 create_symlink ../build/bin/export-cfg
 create_symlink ../build/bin/export-rtl
 create_symlink ../build/bin/exp-frequency-profiler
 create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
+create_symlink ../build/bin/import-blif
 create_symlink ../build/bin/log2csv
 create_symlink "../build/bin/rigidification-testbench"
 create_generator_symlink build/bin/rtl-cmpf-generator
