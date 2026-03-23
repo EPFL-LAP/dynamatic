@@ -270,3 +270,22 @@ class WhenElse(Statement):
                 f"true_statement and false_statement must have the same type, got {self.true_statement.get_type()} and {self.false_statement.get_type()}"
             )
         return self.true_statement.get_type()
+
+def reduce_bin(op: BinOp, statements: list) -> Statement:
+    """
+    Reduces a list of statements into a single statement using the given binary operator.
+    The statements are combined in a left-associative manner.
+
+    Args:
+        statements (list): A list of Statement objects to be reduced.
+        op (BinOp): The binary operator to use for reduction.
+
+    Returns:
+        Statement: A single Statement object resulting from the reduction.
+    """
+    if len(statements) == 0:
+        raise ValueError("Cannot reduce an empty list of statements")
+    elif len(statements) == 1:
+        return statements[0]
+    else:
+        return Bin(statements[0], op, reduce_bin(op, statements[1:]))

@@ -2,7 +2,7 @@ from core_gen.emitters import Emitter
 from core_gen.signals import *
 from core_gen.operators import *
 from core_gen.configs import Configs
-from core_gen.ir import BinOp, Bin, Val, Bit, CustomStatement
+from core_gen.ir import BinOp, Bin, Val, Bit, CustomStatement, reduce_bin
 
 import core_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
@@ -214,14 +214,7 @@ class LSQ:
             temp_gen_mem = Logic(em, "TEMP_GEN_MEM", "w", force_reg=True)
 
             #! The memory completion signal cannot be set to 1 when any group is allocating:
-            binops = [
-                Bin(Val(group_init_valid_i, i), BinOp.OR, None)
-                for i in range(group_init_valid_i.length - 1)
-            ]
-            binops.append(Val(group_init_valid_i, group_init_valid_i.length - 1))
-            for i, op in enumerate(binops[:-1]):
-                op.right = binops[i + 1]
-            no_curr_ga = ~binops[0]
+            no_curr_ga = ~reduce_bin(BinOp.OR, [Val(group_init_valid_i, i) for i in range(group_init_valid_i.length)])
 
             #! Define the needed logic
             em.add_comment(
