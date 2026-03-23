@@ -308,6 +308,9 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
   InterfaceMethod<[{
     Gets the pipeline slots based on the II and the latency.
     TODO: Actually retrieve the II, instead of just assuming II=1
+
+    Implementation is done here instead of in HandshakeOps.cpp as
+    the code will look the same for any operation.
   }], "std::vector<PipelineSlotNamer>", "getPipelineSlots", (ins), [{
     Operation *op = $_op.getOperation();
     auto attr = op->getAttrOfType<IntegerAttr>("latency");

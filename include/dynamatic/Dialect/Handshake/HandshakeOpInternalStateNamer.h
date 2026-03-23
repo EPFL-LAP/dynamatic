@@ -38,6 +38,15 @@ struct InternalStateNamer {
   virtual llvm::json::Value toInnerJSON() const = 0;
 
   inline llvm::json::Value toJSON() const {
+    // Example:
+    // {
+    //   "type": "EagerForkSent",
+    //   "inner": {
+    //     "operation": "fork1",
+    //     "channel_name": "outs_1",
+    //     "channel_size": 2
+    //   }
+    // }
     return llvm::json::Object({
         {TYPE_LIT, typeToStr(type)},
         {INNER_LIT, toInnerJSON()},
@@ -77,6 +86,14 @@ struct ConstrainedNamer : InternalStateNamer {
   virtual std::unique_ptr<InternalStateNamer> getUnconstrained() const = 0;
 
   inline llvm::json::Value toInnerJSON() const override {
+    // This assumes the internal state being named is represented as an object.
+    // Example for fork8 output 0 constrained to 0:
+    // {
+    //   "channel_name": "outs_0",
+    //   "channel_size": 1,
+    //   "operation": "fork8",
+    //   "value": 0
+    // }
     llvm::json::Object *objP = getUnconstrained()->toJSON().getAsObject();
     assert(objP && "internal state namer is a json object");
     llvm::json::Object &obj = *objP;
@@ -148,10 +165,10 @@ inline std::string smvValue(size_t channelSize, size_t value) {
   }
 }
 
-struct ConstrainedEagerForkSentNamer : public ConstrainedNamer {
+struct ConstrainedEagerForkSentNamer : ConstrainedNamer {
   ConstrainedEagerForkSentNamer() = default;
   ConstrainedEagerForkSentNamer(const EagerForkSentNamer &base, int32_t value)
-      : ConstrainedNamer(), base(base), value(value) {}
+      : ConstrainedNamer(TYPE::EagerForkSent, value), base(base) {}
   ~ConstrainedEagerForkSentNamer() = default;
 
   inline std::string getSMVName() const override {
@@ -160,17 +177,11 @@ struct ConstrainedEagerForkSentNamer : public ConstrainedNamer {
         .str();
   }
 
-  inline llvm::json::Value toInnerJSON() const override {
-    llvm::json::Value obj = base.toInnerJSON();
-    return llvm::json::Object({{BASE_LIT, obj}, {VALUE_LIT, value}});
-  }
-
   inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
     return std::make_unique<EagerForkSentNamer>(base);
   }
 
   EagerForkSentNamer base;
-  int32_t value;
   static constexpr llvm::StringLiteral BASE_LIT = "base";
   static constexpr llvm::StringLiteral VALUE_LIT = "value";
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";

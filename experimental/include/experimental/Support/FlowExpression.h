@@ -30,6 +30,14 @@ namespace handshake {
 // for channel lambdas using IndexChannelAnalysis to determine if the channel
 // deals with indices.
 struct IndexTracker {
+  // numValues is the number of index values that are possible for this token.
+  // For example, if the token is used as the select input of a mux with 3 data
+  // inputs, numValues will be 3. The indices are always assumed to range from
+  // (0 .. numValues - 1), so all possible tokens would be {0, 1, 2} in the
+  // example.
+  // Note that this is slightly more information than simply the bit width of a
+  // channel: In the example, the bit width of the channel is 2 bits, but one of
+  // the 4 resulting options is invalid.
   size_t numValues;
   // Which token value does this variable track?
   // e.g. 1 to only count tokens with value 1
@@ -90,7 +98,9 @@ struct FlowVariable {
   // 2. It can be an internal state, which represents any data that can be found
   // in the final HDL: Most commonly, this is the data within a slot of a
   // buffer, or the state keeping track of which results of an eager fork have
-  // been sent.
+  // been sent. It is stored as an shared pointer because it needs to be stored
+  // as a pointer as InternalStateNamer is a virtual class, and because it could
+  // be copied often.
   // 3. It can be an internal lambda, which acts similar to a channel lambda,
   // except it does not count the tokens of a real channel in the handshake
   // MLIR, but rather a fictional channel within an operation (e.g. a channel
@@ -129,7 +139,12 @@ struct FlowVariable {
 
   std::string getDebugName() const;
 
-  // get the annotater for internal state - if it exists
+  // Get the annotater for internal state
+  // If the annotater does not exist, a nullptr is returned
+  // Usage example:
+  // if (auto annotater = var.getAnnotater()) {
+  //   ...
+  // }
   std::shared_ptr<InternalStateNamer> getAnnotater() const;
 };
 

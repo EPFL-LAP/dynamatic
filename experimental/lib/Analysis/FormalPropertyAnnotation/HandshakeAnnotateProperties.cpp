@@ -574,72 +574,110 @@ void EquationExtractor::extractLazyFork(Operation &op, FlowVariable &before) {
 void EquationExtractor::extractAll(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
-      // A general structure for an operation is assumed:
+
+      // In the following if-branch, a general structure for the operation is
+      // assumed, as described below. With this structure, it is relatively
+      // simple to annotate equations for many different operations using the
+      // same logic.
       // in1, in2, ... -> Join/Merge/Mux        -> entry channel
       // entry channel -> arithmetic operation? -> i1
       // i1            -> pipeline slots?       -> i2
       // i2            -> slots?                -> exit
       // exit channel  -> Fork/Branch           -> out1, out2, ...
-      //
-      // Some operations do not follow this structure, and should be handled
-      // separately to avoid making false assumptions.
-      if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
-        continue;
-      }
-      if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
-        continue;
-      }
-      if (auto controllerOp = dyn_cast<handshake::MemoryControllerOp>(op)) {
-        continue;
-      }
-      if (auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op)) {
+      if (isa<MergeOp, ForkOp, MuxOp, ConstantOp, ExtUIOp, ExtSIOp, BufferOp,
+              SourceOp, MulIOp, AddIOp, TruncIOp, CmpIOp, SinkOp,
+              ConditionalBranchOp, EndOp>(op)) {
+        // in1, in2, ... -> Join/Merge/Mux -> entry channel
+        FlowVariable entry = InternalLambda(&op, 0);
+        if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
+          extractMergeLikeOp(mergeOp, entry);
+          if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+            extractMuxOpExtra(muxOp, entry);
+          }
+        } else {
+          extractJoinOp(op, entry);
+        }
+
+        // entry channel -> arithmetic operation? -> i1
+        FlowVariable i1 = entry;
+        if (auto arithOp = dyn_cast<handshake::ArithOpInterface>(op)) {
+          // Arithmetic operations modify the channel - unless further analysis
+          // is done, information about the carried token is lost
+          if (entry.isIndex()) {
+            i1 = entry.nextInternal();
+            i1.indexTokenConstraint.reset();
+            equations.push_back(entry - i1);
+          }
+        }
+
+        // Annotate latency-induced slots
+        // i1            -> pipeline slots?       -> i2
+        FlowVariable i2 = i1;
+        if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
+          extractPipeline(latencyOp, i2);
+        }
+
+        // Annotate buffer slots
+        // i2            -> slots?                -> exit
+        FlowVariable exit = i2;
+        if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
+          extractBufferLikeOp(bufferOp, exit);
+        }
+
+        if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
+          extractEagerFork(forkOp, exit);
+        } else if (auto branchOp =
+                       dyn_cast<handshake::ConditionalBranchOp>(op)) {
+          extractBranchOp(branchOp, exit);
+        } else {
+          extractLazyFork(op, exit);
+        }
+      } else if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
+        // addrInput = addrOutput + addrSlot
+        // addr_input -> addr_slot ----> MC ----->
+        // dataInput = dataOutput + dataSlot
+        // data_input -> data_slot -> data_output
+        auto slots = loadOp.getInternalSlotStateNamers();
+        std::shared_ptr<InternalStateNamer> addrNamer =
+            std::make_shared<BufferSlotFullNamer>(slots[0]);
+        FlowVariable addrSlot(addrNamer);
+        FlowVariable addrInput(indexChannelAnalysis,
+                               ChannelLambda(loadOp.getAddress()));
+        FlowVariable addrOutput(indexChannelAnalysis,
+                                ChannelLambda(loadOp.getAddressResult()));
+
+        equations.push_back(addrInput - addrOutput - addrSlot);
+
+        std::shared_ptr<InternalStateNamer> dataNamer =
+            std::make_shared<BufferSlotFullNamer>(slots[1]);
+        FlowVariable dataSlot(dataNamer);
+        FlowVariable dataInput(indexChannelAnalysis,
+                               ChannelLambda(loadOp.getData()));
+        FlowVariable dataOutput(indexChannelAnalysis,
+                                ChannelLambda(loadOp.getDataResult()));
+
+        equations.push_back(dataInput - dataOutput - dataSlot);
+
+      } else if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
+        // Both data and address are simply forwarded along their channels
+        FlowVariable dataInput(indexChannelAnalysis,
+                               ChannelLambda(storeOp.getData()));
+        FlowVariable dataOutput(indexChannelAnalysis,
+                                ChannelLambda(storeOp.getDataResult()));
+
+        equations.push_back(dataInput - dataOutput);
+
+        FlowVariable addrInput(indexChannelAnalysis,
+                               ChannelLambda(storeOp.getAddress()));
+        FlowVariable addrOutput(indexChannelAnalysis,
+                                ChannelLambda(storeOp.getAddressResult()));
+
+        equations.push_back(addrInput - addrOutput);
+
+      } else if (auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op)) {
         extractControlMergeOp(cmergeOp);
-        continue;
-      }
-
-      // in1, in2, ... -> Join/Merge/Mux -> entry channel
-      FlowVariable entry = InternalLambda(&op, 0);
-      if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
-        extractMergeLikeOp(mergeOp, entry);
-        if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
-          extractMuxOpExtra(muxOp, entry);
-        }
       } else {
-        extractJoinOp(op, entry);
-      }
-
-      // entry channel -> arithmetic operation? -> i1
-      FlowVariable i1 = entry;
-      if (auto arithOp = dyn_cast<handshake::ArithOpInterface>(op)) {
-        // Arithmetic operations modify the channel - unless further analysis is
-        // done, information about the carried token is lost
-        if (entry.isIndex()) {
-          i1 = entry.nextInternal();
-          i1.indexTokenConstraint.reset();
-          equations.push_back(entry - i1);
-        }
-      }
-
-      // Annotate latency-induced slots
-      // i1            -> pipeline slots?       -> i2
-      FlowVariable i2 = i1;
-      if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
-        extractPipeline(latencyOp, i2);
-      }
-
-      // Annotate buffer slots
-      // i2            -> slots?                -> exit
-      FlowVariable exit = i2;
-      if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
-        extractBufferLikeOp(bufferOp, exit);
-      }
-
-      if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
-        extractEagerFork(forkOp, exit);
-      } else if (auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(op)) {
-        extractBranchOp(branchOp, exit);
-      } else {
-        extractLazyFork(op, exit);
+        op.emitError("Not handled yet!");
       }
     }
   }
