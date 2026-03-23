@@ -18,9 +18,9 @@ auto dynamatic::gen::BitwidthTypeSystem::checkParameter(
 
   // Only allow a parameter if either: We have no bitwidth requirement OR
   // the parameter type restricts it to fit in the given bitwidth.
-  if (!context.maxBitwidth ||
-      *context.maxBitwidth >= parameter.getDataType().getBitwidth())
-    return ConclusionOf<ast::Parameter>{};
+  if (std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
+      !req || *req >= parameter.getDataType().getBitwidth())
+    return context;
 
   return std::nullopt;
 }
@@ -32,7 +32,8 @@ auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
     return std::nullopt;
 
   // Any integer constant is okay.
-  if (!context.maxBitwidth)
+  std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
+  if (!req)
     return ConclusionOf<ast::Constant>{};
 
   // Otherwise restrain it to our bitwidth.
@@ -43,7 +44,7 @@ auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
           // TODO: This is basically always a non-negative number.
           //       Figure out when/if it is safe to produce a negative number
           //       here!
-          return {static_cast<T>(value & (1LL << *context.maxBitwidth) - 1)};
+          return {static_cast<T>(value & (1LL << *req) - 1)};
         }
         llvm_unreachable("double and float handled above");
       },
@@ -55,18 +56,19 @@ auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
     -> std::optional<ConclusionOf<ast::BinaryExpression>> {
   switch (op) {
   case ast::BinaryExpression::BitAnd: {
-    // Bitand is distributive: Sub-expressions can be unconstrained as well.
-    if (!context.maxBitwidth)
-      return ConclusionOf<ast::BinaryExpression>{context, context};
+    // Bitand is distributive: Sub-expressions can assume they are truncated
+    // as well.
+    std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
+    if (!req)
+      return ConclusionOf<ast::BinaryExpression>{ResultIsTruncated{},
+                                                 ResultIsTruncated{}};
 
     // Otherwise, one operand is constrained to of the given maximum bitwidth
-    // while the other can be unconstrained.
+    // while the other can assume it is being truncated.
     // The choice of whether the left or right-hand-side is constrained is
     // arbitrary.
     return ConclusionOf<ast::BinaryExpression>{
-        BitwidthTypingContext{std::nullopt},
-        BitwidthTypingContext{
-            getInterestingBitWidthInRange(*context.maxBitwidth)}};
+        ResultIsTruncated{}, getInterestingBitWidthInRange(*req)};
   }
   case ast::BinaryExpression::ShiftLeft:
     // TODO: Left shift is distributive for the shifted operand but not the
@@ -78,8 +80,9 @@ auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
   case ast::BinaryExpression::Plus:
   case ast::BinaryExpression::Mul:
   case ast::BinaryExpression::Minus:
-    if (!context.maxBitwidth)
-      return ConclusionOf<ast::BinaryExpression>{context, context};
+    if (context.resultIsTruncated())
+      return ConclusionOf<ast::BinaryExpression>{ResultIsTruncated{},
+                                                 ResultIsTruncated{}};
 
     // TODO: We can choose bitwidths for the left and right operands of these
     //       expressions here to fit a maximum bitwidth.
@@ -101,7 +104,7 @@ auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
 
   case ast::BinaryExpression::BitOr:
   case ast::BinaryExpression::BitXor:
-    // Distribute regarding the mod operator.
+    // Distribute regarding truncation.
     return ConclusionOf<ast::BinaryExpression>{context, context};
   }
   llvm_unreachable("all enum cases handled");
@@ -114,10 +117,11 @@ auto dynamatic::gen::BitwidthTypeSystem::checkConditionalExpression(
   return {{getInterestingBitWidthInRange(globalMaxBitwidth)}, context, context};
 }
 
-std::uint32_t dynamatic::gen::BitwidthTypeSystem::getInterestingBitWidthInRange(
-    std::uint32_t bitWidth) const {
+dynamatic::gen::BitwidthTypingContext
+dynamatic::gen::BitwidthTypeSystem::getInterestingBitWidthInRange(
+    uint8_t bitWidth) const {
   if (random.getRatherLowProbabilityBool())
-    return random.getInteger<std::uint32_t>(1, bitWidth);
+    return BitwidthTypingContext(random.getInteger<std::uint32_t>(1, bitWidth));
 
-  return bitWidth;
+  return BitwidthTypingContext(bitWidth);
 }

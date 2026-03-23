@@ -40,11 +40,12 @@ BitwidthOptimizationsTarget::createWorker(const Options &options,
 
 void BitwidthOptimizationsGenerator::generate(
     llvm::raw_ostream &os, llvm::StringRef functionName) const {
-  unsigned maxBitwidth = random.getInteger(1, 32);
+  // Enforce a strict bitwidth requirement for the entire program.
+  auto maxBitwidth = random.getInteger<std::uint8_t>(1, 32);
   gen::BitwidthTypeSystem bitwidthTypeSystem(maxBitwidth, random);
   gen::BasicCGenerator generator(random, bitwidthTypeSystem,
                                  /*entryContext=*/
-                                 {maxBitwidth});
+                                 gen::BitwidthTypingContext{maxBitwidth});
 
   ast::Function function = generator.generate(functionName);
   os << R"(

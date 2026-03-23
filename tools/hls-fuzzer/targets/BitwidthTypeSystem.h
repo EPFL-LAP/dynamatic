@@ -5,24 +5,51 @@
 
 namespace dynamatic::gen {
 
+struct ResultIsTruncated {};
+
 /// Typing context used for the bitwidth type system.
-struct BitwidthTypingContext {
-  /// The upper-bound of required bitwidth for computations in a generated
-  /// expression.
-  /// More formally, "expr % (1 << maxBitwidth)" should be semantically
-  /// identical to "expr" (local invariant).
-  ///
-  /// If this is an empty optional, the expression itself does not need to
-  /// adhere to a specific bitwidth requirement but must either:
-  /// * be distributive regarding the mod 2^n operator OR
-  /// * satisfy the local invariant for some "maxBitwidth < globalMaxBitwidth".
-  /// This property is applied recursively for any sub-expression in the first
-  /// case.
-  ///
-  /// The empty optionals are introduced by bitand operations and mainly
-  /// enables the use of parameters as well as computation done on higher
-  /// bitwidths (such as addition or multiplication) to be capped.
-  std::optional<std::uint8_t> maxBitwidth;
+/// The context may be in one of two distinct states:
+/// * There is a bitwidth requirement that requires that an expression can be
+///   done at a given bitwidth or is otherwise illegal.
+/// * An expression is allowed to assume that its result is truncated to some
+///   arbitrary bitwidth 'b'. The expression is legal iff this assumption is
+///   sufficient to perform computations with bitwidth 'b'.
+///   This is commonly the case for operations that are distributive regarding
+///   the truncation operation.
+///
+/// The second state is enabled when a bitand-expression is generated and
+/// allows using more expressions and parameters as sub-expressions.
+/// The type system uses these two states to guarantee that ALL computations in
+/// the generated program can be performed at a bitwidth less-or-equal to a
+/// value chosen randomly in the entry context.
+class BitwidthTypingContext {
+public:
+  /// Constructs a 'BitwidthTypingContext' enabling the assumption that the
+  /// result of an expression is truncated.
+  /*implicit*/ BitwidthTypingContext(ResultIsTruncated)
+      : variant(ResultIsTruncated{}) {}
+
+  /// Constructs a 'BitwidthTypingContext' that puts a strict bitwidth
+  /// requirement on the computation performed in an expression.
+  explicit BitwidthTypingContext(std::uint8_t bitwidth) : variant(bitwidth) {}
+
+  /// Returns true if it can be assumed that the result of the expression is
+  /// truncated.
+  bool resultIsTruncated() const {
+    return std::holds_alternative<ResultIsTruncated>(variant);
+  }
+
+  /// Returns the strictly required bitwidth or an empty optional, if there is
+  /// no strict bitwidth requirement.
+  std::optional<std::uint8_t> bitwidthRequirementOrNone() const {
+    const std::uint8_t *req = std::get_if<std::uint8_t>(&variant);
+    if (!req)
+      return std::nullopt;
+    return *req;
+  }
+
+private:
+  std::variant<ResultIsTruncated, std::uint8_t> variant;
 };
 
 class BitwidthTypeSystem
@@ -55,7 +82,7 @@ public:
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range
   /// [1, bitWidth].
-  std::uint32_t getInterestingBitWidthInRange(std::uint32_t bitWidth) const;
+  BitwidthTypingContext getInterestingBitWidthInRange(uint8_t bitWidth) const;
 
   uint8_t globalMaxBitwidth;
   Randomly &random;
