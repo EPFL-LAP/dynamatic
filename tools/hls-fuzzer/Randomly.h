@@ -1,6 +1,7 @@
 #ifndef DYNAMATIC_HLS_FUZZER_RANDOMLY
 #define DYNAMATIC_HLS_FUZZER_RANDOMLY
 
+#include <algorithm>
 #include <cassert>
 #include <random>
 #include <unordered_set>
@@ -22,6 +23,11 @@ public:
     assert(size != 0 && "cannot return element from empty range");
     auto index = getInteger<size_t>(0, size - 1);
     return *std::next(range.begin(), index);
+  }
+
+  template <class Range>
+  void shuffle(Range &range) {
+    std::shuffle(range.begin(), range.end(), generator);
   }
 
   /// Returns a random bool.
