@@ -11,6 +11,7 @@ struct ResultIsTruncated {};
 /// The context may be in one of two distinct states:
 /// * There is a bitwidth requirement that requires that an expression can be
 ///   done at a given bitwidth or is otherwise illegal.
+///
 /// * An expression is allowed to assume that its result is truncated to some
 ///   arbitrary bitwidth 'b'. The expression is legal iff this assumption is
 ///   sufficient to perform computations with bitwidth 'b'.
