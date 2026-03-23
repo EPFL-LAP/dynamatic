@@ -15,8 +15,7 @@ public:
   explicit RandomCWorker(const Options &options, Randomly &&random)
       : AbstractWorker(options, std::move(random)) {}
 
-  void generate(llvm::raw_ostream &os,
-                llvm::StringRef functionName) override;
+  void generate(llvm::raw_ostream &os, llvm::StringRef functionName) override;
 
   VerificationResult
   verify(const std::filesystem::path &sourceFile) const override;
