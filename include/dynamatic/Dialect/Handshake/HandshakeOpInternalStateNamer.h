@@ -158,7 +158,7 @@ inline std::string smvValue(size_t channelSize, size_t value) {
     case 1:
       return "TRUE";
     default:
-      assert(false && "value outside channel size");
+      llvm::report_fatal_error("value outside channel size");
     }
   } else {
     return llvm::formatv("0ud{0}_{1}", channelSize, value).str();

@@ -27,6 +27,7 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
@@ -242,16 +243,16 @@ struct FlowEquationsMatrix {
   MatIntType matrix;
 
   size_t size() const { return indexToVar.size(); }
-  void verify() {
-    assert(varToIndex.size() == indexToVar.size());
+  bool verify() {
+    if (!(varToIndex.size() == indexToVar.size()))
+      return false;
     for (size_t i = 0; i < indexToVar.size(); ++i) {
       FlowVariable &a = indexToVar[i];
       size_t j = varToIndex[a];
-      assert(i == j);
+      if (i != j)
+        return false;
     }
-    for (auto &[key, value] : varToIndex) {
-      assert(indexToVar[value] == key);
-    }
+    return true;
   }
 
   FlowExpression getRowAsExpression(size_t row) const {
@@ -407,8 +408,11 @@ void EquationExtractor::extractMergeLikeOp(MergeLikeOpInterface mergeOp,
       mergeEq += ch;
     }
   }
-  assert(!(foundIndexed && foundUnindexed) &&
-         "some index channels and some normal channels");
+  if (foundIndexed && foundUnindexed) {
+    mergeOp.emitError(
+        "This merge op has some index channels and some normal channels");
+    return;
+  }
   if (foundIndexed) {
     after.indexTokenConstraint = IndexTracker(indexValue);
     for (size_t i = 0; i < indexValue; ++i) {
@@ -426,13 +430,17 @@ void EquationExtractor::extractMuxOpExtra(MuxOp muxOp, FlowVariable &after) {
   FlowVariable selectVar(indexChannelAnalysis, ChannelLambda(select));
   if (selectVar.isIndex()) {
     auto dataOperands = muxOp.getDataOperands();
-    assert(selectVar.indexTokenConstraint->numValues == dataOperands.size());
+    if (selectVar.indexTokenConstraint->numValues != dataOperands.size()) {
+      muxOp.emitError(
+          "index channel analysis does not match number of mux inputs");
+      return;
+    }
     for (auto [i, operand] : llvm::enumerate(dataOperands)) {
       FlowVariable var(indexChannelAnalysis, ChannelLambda(operand));
       equations.push_back(selectVar.setTrackedTokens(i) - var);
     }
   } else {
-    assert(false && "muxOp select var should always be index");
+    muxOp.emitWarning("muxOp select input should always be index");
     FlowExpression dataEq = -after;
     for (auto operand : muxOp.getDataOperands()) {
       FlowVariable chVar(indexChannelAnalysis, ChannelLambda(operand));
@@ -548,8 +556,14 @@ void EquationExtractor::extractBranchOp(ConditionalBranchOp branchOp,
                         ChannelLambda(branchOp.getFalseResult()));
   FlowVariable condition(indexChannelAnalysis,
                          ChannelLambda(branchOp.getConditionOperand()));
-  assert(condition.isIndex() && "branch op condition should be an index");
-  assert(condition.indexTokenConstraint->numValues == 2);
+  if (!condition.isIndex()) {
+    branchOp.emitError("branch op condition should be an index");
+    return;
+  }
+  if (condition.indexTokenConstraint->numValues != 2) {
+    branchOp.emitError("branch op condition should have two possible values");
+    return;
+  }
   // The number of tokens going across the false result is equal to the
   // number of tokens=0 received at the condition input
   equations.push_back(falseVar - condition.setTrackedTokens(0));
@@ -696,7 +710,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   MatIntType &matrix = indices.matrix;
 
   // Verify that the FlowEquationsMatrix data structure is correct
-  indices.verify();
+  assert(indices.verify());
 
   // bring to row-echelon form
   gaussianElimination(matrix);

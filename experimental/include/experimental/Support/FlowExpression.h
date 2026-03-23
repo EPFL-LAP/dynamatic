@@ -56,7 +56,7 @@ struct IndexTracker {
 
   inline IndexTracker static fromJSON(const llvm::json::Value &value,
                                       llvm::json::Path path) {
-    size_t numValues;
+    size_t numValues = 0;
     std::optional<size_t> singleValue;
     llvm::json::ObjectMapper mapper(value, path);
     if (!mapper || !mapper.map(NUM_VALUES_LIT, numValues) ||
@@ -168,7 +168,7 @@ struct std::hash<FlowVariable::Variants> {
       return chunk ^ hash<Operation *>()(internal->op) ^
              hash<unsigned>()(internal->index);
     }
-    assert(false && "is pattern not exhaustive?");
+    llvm::report_fatal_error("non-exhaustive pattern");
   }
 };
 // Hash implementation required so that FlowVariable can be used in an
