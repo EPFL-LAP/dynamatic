@@ -26,10 +26,14 @@ add_llvm_executable(hls-fuzzer
         Options.cpp
         OptionsParser.cpp
         TargetRegistry.cpp
+        targets/BitwidthOptimizationsTarget.cpp
+        targets/BitwidthTypeSystem.cpp
         targets/DynamaticTypeSystem.cpp
         targets/RandomCTarget.cpp
+        targets/TargetUtils.cpp
 )
 llvm_update_compile_flags(hls-fuzzer)
 target_link_libraries(hls-fuzzer PRIVATE MLIRSupport DynamaticHLSFuzzer)
 target_include_directories(hls-fuzzer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(hls-fuzzer DynamaticHLSFuzzerOptsTableGen)
+# Also keep dynamatic up-to-date such that we are always testing the up-to-date verison.
+add_dependencies(hls-fuzzer DynamaticHLSFuzzerOptsTableGen dynamatic)

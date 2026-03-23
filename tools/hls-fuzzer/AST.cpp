@@ -89,8 +89,8 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const Parameter &parameter) {
 
-  return os << PrintTypePrefix{parameter.datatype} << " " << parameter.name
-            << PrintTypeSuffix{parameter.datatype};
+  return os << PrintTypePrefix{parameter.getDataType()} << " "
+            << parameter.getName() << PrintTypeSuffix{parameter.getDataType()};
 }
 
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
