@@ -56,12 +56,13 @@ struct IndexTracker {
 
   inline IndexTracker static fromJSON(const llvm::json::Value &value,
                                       llvm::json::Path path) {
-    size_t numValues = 0;
+    size_t numValues;
     std::optional<size_t> singleValue;
     llvm::json::ObjectMapper mapper(value, path);
     if (!mapper || !mapper.map(NUM_VALUES_LIT, numValues) ||
-        !mapper.map(SINGLE_VALUE_LIT, singleValue))
-      assert(false && "json parsing failed");
+        !mapper.map(SINGLE_VALUE_LIT, singleValue)) {
+      llvm::report_fatal_error("json parsing of failed");
+    }
 
     IndexTracker ret(numValues);
     ret.trackedValue = singleValue;

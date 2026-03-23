@@ -124,15 +124,18 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
     const llvm::json::Object *obj = termJSON.getAsObject();
     assert(obj && "FlowExpression term JSON not an object");
     const llvm::json::Value *state = obj->get(STATE_LIT);
-    assert(state && "FlowExpression term JSON does not contain STATE_LIT");
+    if (!state) {
+      llvm::report_fatal_error(
+          "FlowExpression term JSON does not contain STATE_LIT");
+    }
     std::shared_ptr<InternalStateNamer> namer =
         InternalStateNamer::fromJSON(*state, path);
     FlowVariable var(namer);
     int coef;
     llvm::json::ObjectMapper mapper(termJSON, path);
     if (!mapper || !mapper.map(COEFFICIENT_LIT, coef)) {
-      assert(false &&
-             "FlowExpression term JSON does not contain COEFFICIENT_LIT");
+      llvm::report_fatal_error(
+          "FlowExpression term JSON does not contain COEFFICIENT_LIT");
     }
     const llvm::json::Value *constraint = obj->get(CONSTRAINT_LIT);
     assert(constraint && "FlowExpression does not contain CONSTRAINT_LIT");
