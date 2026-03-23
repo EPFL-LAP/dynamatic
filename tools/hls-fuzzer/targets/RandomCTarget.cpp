@@ -16,7 +16,7 @@ public:
       : AbstractWorker(options, std::move(random)) {}
 
   void generate(llvm::raw_ostream &os,
-                llvm::StringRef functionName) const override;
+                llvm::StringRef functionName) override;
 
   VerificationResult
   verify(const std::filesystem::path &sourceFile) const override;
@@ -30,7 +30,7 @@ RandomCTarget::createWorker(const Options &options, Randomly randomly) const {
 }
 
 void RandomCWorker::generate(llvm::raw_ostream &os,
-                             llvm::StringRef functionName) const {
+                             llvm::StringRef functionName) {
   gen::DynamaticTypeSystem dynamaticTypeSystem(random);
   gen::BasicCGenerator generator(
       random, dynamaticTypeSystem,
@@ -50,5 +50,6 @@ void RandomCWorker::generate(llvm::raw_ostream &os,
 
 AbstractWorker::VerificationResult
 RandomCWorker::verify(const std::filesystem::path &sourceFile) const {
-  return performDifferentialTesting(sourceFile, options.dynamaticPath);
+  return performDifferentialTesting(sourceFile,
+                                    options.dynamaticExecutablePath);
 }

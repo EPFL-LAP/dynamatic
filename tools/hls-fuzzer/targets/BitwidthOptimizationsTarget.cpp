@@ -22,11 +22,13 @@ public:
                                           Randomly &&random)
       : AbstractWorker(options, std::move(random)) {}
 
-  void generate(llvm::raw_ostream &os,
-                llvm::StringRef functionName) const override;
+  void generate(llvm::raw_ostream &os, llvm::StringRef functionName) override;
 
   VerificationResult
   verify(const std::filesystem::path &sourceFile) const override;
+
+private:
+  std::uint8_t maxBitwidth;
 };
 
 } // namespace
@@ -38,10 +40,10 @@ BitwidthOptimizationsTarget::createWorker(const Options &options,
                                                           std::move(randomly));
 }
 
-void BitwidthOptimizationsGenerator::generate(
-    llvm::raw_ostream &os, llvm::StringRef functionName) const {
+void BitwidthOptimizationsGenerator::generate(llvm::raw_ostream &os,
+                                              llvm::StringRef functionName) {
   // Enforce a strict bitwidth requirement for the entire program.
-  auto maxBitwidth = random.getInteger<std::uint8_t>(1, 32);
+  maxBitwidth = random.getInteger<std::uint8_t>(1, 32);
   gen::BitwidthTypeSystem bitwidthTypeSystem(maxBitwidth, random);
   gen::BasicCGenerator generator(random, bitwidthTypeSystem,
                                  /*entryContext=*/
@@ -60,5 +62,28 @@ void BitwidthOptimizationsGenerator::generate(
 
 AbstractWorker::VerificationResult BitwidthOptimizationsGenerator::verify(
     const std::filesystem::path &sourceFile) const {
-  return performDifferentialTesting(sourceFile, options.dynamaticPath);
+  switch (options.kind) {
+  case OracleKind::Functional:
+    return performDifferentialTesting(sourceFile,
+                                      options.dynamaticExecutablePath);
+  case OracleKind::NonFunctional:
+    break;
+  }
+
+  std::filesystem::path parentPath = sourceFile.parent_path();
+  std::string executeFile = (parentPath / "execute.sh").string();
+  llvm::cantFail(llvm::writeToOutput(
+      executeFile, [&](llvm::raw_ostream &os) -> llvm::Error {
+        os << "set -e\n";
+        outputDynamaticInvocation(os, sourceFile,
+                                  options.dynamaticExecutablePath, R"(
+compile
+)");
+        os << (std::filesystem::path(options.executablePath).parent_path() /
+               "hls-fuzzer-check-bitwidth")
+           << " ./out/comp/handshake_export.mlir "
+           << static_cast<unsigned>(maxBitwidth) << '\n';
+        return llvm::Error::success();
+      }));
+  return executeInWorkingDirectory(parentPath, "bash execute.sh");
 }

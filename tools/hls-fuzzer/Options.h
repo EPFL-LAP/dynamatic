@@ -5,8 +5,16 @@
 
 namespace dynamatic {
 
+enum class OracleKind {
+  Functional,
+  NonFunctional,
+};
+
 struct Options {
-  std::string dynamaticPath;
+  // Path of this executable.
+  std::string executablePath;
+  std::string dynamaticExecutablePath;
+  OracleKind kind = OracleKind::Functional;
 };
 
 } // namespace dynamatic

@@ -89,6 +89,8 @@ auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
     return std::nullopt;
 
   case ast::BinaryExpression::ShiftRight:
+    // TODO: Figure out constraints here.
+    return std::nullopt;
   case ast::BinaryExpression::Greater:
   case ast::BinaryExpression::GreaterEqual:
   case ast::BinaryExpression::Less:

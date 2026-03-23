@@ -69,7 +69,11 @@ dynamatic::OptionsParser::getPositionalArguments() const {
 dynamatic::Options dynamatic::OptionsParser::apply(Options defaults) {
   std::vector<std::string> arguments = getPositionalArguments();
   if (arguments.size() == 1)
-    defaults.dynamaticPath = getPositionalArguments()[0];
+    defaults.dynamaticExecutablePath = getPositionalArguments()[0];
 
+  defaults.kind = args.hasFlag(OPT_functional, OPT_non_functional,
+                               defaults.kind == OracleKind::Functional)
+                      ? OracleKind::Functional
+                      : OracleKind::NonFunctional;
   return defaults;
 }
