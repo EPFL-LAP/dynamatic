@@ -201,7 +201,7 @@ LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceForMemRef(
   // load data ports.
   // Insert a ONE_SLOT_BREAK_DV buffer at each load data output port of the LSQ
   // to break the combinational data/valid path from the LSQ to its consumers.
-  if (newLSQOp) {
+  if (bufferLsqLoadData && newLSQOp) {
     NameAnalysis &namer = getAnalysis<NameAnalysis>();
     builder.setInsertionPointAfter(newLSQOp);
     LSQPorts lsqPorts = newLSQOp.getPorts();

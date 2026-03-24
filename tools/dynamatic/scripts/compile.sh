@@ -20,6 +20,7 @@ DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
+BUFFER_LSQ_LOAD_DATA=${14}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -249,6 +250,12 @@ else
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
+if [[ $BUFFER_LSQ_LOAD_DATA -ne 0 ]]; then
+  REPLACE_MEM_IFACES_PASS="--handshake-replace-memory-interfaces=buffer-lsq-load-data=true"
+else
+  REPLACE_MEM_IFACES_PASS="--handshake-replace-memory-interfaces"
+fi
+
 if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   echo_info "Using FPGA'23 for LSQ connection"
@@ -256,7 +263,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   # FPT19 should run before straight to the queue, so that no useless components are instantiated.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-analyze-lsq-usage \
-    --handshake-replace-memory-interfaces \
+    $REPLACE_MEM_IFACES_PASS \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_SQ"
@@ -277,7 +284,7 @@ else
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-analyze-lsq-usage $REPLACE_MEM_IFACES_PASS \
     --handshake-remove-unused-memrefs \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \

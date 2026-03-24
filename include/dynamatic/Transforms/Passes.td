@@ -211,6 +211,11 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
+  let options = [
+    Option<"bufferLsqLoadData", "buffer-lsq-load-data", "bool", "false",
+           "Insert a ONE_SLOT_BREAK_DV buffer at each LSQ load data output to "
+           "break the combinational path from LSQ to consumers.">
+  ];
 }
 
 def HandshakeRemoveUnusedMemRefs : Pass<
