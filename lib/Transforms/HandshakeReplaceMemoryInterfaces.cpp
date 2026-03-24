@@ -47,6 +47,9 @@ struct HandshakeReplaceMemoryInterfacesPass
     : public dynamatic::impl::HandshakeReplaceMemoryInterfacesBase<
           HandshakeReplaceMemoryInterfacesPass> {
 
+  using HandshakeReplaceMemoryInterfacesBase::
+      HandshakeReplaceMemoryInterfacesBase;
+
   void runDynamaticPass() override;
 
 private:
