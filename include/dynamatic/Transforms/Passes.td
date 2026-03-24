@@ -177,6 +177,10 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
     reduction, considering the specific semantics of all operations present at
     the Handhsake level.
   }];
+
+  let statistics = [
+    Statistic<"bitwidthReduced", "Bitwidth reduced", "Number of operations whose bitwidth was reduced">,
+  ];
 }
 
 def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
