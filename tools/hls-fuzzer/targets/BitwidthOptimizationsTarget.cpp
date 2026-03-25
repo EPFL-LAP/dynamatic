@@ -60,6 +60,10 @@ void BitwidthOptimizationsGenerator::generate(llvm::raw_ostream &os,
   os << generator.generateTestBench(function);
 }
 
+constexpr std::string_view ORACLE_EXECUTABLE = "hls-fuzzer-check-bitwidth";
+constexpr std::string_view COMPILATION_IR_OUTPUT =
+    "./out/comp/handshake_export.mlir";
+
 AbstractWorker::VerificationResult BitwidthOptimizationsGenerator::verify(
     const std::filesystem::path &sourceFile) const {
   switch (options.kind) {
@@ -67,23 +71,12 @@ AbstractWorker::VerificationResult BitwidthOptimizationsGenerator::verify(
     return performDifferentialTesting(sourceFile,
                                       options.dynamaticExecutablePath);
   case OracleKind::NonFunctional:
-    break;
+    return performNonFunctionalTesting(
+        sourceFile, options.dynamaticExecutablePath,
+        (std::filesystem::path(options.executablePath).parent_path() /
+         ORACLE_EXECUTABLE)
+            .string(),
+        {COMPILATION_IR_OUTPUT, std::to_string(maxBitwidth)});
   }
-
-  std::filesystem::path parentPath = sourceFile.parent_path();
-  std::string executeFile = (parentPath / "execute.sh").string();
-  llvm::cantFail(llvm::writeToOutput(
-      executeFile, [&](llvm::raw_ostream &os) -> llvm::Error {
-        os << "set -e\n";
-        outputDynamaticInvocation(os, sourceFile,
-                                  options.dynamaticExecutablePath, R"(
-compile
-)");
-        os << (std::filesystem::path(options.executablePath).parent_path() /
-               "hls-fuzzer-check-bitwidth")
-           << " ./out/comp/handshake_export.mlir "
-           << static_cast<unsigned>(maxBitwidth) << '\n';
-        return llvm::Error::success();
-      }));
-  return executeInWorkingDirectory(parentPath, "bash execute.sh");
+  llvm_unreachable("all enum cases handled");
 }

@@ -3,13 +3,16 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Program.h"
 
+constexpr std::string_view EXECUTE_SCRIPT = "execute.sh";
+constexpr std::string_view SHELL = "bash";
+
 dynamatic::AbstractWorker::VerificationResult
 dynamatic::performDifferentialTesting(const std::filesystem::path &sourceFile,
                                       llvm::StringRef dynamaticPath) {
   // Create an 'execute.sh' that can additionally be used as a nice reproducer
   // for e.g. 'cvise'.
   std::filesystem::path parentPath = sourceFile.parent_path();
-  std::string executeFile = (parentPath / "execute.sh").string();
+  std::string executeFile = (parentPath / EXECUTE_SCRIPT).string();
   llvm::cantFail(llvm::writeToOutput(
       executeFile, [&](llvm::raw_ostream &os) -> llvm::Error {
         outputDynamaticInvocation(os, sourceFile, dynamaticPath, R"(
@@ -19,7 +22,33 @@ simulate
 )");
         return llvm::Error::success();
       }));
-  return executeInWorkingDirectory(parentPath, "bash execute.sh");
+  return executeInWorkingDirectory(parentPath,
+                                   llvm::Twine(SHELL) + " " + EXECUTE_SCRIPT);
+}
+
+dynamatic::AbstractWorker::VerificationResult
+dynamatic::performNonFunctionalTesting(
+    const std::filesystem::path &sourceFile, llvm::StringRef dynamaticPath,
+    llvm::StringRef oracleExecutable,
+    llvm::ArrayRef<llvm::StringRef> arguments) {
+  std::filesystem::path parentPath = sourceFile.parent_path();
+
+  std::string executeFile = (parentPath / EXECUTE_SCRIPT).string();
+  llvm::cantFail(llvm::writeToOutput(
+      executeFile, [&](llvm::raw_ostream &os) -> llvm::Error {
+        os << "set -e\n";
+        outputDynamaticInvocation(os, sourceFile, dynamaticPath, R"(
+compile
+)");
+        os << oracleExecutable;
+        for (llvm::StringRef iter : arguments)
+          os << " " << iter;
+
+        os << '\n';
+        return llvm::Error::success();
+      }));
+  return executeInWorkingDirectory(parentPath,
+                                   llvm::Twine(SHELL) + " " + EXECUTE_SCRIPT);
 }
 
 void dynamatic::outputDynamaticInvocation(
@@ -44,7 +73,7 @@ void dynamatic::outputDynamaticInvocation(
 dynamatic::AbstractWorker::VerificationResult
 dynamatic::executeInWorkingDirectory(
     const std::filesystem::path &workingDirectory,
-    llvm::StringRef bashCommand) {
+    const llvm::Twine &bashCommand) {
 
   // LLVM's process creation does not support changing the current working
   // directory. We require this since dynamatic creates many of its artifacts
@@ -64,7 +93,7 @@ cd $SCRIPT_DIR && )a"
       }));
 
   int exitCode = llvm::sys::ExecuteAndWait(
-      "/usr/bin/bash", {"bash", executeCWDFile}, /*Env=*/std::nullopt,
+      "/usr/bin/bash", {SHELL, executeCWDFile}, /*Env=*/std::nullopt,
       /*Redirects=*/{"", "", ""});
   switch (exitCode) {
     // Normal exit.

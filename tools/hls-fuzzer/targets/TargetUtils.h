@@ -3,6 +3,8 @@
 
 #include "hls-fuzzer/AbstractWorker.h"
 
+#include "llvm/ADT/Twine.h"
+
 namespace dynamatic {
 
 /// Performs differential testing of a C file called 'sourceFile'.
@@ -16,6 +18,25 @@ namespace dynamatic {
 AbstractWorker::VerificationResult
 performDifferentialTesting(const std::filesystem::path &sourceFile,
                            llvm::StringRef dynamaticPath);
+
+/// Performs non-functional testing on the compilation of a C file called
+/// 'sourceFile'.
+/// The source file is compiled to MLIR and the compilation output checked
+/// using 'oracleExecutable'.
+/// 'oracleExecutable' should return exit code 0 if the output is as expected,
+/// any other value otherwise.
+/// 'arguments' can be used to supply extra arguments to the 'oracleExecutable'.
+/// The invocation of 'oracleExecutable' is in the same working directory as the
+/// dynamatic invocation.
+///
+/// 'dynamaticPath' should refer to where the dynamatic executable.
+/// The directory of 'sourceFile' is assumed to be scratch space used for build
+/// artifacts.
+AbstractWorker::VerificationResult
+performNonFunctionalTesting(const std::filesystem::path &sourceFile,
+                            llvm::StringRef dynamaticPath,
+                            llvm::StringRef oracleExecutable,
+                            llvm::ArrayRef<llvm::StringRef> arguments);
 
 /// Outputs a bash commandline to 'os' that invokes dynamatic and executes the
 /// given 'script'.
@@ -34,7 +55,7 @@ void outputDynamaticInvocation(llvm::raw_ostream &os,
 /// 'VerificationResult::Bug'.
 AbstractWorker::VerificationResult
 executeInWorkingDirectory(const std::filesystem::path &workingDirectory,
-                          llvm::StringRef bashCommand);
+                          const llvm::Twine &bashCommand);
 
 } // namespace dynamatic
 
