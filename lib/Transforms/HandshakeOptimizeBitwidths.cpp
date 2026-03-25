@@ -1238,7 +1238,7 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
 
   LogicalResult matchAndRewrite(handshake::ShRUIOp op,
                                 PatternRewriter &rewriter) const override {
-    auto [lhs, lhsExt] = getMinimalValue(op.getLhs());
+    auto [lhs, lhsExt] = getMinimalValueWithExtType(op.getLhs());
     unsigned inputBitwidth = lhs.getType().getDataBitWidth();
     unsigned currentBitwidth = op.getType().getDataBitWidth();
     if (inputBitwidth >= currentBitwidth)
