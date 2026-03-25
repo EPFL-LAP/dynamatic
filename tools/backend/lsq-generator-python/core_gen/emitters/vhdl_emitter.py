@@ -319,7 +319,7 @@ class VHDLEmitter(Emitter):
     def logicvec_reg_init(self, vec: LogicVec, enable=None, init=None) -> None:
         assert vec.type == "r"
         if init is None:
-            init = [0] * vec.size
+            init = 0
         if init != None:
             self.add_reg_str(f"\t\tif ({self.reset_name} = '1') then\n")
             self.add_reg_str(

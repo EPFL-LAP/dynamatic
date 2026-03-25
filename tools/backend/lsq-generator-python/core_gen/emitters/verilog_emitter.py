@@ -249,7 +249,7 @@ class VerilogEmitter(Emitter):
     def logicvec_reg_init(self, vec: LogicVec, enable=None, init=None) -> None:
         assert vec.type == "r"
         if init is None:
-            init = [0] * vec.size
+            init = 0
         self.increase_indent()
         in_else = False
         if init != None:
