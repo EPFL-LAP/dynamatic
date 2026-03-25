@@ -97,7 +97,7 @@ static ChannelVal asTypedIfLegal(Value val) {
 /// original value can be safely discarded. If an extension type is provided and
 /// the function is able to backtrack through any extension operation, updates
 /// the extension type with respect to the latter.
-static ExtValue getMinimalValue(ChannelVal val) {
+static ExtValue getMinimalValueWithExtType(ChannelVal val) {
   // Ignore values whose type isn't optimizable
   if (!asTypedIfLegal(val))
     return {val, ExtType::NONE};
@@ -140,7 +140,7 @@ static ChannelVal backtrack(ChannelVal val) {
 
 static ExtValue backtrackToMinimalValue(ChannelVal val) {
   ExtValue newVal;
-  while ((newVal = getMinimalValue(backtrack(val))).first != val)
+  while ((newVal = getMinimalValueWithExtType(backtrack(val))).first != val)
     val = newVal.first;
   return newVal;
 }
@@ -586,9 +586,9 @@ public:
 // Patterns for Handshake operations
 //===----------------------------------------------------------------------===//
 
-/// For simple data forwarding operations that forward one of 'operands' to its
-/// result, compute the resulting extension type when reducing the bitwidth
-/// to 'optWidth'.
+/// For simple data forwarding operations that forward one of 'operands' as is
+/// to its result (e.g., muxs, merges, etc.), compute the resulting extension
+/// type when reducing the bitwidth to 'optWidth'.
 /// This operation may increase 'optWidth' if it is impossible to preserve
 /// semantics under the given bitwidth.
 static ExtType computeDataForwardResult(ArrayRef<ExtValue> operands,
@@ -675,9 +675,10 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
 
     // Get the operation's data operands actual widths
     SmallVector<ExtValue> minDataOperands;
-    llvm::transform(
-        dataOperands, std::back_inserter(minDataOperands),
-        [&](Value val) { return getMinimalValue(cast<ChannelVal>(val)); });
+    llvm::transform(dataOperands, std::back_inserter(minDataOperands),
+                    [&](Value val) {
+                      return getMinimalValueWithExtType(cast<ChannelVal>(val));
+                    });
 
     // Check whether we can reduce the bitwidth of the operation
     ExtWidth resultWidth = {ExtType::ZEXT, 0};
@@ -849,8 +850,9 @@ struct MemInterfaceAddrOpt
     // Optimizes the bitwidth of the address channel currently being pointed to
     // by inputIdx, and increment inputIdx before returning the optimized value
     auto getOptAddrInput = [&](unsigned inputIdx) {
-      return modBitWidth(getMinimalValue(cast<ChannelVal>(operands[inputIdx])),
-                         optWidth, rewriter);
+      return modBitWidth(
+          getMinimalValueWithExtType(cast<ChannelVal>(operands[inputIdx])),
+          optWidth, rewriter);
     };
 
     // Replace new operands and result types with the narrrower address type by
@@ -949,8 +951,9 @@ struct MemPortAddrOpt
       return failure();
 
     // Derive new operands and result types with the narrrower address type
-    Value newAddr = modBitWidth(getMinimalValue(portOp.getAddressInput()),
-                                optWidth, rewriter);
+    Value newAddr =
+        modBitWidth(getMinimalValueWithExtType(portOp.getAddressInput()),
+                    optWidth, rewriter);
     Value dataIn = portOp.getDataInput();
     SmallVector<Value, 2> newOperands{newAddr, dataIn};
     SmallVector<Type, 2> newResultTypes{newAddr.getType(), dataIn.getType()};
@@ -1042,7 +1045,8 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     // Get the minimal valuue of all data operands
     SmallVector<ExtValue> minDataOperands;
     for (Value oprd : dataOperands)
-      minDataOperands.push_back(getMinimalValue(cast<ChannelVal>(oprd)));
+      minDataOperands.push_back(
+          getMinimalValueWithExtType(cast<ChannelVal>(oprd)));
 
     ExtType resultExt = computeDataForwardResult(minDataOperands, optWidth);
 
@@ -1124,8 +1128,8 @@ struct ArithSingleType : public OpRewritePattern<Op> {
       return failure();
 
     // Check whether we can reduce the bitwidth of the operation
-    ExtValue minLhs = getMinimalValue(op.getLhs());
-    ExtValue minRhs = getMinimalValue(op.getRhs());
+    ExtValue minLhs = getMinimalValueWithExtType(op.getLhs());
+    ExtValue minRhs = getMinimalValueWithExtType(op.getRhs());
     ExtWidth optWidth;
     if (forward)
       optWidth =
@@ -1178,8 +1182,8 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
       return failure();
 
     // Check whether we can reduce the bitwidth of the operation
-    ExtValue lhsExtValue = getMinimalValue(selectOp.getTrueValue());
-    ExtValue rhsExtValue = getMinimalValue(selectOp.getFalseValue());
+    ExtValue lhsExtValue = getMinimalValueWithExtType(selectOp.getTrueValue());
+    ExtValue rhsExtValue = getMinimalValueWithExtType(selectOp.getFalseValue());
     auto [minLhs, extLhs] = lhsExtValue;
     auto [minRhs, extRhs] = rhsExtValue;
     unsigned optWidth;
@@ -1244,7 +1248,7 @@ struct ArithShift : public OpRewritePattern<Op> {
                                 PatternRewriter &rewriter) const override {
     ChannelVal toShift = op.getLhs();
     ChannelVal shiftBy = op.getRhs();
-    auto [minToShift, extToShift] = getMinimalValue(toShift);
+    auto [minToShift, extToShift] = getMinimalValueWithExtType(toShift);
     auto [minShiftBy, minShiftByExt] = backtrackToMinimalValue(shiftBy);
     bool isRightShift =
         isa<handshake::ShRSIOp, handshake::ShRUIOp>((Operation *)op);
@@ -1333,8 +1337,8 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
   LogicalResult matchAndRewrite(handshake::CmpIOp cmpOp,
                                 PatternRewriter &rewriter) const override {
     // Check whether we can reduce the bitwidth of the operation
-    ExtValue lhsExtValue = getMinimalValue(cmpOp.getLhs());
-    ExtValue rhsExtValue = getMinimalValue(cmpOp.getRhs());
+    ExtValue lhsExtValue = getMinimalValueWithExtType(cmpOp.getLhs());
+    ExtValue rhsExtValue = getMinimalValueWithExtType(cmpOp.getRhs());
     auto [minLhs, extLhs] = lhsExtValue;
     auto [minRhs, extRhs] = rhsExtValue;
     unsigned optWidth = std::max(minLhs.getType().getDataBitWidth(),
@@ -1379,7 +1383,7 @@ struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
   LogicalResult matchAndRewrite(handshake::TruncIOp truncOp,
                                 PatternRewriter &rewriter) const override {
     // Operand must be produced by an extension operation
-    ExtValue minVal = getMinimalValue(truncOp.getIn());
+    ExtValue minVal = getMinimalValueWithExtType(truncOp.getIn());
     if (minVal.second == ExtType::NONE)
       return failure();
 
