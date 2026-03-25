@@ -73,6 +73,10 @@ class Configs:
     fallbackIssueLoad: bool = False
     fallbackIssueStore: bool = False
 
+    # fully in-order issue: operations are issued in program order (oldest first, globally across loads and stores;
+    # implies fallbackIssueLoad=True, fallbackIssueStore=True, bypass=False)
+    inOrder: bool = False
+
     def __init__(self, config: dict) -> None:
         self.name = config["name"]
         self.dataW = config["dataWidth"]
@@ -93,6 +97,7 @@ class Configs:
         self.bypass = True
         self.fallbackIssueLoad = False
         self.fallbackIssueStore = False
+        self.inOrder = False
 
         self.gaNumLoads = config["numLoads"]
         self.gaNumStores = config["numStores"]
@@ -121,6 +126,9 @@ class Configs:
         noBypass = get_env("LSQ_NO_BYPASS")
         if noBypass is not None:
             self.bypass = not bool(noBypass)
+        inOrder = get_env("LSQ_IN_ORDER")
+        if inOrder is not None:
+            self.inOrder = bool(inOrder)
 
         pipeComp = get_env("LSQ_PIPE_COMP_EN")
         if pipeComp is not None:
@@ -135,6 +143,14 @@ class Configs:
         if headLag is not None:
             self.headLag = bool(headLag)
 
+        ### COMPUTED VALUES ###
+
+        if self.inOrder:
+            # in-order requires bypass to be disabled and fallback issue to be enabled for both loads and stores
+            self.bypass = False
+            self.fallbackIssueLoad = True
+            self.fallbackIssueStore = True
+
         self.ldqAddrW = math.ceil(math.log2(self.numLdqEntries))
         self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
         self.idW = max(self.ldqAddrW, self.stqAddrW)
@@ -148,6 +164,8 @@ class Configs:
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
 
         pprint(self.__dict__)
+
+        ### CHECKS ###
 
         assert (self.idW >= self.ldqAddrW)
 

@@ -762,10 +762,14 @@ class LSQ:
         for i in range(0, self.configs.numLdqEntries):
             arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i],
                        'and', ldq_addr_valid_pcomp[i])
-        # Generate list for loads that does not face dependency issue
+        # Generate list for loads that does not face dependency issue.
+        # In in-order mode, the regular load path is suppressed entirely; only the fallback path issues loads.
         for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, can_load_p0[i], 'not',
-                       load_conflict[i], 'and', load_req_valid[i])
+            if self.configs.inOrder:
+                arch += Op(ctx, can_load_p0[i], 0)
+            else:
+                arch += Op(ctx, can_load_p0[i], 'not',
+                           load_conflict[i], 'and', load_req_valid[i])
         for i in range(0, self.configs.numLdqEntries):
             arch += Op(ctx, can_load[i], 'not',
                        ldq_issue[i], 'and', can_load_p0[i])
@@ -982,8 +986,12 @@ class LSQ:
 
         arch += Op(ctx, store_idx, stq_issue)
         # The store can be issued when it is valid AND store issue is not stalled AND (no conflict OR it is older than the fallback load).
-        if self.configs.fallbackIssueStore:
-            arch += Op(ctx, store_en, store_req_valid_p0, 'and',  'not', store_issue_stall_p0, 'and',
+        if self.configs.inOrder:
+            assert self.configs.fallbackIssueStore, "In-order store issue requires fallback store issue to be enabled"
+            arch += Op(ctx, store_en, store_req_valid_p0, 'and', 'not', store_issue_stall_p0, 'and',
+                       fallback_store_en_if_valid)
+        elif self.configs.fallbackIssueStore:
+            arch += Op(ctx, store_en, store_req_valid_p0, 'and', 'not', store_issue_stall_p0, 'and',
                        '(', 'not', store_conflict, 'or', fallback_store_en_if_valid, ')')
         else:
             arch += Op(ctx, store_en, store_req_valid_p0, 'and', 'not', store_issue_stall_p0, 'and',
