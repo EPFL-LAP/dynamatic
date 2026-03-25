@@ -24,12 +24,14 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <memory>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -66,7 +68,8 @@ struct Constant;
 class PrimitiveType {
 public:
   enum Type {
-    Int8,
+    MIN_VALUE,
+    Int8 = MIN_VALUE,
     UInt8,
     Int16,
     UInt16,
@@ -290,7 +293,8 @@ private:
 class BinaryExpression {
 public:
   enum Op {
-    BitAnd,
+    MIN_VALUE,
+    BitAnd = MIN_VALUE,
     BitOr,
     BitXor,
     ShiftLeft,
@@ -413,9 +417,20 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ReturnStatement &statement);
 
 /// AST-Node representing a function parameter in C.
-struct Parameter {
-  const ScalarType datatype;
-  const std::string name;
+class Parameter {
+public:
+  Parameter() = default;
+
+  Parameter(ScalarType dataType, std::string name)
+      : dataType(std::move(dataType)), name(std::move(name)) {}
+
+  llvm::StringRef getName() const { return name; }
+
+  const ScalarType &getDataType() const { return dataType; }
+
+private:
+  ScalarType dataType;
+  std::string name;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -465,6 +480,18 @@ inline ScalarType Expression::getType() const {
 }
 
 } // namespace dynamatic::ast
+
+namespace dynamatic {
+/// Returns a range of all enum values from 'MIN_VALUE' to incl 'MAX_VALUE'.
+template <typename EnumT>
+auto enumRange() {
+  return llvm::map_range(
+      llvm::iota_range<std::size_t>(static_cast<std::size_t>(EnumT::MIN_VALUE),
+                                    static_cast<std::size_t>(EnumT::MAX_VALUE),
+                                    /*Inclusive=*/true),
+      [](std::size_t i) { return static_cast<EnumT>(i); });
+}
+} // namespace dynamatic
 
 // Enable 'dyn_cast' and friends on 'ScalarType' by delegating to 'dyn_cast' on
 // the variant.

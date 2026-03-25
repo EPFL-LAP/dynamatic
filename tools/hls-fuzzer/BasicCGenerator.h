@@ -42,8 +42,43 @@ private:
     return "var" + std::to_string(varCounter++);
   }
 
-  const ast::Parameter &generateFreshParameter(ast::ScalarType datatype,
-                                               const OpaqueContext &context);
+  friend class PendingParameter;
+
+  /// Convenience class that automatically undoes the creation of a parameter
+  /// unless it was committed.
+  class PendingParameter {
+  public:
+    PendingParameter(BasicCGenerator &generator,
+                     const ast::Parameter &parameter)
+        : generator(generator), parameter(parameter) {}
+
+    ~PendingParameter() {
+      if (!parameter)
+        return;
+
+      generator.parameters.pop_back();
+      generator.varCounter--;
+    }
+
+    const ast::Parameter &getParameter() const {
+      assert(parameter && "must not yet be committed");
+      return *parameter;
+    }
+
+    ast::Parameter commit() {
+      assert(parameter && "must not yet be committed");
+      ast::Parameter value = std::move(*parameter);
+      parameter.reset();
+      return value;
+    }
+
+  private:
+    BasicCGenerator &generator;
+    std::optional<ast::Parameter> parameter;
+  };
+
+  PendingParameter generateFreshParameter(ast::ScalarType datatype,
+                                          const OpaqueContext &context);
 
   ast::ReturnStatement generateFunctionBody(const OpaqueContext &constraints);
 
@@ -51,7 +86,8 @@ private:
                                      std::size_t depth);
 
   std::optional<ast::Expression>
-  generateBinaryExpression(const OpaqueContext &constraints, std::size_t depth);
+  generateBinaryExpression(ast::BinaryExpression::Op op,
+                           const OpaqueContext &constraints, std::size_t depth);
 
   std::optional<ast::ConditionalExpression>
   generateConditionalExpression(const OpaqueContext &constraint,

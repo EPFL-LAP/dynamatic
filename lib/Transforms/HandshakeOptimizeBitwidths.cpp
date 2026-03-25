@@ -634,8 +634,10 @@ template <typename Op, typename Cfg>
 struct HandshakeOptData : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  HandshakeOptData(bool forward, MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), forward(forward), namer(namer) {}
+  HandshakeOptData(Pass::Statistic &bitwidthReduced, bool forward,
+                   MLIRContext *ctx, NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        forward(forward), namer(namer) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -689,10 +691,12 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
     // Replace uses of the original operation's results with the results of the
     // optimized operation we just created
     rewriter.replaceOp(op, newResults);
+    ++bitwidthReduced;
     return success();
   }
 
 private:
+  Pass::Statistic &bitwidthReduced;
   /// Indicates whether this pattern is part of the forward or backward pass.
   bool forward;
   /// A reference to the pass's name analysis.
@@ -705,8 +709,10 @@ private:
 /// be part of the forward/backward process.
 struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
 
-  HandshakeMuxSelect(NameAnalysis &namer, MLIRContext *ctx)
-      : OpRewritePattern<handshake::MuxOp>(ctx), namer(namer) {}
+  HandshakeMuxSelect(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                     MLIRContext *ctx)
+      : OpRewritePattern<handshake::MuxOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
                                 PatternRewriter &rewriter) const override {
@@ -733,10 +739,12 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
         muxOp->getAttrs());
     namer.replaceOp(muxOp, newMuxOp);
     rewriter.replaceOp(muxOp, newMuxOp);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -748,8 +756,10 @@ protected:
 struct HandshakeCMergeIndex
     : public OpRewritePattern<handshake::ControlMergeOp> {
 
-  HandshakeCMergeIndex(NameAnalysis &namer, MLIRContext *ctx)
-      : OpRewritePattern<handshake::ControlMergeOp>(ctx), namer(namer) {}
+  HandshakeCMergeIndex(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                       MLIRContext *ctx)
+      : OpRewritePattern<handshake::ControlMergeOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::ControlMergeOp cmergeOp,
                                 PatternRewriter &rewriter) const override {
@@ -777,10 +787,12 @@ struct HandshakeCMergeIndex
     Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::ZEXT},
                                  indexWidth, rewriter);
     rewriter.replaceOp(cmergeOp, {newCmergeOp.getResult(), modIndex});
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -793,9 +805,10 @@ protected:
 struct MemInterfaceAddrOpt
     : public OpInterfaceRewritePattern<handshake::MemoryOpInterface> {
 
-  MemInterfaceAddrOpt(NameAnalysis &namer, MLIRContext *ctx)
+  MemInterfaceAddrOpt(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                      MLIRContext *ctx)
       : OpInterfaceRewritePattern<handshake::MemoryOpInterface>(ctx),
-        namer(namer) {}
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::MemoryOpInterface memOp,
                                 PatternRewriter &rewriter) const override {
@@ -884,10 +897,12 @@ struct MemInterfaceAddrOpt
     inheritBB(memOp, newMemOp);
     namer.replaceOp(memOp, newMemOp);
     rewriter.replaceOp(memOp, replacementValues);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -900,9 +915,10 @@ protected:
 struct MemPortAddrOpt
     : public OpInterfaceRewritePattern<handshake::MemPortOpInterface> {
 
-  MemPortAddrOpt(NameAnalysis &namer, MLIRContext *ctx)
+  MemPortAddrOpt(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                 MLIRContext *ctx)
       : OpInterfaceRewritePattern<handshake::MemPortOpInterface>(ctx),
-        namer(namer) {}
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::MemPortOpInterface portOp,
                                 PatternRewriter &rewriter) const override {
@@ -932,10 +948,12 @@ struct MemPortAddrOpt
     Value newAddrRes = modBitWidth(
         {newPortOp.getAddressOutput(), ExtType::ZEXT}, addrWidth, rewriter);
     rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput()});
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -961,8 +979,10 @@ template <typename Op, typename Cfg>
 struct ForwardCycleOpt : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  ForwardCycleOpt(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), namer(namer) {}
+  ForwardCycleOpt(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+                  NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        namer(namer) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -1031,10 +1051,12 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     // Replace uses of the original operation's results with the results of the
     // optimized operation we just created
     rewriter.replaceOp(op, newResults);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -1071,10 +1093,10 @@ template <typename Op>
 struct ArithSingleType : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  ArithSingleType(bool forward, FTransfer fTransfer, MLIRContext *ctx,
-                  NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), namer(namer), forward(forward),
-        fTransfer(std::move(fTransfer)) {}
+  ArithSingleType(Pass::Statistic &bitwidthReduced, bool forward,
+                  FTransfer fTransfer, MLIRContext *ctx, NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        namer(namer), forward(forward), fTransfer(std::move(fTransfer)) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -1102,10 +1124,12 @@ struct ArithSingleType : public OpRewritePattern<Op> {
 
     modArithOp(op, {minLhs, extLhs}, {minRhs, extRhs}, optWidth.bitWidth,
                optWidth.extType, rewriter, namer);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 
@@ -1123,9 +1147,10 @@ private:
 struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
   using OpRewritePattern<handshake::SelectOp>::OpRewritePattern;
 
-  ArithSelect(bool forward, MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::SelectOp>(ctx), namer(namer),
-        forward(forward) {}
+  ArithSelect(Pass::Statistic &bitwidthReduced, bool forward, MLIRContext *ctx,
+              NameAnalysis &namer)
+      : OpRewritePattern<handshake::SelectOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer), forward(forward) {}
 
   LogicalResult matchAndRewrite(handshake::SelectOp selectOp,
                                 PatternRewriter &rewriter) const override {
@@ -1167,10 +1192,12 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
     // Replace uses of the original operation's result with the result of the
     // optimized operation we just created
     rewriter.replaceOp(selectOp, newRes);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 
@@ -1188,8 +1215,10 @@ template <typename Op>
 struct ArithShift : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  ArithShift(bool forward, MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), namer(namer), forward(forward) {}
+  ArithShift(Pass::Statistic &bitwidthReduced, bool forward, MLIRContext *ctx,
+             NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        namer(namer), forward(forward) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -1258,10 +1287,12 @@ struct ArithShift : public OpRewritePattern<Op> {
       modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::ZEXT},
                  optWidth, extToShift, rewriter, namer);
     }
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 
@@ -1275,8 +1306,10 @@ private:
 /// forward pass.
 struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
 
-  ArithCmpFW(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::CmpIOp>(ctx), namer(namer) {}
+  ArithCmpFW(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+             NameAnalysis &namer)
+      : OpRewritePattern<handshake::CmpIOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::CmpIOp cmpOp,
                                 PatternRewriter &rewriter) const override {
@@ -1303,10 +1336,12 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     // Replace uses of the original operation's result with the result of the
     // optimized operation we just created
     rewriter.replaceOp(cmpOp, newOp.getResult());
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -1316,8 +1351,10 @@ protected:
 struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
   using OpRewritePattern<handshake::TruncIOp>::OpRewritePattern;
 
-  ArithExtToTruncOpt(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::TruncIOp>(ctx), namer(namer) {}
+  ArithExtToTruncOpt(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+                     NameAnalysis &namer)
+      : OpRewritePattern<handshake::TruncIOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::TruncIOp truncOp,
                                 PatternRewriter &rewriter) const override {
@@ -1336,10 +1373,12 @@ struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
     auto newExtRes = modBitWidth({minVal, extType}, finalWidth, rewriter);
     namer.replaceOp(truncOp, newExtRes.getDefiningOp());
     rewriter.replaceOp(truncOp, {newExtRes});
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -1352,10 +1391,10 @@ protected:
 /// constant, and allows to reduce the bitwidth of the loop iterator in those
 /// cases.
 struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
-  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
-
-  ArithBoundOpt(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::ConditionalBranchOp>(ctx) {}
+  ArithBoundOpt(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+                NameAnalysis &namer)
+      : OpRewritePattern<handshake::ConditionalBranchOp>(ctx),
+        bitwidthReduced(bitwidthReduced) {}
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condOp,
                                 PatternRewriter &rewriter) const override {
@@ -1420,6 +1459,8 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       anyOptPerformed |= optBranchIfPossible(falseRes, falseBranch->first,
                                              falseBranch->second, rewriter);
 
+    if (anyOptPerformed)
+      ++bitwidthReduced;
     return success(anyOptPerformed);
   }
 
@@ -1450,6 +1491,8 @@ private:
   /// performed; otherwise returns false;
   bool optBranchIfPossible(ChannelVal optBranch, unsigned optWidth, ExtType ext,
                            PatternRewriter &rewriter) const;
+
+  Pass::Statistic &bitwidthReduced;
 };
 
 } // namespace
@@ -1596,7 +1639,8 @@ struct HandshakeOptimizeBitwidthsPass
     // optimization, which down-the-line passes may be sensitive to.
     RewritePatternSet patterns(ctx);
     patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, MemInterfaceAddrOpt,
-                 MemPortAddrOpt>(getAnalysis<NameAnalysis>(), ctx);
+                 MemPortAddrOpt>(bitwidthReduced, getAnalysis<NameAnalysis>(),
+                                 ctx);
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
@@ -1653,27 +1697,29 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   MLIRContext *ctx = patterns.getContext();
 
   patterns.add<ArithSingleType<handshake::AddIOp>,
-               ArithSingleType<handshake::SubIOp>>(forward, addWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+               ArithSingleType<handshake::SubIOp>>(
+      bitwidthReduced, forward, addWidth, ctx, getAnalysis<NameAnalysis>());
 
-  patterns.add<ArithSingleType<handshake::MulIOp>>(true, mulWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+  patterns.add<ArithSingleType<handshake::MulIOp>>(
+      bitwidthReduced, true, mulWidth, ctx, getAnalysis<NameAnalysis>());
 
-  patterns.add<ArithSingleType<handshake::AndIOp>>(true, andWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+  patterns.add<ArithSingleType<handshake::AndIOp>>(
+      bitwidthReduced, true, andWidth, ctx, getAnalysis<NameAnalysis>());
 
   patterns.add<ArithSingleType<handshake::OrIOp>,
-               ArithSingleType<handshake::XOrIOp>>(true, orWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+               ArithSingleType<handshake::XOrIOp>>(
+      bitwidthReduced, true, orWidth, ctx, getAnalysis<NameAnalysis>());
 
   // [TODO] @jiahui17: Optimizing bitwidth based on the shift operation
   // is dangerous if the shift is used as multiplication.
   // Therefore, removing "ArithShift<handshake::ShLIOp>" from the patterns for
   // now
   patterns.add<ArithShift<handshake::ShRSIOp>, ArithShift<handshake::ShRUIOp>,
-               ArithSelect>(forward, ctx, getAnalysis<NameAnalysis>());
+               ArithSelect>(bitwidthReduced, forward, ctx,
+                            getAnalysis<NameAnalysis>());
 
-  patterns.add<ArithExtToTruncOpt>(ctx, getAnalysis<NameAnalysis>());
+  patterns.add<ArithExtToTruncOpt>(bitwidthReduced, ctx,
+                                   getAnalysis<NameAnalysis>());
   handshake::ExtSIOp::getCanonicalizationPatterns(patterns, ctx);
   handshake::ExtUIOp::getCanonicalizationPatterns(patterns, ctx);
 }
@@ -1691,7 +1737,7 @@ void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
            HandshakeOptData<handshake::MuxOp, MuxDataConfig>,
            HandshakeOptData<handshake::BufferOp, BufferDataConfig>,
            HandshakeOptData<handshake::ConditionalBranchOp, CBranchDataConfig>>(
-          forward, ctx, getAnalysis<NameAnalysis>());
+          bitwidthReduced, forward, ctx, getAnalysis<NameAnalysis>());
 }
 
 void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
@@ -1703,17 +1749,20 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
   fwPatterns.add<ForwardCycleOptNoCfg<handshake::MergeOp>,
                  ForwardCycleOpt<handshake::MuxOp, MuxDataConfig>,
                  ForwardCycleOpt<handshake::ControlMergeOp, CMergeDataConfig>>(
-      ctx, getAnalysis<NameAnalysis>());
+      bitwidthReduced, ctx, getAnalysis<NameAnalysis>());
 
   // arith operations
   addArithPatterns(fwPatterns, true);
 
   fwPatterns.add<ArithSingleType<handshake::DivUIOp>>(
-      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
+      bitwidthReduced, true, divWidth</*zeroExtend=*/true>, ctx,
+      getAnalysis<NameAnalysis>());
   fwPatterns.add<ArithSingleType<handshake::DivSIOp>>(
-      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
+      bitwidthReduced, true, divWidth</*zeroExtend=*/true>, ctx,
+      getAnalysis<NameAnalysis>());
 
-  fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx, getAnalysis<NameAnalysis>());
+  fwPatterns.add<ArithCmpFW, ArithBoundOpt>(bitwidthReduced, ctx,
+                                            getAnalysis<NameAnalysis>());
 }
 
 void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(

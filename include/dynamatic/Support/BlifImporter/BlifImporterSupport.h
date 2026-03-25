@@ -37,6 +37,19 @@ public:
   BlifImporter(StringRef blifFilePath, ModuleOp moduleOp)
       : blifFilePath(blifFilePath.str()), moduleOp(moduleOp) {}
 
+  // Function to set the desired ordering of the input and output pins for the
+  // synth circuit being generated from the blif file.
+  void
+  setPinsOrdering(std::pair<SmallVector<std::string>, SmallVector<std::string>>
+                      pinsOrdering) {
+    this->pinsOrdering = pinsOrdering;
+  }
+
+  // Function to enforce the desired ordering of the input and output pins for
+  // the synth circuit being generated from the blif file if specified by the
+  // user
+  LogicalResult enforcePinsOrdering();
+
   // Function to read a blif file and generate the synth circuit depending on
   // the blif description
   LogicalResult populateHWModuleShell();
@@ -77,6 +90,8 @@ private:
   std::string blifFilePath;
   // String representing the module name in the blif file
   std::string moduleName = "";
+  // Pair containing the desired ordering of the input and output pins, if any
+  std::pair<SmallVector<std::string>, SmallVector<std::string>> pinsOrdering;
   // Vector containing the name of input ports of the blif circuit
   SmallVector<std::string> inputPorts;
   // Vector containing the name of output ports of the blif circuit
@@ -93,6 +108,9 @@ private:
 
 // Function to generate a new hw module op containing a new synth circuit
 // describing the functionality in the blif file
-hw::HWModuleOp importBlifCircuit(ModuleOp moduleOp, StringRef blifFilePath);
+hw::HWModuleOp
+importBlifCircuit(ModuleOp moduleOp, StringRef blifFilePath,
+                  std::pair<SmallVector<std::string>, SmallVector<std::string>>
+                      pinsOrdering = {{}, {}});
 
 } // namespace dynamatic

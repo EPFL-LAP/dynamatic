@@ -11,7 +11,7 @@ namespace dynamatic {
 class RandomCTarget : public AbstractTarget {
 public:
   std::unique_ptr<AbstractWorker>
-  createGenerator(const Options &options, Randomly randomly) const override;
+  createWorker(const Options &options, Randomly randomly) const override;
 };
 
 } // namespace dynamatic

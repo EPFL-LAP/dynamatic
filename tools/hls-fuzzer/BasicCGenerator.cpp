@@ -49,12 +49,12 @@ static ast::Expression safeCastAsNeeded(const ast::ScalarType &to,
       outputPrim->getMinValue());
 }
 
-const ast::Parameter &
-gen::BasicCGenerator::generateFreshParameter(ast::ScalarType datatype,
-                                             const OpaqueContext &context) {
+auto gen::BasicCGenerator::generateFreshParameter(ast::ScalarType datatype,
+                                                  const OpaqueContext &context)
+    -> PendingParameter {
   parameters.push_back(
       {{std::move(datatype), generateFreshVarName()}, context});
-  return parameters.back().first;
+  return PendingParameter(*this, parameters.back().first);
 }
 
 ast::ReturnStatement
@@ -64,46 +64,57 @@ gen::BasicCGenerator::generateFunctionBody(const OpaqueContext &context) {
       safeCastAsNeeded(returnType, std::move(expression))};
 }
 
-constexpr std::size_t MAX_DEPTH = 8;
+constexpr std::size_t MAX_DEPTH = 4;
 
 ast::Expression
 gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
                                          std::size_t depth) {
   using Constructor = std::function<std::optional<ast::Expression>(
       BasicCGenerator *, const OpaqueContext &, std::size_t)>;
-  std::vector<Constructor> generators;
+  llvm::SmallVector<Constructor> generators;
+
+  // Keep expressions interesting by making terminators less likely.
+  if (depth > MAX_DEPTH || random.getSmallProbabilityBool())
+    generators.emplace_back(&BasicCGenerator::generateConstant);
+  if (depth > 2 || random.getRatherLowProbabilityBool())
+    generators.emplace_back(&BasicCGenerator::generateScalarParameter);
+
+  // Avoid stack overflows by restricting to a maximum expression depth.
+  if (depth <= MAX_DEPTH) {
+    for (auto op : enumRange<ast::BinaryExpression::Op>()) {
+      generators.emplace_back([op](BasicCGenerator *self,
+                                   const OpaqueContext &context,
+                                   std::size_t depth) {
+        return self->generateBinaryExpression(op, context, depth);
+      });
+    }
+    generators.emplace_back(&BasicCGenerator::generateCastExpression);
+    if (random.getRatherLowProbabilityBool())
+      generators.emplace_back(&BasicCGenerator::generateConditionalExpression);
+  }
+  random.shuffle(generators);
+
+  // If no other expression is allowed, then attempt to generate constants or
+  // parameters rather than fail.
+  // TODO: The entire logic here is a bit ad-hoc. We probably want probability
+  //       tables that can be influenced by type systems somehow.
+  generators.emplace_back(&BasicCGenerator::generateConstant);
+  generators.emplace_back(&BasicCGenerator::generateScalarParameter);
+  if (random.getBool())
+    std::swap(generators.back(), generators[generators.size() - 2]);
 
   // Continuously generate an expression until one passes the type checker.
-  while (true) {
-    generators.clear();
+  for (Constructor &con : generators)
+    if (std::optional<ast::Expression> result = con(this, context, depth))
+      return std::move(*result);
 
-    // Keep expressions interesting by making terminators less likely.
-    if (depth > MAX_DEPTH || random.getSmallProbabilityBool())
-      generators.emplace_back(&BasicCGenerator::generateConstant);
-    if (depth > 2 || random.getRatherLowProbabilityBool())
-      generators.emplace_back(&BasicCGenerator::generateScalarParameter);
-
-    // Avoid stack overflows by restricting to a maximum expression depth.
-    if (depth <= MAX_DEPTH) {
-      generators.emplace_back(&BasicCGenerator::generateBinaryExpression);
-      generators.emplace_back(&BasicCGenerator::generateCastExpression);
-      if (random.getRatherLowProbabilityBool())
-        generators.emplace_back(
-            &BasicCGenerator::generateConditionalExpression);
-    }
-
-    std::vector<Constructor> subset = random.getNonEmptySubset(generators);
-    for (const Constructor &iter : subset)
-      if (std::optional<ast::Expression> result = iter(this, context, depth))
-        return std::move(*result);
-  }
+  llvm_unreachable("it should always be possible to generate an expression");
 }
 
 std::optional<ast::Expression>
-gen::BasicCGenerator::generateBinaryExpression(const OpaqueContext &context,
+gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
+                                               const OpaqueContext &context,
                                                std::size_t depth) {
-
-  auto op = random.fromEnum<ast::BinaryExpression::Op>();
   auto conclusion = typeSystem.checkBinaryExpressionOpaque(op, context);
   if (!conclusion)
     return std::nullopt;
@@ -210,35 +221,42 @@ gen::BasicCGenerator::generateCastExpression(const OpaqueContext &context,
 std::optional<ast::Constant>
 gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
                                        std::size_t) const {
-  ast::Constant constant = [&] {
-    switch (random.fromEnum<ast::PrimitiveType::Type>()) {
-    case ast::PrimitiveType::Int8:
-      return ast::Constant{random.getInterestingInteger<std::int8_t>()};
-    case ast::PrimitiveType::UInt8:
-      return ast::Constant{random.getInterestingInteger<std::uint8_t>()};
+  std::array<ast::PrimitiveType::Type, ast::PrimitiveType::MAX_VALUE + 1>
+      candidates;
+  llvm::copy(enumRange<ast::PrimitiveType::Type>(), candidates.begin());
+  random.shuffle(candidates);
 
-    case ast::PrimitiveType::Int16:
-      return ast::Constant{random.getInterestingInteger<std::int16_t>()};
+  for (ast::PrimitiveType::Type iter : candidates) {
+    std::optional constant = [&] {
+      switch (iter) {
+      case ast::PrimitiveType::Int8:
+        return ast::Constant{random.getInterestingInteger<std::int8_t>()};
+      case ast::PrimitiveType::UInt8:
+        return ast::Constant{random.getInterestingInteger<std::uint8_t>()};
 
-    case ast::PrimitiveType::UInt16:
-      return ast::Constant{random.getInterestingInteger<std::uint16_t>()};
+      case ast::PrimitiveType::Int16:
+        return ast::Constant{random.getInterestingInteger<std::int16_t>()};
 
-    case ast::PrimitiveType::Int32:
-      return ast::Constant{random.getInterestingInteger<std::int32_t>()};
+      case ast::PrimitiveType::UInt16:
+        return ast::Constant{random.getInterestingInteger<std::uint16_t>()};
 
-    case ast::PrimitiveType::UInt32:
-      return ast::Constant{random.getInterestingInteger<std::uint32_t>()};
+      case ast::PrimitiveType::Int32:
+        return ast::Constant{random.getInterestingInteger<std::int32_t>()};
 
-    case ast::PrimitiveType::Float:
-      return ast::Constant{random.getInterestingFloat()};
-    case ast::PrimitiveType::Double:
-      return ast::Constant{random.getInterestingDouble()};
-    }
-    llvm_unreachable("all enum cases handled");
-  }();
-  if (typeSystem.checkConstantOpaque(constant, context))
-    return constant;
+      case ast::PrimitiveType::UInt32:
+        return ast::Constant{random.getInterestingInteger<std::uint32_t>()};
 
+      case ast::PrimitiveType::Float:
+        return ast::Constant{random.getInterestingFloat()};
+
+      case ast::PrimitiveType::Double:
+        return ast::Constant{random.getInterestingDouble()};
+      }
+      llvm_unreachable("all enum cases handled");
+    }();
+    if (constant = typeSystem.checkConstantOpaque(*constant, context); constant)
+      return constant;
+  }
   return std::nullopt;
 }
 
@@ -249,24 +267,28 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
   if (!conclusion)
     return std::nullopt;
 
-  ast::Parameter parameter = [&] {
-    if (parameters.empty() || random.getRatherLowProbabilityBool())
-      return generateFreshParameter(generateScalarType(*conclusion), context);
+  // With a low chance, skip picking an existing parameter and try to generate
+  // a new one.
+  if (!random.getRatherLowProbabilityBool()) {
+    // Randomly shuffle the parameter ordering and find the first parameter
+    // that passes type checking.
+    std::vector<ast::Parameter> copy(parameters.size());
+    llvm::copy(llvm::make_first_range(parameters), copy.begin());
+    random.shuffle(copy);
 
-    // Attempt to find a random parameter that makes the type system happy.
-    // The current number of parameter is used as an arbitrary heuristic as to
-    // how many attempts we should perform.
-    for (std::size_t i = 0; i < parameters.size(); i++) {
-      ast::Parameter &choice = random.fromRange(parameters).first;
-      if (typeSystem.checkParameterOpaque(choice, *conclusion))
-        return choice;
-    }
+    for (ast::Parameter &iter : copy)
+      if (typeSystem.checkParameterOpaque(iter, *conclusion))
+        return ast::Variable{iter.getDataType(), iter.getName().str()};
+  }
 
-    // Otherwise we fall back to a random parameter.
-    return generateFreshParameter(generateScalarType(*conclusion), context);
-  }();
-
-  return ast::Variable{parameter.datatype, parameter.name};
+  PendingParameter pendingParam =
+      generateFreshParameter(generateScalarType(*conclusion), context);
+  if (typeSystem.checkParameterOpaque(pendingParam.getParameter(),
+                                      *conclusion)) {
+    ast::Parameter parameter = pendingParam.commit();
+    return ast::Variable{parameter.getDataType(), parameter.getName().str()};
+  }
+  return std::nullopt;
 }
 
 ast::ScalarType
@@ -305,13 +327,13 @@ gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
       constant = generateConstant(context);
     }
 
-    auto &[datatype, name] = parameter;
-    os << ast::PrintTypePrefix{datatype} << ' ' << name
-       << ast::PrintTypeSuffix{datatype} << " = " << *constant << ";\n";
+    os << ast::PrintTypePrefix{parameter.getDataType()} << ' '
+       << parameter.getName() << ast::PrintTypeSuffix{parameter.getDataType()}
+       << " = " << *constant << ";\n";
   }
   os << "CALL_KERNEL(" << kernel.name;
-  for (const auto &[datatype, name] : kernel.parameters) {
-    os << ", " << name;
+  for (const ast::Parameter &iter : kernel.parameters) {
+    os << ", " << iter.getName();
   }
   os << ");";
   ss << "\n}\n";
