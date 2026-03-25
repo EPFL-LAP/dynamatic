@@ -109,6 +109,10 @@ class Configs:
         numStqEntries = get_env("LSQ_NUM_STQ_ENTRIES")
         if numStqEntries is not None:
             self.numStqEntries = numStqEntries
+        noBypass = get_env("LSQ_NO_BYPASS")
+        if noBypass is not None:
+            self.bypass = not bool(noBypass)
+
         pipeComp = get_env("LSQ_PIPE_COMP_EN")
         if pipeComp is not None:
             self.pipeComp = bool(pipeComp)
