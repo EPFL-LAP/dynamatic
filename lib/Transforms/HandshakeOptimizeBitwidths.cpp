@@ -1230,6 +1230,124 @@ private:
   bool forward;
 };
 
+/// Optimizes unsigned right-shifts with a constant as a forward pass.
+struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
+  ArithShrUIFW(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+               NameAnalysis &namer)
+      : OpRewritePattern(ctx), bitwidthReduced(bitwidthReduced), namer(namer) {}
+
+  LogicalResult matchAndRewrite(handshake::ShRUIOp op,
+                                PatternRewriter &rewriter) const override {
+    auto [lhs, lhsExt] = getMinimalValue(op.getLhs());
+    unsigned inputBitwidth = lhs.getType().getDataBitWidth();
+    unsigned currentBitwidth = op.getType().getDataBitWidth();
+    if (inputBitwidth >= currentBitwidth)
+      return failure();
+
+    assert(lhsExt != ExtType::NONE && "expected an extension");
+    APInt value;
+    Value constantControl;
+    {
+      auto constantOp = op.getRhs().getDefiningOp<handshake::ConstantOp>();
+      if (!constantOp)
+        return failure();
+      value = cast<IntegerAttr>(constantOp.getValue()).getValue();
+      constantControl = constantOp.getCtrl();
+    }
+
+    // Other pattern (such as canonicalization pattern) should fold this case
+    // to a useful constant instead
+    if (value.uge(currentBitwidth))
+      return failure();
+
+    if (lhsExt == ExtType::ZEXT) {
+      if (value.uge(inputBitwidth)) {
+        // The entire input is shifted away and only 0 bits from the extension
+        // remain.
+        auto constant = rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
+            op, op.getType(), rewriter.getZeroAttr(op.getType().getDataType()),
+            constantControl);
+        inheritBB(op, constant);
+        return success();
+      }
+
+      // Otherwise, we can perform the entire shift at the input bitwidth and
+      // zero-extend back to the original bitwidth.
+      modArithOp(op, {lhs, lhsExt}, {op.getRhs(), ExtType::NONE}, inputBitwidth,
+                 ExtType::ZEXT, rewriter, namer);
+      ++bitwidthReduced;
+      return success();
+    }
+
+    // SEXT case.
+    // The thing all the logic has in common here is that the top 'c' bits are
+    // always zero (due to being an unsigned shift) and that any bits between
+    // the top 'c' and (inputBitwidth - c) bits are copies of the sign-bit of
+    // the input value.
+    //
+    // | 0...0 | s ... s | s X ... Y |
+    // -------------------------------
+    // c many 0s in the front.
+    //           (inputBitwidth - c) many sign bits (s).
+    //                     Original input (lead by sign-bit s) shifted by c on
+    //                     the right.
+    //
+    // If c is greater than input bitwidth than there are only c many 0s and
+    // copies of the sign-bit in the remaining bits.
+    ChannelVal result;
+    if (value.ult(inputBitwidth)) {
+      // c is less than the input bitwidth, meaning other bits from the input
+      // besides the sign-bit are preserved in the output.
+
+      // Perform the shift on the bitwidth of lhs.
+      Value newRhs =
+          modBitWidth({op.getRhs(), ExtType::NONE}, inputBitwidth, rewriter);
+      result = rewriter.create<handshake::ShRUIOp>(op.getLoc(), lhs, newRhs);
+
+      // Now truncate the result to make the sign-bit after shifting the
+      // top-bit again.
+      result = rewriter.create<handshake::TruncIOp>(
+          op.getLoc(),
+          result.getType().withDataType(
+              rewriter.getIntegerType(inputBitwidth - value.getZExtValue())),
+          result);
+    } else {
+      // Our shift amount is larger than the input bitwidth but the input
+      // bitwidth is sign-extended. The only thing that remains from the input
+      // is the sign-bit that was copied to the bits [inputWidth:currentBitWidth
+      // - c].
+      Value inputBWM1 = rewriter.create<handshake::ConstantOp>(
+          op.getLoc(),
+          rewriter.getIntegerAttr(lhs.getType().getDataType(),
+                                  inputBitwidth - 1),
+          constantControl);
+      // Shift away all values of lhs other than the sign-bit.
+      ChannelVal signBit =
+          rewriter.create<handshake::ShRUIOp>(op.getLoc(), lhs, inputBWM1);
+      // Truncate down to just the sign-bit.
+      result = rewriter.create<handshake::TruncIOp>(
+          op.getLoc(), signBit.getType().withDataType(rewriter.getI1Type()),
+          signBit);
+    }
+
+    // Fill with the sign-bit up until excluding the top 'c' bits.
+    result = rewriter.create<handshake::ExtSIOp>(
+        op.getLoc(),
+        op.getType().withDataType(
+            rewriter.getIntegerType(currentBitwidth - value.getZExtValue())),
+        result);
+    // Fill the top 'c' bits with zero.
+    rewriter.replaceOpWithNewOp<handshake::ExtUIOp>(op, op.getType(), result);
+    ++bitwidthReduced;
+    return success();
+  }
+
+private:
+  Pass::Statistic &bitwidthReduced;
+  /// A reference to the pass's name analysis.
+  NameAnalysis &namer;
+};
+
 /// Optimizes the bitwidth of shift-type operations. The first template
 /// parameter is meant to be either handshake::ShLIOp, handshake::ShRSIOp, or
 /// handshake::ShRUIOp. In both modes (forward and backward), the matched
@@ -1736,9 +1854,14 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   // is dangerous if the shift is used as multiplication.
   // Therefore, removing "ArithShift<handshake::ShLIOp>" from the patterns for
   // now
-  patterns.add<ArithShift<handshake::ShRSIOp>, ArithShift<handshake::ShRUIOp>,
-               ArithSelect>(bitwidthReduced, forward, ctx,
-                            getAnalysis<NameAnalysis>());
+  patterns.add<ArithShift<handshake::ShRSIOp>, ArithSelect>(
+      bitwidthReduced, forward, ctx, getAnalysis<NameAnalysis>());
+  if (!forward)
+    patterns.add<ArithShift<handshake::ShRUIOp>>(bitwidthReduced, forward, ctx,
+                                                 getAnalysis<NameAnalysis>());
+  else
+    patterns.add<ArithShrUIFW>(bitwidthReduced, ctx,
+                               getAnalysis<NameAnalysis>());
 
   patterns.add<ArithExtToTruncOpt>(bitwidthReduced, ctx,
                                    getAnalysis<NameAnalysis>());
