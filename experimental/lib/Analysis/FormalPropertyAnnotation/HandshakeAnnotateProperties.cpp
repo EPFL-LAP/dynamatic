@@ -316,23 +316,26 @@ struct EquationExtractor {
   std::vector<FlowExpression> equations;
   const IndexChannelAnalysis &indexChannelAnalysis;
 
-  EquationExtractor(ModuleOp modOp, const IndexChannelAnalysis &ica)
-      : equations(), indexChannelAnalysis(ica) {
-    extractAll(modOp);
-  }
-  void extractAll(ModuleOp modOp);
-  void extractControlMergeOp(ControlMergeOp cmergeOp);
-  void extractMergeLikeOp(MergeLikeOpInterface mergeOp, FlowVariable &after);
-  void extractMuxOpExtra(MuxOp muxOp, FlowVariable &after);
-  void extractJoinOp(Operation &op, FlowVariable &after);
-  void extractPipeline(LatencyInterface op, FlowVariable &i2);
-  void extractBufferLikeOp(BufferLikeOpInterface bufferOp, FlowVariable &exit);
-  void extractEagerFork(EagerForkLikeOpInterface forkOp, FlowVariable &before);
-  void extractBranchOp(ConditionalBranchOp branchOp, FlowVariable &before);
-  void extractLazyFork(Operation &op, FlowVariable &before);
+  EquationExtractor(const IndexChannelAnalysis &ica)
+      : equations(), indexChannelAnalysis(ica) {}
+  LogicalResult extractAll(ModuleOp modOp);
+  LogicalResult extractControlMergeOp(ControlMergeOp cmergeOp);
+  LogicalResult extractMergeLikeOp(MergeLikeOpInterface mergeOp,
+                                   FlowVariable &after);
+  LogicalResult extractMuxOpExtra(MuxOp muxOp, FlowVariable &after);
+  LogicalResult extractJoinOp(Operation &op, FlowVariable &after);
+  LogicalResult extractPipeline(LatencyInterface op, FlowVariable &i2);
+  LogicalResult extractBufferLikeOp(BufferLikeOpInterface bufferOp,
+                                    FlowVariable &exit);
+  LogicalResult extractEagerFork(EagerForkLikeOpInterface forkOp,
+                                 FlowVariable &before);
+  LogicalResult extractBranchOp(ConditionalBranchOp branchOp,
+                                FlowVariable &before);
+  LogicalResult extractLazyFork(Operation &op, FlowVariable &before);
 };
 
-void EquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
+LogicalResult
+EquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
   size_t numInputs = cmergeOp.getDataOperands().size();
 
   FlowVariable x0(InternalLambda(cmergeOp, 0));
@@ -379,10 +382,12 @@ void EquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
                         indexChannel.setTrackedTokens(i));
   }
   equations.push_back(data - dataSent - dataChannel);
+  return success();
 }
 
-void EquationExtractor::extractMergeLikeOp(MergeLikeOpInterface mergeOp,
-                                           FlowVariable &after) {
+LogicalResult
+EquationExtractor::extractMergeLikeOp(MergeLikeOpInterface mergeOp,
+                                      FlowVariable &after) {
   FlowExpression mergeEq = -after;
   std::vector<FlowExpression> constrainedEqs;
   size_t indexValue;
@@ -411,7 +416,7 @@ void EquationExtractor::extractMergeLikeOp(MergeLikeOpInterface mergeOp,
   if (foundIndexed && foundUnindexed) {
     mergeOp.emitError(
         "This merge op has some index channels and some normal channels");
-    return;
+    return failure();
   }
   if (foundIndexed) {
     after.indexTokenConstraint = IndexTracker(indexValue);
@@ -422,9 +427,11 @@ void EquationExtractor::extractMergeLikeOp(MergeLikeOpInterface mergeOp,
   } else {
     equations.push_back(mergeEq);
   }
+  return success();
 }
 
-void EquationExtractor::extractMuxOpExtra(MuxOp muxOp, FlowVariable &after) {
+LogicalResult EquationExtractor::extractMuxOpExtra(MuxOp muxOp,
+                                                   FlowVariable &after) {
   // mux : select input has same as output lambda, data inputs act like
   Value select = muxOp.getSelectOperand();
   FlowVariable selectVar(indexChannelAnalysis, ChannelLambda(select));
@@ -433,7 +440,7 @@ void EquationExtractor::extractMuxOpExtra(MuxOp muxOp, FlowVariable &after) {
     if (selectVar.indexTokenConstraint->numValues != dataOperands.size()) {
       muxOp.emitError(
           "index channel analysis does not match number of mux inputs");
-      return;
+      return failure();
     }
     for (auto [i, operand] : llvm::enumerate(dataOperands)) {
       FlowVariable var(indexChannelAnalysis, ChannelLambda(operand));
@@ -448,9 +455,11 @@ void EquationExtractor::extractMuxOpExtra(MuxOp muxOp, FlowVariable &after) {
     }
     equations.push_back(dataEq);
   }
+  return success();
 }
 
-void EquationExtractor::extractJoinOp(Operation &op, FlowVariable &after) {
+LogicalResult EquationExtractor::extractJoinOp(Operation &op,
+                                               FlowVariable &after) {
   auto channels = op.getOperands();
   if (channels.size() == 1) {
     // Only 1 input channel
@@ -472,10 +481,11 @@ void EquationExtractor::extractJoinOp(Operation &op, FlowVariable &after) {
       equations.push_back(chVar - after);
     }
   }
+  return success();
 }
 
-void EquationExtractor::extractPipeline(LatencyInterface latencyOp,
-                                        FlowVariable &i2) {
+LogicalResult EquationExtractor::extractPipeline(LatencyInterface latencyOp,
+                                                 FlowVariable &i2) {
   // Annotates equation for each pipeline slot, and changes i2 to be the
   // internal channel after the slots
   for (auto &pipelineSlot : latencyOp.getPipelineSlots()) {
@@ -485,16 +495,22 @@ void EquationExtractor::extractPipeline(LatencyInterface latencyOp,
 
     FlowVariable before = i2;
     FlowVariable after = before.nextInternal();
-    assert(!before.isIndex() && "Pipeline slot's data cannot be "
-                                "accessed, so it cannot be constrained");
+    if (before.isIndex()) {
+      latencyOp.emitError("Pipeline slot's data cannot be accessed, so it "
+                          "cannot be constrained");
+      return failure();
+    }
+    assert(!before.isIndex() &&);
 
     equations.push_back(before - full - after);
     i2 = after;
   }
+  return success();
 }
 
-void EquationExtractor::extractBufferLikeOp(BufferLikeOpInterface bufferOp,
-                                            FlowVariable &exit) {
+LogicalResult
+EquationExtractor::extractBufferLikeOp(BufferLikeOpInterface bufferOp,
+                                       FlowVariable &exit) {
   // Annotates equation for each slot, and changes exit to be the internal
   // channel after the slots
   for (auto &slotFull : bufferOp.getInternalSlotStateNamers()) {
@@ -521,10 +537,12 @@ void EquationExtractor::extractBufferLikeOp(BufferLikeOpInterface bufferOp,
     }
     exit = after;
   }
+  return success();
 }
 
-void EquationExtractor::extractEagerFork(EagerForkLikeOpInterface forkOp,
-                                         FlowVariable &before) {
+LogicalResult
+EquationExtractor::extractEagerFork(EagerForkLikeOpInterface forkOp,
+                                    FlowVariable &before) {
   for (auto [i, sentVariable] :
        llvm::enumerate(forkOp.getInternalSentStateNamers())) {
     std::shared_ptr<InternalStateNamer> namer =
@@ -546,10 +564,11 @@ void EquationExtractor::extractEagerFork(EagerForkLikeOpInterface forkOp,
       equations.push_back(before + sent - result);
     }
   }
+  return success();
 }
 
-void EquationExtractor::extractBranchOp(ConditionalBranchOp branchOp,
-                                        FlowVariable &before) {
+LogicalResult EquationExtractor::extractBranchOp(ConditionalBranchOp branchOp,
+                                                 FlowVariable &before) {
   FlowVariable trueVar(indexChannelAnalysis,
                        ChannelLambda(branchOp.getTrueResult()));
   FlowVariable falseVar(indexChannelAnalysis,
@@ -558,19 +577,21 @@ void EquationExtractor::extractBranchOp(ConditionalBranchOp branchOp,
                          ChannelLambda(branchOp.getConditionOperand()));
   if (!condition.isIndex()) {
     branchOp.emitError("branch op condition should be an index");
-    return;
+    return failure();
   }
   if (condition.indexTokenConstraint->numValues != 2) {
     branchOp.emitError("branch op condition should have two possible values");
-    return;
+    return failure();
   }
   // The number of tokens going across the false result is equal to the
   // number of tokens=0 received at the condition input
   equations.push_back(falseVar - condition.setTrackedTokens(0));
   equations.push_back(trueVar - condition.setTrackedTokens(1));
+  return success();
 }
 
-void EquationExtractor::extractLazyFork(Operation &op, FlowVariable &before) {
+LogicalResult EquationExtractor::extractLazyFork(Operation &op,
+                                                 FlowVariable &before) {
   // lazy fork: all outputs have same tokens in as out
   for (auto [i, channel] : llvm::enumerate(op.getResults())) {
     FlowVariable result(indexChannelAnalysis, ChannelLambda(channel));
@@ -583,9 +604,11 @@ void EquationExtractor::extractLazyFork(Operation &op, FlowVariable &before) {
       equations.push_back(before - result);
     }
   }
+  return success();
 }
 
-void EquationExtractor::extractAll(ModuleOp modOp) {
+LogicalResult EquationExtractor::extractAll(ModuleOp modOp) {
+  LogicalResult res = success();
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
 
@@ -599,17 +622,23 @@ void EquationExtractor::extractAll(ModuleOp modOp) {
       // i2            -> slots?                -> exit
       // exit channel  -> Fork/Branch           -> out1, out2, ...
       if (isa<MergeOp, ForkOp, MuxOp, ConstantOp, ExtUIOp, ExtSIOp, BufferOp,
-              SourceOp, MulIOp, AddIOp, TruncIOp, CmpIOp, SinkOp,
+              SourceOp, MulIOp, AddIOp, SubIOp, TruncIOp, CmpIOp, SinkOp,
               ConditionalBranchOp, EndOp>(op)) {
         // in1, in2, ... -> Join/Merge/Mux -> entry channel
         FlowVariable entry = InternalLambda(&op, 0);
         if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(op)) {
-          extractMergeLikeOp(mergeOp, entry);
+          if (failed(extractMergeLikeOp(mergeOp, entry))) {
+            res = failure();
+          }
           if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
-            extractMuxOpExtra(muxOp, entry);
+            if (failed(extractMuxOpExtra(muxOp, entry))) {
+              res = failure();
+            }
           }
         } else {
-          extractJoinOp(op, entry);
+          if (failed(extractJoinOp(op, entry))) {
+            res = failure();
+          }
         }
 
         // entry channel -> arithmetic operation? -> i1
@@ -628,23 +657,33 @@ void EquationExtractor::extractAll(ModuleOp modOp) {
         // i1            -> pipeline slots?       -> i2
         FlowVariable i2 = i1;
         if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
-          extractPipeline(latencyOp, i2);
+          if (failed(extractPipeline(latencyOp, i2))) {
+            res = failure();
+          }
         }
 
         // Annotate buffer slots
         // i2            -> slots?                -> exit
         FlowVariable exit = i2;
         if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(op)) {
-          extractBufferLikeOp(bufferOp, exit);
+          if (failed(extractBufferLikeOp(bufferOp, exit))) {
+            res = failure();
+          }
         }
 
         if (auto forkOp = dyn_cast<handshake::EagerForkLikeOpInterface>(op)) {
-          extractEagerFork(forkOp, exit);
+          if (failed(extractEagerFork(forkOp, exit))) {
+            res = failure();
+          }
         } else if (auto branchOp =
                        dyn_cast<handshake::ConditionalBranchOp>(op)) {
-          extractBranchOp(branchOp, exit);
+          if (failed(extractBranchOp(branchOp, exit))) {
+            res = failure();
+          }
         } else {
-          extractLazyFork(op, exit);
+          if (failed(extractLazyFork(op, exit))) {
+            res = failure();
+          }
         }
       } else if (auto loadOp = dyn_cast<handshake::LoadOp>(op)) {
         // addrInput = addrOutput + addrSlot
@@ -689,12 +728,16 @@ void EquationExtractor::extractAll(ModuleOp modOp) {
         equations.push_back(addrInput - addrOutput);
 
       } else if (auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(op)) {
-        extractControlMergeOp(cmergeOp);
+        if (failed(extractControlMergeOp(cmergeOp))) {
+          res = failure();
+        }
       } else {
         op.emitError("Not handled yet!");
+        res = failure();
       }
     }
   }
+  return res;
 }
 } // namespace dynamatic
 
@@ -703,7 +746,11 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
 
   // Local equations extracted in constructor
-  EquationExtractor extractor(modOp, indexChannelAnalysis);
+  EquationExtractor extractor(indexChannelAnalysis);
+  // This fails when some operations in the module are not yet handled
+  if (failed(extractor.extractAll(modOp))) {
+    return failure();
+  }
 
   // Create a matrix, and map all variables to an column index
   FlowEquationsMatrix indices(extractor.equations);
