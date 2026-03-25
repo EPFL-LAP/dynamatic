@@ -31,6 +31,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <memory>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -416,9 +417,20 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ReturnStatement &statement);
 
 /// AST-Node representing a function parameter in C.
-struct Parameter {
-  const ScalarType datatype;
-  const std::string name;
+class Parameter {
+public:
+  Parameter() = default;
+
+  Parameter(ScalarType dataType, std::string name)
+      : dataType(std::move(dataType)), name(std::move(name)) {}
+
+  llvm::StringRef getName() const { return name; }
+
+  const ScalarType &getDataType() const { return dataType; }
+
+private:
+  ScalarType dataType;
+  std::string name;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

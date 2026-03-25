@@ -197,14 +197,21 @@ public:
     return {};
   }
 
-  static ConclusionOf<ast::Constant> checkConstant(const ast::Constant &,
-                                                   const TypingContext &) {
-    return {};
+  std::optional<ConclusionOf<ast::Constant>>
+  checkConstant(const ast::Constant &constant, const TypingContext &context) {
+    if (!self().checkScalarType(constant.getType(), context))
+      return std::nullopt;
+
+    return constant;
   }
 
-  static ConclusionOf<ast::Parameter> checkParameter(const ast::Parameter &,
-                                                     const TypingContext &) {
-    return {};
+  std::optional<ConclusionOf<ast::Parameter>>
+  checkParameter(const ast::Parameter &parameter,
+                 const TypingContext &context) {
+    if (!self().checkScalarType(parameter.getDataType(), context))
+      return std::nullopt;
+
+    return context;
   }
 
   // Implementations of the virtual methods in 'AbstractTypeSystem'.

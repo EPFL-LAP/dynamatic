@@ -49,12 +49,12 @@ static ast::Expression safeCastAsNeeded(const ast::ScalarType &to,
       outputPrim->getMinValue());
 }
 
-const ast::Parameter &
-gen::BasicCGenerator::generateFreshParameter(ast::ScalarType datatype,
-                                             const OpaqueContext &context) {
+auto gen::BasicCGenerator::generateFreshParameter(ast::ScalarType datatype,
+                                                  const OpaqueContext &context)
+    -> PendingParameter {
   parameters.push_back(
       {{std::move(datatype), generateFreshVarName()}, context});
-  return parameters.back().first;
+  return PendingParameter(*this, parameters.back().first);
 }
 
 ast::ReturnStatement
@@ -227,7 +227,7 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
   random.shuffle(candidates);
 
   for (ast::PrimitiveType::Type iter : candidates) {
-    ast::Constant constant = [&] {
+    std::optional constant = [&] {
       switch (iter) {
       case ast::PrimitiveType::Int8:
         return ast::Constant{random.getInterestingInteger<std::int8_t>()};
@@ -254,7 +254,7 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
       }
       llvm_unreachable("all enum cases handled");
     }();
-    if (typeSystem.checkConstantOpaque(constant, context))
+    if (constant = typeSystem.checkConstantOpaque(*constant, context); constant)
       return constant;
   }
   return std::nullopt;
@@ -267,24 +267,28 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
   if (!conclusion)
     return std::nullopt;
 
-  ast::Parameter parameter = [&] {
-    if (parameters.empty() || random.getRatherLowProbabilityBool())
-      return generateFreshParameter(generateScalarType(*conclusion), context);
+  // With a low chance, skip picking an existing parameter and try to generate
+  // a new one.
+  if (!random.getRatherLowProbabilityBool()) {
+    // Randomly shuffle the parameter ordering and find the first parameter
+    // that passes type checking.
+    std::vector<ast::Parameter> copy(parameters.size());
+    llvm::copy(llvm::make_first_range(parameters), copy.begin());
+    random.shuffle(copy);
 
-    // Attempt to find a random parameter that makes the type system happy.
-    // The current number of parameter is used as an arbitrary heuristic as to
-    // how many attempts we should perform.
-    for (std::size_t i = 0; i < parameters.size(); i++) {
-      ast::Parameter &choice = random.fromRange(parameters).first;
-      if (typeSystem.checkParameterOpaque(choice, *conclusion))
-        return choice;
-    }
+    for (ast::Parameter &iter : copy)
+      if (typeSystem.checkParameterOpaque(iter, *conclusion))
+        return ast::Variable{iter.getDataType(), iter.getName().str()};
+  }
 
-    // Otherwise we fall back to a random parameter.
-    return generateFreshParameter(generateScalarType(*conclusion), context);
-  }();
-
-  return ast::Variable{parameter.datatype, parameter.name};
+  PendingParameter pendingParam =
+      generateFreshParameter(generateScalarType(*conclusion), context);
+  if (typeSystem.checkParameterOpaque(pendingParam.getParameter(),
+                                      *conclusion)) {
+    ast::Parameter parameter = pendingParam.commit();
+    return ast::Variable{parameter.getDataType(), parameter.getName().str()};
+  }
+  return std::nullopt;
 }
 
 ast::ScalarType
@@ -323,13 +327,13 @@ gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
       constant = generateConstant(context);
     }
 
-    auto &[datatype, name] = parameter;
-    os << ast::PrintTypePrefix{datatype} << ' ' << name
-       << ast::PrintTypeSuffix{datatype} << " = " << *constant << ";\n";
+    os << ast::PrintTypePrefix{parameter.getDataType()} << ' '
+       << parameter.getName() << ast::PrintTypeSuffix{parameter.getDataType()}
+       << " = " << *constant << ";\n";
   }
   os << "CALL_KERNEL(" << kernel.name;
-  for (const auto &[datatype, name] : kernel.parameters) {
-    os << ", " << name;
+  for (const ast::Parameter &iter : kernel.parameters) {
+    os << ", " << iter.getName();
   }
   os << ");";
   ss << "\n}\n";
