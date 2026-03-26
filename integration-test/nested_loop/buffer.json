@@ -35,7 +35,7 @@
     "comment": "Buffer non-spec token to prevent II=2 locking"
   },
   {
-    "pred": "constant18",
+    "pred": "constant1",
     "outid": 0,
     "slots": 4,
     "type": "fifo_break_none",

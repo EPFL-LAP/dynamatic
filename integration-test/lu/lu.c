@@ -76,6 +76,7 @@ int main() {
     for (int j = 0; j < N; j++) {
       L[i][j] = 0.0;
       U[i][j] = 0.0;
+      P[i][j] = 0.0;
       A_prime[i][j] = 0.0;
     }
   }
