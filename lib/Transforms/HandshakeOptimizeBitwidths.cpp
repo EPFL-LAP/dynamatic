@@ -1306,6 +1306,8 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
 
       // Now truncate the result to make the sign-bit after shifting the
       // top-bit again.
+      // Note that this even works when 'c' is greater than the difference
+      // between the input and current bit width.
       result = rewriter.create<handshake::TruncIOp>(
           op.getLoc(),
           result.getType().withDataType(
@@ -1325,6 +1327,8 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
       ChannelVal signBit =
           rewriter.create<handshake::ShRUIOp>(op.getLoc(), lhs, inputBWM1);
       // Truncate down to just the sign-bit.
+      // Note that this even works when 'c' is greater than the difference
+      // between the input and current bit width.
       result = rewriter.create<handshake::TruncIOp>(
           op.getLoc(), signBit.getType().withDataType(rewriter.getI1Type()),
           signBit);
