@@ -7,21 +7,21 @@
     "comment": "To avoid deadlock"
   },
   {
-    "pred": "cmpi2",
+    "pred": "fork1",
     "outid": 0,
     "slots": 2,
     "type": "fifo_break_none",
     "comment": "To achieve better II"
   },
   {
-    "pred": "fork3",
-    "outid": 0,
+    "pred": "fork5",
+    "outid": 1,
     "slots": 2,
     "type": "fifo_break_none",
     "comment": "To achieve better II"
   },
   {
-    "pred": "trunci0",
+    "pred": "fork11",
     "outid": 0,
     "slots": 2,
     "type": "fifo_break_none",
@@ -33,12 +33,5 @@
     "slots": 2,
     "type": "fifo_break_none",
     "comment": "Buffer non-spec token to prevent II=2 locking (placed before spec_commit to avoid the effect of non-deterministic naming)"
-  },
-  {
-    "pred": "fork11",
-    "outid": 0,
-    "slots": 2,
-    "type": "fifo_break_none",
-    "comment": "To absorb latency for spec_commit4 (ctrl)"
   }
 ]

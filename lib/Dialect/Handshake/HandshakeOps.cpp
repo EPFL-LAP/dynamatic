@@ -187,6 +187,21 @@ static unsigned getDataBitWidth(Value val) {
   return cast<handshake::ChannelType>(val.getType()).getDataBitWidth();
 }
 
+static IntegerAttr constantFoldExt(Operation *op, Attribute attr) {
+  auto integerAttr = cast<IntegerAttr>(attr);
+  if (auto extUI = dyn_cast<ExtUIOp>(op))
+    return IntegerAttr::get(
+        extUI.getType().getDataType(),
+        integerAttr.getValue().zext(extUI.getType().getDataBitWidth()));
+
+  if (auto extSI = dyn_cast<ExtSIOp>(op))
+    return IntegerAttr::get(
+        extSI.getType().getDataType(),
+        integerAttr.getValue().sext(extSI.getType().getDataBitWidth()));
+
+  llvm_unreachable("only expected extui and extsi");
+}
+
 namespace {
 #include "lib/Dialect/Handshake/HandshakeCanonicalization.inc"
 } // namespace
@@ -1883,7 +1898,7 @@ static OpFoldResult foldExtOp(Op op) {
 
 void ExtSIOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                           MLIRContext *context) {
-  results.add<ExtSIOfExtUI>(context);
+  results.add<ExtSIOfExtUI, ExtSIOfConst>(context);
 }
 
 OpFoldResult ExtSIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
@@ -1911,6 +1926,11 @@ LogicalResult ExtSIOp::verify() { return verifyExtOp(*this); }
 //===----------------------------------------------------------------------===//
 
 OpFoldResult ExtUIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
+
+void ExtUIOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                          MLIRContext *context) {
+  results.add<ExtUIOfConst>(context);
+}
 
 LogicalResult ExtUIOp::verify() { return verifyExtOp(*this); }
 
