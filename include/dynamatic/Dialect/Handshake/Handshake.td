@@ -41,6 +41,7 @@ def Handshake_Dialect : Dialect {
   let useDefaultTypePrinterParser = 1;
   let useDefaultAttributePrinterParser = 1;
   let usePropertiesForAttributes = 0;
+  let hasCanonicalizer = 1;
 }
 
 include "dynamatic/Dialect/Handshake/HandshakeAttributes.td"

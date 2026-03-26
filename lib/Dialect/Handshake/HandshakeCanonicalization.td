@@ -60,4 +60,13 @@ def TruncIExtUIToExtUI : Pat<
   [(ValueWiderThan $ext, $tr), (ValueWiderThan $tr, $x)]
 >;
 
+//===----------------------------------------------------------------------===//
+// ShrSIOp
+//===----------------------------------------------------------------------===//
+
+def ShrSIOpOfExtUI : Pat<
+  (Handshake_ShRSIOp (Handshake_ExtUIOp:$ext $_), $shift),
+  (Handshake_ShRUIOp $ext, $shift)
+>;
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_CANONICALIZATION_TD

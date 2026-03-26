@@ -1366,19 +1366,88 @@ private:
   NameAnalysis &namer;
 };
 
+/// Optimizes signed right-shifts with a constant as a forward pass.
+struct ArithShrSIFW : OpRewritePattern<handshake::ShRSIOp> {
+  ArithShrSIFW(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+               NameAnalysis &namer)
+      : OpRewritePattern(ctx), bitwidthReduced(bitwidthReduced), namer(namer) {}
+
+  LogicalResult matchAndRewrite(handshake::ShRSIOp op,
+                                PatternRewriter &rewriter) const override {
+    auto [lhs, lhsExt] = getMinimalValueWithExtType(op.getLhs());
+    unsigned inputBitwidth = lhs.getType().getDataBitWidth();
+    unsigned currentBitwidth = op.getType().getDataBitWidth();
+    if (inputBitwidth >= currentBitwidth)
+      return failure();
+
+    assert(lhsExt != ExtType::NONE && "expected an extension");
+    APInt value;
+    Value constantControl;
+    {
+      auto constantOp = op.getRhs().getDefiningOp<handshake::ConstantOp>();
+      if (!constantOp)
+        return failure();
+      value = cast<IntegerAttr>(constantOp.getValue()).getValue();
+      constantControl = constantOp.getCtrl();
+    }
+
+    // Other pattern (such as canonicalization pattern) should fold this case
+    // to a useful constant instead
+    if (value.uge(currentBitwidth))
+      return failure();
+
+    if (lhsExt == ExtType::ZEXT) {
+      // We use a generic canonicalization pattern that should fold this into
+      // an unsigned shift-right instead.
+      return failure();
+    }
+
+    // SEXT case.
+    if (value.ult(inputBitwidth)) {
+      // c is less than the input bitwidth, meaning other bits from the input
+      // besides the sign-bit are preserved in the output.
+
+      modArithOp(op, {lhs, lhsExt}, {op.getRhs(), ExtType::NONE}, inputBitwidth,
+                 ExtType::SEXT, rewriter, namer);
+      ++bitwidthReduced;
+      return success();
+    }
+
+    // Our shift amount is larger than the input bitwidth but the input
+    // bitwidth is sign-extended. The only thing that remains from the input
+    // is the sign-bit.
+    Value inputBWM1 = rewriter.create<handshake::ConstantOp>(
+        op.getLoc(),
+        rewriter.getIntegerAttr(lhs.getType().getDataType(), inputBitwidth - 1),
+        constantControl);
+    // Shift away all values of lhs other than the sign-bit.
+    ChannelVal signBit =
+        rewriter.create<handshake::ShRSIOp>(op.getLoc(), lhs, inputBWM1);
+    // Fill remaining sign-bit copies.
+    rewriter.replaceOpWithNewOp<handshake::ExtSIOp>(op, op.getType(), signBit);
+    ++bitwidthReduced;
+    return success();
+  }
+
+private:
+  Pass::Statistic &bitwidthReduced;
+  /// A reference to the pass's name analysis.
+  NameAnalysis &namer;
+};
+
 /// Optimizes the bitwidth of shift-type operations. The first template
 /// parameter is meant to be either handshake::ShLIOp, handshake::ShRSIOp, or
 /// handshake::ShRUIOp. In both modes (forward and backward), the matched
 /// operation's bitwidth may only be reduced when the data operand is shifted by
 /// a known constant amount.
 template <typename Op>
-struct ArithShift : public OpRewritePattern<Op> {
+struct ArithShiftBW : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  ArithShift(Pass::Statistic &bitwidthReduced, bool forward, MLIRContext *ctx,
-             NameAnalysis &namer)
+  ArithShiftBW(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+               NameAnalysis &namer)
       : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
-        namer(namer), forward(forward) {}
+        namer(namer) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -1396,56 +1465,25 @@ struct ArithShift : public OpRewritePattern<Op> {
     if (Operation *defOp = minShiftBy.getDefiningOp())
       if (auto cstOp = dyn_cast<handshake::ConstantOp>(defOp)) {
         cstVal = (unsigned)cast<IntegerAttr>(cstOp.getValue()).getInt();
-        if (forward) {
-          optWidth = minToShift.getType().getDataBitWidth();
-          if (!isRightShift)
-            optWidth += cstVal;
-        } else {
-          optWidth = getUsefulResultWidth(op.getResult());
-          if (isRightShift)
-            optWidth += cstVal;
-        }
+        optWidth = getUsefulResultWidth(op.getResult());
+        if (isRightShift)
+          optWidth += cstVal;
       }
 
     if (optWidth >= resWidth)
       return failure();
 
-    if (forward) {
-      // Create a new operation as well as appropriate bitwidth modification
-      // operations to keep the IR valid
-      Value newToShift =
-          modBitWidth({minToShift, extToShift}, optWidth, rewriter);
-      Value newShifyBy =
-          modBitWidth({minShiftBy, ExtType::ZEXT}, optWidth, rewriter);
-      rewriter.setInsertionPoint(op);
-      auto newOp = rewriter.create<Op>(op.getLoc(), newToShift.getType(),
-                                       newToShift, newShifyBy);
-      ChannelVal newRes = newOp.getResult();
-      if (isRightShift)
-        // In the case of a right shift, we first truncate the result of the
-        // newly inserted shift operation to discard high-significance bits that
-        // we know are 0s, then extend the result back to satisfy the users of
-        // the original operation's result
-        newRes = modBitWidth({newRes, extToShift}, optWidth - cstVal, rewriter);
-      Value modRes = modBitWidth({newRes, extToShift}, resWidth, rewriter);
-      inheritBB(op, newOp);
-
-      // Replace uses of the original operation's result with the result of the
-      // optimized operation we just created
-      rewriter.replaceOp(op, modRes);
-    } else {
-      ChannelVal modToShift = minToShift;
-      if (!isRightShift) {
-        // In the case of a left shift, we first truncate the shifted integer to
-        // discard high-significance bits that were discarded in the result,
-        // then extend back to satisfy the users of the original integer
-        unsigned requiredToShiftWidth = optWidth - std::min(cstVal, optWidth);
-        modToShift = modBitWidth({minToShift, extToShift}, requiredToShiftWidth,
-                                 rewriter);
-      }
-      modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::ZEXT},
-                 optWidth, extToShift, rewriter, namer);
+    ChannelVal modToShift = minToShift;
+    if (!isRightShift) {
+      // In the case of a left shift, we first truncate the shifted integer to
+      // discard high-significance bits that were discarded in the result,
+      // then extend back to satisfy the users of the original integer
+      unsigned requiredToShiftWidth = optWidth - std::min(cstVal, optWidth);
+      modToShift =
+          modBitWidth({minToShift, extToShift}, requiredToShiftWidth, rewriter);
     }
+    modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::ZEXT},
+               optWidth, extToShift, rewriter, namer);
     ++bitwidthReduced;
     return success();
   }
@@ -1872,19 +1910,20 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   // is dangerous if the shift is used as multiplication.
   // Therefore, removing "ArithShift<handshake::ShLIOp>" from the patterns for
   // now
-  patterns.add<ArithShift<handshake::ShRSIOp>, ArithSelect>(
-      bitwidthReduced, forward, ctx, getAnalysis<NameAnalysis>());
-  if (!forward)
-    patterns.add<ArithShift<handshake::ShRUIOp>>(bitwidthReduced, forward, ctx,
-                                                 getAnalysis<NameAnalysis>());
+  patterns.add<ArithSelect>(bitwidthReduced, forward, ctx,
+                            getAnalysis<NameAnalysis>());
+  if (forward)
+    patterns.add<ArithShrUIFW, ArithShrSIFW>(bitwidthReduced, ctx,
+                                             getAnalysis<NameAnalysis>());
   else
-    patterns.add<ArithShrUIFW>(bitwidthReduced, ctx,
-                               getAnalysis<NameAnalysis>());
+    patterns.add<ArithShiftBW<handshake::ShRSIOp>,
+                 ArithShiftBW<handshake::ShRUIOp>>(bitwidthReduced, ctx,
+                                                   getAnalysis<NameAnalysis>());
 
   patterns.add<ArithExtToTruncOpt>(bitwidthReduced, ctx,
                                    getAnalysis<NameAnalysis>());
-  handshake::ExtSIOp::getCanonicalizationPatterns(patterns, ctx);
-  handshake::ExtUIOp::getCanonicalizationPatterns(patterns, ctx);
+  ctx->getLoadedDialect<handshake::HandshakeDialect>()
+      ->getCanonicalizationPatterns(patterns);
 }
 
 void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
