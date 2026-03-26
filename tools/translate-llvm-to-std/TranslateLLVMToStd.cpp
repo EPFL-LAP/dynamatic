@@ -983,6 +983,11 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<arith::MaxSIOp>(retType, {lhs, rhs}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::umax) {
+    mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
+    mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<arith::MaxUIOp>(retType, {lhs, rhs}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::smin) {
     mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
