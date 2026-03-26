@@ -21,7 +21,7 @@ public:
   /// Creates a random C program that should be written to 'os'.
   /// 'os' writes to a file called 'functionName.c'.
   virtual void generate(llvm::raw_ostream &os,
-                        llvm::StringRef functionName) const = 0;
+                        llvm::StringRef functionName) = 0;
 
   /// Result of verification.
   enum VerificationResult {

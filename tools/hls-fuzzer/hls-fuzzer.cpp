@@ -13,6 +13,7 @@
 #include "TargetRegistry.h"
 
 #include "llvm/DebugInfo/LogicalView/Core/LVOptions.h"
+#include "llvm/Support/FileSystem.h"
 
 static std::atomic_bool quit = false;
 static std::mutex errorMutex;
@@ -98,7 +99,15 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  auto options = optionsParser.apply(dynamatic::Options{});
+  dynamatic::Options defaults{};
+#pragma clang diagnostic ignored "-Wmain"
+  defaults.executablePath = llvm::sys::fs::getMainExecutable(
+      argv[0], reinterpret_cast<void *>(&main));
+  defaults.dynamaticExecutablePath =
+      std::filesystem::path(defaults.executablePath).parent_path() /
+      "dynamatic";
+
+  auto options = optionsParser.apply(defaults);
 
   std::optional<std::size_t> numThreads = optionsParser.getNumThreads();
   if (!numThreads)

@@ -37,3 +37,5 @@ target_link_libraries(hls-fuzzer PRIVATE MLIRSupport DynamaticHLSFuzzer)
 target_include_directories(hls-fuzzer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 # Also keep dynamatic up-to-date such that we are always testing the up-to-date verison.
 add_dependencies(hls-fuzzer DynamaticHLSFuzzerOptsTableGen dynamatic)
+
+add_subdirectory(oracles)
