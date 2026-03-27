@@ -2016,8 +2016,30 @@ static void insertDirectSuppression(
   // condition block that effectively controls the delivery.
   if (deliverToGamma) {
     Operation *currentMuxOp = consumer;
-    Block *lastValidDominator = producerBlock; // Default: no change
-
+    Block *lastValidDominator = producerBlock;
+    // Acyclic reachability check: only follows forward edges (skips back-edges)
+    // using the block ordering from BlockIndexing.
+    auto isReachableAcyclic = [&](Block *start, Block *end) -> bool {
+      if (start == end)
+        return true;
+      DenseSet<Block *> visited;
+      SmallVector<Block *, 8> stack;
+      stack.push_back(start);
+      visited.insert(start);
+      while (!stack.empty()) {
+        Block *curr = stack.pop_back_val();
+        for (Block *succ : curr->getSuccessors()) {
+          // Skip back-edges: only follow edges to blocks that come later
+          if (bi.isLess(succ, curr) || succ == curr)
+            continue;
+          if (succ == end)
+            return true;
+          if (visited.insert(succ).second)
+            stack.push_back(succ);
+        }
+      }
+      return false;
+    };
     while (true) {
       // Get the condition block of the current Mux's operand(0)
       Value condition = currentMuxOp->getOperand(0);
@@ -2027,8 +2049,8 @@ static void insertDirectSuppression(
       // in the shadow CFG. If not, stop and keep the previous dominator.
       bool bothReach = condBlock &&
                        condBlock->getNumSuccessors() >= 2 &&
-                       isReachable(condBlock->getSuccessor(0), producerBlock) &&
-                       isReachable(condBlock->getSuccessor(1), producerBlock);
+                       isReachableAcyclic(condBlock->getSuccessor(0), producerBlock) &&
+                       isReachableAcyclic(condBlock->getSuccessor(1), producerBlock);
 
       if (!bothReach)
         break;
