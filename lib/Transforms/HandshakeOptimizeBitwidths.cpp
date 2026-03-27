@@ -1245,23 +1245,29 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
       return failure();
 
     assert(lhsExt != ExtType::NONE && "expected an extension");
-    APInt value;
+    APInt numOfShiftPositions;
     Value constantControl;
     {
       auto constantOp = op.getRhs().getDefiningOp<handshake::ConstantOp>();
       if (!constantOp)
         return failure();
-      value = cast<IntegerAttr>(constantOp.getValue()).getValue();
+      numOfShiftPositions = cast<IntegerAttr>(constantOp.getValue()).getValue();
       constantControl = constantOp.getCtrl();
     }
 
     // Other pattern (such as canonicalization pattern) should fold this case
     // to a useful constant instead
-    if (value.uge(currentBitwidth))
+    if (numOfShiftPositions.uge(currentBitwidth))
       return failure();
 
+    // The following optimizations can be performed here:
+    // * ZEXT: Shift amount is larger than the input bitwidth -> replace with 0.
+    // * SEXT: Shift amount 'c' is larger than the input bitwidth -> replace
+    //   with 'c' many 0s leading 0s and copies of the sign bit otherwise.
+    // * Otherwise: We can perform the shift at the (lower) input bitwidth
+    //   enabling other ops to be optimized in the forward pass.
     if (lhsExt == ExtType::ZEXT) {
-      if (value.uge(inputBitwidth)) {
+      if (numOfShiftPositions.uge(inputBitwidth)) {
         // The entire input is shifted away and only 0 bits from the extension
         // remain.
         auto constant = rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
@@ -1294,8 +1300,12 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
     //
     // If c is greater than input bitwidth than there are only c many 0s and
     // copies of the sign-bit in the remaining bits.
+    // In all cases we can perform shifts at the input bitwidth or less and use
+    // extensions to restore the original output.
+    // These extension operations can be folded into other operations if
+    // redundant or leveraged by other patterns.
     ChannelVal result;
-    if (value.ult(inputBitwidth)) {
+    if (numOfShiftPositions.ult(inputBitwidth)) {
       // c is less than the input bitwidth, meaning other bits from the input
       // besides the sign-bit are preserved in the output.
 
@@ -1310,8 +1320,8 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
       // between the input and current bit width.
       result = rewriter.create<handshake::TruncIOp>(
           op.getLoc(),
-          result.getType().withDataType(
-              rewriter.getIntegerType(inputBitwidth - value.getZExtValue())),
+          result.getType().withDataType(rewriter.getIntegerType(
+              inputBitwidth - numOfShiftPositions.getZExtValue())),
           result);
     } else {
       // Our shift amount is larger than the input bitwidth but the input
@@ -1333,14 +1343,18 @@ struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
           op.getLoc(), signBit.getType().withDataType(rewriter.getI1Type()),
           signBit);
     }
+    // Result pattern is now | s X ... Y |.
 
     // Fill with the sign-bit up until excluding the top 'c' bits.
+    // Result now follows the | s ... s | s X ... Y | pattern.
     result = rewriter.create<handshake::ExtSIOp>(
         op.getLoc(),
-        op.getType().withDataType(
-            rewriter.getIntegerType(currentBitwidth - value.getZExtValue())),
+        op.getType().withDataType(rewriter.getIntegerType(
+            currentBitwidth - numOfShiftPositions.getZExtValue())),
         result);
-    // Fill the top 'c' bits with zero.
+
+    // Fill the top 'c' bits with zero to turn the result into the desired
+    // | 0...0 | s ... s | s X ... Y | pattern.
     rewriter.replaceOpWithNewOp<handshake::ExtUIOp>(op, op.getType(), result);
     ++bitwidthReduced;
     return success();
