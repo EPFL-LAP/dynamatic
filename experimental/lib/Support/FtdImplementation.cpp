@@ -2013,72 +2013,55 @@ static void insertDirectSuppression(
   };
 
   // If deliverToGamma is true, we need to trace down the mux chain to find the
-  // root condition block that effectively controls the delivery.
+  // condition block that effectively controls the delivery.
   if (deliverToGamma) {
-    // Start tracing from the current consumer Mux
-    Operation *lastMuxInChain = consumer;
-    bool isChainActive = true;
+    Operation *currentMuxOp = consumer;
+    Block *lastValidDominator = producerBlock; // Default: no change
 
-    // 1. Trace down the Mux chain within the same block
-    while (isChainActive) {
+    while (true) {
+      // Get the condition block of the current Mux's operand(0)
+      Value condition = currentMuxOp->getOperand(0);
+      Block *condBlock = returnMuxConditionBlock(condition, shadow);
+
+      // Check whether both successors of condBlock can reach producerBlock
+      // in the shadow CFG. If not, stop and keep the previous dominator.
+      bool bothReach = condBlock &&
+                       condBlock->getNumSuccessors() >= 2 &&
+                       isReachable(condBlock->getSuccessor(0), producerBlock) &&
+                       isReachable(condBlock->getSuccessor(1), producerBlock);
+
+      if (!bothReach)
+        break;
+
+      lastValidDominator = condBlock;
+
+      // Trace down to the next Gamma Mux in the same block
       Operation *nextMuxOp = nullptr;
-      Value currentResult = lastMuxInChain->getResult(0);
-
+      Value currentResult = currentMuxOp->getResult(0);
       for (auto *user : currentResult.getUsers()) {
-        // Condition: User is a Gamma gate in the Same Block
         if (llvm::isa<handshake::MuxOp>(user) &&
             user->hasAttr(FTD_EXPLICIT_GAMMA) &&
-            getBB(user) == getBB(lastMuxInChain)) {
-
-          // Skip if both data inputs use the connection
-          unsigned connectionCount = 0;
-          if (user->getOperand(1) == currentResult)
-            connectionCount++;
-          if (user->getOperand(2) == currentResult)
-            connectionCount++;
-
-          if (connectionCount != 2) {
-            // Found the next Mux in the chain
+            getBB(user) == getBB(currentMuxOp)) {
+          unsigned cnt = 0;
+          if (user->getOperand(1) == currentResult) cnt++;
+          if (user->getOperand(2) == currentResult) cnt++;
+          // Skip degenerate case where both data inputs are the same value
+          if (cnt != 2) {
             nextMuxOp = user;
             break;
           }
         }
       }
 
-      if (nextMuxOp) {
-        lastMuxInChain = nextMuxOp;
-      } else {
-        // End of chain reached
-        isChainActive = false;
-      }
+      if (!nextMuxOp)
+        break;
+      currentMuxOp = nextMuxOp;
     }
-
-    // 2. Update dominatorBlock to be the block defining the condition of the
-    // last Mux
-    Value finalCondition = lastMuxInChain->getOperand(0);
-    dominatorBlock = returnMuxConditionBlock(finalCondition, shadow);
-    if (bi.isLess(producerBlock, dominatorBlock)) {
-      dominatorBlock = producerBlock;
-    }
-
-    if (dominatorBlock != producerBlock) {
-      std::function<unsigned(Block *, DenseSet<Block *> &)> countPaths;
-      countPaths = [&](Block *curr, DenseSet<Block *> &vis) -> unsigned {
-        if (curr == producerBlock)
-          return 1;
-        if (!vis.insert(curr).second)
-          return 0;
-        unsigned total = 0;
-        for (Block *succ : curr->getSuccessors())
-          total += countPaths(succ, vis);
-        vis.erase(curr);
-        return total;
-      };
-      DenseSet<Block *> vis;
-      unsigned paths = countPaths(dominatorBlock, vis);
-      if (paths <= 1)
-        dominatorBlock = producerBlock;
-    }
+    llvm::errs() << "[FTD] Last valid dominator block in Mux chain: ";
+    if (lastValidDominator)
+      lastValidDominator->printAsOperand(llvm::errs());
+    llvm::errs() << "\n";
+    dominatorBlock = lastValidDominator;
   }
 
   if (debuglog && deliverToGamma) {
