@@ -2016,6 +2016,7 @@ static void insertDirectSuppression(
   // condition block that effectively controls the delivery.
   if (deliverToGamma) {
     Operation *currentMuxOp = consumer;
+    Value currentConnection = connection;
     Block *lastValidDominator = producerBlock;
     // Acyclic reachability check: only follows forward edges (skips back-edges)
     // using the block ordering from BlockIndexing.
@@ -2041,21 +2042,25 @@ static void insertDirectSuppression(
       return false;
     };
     while (true) {
-      // Get the condition block of the current Mux's operand(0)
-      Value condition = currentMuxOp->getOperand(0);
-      Block *condBlock = returnMuxConditionBlock(condition, shadow);
+      // If the connection enters as operand(0) (condition input),
+      // skip the reachability check and just trace to the next Mux.
+      if (currentMuxOp->getOperand(0) != currentConnection) {
+        // Connection is a data input — check this Mux's condition block
+        Value condition = currentMuxOp->getOperand(0);
+        Block *condBlock = returnMuxConditionBlock(condition, shadow);
 
-      // Check whether both successors of condBlock can reach producerBlock
-      // in the shadow CFG. If not, stop and keep the previous dominator.
-      bool bothReach = condBlock &&
-                       condBlock->getNumSuccessors() >= 2 &&
-                       isReachableAcyclic(condBlock->getSuccessor(0), producerBlock) &&
-                       isReachableAcyclic(condBlock->getSuccessor(1), producerBlock);
+        // Check whether both successors of condBlock can reach producerBlock
+        // in the shadow CFG. If not, stop and keep the previous dominator.
+        bool bothReach = condBlock &&
+                         condBlock->getNumSuccessors() >= 2 &&
+                         isReachableAcyclic(condBlock->getSuccessor(0), producerBlock) &&
+                         isReachableAcyclic(condBlock->getSuccessor(1), producerBlock);
 
-      if (!bothReach)
-        break;
+        if (!bothReach)
+          break;
 
-      lastValidDominator = condBlock;
+        lastValidDominator = condBlock;
+      }
 
       // Trace down to the next Gamma Mux in the same block
       Operation *nextMuxOp = nullptr;
@@ -2077,12 +2082,14 @@ static void insertDirectSuppression(
 
       if (!nextMuxOp)
         break;
+      currentConnection = currentMuxOp->getResult(0);
       currentMuxOp = nextMuxOp;
     }
-    llvm::errs() << "[FTD] Last valid dominator block in Mux chain: ";
-    if (lastValidDominator)
+    if (lastValidDominator && lastValidDominator != producerBlock) {
+      llvm::errs() << "[FTD] Last valid dominator block in Mux chain: ";
       lastValidDominator->printAsOperand(llvm::errs());
-    llvm::errs() << "\n";
+      llvm::errs() << "\n";
+    }
     dominatorBlock = lastValidDominator;
   }
 
