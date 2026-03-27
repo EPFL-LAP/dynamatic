@@ -2030,7 +2030,6 @@ static void insertDirectSuppression(
       while (!stack.empty()) {
         Block *curr = stack.pop_back_val();
         for (Block *succ : curr->getSuccessors()) {
-          // Skip back-edges: only follow edges to blocks that come later
           if (bi.isLess(succ, curr) || succ == curr)
             continue;
           if (succ == end)
@@ -2049,17 +2048,17 @@ static void insertDirectSuppression(
         Value condition = currentMuxOp->getOperand(0);
         Block *condBlock = returnMuxConditionBlock(condition, shadow);
 
-        // Check whether both successors of condBlock can reach producerBlock
-        // in the shadow CFG. If not, stop and keep the previous dominator.
         bool bothReach = condBlock &&
                          condBlock->getNumSuccessors() >= 2 &&
                          isReachableAcyclic(condBlock->getSuccessor(0), producerBlock) &&
                          isReachableAcyclic(condBlock->getSuccessor(1), producerBlock);
 
-        if (!bothReach)
-          break;
-
-        lastValidDominator = condBlock;
+        // Among all qualifying condBlocks, pick the one earliest in
+        // topological order (smallest by bi). This gives the outermost
+        // dominator that still encloses the producer on both branches.
+        if (bothReach && bi.isLess(condBlock, lastValidDominator)) {
+          lastValidDominator = condBlock;
+        }
       }
 
       // Trace down to the next Gamma Mux in the same block
@@ -2072,7 +2071,6 @@ static void insertDirectSuppression(
           unsigned cnt = 0;
           if (user->getOperand(1) == currentResult) cnt++;
           if (user->getOperand(2) == currentResult) cnt++;
-          // Skip degenerate case where both data inputs are the same value
           if (cnt != 2) {
             nextMuxOp = user;
             break;
