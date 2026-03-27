@@ -25,6 +25,16 @@ def ExtSIOfExtUI : Pat<
   (Handshake_ExtSIOp (Handshake_ExtUIOp $x)), (Handshake_ExtUIOp $x)
 >;
 
+def ExtUIOfConst : Pat<
+  (Handshake_ExtUIOp:$ext (Handshake_ConstantOp $attr, $ctrl)),
+  (Handshake_ConstantOp (NativeCodeCall<"constantFoldExt($0.getOwner(), $1)"> $ext, $attr), $ctrl)
+>;
+
+def ExtSIOfConst : Pat<
+  (Handshake_ExtSIOp:$ext (Handshake_ConstantOp $attr, $ctrl)),
+  (Handshake_ConstantOp (NativeCodeCall<"constantFoldExt($0.getOwner(), $1)"> $ext, $attr), $ctrl)
+>;
+
 //===----------------------------------------------------------------------===//
 // TruncIOp
 //===----------------------------------------------------------------------===//

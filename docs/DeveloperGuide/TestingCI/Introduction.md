@@ -1,6 +1,24 @@
 # Introduction
 
-This document describes the basic high-level concepts behind integration testing and GitHub Actions.
+This document describes the basic high-level concepts behind testing and GitHub Actions.
+
+## Unit testing
+
+Unit testing in dynamatic refers to the isolated testing of a single component.
+These may range from testing specific datastructures all the way to testing specific compiler passes
+and are most commonly used to catch regressions.
+
+Two common kinds of unit tests exist:
+* A C++ unit test written in [GTest](https://google.github.io/googletest/) used to test datastructures.
+* An MLIR test used to test the behavior of IR and compiler passes and written using `lit`.
+
+C++ unit tests are commonly found in the `unittests` directory, while MLIR tests are found in the `test`
+directory.
+For more information how to write MLIR tests see the [developer guide](../IntroductoryMaterial/FileCheckTesting.md).
+
+Unit tests should not depend on a specific environment setup besides what is implemented in `cmake`.
+All unit tests can be run using the `check-dynamatic` target.
+New unit tests should be added to this target using the `add_to_unit_testing` CMake macro.
 
 ## Integration testing
 

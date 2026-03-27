@@ -97,29 +97,18 @@ static ChannelVal asTypedIfLegal(Value val) {
 /// original value can be safely discarded. If an extension type is provided and
 /// the function is able to backtrack through any extension operation, updates
 /// the extension type with respect to the latter.
-static ChannelVal getMinimalValue(ChannelVal val, ExtType *ext = nullptr) {
+static ExtValue getMinimalValueWithExtType(ChannelVal val) {
   // Ignore values whose type isn't optimizable
   if (!asTypedIfLegal(val))
-    return val;
+    return {val, ExtType::NONE};
 
-  if (auto op = val.getDefiningOp<handshake::ExtSIOp>()) {
-    if (ext)
-      *ext = ExtType::SEXT;
+  if (auto op = val.getDefiningOp<handshake::ExtSIOp>())
+    return {op.getIn(), ExtType::SEXT};
 
-    return op.getIn();
-  }
+  if (auto op = val.getDefiningOp<handshake::ExtUIOp>())
+    return {op.getIn(), ExtType::ZEXT};
 
-  if (auto op = val.getDefiningOp<handshake::ExtUIOp>()) {
-    if (ext)
-      *ext = ExtType::ZEXT;
-
-    return op.getIn();
-  }
-
-  if (ext)
-    *ext = ExtType::NONE;
-
-  return val;
+  return {val, ExtType::NONE};
 }
 
 // Backtracks through defining operations of the given value as long as they are
@@ -149,11 +138,10 @@ static ChannelVal backtrack(ChannelVal val) {
   return val;
 }
 
-static ChannelVal backtrackToMinimalValue(ChannelVal val,
-                                          ExtType *ext = nullptr) {
-  ChannelVal newVal;
-  while ((newVal = getMinimalValue(backtrack(val), ext)) != val)
-    val = newVal;
+static ExtValue backtrackToMinimalValue(ChannelVal val) {
+  ExtValue newVal;
+  while ((newVal = getMinimalValueWithExtType(backtrack(val))).first != val)
+    val = newVal.first;
   return newVal;
 }
 
@@ -459,12 +447,13 @@ public:
   /// optimized operation from the optimized data width, extension type, and
   /// list of minimal data operands of the original operation. The vector given
   /// as last argument is filled with the new operands.
-  virtual void getNewOperands(unsigned optWidth, ExtType ext,
-                              ArrayRef<ChannelVal> minDataOperands,
+  virtual void getNewOperands(unsigned optWidth,
+                              ArrayRef<ExtValue> minDataOperands,
                               PatternRewriter &rewriter,
                               SmallVector<Value> &newOperands) {
     llvm::transform(minDataOperands, std::back_inserter(newOperands),
-                    [&](ChannelVal val) {
+                    [&](auto &&pair) {
+                      auto &&[val, ext] = pair;
                       return modBitWidth({val, ext}, optWidth, rewriter);
                     });
   }
@@ -543,15 +532,12 @@ public:
 
   SmallVector<Value> getDataOperands() override { return op.getDataOperands(); }
 
-  void getNewOperands(unsigned optWidth, ExtType ext,
-                      ArrayRef<ChannelVal> minDataOperands,
+  void getNewOperands(unsigned optWidth, ArrayRef<ExtValue> minDataOperands,
                       PatternRewriter &rewriter,
                       SmallVector<Value> &newOperands) override {
     newOperands.push_back(op.getSelectOperand());
-    llvm::transform(
-        minDataOperands, std::back_inserter(newOperands), [&](Value val) {
-          return modBitWidth({cast<ChannelVal>(val), ext}, optWidth, rewriter);
-        });
+    OptDataConfig::getNewOperands(optWidth, minDataOperands, rewriter,
+                                  newOperands);
   }
 };
 
@@ -565,13 +551,12 @@ public:
     return SmallVector<Value>{op.getDataOperand()};
   }
 
-  void getNewOperands(unsigned optWidth, ExtType ext,
-                      ArrayRef<ChannelVal> minDataOperands,
+  void getNewOperands(unsigned optWidth, ArrayRef<ExtValue> minDataOperands,
                       PatternRewriter &rewriter,
                       SmallVector<Value> &newOperands) override {
     newOperands.push_back(op.getConditionOperand());
-    newOperands.push_back(
-        modBitWidth({minDataOperands[0], ext}, optWidth, rewriter));
+    OptDataConfig::getNewOperands(optWidth, minDataOperands, rewriter,
+                                  newOperands);
   }
 };
 
@@ -584,14 +569,6 @@ public:
 
   SmallVector<Value> getDataOperands() override {
     return SmallVector<Value>{this->op.getOperand()};
-  }
-
-  void getNewOperands(unsigned optWidth, ExtType ext,
-                      ArrayRef<ChannelVal> minDataOperands,
-                      PatternRewriter &rewriter,
-                      SmallVector<Value> &newOperands) override {
-    newOperands.push_back(
-        modBitWidth({minDataOperands[0], ext}, optWidth, rewriter));
   }
 
   handshake::BufferOp createOp(ArrayRef<Type> newResTypes,
@@ -608,6 +585,51 @@ public:
 //===----------------------------------------------------------------------===//
 // Patterns for Handshake operations
 //===----------------------------------------------------------------------===//
+
+/// For simple data forwarding operations that forward one of 'operands' as is
+/// to its result (e.g., muxs, merges, etc.), compute the resulting extension
+/// type when reducing the bitwidth to 'optWidth'.
+/// This operation may increase 'optWidth' if it is impossible to preserve
+/// semantics under the given bitwidth.
+static ExtType computeDataForwardResult(ArrayRef<ExtValue> operands,
+                                        unsigned &optWidth) {
+  assert(!operands.empty() && "expected non empty operands");
+  auto exts = llvm::make_second_range(operands);
+  // If all operands have the same extension, then we can simply use the same
+  // extension for the result.
+  if (llvm::all_equal(exts))
+    return *exts.begin();
+
+  // In all other cases, we must sign-extend the output such that if an operand
+  // was originally sign-extended, it remains fully sign-extended after
+  // forwarding.
+  for (auto [operand, extType] : operands) {
+    // Special case: If the operand with the largest bitwidth uses
+    // zero-extension, we must increase the bitwidth by one.
+    // Otherwise, when the zero-extended operand is forwarded it could get
+    // sign-extended accidentally. Increasing the bitwidth by one ensures that
+    // the top bit remains unset for the zero-extended operand.
+    if (extType == ExtType::ZEXT)
+      if (operand.getType().getDataBitWidth() == optWidth) {
+        optWidth++;
+        break;
+      }
+  }
+
+  return ExtType::SEXT;
+}
+
+/// For simple data forwarding operations that forward one of 'operands' to its
+/// result, computes the resulting bitwidth and extension type.
+static ExtWidth computeDataForwardResult(ArrayRef<ExtValue> operands) {
+  assert(!operands.empty() && "expected non empty operands");
+  unsigned optWidth = 0;
+  for (ChannelVal oprd : llvm::make_first_range(operands))
+    optWidth = std::max(optWidth, oprd.getType().getDataBitWidth());
+
+  ExtType type = computeDataForwardResult(operands, optWidth);
+  return {type, optWidth};
+}
 
 namespace {
 
@@ -634,8 +656,10 @@ template <typename Op, typename Cfg>
 struct HandshakeOptData : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  HandshakeOptData(bool forward, MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), forward(forward), namer(namer) {}
+  HandshakeOptData(Pass::Statistic &bitwidthReduced, bool forward,
+                   MLIRContext *ctx, NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        forward(forward), namer(namer) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -650,25 +674,23 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
       return failure();
 
     // Get the operation's data operands actual widths
-    SmallVector<ChannelVal> minDataOperands;
-    ExtType ext = ExtType::NONE;
+    SmallVector<ExtValue> minDataOperands;
     llvm::transform(dataOperands, std::back_inserter(minDataOperands),
                     [&](Value val) {
-                      return getMinimalValue(cast<ChannelVal>(val), &ext);
+                      return getMinimalValueWithExtType(cast<ChannelVal>(val));
                     });
 
     // Check whether we can reduce the bitwidth of the operation
-    unsigned optWidth = 0;
+    ExtWidth resultWidth = {ExtType::ZEXT, 0};
     if (forward) {
-      for (ChannelVal oprd : minDataOperands)
-        optWidth = std::max(optWidth, oprd.getType().getDataBitWidth());
+      resultWidth = computeDataForwardResult(minDataOperands);
     } else {
       for (Value res : dataResults)
-        optWidth =
-            std::max(optWidth, getUsefulResultWidth(cast<ChannelVal>(res)));
+        resultWidth.bitWidth = std::max(
+            resultWidth.bitWidth, getUsefulResultWidth(cast<ChannelVal>(res)));
     }
     unsigned dataWidth = channelVal.getType().getDataBitWidth();
-    if (optWidth >= dataWidth)
+    if (resultWidth.bitWidth >= dataWidth)
       return failure();
 
     // Create a new operation as well as appropriate bitwidth modification
@@ -676,23 +698,26 @@ struct HandshakeOptData : public OpRewritePattern<Op> {
     SmallVector<Value> newOperands;
     SmallVector<Value> newResults;
     SmallVector<Type> newResTypes;
-    Type newDataType = rewriter.getIntegerType(optWidth);
+    Type newDataType = rewriter.getIntegerType(resultWidth.bitWidth);
     Type newChannelType = channelVal.getType().withDataType(newDataType);
-    cfg.getNewOperands(optWidth, ext, minDataOperands, rewriter, newOperands);
+    cfg.getNewOperands(resultWidth.bitWidth, minDataOperands, rewriter,
+                       newOperands);
     cfg.getResultTypes(newChannelType, newResTypes);
     rewriter.setInsertionPoint(op);
     Op newOp = cfg.createOp(newResTypes, newOperands, rewriter);
     inheritBB(op, newOp);
     namer.replaceOp(op, newOp);
-    cfg.modResults(newOp, dataWidth, ext, rewriter, newResults);
+    cfg.modResults(newOp, dataWidth, resultWidth.extType, rewriter, newResults);
 
     // Replace uses of the original operation's results with the results of the
     // optimized operation we just created
     rewriter.replaceOp(op, newResults);
+    ++bitwidthReduced;
     return success();
   }
 
 private:
+  Pass::Statistic &bitwidthReduced;
   /// Indicates whether this pattern is part of the forward or backward pass.
   bool forward;
   /// A reference to the pass's name analysis.
@@ -705,8 +730,10 @@ private:
 /// be part of the forward/backward process.
 struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
 
-  HandshakeMuxSelect(NameAnalysis &namer, MLIRContext *ctx)
-      : OpRewritePattern<handshake::MuxOp>(ctx), namer(namer) {}
+  HandshakeMuxSelect(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                     MLIRContext *ctx)
+      : OpRewritePattern<handshake::MuxOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
                                 PatternRewriter &rewriter) const override {
@@ -733,10 +760,12 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
         muxOp->getAttrs());
     namer.replaceOp(muxOp, newMuxOp);
     rewriter.replaceOp(muxOp, newMuxOp);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -748,8 +777,10 @@ protected:
 struct HandshakeCMergeIndex
     : public OpRewritePattern<handshake::ControlMergeOp> {
 
-  HandshakeCMergeIndex(NameAnalysis &namer, MLIRContext *ctx)
-      : OpRewritePattern<handshake::ControlMergeOp>(ctx), namer(namer) {}
+  HandshakeCMergeIndex(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                       MLIRContext *ctx)
+      : OpRewritePattern<handshake::ControlMergeOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::ControlMergeOp cmergeOp,
                                 PatternRewriter &rewriter) const override {
@@ -777,10 +808,12 @@ struct HandshakeCMergeIndex
     Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::ZEXT},
                                  indexWidth, rewriter);
     rewriter.replaceOp(cmergeOp, {newCmergeOp.getResult(), modIndex});
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -793,9 +826,10 @@ protected:
 struct MemInterfaceAddrOpt
     : public OpInterfaceRewritePattern<handshake::MemoryOpInterface> {
 
-  MemInterfaceAddrOpt(NameAnalysis &namer, MLIRContext *ctx)
+  MemInterfaceAddrOpt(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                      MLIRContext *ctx)
       : OpInterfaceRewritePattern<handshake::MemoryOpInterface>(ctx),
-        namer(namer) {}
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::MemoryOpInterface memOp,
                                 PatternRewriter &rewriter) const override {
@@ -816,9 +850,9 @@ struct MemInterfaceAddrOpt
     // Optimizes the bitwidth of the address channel currently being pointed to
     // by inputIdx, and increment inputIdx before returning the optimized value
     auto getOptAddrInput = [&](unsigned inputIdx) {
-      return modBitWidth({getMinimalValue(cast<ChannelVal>(operands[inputIdx])),
-                          ExtType::ZEXT},
-                         optWidth, rewriter);
+      return modBitWidth(
+          getMinimalValueWithExtType(cast<ChannelVal>(operands[inputIdx])),
+          optWidth, rewriter);
     };
 
     // Replace new operands and result types with the narrrower address type by
@@ -884,10 +918,12 @@ struct MemInterfaceAddrOpt
     inheritBB(memOp, newMemOp);
     namer.replaceOp(memOp, newMemOp);
     rewriter.replaceOp(memOp, replacementValues);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -900,9 +936,10 @@ protected:
 struct MemPortAddrOpt
     : public OpInterfaceRewritePattern<handshake::MemPortOpInterface> {
 
-  MemPortAddrOpt(NameAnalysis &namer, MLIRContext *ctx)
+  MemPortAddrOpt(Pass::Statistic &bitwidthReduced, NameAnalysis &namer,
+                 MLIRContext *ctx)
       : OpInterfaceRewritePattern<handshake::MemPortOpInterface>(ctx),
-        namer(namer) {}
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::MemPortOpInterface portOp,
                                 PatternRewriter &rewriter) const override {
@@ -915,7 +952,7 @@ struct MemPortAddrOpt
 
     // Derive new operands and result types with the narrrower address type
     Value newAddr =
-        modBitWidth({getMinimalValue(portOp.getAddressInput()), ExtType::ZEXT},
+        modBitWidth(getMinimalValueWithExtType(portOp.getAddressInput()),
                     optWidth, rewriter);
     Value dataIn = portOp.getDataInput();
     SmallVector<Value, 2> newOperands{newAddr, dataIn};
@@ -932,10 +969,12 @@ struct MemPortAddrOpt
     Value newAddrRes = modBitWidth(
         {newPortOp.getAddressOutput(), ExtType::ZEXT}, addrWidth, rewriter);
     rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput()});
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -961,8 +1000,10 @@ template <typename Op, typename Cfg>
 struct ForwardCycleOpt : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  ForwardCycleOpt(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), namer(namer) {}
+  ForwardCycleOpt(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+                  NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        namer(namer) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -995,22 +1036,24 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
 
     // Determine the achievable optimized width for operands inside the cycle
     unsigned optWidth = 0;
-    ExtType ext = ExtType::NONE;
     for (ChannelVal mergedVal : allMergedValues) {
       optWidth = std::max(
           optWidth,
-          backtrackToMinimalValue(mergedVal, &ext).getType().getDataBitWidth());
+          backtrackToMinimalValue(mergedVal).first.getType().getDataBitWidth());
     }
+
+    // Get the minimal valuue of all data operands
+    SmallVector<ExtValue> minDataOperands;
+    for (Value oprd : dataOperands)
+      minDataOperands.push_back(
+          getMinimalValueWithExtType(cast<ChannelVal>(oprd)));
+
+    ExtType resultExt = computeDataForwardResult(minDataOperands, optWidth);
 
     // Check whether we managed to optimize anything
     unsigned dataWidth = channelVal.getType().getDataBitWidth();
     if (optWidth >= dataWidth)
       return failure();
-
-    // Get the minimal valuue of all data operands
-    SmallVector<ChannelVal> minDataOperands;
-    for (Value oprd : dataOperands)
-      minDataOperands.push_back(getMinimalValue(cast<ChannelVal>(oprd)));
 
     // Create a new operation as well as appropriate bitwidth modification
     // operations to keep the IR valid
@@ -1020,21 +1063,23 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     SmallVector<Type> newResTypes;
     Type newDataType = rewriter.getIntegerType(optWidth);
     Type newChannelType = channelVal.getType().withDataType(newDataType);
-    cfg.getNewOperands(optWidth, ext, minDataOperands, rewriter, newOperands);
+    cfg.getNewOperands(optWidth, minDataOperands, rewriter, newOperands);
     cfg.getResultTypes(newChannelType, newResTypes);
     rewriter.setInsertionPoint(op);
     Op newOp = cfg.createOp(newResTypes, newOperands, rewriter);
     namer.replaceOp(op, newOp);
     inheritBB(op, newOp);
-    cfg.modResults(newOp, dataWidth, ext, rewriter, newResults);
+    cfg.modResults(newOp, dataWidth, resultExt, rewriter, newResults);
 
     // Replace uses of the original operation's results with the results of the
     // optimized operation we just created
     rewriter.replaceOp(op, newResults);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -1071,10 +1116,10 @@ template <typename Op>
 struct ArithSingleType : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  ArithSingleType(bool forward, FTransfer fTransfer, MLIRContext *ctx,
-                  NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), namer(namer), forward(forward),
-        fTransfer(std::move(fTransfer)) {}
+  ArithSingleType(Pass::Statistic &bitwidthReduced, bool forward,
+                  FTransfer fTransfer, MLIRContext *ctx, NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        namer(namer), forward(forward), fTransfer(std::move(fTransfer)) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
@@ -1083,13 +1128,13 @@ struct ArithSingleType : public OpRewritePattern<Op> {
       return failure();
 
     // Check whether we can reduce the bitwidth of the operation
-    ExtType extLhs = ExtType::NONE, extRhs = ExtType::NONE;
-    ChannelVal minLhs = getMinimalValue(op.getLhs(), &extLhs);
-    ChannelVal minRhs = getMinimalValue(op.getRhs(), &extRhs);
+    ExtValue minLhs = getMinimalValueWithExtType(op.getLhs());
+    ExtValue minRhs = getMinimalValueWithExtType(op.getRhs());
     ExtWidth optWidth;
     if (forward)
-      optWidth = fTransfer({extLhs, minLhs.getType().getDataBitWidth()},
-                           {extRhs, minRhs.getType().getDataBitWidth()});
+      optWidth =
+          fTransfer({minLhs.second, minLhs.first.getType().getDataBitWidth()},
+                    {minRhs.second, minRhs.first.getType().getDataBitWidth()});
     else {
       // It does not matter whether we use sign- or zero-extension in this case
       // since the bits added by the extension are unused by definition.
@@ -1100,12 +1145,14 @@ struct ArithSingleType : public OpRewritePattern<Op> {
     if (optWidth.bitWidth >= resWidth)
       return failure();
 
-    modArithOp(op, {minLhs, extLhs}, {minRhs, extRhs}, optWidth.bitWidth,
-               optWidth.extType, rewriter, namer);
+    modArithOp(op, minLhs, minRhs, optWidth.bitWidth, optWidth.extType,
+               rewriter, namer);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 
@@ -1123,9 +1170,10 @@ private:
 struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
   using OpRewritePattern<handshake::SelectOp>::OpRewritePattern;
 
-  ArithSelect(bool forward, MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::SelectOp>(ctx), namer(namer),
-        forward(forward) {}
+  ArithSelect(Pass::Statistic &bitwidthReduced, bool forward, MLIRContext *ctx,
+              NameAnalysis &namer)
+      : OpRewritePattern<handshake::SelectOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer), forward(forward) {}
 
   LogicalResult matchAndRewrite(handshake::SelectOp selectOp,
                                 PatternRewriter &rewriter) const override {
@@ -1134,9 +1182,10 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
       return failure();
 
     // Check whether we can reduce the bitwidth of the operation
-    ExtType extLhs = ExtType::NONE, extRhs = ExtType::NONE;
-    ChannelVal minLhs = getMinimalValue(selectOp.getTrueValue(), &extLhs);
-    ChannelVal minRhs = getMinimalValue(selectOp.getFalseValue(), &extRhs);
+    ExtValue lhsExtValue = getMinimalValueWithExtType(selectOp.getTrueValue());
+    ExtValue rhsExtValue = getMinimalValueWithExtType(selectOp.getFalseValue());
+    auto [minLhs, extLhs] = lhsExtValue;
+    auto [minRhs, extRhs] = rhsExtValue;
     unsigned optWidth;
     if (forward)
       optWidth = std::max(minLhs.getType().getDataBitWidth(),
@@ -1155,8 +1204,8 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
 
     // Create a new operation as well as appropriate bitwidth modification
     // operations to keep the IR valid
-    Value newLhs = modBitWidth({minLhs, extLhs}, optWidth, rewriter);
-    Value newRhs = modBitWidth({minRhs, extRhs}, optWidth, rewriter);
+    Value newLhs = modBitWidth(lhsExtValue, optWidth, rewriter);
+    Value newRhs = modBitWidth(rhsExtValue, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
     auto newOp = rewriter.create<handshake::SelectOp>(
         selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
@@ -1167,16 +1216,154 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
     // Replace uses of the original operation's result with the result of the
     // optimized operation we just created
     rewriter.replaceOp(selectOp, newRes);
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 
 private:
   /// Indicates whether this pattern is part of the forward or backward pass.
   bool forward;
+};
+
+/// Optimizes unsigned right-shifts with a constant as a forward pass.
+struct ArithShrUIFW : OpRewritePattern<handshake::ShRUIOp> {
+  ArithShrUIFW(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+               NameAnalysis &namer)
+      : OpRewritePattern(ctx), bitwidthReduced(bitwidthReduced), namer(namer) {}
+
+  LogicalResult matchAndRewrite(handshake::ShRUIOp op,
+                                PatternRewriter &rewriter) const override {
+    auto [lhs, lhsExt] = getMinimalValueWithExtType(op.getLhs());
+    unsigned inputBitwidth = lhs.getType().getDataBitWidth();
+    unsigned currentBitwidth = op.getType().getDataBitWidth();
+    if (inputBitwidth >= currentBitwidth)
+      return failure();
+
+    assert(lhsExt != ExtType::NONE && "expected an extension");
+    APInt numOfShiftPositions;
+    Value constantControl;
+    {
+      auto constantOp = op.getRhs().getDefiningOp<handshake::ConstantOp>();
+      if (!constantOp)
+        return failure();
+      numOfShiftPositions = cast<IntegerAttr>(constantOp.getValue()).getValue();
+      constantControl = constantOp.getCtrl();
+    }
+
+    // Other pattern (such as canonicalization pattern) should fold this case
+    // to a useful constant instead
+    if (numOfShiftPositions.uge(currentBitwidth))
+      return failure();
+
+    // The following optimizations can be performed here:
+    // * ZEXT: Shift amount is larger than the input bitwidth -> replace with 0.
+    // * SEXT: Shift amount 'c' is larger than the input bitwidth -> replace
+    //   with 'c' many 0s leading 0s and copies of the sign bit otherwise.
+    // * Otherwise: We can perform the shift at the (lower) input bitwidth
+    //   enabling other ops to be optimized in the forward pass.
+    if (lhsExt == ExtType::ZEXT) {
+      if (numOfShiftPositions.uge(inputBitwidth)) {
+        // The entire input is shifted away and only 0 bits from the extension
+        // remain.
+        auto constant = rewriter.replaceOpWithNewOp<handshake::ConstantOp>(
+            op, op.getType(), rewriter.getZeroAttr(op.getType().getDataType()),
+            constantControl);
+        inheritBB(op, constant);
+        return success();
+      }
+
+      // Otherwise, we can perform the entire shift at the input bitwidth and
+      // zero-extend back to the original bitwidth.
+      modArithOp(op, {lhs, lhsExt}, {op.getRhs(), ExtType::NONE}, inputBitwidth,
+                 ExtType::ZEXT, rewriter, namer);
+      ++bitwidthReduced;
+      return success();
+    }
+
+    // SEXT case.
+    // The thing all the logic has in common here is that the top 'c' bits are
+    // always zero (due to being an unsigned shift) and that any bits between
+    // the top 'c' and (inputBitwidth - c) bits are copies of the sign-bit of
+    // the input value.
+    //
+    // | 0...0 | s ... s | s X ... Y |
+    // -------------------------------
+    // c many 0s in the front.
+    //           (inputBitwidth - c) many sign bits (s).
+    //                     Original input (lead by sign-bit s) shifted by c on
+    //                     the right.
+    //
+    // If c is greater than input bitwidth than there are only c many 0s and
+    // copies of the sign-bit in the remaining bits.
+    // In all cases we can perform shifts at the input bitwidth or less and use
+    // extensions to restore the original output.
+    // These extension operations can be folded into other operations if
+    // redundant or leveraged by other patterns.
+    ChannelVal result;
+    if (numOfShiftPositions.ult(inputBitwidth)) {
+      // c is less than the input bitwidth, meaning other bits from the input
+      // besides the sign-bit are preserved in the output.
+
+      // Perform the shift on the bitwidth of lhs.
+      Value newRhs =
+          modBitWidth({op.getRhs(), ExtType::NONE}, inputBitwidth, rewriter);
+      result = rewriter.create<handshake::ShRUIOp>(op.getLoc(), lhs, newRhs);
+
+      // Now truncate the result to make the sign-bit after shifting the
+      // top-bit again.
+      // Note that this even works when 'c' is greater than the difference
+      // between the input and current bit width.
+      result = rewriter.create<handshake::TruncIOp>(
+          op.getLoc(),
+          result.getType().withDataType(rewriter.getIntegerType(
+              inputBitwidth - numOfShiftPositions.getZExtValue())),
+          result);
+    } else {
+      // Our shift amount is larger than the input bitwidth but the input
+      // bitwidth is sign-extended. The only thing that remains from the input
+      // is the sign-bit that was copied to the bits [inputWidth:currentBitWidth
+      // - c].
+      Value inputBWM1 = rewriter.create<handshake::ConstantOp>(
+          op.getLoc(),
+          rewriter.getIntegerAttr(lhs.getType().getDataType(),
+                                  inputBitwidth - 1),
+          constantControl);
+      // Shift away all values of lhs other than the sign-bit.
+      ChannelVal signBit =
+          rewriter.create<handshake::ShRUIOp>(op.getLoc(), lhs, inputBWM1);
+      // Truncate down to just the sign-bit.
+      // Note that this even works when 'c' is greater than the difference
+      // between the input and current bit width.
+      result = rewriter.create<handshake::TruncIOp>(
+          op.getLoc(), signBit.getType().withDataType(rewriter.getI1Type()),
+          signBit);
+    }
+    // Result pattern is now | s X ... Y |.
+
+    // Fill with the sign-bit up until excluding the top 'c' bits.
+    // Result now follows the | s ... s | s X ... Y | pattern.
+    result = rewriter.create<handshake::ExtSIOp>(
+        op.getLoc(),
+        op.getType().withDataType(rewriter.getIntegerType(
+            currentBitwidth - numOfShiftPositions.getZExtValue())),
+        result);
+
+    // Fill the top 'c' bits with zero to turn the result into the desired
+    // | 0...0 | s ... s | s X ... Y | pattern.
+    rewriter.replaceOpWithNewOp<handshake::ExtUIOp>(op, op.getType(), result);
+    ++bitwidthReduced;
+    return success();
+  }
+
+private:
+  Pass::Statistic &bitwidthReduced;
+  /// A reference to the pass's name analysis.
+  NameAnalysis &namer;
 };
 
 /// Optimizes the bitwidth of shift-type operations. The first template
@@ -1188,16 +1375,17 @@ template <typename Op>
 struct ArithShift : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  ArithShift(bool forward, MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<Op>(ctx), namer(namer), forward(forward) {}
+  ArithShift(Pass::Statistic &bitwidthReduced, bool forward, MLIRContext *ctx,
+             NameAnalysis &namer)
+      : OpRewritePattern<Op>(ctx), bitwidthReduced(bitwidthReduced),
+        namer(namer), forward(forward) {}
 
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     ChannelVal toShift = op.getLhs();
     ChannelVal shiftBy = op.getRhs();
-    ExtType extToShift = ExtType::NONE;
-    ChannelVal minToShift = getMinimalValue(toShift, &extToShift);
-    ChannelVal minShiftBy = backtrackToMinimalValue(shiftBy);
+    auto [minToShift, extToShift] = getMinimalValueWithExtType(toShift);
+    auto [minShiftBy, minShiftByExt] = backtrackToMinimalValue(shiftBy);
     bool isRightShift =
         isa<handshake::ShRSIOp, handshake::ShRUIOp>((Operation *)op);
 
@@ -1258,10 +1446,12 @@ struct ArithShift : public OpRewritePattern<Op> {
       modArithOp(op, {modToShift, extToShift}, {minShiftBy, ExtType::ZEXT},
                  optWidth, extToShift, rewriter, namer);
     }
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 
@@ -1275,15 +1465,18 @@ private:
 /// forward pass.
 struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
 
-  ArithCmpFW(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::CmpIOp>(ctx), namer(namer) {}
+  ArithCmpFW(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+             NameAnalysis &namer)
+      : OpRewritePattern<handshake::CmpIOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::CmpIOp cmpOp,
                                 PatternRewriter &rewriter) const override {
     // Check whether we can reduce the bitwidth of the operation
-    ExtType extLhs = ExtType::NONE, extRhs = ExtType::NONE;
-    ChannelVal minLhs = getMinimalValue(cmpOp.getLhs(), &extLhs);
-    ChannelVal minRhs = getMinimalValue(cmpOp.getRhs(), &extRhs);
+    ExtValue lhsExtValue = getMinimalValueWithExtType(cmpOp.getLhs());
+    ExtValue rhsExtValue = getMinimalValueWithExtType(cmpOp.getRhs());
+    auto [minLhs, extLhs] = lhsExtValue;
+    auto [minRhs, extRhs] = rhsExtValue;
     unsigned optWidth = std::max(minLhs.getType().getDataBitWidth(),
                                  minRhs.getType().getDataBitWidth());
     unsigned actualWidth = cmpOp.getLhs().getType().getDataBitWidth();
@@ -1303,10 +1496,12 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     // Replace uses of the original operation's result with the result of the
     // optimized operation we just created
     rewriter.replaceOp(cmpOp, newOp.getResult());
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -1316,30 +1511,33 @@ protected:
 struct ArithExtToTruncOpt : public OpRewritePattern<handshake::TruncIOp> {
   using OpRewritePattern<handshake::TruncIOp>::OpRewritePattern;
 
-  ArithExtToTruncOpt(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::TruncIOp>(ctx), namer(namer) {}
+  ArithExtToTruncOpt(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+                     NameAnalysis &namer)
+      : OpRewritePattern<handshake::TruncIOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
 
   LogicalResult matchAndRewrite(handshake::TruncIOp truncOp,
                                 PatternRewriter &rewriter) const override {
     // Operand must be produced by an extension operation
-    ExtType extType = ExtType::NONE;
-    ChannelVal minVal = getMinimalValue(truncOp.getIn(), &extType);
-    if (extType == ExtType::NONE)
+    ExtValue minVal = getMinimalValueWithExtType(truncOp.getIn());
+    if (minVal.second == ExtType::NONE)
       return failure();
 
     unsigned finalWidth = truncOp.getResult().getType().getDataBitWidth();
-    if (finalWidth == minVal.getType().getDataBitWidth())
+    if (finalWidth == minVal.first.getType().getDataBitWidth())
       return failure();
 
     // Bypass all extensions and truncation operation and replace it with a
     // single bitwidth modification operation
-    auto newExtRes = modBitWidth({minVal, extType}, finalWidth, rewriter);
+    auto newExtRes = modBitWidth(minVal, finalWidth, rewriter);
     namer.replaceOp(truncOp, newExtRes.getDefiningOp());
     rewriter.replaceOp(truncOp, {newExtRes});
+    ++bitwidthReduced;
     return success();
   }
 
 protected:
+  Pass::Statistic &bitwidthReduced;
   /// A reference to the pass's name analysis.
   NameAnalysis &namer;
 };
@@ -1352,10 +1550,10 @@ protected:
 /// constant, and allows to reduce the bitwidth of the loop iterator in those
 /// cases.
 struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
-  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
-
-  ArithBoundOpt(MLIRContext *ctx, NameAnalysis &namer)
-      : OpRewritePattern<handshake::ConditionalBranchOp>(ctx) {}
+  ArithBoundOpt(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+                NameAnalysis &namer)
+      : OpRewritePattern<handshake::ConditionalBranchOp>(ctx),
+        bitwidthReduced(bitwidthReduced) {}
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condOp,
                                 PatternRewriter &rewriter) const override {
@@ -1363,7 +1561,7 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     ChannelVal channelVal = asTypedIfLegal(condOp.getDataOperand());
     if (!channelVal)
       return failure();
-    ChannelVal dataOperand = backtrackToMinimalValue(channelVal);
+    ExtValue dataOperand = backtrackToMinimalValue(channelVal);
 
     // Find all comparison operations whose result is used in a logical and to
     // determine the condition operand and which have the data operand as one of
@@ -1373,22 +1571,21 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
                falseRes = cast<ChannelVal>(condOp.getFalseResult());
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
     for (handshake::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
-      ExtType extLhs = ExtType::NONE, extRhs = ExtType::NONE;
-      ChannelVal minLhs = backtrackToMinimalValue(cmpOp.getLhs(), &extLhs);
-      ChannelVal minRhs = backtrackToMinimalValue(cmpOp.getRhs(), &extRhs);
+      ExtValue minLhs = backtrackToMinimalValue(cmpOp.getLhs());
+      ExtValue minRhs = backtrackToMinimalValue(cmpOp.getRhs());
 
       // One of the two comparison operands must be the data input
       unsigned width;
       bool isDataLhs;
       ExtType branchExt;
       if (dataOperand == minLhs) {
-        width = minRhs.getType().getDataBitWidth();
+        width = minRhs.first.getType().getDataBitWidth();
         isDataLhs = true;
-        branchExt = extLhs;
+        branchExt = minLhs.second;
       } else if (dataOperand == minRhs) {
-        width = minLhs.getType().getDataBitWidth();
+        width = minLhs.first.getType().getDataBitWidth();
         isDataLhs = false;
-        branchExt = extRhs;
+        branchExt = minRhs.second;
       } else
         continue;
 
@@ -1396,7 +1593,7 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       Value branch = getBranchToOptimize(condOp, cmpOp, isDataLhs);
       if (!branch)
         continue;
-      if (isBoundTight(isDataLhs ? minRhs : minLhs))
+      if (isBoundTight(isDataLhs ? minRhs.first : minLhs.first))
         width = getRealOptWidth(cmpOp, width, isDataLhs);
 
       // Keep track of the best optimization opportunity found so far for the
@@ -1420,6 +1617,8 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       anyOptPerformed |= optBranchIfPossible(falseRes, falseBranch->first,
                                              falseBranch->second, rewriter);
 
+    if (anyOptPerformed)
+      ++bitwidthReduced;
     return success(anyOptPerformed);
   }
 
@@ -1450,16 +1649,18 @@ private:
   /// performed; otherwise returns false;
   bool optBranchIfPossible(ChannelVal optBranch, unsigned optWidth, ExtType ext,
                            PatternRewriter &rewriter) const;
+
+  Pass::Statistic &bitwidthReduced;
 };
 
 } // namespace
 
 SmallVector<handshake::CmpIOp>
 ArithBoundOpt::getCmpOps(ChannelVal condVal) const {
-  Value minVal = backtrackToMinimalValue(condVal);
+  ExtValue minVal = backtrackToMinimalValue(condVal);
 
   // Stop when reaching function arguments
-  Operation *defOp = minVal.getDefiningOp();
+  Operation *defOp = minVal.first.getDefiningOp();
   if (!defOp)
     return {};
 
@@ -1596,7 +1797,8 @@ struct HandshakeOptimizeBitwidthsPass
     // optimization, which down-the-line passes may be sensitive to.
     RewritePatternSet patterns(ctx);
     patterns.add<HandshakeMuxSelect, HandshakeCMergeIndex, MemInterfaceAddrOpt,
-                 MemPortAddrOpt>(getAnalysis<NameAnalysis>(), ctx);
+                 MemPortAddrOpt>(bitwidthReduced, getAnalysis<NameAnalysis>(),
+                                 ctx);
     if (failed(
             applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
@@ -1653,27 +1855,34 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
   MLIRContext *ctx = patterns.getContext();
 
   patterns.add<ArithSingleType<handshake::AddIOp>,
-               ArithSingleType<handshake::SubIOp>>(forward, addWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+               ArithSingleType<handshake::SubIOp>>(
+      bitwidthReduced, forward, addWidth, ctx, getAnalysis<NameAnalysis>());
 
-  patterns.add<ArithSingleType<handshake::MulIOp>>(true, mulWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+  patterns.add<ArithSingleType<handshake::MulIOp>>(
+      bitwidthReduced, true, mulWidth, ctx, getAnalysis<NameAnalysis>());
 
-  patterns.add<ArithSingleType<handshake::AndIOp>>(true, andWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+  patterns.add<ArithSingleType<handshake::AndIOp>>(
+      bitwidthReduced, true, andWidth, ctx, getAnalysis<NameAnalysis>());
 
   patterns.add<ArithSingleType<handshake::OrIOp>,
-               ArithSingleType<handshake::XOrIOp>>(true, orWidth, ctx,
-                                                   getAnalysis<NameAnalysis>());
+               ArithSingleType<handshake::XOrIOp>>(
+      bitwidthReduced, true, orWidth, ctx, getAnalysis<NameAnalysis>());
 
   // [TODO] @jiahui17: Optimizing bitwidth based on the shift operation
   // is dangerous if the shift is used as multiplication.
   // Therefore, removing "ArithShift<handshake::ShLIOp>" from the patterns for
   // now
-  patterns.add<ArithShift<handshake::ShRSIOp>, ArithShift<handshake::ShRUIOp>,
-               ArithSelect>(forward, ctx, getAnalysis<NameAnalysis>());
+  patterns.add<ArithShift<handshake::ShRSIOp>, ArithSelect>(
+      bitwidthReduced, forward, ctx, getAnalysis<NameAnalysis>());
+  if (!forward)
+    patterns.add<ArithShift<handshake::ShRUIOp>>(bitwidthReduced, forward, ctx,
+                                                 getAnalysis<NameAnalysis>());
+  else
+    patterns.add<ArithShrUIFW>(bitwidthReduced, ctx,
+                               getAnalysis<NameAnalysis>());
 
-  patterns.add<ArithExtToTruncOpt>(ctx, getAnalysis<NameAnalysis>());
+  patterns.add<ArithExtToTruncOpt>(bitwidthReduced, ctx,
+                                   getAnalysis<NameAnalysis>());
   handshake::ExtSIOp::getCanonicalizationPatterns(patterns, ctx);
   handshake::ExtUIOp::getCanonicalizationPatterns(patterns, ctx);
 }
@@ -1691,7 +1900,7 @@ void HandshakeOptimizeBitwidthsPass::addHandshakeDataPatterns(
            HandshakeOptData<handshake::MuxOp, MuxDataConfig>,
            HandshakeOptData<handshake::BufferOp, BufferDataConfig>,
            HandshakeOptData<handshake::ConditionalBranchOp, CBranchDataConfig>>(
-          forward, ctx, getAnalysis<NameAnalysis>());
+          bitwidthReduced, forward, ctx, getAnalysis<NameAnalysis>());
 }
 
 void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
@@ -1703,17 +1912,20 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
   fwPatterns.add<ForwardCycleOptNoCfg<handshake::MergeOp>,
                  ForwardCycleOpt<handshake::MuxOp, MuxDataConfig>,
                  ForwardCycleOpt<handshake::ControlMergeOp, CMergeDataConfig>>(
-      ctx, getAnalysis<NameAnalysis>());
+      bitwidthReduced, ctx, getAnalysis<NameAnalysis>());
 
   // arith operations
   addArithPatterns(fwPatterns, true);
 
   fwPatterns.add<ArithSingleType<handshake::DivUIOp>>(
-      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
+      bitwidthReduced, true, divWidth</*zeroExtend=*/true>, ctx,
+      getAnalysis<NameAnalysis>());
   fwPatterns.add<ArithSingleType<handshake::DivSIOp>>(
-      true, divWidth</*zeroExtend=*/true>, ctx, getAnalysis<NameAnalysis>());
+      bitwidthReduced, true, divWidth</*zeroExtend=*/true>, ctx,
+      getAnalysis<NameAnalysis>());
 
-  fwPatterns.add<ArithCmpFW, ArithBoundOpt>(ctx, getAnalysis<NameAnalysis>());
+  fwPatterns.add<ArithCmpFW, ArithBoundOpt>(bitwidthReduced, ctx,
+                                            getAnalysis<NameAnalysis>());
 }
 
 void HandshakeOptimizeBitwidthsPass::addBackwardPatterns(

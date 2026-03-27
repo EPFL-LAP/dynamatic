@@ -426,7 +426,7 @@ void TranslateLLVMToStd::translateBinaryInst(llvm::BinaryOperator *inst) {
   mlir::Value rhs = valueMap[inst->getOperand(1)];
   mlir::Type resType = getMLIRType(inst->getType(), ctx);
   switch (inst->getOpcode()) {
-    // clang-format off
+  // clang-format off
     case Instruction::Add:  naiveTranslation<arith::AddIOp>( resType,  {lhs, rhs}, inst); break;
     case Instruction::Sub:  naiveTranslation<arith::SubIOp>( resType,  {lhs, rhs}, inst); break;
     case Instruction::Mul:  naiveTranslation<arith::MulIOp>( resType,  {lhs, rhs}, inst); break;
@@ -458,7 +458,7 @@ void TranslateLLVMToStd::translateCastInst(llvm::CastInst *inst) {
   mlir::Type resType = getMLIRType(inst->getType(), ctx);
 
   switch (inst->getOpcode()) {
-    // clang-format off
+  // clang-format off
     case Instruction::ZExt:    naiveTranslation<arith::ExtUIOp>( resType, {arg}, inst); break;
     case Instruction::SExt:    naiveTranslation<arith::ExtSIOp>( resType, {arg}, inst); break;
     case Instruction::FPExt:   naiveTranslation<arith::ExtFOp>( resType, {arg}, inst); break;
@@ -482,7 +482,7 @@ void TranslateLLVMToStd::translateICmpInst(llvm::ICmpInst *inst) {
   mlir::Value rhs = valueMap[inst->getOperand(1)];
   arith::CmpIPredicate predicate;
   switch (inst->getPredicate()) {
-    // clang-format off
+  // clang-format off
     case llvm::CmpInst::Predicate::ICMP_EQ:  predicate = arith::CmpIPredicate::eq;  break;
     case llvm::CmpInst::Predicate::ICMP_NE:  predicate = arith::CmpIPredicate::ne;  break;
     case llvm::CmpInst::Predicate::ICMP_UGT: predicate = arith::CmpIPredicate::ugt; break;
@@ -508,7 +508,7 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
   mlir::Value rhs = valueMap[inst->getOperand(1)];
   arith::CmpFPredicate predicate;
   switch (inst->getPredicate()) {
-    // clang-format off
+  // clang-format off
     case llvm::CmpInst::FCMP_OEQ: predicate = arith::CmpFPredicate::OEQ; break;
     case llvm::CmpInst::FCMP_OGT: predicate = arith::CmpFPredicate::OGT; break;
     case llvm::CmpInst::FCMP_OGE: predicate = arith::CmpFPredicate::OGE; break;
@@ -983,11 +983,21 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<arith::MaxSIOp>(retType, {lhs, rhs}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::umax) {
+    mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
+    mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<arith::MaxUIOp>(retType, {lhs, rhs}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::smin) {
     mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<arith::MinSIOp>(retType, {lhs, rhs}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::umin) {
+    mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
+    mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<arith::MinUIOp>(retType, {lhs, rhs}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::fabs) {
     mlir::Value arg = valueMap[callInst->getArgOperand(0)];
     auto retType = getMLIRType(callInst->getType(), ctx);

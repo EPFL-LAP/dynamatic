@@ -331,6 +331,11 @@ class LSQ:
         arch += BitsToOH(ctx, ldq_head_oh, ldq_head)
         arch += BitsToOH(ctx, stq_head_oh, stq_head)
 
+        # indicates tail pointer was just updated (i.e., new stores were allocated)
+        stq_tail_update = Logic(ctx, 'stq_tail_update', 'r')
+        stq_tail_update.regInit()
+        arch += Reduce(ctx, stq_tail_update, num_stores, 'or')
+
         # Pipelining Strategy:
         # The signals are always passed through the pipeline stages (*_pcomp,
         # *_p0, *_p1). If the pipeline stage is enabled, the signal will be
@@ -604,6 +609,7 @@ class LSQ:
             ctx, 'stq_addr_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
         stq_data_valid_pcomp = LogicArray(
             ctx, 'stq_data_valid_pcomp', pipe_comp_type, self.configs.numStqEntries)
+        stq_tail_update_pcomp = Logic(ctx, 'stq_tail_update_pcomp', pipe_comp_type)
         # addr_valid_pcomp is always a wire: combines other registers signals
         addr_valid_pcomp = LogicVecArray(
             ctx, 'addr_valid_pcomp', 'w', self.configs.numLdqEntries, self.configs.numStqEntries)
@@ -625,6 +631,7 @@ class LSQ:
             stq_alloc_pcomp.regInit(init=[0]*self.configs.numStqEntries)
             stq_addr_valid_pcomp.regInit()
             stq_data_valid_pcomp.regInit()
+            stq_tail_update_pcomp.regInit()
             addr_same_pcomp.regInit()
             store_is_older_pcomp.regInit()
 
@@ -638,6 +645,7 @@ class LSQ:
                        (stq_addr_valid, j))
             arch += Op(ctx, (stq_data_valid_pcomp, j),
                        (stq_data_valid, j))
+        arch += Op(ctx, stq_tail_update_pcomp, stq_tail_update)
         for i in range(0, self.configs.numLdqEntries):
             for j in range(0, self.configs.numStqEntries):
                 arch += Op(ctx, (store_is_older_pcomp, i, j),
@@ -776,10 +784,9 @@ class LSQ:
             store_req_valid_p0.regInit(init=0)
             st_ld_conflict_p0.regInit()
 
-        # next issue pointer (needed for look-ahead when pipelining is enabled)
-        if self.configs.pipe0:
-            stq_issue_next = LogicVec(ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
-            arch += WrapAddConst(ctx, stq_issue_next, stq_issue, 1, self.configs.numStqEntries)
+        # next issue pointer (needed for look-ahead when pipelining is enabled and for stalling store issue)
+        stq_issue_next = LogicVec(ctx, 'stq_issue_next', 'w', self.configs.stqAddrW)
+        arch += WrapAddConst(ctx, stq_issue_next, stq_issue, 1, self.configs.numStqEntries)
 
         # checks for current and next (if needed) store entry
         store_req_valid_curr = Logic(ctx, 'store_req_valid_curr', 'w')
@@ -836,9 +843,24 @@ class LSQ:
             arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_curr)
             arch += Op(ctx, store_req_valid_p0, store_req_valid_curr)
 
+        # Stalling Store Issue
+        # For small queues relative to the memory latency, it is possible that all store entries
+        # have been allocated and are in-flight to the memory. In this case, the store issue
+        # pointer would wrap around and re-issue the same stores a second time. To avoid this, we
+        # stall store issue once the issue pointer catches up to the tail pointer (i.e., when all
+        # store entries are in-flight), and only allow store issue to proceed when the tail pointer
+        # moves (indicating a store entry has been freed up and subsequently allocated again).
+        store_issue_stall_p0 = Logic(ctx, 'store_issue_stall', 'r')
+        store_issue_stall_set = Logic(ctx, 'store_issue_stall_set', 'w')
+        store_issue_stall_reset = Logic(ctx, 'store_issue_stall_reset', 'w')
+        store_issue_stall_p0.regInit(init=0)
+        arch += Op(ctx, store_issue_stall_set, stq_issue_en, 'when', '(', stq_issue_next, '=', stq_tail, ')', 'else', "'0'")
+        arch += Op(ctx, store_issue_stall_reset, stq_tail_update_pcomp)
+        arch += Op(ctx, store_issue_stall_p0, 'not', store_issue_stall_reset, 'and', '(', store_issue_stall_p0, 'or', store_issue_stall_set, ')')
+
         # The store conflicts with any load
         arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
-        arch += Op(ctx, store_en, 'not', store_conflict, 'and', store_req_valid_p0)
+        arch += Op(ctx, store_en, 'not', store_conflict, 'and', store_req_valid_p0, 'and', 'not', store_issue_stall_p0)
         arch += Op(ctx, store_idx, stq_issue)
 
         # Bypass

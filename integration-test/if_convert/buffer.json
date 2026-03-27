@@ -28,7 +28,7 @@
     "comment": "To achieve better II"
   },
   {
-    "pred": "extsi2",
+    "pred": "constant11",
     "outid": 0,
     "slots": 4,
     "type": "fifo_break_none",

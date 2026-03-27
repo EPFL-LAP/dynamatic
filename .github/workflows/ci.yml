@@ -90,10 +90,6 @@ jobs:
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build check-dynamatic
 
-      - name: check-dynamatic-experimental
-        if: steps.build.outputs.exit_code == 0
-        run: ninja -C build check-dynamatic-experimental
-
       - name: check-constraint-programming-library
         if: steps.build.outputs.exit_code == 0
         run: ninja -C build run-constraint-programming-test
