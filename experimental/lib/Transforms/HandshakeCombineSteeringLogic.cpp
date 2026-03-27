@@ -239,7 +239,7 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
 /// Check if two values are functionally equivalent:
 ///   - Same SSA value, OR
 ///   - Both are ConstantOps with the same attribute value, OR
-///   - Both are NotOps whose inputs are themselves equivalent (recursive)
+///   - Both are NotIOps whose inputs are themselves equivalent (recursive)
 static bool areEquivalentValues(Value a, Value b) {
   if (a == b)
     return true;
@@ -255,11 +255,11 @@ static bool areEquivalentValues(Value a, Value b) {
     return false;
   }
 
-  // if (auto notA = dyn_cast<handshake::NotOp>(defA)) {
-  //   if (auto notB = dyn_cast<handshake::NotOp>(defB))
-  //     return areEquivalentValues(notA.getOperand(), notB.getOperand());
-  //   return false;
-  // }
+  if (auto notA = dyn_cast<handshake::NotIOp>(defA)) {
+    if (auto notB = dyn_cast<handshake::NotIOp>(defB))
+      return areEquivalentValues(notA.getOperand(), notB.getOperand());
+    return false;
+  }
 
   return false;
 }
@@ -466,103 +466,103 @@ struct RemoveNotCondition
 /// each output carries a known boolean. Replace the condition operand of any
 /// downstream branch that uses these outputs as condition with a constant
 /// 0 or 1, disconnecting the upstream branch's use.
-// struct SimplifyKnownConditionBranch
-//     : public OpRewritePattern<handshake::ConditionalBranchOp> {
-//   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
-//   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
-//                                 PatternRewriter &rewriter) const override {
+struct SimplifyKnownConditionBranch
+    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
+                                PatternRewriter &rewriter) const override {
 
-//     Value condOperand = condBranchOp.getConditionOperand();
-//     Value dataOperand = condBranchOp.getDataOperand();
+    Value condOperand = condBranchOp.getConditionOperand();
+    Value dataOperand = condBranchOp.getDataOperand();
 
-//     // Match three cases:
-//     //   1) cond == data                (direct)
-//     //   2) cond == not(data)           (inverted)
-//     //   3) data == not(cond)           (inverted)
-//     bool inverted = false;
-//     if (condOperand == dataOperand) {
-//       inverted = false;
-//     } else {
-//       Operation *condDef = condOperand.getDefiningOp();
-//       Operation *dataDef = dataOperand.getDefiningOp();
-//       if (isa_and_nonnull<handshake::NotOp>(condDef) &&
-//           condDef->getOperand(0) == dataOperand) {
-//         inverted = true;
-//       } else if (isa_and_nonnull<handshake::NotOp>(dataDef) &&
-//                  dataDef->getOperand(0) == condOperand) {
-//         inverted = true;
-//       } else {
-//         return failure();
-//       }
-//     }
+    // Match three cases:
+    //   1) cond == data                (direct)
+    //   2) cond == not(data)           (inverted)
+    //   3) data == not(cond)           (inverted)
+    bool inverted = false;
+    if (condOperand == dataOperand) {
+      inverted = false;
+    } else {
+      Operation *condDef = condOperand.getDefiningOp();
+      Operation *dataDef = dataOperand.getDefiningOp();
+      if (isa_and_nonnull<handshake::NotIOp>(condDef) &&
+          condDef->getOperand(0) == dataOperand) {
+        inverted = true;
+      } else if (isa_and_nonnull<handshake::NotIOp>(dataDef) &&
+                 dataDef->getOperand(0) == condOperand) {
+        inverted = true;
+      } else {
+        return failure();
+      }
+    }
 
-//     bool changed = false;
+    bool changed = false;
 
-//     // For a given output of the upstream branch, replace the condition
-//     // of all downstream branches that use it as condition with a constant.
-//     auto replaceDownstreamCond = [&](Value branchOutput, bool outputIsTrue) {
-//       // Runtime boolean value carried by branchOutput:
-//       //   direct:   true output -> 1,   false output -> 0
-//       //   inverted: true output -> 0,   false output -> 1
-//       bool knownCondTrue = inverted ? !outputIsTrue : outputIsTrue;
+    // For a given output of the upstream branch, replace the condition
+    // of all downstream branches that use it as condition with a constant.
+    auto replaceDownstreamCond = [&](Value branchOutput, bool outputIsTrue) {
+      // Runtime boolean value carried by branchOutput:
+      //   direct:   true output -> 1,   false output -> 0
+      //   inverted: true output -> 0,   false output -> 1
+      bool knownCondTrue = inverted ? !outputIsTrue : outputIsTrue;
 
-//       // Collect downstream branches using branchOutput as condition
-//       SmallVector<handshake::ConditionalBranchOp> toSimplify;
-//       for (auto *user : branchOutput.getUsers()) {
-//         if (auto br = dyn_cast<handshake::ConditionalBranchOp>(user)) {
-//           if (br.getConditionOperand() == branchOutput)
-//             toSimplify.push_back(br);
-//         }
-//       }
+      // Collect downstream branches using branchOutput as condition
+      SmallVector<handshake::ConditionalBranchOp> toSimplify;
+      for (auto *user : branchOutput.getUsers()) {
+        if (auto br = dyn_cast<handshake::ConditionalBranchOp>(user)) {
+          if (br.getConditionOperand() == branchOutput)
+            toSimplify.push_back(br);
+        }
+      }
 
-//       for (auto br : toSimplify) {
-//         rewriter.setInsertionPoint(br);
+      for (auto br : toSimplify) {
+        rewriter.setInsertionPoint(br);
 
-//         // Create source as trigger
-//         auto sourceOp =
-//             rewriter.create<handshake::SourceOp>(br.getLoc());
-//         if (auto bbAttr = br->getAttr("handshake.bb"))
-//           sourceOp->setAttr("handshake.bb", bbAttr);
+        // Create source as trigger
+        auto sourceOp =
+            rewriter.create<handshake::SourceOp>(br.getLoc());
+        if (auto bbAttr = br->getAttr("handshake.bb"))
+          sourceOp->setAttr("handshake.bb", bbAttr);
 
-//         // Build the i1 attribute
-//         auto i1Type = rewriter.getIntegerType(1);
-//         auto cstAttr =
-//             rewriter.getIntegerAttr(i1Type, knownCondTrue ? 1 : 0);
+        // Build the i1 attribute
+        auto i1Type = rewriter.getIntegerType(1);
+        auto cstAttr =
+            rewriter.getIntegerAttr(i1Type, knownCondTrue ? 1 : 0);
 
-//         // Check if the condition operand is channelified
-//         Type condType = branchOutput.getType();
-//         handshake::ConstantOp constOp;
+        // Check if the condition operand is channelified
+        Type condType = branchOutput.getType();
+        handshake::ConstantOp constOp;
 
-//         if (auto channelType =
-//                 dyn_cast<handshake::ChannelType>(condType)) {
-//           // Channelified: use 4-arg constructor (loc, resultType, attr, ctrl)
-//           // matching the pattern from the existing codebase
-//           constOp = rewriter.create<handshake::ConstantOp>(
-//               br.getLoc(), channelType, cstAttr, sourceOp.getResult());
-//         } else {
-//           // Raw i1: use 3-arg constructor (loc, attr, ctrl)
-//           constOp = rewriter.create<handshake::ConstantOp>(
-//               br.getLoc(), cstAttr, sourceOp.getResult());
-//         }
+        if (auto channelType =
+                dyn_cast<handshake::ChannelType>(condType)) {
+          // Channelified: use 4-arg constructor (loc, resultType, attr, ctrl)
+          // matching the pattern from the existing codebase
+          constOp = rewriter.create<handshake::ConstantOp>(
+              br.getLoc(), channelType, cstAttr, sourceOp.getResult());
+        } else {
+          // Raw i1: use 3-arg constructor (loc, attr, ctrl)
+          constOp = rewriter.create<handshake::ConstantOp>(
+              br.getLoc(), cstAttr, sourceOp.getResult());
+        }
 
-//         if (auto bbAttr = br->getAttr("handshake.bb"))
-//           constOp->setAttr("handshake.bb", bbAttr);
+        if (auto bbAttr = br->getAttr("handshake.bb"))
+          constOp->setAttr("handshake.bb", bbAttr);
 
-//         // Replace condition operand of downstream branch
-//         br->setOperand(0, constOp.getResult());
+        // Replace condition operand of downstream branch
+        br->setOperand(0, constOp.getResult());
 
-//         changed = true;
-//       }
-//     };
+        changed = true;
+      }
+    };
 
-//     replaceDownstreamCond(condBranchOp.getTrueResult(), /*outputIsTrue=*/true);
-//     replaceDownstreamCond(condBranchOp.getFalseResult(), /*outputIsTrue=*/false);
+    replaceDownstreamCond(condBranchOp.getTrueResult(), /*outputIsTrue=*/true);
+    replaceDownstreamCond(condBranchOp.getFalseResult(), /*outputIsTrue=*/false);
 
-//     if (changed)
-//       logLine("[HandshakeCombineSteeringLogic] SimplifyKnownConditionBranch applied\n");
-//     return changed ? success() : failure();
-//   }
-// };
+    if (changed)
+      logLine("[HandshakeCombineSteeringLogic] SimplifyKnownConditionBranch applied\n");
+    return changed ? success() : failure();
+  }
+};
 
 /// Eliminate a ConditionalBranch whose condition is a constant.
 /// Short-circuit: the always-taken output is replaced with the data operand,
@@ -631,10 +631,10 @@ struct HandshakeCombineSteeringLogicPass
                  RemoveUnusedOp<handshake::ConditionalBranchOp>,
                  RemoveUnusedOp<handshake::ConstantOp>,
                  RemoveUnusedOp<handshake::SourceOp>,
-                //  RemoveUnusedOp<handshake::NotOp>,
+                 RemoveUnusedOp<handshake::NotIOp>,
                  CombineBranchesOppositeSign,
                  CombineInits, CombineMuxes, RemoveNotCondition,
-                 /*SimplifyKnownConditionBranch,*/ EliminateConstantCondBranch,
+                 SimplifyKnownConditionBranch, EliminateConstantCondBranch,
                  CombineEquivalentMuxes, CombineEquivalentBranches>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();

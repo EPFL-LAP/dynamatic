@@ -93,7 +93,7 @@ void ftd::createAllCondPlaceholders(Region &region, OpBuilder &builder) {
   }
 }
 
-/// Resolves all SourceOp condition placeholders into NotOp pass-throughs
+/// Resolves all SourceOp condition placeholders into NotIOp pass-throughs
 /// connected to the real handshake condition values from ShadowCFG.
 void ftd::resolveCondPlaceholders(handshake::FuncOp funcOp,
                                   OpBuilder &builder,
@@ -124,51 +124,31 @@ void ftd::resolveCondPlaceholders(handshake::FuncOp funcOp,
     Location loc = ph->getLoc();
     Type chanI1 = ftd::channelifyType(builder.getI1Type());
 
-    auto sourceOp = builder.create<handshake::SourceOp>(loc);
-    sourceOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-    sourceOp->setAttr("handshake.bb", bbAttr);
-
-    auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 0);
-    auto constOp = builder.create<handshake::ConstantOp>(
-        loc, cstAttr, sourceOp.getResult());
-    constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-    constOp->setAttr("handshake.bb", bbAttr);
-
-    auto xorOp = builder.create<handshake::XOrIOp>(
-        loc, chanI1, ValueRange{realCond, constOp.getResult()});
-    xorOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
-    xorOp->setAttr("handshake.bb", bbAttr);
+    auto notOp = builder.create<handshake::NotIOp>(
+        loc, chanI1, realCond);
+    notOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
+    notOp->setAttr("handshake.bb", bbAttr);
 
     // Kill the old ConstantOp placeholder and its SourceOp
     Operation *phSourceOp = ph->getOperand(0).getDefiningOp();
-    ph->getResult(0).replaceAllUsesWith(xorOp.getResult());
+    ph->getResult(0).replaceAllUsesWith(notOp.getResult());
     ph->erase();
     if (phSourceOp && phSourceOp->use_empty())
       phSourceOp->erase();
   }
 }
 
-/// Short-circuits all NotOp condition placeholders and erases them.
+/// Short-circuits all NotIOp condition placeholders and erases them.
 void ftd::finalizeCondPlaceholders(handshake::FuncOp funcOp) {
-  SmallVector<handshake::XOrIOp> xorOps;
-  for (auto xorOp : funcOp.getOps<handshake::XOrIOp>()) {
-    if (xorOp->hasAttr(FTD_COND_VAR))
-      xorOps.push_back(xorOp);
+  SmallVector<handshake::NotIOp> notOps;
+  for (auto notOp : funcOp.getOps<handshake::NotIOp>()) {
+    if (notOp->hasAttr(FTD_COND_VAR))
+      notOps.push_back(notOp);
   }
-  for (auto xorOp : xorOps) {
-    // XOR(realCond, 0) — operand 0 is the real condition
-    xorOp.getResult().replaceAllUsesWith(xorOp.getOperand(0));
+  for (auto notOp : notOps) {
+    notOp.getResult().replaceAllUsesWith(notOp.getOperand());
 
-    // Collect and erase the constant-0 and source feeding operand 1
-    Operation *constOp = xorOp.getOperand(1).getDefiningOp();
-    Operation *sourceOp =
-        constOp ? constOp->getOperand(0).getDefiningOp() : nullptr;
-
-    xorOp->erase();
-    if (constOp && constOp->use_empty())
-      constOp->erase();
-    if (sourceOp && sourceOp->use_empty())
-      sourceOp->erase();
+    notOp->erase();
   }
 }
 
@@ -181,7 +161,7 @@ static Block *returnMuxConditionBlock(Value muxCondition,
     if (!defOp)
       return shadow.getBlock(0);
 
-    // Found the NotOp placeholder — read its BB attribute.
+    // Found the NotIOp placeholder — read its BB attribute.
     if (defOp->hasAttr(FTD_COND_VAR)) {
       auto bbAttr = defOp->getAttrOfType<IntegerAttr>("handshake.bb");
       assert(bbAttr && "Condition placeholder missing handshake.bb");
@@ -858,24 +838,12 @@ static Value boolExpressionToCircuit(
       Location loc = block->getOperations().front().getLoc();
       Type chanI1 = ftd::channelifyType(builder.getI1Type());
 
-      // Create constant 1 triggered by a source
-      auto sourceOp = builder.create<handshake::SourceOp>(loc);
-      sourceOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      setBBAttr(sourceOp, block, builder);
-
-      auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 1);
-      auto constOp =
-          builder.create<handshake::ConstantOp>(loc, cstAttr, sourceOp.getResult());
-      constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      setBBAttr(constOp, block, builder);
-
-      // XOR with 1 == NOT
-      auto xorOp = builder.create<handshake::XOrIOp>(
-          loc, chanI1, ValueRange{val, constOp.getResult()});
-      xorOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      setBBAttr(xorOp, block, builder);
-      return xorOp->getResult(0);
+      auto notOp = builder.create<handshake::NotIOp>(loc, chanI1, val);
+      notOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      setBBAttr(notOp, block, builder);
+      return notOp->getResult(0);
     }
+
     return val;
   }
 

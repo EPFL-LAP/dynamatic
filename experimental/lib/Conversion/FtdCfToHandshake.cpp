@@ -380,14 +380,14 @@ struct FtdCfToHandshakePass
 
       ftd::resolveCondPlaceholders(funcOp, builder, shadow);
 
-      // Populate conditionMap from XorOp placeholders
-      for (auto xorOp : funcOp.getOps<handshake::XOrIOp>()) {
-        if (!xorOp->hasAttr("ftd.cvar"))
+      // Populate conditionMap from NotIOp placeholders
+      for (auto notOp : funcOp.getOps<handshake::NotIOp>()) {
+        if (!notOp->hasAttr("ftd.cvar"))
           continue;
-        auto bbAttr = xorOp->getAttrOfType<IntegerAttr>("handshake.bb");
+        auto bbAttr = notOp->getAttrOfType<IntegerAttr>("handshake.bb");
         if (!bbAttr)
           continue;
-        shadow.conditionMap[bbAttr.getUInt()] = xorOp.getResult();
+        shadow.conditionMap[bbAttr.getUInt()] = notOp.getResult();
       }
 
       ftd::addRegen(funcOp, builder, shadow);
