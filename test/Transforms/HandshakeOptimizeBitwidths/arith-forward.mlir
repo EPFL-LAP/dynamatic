@@ -171,11 +171,13 @@ handshake.func @shrsiFW(%arg0: !handshake.channel<i16>, %start: !handshake.contr
 // CHECK-LABEL:   handshake.func @shruiFW(
 // CHECK-SAME:                            %[[VAL_0:.*]]: !handshake.channel<i16>,
 // CHECK-SAME:                            %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 4 : i16} : <>, <i16>
-// CHECK:           %[[VAL_3:.*]] = shrui %[[VAL_0]], %[[VAL_2]] : <i16>
-// CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_3]] : <i16> to <i12>
-// CHECK:           %[[VAL_5:.*]] = extsi %[[VAL_4]] : <i12> to <i32>
-// CHECK:           end %[[VAL_5]] : <i32>
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 4 : i32} : <>, <i32>
+// CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_2]] : <i32> to <i16>
+// CHECK:           %[[VAL_4:.*]] = shrui %[[VAL_0]], %[[VAL_3]] : <i16>
+// CHECK:           %[[VAL_5:.*]] = trunci %[[VAL_4]] : <i16> to <i12>
+// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i12> to <i28>
+// CHECK:           %[[VAL_7:.*]] = extui %[[VAL_6]] : <i28> to <i32>
+// CHECK:           end %[[VAL_7]] : <i32>
 // CHECK:         }
 handshake.func @shruiFW(%arg0: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
   %cst = handshake.constant %start {value = 4 : i4} : <>, <i4>
@@ -184,6 +186,83 @@ handshake.func @shruiFW(%arg0: !handshake.channel<i16>, %start: !handshake.contr
   %res = shrui %ext0, %extCst : <i32>
   end %res : <i32>
 }
+
+// -----
+
+// CHECK-LABEL:   handshake.func @shrui_edge_case(
+// CHECK-SAME:                                    %[[VAL_0:.*]]: !handshake.channel<i29>,
+// CHECK-SAME:                                    %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 4 : i32} : <>, <i32>
+// CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_2]] : <i32> to <i29>
+// CHECK:           %[[VAL_4:.*]] = shrui %[[VAL_0]], %[[VAL_3]] : <i29>
+// CHECK:           %[[VAL_5:.*]] = trunci %[[VAL_4]] : <i29> to <i25>
+// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i25> to <i28>
+// CHECK:           %[[VAL_7:.*]] = extui %[[VAL_6]] : <i28> to <i32>
+// CHECK:           end %[[VAL_7]] : <i32>
+// CHECK:         }
+handshake.func @shrui_edge_case(%arg0: !handshake.channel<i29>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %cst = handshake.constant %start {value = 4 : i4} : <>, <i4>
+  %ext0 = extsi %arg0 : <i29> to <i32>
+  %extCst = extsi %cst : <i4> to <i32>
+  %res = shrui %ext0, %extCst : <i32>
+  end %res : <i32>
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @shrui_si_overflow(
+// CHECK-SAME:                                      %[[VAL_0:.*]]: !handshake.channel<i16>,
+// CHECK-SAME:                                      %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 15 : i16} : <>, <i16>
+// CHECK:           %[[VAL_3:.*]] = shrui %[[VAL_0]], %[[VAL_2]] : <i16>
+// CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_3]] : <i16> to <i1>
+// CHECK:           %[[VAL_5:.*]] = extsi %[[VAL_4]] : <i1> to <i14>
+// CHECK:           %[[VAL_6:.*]] = extui %[[VAL_5]] : <i14> to <i32>
+// CHECK:           end %[[VAL_6]] : <i32>
+// CHECK:         }
+handshake.func @shrui_si_overflow(%arg0: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %cst = handshake.constant %start {value = 18 : i8} : <>, <i8>
+  %ext0 = extsi %arg0 : <i16> to <i32>
+  %extCst = extsi %cst : <i8> to <i32>
+  %res = shrui %ext0, %extCst : <i32>
+  end %res : <i32>
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @shrui_ui_FW(
+// CHECK-SAME:                                %[[VAL_0:.*]]: !handshake.channel<i16>,
+// CHECK-SAME:                                %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 4 : i32} : <>, <i32>
+// CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_2]] : <i32> to <i16>
+// CHECK:           %[[VAL_4:.*]] = shrui %[[VAL_0]], %[[VAL_3]] : <i16>
+// CHECK:           %[[VAL_5:.*]] = extui %[[VAL_4]] : <i16> to <i32>
+// CHECK:           end %[[VAL_5]] : <i32>
+// CHECK:         }
+handshake.func @shrui_ui_FW(%arg0: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %cst = handshake.constant %start {value = 4 : i4} : <>, <i4>
+  %ext0 = extui %arg0 : <i16> to <i32>
+  %extCst = extui %cst : <i4> to <i32>
+  %res = shrui %ext0, %extCst : <i32>
+  end %res : <i32>
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @shrui_ui_overflowFW(
+// CHECK-SAME:                                        %[[VAL_0:.*]]: !handshake.channel<i16>,
+// CHECK-SAME:                                        %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 0 : i32} : <>, <i32>
+// CHECK:           end %[[VAL_2]] : <i32>
+// CHECK:         }
+handshake.func @shrui_ui_overflowFW(%arg0: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %cst = handshake.constant %start {value = 17 : i16} : <>, <i16>
+  %ext0 = extui %arg0 : <i16> to <i32>
+  %extCst = extui %cst : <i16> to <i32>
+  %res = shrui %ext0, %extCst : <i32>
+  end %res : <i32>
+}
+
 
 // -----
 
