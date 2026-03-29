@@ -1619,15 +1619,16 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       // One of the two comparison operands must be the data input
       unsigned width;
       bool isDataLhs;
-      ExtType branchExt;
+
+      ExtType constantExt;
       if (dataOperand == minLhs) {
         width = minRhs.first.getType().getDataBitWidth();
         isDataLhs = true;
-        branchExt = minLhs.second;
+        constantExt = minRhs.second;
       } else if (dataOperand == minRhs) {
         width = minLhs.first.getType().getDataBitWidth();
         isDataLhs = false;
-        branchExt = minRhs.second;
+        constantExt = minLhs.second;
       } else
         continue;
 
@@ -1637,6 +1638,27 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
         continue;
       if (isBoundTight(isDataLhs ? minRhs.first : minLhs.first))
         width = getRealOptWidth(cmpOp, width, isDataLhs);
+
+      // Perform result extension based on the comparison operator.
+      ExtType branchExt;
+      switch (cmpOp.getPredicate()) {
+      case handshake::CmpIPredicate::eq:
+      case handshake::CmpIPredicate::ne:
+        // For constants, we must match the extension of the constant.
+        branchExt = constantExt;
+        break;
+      case handshake::CmpIPredicate::ult:
+      case handshake::CmpIPredicate::ule:
+      case handshake::CmpIPredicate::ugt:
+      case handshake::CmpIPredicate::uge:
+        // For unsigned comparisons the bound guarantees us that the upper-bits
+        // must be zero.
+        branchExt = ExtType::ZEXT;
+        break;
+      default:
+        // Others are currently unsupported.
+        continue;
+      }
 
       // Keep track of the best optimization opportunity found so far for the
       // branch
