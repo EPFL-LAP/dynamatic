@@ -310,12 +310,10 @@ def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
 
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi"> {
   let summary = "Integer unsigned width extension.";
-  let hasCanonicalizer = 1;
 }
 
 def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui"> {
   let summary = "Integer signed width extension.";
-  let hasCanonicalizer = 1;
 }
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
@@ -410,7 +408,6 @@ def Handshake_SubIOp : Handshake_Arith_IntBinaryOp<"subi"> {
 
 def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci"> {
   let summary = "Integer truncation.";
-  let hasCanonicalizer = 1;
 }
 
 def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf", [
