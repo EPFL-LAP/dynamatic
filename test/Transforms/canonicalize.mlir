@@ -24,3 +24,16 @@ handshake.func @constantFoldExtSI(%start: !handshake.control<>) -> !handshake.ch
   %d = extsi %c : <i16> to <i32>
   end %d : <i32>
 }
+
+// -----
+
+// CHECK-LABEL:   handshake.func @constantFoldTruncI(
+// CHECK-SAME:                                       %[[VAL_0:.*]]: !handshake.control<>, ...) -> !handshake.channel<i8> attributes {argNames = ["start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_1:.*]] = constant %[[VAL_0]] {value = -86 : i8} : <>, <i8>
+// CHECK:           end %[[VAL_1]] : <i8>
+// CHECK:         }
+handshake.func @constantFoldTruncI(%start: !handshake.control<>) -> !handshake.channel<i8> {
+  %c = constant %start {value = 0xFAAA : i16} : <>, <i16>
+  %d = trunci %c : <i16> to <i8>
+  end %d : <i8>
+}

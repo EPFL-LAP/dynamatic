@@ -60,6 +60,11 @@ def TruncIExtUIToExtUI : Pat<
   [(ValueWiderThan $ext, $tr), (ValueWiderThan $tr, $x)]
 >;
 
+def TruncIOfConst : Pat<
+  (Handshake_TruncIOp:$trunc (Handshake_ConstantOp Builtin_IntegerAttr:$attr, $ctrl)),
+  (Handshake_ConstantOp (NativeCodeCall<"constantFoldTruncI($0.getType(), $1)"> $trunc, $attr), $ctrl)
+>;
+
 //===----------------------------------------------------------------------===//
 // ShrSIOp
 //===----------------------------------------------------------------------===//

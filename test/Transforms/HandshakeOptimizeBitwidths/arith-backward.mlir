@@ -130,11 +130,10 @@ handshake.func @shliBW(%arg0: !handshake.channel<i32>, %start: !handshake.contro
 // CHECK-SAME:                            %[[VAL_0:.*]]: !handshake.channel<i32>,
 // CHECK-SAME:                            %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i16> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i20>
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 4 : i32} : <>, <i32>
-// CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_3]] : <i32> to <i20>
-// CHECK:           %[[VAL_5:.*]] = shrsi %[[VAL_2]], %[[VAL_4]] : <i20>
-// CHECK:           %[[VAL_6:.*]] = trunci %[[VAL_5]] : <i20> to <i16>
-// CHECK:           end %[[VAL_6]] : <i16>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 4 : i20} : <>, <i20>
+// CHECK:           %[[VAL_4:.*]] = shrsi %[[VAL_2]], %[[VAL_3]] : <i20>
+// CHECK:           %[[VAL_5:.*]] = trunci %[[VAL_4]] : <i20> to <i16>
+// CHECK:           end %[[VAL_5]] : <i16>
 // CHECK:         }
 handshake.func @shrsiBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
   %cst = handshake.constant %start {value = 4 : i32} : <>, <i32>
@@ -149,11 +148,10 @@ handshake.func @shrsiBW(%arg0: !handshake.channel<i32>, %start: !handshake.contr
 // CHECK-SAME:                            %[[VAL_0:.*]]: !handshake.channel<i32>,
 // CHECK-SAME:                            %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i16> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
 // CHECK:           %[[VAL_2:.*]] = trunci %[[VAL_0]] {handshake.bb = 0 : ui32} : <i32> to <i20>
-// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 4 : i32} : <>, <i32>
-// CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_3]] : <i32> to <i20>
-// CHECK:           %[[VAL_5:.*]] = shrui %[[VAL_2]], %[[VAL_4]] : <i20>
-// CHECK:           %[[VAL_6:.*]] = trunci %[[VAL_5]] : <i20> to <i16>
-// CHECK:           end %[[VAL_6]] : <i16>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_1]] {value = 4 : i20} : <>, <i20>
+// CHECK:           %[[VAL_4:.*]] = shrui %[[VAL_2]], %[[VAL_3]] : <i20>
+// CHECK:           %[[VAL_5:.*]] = trunci %[[VAL_4]] : <i20> to <i16>
+// CHECK:           end %[[VAL_5]] : <i16>
 // CHECK:         }
 handshake.func @shruiBW(%arg0: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.channel<i16> {
   %cst = handshake.constant %start {value = 4 : i32} : <>, <i32>
