@@ -202,6 +202,12 @@ static IntegerAttr constantFoldExt(Operation *op, Attribute attr) {
   llvm_unreachable("only expected extui and extsi");
 }
 
+static IntegerAttr constantFoldTruncI(Type resultType, Attribute attr) {
+  unsigned bitwidth = cast<ChannelType>(resultType).getDataBitWidth();
+  return IntegerAttr::get(IntegerType::get(resultType.getContext(), bitwidth),
+                          cast<IntegerAttr>(attr).getValue().trunc(bitwidth));
+}
+
 namespace {
 #include "lib/Dialect/Handshake/HandshakeCanonicalization.inc"
 } // namespace
@@ -1940,7 +1946,7 @@ LogicalResult ExtUIOp::verify() { return verifyExtOp(*this); }
 
 void TruncIOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
-  results.add<TruncIExtSIToExtSI, TruncIExtUIToExtUI>(context);
+  results.add<TruncIExtSIToExtSI, TruncIExtUIToExtUI, TruncIOfConst>(context);
 }
 
 OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
