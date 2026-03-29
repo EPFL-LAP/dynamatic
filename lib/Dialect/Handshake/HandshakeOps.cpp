@@ -206,6 +206,11 @@ namespace {
 #include "lib/Dialect/Handshake/HandshakeCanonicalization.inc"
 } // namespace
 
+void handshake::HandshakeDialect::getCanonicalizationPatterns(
+    RewritePatternSet &set) const {
+  populateWithGenerated(set);
+}
+
 //===----------------------------------------------------------------------===//
 // MergeOp
 //===----------------------------------------------------------------------===//
@@ -1896,11 +1901,6 @@ static OpFoldResult foldExtOp(Op op) {
   return nullptr;
 }
 
-void ExtSIOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                          MLIRContext *context) {
-  results.add<ExtSIOfExtUI, ExtSIOfConst>(context);
-}
-
 OpFoldResult ExtSIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
 
 /// Extension operations can only extend to a channel with a wider data type and
@@ -1927,21 +1927,11 @@ LogicalResult ExtSIOp::verify() { return verifyExtOp(*this); }
 
 OpFoldResult ExtUIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
 
-void ExtUIOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                          MLIRContext *context) {
-  results.add<ExtUIOfConst>(context);
-}
-
 LogicalResult ExtUIOp::verify() { return verifyExtOp(*this); }
 
 //===----------------------------------------------------------------------===//
 // TruncIOp
 //===----------------------------------------------------------------------===//
-
-void TruncIOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                           MLIRContext *context) {
-  results.add<TruncIExtSIToExtSI, TruncIExtUIToExtUI>(context);
-}
 
 OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
   if (auto defTruncOp = getIn().getDefiningOp<TruncIOp>()) {
