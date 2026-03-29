@@ -152,10 +152,10 @@ handshake.func @shliFW(%arg0: !handshake.channel<i16>, %start: !handshake.contro
 // CHECK-LABEL:   handshake.func @shrsiFW(
 // CHECK-SAME:                            %[[VAL_0:.*]]: !handshake.channel<i16>,
 // CHECK-SAME:                            %[[VAL_1:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 4 : i16} : <>, <i16>
-// CHECK:           %[[VAL_3:.*]] = shrsi %[[VAL_0]], %[[VAL_2]] : <i16>
-// CHECK:           %[[VAL_4:.*]] = trunci %[[VAL_3]] : <i16> to <i12>
-// CHECK:           %[[VAL_5:.*]] = extsi %[[VAL_4]] : <i12> to <i32>
+// CHECK:           %[[VAL_2:.*]] = constant %[[VAL_1]] {value = 4 : i32} : <>, <i32>
+// CHECK:           %[[VAL_3:.*]] = trunci %[[VAL_2]] : <i32> to <i16>
+// CHECK:           %[[VAL_4:.*]] = shrsi %[[VAL_0]], %[[VAL_3]] : <i16>
+// CHECK:           %[[VAL_5:.*]] = extsi %[[VAL_4]] : <i16> to <i32>
 // CHECK:           end %[[VAL_5]] : <i32>
 // CHECK:         }
 handshake.func @shrsiFW(%arg0: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
