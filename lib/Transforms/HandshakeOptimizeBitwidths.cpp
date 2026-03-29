@@ -1381,19 +1381,19 @@ struct ArithShrSIFW : OpRewritePattern<handshake::ShRSIOp> {
       return failure();
 
     assert(lhsExt != ExtType::NONE && "expected an extension");
-    APInt value;
+    APInt numOfShiftPositions;
     Value constantControl;
     {
       auto constantOp = op.getRhs().getDefiningOp<handshake::ConstantOp>();
       if (!constantOp)
         return failure();
-      value = cast<IntegerAttr>(constantOp.getValue()).getValue();
+      numOfShiftPositions = cast<IntegerAttr>(constantOp.getValue()).getValue();
       constantControl = constantOp.getCtrl();
     }
 
     // Other pattern (such as canonicalization pattern) should fold this case
     // to a useful constant instead
-    if (value.uge(currentBitwidth))
+    if (numOfShiftPositions.uge(currentBitwidth))
       return failure();
 
     if (lhsExt == ExtType::ZEXT) {
@@ -1403,7 +1403,11 @@ struct ArithShrSIFW : OpRewritePattern<handshake::ShRSIOp> {
     }
 
     // SEXT case.
-    if (value.ult(inputBitwidth)) {
+    // At this point we can reduce the shift to be performed on the lower
+    // input bitwidth.
+    // Additional extensions are left to be folded into other operations if
+    // redundant.
+    if (numOfShiftPositions.ult(inputBitwidth)) {
       // c is less than the input bitwidth, meaning other bits from the input
       // besides the sign-bit are preserved in the output.
 
