@@ -1877,15 +1877,17 @@ static void insertDirectSuppression(
   Block *consumerBlock = shadow.getBlock(consBBIdx);
   Block *dominatorBlock = producerBlock;
 
-  bool debuglog = true;
+  bool debuglog = false;
   bool debugGraphDump = false;
-  std::string funcName = funcOp.getName().str();
-  std::string dir = "/home/yuqin/dynamatic-scripts/TempOutputs/";
-  std::string logFile = dir + funcName + "_debuglog.txt";
-  std::error_code EC_log;
-  llvm::raw_fd_ostream log(logFile, EC_log,
-                           static_cast<llvm::sys::fs::OpenFlags>(0x0004));
-  llvm::raw_ostream &out = EC_log ? llvm::errs() : log;
+  // std::string funcName = funcOp.getName().str();
+  // std::string dir = "/home/username/dynamatic-scripts/Outputs/";
+  // std::string logFile = dir + funcName + "_debuglog.txt";
+  // std::error_code EC_log;
+  // llvm::raw_fd_ostream log(logFile, EC_log,
+  //                          static_cast<llvm::sys::fs::OpenFlags>(0x0004));
+  // llvm::raw_ostream &out = EC_log ? llvm::errs() : log;
+  llvm::raw_ostream &out = llvm::errs();
+
 
   // Helper: translate a local block to a readable orig-block name
   auto blockName = [](const ftd::LocalCFG &cfg, Block *b) -> std::string {
@@ -2176,10 +2178,10 @@ static void insertDirectSuppression(
           // Record the specific value required (True/False) to pass this Mux
           muxConstraints[condBlockLocal] = requiredVal;
         } else {
-          llvm::errs() << "[FTD Warning] Mux condition block not found in "
-                          "LocalCFG for condition: ";
-          muxConditionBlock->printAsOperand(llvm::errs());
-          llvm::errs() << " \n";
+          // llvm::errs() << "[FTD Warning] Mux condition block not found in "
+          //                 "LocalCFG for condition: ";
+          // muxConditionBlock->printAsOperand(llvm::errs());
+          // llvm::errs() << " \n";
         }
       }
 
