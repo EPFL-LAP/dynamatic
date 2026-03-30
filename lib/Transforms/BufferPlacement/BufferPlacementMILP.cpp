@@ -1157,12 +1157,59 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   model->setMaximizeObjective(objective);
 }
 
+void BufferPlacementMILP::addBufferPresenceLinkConstraints() {
+  for (auto &[channel, chVars] : vars.channelVars) {
+    std::string name = getUniqueName(*channel.getUses().begin());
+    /// L_c >= R_c (if R_c=1, then L_c >= 1)
+    model->addConstr(chVars.dataLatency >= chVars.bufPresent,
+                     "R_lower_" + name);
+    /// M*R_c >= L_c (if L_c > 0, then R_c must be 1)
+    model->addConstr(fpga24::BIG_M * chVars.bufPresent >= chVars.dataLatency,
+                     "R_upper_" + name);
+  }
+}
+
+void BufferPlacementMILP::addReconvergentPathVars(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
+  vars.reconvergentPathVars.resize(reconvergentPaths.size());
+  for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
+    vars.reconvergentPathVars[i].imbalanced =
+        model->addVar("s_rp_" + std::to_string(i), BOOLEAN, 0, 1);
+  }
+}
+
+void BufferPlacementMILP::addSyncCycleVars(
+    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+  vars.syncCycleVars.resize(syncCyclePairs.size());
+  for (size_t i = 0; i < syncCyclePairs.size(); ++i) {
+    vars.syncCycleVars[i].imbalanced =
+        model->addVar("s_sc_" + std::to_string(i), BOOLEAN, 0, 1);
+  }
+}
+
+void BufferPlacementMILP::addBackedgeConstraints(
+    ArrayRef<CFDFC *> cfdfcs, DenseMap<Value, CPVar> &channelOccupancy) {
+  size_t cycleConstraints = 0;
+  for (size_t i = 0; i < cfdfcs.size(); ++i) {
+    CFDFC *cfdfc = cfdfcs[i];
+    for (Value channel : cfdfc->backedges) {
+      if (channelOccupancy.count(channel)) {
+        model->addConstr(channelOccupancy[channel] >= 1.0,
+                         "backedge_" + std::to_string(i));
+        cycleConstraints++;
+      }
+    }
+  }
+  LLVM_DEBUG(llvm::errs() << "[OccBal]   Added " << cycleConstraints
+                          << " cycle capacity constraints\n");
+}
+
 void BufferPlacementMILP::addReconvergentPathConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
   size_t totalPaths = reconvergentPaths.size();
   for (size_t pathIdx = 0; pathIdx < totalPaths; ++pathIdx) {
     if (pathIdx % 10 == 0 || pathIdx == totalPaths - 1) {
-      LLVM_DEBUG(llvm::errs() << "[LP1]   Processing reconvergent path "
+      LLVM_DEBUG(llvm::errs() << "[LatBal]   Processing reconvergent path "
                               << pathIdx + 1 << "/" << totalPaths << "\n");
     }
 
@@ -1192,7 +1239,7 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
     enumerateSimplePaths(*graph, forkId, joinId, path.nodeIds, allPaths);
 
     LLVM_DEBUG(llvm::errs()
-               << "[LP1]     -> " << allPaths.size() << " simple paths\n");
+               << "[LatBal]     -> " << allPaths.size() << " simple paths\n");
 
     std::vector<LinExpr> pathLatencies;
     std::vector<double> pathBaseLatencies;
@@ -1324,7 +1371,7 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     ArrayRef<CFDFC *> cfdfcs, double &computedII,
     llvm::MapVector<CFDFC *, double> &iiMap) {
   if (cfdfcs.empty()) {
-    llvm::errs() << "[LP1]   No CFDFCs, skipping cycle time constraints\n";
+    llvm::errs() << "[LatBal]   No CFDFCs, skipping cycle time constraints\n";
     return;
   }
 
@@ -1335,7 +1382,7 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
     if (cycles.empty()) {
       LLVM_DEBUG(llvm::errs()
-                 << "[LP1]   CFDFC " << cfdfcIdx << ": no cycles\n");
+                 << "[LatBal]   CFDFC " << cfdfcIdx << ": no cycles\n");
       continue;
     }
 
@@ -1351,14 +1398,14 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     iiMap[cfdfc] = iiCFC;
 
     LLVM_DEBUG(llvm::errs()
-               << "[LP1]   CFDFC " << cfdfcIdx << ": " << cycles.size()
+               << "[LatBal]   CFDFC " << cfdfcIdx << ": " << cycles.size()
                << " cycles, II_CFC = " << iiCFC
                << " (max base latency = " << maxBaseLatency << ")\n");
 
     for (size_t cycleIdx = 0; cycleIdx < cycles.size(); ++cycleIdx) {
       const SimpleCycle &cycle = cycles[cycleIdx];
       LLVM_DEBUG({
-        llvm::errs() << "[LP1]     Cycle " << cycleIdx << " channels: ";
+        llvm::errs() << "[LatBal]     Cycle " << cycleIdx << " channels: ";
         for (size_t i = 0; i < cycle.nodes.size(); ++i) {
           NodeIdType src = cycle.nodes[i];
           NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];

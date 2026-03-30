@@ -170,31 +170,9 @@ void LatencyBalancingMILP::addLatencyVariables() {
   LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << vars.channelVars.size()
                           << " channel variables\n");
 
-  /// Add R_c constraints,to link the binary R_c to integer L_c.
-  /// (Paper: Section 4, Equation 6)
-  for (auto &[channel, chVars] : vars.channelVars) {
-    std::string name = getUniqueName(*channel.getUses().begin());
-    /// L_c >= R_c (if R_c=1, then L_c >= 1)
-    model->addConstr(chVars.dataLatency >= chVars.bufPresent,
-                     "R_lower_" + name);
-    /// M*R_c >= L_c (if L_c > 0, then R_c must be 1)
-    model->addConstr(BIG_M * chVars.bufPresent >= chVars.dataLatency,
-                     "R_upper_" + name);
-  }
-
-  /// Create pattern imbalance variables for reconvergent paths
-  vars.reconvergentPathVars.resize(reconvergentPaths.size());
-  for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
-    vars.reconvergentPathVars[i].imbalanced =
-        model->addVar("s_rp_" + std::to_string(i), BOOLEAN, 0, 1);
-  }
-
-  /// Create pattern imbalance variables for synchronizing cycles
-  vars.syncCycleVars.resize(syncCyclePairs.size());
-  for (size_t i = 0; i < syncCyclePairs.size(); ++i) {
-    vars.syncCycleVars[i].imbalanced =
-        model->addVar("s_sc_" + std::to_string(i), BOOLEAN, 0, 1);
-  }
+  addBufferPresenceLinkConstraints();
+  addReconvergentPathVars(reconvergentPaths);
+  addSyncCycleVars(syncCyclePairs);
 
   LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << reconvergentPaths.size()
                           << " reconvergent path vars, "
@@ -356,25 +334,7 @@ void OccupancyBalancingLP::setup() {
   LLVM_DEBUG(llvm::errs() << "[OccBal]   Added " << constraintCount
                           << " N_c >= L_c/II constraints (max over CFDFCs)\n");
 
-  /// Add cycle capacity constraints
-  /// (Paper: Section 5, Equation 12): Occupancy(cycle) <= B
-  /// For sequential programs, B=1 means at most 1 token per cycle.
-  /// We enforce N_c >= 1 for backedges to ensure each cycle has at least 1
-  /// token, which combined with the minimization objective effectively limits
-  /// to exactly 1 token for sequential execution.
-  size_t cycleConstraints = 0;
-  for (size_t i = 0; i < cfdfcs.size(); ++i) {
-    CFDFC *cfdfc = cfdfcs[i];
-    for (Value channel : cfdfc->backedges) {
-      if (channelOccupancy.count(channel)) {
-        model->addConstr(channelOccupancy[channel] >= 1.0,
-                         "backedge_" + std::to_string(i));
-        cycleConstraints++;
-      }
-    }
-  }
-  LLVM_DEBUG(llvm::errs() << "[OccBal]   Added " << cycleConstraints
-                          << " cycle capacity constraints\n");
+  addBackedgeConstraints(cfdfcs, channelOccupancy);
 
   /// Set objective to minimize total buffer area
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c*N_c)
