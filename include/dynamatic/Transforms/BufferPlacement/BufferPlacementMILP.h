@@ -398,6 +398,12 @@ protected:
   void addBufferAreaAwareObjective(ValueRange channels,
                                    ArrayRef<CFDFC *> cfdfcs);
 
+  /// [FPGA24] Creates L_c, S_c, R_c variables for every dataflow channel, plus
+  /// pattern imbalance variables, and links R_c to L_c.
+  void addLatencyBalancingVars(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+
   /// [FPGA24] Links the binary buffer-presence variable R_c to the integer
   /// latency variable L_c for every channel. (Paper: Section 4, Equation 6)
   void addBufferPresenceLinkConstraints();

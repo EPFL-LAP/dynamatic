@@ -111,8 +111,6 @@ private:
   /// Computed minimum feasible Initiation Interval per CFDFC.
   llvm::MapVector<CFDFC *, double> computedCFDFCIIs;
 
-  void addLatencyVariables();
-
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
