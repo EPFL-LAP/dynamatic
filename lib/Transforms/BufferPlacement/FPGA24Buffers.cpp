@@ -83,75 +83,12 @@ void LatencyBalancingMILP::setup() {
 /// channel. It will be used in the input of the occupancy balancing LP. Defined
 /// in (Paper: Section 4, Table 1).
 void LatencyBalancingMILP::addLatencyVariables() {
-  /// Collect all channels that need L_c variables:
-  /// 1. Channels in synchronization patterns (for balancing).
-  /// 2. ALL channels in CFDFCs (for cycle time constraints).
-  /// Relevant: (Paper: Section 4, Equation 1, 5).
-  llvm::SetVector<Value> allChannels;
-
-  /// From reconvergent paths:
-  for (const auto &pathWithGraph : reconvergentPaths) {
-    const ReconvergentPath &path = pathWithGraph.path;
-    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
-    for (NodeIdType nodeId : path.nodeIds) {
-      for (EdgeIdType edgeId : graph->adjList[nodeId]) {
-        const auto &edge = graph->edges[edgeId];
-        if (path.nodeIds.count(edge.dstId)) {
-          allChannels.insert(edge.channel);
-        }
-      }
-    }
-  }
-
-  /// From synchronizing cycle pairs:
-  for (const auto &pair : syncCyclePairs) {
-    /// Edges in cycle one
-    for (size_t i = 0; i < pair.cycleOne.nodes.size(); ++i) {
-      NodeIdType src = pair.cycleOne.nodes[i];
-      NodeIdType dst =
-          pair.cycleOne.nodes[(i + 1) % pair.cycleOne.nodes.size()];
-      for (EdgeIdType edgeId : syncGraph.adjList[src]) {
-        if (syncGraph.edges[edgeId].dstId == dst) {
-          allChannels.insert(syncGraph.edges[edgeId].channel);
-        }
-      }
-    }
-    /// Edges in cycle two
-    for (size_t i = 0; i < pair.cycleTwo.nodes.size(); ++i) {
-      NodeIdType src = pair.cycleTwo.nodes[i];
-      NodeIdType dst =
-          pair.cycleTwo.nodes[(i + 1) % pair.cycleTwo.nodes.size()];
-      for (EdgeIdType edgeId : syncGraph.adjList[src]) {
-        if (syncGraph.edges[edgeId].dstId == dst) {
-          allChannels.insert(syncGraph.edges[edgeId].channel);
-        }
-      }
-    }
-    /// Edges to joins
-    for (const auto &edgeInfo : pair.edgesToJoins) {
-      for (EdgeIdType edgeId : edgeInfo.edgesFromCycleOne) {
-        allChannels.insert(syncGraph.edges[edgeId].channel);
-      }
-      for (EdgeIdType edgeId : edgeInfo.edgesFromCycleTwo) {
-        allChannels.insert(syncGraph.edges[edgeId].channel);
-      }
-    }
-  }
-
-  /// Also include ALL channels from CFDFCs for cycle time constraints
-  /// This ensures we can add latency to any channel to satisfy the following
-  /// equations: (Paper: Section 4, Equation 5; Section 7, Equation 15)
-  for (CFDFC *cfdfc : cfdfcs) {
-    for (Value channel : cfdfc->channels) {
-      allChannels.insert(channel);
-    }
-  }
-
-  LLVM_DEBUG(llvm::errs() << "[LatBal]   Found " << allChannels.size()
-                          << " channels (patterns + CFDFCs)\n");
-
-  /// Create variables for each channel:
-  for (Value channel : allChannels) {
+  /// Create L_c, S_c, and R_c variables for every dataflow channel in the
+  /// function. The MILP constraints will naturally drive unused variables to
+  /// zero.
+  for (auto &[channel, _] : channelProps) {
+    if (isa<MemRefType>(channel.getType()))
+      continue;
     std::string name = getUniqueName(*channel.getUses().begin());
     ChannelVars &chVars = vars.channelVars[channel];
 
