@@ -1632,8 +1632,9 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
         continue;
 
       // Determine whether one of the branches can be optimized and by how much
-      Value branch = getBranchToOptimize(condOp, cmpOp, isDataLhs);
-      if (!branch)
+      Value branchOutputToOptimize =
+          getBranchToOptimize(condOp, cmpOp, isDataLhs);
+      if (!branchOutputToOptimize)
         continue;
       if (isBoundTight(isDataLhs ? minRhs.first : minLhs.first))
         width = getRealOptWidth(cmpOp, width, isDataLhs);
@@ -1641,6 +1642,10 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       // Perform result extension based on the comparison operator.
       ExtType branchExt;
       switch (cmpOp.getPredicate()) {
+      default:
+        // Other comparison predicates are currently unsupported and therefore
+        // skipped.
+        continue;
       case handshake::CmpIPredicate::eq:
       case handshake::CmpIPredicate::ne:
         // For constants, we must match the extension of the constant.
@@ -1670,15 +1675,11 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
 
         branchExt = ExtType::ZEXT;
         break;
-      default:
-        // Other comparison predicates are currently unsupported and therefore
-        // skipped.
-        continue;
       }
 
       // Keep track of the best optimization opportunity found so far for the
       // branch
-      if (branch == trueRes) {
+      if (branchOutputToOptimize == trueRes) {
         if (!trueBranch.has_value() || width < trueBranch.value().first)
           trueBranch = std::make_pair(width, branchExt);
       } else if (!falseBranch.has_value() || width < falseBranch.value().first)
