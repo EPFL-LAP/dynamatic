@@ -176,10 +176,10 @@ private:
       const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
 
   /// Solves LP2 (Occupancy Balancing) and writes into placement.
-  LogicalResult solveOccupancyBalancing(
-      BufferPlacement &placement, ArrayRef<CFDFC *> cfdfcs,
-      ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
-      const LatencyBalancingResult &latencyResult);
+  LogicalResult
+  solveOccupancyBalancing(BufferPlacement &placement, ArrayRef<CFDFC *> cfdfcs,
+                          ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+                          const LatencyBalancingResult &latencyResult);
 
   /// Adds post-processing buffers for deadlock prevention and memory
   /// synchronization.

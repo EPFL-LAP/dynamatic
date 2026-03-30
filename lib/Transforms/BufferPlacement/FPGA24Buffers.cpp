@@ -468,9 +468,9 @@ void FPGA24Buffers::findSynchronizationPatterns(
     if (seqIdx % 50 == 0 || seqIdx == totalSequences - 1) {
       LLVM_DEBUG(llvm::errs()
                  << "  Processing sequence " << seqIdx + 1 << "/"
-                 << totalSequences << " (found "
-                 << allReconvergentPaths.size() << " unique paths, "
-                 << duplicatesSkipped << " duplicates skipped)\n");
+                 << totalSequences << " (found " << allReconvergentPaths.size()
+                 << " unique paths, " << duplicatesSkipped
+                 << " duplicates skipped)\n");
     }
 
     const auto &sequence = sequences[seqIdx];
@@ -525,8 +525,8 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
   LLVM_DEBUG(llvm::errs() << "=== Setting up LP1 (Latency Balancing) ===\n");
 
   LatencyBalancingMILP latencyBalancingLP(
-      solverKind, timeout, funcInfo, timingDB, targetPeriod,
-      reconvergentPaths, syncCyclePairs, syncGraph, cfdfcs);
+      solverKind, timeout, funcInfo, timingDB, targetPeriod, reconvergentPaths,
+      syncCyclePairs, syncGraph, cfdfcs);
 
   LLVM_DEBUG(llvm::errs() << "=== Optimizing LP1 ===\n");
   if (failed(latencyBalancingLP.optimize())) {
@@ -704,8 +704,8 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
   if (failed(latencyResult))
     return failure();
 
-  if (failed(solveOccupancyBalancing(placement, cfdfcPtrs,
-                                     allReconvergentPaths, *latencyResult)))
+  if (failed(solveOccupancyBalancing(placement, cfdfcPtrs, allReconvergentPaths,
+                                     *latencyResult)))
     return failure();
 
   addPostProcessingBuffers(placement, cfdfcPtrs);
