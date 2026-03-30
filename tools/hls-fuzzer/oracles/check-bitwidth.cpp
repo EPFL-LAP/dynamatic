@@ -41,7 +41,17 @@ int main(int argc, char **argv) {
   OwningOpRef<Operation *> module =
       parseSourceFileForTool(sourceMgr, config, true);
 
+  llvm::SmallDenseSet<Value> functionArgs;
+  module->walk([&](handshake::FuncOp funcOp) {
+    functionArgs.insert(funcOp.args_begin(), funcOp.args_end());
+  });
+
   WalkResult result = module->walk([&](Operation *op) {
+    // Allow forks of function arguments.
+    if (auto forkOp = dyn_cast<handshake::ForkOp>(op))
+      if (functionArgs.contains(forkOp.getOperand()))
+        return WalkResult::advance();
+
     for (Value iter : op->getResults()) {
       auto channelType = dyn_cast<handshake::ChannelType>(iter.getType());
       if (!channelType || !isa<IntegerType>(channelType.getDataType()))
