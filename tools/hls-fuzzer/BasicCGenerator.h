@@ -49,36 +49,36 @@ private:
   class PendingParameter {
   public:
     PendingParameter(BasicCGenerator &generator,
-                     const ast::Parameter &parameter)
+                     const ast::ScalarParameter &parameter)
         : generator(generator), parameter(parameter) {}
 
     ~PendingParameter() {
       if (!parameter)
         return;
 
-      generator.parameters.pop_back();
+      generator.scalarParameters.pop_back();
       generator.varCounter--;
     }
 
-    const ast::Parameter &getParameter() const {
+    const ast::ScalarParameter &getParameter() const {
       assert(parameter && "must not yet be committed");
       return *parameter;
     }
 
-    ast::Parameter commit() {
+    ast::ScalarParameter commit() {
       assert(parameter && "must not yet be committed");
-      ast::Parameter value = std::move(*parameter);
+      ast::ScalarParameter value = std::move(*parameter);
       parameter.reset();
       return value;
     }
 
   private:
     BasicCGenerator &generator;
-    std::optional<ast::Parameter> parameter;
+    std::optional<ast::ScalarParameter> parameter;
   };
 
-  PendingParameter generateFreshParameter(ast::ScalarType datatype,
-                                          const OpaqueContext &context);
+  PendingParameter generateFreshScalarParameter(ast::ScalarType datatype,
+                                                const OpaqueContext &context);
 
   ast::ReturnStatement generateFunctionBody(const OpaqueContext &constraints);
 
@@ -99,6 +99,10 @@ private:
   std::optional<ast::Constant> generateConstant(const OpaqueContext &constraint,
                                                 std::size_t depth = 0) const;
 
+  std::optional<ast::ArrayReadExpression>
+  generateArrayReadExpression(const OpaqueContext &context,
+                              std::size_t depth = 0);
+
   std::optional<ast::Variable>
   generateScalarParameter(const OpaqueContext &constraints,
                           std::size_t depth = 0);
@@ -114,7 +118,8 @@ private:
 
   Randomly &random;
   ast::ScalarType returnType{};
-  std::vector<std::pair<ast::Parameter, OpaqueContext>> parameters;
+  std::vector<std::pair<ast::ScalarParameter, OpaqueContext>> scalarParameters;
+  std::vector<std::pair<ast::ArrayParameter, OpaqueContext>> arrayParameters;
   std::size_t varCounter = 0;
   AbstractTypeSystem &typeSystem;
   OpaqueContext entryContext;

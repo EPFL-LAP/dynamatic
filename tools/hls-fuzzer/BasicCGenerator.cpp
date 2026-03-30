@@ -49,12 +49,12 @@ static ast::Expression safeCastAsNeeded(const ast::ScalarType &to,
       outputPrim->getMinValue());
 }
 
-auto gen::BasicCGenerator::generateFreshParameter(ast::ScalarType datatype,
-                                                  const OpaqueContext &context)
+auto gen::BasicCGenerator::generateFreshScalarParameter(
+    ast::ScalarType datatype, const OpaqueContext &context)
     -> PendingParameter {
-  parameters.push_back(
+  scalarParameters.push_back(
       {{std::move(datatype), generateFreshVarName()}, context});
-  return PendingParameter(*this, parameters.back().first);
+  return PendingParameter(*this, scalarParameters.back().first);
 }
 
 ast::ReturnStatement
@@ -89,6 +89,7 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
       });
     }
     generators.emplace_back(&BasicCGenerator::generateCastExpression);
+    generators.emplace_back(&BasicCGenerator::generateArrayReadExpression);
     if (random.getRatherLowProbabilityBool())
       generators.emplace_back(&BasicCGenerator::generateConditionalExpression);
   }
@@ -265,6 +266,73 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
   return std::nullopt;
 }
 
+std::optional<ast::ArrayReadExpression>
+gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
+                                                  std::size_t depth) {
+  auto conclusion = typeSystem.checkArrayReadExpressionOpaque(context);
+  if (!conclusion)
+    return std::nullopt;
+  auto [paramConc, indexConc] = *conclusion;
+
+  // Construct a safe indexing expression from an array parameter.
+  auto expressionFromParam = [&, &indexConc = indexConc](
+                                 const ast::ArrayParameter &param) {
+    ast::ScalarType elementType = param.getElementType();
+    std::size_t mask = param.getDimension() - 1;
+    std::string name = param.getName().str();
+    // Generate an indexing expression.
+    // Has to be an integer.
+    ast::Expression index = safeCastAsNeeded(
+        ast::PrimitiveType::UInt32, generateExpression(indexConc, depth + 1));
+
+    // Bitmask the index to be in range of the array! We use this to avoid
+    // undefined behavior in our programs. In the future we could also add
+    // mechanisms (type systems, or whatever), that restrict expressions to
+    // safe in-range expressions.
+    //
+    // Note: We can use a bitmask here since array parameters that we generate
+    // are all powers-of-2. We do so since the modulo operator is currently
+    // unsupported in dynamatic.
+    return ast::ArrayReadExpression{
+        std::move(elementType), name,
+        ast::BinaryExpression{std::move(index), ast::BinaryExpression::BitAnd,
+                              ast::Constant{static_cast<std::uint32_t>(mask)}}};
+  };
+
+  // With a low chance, skip picking an existing parameter and try to generate
+  // a new one.
+  if (!random.getRatherLowProbabilityBool()) {
+    // Randomly shuffle the parameter ordering and find the first parameter
+    // that passes type checking.
+    std::vector<ast::ArrayParameter> copy(arrayParameters.size());
+    llvm::copy(llvm::make_first_range(arrayParameters), copy.begin());
+    random.shuffle(copy);
+
+    for (const ast::ArrayParameter &iter : copy)
+      if (typeSystem.checkArrayParameterOpaque(iter, paramConc))
+        return expressionFromParam(iter);
+  }
+
+  std::optional<ast::ScalarType> elementType = generateScalarType(paramConc);
+  if (!elementType)
+    return std::nullopt;
+
+  arrayParameters.push_back(
+      {{std::move(*elementType), generateFreshVarName(),
+        // Generate a power-of-2 dimension to make the modulo operator fast and
+        // easy to implement.
+        // We choose an arbitrary upper-bound of 32 for the dimension for now.
+        static_cast<std::size_t>(1 << random.getInteger(0, 5))},
+       paramConc});
+  if (!typeSystem.checkArrayParameterOpaque(arrayParameters.back().first,
+                                            paramConc)) {
+    arrayParameters.pop_back();
+    varCounter--;
+    return std::nullopt;
+  }
+  return expressionFromParam(arrayParameters.back().first);
+}
+
 std::optional<ast::Variable>
 gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
                                               std::size_t) {
@@ -277,12 +345,12 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
   if (!random.getRatherLowProbabilityBool()) {
     // Randomly shuffle the parameter ordering and find the first parameter
     // that passes type checking.
-    std::vector<ast::Parameter> copy(parameters.size());
-    llvm::copy(llvm::make_first_range(parameters), copy.begin());
+    std::vector<ast::ScalarParameter> copy(scalarParameters.size());
+    llvm::copy(llvm::make_first_range(scalarParameters), copy.begin());
     random.shuffle(copy);
 
-    for (ast::Parameter &iter : copy)
-      if (typeSystem.checkParameterOpaque(iter, *conclusion))
+    for (ast::ScalarParameter &iter : copy)
+      if (typeSystem.checkScalarParameterOpaque(iter, *conclusion))
         return ast::Variable{iter.getDataType(), iter.getName().str()};
   }
 
@@ -290,10 +358,11 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
   if (!datatype)
     return std::nullopt;
 
-  PendingParameter pendingParam = generateFreshParameter(*datatype, context);
-  if (typeSystem.checkParameterOpaque(pendingParam.getParameter(),
-                                      *conclusion)) {
-    ast::Parameter parameter = pendingParam.commit();
+  PendingParameter pendingParam =
+      generateFreshScalarParameter(*datatype, context);
+  if (typeSystem.checkScalarParameterOpaque(pendingParam.getParameter(),
+                                            *conclusion)) {
+    ast::ScalarParameter parameter = pendingParam.commit();
     return ast::Variable{parameter.getDataType(), parameter.getName().str()};
   }
   return std::nullopt;
@@ -326,11 +395,13 @@ ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
 
   returnType = std::move(*maybeReturnType);
   ast::ReturnStatement body = generateFunctionBody(conclusion.returnStatement);
-  auto range = llvm::make_first_range(parameters);
+  auto scalarRange = llvm::make_first_range(scalarParameters);
+  auto arrayRange = llvm::make_first_range(arrayParameters);
   return ast::Function{
       returnType,
       std::string(functionName),
-      std::vector(range.begin(), range.end()),
+      std::vector(scalarRange.begin(), scalarRange.end()),
+      std::vector(arrayRange.begin(), arrayRange.end()),
       std::move(body),
   };
 }
@@ -342,18 +413,38 @@ gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
   ss << "\nint main() {\n";
   mlir::raw_indented_ostream os(ss);
   os.indent();
-  for (const auto &[parameter, context] : parameters) {
+  for (const auto &[parameter, context] : scalarParameters) {
     std::optional<ast::Constant> constant;
     while (!constant) {
       constant = generateConstant(context);
     }
 
-    os << ast::PrintTypePrefix{parameter.getDataType()} << ' '
-       << parameter.getName() << ast::PrintTypeSuffix{parameter.getDataType()}
-       << " = " << *constant << ";\n";
+    os << parameter.getDataType() << ' ' << parameter.getName() << " = "
+       << *constant << ";\n";
   }
+
+  for (const auto &[parameter, context] : arrayParameters) {
+    os << parameter.getElementType() << ' ' << parameter.getName() << "["
+       << parameter.getDimension() << "] = {";
+    llvm::interleaveComma(
+        llvm::seq<std::size_t>(0, parameter.getDimension()), os,
+        [&, &context = context, &parameter = parameter](auto &&) {
+          std::optional<ast::Constant> constant;
+          while (!constant) {
+            constant = generateConstant(context);
+          }
+          // C++ does not allow implicit casts in array constructors, so we must
+          // cast the constant explicitly.
+          os << safeCastAsNeeded(parameter.getElementType(), *constant);
+        });
+    os << "};\n";
+  }
+
   os << "CALL_KERNEL(" << kernel.name;
-  for (const ast::Parameter &iter : kernel.parameters) {
+  for (const ast::ScalarParameter &iter : kernel.scalarParameters) {
+    os << ", " << iter.getName();
+  }
+  for (const ast::ArrayParameter &iter : kernel.arrayParameters) {
     os << ", " << iter.getName();
   }
   os << ");";
