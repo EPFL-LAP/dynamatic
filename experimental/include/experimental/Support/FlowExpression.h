@@ -3,6 +3,7 @@
 
 #include "dynamatic/Analysis/IndexChannelAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -218,6 +219,35 @@ FlowExpression operator-(FlowExpression left, const FlowExpression &right);
 void operator+=(FlowExpression &left, const FlowExpression &right);
 
 void operator-=(FlowExpression &left, const FlowExpression &right);
+
+struct FlowEquationExtractor {
+  std::vector<FlowExpression> equations;
+  const IndexChannelAnalysis &indexChannelAnalysis;
+
+  FlowEquationExtractor(const IndexChannelAnalysis &ica)
+      : equations(), indexChannelAnalysis(ica) {}
+  LogicalResult extractAll(ModuleOp modOp);
+
+  LogicalResult extractSlotEquation(const FlowVariable &in,
+                                    const FlowVariable &out,
+                                    const FlowVariable &slot);
+  LogicalResult extractEagerSentEquation(const FlowVariable &in,
+                                         const FlowVariable &out,
+                                         const FlowVariable &sent);
+
+  LogicalResult extractArithmeticJoinOp(Operation &op);
+  LogicalResult extractBranchOp(ConditionalBranchOp branchOp);
+  LogicalResult extractBufferOp(BufferOp bufferOp);
+  LogicalResult extractControlMergeOp(ControlMergeOp cmergeOp);
+  LogicalResult extractEndOp(EndOp endOp);
+  LogicalResult extractForkOp(ForkOp forkOp);
+  LogicalResult extractLoadOp(LoadOp loadOp);
+  LogicalResult extractMemoryControllerOp(MemoryControllerOp memCon);
+  LogicalResult extractMuxOp(MuxOp muxOp);
+  LogicalResult extractPipeline(LatencyInterface op, FlowVariable &i2);
+  LogicalResult extractStoreOp(StoreOp storeOp);
+};
+
 } // namespace handshake
 } // namespace dynamatic
 
