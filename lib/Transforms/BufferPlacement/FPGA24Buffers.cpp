@@ -68,7 +68,8 @@ void LatencyBalancingMILP::setup() {
   LLVM_DEBUG(llvm::errs() << "[LatBal] Adding sync cycle constraints ("
                           << syncCyclePairs.size() << " pairs)...\n");
   addSyncCycleConstraints(syncCyclePairs, syncGraph);
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding stall propagation constraints...\n");
+  LLVM_DEBUG(
+      llvm::errs() << "[LatBal] Adding stall propagation constraints...\n");
   addStallPropagationConstraints(reconvergentPaths, syncCyclePairs, syncGraph);
   LLVM_DEBUG(llvm::errs() << "[LatBal] Adding cycle time constraints...\n");
   addCycleTimeConstraints(cfdfcs, computedII, computedCFDFCIIs);

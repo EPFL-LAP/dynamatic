@@ -398,6 +398,23 @@ protected:
   void addBufferAreaAwareObjective(ValueRange channels,
                                    ArrayRef<CFDFC *> cfdfcs);
 
+  /// [FPGA24] Links the binary buffer-presence variable R_c to the integer
+  /// latency variable L_c for every channel. (Paper: Section 4, Equation 6)
+  void addBufferPresenceLinkConstraints();
+
+  /// [FPGA24] Creates binary imbalance variables for reconvergent paths.
+  void addReconvergentPathVars(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
+
+  /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
+  void addSyncCycleVars(
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+
+  /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
+  /// least one token. (Paper: Section 5, Equation 12)
+  void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
+                              DenseMap<Value, CPVar> &channelOccupancy);
+
   /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
   void addReconvergentPathConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
