@@ -139,10 +139,7 @@ static ChannelVal backtrack(ChannelVal val) {
 }
 
 static ExtValue backtrackToMinimalValue(ChannelVal val) {
-  ExtValue newVal;
-  while ((newVal = getMinimalValueWithExtType(backtrack(val))).first != val)
-    val = newVal.first;
-  return newVal;
+  return getMinimalValueWithExtType(backtrack(val));
 }
 
 /// Returns the maximum number of bits that are used by any of the value's
@@ -1620,15 +1617,17 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       unsigned width;
       bool isDataLhs;
 
-      ExtType constantExt;
+      // Extension type of the bound.
+      // Used in the case of equality-comparisons.
+      ExtType boundExt;
       if (dataOperand == minLhs) {
         width = minRhs.first.getType().getDataBitWidth();
         isDataLhs = true;
-        constantExt = minRhs.second;
+        boundExt = minRhs.second;
       } else if (dataOperand == minRhs) {
         width = minLhs.first.getType().getDataBitWidth();
         isDataLhs = false;
-        constantExt = minLhs.second;
+        boundExt = minLhs.second;
       } else
         continue;
 
@@ -1645,18 +1644,35 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       case handshake::CmpIPredicate::eq:
       case handshake::CmpIPredicate::ne:
         // For constants, we must match the extension of the constant.
-        branchExt = constantExt;
+        branchExt = boundExt;
         break;
       case handshake::CmpIPredicate::ult:
       case handshake::CmpIPredicate::ule:
       case handshake::CmpIPredicate::ugt:
       case handshake::CmpIPredicate::uge:
-        // For unsigned comparisons the bound guarantees us that the upper-bits
-        // must be zero.
+        // The pattern establishes an upper-bound for the data operand, and
+        // tries to use the bitwidth of the upper-bound for the corresponding
+        // result of the conditional branch.
+        //
+        // However, in the case of the upper-bound being sign-extended, we
+        // cannot do this in combination with unsigned comparisons since the
+        // result of the comparison does not imply that bits beyond the
+        // upper-bound are zero.
+        // Example: Upper bound could be the value -1 with the bitwidth 1, but
+        // if the comparison is done at i32 and -1 sign-extended to i32, then
+        // all 32-bits of the data operand are meaningful and cannot be
+        // truncated.
+        //
+        // Any other kind of extensions does however imply that the bits beyond
+        // the upper-bound bitwidth are zero.
+        if (boundExt == ExtType::SEXT)
+          continue;
+
         branchExt = ExtType::ZEXT;
         break;
       default:
-        // Others are currently unsupported.
+        // Other comparison predicates are currently unsupported and therefore
+        // skipped.
         continue;
       }
 
