@@ -80,6 +80,16 @@ public:
     MAX_VALUE = Double,
   };
 
+  /// Array containing all primitive types.
+  constexpr static auto ALL_PRIMITIVES = [] {
+    std::array<Type, MAX_VALUE + 1> candidates{};
+    std::size_t j = 0;
+    for (std::size_t i = MIN_VALUE; i <= MAX_VALUE; i++)
+      candidates[j++] = static_cast<Type>(i);
+
+    return candidates;
+  }();
+
   PrimitiveType() = default;
 
   /*implicit*/ PrimitiveType(Type type) : type(type) {}

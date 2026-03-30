@@ -103,7 +103,14 @@ private:
   generateScalarParameter(const OpaqueContext &constraints,
                           std::size_t depth = 0);
 
-  ast::ScalarType generateScalarType(const OpaqueContext &constraints) const;
+  /// Generates a scalar type or none if it was impossible to generate a scalar
+  /// type in the given context.
+  /// 'toExclude' may be supplied by the caller to further exclude some scalar
+  /// types based on the given context.
+  std::optional<ast::ScalarType> generateScalarType(
+      const OpaqueContext &context,
+      llvm::function_ref<bool(const ast::ScalarType &)> toExclude =
+          nullptr) const;
 
   Randomly &random;
   ast::ScalarType returnType{};
