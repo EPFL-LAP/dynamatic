@@ -231,88 +231,6 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
-namespace dynamatic {
-// Used to assign dense indices to FlowVariables based on a list of
-// FlowExpression, i.e. indices 0 to n-1 are used for n variables, while keeping
-// lambda variables with low indices to ensure they are eliminated first within
-// the row-echelon form
-struct FlowEquationsMatrix {
-  std::unordered_map<FlowVariable, size_t> varToIndex;
-  std::vector<FlowVariable> indexToVar;
-  size_t nLambdas;
-  MatIntType matrix;
-
-  size_t size() const { return indexToVar.size(); }
-  bool verify() {
-    if (!(varToIndex.size() == indexToVar.size()))
-      return false;
-    for (size_t i = 0; i < indexToVar.size(); ++i) {
-      FlowVariable &a = indexToVar[i];
-      size_t j = varToIndex[a];
-      if (i != j)
-        return false;
-    }
-    return true;
-  }
-
-  FlowExpression getRowAsExpression(size_t row) const {
-    FlowExpression ret;
-    for (size_t col = 0; col < indexToVar.size(); ++col) {
-      int coef = matrix(row, col);
-      if (coef != 0) {
-        ret += coef * indexToVar[col];
-      }
-    }
-    return ret;
-  }
-
-  FlowEquationsMatrix() = default;
-  FlowEquationsMatrix(const std::vector<FlowExpression> &exprs) {
-    size_t index = 0;
-    // give lower indices to variables that cannot be annotated
-    for (auto &expr : exprs) {
-      for (auto &[key, value] : expr.terms) {
-        // skip variables that can be annotated in SMV
-        if (key.getAnnotater() != nullptr) {
-          continue;
-        }
-        // PlusAndMinus variables should never be inserted, as the DSL will
-        // insert them as two separate variables
-        assert(!key.indexTokenConstraint ||
-               key.indexTokenConstraint->trackedValue);
-        if (varToIndex.count(key) == 0) {
-          varToIndex[key] = index;
-          ++index;
-          indexToVar.push_back(key);
-        }
-      }
-    }
-    nLambdas = index;
-    // annotate remaining variables
-    for (auto &expr : exprs) {
-      for (auto &[key, value] : expr.terms) {
-        if (varToIndex.count(key) == 0) {
-          varToIndex[key] = index;
-          ++index;
-          indexToVar.push_back(key);
-        }
-      }
-    }
-
-    // matrix with one row per equation, and column per variable
-    matrix = MatIntZero(exprs.size(), size());
-
-    // insert equations into the matrix
-    for (auto [row, expr] : llvm::enumerate(exprs)) {
-      for (auto &[key, value] : expr.terms) {
-        unsigned index = varToIndex[key];
-        matrix(row, index) = (int)value;
-      }
-    }
-  }
-};
-} // namespace dynamatic
-
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
@@ -325,11 +243,11 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   }
 
   // Create a matrix, and map all variables to an column index
-  FlowEquationsMatrix indices(extractor.equations);
+  FlowSystem indices(extractor.equations);
   MatIntType &matrix = indices.matrix;
 
-  // Verify that the FlowEquationsMatrix data structure is correct
-  assert(indices.verify());
+  // Verify that the registry data structure is correct
+  assert(indices.registry.verify());
 
   // bring to row-echelon form
   gaussianElimination(matrix);

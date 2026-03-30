@@ -4,6 +4,10 @@
 
 namespace dynamatic {
 namespace handshake {
+
+// --------------------
+// --- FlowVariable ---
+// --------------------
 FlowVariable::FlowVariable(const IndexChannelAnalysis &indexChannels,
                            ChannelLambda channel) {
   *this = FlowVariable(Variants(channel));
@@ -96,6 +100,9 @@ std::string FlowVariable::getDebugName() const {
   return ret;
 }
 
+// ----------------------
+// --- FlowExpression ---
+// ----------------------
 FlowExpression::FlowExpression(const FlowVariable &v) {
   if (v.isIndex()) {
     if (v.indexTokenConstraint->trackedValue) {
@@ -226,6 +233,9 @@ void operator-=(FlowExpression &left, const FlowExpression &right) {
   }
 }
 
+// -----------------------------
+// --- FlowEquationExtractor ---
+// -----------------------------
 LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
   // Store the result so that all operations can be handled, rather than exiting
   // after first error
@@ -640,6 +650,55 @@ LogicalResult FlowEquationExtractor::extractStoreOp(StoreOp storeOp) {
   equations.push_back(addrInput - addrOutput);
 
   return success();
+}
+
+// ------------------
+// --- FlowSystem ---
+// ------------------
+FlowExpression FlowSystem::getRowAsExpression(size_t row) const {
+  FlowExpression ret;
+  for (size_t col = 0; col < registry.size(); ++col) {
+    int coef = matrix(row, col);
+    if (coef != 0) {
+      ret += coef * registry.getVar(col);
+    }
+  }
+  return ret;
+}
+
+FlowSystem::FlowSystem(const std::vector<FlowExpression> &exprs) {
+  // give lower indices to variables that cannot be annotated
+  for (auto &expr : exprs) {
+    for (auto &[key, value] : expr.terms) {
+      // skip variables that can be annotated in SMV
+      if (key.getAnnotater() != nullptr) {
+        continue;
+      }
+      // PlusAndMinus variables should never be inserted, as the DSL will
+      // insert them as two separate variables
+      assert(!key.indexTokenConstraint ||
+             key.indexTokenConstraint->trackedValue);
+      registry.addVariable(key);
+    }
+  }
+  nLambdas = registry.size();
+  // annotate remaining variables
+  for (auto &expr : exprs) {
+    for (auto &[key, value] : expr.terms) {
+      registry.addVariable(key);
+    }
+  }
+
+  // matrix with one row per equation, and column per variable
+  matrix = MatIntZero(exprs.size(), registry.size());
+
+  // insert equations into the matrix
+  for (auto [row, expr] : llvm::enumerate(exprs)) {
+    for (auto &[key, value] : expr.terms) {
+      unsigned index = registry.getIndex(key);
+      matrix(row, index) = (int)value;
+    }
+  }
 }
 
 } // namespace handshake

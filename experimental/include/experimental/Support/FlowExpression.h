@@ -5,6 +5,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/JSON.h"
@@ -248,6 +249,61 @@ struct FlowEquationExtractor {
   LogicalResult extractStoreOp(StoreOp storeOp);
 };
 
+namespace {
+// This is a helper class to create a bidirectional mapping between variables
+// and indices
+class VariableRegistry {
+public:
+  size_t addVariable(const FlowVariable &var) {
+    if (auto it = varToIndex.find(var); it != varToIndex.end()) {
+      return it->second;
+    }
+    size_t newIdx = indexToVar.size();
+    varToIndex[var] = newIdx;
+    indexToVar.push_back(var);
+    return newIdx;
+  }
+
+  bool verify() {
+    if (!(varToIndex.size() == indexToVar.size()))
+      return false;
+    for (size_t i = 0; i < indexToVar.size(); ++i) {
+      FlowVariable &a = indexToVar[i];
+      size_t j = varToIndex[a];
+      if (i != j)
+        return false;
+    }
+    return true;
+  }
+
+  inline size_t getIndex(const FlowVariable &var) const {
+    return varToIndex.at(var);
+  }
+  inline const FlowVariable &getVar(size_t idx) const {
+    return indexToVar.at(idx);
+  }
+  inline size_t size() const { return indexToVar.size(); }
+
+private:
+  std::unordered_map<FlowVariable, size_t> varToIndex;
+  std::vector<FlowVariable> indexToVar;
+};
+} // namespace
+
+// FlowSystem is a wrapper for combining flow equations with a corresponding
+// matrix. It keeps track of which variable corresponds to which column index,
+// and makes sure that low indices are resesrved for variables that cannot be
+// annotated to ensure they are eliminated first in the row-echelon form
+struct FlowSystem {
+  VariableRegistry registry;
+  size_t nLambdas;
+  MatIntType matrix;
+
+  FlowExpression getRowAsExpression(size_t row) const;
+
+  FlowSystem() = default;
+  FlowSystem(const std::vector<FlowExpression> &exprs);
+};
 } // namespace handshake
 } // namespace dynamatic
 
