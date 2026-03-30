@@ -435,101 +435,98 @@ FPGA24Buffers::FPGA24Buffers(CPSolver::SolverKind solverKind, int timeout,
     : solverKind(solverKind), timeout(timeout), funcInfo(funcInfo),
       targetPeriod(targetPeriod), timingDB(timingDB) {}
 
-LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
-  LLVM_DEBUG(llvm::errs() << "=== FPGA24 Buffer Placement ===\n");
+void FPGA24Buffers::findSynchronizationPatterns(
+    ArrayRef<CFDFC *> cfdfcs,
+    std::list<CFGTransitionSequenceSubgraph> &reconvergentGraphs,
+    std::vector<ReconvergentPathWithGraph> &allReconvergentPaths,
+    std::vector<SynchronizingCyclePair> &allSyncCyclePairs,
+    SynchronizingCyclesFinderGraph &syncGraph) {
 
-  SmallVector<CFDFC *> cfdfcPtrs;
-  for (auto &[cfdfc, _] : funcInfo.cfdfcs)
-    cfdfcPtrs.push_back(cfdfc);
-
-  LLVM_DEBUG(llvm::errs() << "Found " << cfdfcPtrs.size() << " CFDFCs\n");
-
-  std::list<CFGTransitionSequenceSubgraph> reconvergentGraphs;
-  std::vector<ReconvergentPathWithGraph> allReconvergentPaths;
-  std::vector<SynchronizingCyclePair> allSyncCyclePairs;
-  SynchronizingCyclesFinderGraph syncGraph;
-
-  if (!cfdfcPtrs.empty()) {
-    syncGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfcPtrs[0]);
+  if (!cfdfcs.empty()) {
+    syncGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfcs[0]);
     allSyncCyclePairs = syncGraph.findSynchronizingCyclePairs();
     LLVM_DEBUG(llvm::errs() << "Found " << allSyncCyclePairs.size()
                             << " synchronizing cycle pairs\n");
   }
 
   const auto &archTransitions = funcInfo.archs;
+  if (archTransitions.empty())
+    return;
 
-  if (!archTransitions.empty()) {
-    constexpr size_t sequenceLength = 2;
-    auto sequences =
-        enumerateTransitionSequences(archTransitions, sequenceLength);
+  constexpr size_t sequenceLength = 2;
+  auto sequences =
+      enumerateTransitionSequences(archTransitions, sequenceLength);
 
-    LLVM_DEBUG(llvm::errs() << "Enumerated " << sequences.size()
-                            << " transition sequences\n");
+  LLVM_DEBUG(llvm::errs() << "Enumerated " << sequences.size()
+                          << " transition sequences\n");
 
-    std::set<std::pair<Operation *, Operation *>> seenForkJoinPairs;
+  std::set<std::pair<Operation *, Operation *>> seenForkJoinPairs;
 
-    size_t totalSequences = sequences.size();
-    size_t duplicatesSkipped = 0;
-    for (size_t seqIdx = 0; seqIdx < totalSequences; ++seqIdx) {
-      if (seqIdx % 50 == 0 || seqIdx == totalSequences - 1) {
-        LLVM_DEBUG(llvm::errs()
-                   << "  Processing sequence " << seqIdx + 1 << "/"
-                   << totalSequences << " (found "
-                   << allReconvergentPaths.size() << " unique paths, "
-                   << duplicatesSkipped << " duplicates skipped)\n");
-      }
-
-      const auto &sequence = sequences[seqIdx];
-      CFGTransitionSequenceSubgraph graph;
-      graph.buildGraphFromSequence(funcInfo.funcOp, sequence);
-      auto paths = graph.findReconvergentPaths();
-      CFGTransitionSequenceSubgraph::GraphPathsForDumping graphPaths = {&graph,
-                                                                        paths};
-      graph.dumpAllReconvergentPaths(
-          graphPaths, "reconvergent_graph_" + std::to_string(seqIdx) + ".dot");
-
-      if (!paths.empty()) {
-        /// Filter out duplicate fork/join pairs we've already seen
-        std::vector<ReconvergentPath> uniquePaths;
-        for (auto &path : paths) {
-          Operation *forkOp = graph.nodes[path.forkNodeId].op;
-          Operation *joinOp = graph.nodes[path.joinNodeId].op;
-          auto key = std::make_pair(forkOp, joinOp);
-
-          if (seenForkJoinPairs.count(key)) {
-            duplicatesSkipped++;
-            continue;
-          }
-          seenForkJoinPairs.insert(key);
-          uniquePaths.push_back(std::move(path));
-        }
-
-        if (!uniquePaths.empty()) {
-          /// Add graph to list first
-          reconvergentGraphs.push_back(std::move(graph));
-          const CFGTransitionSequenceSubgraph *graphPtr =
-              &reconvergentGraphs.back();
-
-          /// Then add paths with pointer to their graph
-          for (auto &path : uniquePaths) {
-            allReconvergentPaths.emplace_back(std::move(path), graphPtr);
-          }
-        }
-      }
+  size_t totalSequences = sequences.size();
+  size_t duplicatesSkipped = 0;
+  for (size_t seqIdx = 0; seqIdx < totalSequences; ++seqIdx) {
+    if (seqIdx % 50 == 0 || seqIdx == totalSequences - 1) {
+      LLVM_DEBUG(llvm::errs()
+                 << "  Processing sequence " << seqIdx + 1 << "/"
+                 << totalSequences << " (found "
+                 << allReconvergentPaths.size() << " unique paths, "
+                 << duplicatesSkipped << " duplicates skipped)\n");
     }
 
-    LLVM_DEBUG(llvm::errs() << "Found " << allReconvergentPaths.size()
-                            << " unique reconvergent paths across "
-                            << reconvergentGraphs.size() << " graphs ("
-                            << duplicatesSkipped << " duplicates skipped)\n");
+    const auto &sequence = sequences[seqIdx];
+    CFGTransitionSequenceSubgraph graph;
+    graph.buildGraphFromSequence(funcInfo.funcOp, sequence);
+    auto paths = graph.findReconvergentPaths();
+    CFGTransitionSequenceSubgraph::GraphPathsForDumping graphPaths = {&graph,
+                                                                      paths};
+    graph.dumpAllReconvergentPaths(
+        graphPaths, "reconvergent_graph_" + std::to_string(seqIdx) + ".dot");
+
+    if (paths.empty())
+      continue;
+
+    std::vector<ReconvergentPath> uniquePaths;
+    for (auto &path : paths) {
+      Operation *forkOp = graph.nodes[path.forkNodeId].op;
+      Operation *joinOp = graph.nodes[path.joinNodeId].op;
+      auto key = std::make_pair(forkOp, joinOp);
+
+      if (seenForkJoinPairs.count(key)) {
+        duplicatesSkipped++;
+        continue;
+      }
+      seenForkJoinPairs.insert(key);
+      uniquePaths.push_back(std::move(path));
+    }
+
+    if (!uniquePaths.empty()) {
+      reconvergentGraphs.push_back(std::move(graph));
+      const CFGTransitionSequenceSubgraph *graphPtr =
+          &reconvergentGraphs.back();
+
+      for (auto &path : uniquePaths) {
+        allReconvergentPaths.emplace_back(std::move(path), graphPtr);
+      }
+    }
   }
 
-  /// Solve Latency Balancing LP1
+  LLVM_DEBUG(llvm::errs() << "Found " << allReconvergentPaths.size()
+                          << " unique reconvergent paths across "
+                          << reconvergentGraphs.size() << " graphs ("
+                          << duplicatesSkipped << " duplicates skipped)\n");
+}
+
+FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
+    ArrayRef<CFDFC *> cfdfcs,
+    ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+    const SynchronizingCyclesFinderGraph &syncGraph) {
+
   LLVM_DEBUG(llvm::errs() << "=== Setting up LP1 (Latency Balancing) ===\n");
 
   LatencyBalancingMILP latencyBalancingLP(
       solverKind, timeout, funcInfo, timingDB, targetPeriod,
-      allReconvergentPaths, allSyncCyclePairs, syncGraph, cfdfcPtrs);
+      reconvergentPaths, syncCyclePairs, syncGraph, cfdfcs);
 
   LLVM_DEBUG(llvm::errs() << "=== Optimizing LP1 ===\n");
   if (failed(latencyBalancingLP.optimize())) {
@@ -538,17 +535,15 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
   }
   LLVM_DEBUG(llvm::errs() << "LP1 optimization complete.\n");
 
-  LatencyBalancingResult latencyResult =
-      latencyBalancingLP.extractLatencyResults();
+  LatencyBalancingResult result = latencyBalancingLP.extractLatencyResults();
   LLVM_DEBUG(llvm::errs() << "LP1 computed extra latencies for "
-                          << latencyResult.channelExtraLatency.size()
+                          << result.channelExtraLatency.size()
                           << " channels\n");
 
-  /// Debug: Verify cycle latencies after LP1
   LLVM_DEBUG({
     llvm::errs() << "=== Verifying CFDFC Cycle Latencies After LP1 ===\n";
-    for (size_t cfdfcIdx = 0; cfdfcIdx < cfdfcPtrs.size(); ++cfdfcIdx) {
-      CFDFC *cfdfc = cfdfcPtrs[cfdfcIdx];
+    for (size_t cfdfcIdx = 0; cfdfcIdx < cfdfcs.size(); ++cfdfcIdx) {
+      CFDFC *cfdfc = cfdfcs[cfdfcIdx];
       SynchronizingCyclesFinderGraph cfdfcGraph;
       cfdfcGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfc);
       std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
@@ -564,8 +559,8 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
             if (cfdfcGraph.edges[edgeId].dstId == dst) {
               Value channel = cfdfcGraph.edges[edgeId].channel;
               unsigned extraLat = 0;
-              if (latencyResult.channelExtraLatency.count(channel)) {
-                extraLat = latencyResult.channelExtraLatency.lookup(channel);
+              if (result.channelExtraLatency.count(channel)) {
+                extraLat = result.channelExtraLatency.lookup(channel);
               }
               if (extraLat > 0) {
                 llvm::errs() << getUniqueName(*channel.getUses().begin())
@@ -585,21 +580,19 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
     }
   });
 
-  /// Solve Occupancy Balancing LP2
+  return result;
+}
+
+LogicalResult FPGA24Buffers::solveOccupancyBalancing(
+    BufferPlacement &placement, ArrayRef<CFDFC *> cfdfcs,
+    ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+    const LatencyBalancingResult &latencyResult) {
+
   LLVM_DEBUG(llvm::errs() << "=== Setting up LP2 (Occupancy Balancing) ===\n");
-  /// Key equations:
-  /// - (Paper: Section 5, Equation 8): N_c >= L_c / II
-  /// - (Paper: Section 5, Equation 10): Occupancy(p) = sum(N_u) + sum(N_c)
-  /// (path occupancy includes units)
-  /// - (Paper: Section 5, Equation 11): Occupancy(p1) = Occupancy(p2) for
-  /// reconvergent paths
-  /// - (Paper: Section 5, Equation 12): Occupancy(cycle) <= B where B=1 for
-  /// sequential programs
-  LLVM_DEBUG(llvm::errs() << "=== Occupancy Balancing (LP2) ===\n");
 
   OccupancyBalancingLP occupancyBalancingLP(
       solverKind, timeout, funcInfo, timingDB, targetPeriod, latencyResult,
-      allReconvergentPaths, cfdfcPtrs);
+      reconvergentPaths, cfdfcs);
 
   if (failed(occupancyBalancingLP.optimize())) {
     LLVM_DEBUG(llvm::errs() << "LP2 optimization failed\n");
@@ -608,9 +601,13 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
 
   LLVM_DEBUG(llvm::errs() << "LP2 optimization complete.\n");
   occupancyBalancingLP.extractResult(placement);
+  return success();
+}
 
-  /// Post-process: Add DV+R for Mux/Merge/ControlMerge for deadlock prevention.
-  for (CFDFC *cfdfc : cfdfcPtrs) {
+void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
+                                             ArrayRef<CFDFC *> cfdfcs) {
+  /// Add R for Mux/Merge/ControlMerge outputs for deadlock prevention.
+  for (CFDFC *cfdfc : cfdfcs) {
     for (Value channel : cfdfc->channels) {
       Operation *srcOp = channel.getDefiningOp();
       bool isMergeLike = isa_and_nonnull<handshake::MuxOp, handshake::MergeOp,
@@ -628,13 +625,11 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
   }
 
   /// Buffer forks connected to memory controllers.
-  /// These forks synchronize with 'di_end' and 'idx_end' signals
   for (Operation &op : funcInfo.funcOp.getOps()) {
     auto forkOp = dyn_cast<handshake::ForkOp>(op);
     if (!forkOp)
       continue;
 
-    // Check if this fork connects to any memory controller
     bool connectsToMemCtrl = false;
     for (Value res : forkOp.getResults()) {
       for (Operation *user : res.getUsers()) {
@@ -650,7 +645,6 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
     if (!connectsToMemCtrl)
       continue;
 
-    // Add transparent buffer to all outputs of this memory fork
     for (Value res : forkOp.getResults()) {
       if (!placement.count(res)) {
         PlacementResult result;
@@ -663,16 +657,12 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
     }
   }
 
-  /// Buffer memory controller end signals.
-  /// These need to synchronize with the function output (out0).
+  /// Buffer memory controller end signals (di_end, idx_end).
   for (Operation &op : funcInfo.funcOp.getOps()) {
     if (!isa<handshake::MemoryControllerOp, handshake::LSQOp>(op))
       continue;
 
-    // Get the 'di_end' and 'idx_end' signals
     for (Value res : op.getResults()) {
-      // Check if this is a control-type output ('di_end' and 'idx_end' are
-      // control)
       if (!isa<handshake::ControlType>(res.getType()))
         continue;
 
@@ -691,28 +681,52 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
                   "controller, they get rid of the stalls after the memory "
                   "controller, but they themselves stall the circuit.\n");
   }
+}
 
-  /// Debug: Log final placed buffers
-  LLVM_DEBUG(llvm::errs() << "Final buffer placement:\n");
-  for (auto &[channel, result] : placement) {
-    if (result.numOneSlotDV > 0 || result.numFifoNone > 0 ||
-        result.numOneSlotR > 0) {
-      LLVM_DEBUG(llvm::errs()
-                 << "  " << getUniqueName(*channel.getUses().begin()) << ": DV="
-                 << result.numOneSlotDV << ", FIFO=" << result.numFifoNone
-                 << ", R=" << result.numOneSlotR << "\n");
+LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
+  LLVM_DEBUG(llvm::errs() << "=== FPGA24 Buffer Placement ===\n");
+
+  SmallVector<CFDFC *> cfdfcPtrs;
+  for (auto &[cfdfc, _] : funcInfo.cfdfcs)
+    cfdfcPtrs.push_back(cfdfc);
+  LLVM_DEBUG(llvm::errs() << "Found " << cfdfcPtrs.size() << " CFDFCs\n");
+
+  std::list<CFGTransitionSequenceSubgraph> reconvergentGraphs;
+  std::vector<ReconvergentPathWithGraph> allReconvergentPaths;
+  std::vector<SynchronizingCyclePair> allSyncCyclePairs;
+  SynchronizingCyclesFinderGraph syncGraph;
+  findSynchronizationPatterns(cfdfcPtrs, reconvergentGraphs,
+                              allReconvergentPaths, allSyncCyclePairs,
+                              syncGraph);
+
+  FailureOr<LatencyBalancingResult> latencyResult = solveLatencyBalancing(
+      cfdfcPtrs, allReconvergentPaths, allSyncCyclePairs, syncGraph);
+  if (failed(latencyResult))
+    return failure();
+
+  if (failed(solveOccupancyBalancing(placement, cfdfcPtrs,
+                                     allReconvergentPaths, *latencyResult)))
+    return failure();
+
+  addPostProcessingBuffers(placement, cfdfcPtrs);
+
+  LLVM_DEBUG({
+    llvm::errs() << "Final buffer placement:\n";
+    for (auto &[channel, result] : placement) {
+      if (result.numOneSlotDV > 0 || result.numFifoNone > 0 ||
+          result.numOneSlotR > 0) {
+        llvm::errs() << "  " << getUniqueName(*channel.getUses().begin())
+                     << ": DV=" << result.numOneSlotDV
+                     << ", FIFO=" << result.numFifoNone
+                     << ", R=" << result.numOneSlotR << "\n";
+      }
     }
-  }
+  });
 
-  /// Populate channelOccupancy for all CFDFC channels (required by
-  /// instantiateBuffers) Channels we placed buffers on get their computed
-  /// occupancy, others get 0.0
   for (CFDFC *cfdfc : cfdfcPtrs) {
     for (Value channel : cfdfc->channels) {
-      if (cfdfc->channelOccupancy.count(channel) == 0) {
-        /// Default occupancy for channels not involved in our analysis
+      if (cfdfc->channelOccupancy.count(channel) == 0)
         cfdfc->channelOccupancy[channel] = 0.0;
-      }
     }
   }
 

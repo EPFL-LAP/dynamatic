@@ -31,6 +31,7 @@
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include <list>
 #include <vector>
 
 namespace dynamatic {
@@ -157,6 +158,33 @@ private:
   FuncInfo &funcInfo;
   double targetPeriod;
   const TimingDatabase &timingDB;
+
+  /// Finds synchronizing cycle pairs and reconvergent paths from the CFDFCs and
+  /// architecture transitions. Populates the output parameters.
+  void findSynchronizationPatterns(
+      ArrayRef<CFDFC *> cfdfcs,
+      std::list<CFGTransitionSequenceSubgraph> &reconvergentGraphs,
+      std::vector<ReconvergentPathWithGraph> &allReconvergentPaths,
+      std::vector<::dynamatic::SynchronizingCyclePair> &allSyncCyclePairs,
+      ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// Solves LP1 (Latency Balancing) and returns the result.
+  FailureOr<LatencyBalancingResult> solveLatencyBalancing(
+      ArrayRef<CFDFC *> cfdfcs,
+      ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
+      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// Solves LP2 (Occupancy Balancing) and writes into placement.
+  LogicalResult solveOccupancyBalancing(
+      BufferPlacement &placement, ArrayRef<CFDFC *> cfdfcs,
+      ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+      const LatencyBalancingResult &latencyResult);
+
+  /// Adds post-processing buffers for deadlock prevention and memory
+  /// synchronization.
+  void addPostProcessingBuffers(BufferPlacement &placement,
+                                ArrayRef<CFDFC *> cfdfcs);
 };
 
 } // namespace fpga24
