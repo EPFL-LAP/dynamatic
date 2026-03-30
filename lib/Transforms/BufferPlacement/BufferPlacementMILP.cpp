@@ -1158,6 +1158,35 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   model->setMaximizeObjective(objective);
 }
 
+void BufferPlacementMILP::addLatencyBalancingVars(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+  for (auto &[channel, _] : channelProps) {
+    if (isa<MemRefType>(channel.getType()))
+      continue;
+    std::string name = getUniqueName(*channel.getUses().begin());
+    ChannelVars &chVars = vars.channelVars[channel];
+
+    /// L_c: extra latency to add to the channel for balancing (integer >= 0).
+    chVars.dataLatency = model->addVar("L_" + name, INTEGER, 0, std::nullopt);
+    /// S_c: whether the channel is stalled due to imbalance (binary).
+    chVars.stalled = model->addVar("S_" + name, BOOLEAN, 0, 1);
+    /// R_c: whether the channel has L > 0, i.e., channel cut (binary).
+    chVars.bufPresent = model->addVar("R_" + name, BOOLEAN, 0, 1);
+  }
+
+  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << vars.channelVars.size()
+                          << " channel variables\n");
+
+  addBufferPresenceLinkConstraints();
+  addReconvergentPathVars(reconvergentPaths);
+  addSyncCycleVars(syncCyclePairs);
+
+  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << reconvergentPaths.size()
+                          << " reconvergent path vars, "
+                          << syncCyclePairs.size() << " sync cycle vars\n");
+}
+
 void BufferPlacementMILP::addBufferPresenceLinkConstraints() {
   for (auto &[channel, chVars] : vars.channelVars) {
     std::string name = getUniqueName(*channel.getUses().begin());

@@ -61,7 +61,7 @@ void LatencyBalancingMILP::setup() {
     return;
 
   LLVM_DEBUG(llvm::errs() << "[LatBal] Adding latency variables...\n");
-  addLatencyVariables();
+  addLatencyBalancingVars(reconvergentPaths, syncCyclePairs);
   LLVM_DEBUG(llvm::errs() << "[LatBal] Adding reconvergent path constraints ("
                           << reconvergentPaths.size() << " paths)...\n");
   addReconvergentPathConstraints(reconvergentPaths);
@@ -82,41 +82,6 @@ void LatencyBalancingMILP::setup() {
 /// The latency variable L_c is the number of extra latencies to be added to a
 /// channel. It will be used in the input of the occupancy balancing LP. Defined
 /// in (Paper: Section 4, Table 1).
-void LatencyBalancingMILP::addLatencyVariables() {
-  /// Create L_c, S_c, and R_c variables for every dataflow channel in the
-  /// function. The MILP constraints will naturally drive unused variables to
-  /// zero.
-  for (auto &[channel, _] : channelProps) {
-    if (isa<MemRefType>(channel.getType()))
-      continue;
-    std::string name = getUniqueName(*channel.getUses().begin());
-    ChannelVars &chVars = vars.channelVars[channel];
-
-    /// L_c: extra latency to add to the channel for balancing (integer >= 0).
-    /// (Paper: Section 4, Table 1)
-    chVars.dataLatency = model->addVar("L_" + name, INTEGER, 0, std::nullopt);
-
-    /// S_c: whether the channel is stalled due to imbalance (binary).
-    /// (Paper: Section 4, Table 1)
-    chVars.stalled = model->addVar("S_" + name, BOOLEAN, 0, 1);
-
-    /// R_c: whether the channel has L > 0, i.e., channel cut (binary).
-    /// (Paper: Section 4, Table 1)
-    chVars.bufPresent = model->addVar("R_" + name, BOOLEAN, 0, 1);
-  }
-
-  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << vars.channelVars.size()
-                          << " channel variables\n");
-
-  addBufferPresenceLinkConstraints();
-  addReconvergentPathVars(reconvergentPaths);
-  addSyncCycleVars(syncCyclePairs);
-
-  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << reconvergentPaths.size()
-                          << " reconvergent path vars, "
-                          << syncCyclePairs.size() << " sync cycle vars\n");
-}
-
 // This method is required by the base class but not used since we feed the
 // results to the occupancy balancing LP anyways.
 void LatencyBalancingMILP::extractResult(BufferPlacement &placement) {}
