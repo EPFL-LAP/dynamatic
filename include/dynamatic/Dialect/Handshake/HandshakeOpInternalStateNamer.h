@@ -15,6 +15,7 @@ struct PipelineSlotNamer;
 struct ConstrainedNamer;
 struct ConstrainedEagerForkSentNamer;
 struct ConstrainedBufferSlotFullNamer;
+struct MemoryControllerSlotNamer;
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
@@ -30,6 +31,7 @@ struct InternalStateNamer {
     BufferSlotFull,
     PipelineSlot,
     Constrained,
+    MemoryControllerSlot,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -68,8 +70,10 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral TYPE_LIT = "type";
   static constexpr llvm::StringLiteral EAGER_FORK_SENT = "EagerForkSent";
   static constexpr llvm::StringLiteral BUFFER_SLOT_FULL = "BufferSlotFull";
-  static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
   static constexpr llvm::StringLiteral PIPELINE_SLOT = "PipelineSlot";
+  static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
+  static constexpr llvm::StringLiteral MEMORY_CONTROLLER_SLOT =
+      "MemoryControllerSlot";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -279,6 +283,55 @@ struct PipelineSlotNamer : InternalStateNamer {
   unsigned slotIndex;
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "pipeline_index";
+};
+
+struct MemoryControllerSlotNamer : InternalStateNamer {
+  enum PortType {
+    Load,
+    Store,
+    Control,
+  };
+  MemoryControllerSlotNamer() = default;
+  MemoryControllerSlotNamer(PortType portType, const std::string &name,
+                            size_t slotIndex)
+      : InternalStateNamer(TYPE::MemoryControllerSlot), opName(name),
+        slotIndex(slotIndex), portType(portType), loadless(false) {}
+  ~MemoryControllerSlotNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::MemoryControllerSlot;
+  }
+
+  inline std::string getSMVName() const override {
+    switch (portType) {
+    case Load:
+      return llvm::formatv("{0}.inner_arbiter.valid_{1}", opName, slotIndex);
+    case Store:
+      return llvm::formatv("{0}.inner_mc_loadless.inner_arbiter.valid_{1}",
+                           opName, slotIndex);
+    case Control:
+      assert(false && "todo");
+      return nullptr;
+    }
+  }
+
+  inline llvm::json::Value toInnerJSON() const override {
+    return llvm::json::Object({{OPERATION_LIT, opName},
+                               {SLOT_INDEX_LIT, slotIndex},
+                               {PORT_TYPE_LIT, (int)portType},
+                               {LOADLESS_LIT, loadless}});
+  }
+  std::unique_ptr<MemoryControllerSlotNamer> static fromInnerJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
+
+  std::string opName;
+  size_t slotIndex;
+  PortType portType;
+  bool loadless;
+  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
+  static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "slot_index";
+  static constexpr llvm::StringLiteral PORT_TYPE_LIT = "port_type";
+  static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
 };
 } // namespace handshake
 } // namespace dynamatic

@@ -12,6 +12,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::PipelineSlot;
   if (s == CONSTRAINED)
     return TYPE::Constrained;
+  if (s == MEMORY_CONTROLLER_SLOT)
+    return TYPE::MemoryControllerSlot;
   return std::nullopt;
 }
 
@@ -25,6 +27,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return PIPELINE_SLOT.str();
   case TYPE::Constrained:
     return CONSTRAINED.str();
+  case TYPE::MemoryControllerSlot:
+    return MEMORY_CONTROLLER_SLOT.str();
   }
 }
 
@@ -62,6 +66,11 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
     break;
   case TYPE::Constrained:
     assert(false && "todo");
+    break;
+  case TYPE::MemoryControllerSlot:
+    prop = MemoryControllerSlotNamer::fromInnerJSON(inner, path);
+    assert(prop && "mc slot failed");
+    break;
   }
   prop->type = type;
   return prop;
@@ -144,5 +153,21 @@ ConstrainedNamer::fromInnerJSON(const llvm::json::Value &value,
   }
   return nullptr;
 }
+
+std::unique_ptr<MemoryControllerSlotNamer>
+MemoryControllerSlotNamer::fromInnerJSON(const llvm::json::Value &value,
+                                         llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  auto prop = std::make_unique<MemoryControllerSlotNamer>();
+  int t;
+  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
+      !mapper.map(SLOT_INDEX_LIT, prop->slotIndex) ||
+      !mapper.map(PORT_TYPE_LIT, t) ||
+      !mapper.map(LOADLESS_LIT, prop->loadless))
+    return nullptr;
+  prop->portType = (PortType)t;
+  return prop;
+}
+
 } // namespace handshake
 } // namespace dynamatic

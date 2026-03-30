@@ -500,7 +500,6 @@ LogicalResult EquationExtractor::extractPipeline(LatencyInterface latencyOp,
                           "cannot be constrained");
       return failure();
     }
-    assert(!before.isIndex() &&);
 
     equations.push_back(before - full - after);
     i2 = after;
@@ -731,6 +730,27 @@ LogicalResult EquationExtractor::extractAll(ModuleOp modOp) {
         if (failed(extractControlMergeOp(cmergeOp))) {
           res = failure();
         }
+      } else if (auto memCon = dyn_cast<handshake::MemoryControllerOp>(op)) {
+        size_t nLoads = memCon.getNumLoadPorts();
+        for (size_t loadIndex = 0; loadIndex < nLoads; ++loadIndex) {
+          if (auto load = memCon.getLoadPort(loadIndex)) {
+            unsigned operandIndex = load->getAddrInputIndex();
+            unsigned resultIndex = load->getDataOutputIndex();
+            FlowVariable operand(
+                indexChannelAnalysis,
+                ChannelLambda(memCon.getOperands()[operandIndex]));
+            FlowVariable result(
+                indexChannelAnalysis,
+                ChannelLambda(memCon.getResults()[resultIndex]));
+            auto slotNamer = memCon.getLoadPortSlotNamer(loadIndex);
+            std::shared_ptr<InternalStateNamer> sharedNamer =
+                std::make_shared<MemoryControllerSlotNamer>(slotNamer);
+            FlowVariable slot(sharedNamer);
+            equations.push_back(operand - result - slot);
+          }
+        }
+        // For store ports, a next goal could be to transmit a control token
+        // when the store operation has finished.
       } else {
         op.emitError("Not handled yet!");
         res = failure();

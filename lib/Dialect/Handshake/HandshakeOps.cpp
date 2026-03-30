@@ -924,6 +924,49 @@ dynamatic::MCPorts MemoryControllerOp::getPorts() {
   return mcPorts;
 }
 
+size_t MemoryControllerOp::getNumLoadPorts() {
+  MCPorts mcPorts = getPorts();
+  const FuncMemoryPorts &ports = mcPorts;
+  size_t numLoads = 0;
+  for (const GroupMemoryPorts &blockPorts : ports.groups) {
+    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
+        ++numLoads;
+      }
+    }
+  }
+  return numLoads;
+}
+
+std::optional<LoadPort> MemoryControllerOp::getLoadPort(size_t index) {
+  MCPorts mcPorts = getPorts();
+  const FuncMemoryPorts &ports = mcPorts;
+  size_t loadIdx = 0;
+  for (const GroupMemoryPorts &blockPorts : ports.groups) {
+    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
+        if (loadIdx == index) {
+          return loadPort;
+        }
+        ++loadIdx;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+MemoryControllerSlotNamer
+MemoryControllerOp::getLoadPortSlotNamer(size_t index) {
+  size_t nLoads = getNumLoadPorts();
+  assert(index < nLoads);
+  auto name = getOperation()->getAttrOfType<::mlir::StringAttr>(
+      NameAnalysis::ATTR_NAME);
+  assert(name && "name required for memory controller slot namer");
+  MemoryControllerSlotNamer ret(MemoryControllerSlotNamer::PortType::Load,
+                                name.str(), index);
+  return ret;
+}
+
 //===----------------------------------------------------------------------===//
 // LSQOp
 //===----------------------------------------------------------------------===//
