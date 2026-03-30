@@ -368,11 +368,10 @@ void FPGA24Buffers::findSynchronizationPatterns(
   size_t duplicatesSkipped = 0;
   for (size_t seqIdx = 0; seqIdx < totalSequences; ++seqIdx) {
     LLVM_DEBUG(if (seqIdx % 50 == 0 || seqIdx == totalSequences - 1) {
-      llvm::errs()
-                 << "  Processing sequence " << seqIdx + 1 << "/"
-                 << totalSequences << " (found " << allReconvergentPaths.size()
-                 << " unique paths, " << duplicatesSkipped
-                 << " duplicates skipped)\n";
+      llvm::errs() << "  Processing sequence " << seqIdx + 1 << "/"
+                   << totalSequences << " (found "
+                   << allReconvergentPaths.size() << " unique paths, "
+                   << duplicatesSkipped << " duplicates skipped)\n";
     });
 
     const auto &sequence = sequences[seqIdx];
