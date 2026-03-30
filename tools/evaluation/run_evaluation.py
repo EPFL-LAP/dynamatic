@@ -23,28 +23,30 @@ from pathlib import Path
 # Kernel list
 # ──────────────────────────────────────────────────────────────────────────────
 KERNELS = [
+    # long runtimes
+    "lu",
+    "kernel_3mm",
+    "threshold",
+    "covariance",
+    "jacobi_1d_imper",
+    "syr2k_float",
+    # rest
     "atax",
     "bicg",
-    "covariance",
     "gaussian",
     "gemver",
     "get_tanh",
     "histogram",
     "insertion_sort",
-    "jacobi_1d_imper",
     "kernel_2mm",
-    "kernel_3mm",
     "kmp",
     "loop_array",
-    "lu",
     "matching",
     "matching_2",
     "matrix_power",
     "pivot",
     "polyn_mult",
     "symm_float",
-    "syr2k_float",
-    "threshold",
     "triangular",
     "while_loop_1",
 ]
@@ -421,7 +423,7 @@ def main() -> None:
 
     if args.json is not None:
         results = {}
-        for kernel in KERNELS:
+        for kernel in sorted(KERNELS):
             out_dir = REPO_ROOT / "integration-test" / kernel / "out"
             failure_reason = next((r for k, r in failed if k == kernel), None)
             entry: dict = {"failure_reason": failure_reason}
