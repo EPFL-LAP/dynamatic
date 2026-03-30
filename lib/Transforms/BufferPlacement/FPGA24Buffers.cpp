@@ -60,22 +60,22 @@ void LatencyBalancingMILP::setup() {
   if (unsatisfiable)
     return;
 
-  LLVM_DEBUG(llvm::errs() << "[LP1] Adding latency variables...\n");
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding latency variables...\n");
   addLatencyVariables();
-  LLVM_DEBUG(llvm::errs() << "[LP1] Adding reconvergent path constraints ("
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding reconvergent path constraints ("
                           << reconvergentPaths.size() << " paths)...\n");
   addReconvergentPathConstraints(reconvergentPaths);
-  LLVM_DEBUG(llvm::errs() << "[LP1] Adding sync cycle constraints ("
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding sync cycle constraints ("
                           << syncCyclePairs.size() << " pairs)...\n");
   addSyncCycleConstraints(syncCyclePairs, syncGraph);
-  LLVM_DEBUG(llvm::errs() << "[LP1] Adding stall propagation constraints...\n");
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding stall propagation constraints...\n");
   addStallPropagationConstraints(reconvergentPaths, syncCyclePairs, syncGraph);
-  LLVM_DEBUG(llvm::errs() << "[LP1] Adding cycle time constraints...\n");
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding cycle time constraints...\n");
   addCycleTimeConstraints(cfdfcs, computedII, computedCFDFCIIs);
-  LLVM_DEBUG(llvm::errs() << "[LP1] Setting objective...\n");
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Setting objective...\n");
   setLatencyBalancingObjective();
   markReadyToOptimize();
-  LLVM_DEBUG(llvm::errs() << "[LP1] Setup complete.\n");
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Setup complete.\n");
 }
 
 /// The latency variable L_c is the number of extra latencies to be added to a
@@ -146,7 +146,7 @@ void LatencyBalancingMILP::addLatencyVariables() {
     }
   }
 
-  LLVM_DEBUG(llvm::errs() << "[LP1]   Found " << allChannels.size()
+  LLVM_DEBUG(llvm::errs() << "[LatBal]   Found " << allChannels.size()
                           << " channels (patterns + CFDFCs)\n");
 
   /// Create variables for each channel:
@@ -167,7 +167,7 @@ void LatencyBalancingMILP::addLatencyVariables() {
     chVars.bufPresent = model->addVar("R_" + name, BOOLEAN, 0, 1);
   }
 
-  LLVM_DEBUG(llvm::errs() << "[LP1]   Created " << vars.channelVars.size()
+  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << vars.channelVars.size()
                           << " channel variables\n");
 
   /// Add R_c constraints,to link the binary R_c to integer L_c.
@@ -196,7 +196,7 @@ void LatencyBalancingMILP::addLatencyVariables() {
         model->addVar("s_sc_" + std::to_string(i), BOOLEAN, 0, 1);
   }
 
-  LLVM_DEBUG(llvm::errs() << "[LP1]   Created " << reconvergentPaths.size()
+  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << reconvergentPaths.size()
                           << " reconvergent path vars, "
                           << syncCyclePairs.size() << " sync cycle vars\n");
 }
@@ -222,7 +222,7 @@ LatencyBalancingResult LatencyBalancingMILP::extractLatencyResults() {
 
   result.targetII = computedII;
   result.cfdfcTargetIIs = computedCFDFCIIs;
-  LLVM_DEBUG(llvm::errs() << "[LP1] Computed target II = " << computedII
+  LLVM_DEBUG(llvm::errs() << "[LatBal] Computed target II = " << computedII
                           << "\n");
   return result;
 }
@@ -244,13 +244,13 @@ OccupancyBalancingLP::OccupancyBalancingLP(
 }
 
 void OccupancyBalancingLP::setup() {
-  LLVM_DEBUG(llvm::errs() << "[LP2] Setting up Occupancy Balancing LP...\n");
+  LLVM_DEBUG(llvm::errs() << "[OccBal] Setting up Occupancy Balancing LP...\n");
 
   if (unsatisfiable)
     return;
 
   if (cfdfcs.empty()) {
-    LLVM_DEBUG(llvm::errs() << "[LP2] WARNING: No CFDFCs provided\n");
+    LLVM_DEBUG(llvm::errs() << "[OccBal] WARNING: No CFDFCs provided\n");
     unsatisfiable = true;
     return;
   }
@@ -280,14 +280,14 @@ void OccupancyBalancingLP::setup() {
   }
 
   SmallVector<Value> allChannels(allChannelsSet.begin(), allChannelsSet.end());
-  LLVM_DEBUG(llvm::errs() << "[LP2]   Found " << cfdfcChannelCount
+  LLVM_DEBUG(llvm::errs() << "[OccBal]   Found " << cfdfcChannelCount
                           << " CFDFC channels + "
                           << (allChannels.size() - cfdfcChannelCount)
                           << " reconvergent path channels = "
                           << allChannels.size() << " total\n");
 
   if (allChannels.empty()) {
-    LLVM_DEBUG(llvm::errs() << "[LP2] WARNING: No channels found\n");
+    LLVM_DEBUG(llvm::errs() << "[OccBal] WARNING: No channels found\n");
     unsatisfiable = true;
     return;
   }
@@ -297,7 +297,7 @@ void OccupancyBalancingLP::setup() {
   if (targetII <= 0.0) {
     targetII = 1.0;
   }
-  LLVM_DEBUG(llvm::errs() << "[LP2]   Target II = " << targetII << "\n");
+  LLVM_DEBUG(llvm::errs() << "[OccBal]   Target II = " << targetII << "\n");
 
   /// Create variables for each channel
   /// N_c: Maximal token occupancy on channel c.
@@ -307,7 +307,7 @@ void OccupancyBalancingLP::setup() {
     CPVar var = model->addVar("n_" + name, REAL, 0.0, MAX_OCCUPANCY);
     channelOccupancy[channel] = var;
   }
-  LLVM_DEBUG(llvm::errs() << "[LP2]   Created " << channelOccupancy.size()
+  LLVM_DEBUG(llvm::errs() << "[OccBal]   Created " << channelOccupancy.size()
                           << " occupancy variables\n");
 
   /// (Paper: Section 5, Equation 8): N_c >= L_c / II
@@ -353,7 +353,7 @@ void OccupancyBalancingLP::setup() {
                          getUniqueName(*channel.getUses().begin()));
     constraintCount++;
   }
-  LLVM_DEBUG(llvm::errs() << "[LP2]   Added " << constraintCount
+  LLVM_DEBUG(llvm::errs() << "[OccBal]   Added " << constraintCount
                           << " N_c >= L_c/II constraints (max over CFDFCs)\n");
 
   /// Add cycle capacity constraints
@@ -373,7 +373,7 @@ void OccupancyBalancingLP::setup() {
       }
     }
   }
-  LLVM_DEBUG(llvm::errs() << "[LP2]   Added " << cycleConstraints
+  LLVM_DEBUG(llvm::errs() << "[OccBal]   Added " << cycleConstraints
                           << " cycle capacity constraints\n");
 
   /// Set objective to minimize total buffer area
@@ -391,11 +391,11 @@ void OccupancyBalancingLP::setup() {
   model->setMaximizeObjective(-objective);
 
   markReadyToOptimize();
-  LLVM_DEBUG(llvm::errs() << "[LP2] Setup complete.\n");
+  LLVM_DEBUG(llvm::errs() << "[OccBal] Setup complete.\n");
 }
 
 void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
-  LLVM_DEBUG(llvm::errs() << "[LP2] Extracting results...\n");
+  LLVM_DEBUG(llvm::errs() << "[OccBal] Extracting results...\n");
 
   for (auto &[channel, var] : channelOccupancy) {
     double occupancy = model->getValue(var);
