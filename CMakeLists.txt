@@ -280,11 +280,8 @@ endif()
 find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)
 
 set(VENV_DIR "${CMAKE_BINARY_DIR}/python3-venv")
-
-add_custom_target(python-venv ALL
-    COMMAND ${Python3_EXECUTABLE} -m venv ${VENV_DIR}
-    COMMENT "Creating Python virtual environment (Python ${Python3_VERSION})"
-)
+message(STATUS "Creating Python virtual environment (Python ${Python3_VERSION})")
+execute_process(COMMAND ${Python3_EXECUTABLE} -m venv ${VENV_DIR})
 
 #-------------------------------------------------------------------------------
 # XLS Integration (experimental)
