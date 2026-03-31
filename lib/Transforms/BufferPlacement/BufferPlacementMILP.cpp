@@ -1239,10 +1239,12 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
   size_t totalPaths = reconvergentPaths.size();
   for (size_t pathIdx = 0; pathIdx < totalPaths; ++pathIdx) {
-    if (pathIdx % 10 == 0 || pathIdx == totalPaths - 1) {
-      LLVM_DEBUG(llvm::errs() << "[LatBal]   Processing reconvergent path "
-                              << pathIdx + 1 << "/" << totalPaths << "\n");
-    }
+    LLVM_DEBUG(
+      if (pathIdx % 10 == 0 || pathIdx == totalPaths - 1) {
+        llvm::errs() << "[LatBal]   Processing reconvergent path "
+                                << pathIdx + 1 << "/" << totalPaths << "\n";
+      }
+    );
 
     const fpga24::ReconvergentPathWithGraph &pathWithGraph =
         reconvergentPaths[pathIdx];
