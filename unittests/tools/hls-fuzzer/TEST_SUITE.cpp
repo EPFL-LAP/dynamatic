@@ -72,9 +72,10 @@ public:
 };
 
 // Bool representing whether an array read expression is required.
+// Otherwise, a 0 constant must be generated.
 class ReturnArrayConstantOnlyTypeSystem
     : public gen::DisallowByDefaultTypeSystem<
-          bool, ReturnArrayConstantOnlyTypeSystem> {
+          /*createArrayRead=*/bool, ReturnArrayConstantOnlyTypeSystem> {
 public:
   static std::optional<ConclusionOf<ast::ArrayReadExpression>>
   checkArrayReadExpression(bool createArrayRead) {
@@ -95,7 +96,7 @@ public:
   }
 
   static std::optional<ConclusionOf<ast::ScalarType>>
-  checkScalarType(const ast::ScalarType &scalarType, bool) {
+  checkScalarType(const ast::ScalarType &scalarType, bool /*createArrayRead*/) {
     if (scalarType != ast::PrimitiveType::Double)
       return std::nullopt;
 
@@ -106,6 +107,7 @@ public:
   checkConstant(const ast::Constant &, bool createArrayRead) {
     if (createArrayRead)
       return std::nullopt;
+
     return ast::Constant{0};
   }
 

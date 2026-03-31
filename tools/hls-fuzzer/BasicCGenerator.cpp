@@ -275,8 +275,8 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
   auto [paramConc, indexConc] = *conclusion;
 
   // Construct a safe indexing expression from an array parameter.
-  auto expressionFromParam = [&, &indexConc = indexConc](
-                                 const ast::ArrayParameter &param) {
+  auto genWrappedArrayReadFromParam = [&, &indexConc = indexConc](
+                                          const ast::ArrayParameter &param) {
     ast::ScalarType elementType = param.getElementType();
     std::size_t mask = param.getDimension() - 1;
     std::string name = param.getName().str();
@@ -310,7 +310,7 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
 
     for (const ast::ArrayParameter &iter : copy)
       if (typeSystem.checkArrayParameterOpaque(iter, paramConc))
-        return expressionFromParam(iter);
+        return genWrappedArrayReadFromParam(iter);
   }
 
   std::optional<ast::ScalarType> elementType = generateScalarType(paramConc);
@@ -330,7 +330,7 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
     varCounter--;
     return std::nullopt;
   }
-  return expressionFromParam(arrayParameters.back().first);
+  return genWrappedArrayReadFromParam(arrayParameters.back().first);
 }
 
 std::optional<ast::Variable>
