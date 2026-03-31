@@ -373,7 +373,8 @@ LogicalResult FlowEquationExtractor::extractEagerSentEquation(
 // Handles any arithmetic operation with a single output and any number of
 // inputs, and potentially a pipeline for operations with latency. All inputs
 // together propagate each token to the output, so:
-// lambda_in_1 = lambda_in_2 = ... = lambda_out + #tokens_in_pipeline
+// lambda_in_1 = lambda_in_2 = ... = joinResult
+// joinResult = lambda_out + #slots_in_pipeline
 LogicalResult FlowEquationExtractor::extractArithmeticJoinOp(Operation &op) {
   assert(op.getResults().size() == 1);
   FlowVariable out(indexChannelAnalysis, ChannelLambda(op.getResults()[0]));
@@ -381,6 +382,9 @@ LogicalResult FlowEquationExtractor::extractArithmeticJoinOp(Operation &op) {
   if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(op)) {
     FlowVariable inner(InternalLambda(&op, 0));
     joinResult = inner;
+    // extractPipeline annotates the equations:
+    // joinResult_i = joinResult_(i+1) + latencySlot_i
+    // and sets `inner` to joinResult_
     if (failed(extractPipeline(latencyOp, inner))) {
       return failure();
     }
@@ -428,6 +432,10 @@ LogicalResult FlowEquationExtractor::extractBufferOp(BufferOp bufferOp) {
   FlowVariable in(indexChannelAnalysis, ChannelLambda(bufferOp.getOperand()));
   FlowVariable out(indexChannelAnalysis, ChannelLambda(bufferOp.getResult()));
   for (auto &slotNamer : bufferOp.getInternalSlotStateNamers()) {
+    // For any slot: in -> slot_i -> next, where `next` is simply the next
+    // internal channel after `in`. The normal slot equation is annotated:
+    // in = next + slot
+    // Then, `in` is set to `next`
     std::shared_ptr<InternalStateNamer> sharedNamer =
         std::make_shared<BufferSlotFullNamer>(slotNamer);
     FlowVariable slot(sharedNamer);
@@ -437,20 +445,51 @@ LogicalResult FlowEquationExtractor::extractBufferOp(BufferOp bufferOp) {
     }
     in = next;
   }
+  // `in` now is the last internal channel after all the slots. It is connected
+  // to the output.
   equations.push_back(in - out);
   return success();
 }
 
 LogicalResult
 FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
+  // Control Merge Op:
+  //
+  //    |         |         |
+  //    |in1      |in2      |in3
+  //    |         |         |
+  //    ---  CMERGE OP  -----
+  //          |       |
+  //      data|       |index
+  //    (CTRL)|       |(2 bits)
+  //          |       |      `dataIntermediate` / `indexIntermediate`
+  //          ----|----
+  //             ---
+  //             | |slot
+  //             ---
+  //              |
+  //          ---------
+  //          |       |      `dataChannel` / `indexChannel`
+  //         ---     ---
+  // dataSent| |     | |indexSent
+  //         ---     ---
+  //          |       |
+  // dataOut  |       | indexOut
+  //
+  //
+  // Notes:
+  // 1. The data contained in the slot is simply the index, as the data is a
+  // control signal that does not contain any data.
+  // 2. The index signal is 2 bits as, in this example, there are three inputs,
+  // and two bits are required to represent an index to three values.
   size_t numInputs = cmergeOp.getDataOperands().size();
 
-  FlowVariable x0(InternalLambda(cmergeOp, 0));
-  x0.indexTokenConstraint = IndexTracker(numInputs);
+  FlowVariable indexIntermediate(InternalLambda(cmergeOp, 0));
+  indexIntermediate.indexTokenConstraint = IndexTracker(numInputs);
 
   for (auto [i, channel] : llvm::enumerate(cmergeOp.getDataOperands())) {
     FlowVariable channelVar(indexChannelAnalysis, ChannelLambda(channel));
-    equations.push_back(channelVar - x0.setTrackedTokens(i));
+    equations.push_back(channelVar - indexIntermediate.setTrackedTokens(i));
   }
 
   auto slots = cmergeOp.getInternalSlotStateNamers();
@@ -459,15 +498,20 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
   FlowVariable slot(slotNamer);
   slot.indexTokenConstraint = IndexTracker(numInputs);
 
-  FlowVariable indexChannel = x0.nextInternal();
-  for (size_t i = 0; i < numInputs; ++i) {
-    equations.push_back(x0.setTrackedTokens(i) -
-                        indexChannel.setTrackedTokens(i) -
-                        slot.setTrackedTokens(i));
+  FlowVariable indexChannel = indexIntermediate.nextInternal();
+  if (failed(extractSlotEquation(indexIntermediate, indexChannel, slot))) {
+    return failure();
   }
-  FlowVariable dataChannel = indexChannel.nextInternal();
-  dataChannel.indexTokenConstraint.reset();
-  equations.push_back(x0 - dataChannel - slot);
+  FlowVariable dataIntermediate = indexChannel.nextInternal();
+  dataIntermediate.indexTokenConstraint.reset();
+
+  // Same number of tokens arrive at dataIntermediate and indexIntermediate
+  equations.push_back(dataIntermediate - indexIntermediate);
+
+  FlowVariable dataChannel = dataIntermediate.nextInternal();
+  if (failed(extractSlotEquation(dataIntermediate, dataChannel, slot))) {
+    return failure();
+  }
 
   auto sentNamers = cmergeOp.getInternalSentStateNamers();
 
@@ -480,21 +524,21 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
   indexSent.indexTokenConstraint = IndexTracker(numInputs);
 
   auto outputs = cmergeOp.getResults();
-  FlowVariable data(indexChannelAnalysis, ChannelLambda(outputs[0]));
-  FlowVariable index(indexChannelAnalysis, ChannelLambda(outputs[1]));
+  FlowVariable dataOut(indexChannelAnalysis, ChannelLambda(outputs[0]));
+  FlowVariable indexOut(indexChannelAnalysis, ChannelLambda(outputs[1]));
 
-  for (size_t i = 0; i < numInputs; ++i) {
-    equations.push_back(index.setTrackedTokens(i) -
-                        indexSent.setTrackedTokens(i) -
-                        indexChannel.setTrackedTokens(i));
+  if (failed(extractEagerSentEquation(indexChannel, indexOut, indexSent))) {
+    return failure();
   }
-  equations.push_back(data - dataSent - dataChannel);
+  if (failed(extractEagerSentEquation(dataChannel, dataOut, dataSent))) {
+    return failure();
+  }
   return success();
 }
 
-// All inputs of the end op propagate the same number of tokens:
-// lambda_in_1 = lambda_in_2 = ...
 LogicalResult FlowEquationExtractor::extractEndOp(EndOp endOp) {
+  // All inputs of the end op propagate the same number of tokens:
+  // lambda_in_1 = lambda_in_2 = ...
   FlowVariable out(InternalLambda(endOp, 0));
   for (auto inChannel : endOp.getInputs()) {
     FlowVariable in(indexChannelAnalysis, ChannelLambda(inChannel));
@@ -504,6 +548,7 @@ LogicalResult FlowEquationExtractor::extractEndOp(EndOp endOp) {
 }
 
 LogicalResult FlowEquationExtractor::extractForkOp(ForkOp forkOp) {
+  // The input is propagated to all outputs according to eager fork rules
   FlowVariable in(indexChannelAnalysis, ChannelLambda(forkOp.getOperand()));
   auto namers = forkOp.getInternalSentStateNamers();
   for (auto [i, outChannel] : llvm::enumerate(forkOp.getResult())) {
@@ -549,20 +594,31 @@ LogicalResult FlowEquationExtractor::extractLoadOp(LoadOp loadOp) {
 
 LogicalResult
 FlowEquationExtractor::extractMemoryControllerOp(MemoryControllerOp memCon) {
+  // LoadPort         MemoryController
+  //
+  //           ----->   addrIn
+  //                        |
+  //                    ---------
+  //                    | slot  |
+  //                    ---------
+  //                        |
+  //           <-----   dataOut
   size_t nLoads = memCon.getNumLoadPorts();
   for (size_t loadIndex = 0; loadIndex < nLoads; ++loadIndex) {
     if (auto load = memCon.getLoadPort(loadIndex)) {
       unsigned operandIndex = load->getAddrInputIndex();
       unsigned resultIndex = load->getDataOutputIndex();
-      FlowVariable operand(indexChannelAnalysis,
-                           ChannelLambda(memCon.getOperands()[operandIndex]));
-      FlowVariable result(indexChannelAnalysis,
-                          ChannelLambda(memCon.getResults()[resultIndex]));
+      FlowVariable addrIn(indexChannelAnalysis,
+                          ChannelLambda(memCon.getOperands()[operandIndex]));
+      FlowVariable dataOut(indexChannelAnalysis,
+                           ChannelLambda(memCon.getResults()[resultIndex]));
       auto slotNamer = memCon.getLoadPortSlotNamer(loadIndex);
       std::shared_ptr<InternalStateNamer> sharedNamer =
           std::make_shared<MemoryControllerSlotNamer>(slotNamer);
       FlowVariable slot(sharedNamer);
-      equations.push_back(operand - result - slot);
+      if (failed(extractSlotEquation(addrIn, dataOut, slot))) {
+        return failure();
+      }
     }
   }
   // For store ports, a next goal could be to transmit a control token
@@ -570,12 +626,12 @@ FlowEquationExtractor::extractMemoryControllerOp(MemoryControllerOp memCon) {
   return success();
 }
 
-// A mux op propagates a token from the data input selected by the select input
-// to the output:
-// lambda_select = lambda_out
-// lambda_select(0) = lambda_data_0
-// lambda_select(1) = lambda_data_1
 LogicalResult FlowEquationExtractor::extractMuxOp(MuxOp muxOp) {
+  // A mux op propagates a token from the data input selected by the select
+  // input to the output:
+  // lambda_select = lambda_out
+  // lambda_select(0) = lambda_data_0
+  // lambda_select(1) = lambda_data_1
   FlowVariable out(indexChannelAnalysis, ChannelLambda(muxOp.getResult()));
   FlowVariable selectVar(indexChannelAnalysis,
                          ChannelLambda(muxOp.getSelectOperand()));
@@ -609,15 +665,21 @@ LogicalResult FlowEquationExtractor::extractMuxOp(MuxOp muxOp) {
 }
 
 LogicalResult FlowEquationExtractor::extractPipeline(LatencyInterface latencyOp,
-                                                     FlowVariable &i2) {
-  // Annotates equation for each pipeline slot, and changes i2 to be the
-  // internal channel after the slots
+                                                     FlowVariable &internal) {
+  // Annotates equation for each pipeline slot, and changes `internal` to be an
+  // internal channel after the slots:
+  // lambda_internal_0 = lambda_internal_1 + pipeline_full_0
+  // lambda_internal_1 = lambda_internal_2 + pipeline_full_1
+  // ...
+  // lambda_internal_n-1 = lambda_internal_n + pipeline_full_n-1
+  //
+  // Finally, `internal` = lambda_internal_n
   for (auto &pipelineSlot : latencyOp.getPipelineSlots()) {
     std::shared_ptr<InternalStateNamer> namer =
         std::make_shared<PipelineSlotNamer>(pipelineSlot);
     FlowVariable full(namer);
 
-    FlowVariable before = i2;
+    FlowVariable before = internal;
     FlowVariable after = before.nextInternal();
     if (before.isIndex()) {
       latencyOp.emitError("Pipeline slot's data cannot be accessed, so it "
@@ -628,7 +690,7 @@ LogicalResult FlowEquationExtractor::extractPipeline(LatencyInterface latencyOp,
     if (failed(extractSlotEquation(before, after, full))) {
       return failure();
     }
-    i2 = after;
+    internal = after;
   }
   return success();
 }
