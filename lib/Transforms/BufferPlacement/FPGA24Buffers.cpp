@@ -422,8 +422,7 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
       SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp, *cfdfc);
       std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
 
-      for (size_t cycleIdx = 0; cycleIdx < cycles.size(); ++cycleIdx) {
-        const SimpleCycle &cycle = cycles[cycleIdx];
+      for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
         unsigned totalLatency = 0;
         llvm::errs() << "  Cycle " << cycleIdx << ": ";
         for (size_t i = 0; i < cycle.nodes.size(); ++i) {

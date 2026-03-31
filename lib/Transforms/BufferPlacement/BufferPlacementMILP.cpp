@@ -1459,24 +1459,7 @@ void BufferPlacementMILP::addCycleTimeConstraints(
                << " cycles, II_CFC = " << iiCFC
                << " (max base latency = " << maxBaseLatency << ")\n");
 
-    for (size_t cycleIdx = 0; cycleIdx < cycles.size(); ++cycleIdx) {
-      const SimpleCycle &cycle = cycles[cycleIdx];
-      LLVM_DEBUG({
-        llvm::errs() << "[LatBal]     Cycle " << cycleIdx << " channels: ";
-        for (size_t i = 0; i < cycle.nodes.size(); ++i) {
-          NodeIdType src = cycle.nodes[i];
-          NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
-          for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
-            if (cfdfcGraph.edges[edgeId].dstId == dst) {
-              Value channel = cfdfcGraph.edges[edgeId].channel;
-              llvm::errs() << getUniqueName(*channel.getUses().begin()) << " ";
-              break;
-            }
-          }
-        }
-        llvm::errs() << "\n";
-      });
-
+    for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
       LinExpr cycleLatency =
           computeCycleLatency(cycle, cfdfcGraph, vars, timingDB, targetPeriod);
       std::string baseName =
