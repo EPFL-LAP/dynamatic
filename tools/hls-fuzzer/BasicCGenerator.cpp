@@ -129,12 +129,16 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
   // random type that can be legally used with '&'.
   if (!ast::BinaryExpression::isLegalOperandType(op, lhs.getType()) ||
       !ast::BinaryExpression::isLegalOperandType(op, rhs.getType())) {
-    ast::ScalarType scalarType;
-    do {
-      scalarType = generateScalarType(context);
-    } while (!ast::BinaryExpression::isLegalOperandType(op, scalarType));
-    lhs = safeCastAsNeeded(scalarType, std::move(lhs));
-    rhs = safeCastAsNeeded(scalarType, std::move(rhs));
+
+    std::optional<ast::ScalarType> scalarType = generateScalarType(
+        context, /*toExclude=*/[&](const ast::ScalarType &value) {
+          return !ast::BinaryExpression::isLegalOperandType(op, value);
+        });
+    if (!scalarType)
+      return std::nullopt;
+
+    lhs = safeCastAsNeeded(*scalarType, std::move(lhs));
+    rhs = safeCastAsNeeded(*scalarType, std::move(rhs));
   }
 
   switch (op) {
@@ -211,19 +215,20 @@ gen::BasicCGenerator::generateCastExpression(const OpaqueContext &context,
   ast::ScalarType expressionType = expression.getType();
 
   // Keep it interesting by not performing noop-casts!
-  ast::ScalarType datatype = generateScalarType(typeCon);
-  while (datatype == expressionType)
-    datatype = generateScalarType(typeCon);
+  std::optional<ast::ScalarType> datatype =
+      generateScalarType(typeCon, /*toExclude=*/[&](auto &&value) {
+        return value == expressionType;
+      });
+  if (!datatype)
+    return std::nullopt;
 
-  return ast::CastExpression{std::move(datatype), std::move(expression)};
+  return ast::CastExpression{std::move(*datatype), std::move(expression)};
 }
 
 std::optional<ast::Constant>
 gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
                                        std::size_t) const {
-  std::array<ast::PrimitiveType::Type, ast::PrimitiveType::MAX_VALUE + 1>
-      candidates;
-  llvm::copy(enumRange<ast::PrimitiveType::Type>(), candidates.begin());
+  auto candidates = ast::PrimitiveType::ALL_PRIMITIVES;
   random.shuffle(candidates);
 
   for (ast::PrimitiveType::Type iter : candidates) {
@@ -281,8 +286,11 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
         return ast::Variable{iter.getDataType(), iter.getName().str()};
   }
 
-  PendingParameter pendingParam =
-      generateFreshParameter(generateScalarType(*conclusion), context);
+  std::optional<ast::ScalarType> datatype = generateScalarType(*conclusion);
+  if (!datatype)
+    return std::nullopt;
+
+  PendingParameter pendingParam = generateFreshParameter(*datatype, context);
   if (typeSystem.checkParameterOpaque(pendingParam.getParameter(),
                                       *conclusion)) {
     ast::Parameter parameter = pendingParam.commit();
@@ -291,19 +299,32 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
   return std::nullopt;
 }
 
-ast::ScalarType
-gen::BasicCGenerator::generateScalarType(const OpaqueContext &context) const {
-  while (true) {
-    ast::ScalarType datatype = random.fromEnum<ast::PrimitiveType::Type>();
-    if (typeSystem.checkScalarTypeOpaque(datatype, context))
-      return datatype;
+std::optional<ast::ScalarType> gen::BasicCGenerator::generateScalarType(
+    const OpaqueContext &context,
+    llvm::function_ref<bool(const ast::ScalarType &)> toExclude) const {
+  auto candidates = ast::PrimitiveType::ALL_PRIMITIVES;
+  random.shuffle(candidates);
+  for (ast::ScalarType iter : candidates) {
+    // Skip some types based on the caller excluding them.
+    if (toExclude && toExclude(iter))
+      continue;
+
+    if (typeSystem.checkScalarTypeOpaque(iter, context))
+      return iter;
   }
+
+  return std::nullopt;
 }
 
 ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
   auto conclusion = typeSystem.checkFunctionOpaque(entryContext);
+  std::optional<ast::ScalarType> maybeReturnType =
+      generateScalarType(conclusion.returnType);
+  if (!maybeReturnType)
+    llvm::report_fatal_error(
+        "it must always be possible to generate a return type");
 
-  returnType = generateScalarType(conclusion.returnType);
+  returnType = std::move(*maybeReturnType);
   ast::ReturnStatement body = generateFunctionBody(conclusion.returnStatement);
   auto range = llvm::make_first_range(parameters);
   return ast::Function{

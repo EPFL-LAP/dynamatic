@@ -147,9 +147,9 @@ public:
 /// The current implementation how a type system is used in the base generator
 /// has a few constraints:
 /// * For any given context, it must always be possible to generate some
-/// expression, otherwise the generator loops forever.
-/// * For any given context, it must always be possible to generate some scalar
-/// datatype, otherwise the generator loops forever.
+///   expression, otherwise the generator loops forever.
+/// * For any given context, it must always be possible to generate a function
+///   return type.
 template <typename TypingContext, typename Self>
 class TypeSystem : public AbstractTypeSystem {
 

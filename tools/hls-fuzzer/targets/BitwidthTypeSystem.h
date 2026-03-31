@@ -64,14 +64,10 @@ public:
   checkScalarType(const ast::ScalarType &scalarType,
                   const BitwidthTypingContext &);
 
-  std::optional<ConclusionOf<ast::Parameter>>
-  checkParameter(const ast::Parameter &parameter,
-                 const BitwidthTypingContext &context);
-
   /// Forces constants to fit in the given bitwidth requirement.
   std::optional<ConclusionOf<ast::Constant>>
   checkConstant(const ast::Constant &constant,
-                const BitwidthTypingContext &context);
+                const BitwidthTypingContext &context) const;
 
   std::optional<ConclusionOf<ast::BinaryExpression>>
   checkBinaryExpression(ast::BinaryExpression::Op op,
@@ -79,6 +75,9 @@ public:
 
   ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(const BitwidthTypingContext &context) const;
+
+  static ConclusionOf<ast::Function>
+  checkFunction(const BitwidthTypingContext &context);
 
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range

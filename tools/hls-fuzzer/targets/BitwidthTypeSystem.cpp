@@ -1,34 +1,27 @@
 #include "BitwidthTypeSystem.h"
 
 auto dynamatic::gen::BitwidthTypeSystem::checkScalarType(
-    const ast::ScalarType &scalarType, const BitwidthTypingContext &)
+    const ast::ScalarType &scalarType, const BitwidthTypingContext &context)
     -> std::optional<ConclusionOf<ast::ScalarType>> {
   if (scalarType == ast::PrimitiveType::Double ||
       scalarType == ast::PrimitiveType::Float)
     return std::nullopt;
 
-  return ConclusionOf<ast::ScalarType>{};
-}
-
-auto dynamatic::gen::BitwidthTypeSystem::checkParameter(
-    const ast::Parameter &parameter, const BitwidthTypingContext &context)
-    -> std::optional<ConclusionOf<ast::Parameter>> {
-  if (!Super::checkParameter(parameter, context))
-    return std::nullopt;
-
-  // Only allow a parameter if either: We have no bitwidth requirement OR
-  // the parameter type restricts it to fit in the given bitwidth.
+  // Only allow a datatype if either: We have no bitwidth requirement OR
+  // the type restricts it to fit in the given bitwidth.
   if (std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
-      !req || *req >= parameter.getDataType().getBitwidth())
-    return context;
+      !req || *req >= scalarType.getBitwidth())
+    return ConclusionOf<ast::ScalarType>{};
 
   return std::nullopt;
 }
 
 auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
-    const ast::Constant &constant, const BitwidthTypingContext &context)
+    const ast::Constant &constant, const BitwidthTypingContext &context) const
     -> std::optional<ConclusionOf<ast::Constant>> {
-  if (!Super::checkConstant(constant, context))
+  // Allow all integer constants as we manually truncate them
+  // (regardless of their C++ type).
+  if (!checkScalarType(constant.getType(), ResultIsTruncated{}))
     return std::nullopt;
 
   // Any integer constant is okay.
@@ -117,6 +110,17 @@ auto dynamatic::gen::BitwidthTypeSystem::checkConditionalExpression(
     -> ConclusionOf<ast::ConditionalExpression> {
   // The condition must be constrained to fit within the global max bitwidth.
   return {{getInterestingBitWidthInRange(globalMaxBitwidth)}, context, context};
+}
+
+auto dynamatic::gen::BitwidthTypeSystem::checkFunction(
+    const BitwidthTypingContext &context) -> ConclusionOf<ast::Function> {
+  // Return types are exempt from the bitwidth rules as they're an interface
+  // type.
+  // Any integer type is allowed in that case.
+  return ConclusionOf<ast::Function>{
+      /*returnType=*/ResultIsTruncated{},
+      /*returnStatement=*/context,
+  };
 }
 
 dynamatic::gen::BitwidthTypingContext
