@@ -47,7 +47,10 @@ int main(int argc, char **argv) {
   });
 
   WalkResult result = module->walk([&](Operation *op) {
-    // Allow forks of function arguments.
+    // Function arguments may be truncated multiple times to legal bitwidths.
+    // In that case a fork of the argument is inserted that has an arbitrary
+    // bitwidth.
+    // This is not a deficiency in the compiler and therefore not an error.
     if (auto forkOp = dyn_cast<handshake::ForkOp>(op))
       if (functionArgs.contains(forkOp.getOperand()))
         return WalkResult::advance();
