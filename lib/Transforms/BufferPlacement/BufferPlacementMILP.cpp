@@ -1206,9 +1206,10 @@ void BufferPlacementMILP::addBufferPresenceLinkConstraints() {
 void BufferPlacementMILP::addReconvergentPathVars(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
   vars.reconvergentPathVars.resize(reconvergentPaths.size());
-  for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
-    vars.reconvergentPathVars[i].imbalanced =
-        model->addVar("s_rp_" + std::to_string(i), BOOLEAN, 0, 1);
+  for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
+    (void)pathWithGraph;
+    vars.reconvergentPathVars[pathIdx].imbalanced =
+        model->addVar("s_rp_" + std::to_string(pathIdx), BOOLEAN, 0, 1);
   }
 }
 
@@ -1377,9 +1378,7 @@ void BufferPlacementMILP::addStallPropagationConstraints(
     channelToPatterns[channel].push_back(imbalanced);
   };
 
-  for (size_t i = 0; i < reconvergentPaths.size(); ++i) {
-    const fpga24::ReconvergentPathWithGraph &pathWithGraph =
-        reconvergentPaths[i];
+  for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
     const ReconvergentPath &path = pathWithGraph.path;
     const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     for (NodeIdType nodeId : path.nodeIds) {
@@ -1387,7 +1386,7 @@ void BufferPlacementMILP::addStallPropagationConstraints(
         const auto &edge = graph->edges[edgeId];
         if (path.nodeIds.count(edge.dstId))
           addPatternToChannelStallProp(
-              edge.channel, &vars.reconvergentPathVars[i].imbalanced);
+              edge.channel, &vars.reconvergentPathVars[pathIdx].imbalanced);
       }
     }
   }
