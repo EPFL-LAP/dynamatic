@@ -24,6 +24,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
 #include <cmath>
@@ -1299,8 +1300,8 @@ path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
 
     for (size_t i = 0; i < pathLatencies.size(); ++i) {
       for (size_t j = i + 1; j < pathLatencies.size(); ++j) {
-        std::string baseName = "imbalance_rp_" + std::to_string(pathIdx) + "_" +
-                               std::to_string(i) + "_" + std::to_string(j);
+        std::string baseName =
+            llvm::formatv("imbalance_rp_{0}_{1}_{2}", pathIdx, i, j).str();
         model->addConstr(pathLatencies[i] - pathLatencies[j] <=
                              fpga24::BIG_M * patternImbalanced,
                          baseName + "_a");
@@ -1389,7 +1390,7 @@ void BufferPlacementMILP::addStallPropagationConstraints(
     CPVar &stalled = vars.channelVars[channel].stalled;
     for (size_t i = 0; i < patterns.size(); ++i) {
       std::string cstrName =
-          "stallProp_" + std::to_string(channelIdx) + "_" + std::to_string(i);
+          llvm::formatv("stallProp_{0}_{1}", channelIdx, i).str();
       model->addConstr(stalled >= *patterns[i], cstrName);
     }
     channelIdx++;
@@ -1404,8 +1405,7 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     return;
   }
 
-  for (size_t cfdfcIdx = 0; cfdfcIdx < cfdfcs.size(); ++cfdfcIdx) {
-    CFDFC *cfdfc = cfdfcs[cfdfcIdx];
+  for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
     ::dynamatic::SynchronizingCyclesFinderGraph cfdfcGraph;
     cfdfcGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfc);
     std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();

@@ -26,6 +26,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -443,8 +444,7 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
 
   LLVM_DEBUG({
     llvm::errs() << "=== Verifying CFDFC Cycle Latencies After LP1 ===\n";
-    for (size_t cfdfcIdx = 0; cfdfcIdx < cfdfcs.size(); ++cfdfcIdx) {
-      CFDFC *cfdfc = cfdfcs[cfdfcIdx];
+    for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
       SynchronizingCyclesFinderGraph cfdfcGraph;
       cfdfcGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfc);
       std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
