@@ -498,7 +498,8 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
   }
 
   /// Buffer forks connected to memory controllers.
-  /// TODO: We will model this in the MILP soon, but for now we just add buffers here.
+  /// TODO: We will model this in the MILP soon, but for now we just add buffers
+  /// here.
   for (Operation &op : funcInfo.funcOp.getOps()) {
     auto forkOp = dyn_cast<handshake::ForkOp>(op);
     if (!forkOp)

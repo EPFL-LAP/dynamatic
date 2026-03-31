@@ -823,10 +823,11 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
     // node with channel variables
     if (Value nodeChannel = node->nodeMLIRValue) {
       std::string nodeName = node->str();
-      SignalType signalType =
-          nodeName.find("ready") != std::string::npos   ? SignalType::READY
-          : nodeName.find("valid") != std::string::npos ? SignalType::VALID
-                                                        : SignalType::DATA;
+      SignalType signalType = nodeName.find("ready") != std::string::npos
+                                  ? SignalType::READY
+                                  : nodeName.find("valid") != std::string::npos
+                                        ? SignalType::VALID
+                                        : SignalType::DATA;
 
       // Retrieve the channel variable corresponding to the AIG node
       ChannelSignalVars &signalVars =
@@ -1267,12 +1268,10 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
   size_t totalPaths = reconvergentPaths.size();
   for (size_t pathIdx = 0; pathIdx < totalPaths; ++pathIdx) {
-    LLVM_DEBUG(
-      if (pathIdx % 10 == 0 || pathIdx == totalPaths - 1) {
-        llvm::errs() << "[LatBal]   Processing reconvergent path "
-                                << pathIdx + 1 << "/" << totalPaths << "\n";
-      }
-    );
+    LLVM_DEBUG(if (pathIdx % 10 == 0 || pathIdx == totalPaths - 1) {
+      llvm::errs() << "[LatBal]   Processing reconvergent path " << pathIdx + 1
+                   << "/" << totalPaths << "\n";
+    });
 
     const fpga24::ReconvergentPathWithGraph &pathWithGraph =
         reconvergentPaths[pathIdx];
@@ -1281,10 +1280,9 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
     CPVar &patternImbalanced = vars.reconvergentPathVars[pathIdx].imbalanced;
 
     bool hasVarLatency = std::any_of(
-path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
-        return hasVariableLatencyUnit(graph->nodes[id].op);
-      }
-    );
+        path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
+          return hasVariableLatencyUnit(graph->nodes[id].op);
+        });
 
     if (hasVarLatency) {
       model->addConstr(patternImbalanced == 1,
@@ -1438,14 +1436,14 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     }
 
     assert(!cycles.empty() && "empty cycle list should have been skipped");
-    auto maxCycleIt = std::max_element(
-        cycles.begin(), cycles.end(), [&](const SimpleCycle &lhs,
-                                          const SimpleCycle &rhs) {
-          return computeCycleBaseLatency(lhs, cfdfcGraph, timingDB,
-                                         targetPeriod) <
-                 computeCycleBaseLatency(rhs, cfdfcGraph, timingDB,
-                                         targetPeriod);
-        });
+    auto maxCycleIt =
+        std::max_element(cycles.begin(), cycles.end(),
+                         [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
+                           return computeCycleBaseLatency(
+                                      lhs, cfdfcGraph, timingDB, targetPeriod) <
+                                  computeCycleBaseLatency(
+                                      rhs, cfdfcGraph, timingDB, targetPeriod);
+                         });
     double maxBaseLatency = computeCycleBaseLatency(*maxCycleIt, cfdfcGraph,
                                                     timingDB, targetPeriod);
 
@@ -1462,7 +1460,8 @@ void BufferPlacementMILP::addCycleTimeConstraints(
       LinExpr cycleLatency =
           computeCycleLatency(cycle, cfdfcGraph, vars, timingDB, targetPeriod);
       std::string baseName =
-          llvm::formatv("cycleTime_cfdfc{0}_cycle{1}", cfdfcIdx, cycleIdx).str();
+          llvm::formatv("cycleTime_cfdfc{0}_cycle{1}", cfdfcIdx, cycleIdx)
+              .str();
       model->addConstr(cycleLatency >= iiCFC, baseName + "_min");
       model->addConstr(cycleLatency <= iiCFC, baseName + "_max");
     }
