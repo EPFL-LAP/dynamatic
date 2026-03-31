@@ -64,6 +64,16 @@ public:
     };
   }
 
+  static std::optional<ConclusionOf<ast::ArrayReadExpression>>
+  checkArrayReadExpression(DynamaticTypingContext context) {
+    return ConclusionOf<ast::ArrayReadExpression>{
+        // Forward the context to the array parameter as is.
+        context,
+        // Indexing expression must be an integer.
+        DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
+    };
+  }
+
 private:
   /// If 'context' is none, randomly picks one of 'integer' or 'float'.
   DynamaticTypingContext eliminateNone(DynamaticTypingContext context) const;

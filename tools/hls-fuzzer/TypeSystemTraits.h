@@ -118,7 +118,24 @@ struct TypeSystemTraits<ast::Constant> : TypeSystemTraitsDefaults {
 };
 
 template <>
-struct TypeSystemTraits<ast::Parameter> : TypeSystemTraitsDefaults {
+struct TypeSystemTraits<ast::ScalarParameter> {
+
+  /// Type constraint for constants that this parameter is initialized to during
+  /// test bench generation.
+  template <typename TypingContext>
+  using Conclusions = TypingContext;
+};
+
+template <>
+struct TypeSystemTraits<ast::ArrayReadExpression> {
+
+  template <typename TypingContext>
+  using Conclusions =
+      std::tuple</*parameter=*/TypingContext, /*index=*/TypingContext>;
+};
+
+template <>
+struct TypeSystemTraits<ast::ArrayParameter> {
 
   /// Type constraint for constants that this parameter is initialized to during
   /// test bench generation.

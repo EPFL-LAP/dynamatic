@@ -196,25 +196,8 @@ private:
   std::shared_ptr<const Variant> datatype;
 };
 
-/// Wrapper class to print only the type prefix of a datatype.
-/// This is the part of a datatype in the syntax that comes prior to any
-/// identifier.
-struct PrintTypePrefix {
-  const ScalarType &datatype;
-};
-
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              const PrintTypePrefix &prefix);
-
-/// Wrapper class to print only the type suffix of a datatype.
-/// This is the part of a datatype in the syntax that comes after any
-/// identifier.
-struct PrintTypeSuffix {
-  const ScalarType &datatype;
-};
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              const PrintTypeSuffix &suffix);
+                              const ScalarType &scalarType);
 
 /// AST-node representing literals in C.
 /// This is a variant between all possible integer and floating point types.
@@ -269,6 +252,7 @@ class BinaryExpression;
 class CastExpression;
 class UnaryExpression;
 class ConditionalExpression;
+class ArrayReadExpression;
 
 /// Super-type of all AST-nodes representing expressions.
 /// Lifetimes of objects are handled internally via reference counting and does
@@ -276,7 +260,7 @@ class ConditionalExpression;
 class Expression {
   using Variant =
       std::variant<Constant, Variable, BinaryExpression, CastExpression,
-                   UnaryExpression, ConditionalExpression>;
+                   UnaryExpression, ConditionalExpression, ArrayReadExpression>;
 
 public:
   Expression() = default;
@@ -284,7 +268,7 @@ public:
   /// Construct an 'Expression' implicitly from any concrete AST-node.
   template <class T,
             std::enable_if_t<std::conjunction_v<
-                std::negation<std::is_same<T, std::decay_t<Expression>>>,
+                std::negation<std::is_same<std::decay_t<T>, Expression>>,
                 std::is_constructible<Variant, T>>> * = nullptr>
   /*implicit*/ Expression(T &&arg)
       : expression(std::make_shared<Variant>(std::forward<T>(arg))) {}
@@ -418,6 +402,36 @@ private:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ConditionalExpression &ternaryExpression);
 
+/// Expression representing reading and indexing into an array.
+/// Only array parameters and one-dimensional arrays are currently supported.
+class ArrayReadExpression {
+public:
+  /// Constructs an array-read expression from an array element type, the name
+  /// of the array parameter and the indexing expression.
+  ArrayReadExpression(ScalarType elementType, std::string arrayParameter,
+                      Expression index)
+      : dataType(std::move(elementType)),
+        arrayParameter(std::move(arrayParameter)), index(std::move(index)) {}
+
+  /// Returns the name of the array parameters.
+  llvm::StringRef getArrayParameter() const { return arrayParameter; }
+
+  /// Returns the indexing expression.
+  const Expression &getIndex() const { return index; }
+
+  /// Returns the result-type of the expression, which is equivalent to the
+  /// element type of the array.
+  const ScalarType &getType() const { return dataType; }
+
+private:
+  ScalarType dataType;
+  std::string arrayParameter;
+  Expression index;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const ArrayReadExpression &arrayReadExpression);
+
 /// AST-Node representing a return statement in C.
 struct ReturnStatement {
   const Expression returnValue;
@@ -426,12 +440,12 @@ struct ReturnStatement {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ReturnStatement &statement);
 
-/// AST-Node representing a function parameter in C.
-class Parameter {
+/// AST-Node representing a scalar function parameter in C.
+class ScalarParameter {
 public:
-  Parameter() = default;
+  ScalarParameter() = default;
 
-  Parameter(ScalarType dataType, std::string name)
+  ScalarParameter(ScalarType dataType, std::string name)
       : dataType(std::move(dataType)), name(std::move(name)) {}
 
   llvm::StringRef getName() const { return name; }
@@ -444,14 +458,42 @@ private:
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                              const Parameter &parameter);
+                              const ScalarParameter &parameter);
+
+/// AST-Node representing an array function parameter in C.
+class ArrayParameter {
+public:
+  ArrayParameter() = default;
+
+  ArrayParameter(ScalarType elementType, std::string name,
+                 std::size_t dimension)
+      : dataType(std::move(elementType)), name(std::move(name)),
+        dimension(dimension) {
+    assert(dimension > 0);
+  }
+
+  llvm::StringRef getName() const { return name; }
+
+  const ScalarType &getElementType() const { return dataType; }
+
+  std::size_t getDimension() const { return dimension; }
+
+private:
+  ScalarType dataType;
+  std::string name;
+  std::size_t dimension;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const ArrayParameter &parameter);
 
 /// AST-Node representing a function in C.
 /// Functions are currently limited to just a return statement.
 struct Function {
   const ScalarType returnType;
   const std::string name;
-  const std::vector<Parameter> parameters;
+  const std::vector<ScalarParameter> scalarParameters;
+  const std::vector<ArrayParameter> arrayParameters;
   const ReturnStatement returnStatement;
 };
 

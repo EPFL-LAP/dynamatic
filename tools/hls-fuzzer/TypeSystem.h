@@ -81,9 +81,16 @@ public:
   virtual std::optional<ConclusionOf<ast::Constant, OpaqueContext>>
   checkConstantOpaque(const ast::Constant &, const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::Parameter, OpaqueContext>>
-  checkParameterOpaque(const ast::Parameter &,
-                       const OpaqueContext &context) = 0;
+  virtual std::optional<ConclusionOf<ast::ScalarParameter, OpaqueContext>>
+  checkScalarParameterOpaque(const ast::ScalarParameter &,
+                             const OpaqueContext &context) = 0;
+
+  virtual std::optional<ConclusionOf<ast::ArrayReadExpression, OpaqueContext>>
+  checkArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
+
+  virtual std::optional<ConclusionOf<ast::ArrayParameter, OpaqueContext>>
+  checkArrayParameterOpaque(const ast::ArrayParameter &,
+                            const OpaqueContext &context) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -205,10 +212,24 @@ public:
     return constant;
   }
 
-  std::optional<ConclusionOf<ast::Parameter>>
-  checkParameter(const ast::Parameter &parameter,
-                 const TypingContext &context) {
+  std::optional<ConclusionOf<ast::ScalarParameter>>
+  checkScalarParameter(const ast::ScalarParameter &parameter,
+                       const TypingContext &context) {
     if (!self().checkScalarType(parameter.getDataType(), context))
+      return std::nullopt;
+
+    return context;
+  }
+
+  static ConclusionOf<ast::ArrayReadExpression>
+  checkArrayReadExpression(const TypingContext &context) {
+    return {context, context};
+  }
+
+  std::optional<ConclusionOf<ast::ArrayParameter>>
+  checkArrayParameter(const ast::ArrayParameter &parameter,
+                      const TypingContext &context) {
+    if (!self().checkScalarType(parameter.getElementType(), context))
       return std::nullopt;
 
     return context;
@@ -260,10 +281,25 @@ public:
     return convert(self().checkConstant(node, context.cast<TypingContext>()));
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::Parameter, OpaqueContext>>
-  checkParameterOpaque(const ast::Parameter &node,
-                       const OpaqueContext &context) final {
-    return convert(self().checkParameter(node, context.cast<TypingContext>()));
+  std::optional<dynamatic::ConclusionOf<ast::ScalarParameter, OpaqueContext>>
+  checkScalarParameterOpaque(const ast::ScalarParameter &node,
+                             const OpaqueContext &context) final {
+    return convert(
+        self().checkScalarParameter(node, context.cast<TypingContext>()));
+  }
+
+  std::optional<
+      dynamatic::ConclusionOf<ast::ArrayReadExpression, OpaqueContext>>
+  checkArrayReadExpressionOpaque(const OpaqueContext &context) final {
+    return convert(
+        self().checkArrayReadExpression(context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::ArrayParameter, OpaqueContext>>
+  checkArrayParameterOpaque(const ast::ArrayParameter &node,
+                            const OpaqueContext &context) final {
+    return convert(
+        self().checkArrayParameter(node, context.cast<TypingContext>()));
   }
 
 private:
@@ -327,6 +363,58 @@ private:
 /// A noop-system which uses all the default implementations in 'TypeSystem'.
 /// Puts no constraints onto the base generator.
 class NoopTypeSystem : public TypeSystem<std::monostate, NoopTypeSystem> {};
+
+/// Convenience type system that disallows every AST constructs (besides
+/// functions) by default.
+template <typename TypingContext, typename Self>
+class DisallowByDefaultTypeSystem : public TypeSystem<TypingContext, Self> {
+
+public:
+  static std::optional<ConclusionOf<ast::BinaryExpression, TypingContext>>
+  checkBinaryExpression(ast::BinaryExpression::Op, const TypingContext &) {
+    return std::nullopt;
+  }
+
+  static std::optional<ConclusionOf<ast::Variable, TypingContext>>
+  checkVariable(const TypingContext &) {
+    return std::nullopt;
+  }
+
+  static std::optional<ConclusionOf<ast::CastExpression, TypingContext>>
+  checkCastExpression(const TypingContext &) {
+    return std::nullopt;
+  }
+
+  static std::optional<ConclusionOf<ast::ConditionalExpression, TypingContext>>
+  checkConditionalExpression(const TypingContext &) {
+    return std::nullopt;
+  }
+
+  static std::optional<ConclusionOf<ast::ScalarType, TypingContext>>
+  checkScalarType(const ast::ScalarType &, const TypingContext &) {
+    return std::nullopt;
+  }
+
+  std::optional<ConclusionOf<ast::Constant, TypingContext>>
+  checkConstant(const ast::Constant &, const TypingContext &) {
+    return std::nullopt;
+  }
+
+  std::optional<ConclusionOf<ast::ScalarParameter, TypingContext>>
+  checkScalarParameter(const ast::ScalarParameter &, const TypingContext &) {
+    return std::nullopt;
+  }
+
+  static std::optional<ConclusionOf<ast::ArrayReadExpression, TypingContext>>
+  checkArrayReadExpression(const TypingContext &) {
+    return std::nullopt;
+  }
+
+  std::optional<ConclusionOf<ast::ArrayParameter, TypingContext>>
+  checkArrayParameter(const ast::ArrayParameter &, const TypingContext &) {
+    return std::nullopt;
+  }
+};
 
 } // namespace dynamatic::gen
 
