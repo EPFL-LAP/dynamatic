@@ -1216,9 +1216,9 @@ void BufferPlacementMILP::addReconvergentPathVars(
 void BufferPlacementMILP::addSyncCycleVars(
     ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
   vars.syncCycleVars.resize(syncCyclePairs.size());
-  for (size_t i = 0; i < syncCyclePairs.size(); ++i) {
-    vars.syncCycleVars[i].imbalanced =
-        model->addVar("s_sc_" + std::to_string(i), BOOLEAN, 0, 1);
+  for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
+    vars.syncCycleVars[pairIdx].imbalanced =
+        model->addVar("s_sc_" + std::to_string(pairIdx), BOOLEAN, 0, 1);
   }
 }
 
@@ -1391,15 +1391,14 @@ void BufferPlacementMILP::addStallPropagationConstraints(
     }
   }
 
-  for (size_t i = 0; i < syncCyclePairs.size(); ++i) {
-    const auto &pair = syncCyclePairs[i];
+  for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
     for (const auto &edgeInfo : pair.edgesToJoins) {
       for (EdgeIdType edgeId : edgeInfo.edgesFromCycleOne)
         addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
-                                     &vars.syncCycleVars[i].imbalanced);
+                                     &vars.syncCycleVars[pairIdx].imbalanced);
       for (EdgeIdType edgeId : edgeInfo.edgesFromCycleTwo)
         addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
-                                     &vars.syncCycleVars[i].imbalanced);
+                                     &vars.syncCycleVars[pairIdx].imbalanced);
     }
   }
 
