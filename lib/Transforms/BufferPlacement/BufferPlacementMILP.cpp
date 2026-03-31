@@ -823,11 +823,11 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
     // node with channel variables
     if (Value nodeChannel = node->nodeMLIRValue) {
       std::string nodeName = node->str();
-      SignalType signalType = nodeName.find("ready") != std::string::npos
-                                  ? SignalType::READY
-                                  : nodeName.find("valid") != std::string::npos
-                                        ? SignalType::VALID
-                                        : SignalType::DATA;
+      SignalType signalType = SignalType::DATA;
+      if (nodeName.find("ready") != std::string::npos)
+        signalType = SignalType::READY;
+      else if (nodeName.find("valid") != std::string::npos)
+        signalType = SignalType::VALID;
 
       // Retrieve the channel variable corresponding to the AIG node
       ChannelSignalVars &signalVars =
