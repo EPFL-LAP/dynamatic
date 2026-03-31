@@ -103,10 +103,12 @@ static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
 }
 
 /// [FPGA24] Represents one simple path.
+namespace {
 struct SimplePath {
   SmallVector<EdgeIdType> edges;
   SmallVector<NodeIdType> nodes;
 };
+} // namespace
 
 /// [FPGA24] Enumerates all simple paths from start to end.
 static void enumerateSimplePaths(const DataflowSubgraphBase &graph,
