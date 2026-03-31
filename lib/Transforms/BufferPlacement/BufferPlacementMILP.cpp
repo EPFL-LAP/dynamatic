@@ -111,16 +111,17 @@ struct SimplePath {
 } // namespace
 
 /// [FPGA24] Enumerates all simple paths from start to end.
-static void enumerateSimplePaths(const DataflowSubgraphBase &graph,
-                                 NodeIdType startNode, NodeIdType endNode,
-                                 const std::set<NodeIdType> &allowedNodes,
-                                 std::vector<SimplePath> &outPaths) {
+static std::vector<SimplePath>
+enumerateSimplePaths(const DataflowSubgraphBase &graph, NodeIdType startNode,
+                     NodeIdType endNode,
+                     const std::set<NodeIdType> &allowedNodes) {
+  std::vector<SimplePath> allPaths;
   std::vector<bool> visited(graph.nodes.size(), false);
   SimplePath currentPath;
 
   std::function<void(NodeIdType)> dfs = [&](NodeIdType current) {
     if (current == endNode) {
-      outPaths.push_back(currentPath);
+      allPaths.push_back(currentPath);
       return;
     }
 
@@ -143,6 +144,7 @@ static void enumerateSimplePaths(const DataflowSubgraphBase &graph,
 
   currentPath.nodes.push_back(startNode);
   dfs(startNode);
+  return allPaths;
 }
 
 /// [FPGA24] Computes cycle latency expression.
@@ -1266,8 +1268,8 @@ path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
 
     NodeIdType forkId = path.forkNodeId;
     NodeIdType joinId = path.joinNodeId;
-    std::vector<SimplePath> allPaths;
-    enumerateSimplePaths(*graph, forkId, joinId, path.nodeIds, allPaths);
+    std::vector<SimplePath> allPaths =
+        enumerateSimplePaths(*graph, forkId, joinId, path.nodeIds);
 
     LLVM_DEBUG(llvm::errs()
                << "[LatBal]     -> " << allPaths.size() << " simple paths\n");
