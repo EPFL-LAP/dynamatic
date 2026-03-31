@@ -416,6 +416,11 @@ protected:
   void addSyncCycleVars(
       ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
 
+  /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
+  void addOccupancyVars(ValueRange channels,
+                        DenseMap<Value, CPVar> &channelOccupancy,
+                        double maxOccupancy);
+
   /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
   /// least one token. (Paper: Section 5, Equation 12)
   void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,

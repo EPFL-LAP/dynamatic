@@ -1221,6 +1221,16 @@ void BufferPlacementMILP::addSyncCycleVars(
   }
 }
 
+void BufferPlacementMILP::addOccupancyVars(
+    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy,
+    double maxOccupancy) {
+  for (Value channel : channels) {
+    std::string name = getUniqueName(*channel.getUses().begin());
+    channelOccupancy[channel] =
+        model->addVar("n_" + name, REAL, 0.0, maxOccupancy);
+  }
+}
+
 void BufferPlacementMILP::addBackedgeConstraints(
     ArrayRef<CFDFC *> cfdfcs, DenseMap<Value, CPVar> &channelOccupancy) {
   size_t cycleConstraints = 0;

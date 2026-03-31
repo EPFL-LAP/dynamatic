@@ -174,11 +174,7 @@ void OccupancyBalancingLP::setup() {
   /// Create variables for each channel
   /// N_c: Maximal token occupancy on channel c.
   /// (Paper: Section 5, Table 2)
-  for (Value channel : allChannels) {
-    std::string name = getUniqueName(*channel.getUses().begin());
-    CPVar var = model->addVar("n_" + name, REAL, 0.0, MAX_OCCUPANCY);
-    channelOccupancy[channel] = var;
-  }
+  this->addOccupancyVars(allChannels, channelOccupancy, MAX_OCCUPANCY);
   LLVM_DEBUG(llvm::errs() << "[OccBal]   Created " << channelOccupancy.size()
                           << " occupancy variables\n");
 
