@@ -61,23 +61,13 @@ void LatencyBalancingMILP::setup() {
   if (unsatisfiable)
     return;
 
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding latency variables...\n");
   addLatencyBalancingVars(reconvergentPaths, syncCyclePairs);
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding reconvergent path constraints ("
-                          << reconvergentPaths.size() << " paths)...\n");
   addReconvergentPathConstraints(reconvergentPaths);
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding sync cycle constraints ("
-                          << syncCyclePairs.size() << " pairs)...\n");
   addSyncCycleConstraints(syncCyclePairs, syncGraph);
-  LLVM_DEBUG(
-      llvm::errs() << "[LatBal] Adding stall propagation constraints...\n");
   addStallPropagationConstraints(reconvergentPaths, syncCyclePairs, syncGraph);
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Adding cycle time constraints...\n");
   addCycleTimeConstraints(cfdfcs, computedII, computedCFDFCIIs);
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Setting objective...\n");
   setLatencyBalancingObjective();
   markReadyToOptimize();
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Setup complete.\n");
 }
 
 /// The latency variable L_c is the number of extra latencies to be added to a
