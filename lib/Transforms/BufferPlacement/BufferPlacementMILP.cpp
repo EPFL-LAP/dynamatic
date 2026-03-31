@@ -1415,12 +1415,17 @@ void BufferPlacementMILP::addCycleTimeConstraints(
       continue;
     }
 
-    double maxBaseLatency = 0.0;
-    for (const auto &cycle : cycles) {
-      double baseLatency =
-          computeCycleBaseLatency(cycle, cfdfcGraph, timingDB, targetPeriod);
-      maxBaseLatency = std::max(maxBaseLatency, baseLatency);
-    }
+    assert(!cycles.empty() && "empty cycle list should have been skipped");
+    auto maxCycleIt = std::max_element(
+        cycles.begin(), cycles.end(), [&](const SimpleCycle &lhs,
+                                          const SimpleCycle &rhs) {
+          return computeCycleBaseLatency(lhs, cfdfcGraph, timingDB,
+                                         targetPeriod) <
+                 computeCycleBaseLatency(rhs, cfdfcGraph, timingDB,
+                                         targetPeriod);
+        });
+    double maxBaseLatency = computeCycleBaseLatency(*maxCycleIt, cfdfcGraph,
+                                                    timingDB, targetPeriod);
 
     double iiCFC = std::max(1.0, std::ceil(maxBaseLatency));
     computedII = std::max(computedII, iiCFC);
