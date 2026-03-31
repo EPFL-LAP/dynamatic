@@ -1275,17 +1275,14 @@ path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
                << "[LatBal]     -> " << allPaths.size() << " simple paths\n");
 
     std::vector<LinExpr> pathLatencies;
-    std::vector<double> pathBaseLatencies;
     for (const auto &simplePath : allPaths) {
       LinExpr pathLatency;
-      double baseLatency = 0.0;
 
       for (NodeIdType nodeId : simplePath.nodes) {
         double unitLat = 0.0;
         (void)timingDB.getLatency(graph->nodes[nodeId].op, SignalType::DATA,
                                   unitLat, targetPeriod);
         pathLatency += unitLat;
-        baseLatency += unitLat;
       }
 
       for (EdgeIdType edgeId : simplePath.edges) {
@@ -1295,10 +1292,9 @@ path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
       }
 
       pathLatencies.push_back(pathLatency);
-      pathBaseLatencies.push_back(baseLatency);
     }
 
-    if (pathBaseLatencies.empty())
+    if (pathLatencies.empty())
       continue;
 
     for (size_t i = 0; i < pathLatencies.size(); ++i) {
