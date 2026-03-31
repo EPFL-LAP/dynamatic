@@ -306,7 +306,7 @@ std::optional<ast::ScalarType> gen::BasicCGenerator::generateScalarType(
   random.shuffle(candidates);
   for (ast::ScalarType iter : candidates) {
     // Skip some types based on the caller excluding them.
-    if (toExclude && !toExclude(iter))
+    if (toExclude && toExclude(iter))
       continue;
 
     if (typeSystem.checkScalarTypeOpaque(iter, context))
