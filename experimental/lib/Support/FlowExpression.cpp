@@ -5,6 +5,24 @@
 namespace dynamatic {
 namespace handshake {
 
+IndexTokenTracker::IndexTokenTracker(size_t numValues) {
+  trackedValues.reset();
+  for (size_t i = 0; i < numValues; ++i) {
+    trackedValues.set(i);
+  }
+}
+
+IndexTokenTracker IndexTokenTracker::fromJSON(const llvm::json::Value &value,
+                                              llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  unsigned long x;
+  if (!mapper || !mapper.map(TRACKED_VALUES_LIT, x)) {
+    llvm::report_fatal_error("json parsing of Token Tracker failed");
+  }
+  TrackerBitSet trackedValues = x;
+  return IndexTokenTracker(trackedValues);
+}
+
 // --------------------
 // --- FlowVariable ---
 // --------------------
@@ -12,7 +30,7 @@ FlowVariable::FlowVariable(const IndexChannelAnalysis &indexChannels,
                            ChannelLambda channel)
     : FlowVariable(Variants(channel)) {
   if (auto numValues = indexChannels.getIndexChannelValues(channel.channel)) {
-    indexTokenConstraint = *numValues;
+    indexTokenTracker = *numValues;
   }
 }
 
@@ -21,7 +39,7 @@ FlowVariable FlowVariable::nextInternal() const {
     for (auto &use : lambda->channel.getUses()) {
       Operation *op = use.getOwner();
       FlowVariable ret(InternalLambda(op, 0));
-      ret.indexTokenConstraint = indexTokenConstraint;
+      ret.indexTokenTracker = indexTokenTracker;
       return ret;
     }
   }
@@ -40,13 +58,7 @@ FlowVariable FlowVariable::setTrackedTokens(size_t x) const {
         "Attempting to set tracked token of non-index variable {0}",
         p.getDebugName()));
   }
-  if (p.indexTokenConstraint->trackedValue) {
-    llvm::report_fatal_error(
-        llvm::formatv("Attempting to set tracked token that has already been "
-                      "set of variable {0}",
-                      p.getDebugName()));
-  }
-  p.indexTokenConstraint->trackedValue = x;
+  p.indexTokenTracker->only(x);
   return p;
 }
 
@@ -55,8 +67,16 @@ std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
   if (!state)
     return nullptr;
 
-  if (indexTokenConstraint && indexTokenConstraint->trackedValue) {
-    return state->namer->tryConstrain(*(indexTokenConstraint->trackedValue));
+  if (indexTokenTracker) {
+    size_t numValues = indexTokenTracker->trackedValues.count();
+    if (numValues == 0) {
+      return nullptr;
+    }
+    if (numValues == 1) {
+      return state->namer->tryConstrain(indexTokenTracker->getSingleValue());
+    }
+    llvm::report_fatal_error(
+        "Cannot get namer of variable with multiple tracked tokens");
   }
   return state->namer;
 }
@@ -88,12 +108,8 @@ std::string FlowVariable::getDebugName() const {
         llvm::formatv("{0}.#{1}", getUniqueName(internal->op), internal->index);
   }
 
-  if (indexTokenConstraint) {
-    if (indexTokenConstraint->trackedValue) {
-      ret += llvm::formatv("(={0})", *(indexTokenConstraint->trackedValue));
-    } else {
-      ret += llvm::formatv("(=x)");
-    }
+  if (indexTokenTracker) {
+    ret += llvm::formatv("({0})", indexTokenTracker->trackedValues.to_string());
   }
   return ret;
 }
@@ -102,14 +118,14 @@ std::string FlowVariable::getDebugName() const {
 // --- FlowExpression ---
 // ----------------------
 FlowExpression::FlowExpression(const FlowVariable &v) {
+  if (v.isNull()) {
+    return;
+  }
   if (v.isIndex()) {
-    if (v.indexTokenConstraint->trackedValue) {
-      terms[v] = 1;
-      return;
-    }
-    // If plusAndMinus, separate into plus and minus parts
-    for (size_t i = 0; i < v.indexTokenConstraint->numValues; ++i) {
-      terms[v.setTrackedTokens(i)] = 1;
+    for (size_t i = 0; i < v.indexTokenTracker->trackedValues.size(); ++i) {
+      if (v.indexTokenTracker->trackedValues.test(i)) {
+        terms[v.setTrackedTokens(i)] = 1;
+      }
     }
   } else {
     terms[v] = 1;
@@ -122,8 +138,8 @@ llvm::json::Value FlowExpression::toJSON() const {
     auto *state = std::get_if<FlowInternalState>(&key.variable);
     assert(state);
     std::optional<llvm::json::Value> constraintJson;
-    if (key.indexTokenConstraint) {
-      constraintJson = key.indexTokenConstraint->toJSON();
+    if (key.indexTokenTracker) {
+      constraintJson = key.indexTokenTracker->toJSON();
     } else {
       constraintJson = nullptr;
     }
@@ -161,9 +177,9 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
     const llvm::json::Value *constraint = obj->get(CONSTRAINT_LIT);
     assert(constraint && "FlowExpression does not contain CONSTRAINT_LIT");
     if (auto n = constraint->getAsNull()) {
-      assert(!var.indexTokenConstraint);
+      assert(!var.indexTokenTracker);
     } else {
-      var.indexTokenConstraint = IndexTracker::fromJSON(*constraint, path);
+      var.indexTokenTracker = IndexTokenTracker::fromJSON(*constraint, path);
     }
 
     expr.terms[var] = coef;
@@ -300,16 +316,14 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
 LogicalResult FlowEquationExtractor::extractSlotEquation(
     const FlowVariable &in, const FlowVariable &out, const FlowVariable &slot) {
   if (in.isIndex()) {
-    // All variables should have the same number of possible index values, as
+    // All variables should have the same possible index values, as
     // the slot does not modify the token
-    if (!out.isIndex() || in.indexTokenConstraint->numValues !=
-                              out.indexTokenConstraint->numValues) {
+    if (!out.isIndex() || in.indexTokenTracker != out.indexTokenTracker) {
       llvm::errs()
           << "input and output of slot have index token constraint mismatch\n";
       return failure();
     }
-    if (!slot.isIndex() || in.indexTokenConstraint->numValues !=
-                               slot.indexTokenConstraint->numValues) {
+    if (!slot.isIndex() || in.indexTokenTracker != slot.indexTokenTracker) {
       llvm::errs() << "input and slot have index token constraint mismatch\n";
       return failure();
     }
@@ -320,7 +334,7 @@ LogicalResult FlowEquationExtractor::extractSlotEquation(
     // ...
     // where lambda_in(0) denotes the number of tokens with value 0 that have
     // propagated through `in`
-    for (size_t i = 0; i < in.indexTokenConstraint->numValues; ++i) {
+    for (size_t i = 0; i < in.indexTokenTracker->trackedValues.size(); ++i) {
       equations.push_back(in.setTrackedTokens(i) - out.setTrackedTokens(i) -
                           slot.setTrackedTokens(i));
     }
@@ -338,14 +352,14 @@ LogicalResult FlowEquationExtractor::extractEagerSentEquation(
   if (in.isIndex()) {
     // All variables should have the same number of possible index values, as
     // the slot does not modify the token
-    if (!out.isIndex() || in.indexTokenConstraint->numValues !=
-                              out.indexTokenConstraint->numValues) {
+    if (!out.isIndex() || in.indexTokenTracker->trackedValues !=
+                              out.indexTokenTracker->trackedValues) {
       llvm::errs() << "input and output of eager sent state have index token "
                       "constraint mismatch";
       return failure();
     }
-    if (!sent.isIndex() || in.indexTokenConstraint->numValues !=
-                               sent.indexTokenConstraint->numValues) {
+    if (!sent.isIndex() || in.indexTokenTracker->trackedValues !=
+                               sent.indexTokenTracker->trackedValues) {
       llvm::errs()
           << "input and eager sent state have index token constraint mismatch";
       return failure();
@@ -357,7 +371,7 @@ LogicalResult FlowEquationExtractor::extractEagerSentEquation(
     // ...
     // where lambda_in(0) denotes the number of tokens with value 0 that have
     // propagated through `in`
-    for (size_t i = 0; i < in.indexTokenConstraint->numValues; ++i) {
+    for (size_t i = 0; i < in.indexTokenTracker->trackedValues.size(); ++i) {
       equations.push_back(in.setTrackedTokens(i) - out.setTrackedTokens(i) +
                           sent.setTrackedTokens(i));
     }
@@ -408,8 +422,8 @@ FlowEquationExtractor::extractBranchOp(ConditionalBranchOp branchOp) {
     branchOp.emitError("branch op condition should be an index");
     return failure();
   }
-  if (condition.indexTokenConstraint->numValues != 2) {
-    branchOp.emitError("branch op condition should have two possible values");
+  if (condition.indexTokenTracker->trackedValues != 0b11) {
+    branchOp.emitError("branch op condition should possible values 0,1");
     return failure();
   }
   // The number of tokens going across the false result is equal to the
@@ -480,7 +494,7 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
   size_t numInputs = cmergeOp.getDataOperands().size();
 
   FlowVariable indexIntermediate(InternalLambda(cmergeOp, 0));
-  indexIntermediate.indexTokenConstraint = IndexTracker(numInputs);
+  indexIntermediate.indexTokenTracker = IndexTokenTracker(numInputs);
 
   for (auto [i, channel] : llvm::enumerate(cmergeOp.getDataOperands())) {
     FlowVariable channelVar(indexChannelAnalysis, ChannelLambda(channel));
@@ -489,14 +503,14 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
 
   auto slots = cmergeOp.getInternalSlotStateNamers();
   auto slot = FlowVariable(FlowInternalState(slots[0]));
-  slot.indexTokenConstraint = IndexTracker(numInputs);
+  slot.indexTokenTracker = IndexTokenTracker(numInputs);
 
   FlowVariable indexChannel = indexIntermediate.nextInternal();
   if (failed(extractSlotEquation(indexIntermediate, indexChannel, slot))) {
     return failure();
   }
   FlowVariable dataIntermediate = indexChannel.nextInternal();
-  dataIntermediate.indexTokenConstraint.reset();
+  dataIntermediate.indexTokenTracker.reset();
 
   // Same number of tokens arrive at dataIntermediate and indexIntermediate
   equations.push_back(dataIntermediate - indexIntermediate);
@@ -510,7 +524,7 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
 
   auto dataSent = FlowVariable(FlowInternalState(sentNamers[0]));
   auto indexSent = FlowVariable(FlowInternalState(sentNamers[1]));
-  indexSent.indexTokenConstraint = IndexTracker(numInputs);
+  indexSent.indexTokenTracker = IndexTokenTracker(numInputs);
 
   auto outputs = cmergeOp.getResults();
   FlowVariable dataOut(indexChannelAnalysis, ChannelLambda(outputs[0]));
@@ -543,7 +557,7 @@ LogicalResult FlowEquationExtractor::extractForkOp(ForkOp forkOp) {
   for (auto [i, outChannel] : llvm::enumerate(forkOp.getResult())) {
     FlowVariable out(indexChannelAnalysis, ChannelLambda(outChannel));
     FlowVariable sent = FlowVariable(FlowInternalState(namers[i]));
-    sent.indexTokenConstraint = in.indexTokenConstraint;
+    sent.indexTokenTracker = in.indexTokenTracker;
     if (failed(extractEagerSentEquation(in, out, sent))) {
       return failure();
     }
@@ -629,7 +643,7 @@ LogicalResult FlowEquationExtractor::extractMuxOp(MuxOp muxOp) {
   }
   auto dataOperands = muxOp.getDataOperands();
 
-  if (selectVar.indexTokenConstraint->numValues != dataOperands.size()) {
+  if (selectVar.indexTokenTracker != IndexTokenTracker(dataOperands.size())) {
     muxOp.emitError(
         "index channel analysis does not match number of mux inputs");
     return failure();
@@ -716,10 +730,11 @@ FlowSystem::FlowSystem(const std::vector<FlowExpression> &exprs) {
       if (key.getAnnotater() != nullptr) {
         continue;
       }
-      // PlusAndMinus variables should never be inserted, as the DSL will
-      // insert them as two separate variables
-      assert(!key.indexTokenConstraint ||
-             key.indexTokenConstraint->trackedValue);
+      // Variables within the flow system should track exactly one index, as
+      // more complicated trackings will be split up and inserted separately by
+      // the DSL.
+      assert(!key.indexTokenTracker ||
+             key.indexTokenTracker->trackedValues.count() == 1);
       registry.addVariable(key);
     }
   }

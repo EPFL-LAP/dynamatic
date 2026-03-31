@@ -9,6 +9,7 @@
 #include "mlir/IR/Value.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/JSON.h"
+#include <bitset>
 #include <variant>
 
 // FlowExpression together with FlowVariable implements a DSL for combining flow
@@ -75,6 +76,48 @@ struct IndexTracker {
   inline static const StringLiteral SINGLE_VALUE_LIT = "single_value";
 };
 
+// IndexTokenTracker is used to represent flow variables that, instead of
+// tracking any token, only track tokens of specific indices. It is
+// automatically added for channel lambdas using IndexChannelAnalysis to
+// determine if the channel deals with indices.
+struct IndexTokenTracker {
+  using TrackerBitSet = std::bitset<8>;
+  // If trackedValues[i] is set, this tracker tracks tokens of value i
+  TrackerBitSet trackedValues;
+
+  // Tracker with the first `numValues` bits set to 1, and the rest to 0
+  IndexTokenTracker(TrackerBitSet trackedValues)
+      : trackedValues(trackedValues) {}
+  IndexTokenTracker(size_t numValues);
+  inline llvm::json::Value toJSON() const {
+    return llvm::json::Object({{TRACKED_VALUES_LIT, trackedValues.to_ulong()}});
+  }
+
+  IndexTokenTracker static fromJSON(const llvm::json::Value &value,
+                                    llvm::json::Path path);
+
+  inline void only(size_t value) { trackedValues &= (1 << value); }
+
+  size_t getSingleValue() const {
+    assert(trackedValues.count() == 1);
+    for (size_t index = 0; index < trackedValues.size(); ++index) {
+      if (trackedValues.test(index))
+        return index;
+    }
+    assert(false);
+  }
+
+  inline bool operator==(const IndexTokenTracker &other) const {
+    return trackedValues == other.trackedValues;
+  }
+
+  inline bool operator!=(const IndexTokenTracker &other) const {
+    return trackedValues != other.trackedValues;
+  }
+
+  inline static const StringLiteral TRACKED_VALUES_LIT = "tracked_values";
+};
+
 struct ChannelLambda {
   mlir::Value channel;
 
@@ -95,6 +138,16 @@ struct InternalLambda {
 };
 
 struct FlowInternalState {
+  // FlowInternalState is a wrapper around std::shared_ptr<InternalStateNamer>
+  // to represent variables within FlowVariable. It simplifies constructors, as
+  // it hides the creation of shared pointers. Shared pointers are required for
+  // the following reasons:
+  // 1. InternalStateNamer is an abstract class, meaning the size depends on
+  // which internal state (EagerForkSent / BufferSlotFull) it is, so it can only
+  // be used as a pointer or a reference.
+  // 2. FlowVariables are regularly copied (when they are part of multiple
+  // different equations), so the copy operation should be cheap. This excludes
+  // std::unique_ptr
   inline FlowInternalState(const std::shared_ptr<InternalStateNamer> &namer)
       : namer(namer) {}
   template <typename T>
@@ -116,9 +169,7 @@ struct FlowVariable {
   // 2. It can be an internal state, which represents any data that can be found
   // in the final HDL: Most commonly, this is the data within a slot of a
   // buffer, or the state keeping track of which results of an eager fork have
-  // been sent. It is stored as an shared pointer because it needs to be stored
-  // as a pointer as InternalStateNamer is a virtual class, and because it could
-  // be copied often.
+  // been sent.
   // 3. It can be an internal lambda, which acts similar to a channel lambda,
   // except it does not count the tokens of a real channel in the handshake
   // MLIR, but rather a fictional channel within an operation (e.g. a channel
@@ -131,10 +182,10 @@ struct FlowVariable {
   // tracked. This can be useful e.g. in the case of control merges, where it is
   // known that a token at operand 0 leads to a token of value 0 at the index
   // output, and correspondingly for a token at operand 1.
-  std::optional<IndexTracker> indexTokenConstraint;
+  std::optional<IndexTokenTracker> indexTokenTracker;
 
   FlowVariable(Variants variable)
-      : variable(std::move(variable)), indexTokenConstraint() {}
+      : variable(std::move(variable)), indexTokenTracker() {}
   FlowVariable(const IndexChannelAnalysis &indexChannels,
                ChannelLambda channel);
   FlowVariable(InternalLambda l) : FlowVariable(Variants(l)) {}
@@ -147,11 +198,14 @@ struct FlowVariable {
   // Compares the relevant struct fields to determine if two variables are equal
   inline bool operator==(const FlowVariable &other) const {
     return variable == other.variable &&
-           indexTokenConstraint == other.indexTokenConstraint;
+           indexTokenTracker == other.indexTokenTracker;
   }
 
   // Utility functions for handling flow variables with index tokens
-  inline bool isIndex() const { return indexTokenConstraint.has_value(); }
+  inline bool isIndex() const { return indexTokenTracker.has_value(); }
+  inline bool isNull() const {
+    return indexTokenTracker && indexTokenTracker->trackedValues == 0;
+  }
   FlowVariable setTrackedTokens(size_t x) const;
 
   std::string getDebugName() const;
@@ -194,12 +248,11 @@ template <>
 struct std::hash<FlowVariable> {
   size_t operator()(const FlowVariable &var) const {
     using std::hash;
-    if (var.indexTokenConstraint) {
+    if (var.indexTokenTracker) {
       return hash<FlowVariable::Variants>()(var.variable) ^
              hash<unsigned>()(0) ^
-             hash<size_t>()(var.indexTokenConstraint->numValues) ^
-             hash<std::optional<size_t>>()(
-                 var.indexTokenConstraint->trackedValue);
+             hash<IndexTokenTracker::TrackerBitSet>()(
+                 var.indexTokenTracker->trackedValues);
     }
     return hash<FlowVariable::Variants>()(var.variable) ^ hash<unsigned>()(1);
   }
