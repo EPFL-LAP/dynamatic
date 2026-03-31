@@ -307,6 +307,10 @@ struct SynchronizingCyclePair {
 
 class SynchronizingCyclesFinderGraph : public DataflowSubgraphBase {
 public:
+  SynchronizingCyclesFinderGraph() = default;
+  SynchronizingCyclesFinderGraph(handshake::FuncOp funcOp,
+                                 const buffer::CFDFC &cfdfc);
+
   /// Build the graph from a CFDFC.
   void buildFromCFDFC(handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc);
 

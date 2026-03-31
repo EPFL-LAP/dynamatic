@@ -584,6 +584,11 @@ NodeIdType SynchronizingCyclesFinderGraph::getOrAddNode(mlir::Operation *op) {
   return id;
 }
 
+SynchronizingCyclesFinderGraph::SynchronizingCyclesFinderGraph(
+    handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc) {
+  buildFromCFDFC(funcOp, cfdfc);
+}
+
 void SynchronizingCyclesFinderGraph::buildFromCFDFC(
     handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc) {
   this->funcOp = funcOp;

@@ -1406,8 +1406,8 @@ void BufferPlacementMILP::addCycleTimeConstraints(
   }
 
   for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
-    ::dynamatic::SynchronizingCyclesFinderGraph cfdfcGraph;
-    cfdfcGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfc);
+    ::dynamatic::SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp,
+                                                           *cfdfc);
     std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
     if (cycles.empty()) {
       LLVM_DEBUG(llvm::errs()

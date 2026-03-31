@@ -445,8 +445,7 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
   LLVM_DEBUG({
     llvm::errs() << "=== Verifying CFDFC Cycle Latencies After LP1 ===\n";
     for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
-      SynchronizingCyclesFinderGraph cfdfcGraph;
-      cfdfcGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfc);
+      SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp, *cfdfc);
       std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
 
       for (size_t cycleIdx = 0; cycleIdx < cycles.size(); ++cycleIdx) {
