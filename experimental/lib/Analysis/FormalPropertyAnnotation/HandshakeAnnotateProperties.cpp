@@ -270,7 +270,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
     if (expr.terms.size() == 0) {
       continue;
     }
-    ReconvergentPathFlow p(uid, FormalProperty::TAG::OPT);
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
     p.addEquation(expr);
     if (p.getEquations().size() > 0) {
       uid++;
@@ -283,12 +283,10 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-#ifdef false
   if (failed(annotateAbsenceOfBackpressure(modOp)))
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
-#endif
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
