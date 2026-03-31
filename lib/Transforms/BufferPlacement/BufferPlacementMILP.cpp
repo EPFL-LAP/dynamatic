@@ -1252,13 +1252,11 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
     const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     CPVar &patternImbalanced = vars.reconvergentPathVars[pathIdx].imbalanced;
 
-    bool hasVarLatency = false;
-    for (NodeIdType nodeId : path.nodeIds) {
-      if (hasVariableLatencyUnit(graph->nodes[nodeId].op)) {
-        hasVarLatency = true;
-        break;
+    bool hasVarLatency = std::any_of(
+path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
+        return hasVariableLatencyUnit(graph->nodes[id].op);
       }
-    }
+    );
 
     if (hasVarLatency) {
       model->addConstr(patternImbalanced == 1,
