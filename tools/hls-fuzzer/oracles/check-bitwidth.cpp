@@ -41,7 +41,20 @@ int main(int argc, char **argv) {
   OwningOpRef<Operation *> module =
       parseSourceFileForTool(sourceMgr, config, true);
 
+  llvm::SmallDenseSet<Value> functionArgs;
+  module->walk([&](handshake::FuncOp funcOp) {
+    functionArgs.insert(funcOp.args_begin(), funcOp.args_end());
+  });
+
   WalkResult result = module->walk([&](Operation *op) {
+    // Function arguments may be truncated multiple times to legal bitwidths.
+    // In that case a fork of the argument is inserted that has an arbitrary
+    // bitwidth.
+    // This is not a deficiency in the compiler and therefore not an error.
+    if (auto forkOp = dyn_cast<handshake::ForkOp>(op))
+      if (functionArgs.contains(forkOp.getOperand()))
+        return WalkResult::advance();
+
     for (Value iter : op->getResults()) {
       auto channelType = dyn_cast<handshake::ChannelType>(iter.getType());
       if (!channelType || !isa<IntegerType>(channelType.getDataType()))
