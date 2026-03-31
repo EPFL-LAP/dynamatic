@@ -791,7 +791,7 @@ static Value getOriginalValue(mlir::OpBuilder &builder, StringRef varName,
     Block *shadowBlock = conditionOpt.value();
     unsigned enumIdx = shadow->getBlockIndex(shadowBlock);
     condition = shadow->getCondition(enumIdx);
-  } else if (pendingMuxOperands) {
+  } else {
     // Pre-flatten CfToHandshake path: use a SourceOp placeholder instead of
     // the real terminator condition. This avoids creating backedges for
     // condition values (which caused null-Value crashes in bddToCircuit).

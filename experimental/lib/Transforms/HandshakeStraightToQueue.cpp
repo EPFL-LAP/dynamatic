@@ -17,7 +17,9 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -475,6 +477,122 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
     toRemove->erase();
 }
 
+/// Per-block edge information captured from the multi-block CFG before
+/// flattening. Used to reconstruct a ShadowCFG afterwards.
+struct CapturedEdgeInfo {
+  bool isConditional = false;
+  bool hasSuccessors = false;
+  unsigned trueSuccIdx = 0;
+  unsigned falseSuccIdx = 0;
+  unsigned uncondSuccIdx = 0;
+};
+
+/// Capture the CFG topology and branch condition Values of a handshake::FuncOp
+/// while it still has restored multi-block structure. Both pieces of information
+/// are destroyed by removeNetworkCMerges + flattenFunction and are needed later
+/// to construct the ShadowCFG for addRegen / addSupp.
+static void captureCFGTopology(handshake::FuncOp funcOp,
+                               unsigned &numBlocks,
+                               SmallVector<CapturedEdgeInfo> &edges,
+                               DenseMap<unsigned, Value> &capturedConditions) {
+  Region &region = funcOp.getRegion();
+  DenseMap<Block *, unsigned> blockToIdx;
+  for (auto [idx, block] : llvm::enumerate(region))
+    blockToIdx[&block] = idx;
+
+  numBlocks = blockToIdx.size();
+  edges.resize(numBlocks);
+
+  for (auto [idx, block] : llvm::enumerate(region)) {
+    CapturedEdgeInfo &edge = edges[idx];
+    Operation *term = block.getTerminator();
+    if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+      edge.isConditional = true;
+      edge.hasSuccessors = true;
+      edge.trueSuccIdx = blockToIdx.lookup(condBr.getTrueDest());
+      edge.falseSuccIdx = blockToIdx.lookup(condBr.getFalseDest());
+    } else if (auto br = dyn_cast<cf::BranchOp>(term)) {
+      edge.hasSuccessors = true;
+      edge.uncondSuccIdx = blockToIdx.lookup(br.getDest());
+    }
+  }
+
+  // Capture branch condition Values from handshake::ConditionalBranchOp ops.
+  // This must happen before removeNetworkCMerges, which erases cmerge-network
+  // ConditionalBranchOps and may leave some blocks without any surviving
+  // condition source. We prefer conditions that do NOT originate from a
+  // ControlMergeOp (those belong to the cmerge network and will be erased).
+  funcOp.walk([&](handshake::ConditionalBranchOp brOp) {
+    auto bbAttr = brOp->getAttrOfType<IntegerAttr>("handshake.bb");
+    if (!bbAttr)
+      return;
+    unsigned bbIdx = bbAttr.getUInt();
+    Value cond = brOp.getConditionOperand();
+    bool fromCmerge = cond.getDefiningOp() &&
+                      llvm::isa<handshake::ControlMergeOp>(cond.getDefiningOp());
+    // Always prefer a non-cmerge condition; keep the first non-cmerge one found
+    if (!capturedConditions.contains(bbIdx)) {
+      // First condition seen for this BB — always capture
+      capturedConditions[bbIdx] = cond;
+    } else if (!fromCmerge) {
+      // Found a better (non-cmerge) condition — upgrade
+      capturedConditions[bbIdx] = cond;
+    }
+  });
+}
+
+/// Build a ShadowCFG for the given handshake::FuncOp using previously captured
+/// CFG topology and condition Values. The shadow function replicates the
+/// original block structure with standard CF terminators, enabling analysis
+/// passes (BlockIndexing, DominanceInfo, CFGLoopInfo) that addRegen and addSupp
+/// rely on.
+static ftd::ShadowCFG buildShadowFromCapturedTopology(
+    OpBuilder &builder, handshake::FuncOp funcOp, unsigned numBlocks,
+    const SmallVector<CapturedEdgeInfo> &edges,
+    const DenseMap<unsigned, Value> &capturedConditions) {
+
+  ftd::ShadowCFG shadow;
+  Location loc = funcOp.getLoc();
+
+  // Create a temporary func::FuncOp with blocks + CF terminators that mirror
+  // the original multi-block topology.
+  {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointAfter(funcOp);
+    auto funcType = builder.getFunctionType({}, {});
+    shadow.shadowFunc =
+        builder.create<func::FuncOp>(loc, "__ftd_shadow_cfg__", funcType);
+
+    Region &R = shadow.shadowFunc.getBody();
+    SmallVector<Block *> blocks;
+    for (unsigned i = 0; i < numBlocks; ++i)
+      blocks.push_back(builder.createBlock(&R, R.end()));
+
+    for (unsigned i = 0; i < numBlocks; ++i) {
+      const CapturedEdgeInfo &edge = edges[i];
+      builder.setInsertionPointToEnd(blocks[i]);
+
+      if (edge.isConditional) {
+        auto dummyCond =
+            builder.create<arith::ConstantOp>(loc, builder.getBoolAttr(true));
+        builder.create<cf::CondBranchOp>(
+            loc, dummyCond, blocks[edge.trueSuccIdx], ValueRange{},
+            blocks[edge.falseSuccIdx], ValueRange{});
+      } else if (edge.hasSuccessors) {
+        builder.create<cf::BranchOp>(loc, blocks[edge.uncondSuccIdx]);
+      } else {
+        builder.create<func::ReturnOp>(loc);
+      }
+    }
+  }
+
+  // Use the pre-captured condition Values (captured before removeNetworkCMerges
+  // destroyed cmerge-network ConditionalBranchOps).
+  shadow.conditionMap = capturedConditions;
+
+  return shadow;
+}
+
 /// Run straight to the queue.
 static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
                                           MLIRContext *ctx) {
@@ -526,6 +644,13 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
       delete g;
   }
 
+  // Create condition placeholders for every conditional block in the restored
+  // CFG. The refactored addGsaGates (called by replaceMergeToGSA) relies on
+  // these placeholders when building distribution networks and BDD circuits
+  // for MU gates.  In the FTD flow, createAllCondPlaceholders is called before
+  // addGsaGates; S2Q must do the same.
+  ftd::createAllCondPlaceholders(funcOp.getRegion(), rewriter);
+
   // Replace each merge created by `createPhiNetwork` with a multiplxer
   if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
     return failure();
@@ -535,6 +660,16 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   // experimental::ftd::addSupp(funcOp, rewriter);
   experimental::cfg::markBasicBlocks(funcOp, rewriter);
 
+  // Capture CFG topology and branch conditions while we still have the
+  // multi-block structure. Both are needed after flattening to build the
+  // ShadowCFG for addRegen and addSupp. Conditions must be captured before
+  // removeNetworkCMerges, which erases cmerge-network ConditionalBranchOps.
+  unsigned capturedNumBlocks = 0;
+  SmallVector<CapturedEdgeInfo> capturedEdges;
+  DenseMap<unsigned, Value> capturedConditions;
+  captureCFGTopology(funcOp, capturedNumBlocks, capturedEdges,
+                     capturedConditions);
+
   // Try to remove the network of cmerges if possible (i.e. if the function was
   // void)
   removeNetworkCMerges(funcOp, rewriter);
@@ -542,6 +677,35 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   // Remove the blocks and terminators
   if (failed(cfg::flattenFunction(funcOp)))
     return failure();
+
+  // After flattening, build a ShadowCFG and run addRegen/addSupp on the newly
+  // inserted operations to maintain token conservation across basic blocks.
+  if (capturedNumBlocks > 1) {
+    OpBuilder builder(ctx);
+
+    ftd::ShadowCFG shadow = buildShadowFromCapturedTopology(
+        builder, funcOp, capturedNumBlocks, capturedEdges, capturedConditions);
+
+    // Resolve condition placeholders that were created by replaceMergeToGSA
+    // (via addGsaGates / getOrCreateCondPlaceholder).
+    ftd::resolveCondPlaceholders(funcOp, builder, shadow);
+
+    // Pick up negated condition signals produced by resolveCondPlaceholders
+    for (auto notOp : funcOp.getOps<handshake::NotIOp>()) {
+      if (!notOp->hasAttr("ftd.cvar"))
+        continue;
+      auto bbAttr = notOp->getAttrOfType<IntegerAttr>("handshake.bb");
+      if (!bbAttr)
+        continue;
+      shadow.conditionMap[bbAttr.getUInt()] = notOp.getResult();
+    }
+
+    ftd::addRegen(funcOp, builder, shadow);
+    ftd::addSupp(funcOp, builder, shadow);
+    ftd::finalizeCondPlaceholders(funcOp);
+
+    shadow.destroy();
+  }
 
   return success();
 }
