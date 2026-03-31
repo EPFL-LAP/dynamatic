@@ -1456,8 +1456,8 @@ void BufferPlacementMILP::addCycleTimeConstraints(
 
       LinExpr cycleLatency =
           computeCycleLatency(cycle, cfdfcGraph, vars, timingDB, targetPeriod);
-      std::string baseName = "cycleTime_cfdfc" + std::to_string(cfdfcIdx) +
-                             "_cycle" + std::to_string(cycleIdx);
+      std::string baseName =
+          llvm::formatv("cycleTime_cfdfc{0}_cycle{1}", cfdfcIdx, cycleIdx).str();
       model->addConstr(cycleLatency >= iiCFC, baseName + "_min");
       model->addConstr(cycleLatency <= iiCFC, baseName + "_max");
     }
