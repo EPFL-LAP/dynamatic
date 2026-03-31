@@ -1231,6 +1231,20 @@ void BufferPlacementMILP::addOccupancyVars(
   }
 }
 
+void BufferPlacementMILP::setOccupancyBalancingObjective(
+    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy) {
+  /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c)
+  LinExpr objective;
+  for (Value channel : channels) {
+    assert(channelOccupancy.count(channel) &&
+           "missing occupancy variable for channel");
+    unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
+    // Control channels may have bitwidth 0, weight them with 1.
+    objective += (bitwidth == 0 ? 1 : bitwidth) * channelOccupancy[channel];
+  }
+  model->setMaximizeObjective(-objective);
+}
+
 void BufferPlacementMILP::addBackedgeConstraints(
     ArrayRef<CFDFC *> cfdfcs, DenseMap<Value, CPVar> &channelOccupancy) {
   size_t cycleConstraints = 0;

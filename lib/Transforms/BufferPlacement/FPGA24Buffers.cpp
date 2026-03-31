@@ -226,19 +226,7 @@ void OccupancyBalancingLP::setup() {
 
   addBackedgeConstraints(cfdfcs, channelOccupancy);
 
-  /// Set objective to minimize total buffer area
-  /// (Paper: Section 5, Equation 14): Minimize sum(B_c*N_c)
-  LinExpr objective;
-  for (Value channel : allChannels) {
-    llvm::errs() << "[LP2 **--**] Channel in obj "
-                 << getUniqueName(*channel.getUses().begin()) << "\n";
-    unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
-    // Control channel might have a bitwidth of zero, in this case, we always
-    // weight it with 1.
-    objective += (bitwidth == 0 ? 1 : bitwidth) * channelOccupancy[channel];
-  }
-
-  model->setMaximizeObjective(-objective);
+  this->setOccupancyBalancingObjective(allChannels, channelOccupancy);
 
   markReadyToOptimize();
   LLVM_DEBUG(llvm::errs() << "[OccBal] Setup complete.\n");
