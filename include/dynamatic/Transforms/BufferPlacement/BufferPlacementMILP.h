@@ -422,8 +422,8 @@ protected:
                         double maxOccupancy);
 
   /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum.
-  void setOccupancyBalancingObjective(
-      ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy);
+  void setOccupancyBalancingObjective(ValueRange channels,
+                                      DenseMap<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
   /// least one token. (Paper: Section 5, Equation 12)
