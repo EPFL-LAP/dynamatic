@@ -9,8 +9,8 @@ namespace handshake {
 // --- FlowVariable ---
 // --------------------
 FlowVariable::FlowVariable(const IndexChannelAnalysis &indexChannels,
-                           ChannelLambda channel) {
-  *this = FlowVariable(Variants(channel));
+                           ChannelLambda channel)
+    : FlowVariable(Variants(channel)) {
   if (auto numValues = indexChannels.getIndexChannelValues(channel.channel)) {
     indexTokenConstraint = *numValues;
   }
@@ -51,22 +51,20 @@ FlowVariable FlowVariable::setTrackedTokens(size_t x) const {
 }
 
 std::shared_ptr<InternalStateNamer> FlowVariable::getAnnotater() const {
-  auto *namer = std::get_if<std::shared_ptr<InternalStateNamer>>(&variable);
-  if (!namer)
+  auto *state = std::get_if<FlowInternalState>(&variable);
+  if (!state)
     return nullptr;
 
-  auto &state = *namer;
   if (indexTokenConstraint && indexTokenConstraint->trackedValue) {
-    return state->tryConstrain(*(indexTokenConstraint->trackedValue));
+    return state->namer->tryConstrain(*(indexTokenConstraint->trackedValue));
   }
-  return state;
+  return state->namer;
 }
 
 std::string FlowVariable::getDebugName() const {
   std::string ret = "";
-  if (auto *namer =
-          std::get_if<std::shared_ptr<InternalStateNamer>>(&variable)) {
-    ret += (*namer)->getSMVName();
+  if (auto *state = std::get_if<FlowInternalState>(&variable)) {
+    ret += state->namer->getSMVName();
   }
   if (auto *channel = std::get_if<ChannelLambda>(&variable)) {
     if (auto *op = channel->channel.getDefiningOp()) {
@@ -121,9 +119,8 @@ FlowExpression::FlowExpression(const FlowVariable &v) {
 llvm::json::Value FlowExpression::toJSON() const {
   std::vector<llvm::json::Value> jsonTerms{};
   for (auto &[key, value] : terms) {
-    auto *namer =
-        std::get_if<std::shared_ptr<InternalStateNamer>>(&key.variable);
-    assert(namer);
+    auto *state = std::get_if<FlowInternalState>(&key.variable);
+    assert(state);
     std::optional<llvm::json::Value> constraintJson;
     if (key.indexTokenConstraint) {
       constraintJson = key.indexTokenConstraint->toJSON();
@@ -132,7 +129,7 @@ llvm::json::Value FlowExpression::toJSON() const {
     }
     // int pm = key.pm;
     jsonTerms.emplace_back(
-        llvm::json::Object({{STATE_LIT, (*namer)->toJSON()},
+        llvm::json::Object({{STATE_LIT, state->namer->toJSON()},
                             {COEFFICIENT_LIT, value},
                             {CONSTRAINT_LIT, constraintJson}}));
   }
@@ -154,7 +151,7 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
     }
     std::shared_ptr<InternalStateNamer> namer =
         InternalStateNamer::fromJSON(*state, path);
-    FlowVariable var(namer);
+    FlowVariable var = FlowVariable(FlowInternalState(namer));
     int coef;
     llvm::json::ObjectMapper mapper(termJSON, path);
     if (!mapper || !mapper.map(COEFFICIENT_LIT, coef)) {
@@ -436,9 +433,7 @@ LogicalResult FlowEquationExtractor::extractBufferOp(BufferOp bufferOp) {
     // internal channel after `in`. The normal slot equation is annotated:
     // in = next + slot
     // Then, `in` is set to `next`
-    std::shared_ptr<InternalStateNamer> sharedNamer =
-        std::make_shared<BufferSlotFullNamer>(slotNamer);
-    FlowVariable slot(sharedNamer);
+    auto slot = FlowVariable(FlowInternalState(slotNamer));
     FlowVariable next = in.nextInternal();
     if (failed(extractSlotEquation(in, next, slot))) {
       return failure();
@@ -493,9 +488,7 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
   }
 
   auto slots = cmergeOp.getInternalSlotStateNamers();
-  std::shared_ptr<InternalStateNamer> slotNamer =
-      std::make_shared<BufferSlotFullNamer>(slots[0]);
-  FlowVariable slot(slotNamer);
+  auto slot = FlowVariable(FlowInternalState(slots[0]));
   slot.indexTokenConstraint = IndexTracker(numInputs);
 
   FlowVariable indexChannel = indexIntermediate.nextInternal();
@@ -515,12 +508,8 @@ FlowEquationExtractor::extractControlMergeOp(ControlMergeOp cmergeOp) {
 
   auto sentNamers = cmergeOp.getInternalSentStateNamers();
 
-  std::shared_ptr<InternalStateNamer> dataNamer =
-      std::make_shared<EagerForkSentNamer>(sentNamers[0]);
-  std::shared_ptr<InternalStateNamer> indexNamer =
-      std::make_shared<EagerForkSentNamer>(sentNamers[1]);
-  FlowVariable dataSent(dataNamer);
-  FlowVariable indexSent(indexNamer);
+  auto dataSent = FlowVariable(FlowInternalState(sentNamers[0]));
+  auto indexSent = FlowVariable(FlowInternalState(sentNamers[1]));
   indexSent.indexTokenConstraint = IndexTracker(numInputs);
 
   auto outputs = cmergeOp.getResults();
@@ -553,9 +542,7 @@ LogicalResult FlowEquationExtractor::extractForkOp(ForkOp forkOp) {
   auto namers = forkOp.getInternalSentStateNamers();
   for (auto [i, outChannel] : llvm::enumerate(forkOp.getResult())) {
     FlowVariable out(indexChannelAnalysis, ChannelLambda(outChannel));
-    std::shared_ptr<InternalStateNamer> sentNamer =
-        std::make_shared<EagerForkSentNamer>(namers[i]);
-    FlowVariable sent(sentNamer);
+    FlowVariable sent = FlowVariable(FlowInternalState(namers[i]));
     sent.indexTokenConstraint = in.indexTokenConstraint;
     if (failed(extractEagerSentEquation(in, out, sent))) {
       return failure();
@@ -570,9 +557,7 @@ LogicalResult FlowEquationExtractor::extractLoadOp(LoadOp loadOp) {
   // dataInput = dataOutput + dataSlot
   // data_input -> data_slot -> data_output
   auto slots = loadOp.getInternalSlotStateNamers();
-  std::shared_ptr<InternalStateNamer> addrNamer =
-      std::make_shared<BufferSlotFullNamer>(slots[0]);
-  FlowVariable addrSlot(addrNamer);
+  FlowVariable addrSlot = FlowVariable(FlowInternalState(slots[0]));
   FlowVariable addrInput(indexChannelAnalysis,
                          ChannelLambda(loadOp.getAddress()));
   FlowVariable addrOutput(indexChannelAnalysis,
@@ -580,9 +565,7 @@ LogicalResult FlowEquationExtractor::extractLoadOp(LoadOp loadOp) {
 
   equations.push_back(addrInput - addrOutput - addrSlot);
 
-  std::shared_ptr<InternalStateNamer> dataNamer =
-      std::make_shared<BufferSlotFullNamer>(slots[1]);
-  FlowVariable dataSlot(dataNamer);
+  auto dataSlot = FlowVariable(FlowInternalState(slots[1]));
   FlowVariable dataInput(indexChannelAnalysis, ChannelLambda(loadOp.getData()));
   FlowVariable dataOutput(indexChannelAnalysis,
                           ChannelLambda(loadOp.getDataResult()));
@@ -613,9 +596,8 @@ FlowEquationExtractor::extractMemoryControllerOp(MemoryControllerOp memCon) {
       FlowVariable dataOut(indexChannelAnalysis,
                            ChannelLambda(memCon.getResults()[resultIndex]));
       auto slotNamer = memCon.getLoadPortSlotNamer(loadIndex);
-      std::shared_ptr<InternalStateNamer> sharedNamer =
-          std::make_shared<MemoryControllerSlotNamer>(slotNamer);
-      FlowVariable slot(sharedNamer);
+
+      FlowVariable slot = FlowVariable(FlowInternalState(slotNamer));
       if (failed(extractSlotEquation(addrIn, dataOut, slot))) {
         return failure();
       }
@@ -675,9 +657,7 @@ LogicalResult FlowEquationExtractor::extractPipeline(LatencyInterface latencyOp,
   //
   // Finally, `internal` = lambda_internal_n
   for (auto &pipelineSlot : latencyOp.getPipelineSlots()) {
-    std::shared_ptr<InternalStateNamer> namer =
-        std::make_shared<PipelineSlotNamer>(pipelineSlot);
-    FlowVariable full(namer);
+    FlowVariable full = FlowVariable(FlowInternalState(pipelineSlot));
 
     FlowVariable before = internal;
     FlowVariable after = before.nextInternal();

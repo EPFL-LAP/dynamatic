@@ -94,6 +94,21 @@ struct InternalLambda {
   }
 };
 
+struct FlowInternalState {
+  inline FlowInternalState(const std::shared_ptr<InternalStateNamer> &namer)
+      : namer(namer) {}
+  template <typename T>
+  inline FlowInternalState(const T &typedNamer) {
+    std::shared_ptr<InternalStateNamer> anyNamer =
+        std::make_shared<T>(typedNamer);
+    namer = anyNamer;
+  }
+  inline bool operator==(const FlowInternalState &other) const {
+    return namer == other.namer;
+  }
+  std::shared_ptr<InternalStateNamer> namer;
+};
+
 struct FlowVariable {
   // A flow variable can be defined by different parts of a circuit:
   // 1. It can be a channel lambda, which tracks the number of tokens that
@@ -108,8 +123,8 @@ struct FlowVariable {
   // except it does not count the tokens of a real channel in the handshake
   // MLIR, but rather a fictional channel within an operation (e.g. a channel
   // between slots of a buffer with multiple slots)
-  using Variants = std::variant<std::shared_ptr<InternalStateNamer>,
-                                ChannelLambda, InternalLambda>;
+  using Variants =
+      std::variant<FlowInternalState, ChannelLambda, InternalLambda>;
   Variants variable;
 
   // When indexTokenConstraint is set, only tokens of a specific value are
@@ -123,8 +138,7 @@ struct FlowVariable {
   FlowVariable(const IndexChannelAnalysis &indexChannels,
                ChannelLambda channel);
   FlowVariable(InternalLambda l) : FlowVariable(Variants(l)) {}
-  FlowVariable(std::shared_ptr<InternalStateNamer> n)
-      : FlowVariable(Variants(n)) {}
+  FlowVariable(FlowInternalState state) : FlowVariable(Variants(state)) {}
 
   // Utility function for generating multiple internal channels for a single
   // operation without collisions of indices
@@ -161,8 +175,8 @@ struct std::hash<FlowVariable::Variants> {
   size_t operator()(const FlowVariable::Variants &vars) const {
     using std::hash;
     size_t chunk = hash<size_t>()(vars.index());
-    if (auto *namer = std::get_if<std::shared_ptr<InternalStateNamer>>(&vars)) {
-      return chunk ^ hash<std::string>()((*namer)->getSMVName());
+    if (auto *namer = std::get_if<FlowInternalState>(&vars)) {
+      return chunk ^ hash<std::string>()(namer->namer->getSMVName());
     }
     if (auto *channel = std::get_if<ChannelLambda>(&vars)) {
       return chunk ^ mlir::hash_value(channel->channel);
