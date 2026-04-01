@@ -103,51 +103,6 @@ static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
   });
 }
 
-/// [FPGA24] Represents one simple path.
-namespace {
-struct SimplePath {
-  SmallVector<EdgeIdType> edges;
-  SmallVector<NodeIdType> nodes;
-};
-} // namespace
-
-/// [FPGA24] Enumerates all simple paths from start to end.
-static std::vector<SimplePath>
-enumerateSimplePaths(const DataflowSubgraphBase &graph, NodeIdType startNode,
-                     NodeIdType endNode,
-                     const std::set<NodeIdType> &allowedNodes) {
-  std::vector<SimplePath> allPaths;
-  std::vector<bool> visited(graph.nodes.size(), false);
-  SimplePath currentPath;
-
-  std::function<void(NodeIdType)> dfs = [&](NodeIdType current) {
-    if (current == endNode) {
-      allPaths.push_back(currentPath);
-      return;
-    }
-
-    visited[current] = true;
-
-    for (EdgeIdType edgeId : graph.adjList[current]) {
-      const auto &edge = graph.edges[edgeId];
-      NodeIdType next = edge.dstId;
-      if (!visited[next] && allowedNodes.count(next)) {
-        currentPath.edges.push_back(edgeId);
-        currentPath.nodes.push_back(next);
-        dfs(next);
-        currentPath.edges.pop_back();
-        currentPath.nodes.pop_back();
-      }
-    }
-
-    visited[current] = false;
-  };
-
-  currentPath.nodes.push_back(startNode);
-  dfs(startNode);
-  return allPaths;
-}
-
 /// [FPGA24] Computes cycle latency expression.
 static LinExpr
 computeCycleLatency(const SimpleCycle &cycle,
