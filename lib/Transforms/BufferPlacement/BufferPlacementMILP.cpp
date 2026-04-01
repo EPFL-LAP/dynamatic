@@ -15,6 +15,8 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
@@ -22,7 +24,11 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
+#include <algorithm>
+#include <cmath>
+#include <set>
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
 // - Dynamatic is built in debug mode
@@ -70,6 +76,77 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
   case SignalType::READY:
     return {model->inputModel.readyDelay, model->outputModel.readyDelay};
   }
+}
+
+/// [FPGA24] Returns whether the unit has variable latency.
+static bool hasVariableLatencyUnit(Operation *unit) {
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
+    auto memOp = findMemInterface(loadOp.getAddress());
+    if (isa_and_present<handshake::LSQOp>(memOp))
+      return true;
+  }
+
+  if (auto storeOp = dyn_cast<handshake::StoreOp>(unit)) {
+    auto memOp = findMemInterface(storeOp.getAddress());
+    if (isa_and_present<handshake::LSQOp>(memOp))
+      return true;
+  }
+
+  return false;
+}
+
+/// [FPGA24] Returns whether any node in the path has variable latency.
+static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
+                                   const DataflowSubgraphBase &graph) {
+  return std::any_of(nodeIds.begin(), nodeIds.end(), [&](NodeIdType nodeId) {
+    return hasVariableLatencyUnit(graph.nodes[nodeId].op);
+  });
+}
+
+/// [FPGA24] Computes cycle latency expression.
+static LinExpr
+computeCycleLatency(const SimpleCycle &cycle,
+                    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
+                    const MILPVars &vars, const TimingDatabase &timingDB,
+                    double targetPeriod) {
+  LinExpr latency;
+
+  for (NodeIdType nodeId : cycle.nodes) {
+    Operation *op = graph.nodes[nodeId].op;
+    double unitLatency = 0.0;
+    (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
+    latency += unitLatency;
+  }
+
+  for (size_t i = 0; i < cycle.nodes.size(); ++i) {
+    NodeIdType src = cycle.nodes[i];
+    NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId == dst) {
+        Value channel = graph.edges[edgeId].channel;
+        if (vars.channelVars.count(channel))
+          latency += vars.channelVars.lookup(channel).dataLatency;
+        break;
+      }
+    }
+  }
+
+  return latency;
+}
+
+/// [FPGA24] Computes cycle base latency.
+static double computeCycleBaseLatency(
+    const SimpleCycle &cycle,
+    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
+    const TimingDatabase &timingDB, double targetPeriod) {
+  double latency = 0.0;
+  for (NodeIdType nodeId : cycle.nodes) {
+    Operation *op = graph.nodes[nodeId].op;
+    double unitLatency = 0.0;
+    (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
+    latency += unitLatency;
+  }
+  return latency;
 }
 
 double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
@@ -242,8 +319,6 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       // Check if the operation is a shift operation with a constant shift value
       // If yes, the operation has a zero delay.
       if (signalType == SignalType::DATA && shiftOp.isShiftByConstant()) {
-        LLVM_DEBUG(llvm::errs() << "Shift" << getUniqueName(unit)
-                                << " has a constant delay\n");
         delay = 0.0;
       }
     }
@@ -701,10 +776,11 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
     // node with channel variables
     if (Value nodeChannel = node->nodeMLIRValue) {
       std::string nodeName = node->str();
-      SignalType signalType =
-          nodeName.find("ready") != std::string::npos   ? SignalType::READY
-          : nodeName.find("valid") != std::string::npos ? SignalType::VALID
-                                                        : SignalType::DATA;
+      SignalType signalType = SignalType::DATA;
+      if (nodeName.find("ready") != std::string::npos)
+        signalType = SignalType::READY;
+      else if (nodeName.find("valid") != std::string::npos)
+        signalType = SignalType::VALID;
 
       // Retrieve the channel variable corresponding to the AIG node
       ChannelSignalVars &signalVars =
@@ -1038,6 +1114,311 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
 
   // Finally, set the MILP objective
   model->setMaximizeObjective(objective);
+}
+
+void BufferPlacementMILP::addLatencyBalancingVars(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+  for (auto &[channel, _] : channelProps) {
+    if (isa<MemRefType>(channel.getType()))
+      continue;
+    std::string name = getUniqueName(*channel.getUses().begin());
+    ChannelVars &chVars = vars.channelVars[channel];
+
+    /// L_c: extra latency to add to the channel for balancing (integer >= 0).
+    chVars.dataLatency = model->addVar("L_" + name, INTEGER, 0, std::nullopt);
+    /// S_c: whether the channel is stalled due to imbalance (binary).
+    chVars.stalled = model->addVar("S_" + name, BOOLEAN, 0, 1);
+    /// R_c: whether the channel has L > 0, i.e., channel cut (binary).
+    chVars.bufPresent = model->addVar("R_" + name, BOOLEAN, 0, 1);
+  }
+
+  addBufferPresenceLinkConstraints();
+  addReconvergentPathVars(reconvergentPaths);
+  addSyncCycleVars(syncCyclePairs);
+}
+
+void BufferPlacementMILP::addBufferPresenceLinkConstraints() {
+  for (auto &[channel, chVars] : vars.channelVars) {
+    std::string name = getUniqueName(*channel.getUses().begin());
+    /// L_c >= R_c (if R_c=1, then L_c >= 1)
+    model->addConstr(chVars.dataLatency >= chVars.bufPresent,
+                     "R_lower_" + name);
+    /// M*R_c >= L_c (if L_c > 0, then R_c must be 1)
+    model->addConstr(fpga24::BIG_M * chVars.bufPresent >= chVars.dataLatency,
+                     "R_upper_" + name);
+  }
+}
+
+void BufferPlacementMILP::addReconvergentPathVars(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
+  vars.reconvergentPathVars.resize(reconvergentPaths.size());
+  for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
+    (void)pathWithGraph;
+    vars.reconvergentPathVars[pathIdx].imbalanced =
+        model->addVar("s_rp_" + std::to_string(pathIdx), BOOLEAN, 0, 1);
+  }
+}
+
+void BufferPlacementMILP::addSyncCycleVars(
+    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+  vars.syncCycleVars.resize(syncCyclePairs.size());
+  for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
+    vars.syncCycleVars[pairIdx].imbalanced =
+        model->addVar("s_sc_" + std::to_string(pairIdx), BOOLEAN, 0, 1);
+  }
+}
+
+void BufferPlacementMILP::addOccupancyVars(
+    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy,
+    double maxOccupancy) {
+  for (Value channel : channels) {
+    std::string name = getUniqueName(*channel.getUses().begin());
+    channelOccupancy[channel] =
+        model->addVar("n_" + name, REAL, 0.0, maxOccupancy);
+  }
+}
+
+void BufferPlacementMILP::setOccupancyBalancingObjective(
+    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy) {
+  /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c)
+  LinExpr objective;
+  for (Value channel : channels) {
+    assert(channelOccupancy.count(channel) &&
+           "missing occupancy variable for channel");
+    unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
+    // Control channels may have bitwidth 0, weight them with 1.
+    objective += (bitwidth == 0 ? 1 : bitwidth) * channelOccupancy[channel];
+  }
+  model->setMaximizeObjective(-objective);
+}
+
+void BufferPlacementMILP::addMinOccupancyConstraints(
+    const DenseMap<Value, double> &requiredOccupancy,
+    DenseMap<Value, CPVar> &channelOccupancy) {
+  for (auto const &[channel, minOccupancy] : requiredOccupancy) {
+    model->addConstr(channelOccupancy[channel] >= minOccupancy,
+                     "n_c>=(L_c/II)" +
+                         getUniqueName(*channel.getUses().begin()));
+  }
+}
+
+void BufferPlacementMILP::addBackedgeConstraints(
+    ArrayRef<CFDFC *> cfdfcs, DenseMap<Value, CPVar> &channelOccupancy) {
+  size_t cycleConstraints = 0;
+  for (size_t i = 0; i < cfdfcs.size(); ++i) {
+    CFDFC *cfdfc = cfdfcs[i];
+    for (Value channel : cfdfc->backedges) {
+      if (channelOccupancy.count(channel)) {
+        model->addConstr(channelOccupancy[channel] >= 1.0,
+                         "backedge_" + std::to_string(i));
+        cycleConstraints++;
+      }
+    }
+  }
+}
+
+void BufferPlacementMILP::addReconvergentPathConstraints(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
+  for (size_t pathIdx = 0; pathIdx < reconvergentPaths.size(); ++pathIdx) {
+    const fpga24::ReconvergentPathWithGraph &pathWithGraph =
+        reconvergentPaths[pathIdx];
+    const ReconvergentPath &path = pathWithGraph.path;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
+    CPVar &patternImbalanced = vars.reconvergentPathVars[pathIdx].imbalanced;
+
+    bool hasVarLatency = std::any_of(
+        path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
+          return hasVariableLatencyUnit(graph->nodes[id].op);
+        });
+
+    if (hasVarLatency) {
+      model->addConstr(patternImbalanced == 1,
+                       "varLatency_rp_" + std::to_string(pathIdx));
+      continue;
+    }
+
+    NodeIdType forkId = path.forkNodeId;
+    NodeIdType joinId = path.joinNodeId;
+    std::vector<SimplePath> allPaths =
+        enumerateSimplePaths(*graph, forkId, joinId, path.nodeIds);
+
+    std::vector<LinExpr> pathLatencies;
+    for (const auto &simplePath : allPaths) {
+      LinExpr pathLatency;
+
+      for (NodeIdType nodeId : simplePath.nodes) {
+        double unitLat = 0.0;
+        (void)timingDB.getLatency(graph->nodes[nodeId].op, SignalType::DATA,
+                                  unitLat, targetPeriod);
+        pathLatency += unitLat;
+      }
+
+      for (EdgeIdType edgeId : simplePath.edges) {
+        Value channel = graph->edges[edgeId].channel;
+        if (vars.channelVars.count(channel))
+          pathLatency += vars.channelVars[channel].dataLatency;
+      }
+
+      pathLatencies.push_back(pathLatency);
+    }
+
+    if (pathLatencies.empty())
+      continue;
+
+    for (size_t i = 0; i < pathLatencies.size(); ++i) {
+      for (size_t j = i + 1; j < pathLatencies.size(); ++j) {
+        std::string baseName =
+            llvm::formatv("imbalance_rp_{0}_{1}_{2}", pathIdx, i, j).str();
+        model->addConstr(pathLatencies[i] - pathLatencies[j] <=
+                             fpga24::BIG_M * patternImbalanced,
+                         baseName + "_a");
+        model->addConstr(pathLatencies[j] - pathLatencies[i] <=
+                             fpga24::BIG_M * patternImbalanced,
+                         baseName + "_b");
+      }
+    }
+  }
+}
+
+void BufferPlacementMILP::addSyncCycleConstraints(
+    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
+    const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph) {
+  for (size_t pairIdx = 0; pairIdx < syncCyclePairs.size(); ++pairIdx) {
+    const ::dynamatic::SynchronizingCyclePair &pair = syncCyclePairs[pairIdx];
+    CPVar &patternImbalanced = vars.syncCycleVars[pairIdx].imbalanced;
+
+    bool hasVarLatency =
+        hasVariableLatencyPath(pair.cycleOne.nodes, syncGraph) ||
+        hasVariableLatencyPath(pair.cycleTwo.nodes, syncGraph);
+    if (hasVarLatency) {
+      model->addConstr(patternImbalanced == 1,
+                       "varLatency_sc_" + std::to_string(pairIdx));
+      continue;
+    }
+
+    LinExpr latencyCycleOne = computeCycleLatency(pair.cycleOne, syncGraph,
+                                                  vars, timingDB, targetPeriod);
+    LinExpr latencyCycleTwo = computeCycleLatency(pair.cycleTwo, syncGraph,
+                                                  vars, timingDB, targetPeriod);
+
+    std::string baseName = "imbalance_sc_" + std::to_string(pairIdx);
+    model->addConstr(latencyCycleOne - latencyCycleTwo <=
+                         fpga24::BIG_M * patternImbalanced,
+                     baseName + "_a");
+    model->addConstr(latencyCycleTwo - latencyCycleOne <=
+                         fpga24::BIG_M * patternImbalanced,
+                     baseName + "_b");
+  }
+}
+
+/// Connects pattern-level imbalance indicators to per-channel stall variables.
+/// For each channel in a reconvergent path or sync cycle, enforces:
+///     stalled_c >= imbalanced_p   for each pattern p using channel c,
+/// so channels are marked stalled if any associated pattern is imbalanced.
+void BufferPlacementMILP::addStallPropagationConstraints(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
+    const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph) {
+  DenseMap<Value, SmallVector<CPVar *>> channelToPatterns;
+  auto addPatternToChannelStallProp = [&](Value channel, CPVar *imbalanced) {
+    channelToPatterns[channel].push_back(imbalanced);
+  };
+
+  for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
+    const ReconvergentPath &path = pathWithGraph.path;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
+    for (NodeIdType nodeId : path.nodeIds) {
+      for (EdgeIdType edgeId : graph->adjList[nodeId]) {
+        const auto &edge = graph->edges[edgeId];
+        if (path.nodeIds.count(edge.dstId))
+          addPatternToChannelStallProp(
+              edge.channel, &vars.reconvergentPathVars[pathIdx].imbalanced);
+      }
+    }
+  }
+
+  for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
+    for (const auto &edgeInfo : pair.edgesToJoins) {
+      for (EdgeIdType edgeId : edgeInfo.edgesFromCycleOne)
+        addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
+                                     &vars.syncCycleVars[pairIdx].imbalanced);
+      for (EdgeIdType edgeId : edgeInfo.edgesFromCycleTwo)
+        addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
+                                     &vars.syncCycleVars[pairIdx].imbalanced);
+    }
+  }
+
+  size_t channelIdx = 0;
+  for (auto &[channel, patterns] : channelToPatterns) {
+    if (!vars.channelVars.count(channel)) {
+      channelIdx++;
+      continue;
+    }
+
+    CPVar &stalled = vars.channelVars[channel].stalled;
+    for (size_t i = 0; i < patterns.size(); ++i) {
+      std::string cstrName =
+          llvm::formatv("stallProp_{0}_{1}", channelIdx, i).str();
+      model->addConstr(stalled >= *patterns[i], cstrName);
+    }
+    channelIdx++;
+  }
+}
+
+void BufferPlacementMILP::addCycleTimeConstraints(
+    ArrayRef<CFDFC *> cfdfcs, double &computedII,
+    llvm::MapVector<CFDFC *, double> &iiMap) {
+  if (cfdfcs.empty()) {
+    llvm::errs() << "[LatBal]   No CFDFCs, skipping cycle time constraints\n";
+    return;
+  }
+
+  for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
+    ::dynamatic::SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp,
+                                                           *cfdfc);
+    std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
+    if (cycles.empty()) {
+      continue;
+    }
+
+    assert(!cycles.empty() && "empty cycle list should have been skipped");
+    auto maxCycleIt =
+        std::max_element(cycles.begin(), cycles.end(),
+                         [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
+                           return computeCycleBaseLatency(
+                                      lhs, cfdfcGraph, timingDB, targetPeriod) <
+                                  computeCycleBaseLatency(
+                                      rhs, cfdfcGraph, timingDB, targetPeriod);
+                         });
+    double maxBaseLatency = computeCycleBaseLatency(*maxCycleIt, cfdfcGraph,
+                                                    timingDB, targetPeriod);
+
+    double iiCFC = std::max(1.0, std::ceil(maxBaseLatency));
+    computedII = std::max(computedII, iiCFC);
+    iiMap[cfdfc] = iiCFC;
+
+    for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
+      LinExpr cycleLatency =
+          computeCycleLatency(cycle, cfdfcGraph, vars, timingDB, targetPeriod);
+      std::string baseName =
+          llvm::formatv("cycleTime_cfdfc{0}_cycle{1}", cfdfcIdx, cycleIdx)
+              .str();
+      model->addConstr(cycleLatency >= iiCFC, baseName + "_min");
+      model->addConstr(cycleLatency <= iiCFC, baseName + "_max");
+    }
+  }
+}
+
+void BufferPlacementMILP::setLatencyBalancingObjective() {
+  LinExpr objective;
+  for (auto &[channel, chVars] : vars.channelVars) {
+    objective += fpga24::STALL_WEIGHT * chVars.stalled;
+    unsigned bitwidth = getHandshakeTypeBitWidth(channel.getType());
+    objective += fpga24::LATENCY_WEIGHT * (bitwidth * chVars.bufPresent);
+    objective += fpga24::LATENCY_WEIGHT * chVars.dataLatency;
+  }
+  model->setMaximizeObjective(-objective);
 }
 
 void BufferPlacementMILP::forEachIOPair(

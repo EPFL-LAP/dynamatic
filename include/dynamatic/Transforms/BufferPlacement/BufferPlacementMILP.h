@@ -29,12 +29,20 @@
 #include "experimental/Support/SubjectGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace dynamatic {
+struct SynchronizingCyclePair;
+class SynchronizingCyclesFinderGraph;
+
 namespace buffer {
+namespace fpga24 {
+struct ReconvergentPathWithGraph;
+}
 
 /// Pair of Gurobi variables meant to represent the arrival times of a signal at
 /// a channel's endpoints.
@@ -53,6 +61,8 @@ struct UnitVars {
   /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
   /// input if the latter is combinational (real).
   CPVar retOut;
+  /// [FPGA24] Occupancy contribution of this unit (real).
+  CPVar occupancy;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -77,6 +87,18 @@ struct ChannelVars {
   CPVar dataLatency;
   /// Usage of a shift register on the channel (binary).
   CPVar shiftReg;
+
+  /// [FPGA24] Whether the channel is stalled due to pattern imbalance (binary).
+  CPVar stalled;
+  /// [FPGA24] Maximum token occupancy for this channel (real).
+  CPVar maxOccupancy;
+};
+
+/// [FPGA24] Holds all variables associated to a synchronization pattern. (e.g.
+/// reconvergent paths)
+struct SynchronizationPatternVars {
+  /// Whether the synchronization pattern is imbalanced (binary).
+  CPVar imbalanced;
 };
 
 /// Holds all variables associated to a CFDFC. These are a set of variables for
@@ -99,6 +121,12 @@ struct MILPVars {
   llvm::MapVector<CFDFC *, CFDFCVars> cfdfcVars;
   /// Mapping between channels and their related variables.
   llvm::MapVector<Value, ChannelVars> channelVars;
+  /// [FPGA24] Balancing variables for reconvergent paths.
+  SmallVector<SynchronizationPatternVars> reconvergentPathVars;
+  /// [FPGA24] Balancing variables for synchronizing cycles.
+  SmallVector<SynchronizationPatternVars> syncCycleVars;
+  /// List of units in the function.
+  llvm::MapVector<Operation *, UnitVars> unitVars;
 };
 
 /// Abstract class holding the basic logic for the smart buffer placement pass,
@@ -369,6 +397,69 @@ protected:
   /// 'addBufferAreaAwareObjective'.
   void addBufferAreaAwareObjective(ValueRange channels,
                                    ArrayRef<CFDFC *> cfdfcs);
+
+  /// [FPGA24] Creates L_c, S_c, R_c variables for every dataflow channel, plus
+  /// pattern imbalance variables, and links R_c to L_c.
+  void addLatencyBalancingVars(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+
+  /// [FPGA24] Links the binary buffer-presence variable R_c to the integer
+  /// latency variable L_c for every channel. (Paper: Section 4, Equation 6)
+  void addBufferPresenceLinkConstraints();
+
+  /// [FPGA24] Creates binary imbalance variables for reconvergent paths.
+  void addReconvergentPathVars(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
+
+  /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
+  void addSyncCycleVars(
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+
+  /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
+  void addOccupancyVars(ValueRange channels,
+                        DenseMap<Value, CPVar> &channelOccupancy,
+                        double maxOccupancy);
+
+  /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum.
+  void setOccupancyBalancingObjective(ValueRange channels,
+                                      DenseMap<Value, CPVar> &channelOccupancy);
+
+  /// [FPGA24] Adds minimum occupancy constraints: N_c >= L_c / II.
+  /// (Paper: Section 5, Equation 8 and 15)
+  void
+  addMinOccupancyConstraints(const DenseMap<Value, double> &requiredOccupancy,
+                             DenseMap<Value, CPVar> &channelOccupancy);
+
+  /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
+  /// least one token. (Paper: Section 5, Equation 12)
+  void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
+                              DenseMap<Value, CPVar> &channelOccupancy);
+
+  /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
+  void addReconvergentPathConstraints(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
+
+  /// [FPGA24] Adds imbalance constraints for synchronizing cycle pairs in LP1.
+  void addSyncCycleConstraints(
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
+      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// [FPGA24] For each channel involved in a reconvergent path or
+  /// synchronizing cycle pair, constrains stalled_c >= imbalanced_p so that
+  /// pattern imbalance surfaces in the per-channel stall term of the objective.
+  void addStallPropagationConstraints(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
+      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// [FPGA24] Adds cycle-time constraints and computes required II values.
+  void addCycleTimeConstraints(ArrayRef<CFDFC *> cfdfcs, double &computedII,
+                               llvm::MapVector<CFDFC *, double> &iiMap);
+
+  /// [FPGA24] Sets LP1 objective prioritizing stall removal and low latency.
+  void setLatencyBalancingObjective();
+
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
   void forEachIOPair(Operation *op,

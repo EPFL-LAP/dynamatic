@@ -714,8 +714,8 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
-        it->second == "fpl22" || it->second == "costaware" ||
-        it->second == "mapbuf") {
+        it->second == "fpl22" || it->second == "fpga24" ||
+        it->second == "costaware" || it->second == "mapbuf") {
       buffers = it->second;
     } else {
       llvm::errs()

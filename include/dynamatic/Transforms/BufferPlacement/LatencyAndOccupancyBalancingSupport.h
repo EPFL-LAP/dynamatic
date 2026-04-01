@@ -105,6 +105,19 @@ struct DataflowSubgraphBase {
   }
 };
 
+/// [FPGA24] Represents one simple path through a dataflow subgraph.
+struct SimplePath {
+  llvm::SmallVector<EdgeIdType> edges;
+  llvm::SmallVector<NodeIdType> nodes;
+};
+
+/// [FPGA24] Enumerates all simple paths from start to end within the allowed
+/// node set.
+std::vector<SimplePath>
+enumerateSimplePaths(const DataflowSubgraphBase &graph, NodeIdType startNode,
+                     NodeIdType endNode,
+                     const std::set<NodeIdType> &allowedNodes);
+
 /// A reconvergent path is a subgraph where multiple paths diverge from a fork
 /// and reconverge at a join. This is important for latency balancing.
 struct ReconvergentPath {
@@ -176,7 +189,7 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
 
 /// A dataflow graph specialized for reconvergent path analysis.
 /// IMPORTANT: This class assumes the graph an ACYCLIC transition sequence.
-class ReconvergentPathFinderGraph : public DataflowSubgraphBase {
+class CFGTransitionSequenceSubgraph : public DataflowSubgraphBase {
 public:
   bool isForkNode(NodeIdType nodeId) const override {
     return isa<handshake::ForkOp, handshake::LazyForkOp,
@@ -187,6 +200,12 @@ public:
   // inputs to be active at the same time. Unlike: ControlMergeOp and MergeOp.
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(nodes[nodeId].op)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+        return true;
+    }
+
     return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
                handshake::ConditionalBranchOp>(nodes[nodeId].op);
   }
@@ -223,18 +242,19 @@ public:
 
   /// Dump multiple graphs to a single GraphViz file.
   /// Each graph is placed in its own cluster subgraph.
-  static void dumpAllGraphs(llvm::ArrayRef<ReconvergentPathFinderGraph> graphs,
-                            llvm::StringRef filename);
+  static void
+  dumpAllGraphs(llvm::ArrayRef<CFGTransitionSequenceSubgraph> graphs,
+                llvm::StringRef filename);
 
   /// Dump all reconvergent paths from multiple graphs to a single GraphViz
   /// file. Each path is placed in its own cluster subgraph with a graph index
   /// prefix. The input is a vector of GraphPathsForDumping objects. Each object
   /// contains:
-  /// - graph: Pointer to the ReconvergentPathFinderGraph for this sequence.
+  /// - graph: Pointer to the CFGTransitionSequenceSubgraph for this sequence.
   /// - paths: Vector of ReconvergentPath objects for this sequence.
 
   struct GraphPathsForDumping {
-    const ReconvergentPathFinderGraph *graph;
+    const CFGTransitionSequenceSubgraph *graph;
     std::vector<ReconvergentPath> paths;
   };
 
@@ -286,6 +306,10 @@ struct SynchronizingCyclePair {
   SimpleCycle cycleOne;
   SimpleCycle cycleTwo;
 
+  /// The edges are grouped by the join node they reach.
+  /// We keep track of:
+  /// - The join node each edge group belongs to.
+  /// - Whether the edge group comes from cycleOne or cycleTwo.
   std::vector<EdgesToJoin> edgesToJoins;
 
   SynchronizingCyclePair(SimpleCycle one, SimpleCycle two,
@@ -296,6 +320,10 @@ struct SynchronizingCyclePair {
 
 class SynchronizingCyclesFinderGraph : public DataflowSubgraphBase {
 public:
+  SynchronizingCyclesFinderGraph() = default;
+  SynchronizingCyclesFinderGraph(handshake::FuncOp funcOp,
+                                 const buffer::CFDFC &cfdfc);
+
   /// Build the graph from a CFDFC.
   void buildFromCFDFC(handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc);
 
@@ -312,6 +340,12 @@ public:
 
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(nodes[nodeId].op)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+        return true;
+    }
+
     return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
                handshake::ConditionalBranchOp>(nodes[nodeId].op);
   }
