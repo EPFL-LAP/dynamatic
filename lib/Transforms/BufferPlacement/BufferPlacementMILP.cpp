@@ -1302,6 +1302,10 @@ void BufferPlacementMILP::addSyncCycleConstraints(
   }
 }
 
+/// Connects pattern-level imbalance indicators to per-channel stall variables.
+/// For each channel in a reconvergent path or sync cycle, enforces:
+///     stalled_c >= imbalanced_p   for each pattern p using channel c,
+/// so channels are marked stalled if any associated pattern is imbalanced.
 void BufferPlacementMILP::addStallPropagationConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
     ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
