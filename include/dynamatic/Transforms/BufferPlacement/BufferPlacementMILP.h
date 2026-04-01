@@ -427,9 +427,9 @@ protected:
 
   /// [FPGA24] Adds minimum occupancy constraints: N_c >= L_c / II.
   /// (Paper: Section 5, Equation 8 and 15)
-  void addMinOccupancyConstraints(
-      const DenseMap<Value, double> &requiredOccupancy,
-      DenseMap<Value, CPVar> &channelOccupancy);
+  void
+  addMinOccupancyConstraints(const DenseMap<Value, double> &requiredOccupancy,
+                             DenseMap<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
   /// least one token. (Paper: Section 5, Equation 12)
