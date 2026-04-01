@@ -18,6 +18,7 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
@@ -34,6 +35,7 @@ namespace dynamatic {
 namespace handshake {
 
 class NamedIOInterface;
+class LatencyInterface;
 class FuncOp;
 
 /// Provides an opaque interface for generating the port names of an operation;

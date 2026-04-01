@@ -68,7 +68,7 @@ def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
   }];
   let methods = [
    InterfaceMethod<[{
-       Get the internal state of each slot.
+       Get the internal state namer of each slot.
      }],
      "std::vector<BufferSlotFullNamer>", "getInternalSlotStateNamers", (ins)
    >,
@@ -305,6 +305,27 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
     return attr.getInt();
   }]>,
 
+  InterfaceMethod<[{
+    Gets the pipeline slots based on the II and the latency.
+    TODO: Actually retrieve the II, instead of just assuming II=1
+
+    Implementation is done here instead of in HandshakeOps.cpp as
+    the code will look the same for any operation.
+  }], "std::vector<PipelineSlotNamer>", "getPipelineSlots", (ins), [{
+    Operation *op = $_op.getOperation();
+    auto attr = op->getAttrOfType<IntegerAttr>("latency");
+    assert(attr && "cannot latency slot without defined latency");
+    auto name = op->getAttrOfType<::mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+    assert(name && "cannot latency slot without defined op name");
+    int64_t latency = attr.getInt();
+    int64_t II = 1;
+    int64_t numSlots = latency / II;
+    std::vector<PipelineSlotNamer> ret(numSlots);
+    for (int64_t i = 0; i < numSlots; ++i) {
+      ret[i] = PipelineSlotNamer(name.str(), i);
+    }
+    return ret;
+  }]>,
   InterfaceMethod<[{
   Sets the operation latency.
     }], "void", "setLatency", (ins "int64_t":$latency), [{

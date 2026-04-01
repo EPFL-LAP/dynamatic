@@ -13,6 +13,7 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Support/FlowExpression.h"
 #include "mlir/IR/Value.h"
 #include "llvm/Support/JSON.h"
 #include <cstdint>
@@ -31,6 +32,7 @@ public:
     VEQ /* Valid EQuivalence */,
     EFNAO /* Eager Fork Not All Output sent */,
     CSOAFAF, /* Copied Slots Of Active Forks Are Full */
+    RPF,     /* Reconvergent Path Flow */
   };
 
   TAG getTag() const { return tag; }
@@ -226,10 +228,44 @@ public:
 private:
   std::vector<handshake::EagerForkSentNamer> sentStateNamers;
   handshake::BufferSlotFullNamer copiedSlot;
-  inline static const StringLiteral FORK_OP_LIT = "fork_op";
-  inline static const StringLiteral FORK_CHANNELS_LIT = "channels";
-  inline static const StringLiteral BUFFER_OP_LIT = "buffer_op";
-  inline static const StringLiteral BUFFER_SLOT_LIT = "buffer_slot";
+  inline static const StringLiteral FORK_CHANNELS_LIT = "fork_channels";
+  inline static const StringLiteral COPIED_SLOT_LIT = "copied_slot";
+};
+
+// A pair of two paths is called reconvergent if they split at the same fork,
+// and later reconverge at some join. Both of these paths will contain the same
+// number of tokens (although one needs to account for eager forks "generating"
+// new tokens when eagerly forwarding a token). Rather than starting at each
+// fork and following each path until they reconverge, these reconvergent paths
+// are annotated using Gaussian elimination: Each operation describes a local
+// equation about the number of tokens that have arrived at each operand, the
+// number of tokens that have left at each result, and the number of tokens
+// stored within internal state (e.g. a buffer slot or eager fork sent). If, for
+// every operation, these local equations are put into a matrix and Gaussian
+// elimination is performed, many variables can be eliminated, leaving a few
+// equations relating only the internal states. These equations correspond
+// exactly to the reconvergent paths.
+// See https://ieeexplore.ieee.org/document/10323796 Invariants from
+// Reconvergent Paths
+class ReconvergentPathFlow : public FormalProperty {
+public:
+  std::vector<FlowExpression> getEquations() { return equations; }
+  void addEquation(const FlowExpression &expr) { equations.push_back(expr); }
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ReconvergentPathFlow>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  ReconvergentPathFlow() = default;
+  ReconvergentPathFlow(unsigned long id, TAG tag);
+  ~ReconvergentPathFlow() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::RPF;
+  }
+
+private:
+  std::vector<FlowExpression> equations;
+  inline static const StringLiteral EQUATIONS_LIT = "equations";
 };
 
 class FormalPropertyTable {

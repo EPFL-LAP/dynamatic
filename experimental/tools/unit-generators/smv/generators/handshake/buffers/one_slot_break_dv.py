@@ -24,6 +24,7 @@ MODULE {name} (ins_valid, outs_ready)
   DEFINE
   ins_ready := !outs_valid_i | outs_ready;
   outs_valid := outs_valid_i;
+  slot_0_full := outs_valid_i;
 """
 
 

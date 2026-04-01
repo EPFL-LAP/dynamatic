@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/IndexChannelAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -21,10 +22,12 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
@@ -78,11 +81,10 @@ private:
                          Operation &curOp);
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
-  bool isChannelToBeChecked(OpResult res);
+  LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
 };
-} // namespace
 
-bool HandshakeAnnotatePropertiesPass::isChannelToBeChecked(OpResult res) {
+bool isChannelToBeChecked(OpResult res) {
   // The channel connected to EndOp, MemoryControllerOp, and LSQOp don't appear
   // in the properties database for the following reasons:
   // - EndOp: the operation doesn't exist in the output model; the property
@@ -101,6 +103,7 @@ bool HandshakeAnnotatePropertiesPass::isChannelToBeChecked(OpResult res) {
                     handshake::LSQOp>(*user);
       });
 }
+} // namespace
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateValidEquivalenceBetweenOps(
@@ -228,6 +231,55 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
   return success();
 }
 
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
+  auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
+
+  // Local equations extracted in constructor
+  FlowEquationExtractor extractor(indexChannelAnalysis);
+  // This fails when some operations in the module are not yet handled
+  if (failed(extractor.extractAll(modOp))) {
+    return failure();
+  }
+
+  // Create a matrix, and map all variables to an column index
+  FlowSystem indices(extractor.equations);
+  MatIntType &matrix = indices.matrix;
+
+  // Verify that the registry data structure is correct
+  assert(indices.registry.verify());
+
+  // bring to row-echelon form
+  gaussianElimination(matrix);
+
+  size_t rows = matrix.size1();
+  for (size_t row = 0; row < rows; ++row) {
+    bool canAnnotate = true;
+    for (size_t col = 0; col < indices.nLambdas; ++col) {
+      if (matrix(row, col) != 0) {
+        canAnnotate = false;
+        break;
+      }
+    }
+
+    if (!canAnnotate) {
+      continue;
+    }
+
+    FlowExpression expr = indices.getRowAsExpression(row);
+    if (expr.terms.size() == 0) {
+      continue;
+    }
+    ReconvergentPathFlow p(uid, FormalProperty::TAG::INVAR);
+    p.addEquation(expr);
+    if (p.getEquations().size() > 0) {
+      uid++;
+      propertyTable.push_back(p.toJSON());
+    }
+  }
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -239,6 +291,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return signalPassFailure();
+    if (failed(annotateReconvergentPathFlow(modOp)))
       return signalPassFailure();
   }
 

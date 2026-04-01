@@ -752,6 +752,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the memory controller.
     dynamatic::MCPorts getPorts();
+
+    size_t getNumLoadPorts();
+    std::optional<LoadPort> getLoadPort(size_t index);
+    MemoryControllerSlotNamer getLoadPortSlotNamer(size_t index);
   }];
 }
 
