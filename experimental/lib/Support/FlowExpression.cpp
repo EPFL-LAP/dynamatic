@@ -257,8 +257,7 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
   LogicalResult res = success();
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
-      if (isa<AddIOp, CmpIOp, ConstantOp, ExtUIOp, ExtSIOp, MulIOp, SubIOp,
-              TruncIOp>(op)) {
+      if (isa<ArithOpInterface>(op)) {
         if (failed(extractArithmeticJoinOp(op))) {
           res = failure();
         }
