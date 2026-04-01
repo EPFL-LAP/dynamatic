@@ -13,8 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/LLVM.h"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graph_utility.hpp>
@@ -27,10 +29,7 @@
 #include <numeric>
 #include <queue>
 
-// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
-// - Dynamatic is built in debug mode
-// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
-#define DEBUG_TYPE "latency-and-occupancy-balancing"
+#define DEBUG_TYPE "latency-and-occupancy-balancing-support"
 
 // Make the graph boost analyzable.
 // NOTE: Moving this to the header file will cause linking errors.
@@ -46,16 +45,19 @@ namespace dynamatic {
 
 ///=== RECONVERGENT PATH FINDER ===///
 
-std::string ReconvergentPathFinderGraph::getNodeLabel(NodeIdType nodeId) const {
-  std::string opName = nodes[nodeId].op->getName().getStringRef().str();
-  return opName + "\\nStep: " + std::to_string(getNodeStep(nodeId));
+std::string
+CFGTransitionSequenceSubgraph::getNodeLabel(NodeIdType nodeId) const {
+  auto opName = nodes[nodeId].op->getAttrOfType<mlir::StringAttr>(
+      NameAnalysis::ATTR_NAME);
+  return opName.str() + "\\nStep: " + std::to_string(getNodeStep(nodeId));
 }
 
-std::string ReconvergentPathFinderGraph::getNodeDotId(NodeIdType nodeId) const {
+std::string
+CFGTransitionSequenceSubgraph::getNodeDotId(NodeIdType nodeId) const {
   return "node_" + std::to_string(nodeId);
 }
 
-void ReconvergentPathFinderGraph::buildGraphFromSequence(
+void CFGTransitionSequenceSubgraph::buildGraphFromSequence(
     handshake::FuncOp funcOp, llvm::ArrayRef<ArchBB> sequence) {
   if (sequence.empty()) {
     return;
@@ -150,7 +152,7 @@ void ReconvergentPathFinderGraph::buildGraphFromSequence(
 }
 
 std::vector<ReconvergentPath>
-ReconvergentPathFinderGraph::findReconvergentPaths() const {
+CFGTransitionSequenceSubgraph::findReconvergentPaths() const {
   std::vector<NodeIdType> forks;
   std::vector<NodeIdType> joins;
 
@@ -246,7 +248,7 @@ ReconvergentPathFinderGraph::findReconvergentPaths() const {
 
 // [START AI-generated code]
 
-void ReconvergentPathFinderGraph::dumpReconvergentPaths(
+void CFGTransitionSequenceSubgraph::dumpReconvergentPaths(
     llvm::ArrayRef<ReconvergentPath> paths, llvm::StringRef filename) const {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
@@ -329,7 +331,7 @@ void ReconvergentPathFinderGraph::dumpReconvergentPaths(
                           << " reconvergent paths to " << fullPath << "\n";);
 }
 
-void ReconvergentPathFinderGraph::dumpTransitionGraph(
+void CFGTransitionSequenceSubgraph::dumpTransitionGraph(
     llvm::StringRef filename) const {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
@@ -394,8 +396,8 @@ void ReconvergentPathFinderGraph::dumpTransitionGraph(
   LLVM_DEBUG(llvm::errs() << "Dumped DataflowGraph to " << fullPath << "\n";);
 }
 
-void ReconvergentPathFinderGraph::dumpAllGraphs(
-    llvm::ArrayRef<ReconvergentPathFinderGraph> graphs,
+void CFGTransitionSequenceSubgraph::dumpAllGraphs(
+    llvm::ArrayRef<CFGTransitionSequenceSubgraph> graphs,
     llvm::StringRef filename) {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
@@ -421,7 +423,7 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
   file << "  compound=true;\n\n";
 
   for (size_t graphIdx = 0; graphIdx < graphs.size(); ++graphIdx) {
-    const ReconvergentPathFinderGraph &graph = graphs[graphIdx];
+    const CFGTransitionSequenceSubgraph &graph = graphs[graphIdx];
     std::string graphPrefix = "g" + std::to_string(graphIdx) + "_";
 
     file << "  subgraph cluster_graph_" << graphIdx << " {\n";
@@ -474,7 +476,7 @@ void ReconvergentPathFinderGraph::dumpAllGraphs(
                           << " dataflow graphs to " << fullPath << "\n";);
 }
 
-void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
+void CFGTransitionSequenceSubgraph::dumpAllReconvergentPaths(
     llvm::ArrayRef<GraphPathsForDumping> graphPaths, llvm::StringRef filename) {
   llvm::SmallString<256> fullPath;
   if (llvm::sys::path::is_absolute(filename)) {
@@ -499,8 +501,12 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
   file << "  bgcolor=white;\n";
   file << "  compound=true;\n\n";
 
+  size_t totalPaths = 0;
+  for (const auto &entry : graphPaths)
+    totalPaths += entry.paths.size();
+
   for (const auto &[graphIdx, entry] : llvm::enumerate(graphPaths)) {
-    const ReconvergentPathFinderGraph *graph = entry.graph;
+    const CFGTransitionSequenceSubgraph *graph = entry.graph;
     const std::vector<ReconvergentPath> &paths = entry.paths;
 
     for (size_t pathIdx = 0; pathIdx < paths.size(); ++pathIdx) {
@@ -557,9 +563,48 @@ void ReconvergentPathFinderGraph::dumpAllReconvergentPaths(
 
   file << "}\n";
   file.close();
+  LLVM_DEBUG(llvm::errs() << "Dumped " << totalPaths
+                          << " reconvergent paths from " << graphPaths.size()
+                          << " graphs to " << fullPath << "\n";);
 }
 
 // [END AI-generated code]
+
+std::vector<SimplePath>
+enumerateSimplePaths(const DataflowSubgraphBase &graph, NodeIdType startNode,
+                     NodeIdType endNode,
+                     const std::set<NodeIdType> &allowedNodes) {
+  std::vector<SimplePath> allPaths;
+  std::vector<bool> visited(graph.nodes.size(), false);
+  SimplePath currentPath;
+
+  std::function<void(NodeIdType)> dfs = [&](NodeIdType current) {
+    if (current == endNode) {
+      allPaths.push_back(currentPath);
+      return;
+    }
+
+    visited[current] = true;
+
+    for (EdgeIdType edgeId : graph.adjList[current]) {
+      const auto &edge = graph.edges[edgeId];
+      NodeIdType next = edge.dstId;
+      if (!visited[next] && allowedNodes.count(next)) {
+        currentPath.edges.push_back(edgeId);
+        currentPath.nodes.push_back(next);
+        dfs(next);
+        currentPath.edges.pop_back();
+        currentPath.nodes.pop_back();
+      }
+    }
+
+    visited[current] = false;
+  };
+
+  currentPath.nodes.push_back(startNode);
+  dfs(startNode);
+  return allPaths;
+}
 
 bool SimpleCycle::isDisjointFrom(const SimpleCycle &other) const {
   std::set<NodeIdType> thisNodes(nodes.begin(), nodes.end());
@@ -573,6 +618,11 @@ NodeIdType SynchronizingCyclesFinderGraph::getOrAddNode(mlir::Operation *op) {
   NodeIdType id = addNode(op);
   opToNodeId[op] = id;
   return id;
+}
+
+SynchronizingCyclesFinderGraph::SynchronizingCyclesFinderGraph(
+    handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc) {
+  buildFromCFDFC(funcOp, cfdfc);
 }
 
 void SynchronizingCyclesFinderGraph::buildFromCFDFC(
