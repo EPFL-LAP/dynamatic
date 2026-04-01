@@ -30,8 +30,8 @@ def generate_forwarding_expression_for_signal(signal_name: str, in_extra_signal_
     We can use the first input port's tag for all output ports.
     """
     if signal_name.startswith("tag"):
-        if in_extra_signals:
-            return in_extra_signals[0]
+        if in_extra_signal_names:
+            return in_extra_signal_names[0]
         raise ValueError(f"{signal_name} requires at least one signal")
 
     raise ValueError(

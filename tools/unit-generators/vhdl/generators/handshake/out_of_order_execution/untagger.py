@@ -48,9 +48,9 @@ port(
   ins   : in  std_logic_vector({data_bitwidth} - 1 downto 0);
   outs  : out std_logic_vector({data_bitwidth} - 1 downto 0);
 
-  dataOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
-  dataOut_valid : out  std_logic;
-  dataOut_ready : in std_logic;
+  tagOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  tagOut_valid : out  std_logic;
+  tagOut_ready : in std_logic;
 
   ins_{current_tag} : in std_logic_vector({tag_bitwidth}-1 downto 0) 
 );
@@ -62,10 +62,10 @@ end entity;
 architecture arch of {name} is
 begin
     outs_valid<= ins_valid;
-    dataOut_valid<= ins_valid;
-    ins_ready <= dataOut_ready and outs_ready;
+    tagOut_valid<= ins_valid;
+    ins_ready <= tagOut_ready and outs_ready;
     outs <= ins;
-    dataOut <= ins_{current_tag};
+    tagOut <= ins_{current_tag};
 end architecture;
 """
 
@@ -93,9 +93,9 @@ port(
 
   ins_ready : out std_logic;
 
-  dataOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
-  dataOut_valid : out  std_logic;
-  dataOut_ready : in std_logic;
+  tagOut : out std_logic_vector({tag_bitwidth}-1 downto 0);
+  tagOut_valid : out  std_logic;
+  tagOut_ready : in std_logic;
 
   ins_{current_tag} : in std_logic_vector({tag_bitwidth}-1 downto 0) 
 );
@@ -107,9 +107,9 @@ end {name};
 architecture arch of {name} is
 begin
     outs_valid<= ins_valid;
-    dataOut_valid<= ins_valid;
-    ins_ready <= dataOut_ready and outs_ready;
-    dataOut <= ins_{current_tag};
+    tagOut_valid<= ins_valid;
+    ins_ready <= tagOut_ready and outs_ready;
+    tagOut <= ins_{current_tag};
 end architecture;
 """
 
@@ -140,7 +140,7 @@ def _generate_untagger_signal_manager(name, data_bitwidth, current_tag, tag_bitw
       "bitwidth": data_bitwidth,
       "extra_signals": extra_signals
   }, {
-      "name": "dataOut",
+      "name": "tagOut",
       "bitwidth": tag_bitwidth,
       "extra_signals": {}
   }]
