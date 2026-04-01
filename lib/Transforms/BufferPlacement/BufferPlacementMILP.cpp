@@ -364,8 +364,6 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       // Check if the operation is a shift operation with a constant shift value
       // If yes, the operation has a zero delay.
       if (signalType == SignalType::DATA && shiftOp.isShiftByConstant()) {
-        LLVM_DEBUG(llvm::errs() << "Shift" << getUniqueName(unit)
-                                << " has a constant delay\n");
         delay = 0.0;
       }
     }
@@ -1180,16 +1178,9 @@ void BufferPlacementMILP::addLatencyBalancingVars(
     chVars.bufPresent = model->addVar("R_" + name, BOOLEAN, 0, 1);
   }
 
-  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << vars.channelVars.size()
-                          << " channel variables\n");
-
   addBufferPresenceLinkConstraints();
   addReconvergentPathVars(reconvergentPaths);
   addSyncCycleVars(syncCyclePairs);
-
-  LLVM_DEBUG(llvm::errs() << "[LatBal]   Created " << reconvergentPaths.size()
-                          << " reconvergent path vars, "
-                          << syncCyclePairs.size() << " sync cycle vars\n");
 }
 
 void BufferPlacementMILP::addBufferPresenceLinkConstraints() {
@@ -1260,19 +1251,11 @@ void BufferPlacementMILP::addBackedgeConstraints(
       }
     }
   }
-  LLVM_DEBUG(llvm::errs() << "[OccBal]   Added " << cycleConstraints
-                          << " cycle capacity constraints\n");
 }
 
 void BufferPlacementMILP::addReconvergentPathConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
-  size_t totalPaths = reconvergentPaths.size();
-  for (size_t pathIdx = 0; pathIdx < totalPaths; ++pathIdx) {
-    LLVM_DEBUG(if (pathIdx % 10 == 0 || pathIdx == totalPaths - 1) {
-      llvm::errs() << "[LatBal]   Processing reconvergent path " << pathIdx + 1
-                   << "/" << totalPaths << "\n";
-    });
-
+  for (size_t pathIdx = 0; pathIdx < reconvergentPaths.size(); ++pathIdx) {
     const fpga24::ReconvergentPathWithGraph &pathWithGraph =
         reconvergentPaths[pathIdx];
     const ReconvergentPath &path = pathWithGraph.path;
@@ -1294,9 +1277,6 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
     NodeIdType joinId = path.joinNodeId;
     std::vector<SimplePath> allPaths =
         enumerateSimplePaths(*graph, forkId, joinId, path.nodeIds);
-
-    LLVM_DEBUG(llvm::errs()
-               << "[LatBal]     -> " << allPaths.size() << " simple paths\n");
 
     std::vector<LinExpr> pathLatencies;
     for (const auto &simplePath : allPaths) {
@@ -1430,8 +1410,6 @@ void BufferPlacementMILP::addCycleTimeConstraints(
                                                            *cfdfc);
     std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
     if (cycles.empty()) {
-      LLVM_DEBUG(llvm::errs()
-                 << "[LatBal]   CFDFC " << cfdfcIdx << ": no cycles\n");
       continue;
     }
 
@@ -1450,11 +1428,6 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     double iiCFC = std::max(1.0, std::ceil(maxBaseLatency));
     computedII = std::max(computedII, iiCFC);
     iiMap[cfdfc] = iiCFC;
-
-    LLVM_DEBUG(llvm::errs()
-               << "[LatBal]   CFDFC " << cfdfcIdx << ": " << cycles.size()
-               << " cycles, II_CFC = " << iiCFC
-               << " (max base latency = " << maxBaseLatency << ")\n");
 
     for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
       LinExpr cycleLatency =

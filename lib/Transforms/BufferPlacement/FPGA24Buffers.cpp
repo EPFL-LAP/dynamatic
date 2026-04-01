@@ -29,7 +29,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
 #include <cmath>
 #include <list>
 #include <set>
@@ -86,16 +85,10 @@ LatencyBalancingResult LatencyBalancingMILP::extractLatencyResults() {
         static_cast<unsigned>(model->getValue(chVars.dataLatency) + 0.5);
     result.channelExtraLatency[channel] = dataLatency;
 
-    LLVM_DEBUG(llvm::errs()
-               << "Channel " << getUniqueName(*channel.getUses().begin())
-               << ": extra_latency=" << dataLatency
-               << ", stalled=" << model->getValue(chVars.stalled) << "\n");
   }
 
   result.targetII = computedII;
   result.cfdfcTargetIIs = computedCFDFCIIs;
-  LLVM_DEBUG(llvm::errs() << "[LatBal] Computed target II = " << computedII
-                          << "\n");
   return result;
 }
 
@@ -116,13 +109,10 @@ OccupancyBalancingLP::OccupancyBalancingLP(
 }
 
 void OccupancyBalancingLP::setup() {
-  LLVM_DEBUG(llvm::errs() << "[OccBal] Setting up Occupancy Balancing LP...\n");
-
   if (unsatisfiable)
     return;
 
   if (cfdfcs.empty()) {
-    LLVM_DEBUG(llvm::errs() << "[OccBal] WARNING: No CFDFCs provided\n");
     unsatisfiable = true;
     return;
   }
@@ -134,8 +124,6 @@ void OccupancyBalancingLP::setup() {
       allChannelsSet.insert(channel);
     }
   }
-  size_t cfdfcChannelCount = allChannelsSet.size();
-
   /// Also include channels from reconvergent paths (including non-CFDFC edges)
   /// This ensures LP2 handles entry/exit paths that LP1 balanced.
   for (const auto &pathWithGraph : reconvergentPaths) {
@@ -152,14 +140,7 @@ void OccupancyBalancingLP::setup() {
   }
 
   SmallVector<Value> allChannels(allChannelsSet.begin(), allChannelsSet.end());
-  LLVM_DEBUG(llvm::errs() << "[OccBal]   Found " << cfdfcChannelCount
-                          << " CFDFC channels + "
-                          << (allChannels.size() - cfdfcChannelCount)
-                          << " reconvergent path channels = "
-                          << allChannels.size() << " total\n");
-
   if (allChannels.empty()) {
-    LLVM_DEBUG(llvm::errs() << "[OccBal] WARNING: No channels found\n");
     unsatisfiable = true;
     return;
   }
@@ -169,14 +150,10 @@ void OccupancyBalancingLP::setup() {
   if (targetII <= 0.0) {
     targetII = 1.0;
   }
-  LLVM_DEBUG(llvm::errs() << "[OccBal]   Target II = " << targetII << "\n");
-
   /// Create variables for each channel
   /// N_c: Maximal token occupancy on channel c.
   /// (Paper: Section 5, Table 2)
   this->addOccupancyVars(allChannels, channelOccupancy, MAX_OCCUPANCY);
-  LLVM_DEBUG(llvm::errs() << "[OccBal]   Created " << channelOccupancy.size()
-                          << " occupancy variables\n");
 
   /// (Paper: Section 5, Equation 8): N_c >= L_c / II
   /// We enforce this for the global II, but also for each CFDFC's specific II
@@ -210,31 +187,20 @@ void OccupancyBalancingLP::setup() {
   }
 
   // Add constraints
-  size_t constraintCount = 0;
   for (auto const &[channel, minOccupancy] : requiredOccupancy) {
-    LLVM_DEBUG(llvm::errs()
-                   << "[LP2***] minOccupancy = " << minOccupancy
-                   << " channel = " << getUniqueName(*channel.getUses().begin())
-                   << "\n";);
     model->addConstr(channelOccupancy[channel] >= minOccupancy,
                      "n_c>=(L_c/II)" +
                          getUniqueName(*channel.getUses().begin()));
-    constraintCount++;
   }
-  LLVM_DEBUG(llvm::errs() << "[OccBal]   Added " << constraintCount
-                          << " N_c >= L_c/II constraints (max over CFDFCs)\n");
 
   addBackedgeConstraints(cfdfcs, channelOccupancy);
 
   this->setOccupancyBalancingObjective(allChannels, channelOccupancy);
 
   markReadyToOptimize();
-  LLVM_DEBUG(llvm::errs() << "[OccBal] Setup complete.\n");
 }
 
 void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
-  LLVM_DEBUG(llvm::errs() << "[OccBal] Extracting results...\n");
-
   for (auto &[channel, var] : channelOccupancy) {
     double occupancy = model->getValue(var);
     unsigned numSlots = static_cast<unsigned>(std::ceil(occupancy));
@@ -294,12 +260,6 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
     if (result.numFifoNone > 0 || result.numOneSlotDV > 0 ||
         result.numOneSlotR > 0) {
       placement[channel] = result;
-      LLVM_DEBUG(llvm::errs()
-                 << "  " << getUniqueName(*channel.getUses().begin())
-                 << ": L=" << latencyCycles << ", N=" << numSlots
-                 << ", occ=" << occupancy << " -> DV=" << result.numOneSlotDV
-                 << ", FIFO=" << result.numFifoNone
-                 << ", R=" << result.numOneSlotR << "\n");
     }
   }
 }
@@ -322,8 +282,6 @@ void FPGA24Buffers::findSynchronizationPatterns(
   if (!cfdfcs.empty()) {
     syncGraph.buildFromCFDFC(funcInfo.funcOp, *cfdfcs[0]);
     allSyncCyclePairs = syncGraph.findSynchronizingCyclePairs();
-    LLVM_DEBUG(llvm::errs() << "Found " << allSyncCyclePairs.size()
-                            << " synchronizing cycle pairs\n");
   }
 
   const auto &archTransitions = funcInfo.archs;
@@ -334,21 +292,10 @@ void FPGA24Buffers::findSynchronizationPatterns(
   auto sequences =
       enumerateTransitionSequences(archTransitions, sequenceLength);
 
-  LLVM_DEBUG(llvm::errs() << "Enumerated " << sequences.size()
-                          << " transition sequences\n");
-
   std::set<std::pair<Operation *, Operation *>> seenForkJoinPairs;
 
   size_t totalSequences = sequences.size();
-  size_t duplicatesSkipped = 0;
   for (size_t seqIdx = 0; seqIdx < totalSequences; ++seqIdx) {
-    LLVM_DEBUG(if (seqIdx % 50 == 0 || seqIdx == totalSequences - 1) {
-      llvm::errs() << "  Processing sequence " << seqIdx + 1 << "/"
-                   << totalSequences << " (found "
-                   << allReconvergentPaths.size() << " unique paths, "
-                   << duplicatesSkipped << " duplicates skipped)\n";
-    });
-
     const auto &sequence = sequences[seqIdx];
     CFGTransitionSequenceSubgraph graph;
     graph.buildGraphFromSequence(funcInfo.funcOp, sequence);
@@ -368,7 +315,6 @@ void FPGA24Buffers::findSynchronizationPatterns(
       auto key = std::make_pair(forkOp, joinOp);
 
       if (seenForkJoinPairs.count(key)) {
-        duplicatesSkipped++;
         continue;
       }
       seenForkJoinPairs.insert(key);
@@ -386,10 +332,6 @@ void FPGA24Buffers::findSynchronizationPatterns(
     }
   }
 
-  LLVM_DEBUG(llvm::errs() << "Found " << allReconvergentPaths.size()
-                          << " unique reconvergent paths across "
-                          << reconvergentGraphs.size() << " graphs ("
-                          << duplicatesSkipped << " duplicates skipped)\n");
 }
 
 FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
@@ -398,23 +340,15 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
     ArrayRef<SynchronizingCyclePair> syncCyclePairs,
     const SynchronizingCyclesFinderGraph &syncGraph) {
 
-  LLVM_DEBUG(llvm::errs() << "=== Setting up LP1 (Latency Balancing) ===\n");
-
   LatencyBalancingMILP latencyBalancingLP(
       solverKind, timeout, funcInfo, timingDB, targetPeriod, reconvergentPaths,
       syncCyclePairs, syncGraph, cfdfcs);
 
-  LLVM_DEBUG(llvm::errs() << "=== Optimizing LP1 ===\n");
   if (failed(latencyBalancingLP.optimize())) {
-    LLVM_DEBUG(llvm::errs() << "LP1 optimization failed\n");
     return failure();
   }
-  LLVM_DEBUG(llvm::errs() << "LP1 optimization complete.\n");
 
   LatencyBalancingResult result = latencyBalancingLP.extractLatencyResults();
-  LLVM_DEBUG(llvm::errs() << "LP1 computed extra latencies for "
-                          << result.channelExtraLatency.size()
-                          << " channels\n");
 
   LLVM_DEBUG({
     llvm::errs() << "=== Verifying CFDFC Cycle Latencies After LP1 ===\n";
@@ -461,18 +395,14 @@ LogicalResult FPGA24Buffers::solveOccupancyBalancing(
     ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
     const LatencyBalancingResult &latencyResult) {
 
-  LLVM_DEBUG(llvm::errs() << "=== Setting up LP2 (Occupancy Balancing) ===\n");
-
   OccupancyBalancingLP occupancyBalancingLP(
       solverKind, timeout, funcInfo, timingDB, targetPeriod, latencyResult,
       reconvergentPaths, cfdfcs);
 
   if (failed(occupancyBalancingLP.optimize())) {
-    LLVM_DEBUG(llvm::errs() << "LP2 optimization failed\n");
     return failure();
   }
 
-  LLVM_DEBUG(llvm::errs() << "LP2 optimization complete.\n");
   occupancyBalancingLP.extractResult(placement);
   return success();
 }
@@ -525,9 +455,6 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
         PlacementResult result;
         result.numFifoNone = 1;
         placement[res] = result;
-        LLVM_DEBUG(llvm::errs()
-                   << "  Adding memory fork buffer: "
-                   << getUniqueName(*res.getUses().begin()) << "\n");
       }
     }
   }
@@ -545,26 +472,15 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
         PlacementResult result;
         result.numFifoNone = 1;
         placement[res] = result;
-        LLVM_DEBUG(llvm::errs()
-                   << "  Adding memory controller end buffer: "
-                   << getUniqueName(*res.getUses().begin()) << "\n");
       }
     }
-
-    LLVM_DEBUG(llvm::errs()
-               << "Note: these buffers are added to the output of the memory "
-                  "controller, they get rid of the stalls after the memory "
-                  "controller, but they themselves stall the circuit.\n");
   }
 }
 
 LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
-  LLVM_DEBUG(llvm::errs() << "=== FPGA24 Buffer Placement ===\n");
-
   SmallVector<CFDFC *> cfdfcPtrs;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
     cfdfcPtrs.push_back(cfdfc);
-  LLVM_DEBUG(llvm::errs() << "Found " << cfdfcPtrs.size() << " CFDFCs\n");
 
   std::list<CFGTransitionSequenceSubgraph> reconvergentGraphs;
   std::vector<ReconvergentPathWithGraph> allReconvergentPaths;
@@ -604,10 +520,6 @@ LogicalResult FPGA24Buffers::solve(BufferPlacement &placement) {
         cfdfc->channelOccupancy[channel] = 0.0;
     }
   }
-
-  LLVM_DEBUG(llvm::errs() << "=== FPGA24 Buffer Placement Complete ===\n");
-  LLVM_DEBUG(llvm::errs() << "Placed buffers on " << placement.size()
-                          << " channels\n");
 
   return success();
 }
