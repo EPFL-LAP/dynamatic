@@ -84,7 +84,6 @@ LatencyBalancingResult LatencyBalancingMILP::extractLatencyResults() {
     unsigned dataLatency =
         static_cast<unsigned>(model->getValue(chVars.dataLatency) + 0.5);
     result.channelExtraLatency[channel] = dataLatency;
-
   }
 
   result.targetII = computedII;
@@ -331,7 +330,6 @@ void FPGA24Buffers::findSynchronizationPatterns(
       }
     }
   }
-
 }
 
 FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
