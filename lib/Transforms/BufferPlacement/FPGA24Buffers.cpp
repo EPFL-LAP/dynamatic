@@ -185,13 +185,7 @@ void OccupancyBalancingLP::setup() {
     }
   }
 
-  // Add constraints
-  for (auto const &[channel, minOccupancy] : requiredOccupancy) {
-    model->addConstr(channelOccupancy[channel] >= minOccupancy,
-                     "n_c>=(L_c/II)" +
-                         getUniqueName(*channel.getUses().begin()));
-  }
-
+  addMinOccupancyConstraints(requiredOccupancy, channelOccupancy);
   addBackedgeConstraints(cfdfcs, channelOccupancy);
 
   this->setOccupancyBalancingObjective(allChannels, channelOccupancy);

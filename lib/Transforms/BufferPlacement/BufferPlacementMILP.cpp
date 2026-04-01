@@ -1193,6 +1193,16 @@ void BufferPlacementMILP::setOccupancyBalancingObjective(
   model->setMaximizeObjective(-objective);
 }
 
+void BufferPlacementMILP::addMinOccupancyConstraints(
+    const DenseMap<Value, double> &requiredOccupancy,
+    DenseMap<Value, CPVar> &channelOccupancy) {
+  for (auto const &[channel, minOccupancy] : requiredOccupancy) {
+    model->addConstr(channelOccupancy[channel] >= minOccupancy,
+                     "n_c>=(L_c/II)" +
+                         getUniqueName(*channel.getUses().begin()));
+  }
+}
+
 void BufferPlacementMILP::addBackedgeConstraints(
     ArrayRef<CFDFC *> cfdfcs, DenseMap<Value, CPVar> &channelOccupancy) {
   size_t cycleConstraints = 0;
