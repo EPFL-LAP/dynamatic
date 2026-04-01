@@ -439,7 +439,9 @@ protected:
       ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
       const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
 
-  /// [FPGA24] Propagates pattern imbalance to per-channel stall variables.
+  /// [FPGA24] For each channel involved in a reconvergent path or
+  /// synchronizing cycle pair, constrains stalled_c >= imbalanced_p so that
+  /// pattern imbalance surfaces in the per-channel stall term of the objective.
   void addStallPropagationConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
       ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,

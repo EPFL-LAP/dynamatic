@@ -105,6 +105,19 @@ struct DataflowSubgraphBase {
   }
 };
 
+/// [FPGA24] Represents one simple path through a dataflow subgraph.
+struct SimplePath {
+  llvm::SmallVector<EdgeIdType> edges;
+  llvm::SmallVector<NodeIdType> nodes;
+};
+
+/// [FPGA24] Enumerates all simple paths from start to end within the allowed
+/// node set.
+std::vector<SimplePath>
+enumerateSimplePaths(const DataflowSubgraphBase &graph, NodeIdType startNode,
+                     NodeIdType endNode,
+                     const std::set<NodeIdType> &allowedNodes);
+
 /// A reconvergent path is a subgraph where multiple paths diverge from a fork
 /// and reconverge at a join. This is important for latency balancing.
 struct ReconvergentPath {
