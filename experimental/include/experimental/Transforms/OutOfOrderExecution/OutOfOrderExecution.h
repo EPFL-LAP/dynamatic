@@ -1,4 +1,7 @@
-//===- Passes.h - Exp. transformation passes registration -------*- C++ -*-===//
+//===- OutOfOrderExecution.h - Enable Out-of-Order Execution in Dataflow
+// Circuits
+//-*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,26 +9,29 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the registration code for all experimental transformation
-// passes.
+// This file declares the --out-of-order-execution pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_TRANSFORMS_PASSES_H
-#define EXPERIMENTAL_TRANSFORMS_PASSES_H
+#ifndef EXPERIMENTAL_TRANSFORMS_OUTOFORDEREXECUTION_OUTOFORDEREXECUTION_H
+#define EXPERIMENTAL_TRANSFORMS_OUTOFORDEREXECUTION_OUTOFORDEREXECUTION_H
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Transforms/OutOfOrderExecution/OutOfOrderExecution.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
 namespace experimental {
-/// Generate the code for registering passes.
-#define GEN_PASS_DECL
-#define GEN_PASS_REGISTRATION
+namespace outoforder {
+
+std::unique_ptr<dynamatic::DynamaticPass> createOutOfOrderExecution();
+
+#define GEN_PASS_DECL_OUTOFORDEREXECUTION
+#define GEN_PASS_DEF_OUTOFORDEREXECUTION
 #include "experimental/Transforms/Passes.h.inc"
+
+} // namespace outoforder
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_TRANSFORMS_PASSES_H
+#endif // EXPERIMENTAL_TRANSFORMS_OUTOFORDEREXECUTION_OUTOFORDEREXECUTION_H

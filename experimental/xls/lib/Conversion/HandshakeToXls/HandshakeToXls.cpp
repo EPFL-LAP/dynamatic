@@ -287,7 +287,7 @@ void JoinProc::build(OpBuilder builder) const {
                          nextArgs.back() /* output */, rxOp.getValid());
 
   for (unsigned int i = 1; i < numDataOperands; i++) {
-    auto prevRxNotValid = b.create<xls::NotOp>(rxOp.getValid()).getResult();
+    auto prevRxNotValid = b.create<xls::NotIOp>(rxOp.getValid()).getResult();
     auto allPrevRxNotValid =
         b.create<xls::AndOp>(prevRxNotValid, rxOp.getPredicate()).getResult();
 
@@ -516,7 +516,7 @@ void CMergeProc::build(OpBuilder builder) const {
 
   for (unsigned int i = 0; i < numDataOperands; i++) {
 
-    auto prevRxNotValid = b.create<xls::NotOp>(rxOp.getValid()).getResult();
+    auto prevRxNotValid = b.create<xls::NotIOp>(rxOp.getValid()).getResult();
     auto allPrevRxNotValid =
         b.create<xls::AndOp>(prevRxNotValid, rxOp.getPredicate()).getResult();
 
@@ -585,7 +585,7 @@ void CBranchProc::build(OpBuilder builder) const {
   auto tokResult =
       createAfterAll(b, rxSel.getTknOut(), rxVal.getTknOut()).getResult();
 
-  auto notSel = b.create<xls::NotOp>(rxSel.getResult());
+  auto notSel = b.create<xls::NotIOp>(rxSel.getResult());
 
   // Two conditional sends:
   b.create<xls::SSendOp>(tokResult, rxVal.getResult(), nextArgs[2],
@@ -865,7 +865,7 @@ public:
 
   void build(OpBuilder builder) const override;
 
-  static std::shared_ptr<HandshakeProc> get(NotOp op);
+  static std::shared_ptr<HandshakeProc> get(NotIOp op);
 
 private:
   unsigned int width;
@@ -891,12 +891,12 @@ void NotOpProc::build(OpBuilder builder) const {
   auto inp = rx1.getResult();
   auto tok1 = rx1.getTknOut();
 
-  Value result = b.create<xls::NotOp>(inp).getResult();
+  Value result = b.create<xls::NotIOp>(inp).getResult();
 
   b.create<xls::SSendOp>(tok1, result, nextArgs[1]);
 }
 
-std::shared_ptr<HandshakeProc> NotOpProc::get(NotOp op) {
+std::shared_ptr<HandshakeProc> NotOpProc::get(NotIOp op) {
   auto width = getHandshakeTypeBitWidth(op.getResult().getType());
   return std::make_shared<NotOpProc>(NotOpProc(width));
 }
@@ -1144,7 +1144,7 @@ public:
             .Case<AndIOp, AddIOp, DivSIOp, DivUIOp, MulIOp, OrIOp, XOrIOp,
                   ShLIOp, ShRSIOp, ShRUIOp, SubIOp>(
                 [&](auto op) { return BinaryIOpProc::get(op); })
-            .Case<NotOp>([&](NotOp op) { return NotOpProc::get(op); })
+            .Case<NotIOp>([&](NotIOp op) { return NotOpProc::get(op); })
             .Case<handshake::CmpIOp>(
                 [&](CmpIOp op) { return CmpIProc::get(op); })
             .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp>(
@@ -1508,7 +1508,7 @@ public:
     patterns.insert<ConvertToXlsSpawn<SourceOp>>(ctx, procs);
     patterns.insert<ConvertToXlsSpawn<SinkOp>>(ctx, procs);
     patterns.insert<ConvertToXlsSpawn<ConstantOp>>(ctx, procs);
-    patterns.insert<ConvertToXlsSpawn<NotOp>>(ctx, procs);
+    patterns.insert<ConvertToXlsSpawn<NotIOp>>(ctx, procs);
 
     // BinaryIOp:
     patterns.insert<ConvertToXlsSpawn<AndIOp>>(ctx, procs);

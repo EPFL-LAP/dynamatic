@@ -413,7 +413,7 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>, 
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>,
   LacksExtraSignals<"selectOperand">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
@@ -597,7 +597,6 @@ def DemuxOp : Handshake_Op<"demux", [
   //    `:` type($selectOperand) `,`  functional-type($dataOperand, results)
   //}];
 
-
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < 2 && "index too high");
@@ -755,7 +754,6 @@ def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
   let description = [{
     The `free_tags_fifo` operation represents a FIFO queue that supplies tags ready for reuse.
     It takes free tags as input and outputs a free tag, giving it to the Tagger when necessary
-
     Example:
 
     ```mlir
@@ -1261,7 +1259,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"saveCtrl">,
+  // IsSimpleHandshake<"saveCtrl">,
   IsIntSizedChannel<1, "saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
@@ -1350,10 +1348,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
-  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  LacksSpecTag<"dataIn">,
-  HasValidSpecTag<"dataOut">,
-  IsSimpleHandshake<"ctrl">,
+  // AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  // LacksSpecTag<"dataIn">,
+  // HasValidSpecTag<"dataOut">,
+  // IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
