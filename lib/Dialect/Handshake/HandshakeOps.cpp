@@ -441,8 +441,9 @@ LogicalResult BufferOp::verify() {
 
   auto emitLatencyError = [&](int64_t expectedLatency) -> LogicalResult {
     return emitOpError("buffer type '")
-           << stringifyEnum(bufferType) << "' requires DV_LATENCY = "
-           << expectedLatency << ", but got " << dvLatency;
+           << stringifyEnum(bufferType)
+           << "' requires DV_LATENCY = " << expectedLatency << ", but got "
+           << dvLatency;
   };
 
   switch (bufferType) {
