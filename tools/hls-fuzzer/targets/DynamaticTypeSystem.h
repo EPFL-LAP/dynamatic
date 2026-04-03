@@ -8,13 +8,11 @@ namespace dynamatic::gen {
 /// Typing context that used to avoid casts between floats and integers.
 struct DynamaticTypingContext {
   enum Constraint {
-    /// Expression mustn't be of a floating-point type.
+    /// Expression must be of a floating-point type.
     FloatRequired,
-    /// Expression mustn't be of an integer type.
+    /// Expression must be of an integer type.
     IntegerRequired,
-    /// Expression can be whatever.
-    None,
-    MAX_VALUE = None,
+    MAX_VALUE = IntegerRequired,
   } constraint;
 };
 
@@ -36,29 +34,16 @@ public:
 
   /// Discard 'op' based on the mode in 'context' and forward constraint to
   /// the operands as required.
-  std::optional<ConclusionOf<ast::BinaryExpression>>
+  static std::optional<ConclusionOf<ast::BinaryExpression>>
   checkBinaryExpression(ast::BinaryExpression::Op op,
-                        DynamaticTypingContext context) const;
+                        DynamaticTypingContext context);
 
-  std::optional<ConclusionOf<ast::CastExpression>>
-  checkCastExpression(DynamaticTypingContext context) {
-    // Pick a specific constraints such that the 'to' type and the expression
-    // are both integers or both floating point types.
-    context = eliminateNone(context);
-    return Super::checkCastExpression(context);
-  }
-
-  ConclusionOf<ast::Function> checkFunction(DynamaticTypingContext context) {
-    context = eliminateNone(context);
-    return Super::checkFunction(context);
-  }
-
-  static ConclusionOf<ast::ConditionalExpression>
-  checkConditionalExpression(DynamaticTypingContext context) {
+  ConclusionOf<ast::ConditionalExpression>
+  checkConditionalExpression(DynamaticTypingContext context) const {
     // Condition can be either a floating point type or integer type.
     // Either converts to a bool type without issues.
     return ConclusionOf<ast::ConditionalExpression>{
-        {DynamaticTypingContext::None},
+        {random.fromEnum<DynamaticTypingContext::Constraint>()},
         context,
         context,
     };
@@ -75,9 +60,6 @@ public:
   }
 
 private:
-  /// If 'context' is none, randomly picks one of 'integer' or 'float'.
-  DynamaticTypingContext eliminateNone(DynamaticTypingContext context) const;
-
   Randomly &random;
 };
 

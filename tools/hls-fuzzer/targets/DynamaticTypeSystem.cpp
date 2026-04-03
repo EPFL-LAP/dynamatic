@@ -15,15 +15,12 @@ auto dynamatic::gen::DynamaticTypeSystem::checkScalarType(
         scalarType == ast::PrimitiveType::Double)
       return std::nullopt;
     return ConclusionOf<ast::ScalarType>{};
-
-  case DynamaticTypingContext::None:
-    return ConclusionOf<ast::ScalarType>{};
   }
   llvm_unreachable("all enum cases handled");
 }
 
 auto dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
-    ast::BinaryExpression::Op op, DynamaticTypingContext context) const
+    ast::BinaryExpression::Op op, DynamaticTypingContext context)
     -> std::optional<ConclusionOf<ast::BinaryExpression>> {
   switch (op) {
   case ast::BinaryExpression::BitAnd:
@@ -54,23 +51,7 @@ auto dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
   case ast::BinaryExpression::Plus:
   case ast::BinaryExpression::Minus:
   case ast::BinaryExpression::Mul:
-    // If no requirement is given by the current typing context, pick one such
-    // that lhs and rhs are consistent.
-    context = eliminateNone(context);
     return Super::checkBinaryExpression(op, context);
   }
   llvm_unreachable("all enum values handled");
-}
-
-dynamatic::gen::DynamaticTypingContext
-dynamatic::gen::DynamaticTypeSystem::eliminateNone(
-    DynamaticTypingContext context) const {
-  if (context.constraint != DynamaticTypingContext::None)
-    return context;
-
-  return {random.fromRange(
-      std::initializer_list<DynamaticTypingContext::Constraint>{
-          DynamaticTypingContext::IntegerRequired,
-          DynamaticTypingContext::FloatRequired,
-      })};
 }
