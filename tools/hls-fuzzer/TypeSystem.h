@@ -78,6 +78,10 @@ public:
   checkScalarTypeOpaque(const ast::ScalarType &,
                         const OpaqueContext &context) = 0;
 
+  virtual std::optional<ConclusionOf<ast::ReturnType, OpaqueContext>>
+  checkReturnTypeOpaque(const ast::ReturnType &,
+                        const OpaqueContext &context) = 0;
+
   virtual std::optional<ConclusionOf<ast::Constant, OpaqueContext>>
   checkConstantOpaque(const ast::Constant &, const OpaqueContext &context) = 0;
 
@@ -91,6 +95,10 @@ public:
   virtual std::optional<ConclusionOf<ast::ArrayParameter, OpaqueContext>>
   checkArrayParameterOpaque(const ast::ArrayParameter &,
                             const OpaqueContext &context) = 0;
+
+  virtual std::optional<
+      ConclusionOf<ast::ArrayAssignmentStatement, OpaqueContext>>
+  checkArrayAssignmentStatementOpaque(const OpaqueContext &context) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -204,6 +212,25 @@ public:
     return {};
   }
 
+  std::optional<ConclusionOf<ast::ReturnType>>
+  checkReturnType(const ast::ReturnType &returnType,
+                  const TypingContext &context) {
+    // Default implementation dispatches to 'checkScalarType'.
+    return llvm::TypeSwitch<ast::ReturnType,
+                            std::optional<ConclusionOf<ast::ReturnType>>>(
+               returnType)
+        .Case([](const ast::VoidType *) {
+          return ConclusionOf<ast::ReturnType>{};
+        })
+        .Case([&](const ast::ScalarType *scalar)
+                  -> std::optional<ConclusionOf<ast::ReturnType>> {
+          if (!self().checkScalarType(*scalar, context))
+            return std::nullopt;
+
+          return ConclusionOf<ast::ReturnType>{};
+        });
+  }
+
   std::optional<ConclusionOf<ast::Constant>>
   checkConstant(const ast::Constant &constant, const TypingContext &context) {
     if (!self().checkScalarType(constant.getType(), context))
@@ -233,6 +260,11 @@ public:
       return std::nullopt;
 
     return context;
+  }
+
+  static ConclusionOf<ast::ArrayAssignmentStatement>
+  checkArrayAssignmentStatement(const TypingContext &context) {
+    return {context, context, context};
   }
 
   // Implementations of the virtual methods in 'AbstractTypeSystem'.
@@ -275,6 +307,12 @@ public:
     return convert(self().checkScalarType(node, context.cast<TypingContext>()));
   }
 
+  std::optional<dynamatic::ConclusionOf<ast::ReturnType, OpaqueContext>>
+  checkReturnTypeOpaque(const ast::ReturnType &node,
+                        const OpaqueContext &context) final {
+    return convert(self().checkReturnType(node, context.cast<TypingContext>()));
+  }
+
   std::optional<dynamatic::ConclusionOf<ast::Constant, OpaqueContext>>
   checkConstantOpaque(const ast::Constant &node,
                       const OpaqueContext &context) final {
@@ -300,6 +338,13 @@ public:
                             const OpaqueContext &context) final {
     return convert(
         self().checkArrayParameter(node, context.cast<TypingContext>()));
+  }
+
+  std::optional<
+      dynamatic::ConclusionOf<ast::ArrayAssignmentStatement, OpaqueContext>>
+  checkArrayAssignmentStatementOpaque(const OpaqueContext &context) final {
+    return convert(
+        self().checkArrayAssignmentStatement(context.cast<TypingContext>()));
   }
 
 private:
@@ -395,6 +440,11 @@ public:
     return std::nullopt;
   }
 
+  static std::optional<ConclusionOf<ast::ReturnType, TypingContext>>
+  checkScalarType(const ast::ReturnType &, const TypingContext &) {
+    return std::nullopt;
+  }
+
   std::optional<ConclusionOf<ast::Constant, TypingContext>>
   checkConstant(const ast::Constant &, const TypingContext &) {
     return std::nullopt;
@@ -412,6 +462,12 @@ public:
 
   std::optional<ConclusionOf<ast::ArrayParameter, TypingContext>>
   checkArrayParameter(const ast::ArrayParameter &, const TypingContext &) {
+    return std::nullopt;
+  }
+
+  static std::optional<
+      ConclusionOf<ast::ArrayAssignmentStatement, TypingContext>>
+  checkArrayAssignmentStatement(const TypingContext &) {
     return std::nullopt;
   }
 };

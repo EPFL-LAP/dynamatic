@@ -80,7 +80,8 @@ private:
   PendingParameter generateFreshScalarParameter(ast::ScalarType datatype,
                                                 const OpaqueContext &context);
 
-  ast::ReturnStatement generateFunctionBody(const OpaqueContext &constraints);
+  ast::ReturnStatement
+  generateReturnStatement(const OpaqueContext &constraints);
 
   ast::Expression generateExpression(const OpaqueContext &constraint,
                                      std::size_t depth);
@@ -103,6 +104,9 @@ private:
   generateArrayReadExpression(const OpaqueContext &context,
                               std::size_t depth = 0);
 
+  std::optional<ast::ArrayParameter>
+  generateArrayParameter(const OpaqueContext &context, std::size_t depth = 0);
+
   std::optional<ast::Variable>
   generateScalarParameter(const OpaqueContext &constraints,
                           std::size_t depth = 0);
@@ -116,8 +120,18 @@ private:
       llvm::function_ref<bool(const ast::ScalarType &)> toExclude =
           nullptr) const;
 
+  ast::ReturnType generateReturnType(const OpaqueContext &context) const;
+
+  std::vector<ast::Statement>
+  generateStatementList(const OpaqueContext &context);
+
+  std::optional<ast::Statement> generateStatement(const OpaqueContext &context);
+
+  std::optional<ast::ArrayAssignmentStatement>
+  generateArrayAssignmentStatement(const OpaqueContext &context);
+
   Randomly &random;
-  ast::ScalarType returnType{};
+  ast::ReturnType returnType;
   std::vector<std::pair<ast::ScalarParameter, OpaqueContext>> scalarParameters;
   std::vector<std::pair<ast::ArrayParameter, OpaqueContext>> arrayParameters;
   std::size_t varCounter = 0;
