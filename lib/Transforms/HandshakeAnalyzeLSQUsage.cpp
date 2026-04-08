@@ -267,6 +267,7 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
       LLVM_DEBUG({
         llvm::dbgs() << "\tRerouting '" << getUniqueName(loadOp) << "' to MC\n";
       });
+      ++loadsRerouted;
     }
   }
 
@@ -296,17 +297,20 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
     }
   }
 
-  LLVM_DEBUG({
-    for (handshake::StoreOp storeOp : lsqStoreOps) {
-      if (dependentStores.contains(storeOp)) {
+  for (StoreOp storeOp : lsqStoreOps) {
+    if (dependentStores.contains(storeOp)) {
+      LLVM_DEBUG({
         llvm::dbgs() << "\tKeeping '" << getUniqueName(storeOp)
                      << "': WAW or RAW dependency with other access\n";
-      } else {
+      });
+    } else {
+      LLVM_DEBUG({
         llvm::dbgs() << "\tRerouting '" << getUniqueName(storeOp)
                      << "' to MC\n";
-      }
+      });
+      ++storesRerouted;
     }
-  });
+  }
 
   // Tag LSQ access ports with the interface they should actually connect to,
   // which may be different from the one they currently connect to
