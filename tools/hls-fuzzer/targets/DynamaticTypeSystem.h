@@ -25,7 +25,7 @@ struct DynamaticTypingContext {
 class DynamaticTypeSystem
     : public TypeSystem<DynamaticTypingContext, DynamaticTypeSystem> {
 public:
-  explicit DynamaticTypeSystem(Randomly &random) : random(random) {}
+  explicit DynamaticTypeSystem(Randomly &random) : TypeSystem(random) {}
 
   /// Discard 'scalarType' based on the mode in 'context'.
   static std::optional<ConclusionOf<ast::ScalarType>>
@@ -69,9 +69,6 @@ public:
         context,
     };
   }
-
-private:
-  Randomly &random;
 };
 
 } // namespace dynamatic::gen

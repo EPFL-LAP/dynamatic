@@ -138,13 +138,7 @@ struct TypeSystemTraits<ast::ArrayReadExpression> {
 };
 
 template <>
-struct TypeSystemTraits<ast::ArrayParameter> {
-
-  /// Type constraint for constants that this parameter is initialized to during
-  /// test bench generation.
-  template <typename TypingContext>
-  using Conclusions = TypingContext;
-};
+struct TypeSystemTraits<ast::ArrayParameter> : TypeSystemTraitsDefaults {};
 
 template <>
 struct TypeSystemTraits<ast::ArrayAssignmentStatement> {

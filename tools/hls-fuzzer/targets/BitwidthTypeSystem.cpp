@@ -16,6 +16,35 @@ auto dynamatic::gen::BitwidthTypeSystem::checkScalarType(
   return std::nullopt;
 }
 
+std::optional<dynamatic::ast::ArrayReadExpression>
+dynamatic::gen::BitwidthTypeSystem::generateArrayReadExpression(
+    BitwidthTypingContext context,
+    GenerateCallback<ast::ArrayParameter, BitwidthTypingContext>
+        generateArrayParameter,
+    GenerateCallback<ast::Expression, BitwidthTypingContext> generateExpression)
+    const {
+  std::optional<ast::ArrayParameter> arrayParameter =
+      generateArrayParameter(context);
+  if (!arrayParameter)
+    return std::nullopt;
+
+  ast::ScalarType elementType = arrayParameter->getElementType();
+  assert(llvm::isPowerOf2_64(arrayParameter->getDimension()) &&
+         "implementation depends on dimensions being powers of 2");
+
+  // We can use the bitwidth constraint + the size of the array to ensure
+  // that the indexing expression is in range of the array.
+  std::optional<ast::Expression> index =
+      generateExpression(BitwidthTypingContext(std::min<std::uint8_t>(
+          llvm::Log2_64(arrayParameter->getDimension()), globalMaxBitwidth)));
+  if (!index)
+    return std::nullopt;
+
+  return ast::ArrayReadExpression{std::move(elementType),
+                                  arrayParameter->getName().str(),
+                                  std::move(*index)};
+}
+
 auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
     const ast::Constant &constant, const BitwidthTypingContext &context) const
     -> std::optional<ConclusionOf<ast::Constant>> {

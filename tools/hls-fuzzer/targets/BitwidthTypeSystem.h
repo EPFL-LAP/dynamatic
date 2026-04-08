@@ -57,7 +57,7 @@ class BitwidthTypeSystem
     : public TypeSystem<BitwidthTypingContext, BitwidthTypeSystem> {
 public:
   explicit BitwidthTypeSystem(uint8_t globalMaxBitwidth, Randomly &random)
-      : globalMaxBitwidth(globalMaxBitwidth), random(random) {}
+      : TypeSystem(random), globalMaxBitwidth(globalMaxBitwidth) {}
 
   /// Disallows floats and doubles.
   static std::optional<ConclusionOf<ast::ScalarType>>
@@ -73,6 +73,13 @@ public:
 
     return Super::checkReturnType(returnType, context);
   }
+
+  std::optional<ast::ArrayReadExpression> generateArrayReadExpression(
+      BitwidthTypingContext context,
+      GenerateCallback<ast::ArrayParameter, BitwidthTypingContext>
+          generateArrayParameter,
+      GenerateCallback<ast::Expression, BitwidthTypingContext>
+          generateExpression) const;
 
   /// Disallow array-assignment statements.
   /// There is no rationale for doing so beyond the fact that we don't need
@@ -104,7 +111,6 @@ private:
   BitwidthTypingContext getInterestingBitWidthInRange(uint8_t bitWidth) const;
 
   uint8_t globalMaxBitwidth;
-  Randomly &random;
 };
 
 } // namespace dynamatic::gen
