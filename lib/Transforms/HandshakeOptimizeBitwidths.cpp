@@ -402,7 +402,7 @@ static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
   // with 3 bits would be wrong however, since sext(OR 101, sext(01) to i3)
   // would extend with 1s, merely due to the bitwidth reduction.
   // The extra bit prevents this behavior.
-  if (lhs.extType == ExtType::ZEXT && lhs.bitWidth > rhs.bitWidth)
+  if (lhs.extType == ExtType::ZEXT && lhs.bitWidth >= rhs.bitWidth)
     return {ExtType::SEXT, 1 + lhs.bitWidth};
 
   return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth)};
