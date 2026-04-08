@@ -205,7 +205,7 @@ begin
   begin
     if (rising_edge(clk)) then
       if (rst = '1') then
-        fifo_valid <= '0';
+        fifo_valid <= '1';
       else
         if (ReadEn = '1') then
           fifo_valid <= '1';
@@ -221,7 +221,7 @@ begin
     if rising_edge(clk) then
       if (rst = '1') then
         for i in Memory'range loop
-          Memory(i) <= (others => '0');
+          Memory(i) <= std_logic_vector(to_unsigned(i, Memory(i)'length));
         end loop;
       else
         if (WriteEn = '1') then
@@ -238,7 +238,7 @@ begin
   begin
     if rising_edge(clk) then
       if (rst = '1') then
-        Tail <= 0;
+        Tail <= {size} - 1;
       else
         if (WriteEn = '1') then
           Tail <= (Tail + 1) mod {size};
@@ -268,7 +268,7 @@ begin
   begin
     if rising_edge(clk) then
       if (rst = '1') then
-        Full <= '0';
+        Full <= '1';
       else
         -- if only filling but not emptying
         if (WriteEn = '1') and (ReadEn = '0') then
@@ -291,7 +291,7 @@ begin
   begin
     if rising_edge(clk) then
       if rst = '1' then
-        Empty <= '1';
+        Empty <= '0';
       else
         -- if only emptying but not filling
         if (WriteEn = '0') and (ReadEn = '1') then
