@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -20,9 +22,13 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Casting.h"
 #include <fstream>
 
 using namespace mlir;
@@ -30,6 +36,9 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
+
+#include "graphviz/cgraph.h"
+#include "graphviz/gvc.h"
 
 namespace {
 /// Helper data structure to hold mappings between each arch/basic block and the
@@ -43,6 +52,17 @@ struct MILPVars {
   CPVar numExecs;
 };
 } // namespace
+
+// AYA: added the following function
+bool CFDFC::isCFGCompliant(unsigned srcBB, unsigned dstBB) {
+  for (size_t i = 0; i < cycle.size(); ++i) {
+    unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+    if (srcBB == cycle[i] && dstBB == cycle[nextBB])
+      return true;
+  }
+
+  return false;
+}
 
 /// Initializes all variables in the MILP, one per arch and per basic block.
 /// Fills in the last argument with mappings between archs/BBs and their
@@ -155,87 +175,175 @@ static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   }
 }
 
-CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
+CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
+             DenseSet<Value> backwardChannels)
     : numExecs(numExec) {
 
-  // Identify the block that starts the CFDFC; it's the only one that is both
-  // the source of an arch and the destination of another
-  std::optional<unsigned> startBB;
-  llvm::SmallSet<unsigned, 4> uniqueBlocks;
-  for (ArchBB *arch : archs) {
-    if (auto [_, inserted] = uniqueBlocks.insert(arch->srcBB); !inserted) {
-      startBB = arch->srcBB;
-      break;
-    }
-    if (auto [_, inserted] = uniqueBlocks.insert(arch->dstBB); !inserted) {
-      startBB = arch->dstBB;
-      break;
-    }
-  }
-  assert(startBB.has_value() && "failed to identify start of CFDFC");
-
-  // Form the cycle by stupidly iterating over the archs
-  cycle.insert(*startBB);
-  unsigned currentBB = *startBB;
-  for (size_t i = 0, e = archs.size() - 1; i < e; ++i) {
+  bool ayaWay = true;
+  if (ayaWay) {
+    llvm::errs() << "\n\tUsing Aya's CFDFC extraction method\n";
+    // Identify the block that starts the CFDFC; it's the only one that is both
+    // the source of an arch and the destination of another
+    std::optional<unsigned> startBB;
+    llvm::SmallSet<unsigned, 4> uniqueBlocks;
     for (ArchBB *arch : archs) {
-      if (arch->srcBB == currentBB) {
-        currentBB = arch->dstBB;
-        cycle.insert(currentBB);
+      if (auto [_, inserted] = uniqueBlocks.insert(arch->srcBB); !inserted) {
+        startBB = arch->srcBB;
+        break;
+      }
+      if (auto [_, inserted] = uniqueBlocks.insert(arch->dstBB); !inserted) {
+        startBB = arch->dstBB;
         break;
       }
     }
-  }
-  assert(cycle.size() == archs.size() && "failed to construct cycle");
+    assert(startBB.has_value() && "failed to identify start of CFDFC");
 
-  for (Operation &op : funcOp.getOps()) {
-    // Get operation's basic block
-    unsigned srcBB;
-    if (auto optBB = getLogicBB(&op); !optBB.has_value())
-      continue;
-    else
-      srcBB = *optBB;
+    // Form the CFG cycle by stupidly iterating over the archs
+    cycle.insert(*startBB);
+    unsigned currentBB = *startBB;
+    for (size_t i = 0, e = archs.size() - 1; i < e; ++i) {
+      for (ArchBB *arch : archs) {
+        if (arch->srcBB == currentBB) {
+          currentBB = arch->dstBB;
+          cycle.insert(currentBB);
+          break;
+        }
+      }
+    }
+    assert(cycle.size() == archs.size() && "failed to construct cycle");
 
-    // The basic block the operation belongs to must be selected
-    if (!cycle.contains(srcBB))
-      continue;
+    // AYA: note to self: the above is common with the old approach
 
-    // Add the unit and valid outgoing channels to the CFDFC
-    units.insert(&op);
-    for (OpResult res : op.getResults()) {
-      assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
-             "value must have unique user");
-
-      // Get the value's unique user and its basic block
-      Operation *user = *res.getUsers().begin();
-      unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
+    for (Operation &op : funcOp.getOps()) {
+      // Get operation's basic block
+      unsigned srcBB;
+      if (auto optBB = getLogicBB(&op); !optBB.has_value())
         continue;
       else
-        dstBB = *optBB;
+        srcBB = *optBB;
 
-      if (srcBB != dstBB) {
-        // The channel is in the CFDFC if it belongs belong to a selected arch
-        // between two basic blocks
-        for (size_t i = 0; i < cycle.size(); ++i) {
-          unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
-          if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
-            channels.insert(res);
-            if (isCFDFCBackedge(res))
-              backedges.insert(res);
-            break;
-          }
-        }
-      } else if (cycle.size() == 1) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the CFDFC is just a block looping to itself
-        channels.insert(res);
-        if (isCFDFCBackedge(res))
+      // The basic block the operation belongs to must be selected in the CFG
+      // cycle currently under study
+      if (!cycle.contains(srcBB))
+        continue;
+
+      // Add the unit and valid outgoing channels to the CFDFC
+      units.insert(&op);
+      for (OpResult res : op.getResults()) {
+        assert(std::distance(res.getUsers().begin(), res.getUsers().end()) ==
+                   1 &&
+               "value must have unique user");
+
+        // Get the value's unique user and its basic block
+        Operation *user = *res.getUsers().begin();
+        unsigned dstBB;
+        if (std::optional<unsigned> optBB = getLogicBB(user);
+            !optBB.has_value())
+          continue;
+        else
+          dstBB = *optBB;
+
+        if (!cycle.contains(dstBB))
+          continue;
+
+        // AYA: the following if-else is really the core of my logic. First,
+        // check if it is not a backward edge and the src and dst BBs are part
+        // of the cycle, consider the channel. Otherwise, if it is a backward
+        // edge, insert it only if compliant with the CFG
+        if (!backwardChannels.contains(res))
+          channels.insert(res);
+        else {
+          // insert backedges only if they are compliant with the CFG
           backedges.insert(res);
-      } else if (!isBackedge(res)) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the channel is not a backedge
-        channels.insert(res);
+          if (isCFGCompliant(srcBB, dstBB))
+            channels.insert(res);
+        }
+      }
+    }
+  } else {
+    llvm::errs() << "\n\tUsing the old CFDFC extraction method\n";
+
+    // Identify the block that starts the CFDFC; it's the only one that is both
+    // the source of an arch and the destination of another
+    std::optional<unsigned> startBB;
+    llvm::SmallSet<unsigned, 4> uniqueBlocks;
+    for (ArchBB *arch : archs) {
+      if (auto [_, inserted] = uniqueBlocks.insert(arch->srcBB); !inserted) {
+        startBB = arch->srcBB;
+        break;
+      }
+      if (auto [_, inserted] = uniqueBlocks.insert(arch->dstBB); !inserted) {
+        startBB = arch->dstBB;
+        break;
+      }
+    }
+    assert(startBB.has_value() && "failed to identify start of CFDFC");
+
+    // Form the cycle by stupidly iterating over the archs
+    cycle.insert(*startBB);
+    unsigned currentBB = *startBB;
+    for (size_t i = 0, e = archs.size() - 1; i < e; ++i) {
+      for (ArchBB *arch : archs) {
+        if (arch->srcBB == currentBB) {
+          currentBB = arch->dstBB;
+          cycle.insert(currentBB);
+          break;
+        }
+      }
+    }
+    assert(cycle.size() == archs.size() && "failed to construct cycle");
+
+    for (Operation &op : funcOp.getOps()) {
+      // Get operation's basic block
+      unsigned srcBB;
+      if (auto optBB = getLogicBB(&op); !optBB.has_value())
+        continue;
+      else
+        srcBB = *optBB;
+
+      // The basic block the operation belongs to must be selected
+      if (!cycle.contains(srcBB))
+        continue;
+
+      // Add the unit and valid outgoing channels to the CFDFC
+      units.insert(&op);
+      for (OpResult res : op.getResults()) {
+        assert(std::distance(res.getUsers().begin(), res.getUsers().end()) ==
+                   1 &&
+               "value must have unique user");
+
+        // Get the value's unique user and its basic block
+        Operation *user = *res.getUsers().begin();
+        unsigned dstBB;
+        if (std::optional<unsigned> optBB = getLogicBB(user);
+            !optBB.has_value())
+          continue;
+        else
+          dstBB = *optBB;
+
+        if (srcBB != dstBB) {
+          // The channel is in the CFDFC if it belongs belong to a selected arch
+          // between two basic blocks
+          for (size_t i = 0; i < cycle.size(); ++i) {
+            unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+            if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
+              channels.insert(res);
+              if (isCFDFCBackedge(res))
+                backedges.insert(res);
+              break;
+            }
+          }
+        } else if (cycle.size() == 1) {
+          // The channel is in the CFDFC if its producer/consumer belong to the
+          // same basic block and the CFDFC is just a block looping to itself
+          channels.insert(res);
+          if (isCFDFCBackedge(res))
+            backedges.insert(res);
+        } else if (!isBackedge(res)) {
+          // The channel is in the CFDFC if its producer/consumer belong to the
+          // same basic block and the channel is not a backedge
+          channels.insert(res);
+        }
       }
     }
   }
@@ -353,6 +461,35 @@ void dynamatic::buffer::getDisjointBlockUnions(
         cfUnion.push_back(cf);
     unions.emplace_back(cfUnion);
   }
+}
+
+// AYA: Added this from Jiahui to write the CFDFCs in DOT for debugging
+void CFDFC::writeDot(const std::string &fileName) {
+  Agraph_t *gv = agopen(const_cast<char *>("cfdfc"), Agdirected, nullptr);
+  for (auto value : channels) {
+    auto *pred = value.getDefiningOp();
+    auto succ = value.getUsers().begin();
+    std::string predName =
+        pred->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME).str();
+    std::string succName =
+        succ->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME).str();
+
+    auto *predNode = agnode(gv, const_cast<char *>(predName.c_str()),
+                            /* create if not exist */ 1);
+
+    auto *succNode = agnode(gv, const_cast<char *>(succName.c_str()),
+                            /* create if not exist */ 1);
+
+    agedge(gv, predNode, succNode, nullptr, 1);
+  }
+  // Write to DOT file
+  FILE *fs = fopen(fileName.c_str(), "w");
+
+  if (!fs)
+    llvm::errs() << "Failed to write file\n";
+
+  agwrite(gv, fs);
+  fclose(fs);
 }
 
 LogicalResult dynamatic::buffer::extractCFDFC(

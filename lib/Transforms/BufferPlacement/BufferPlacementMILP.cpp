@@ -408,7 +408,10 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
     CPVar &retSrc = cfVars.unitVars[srcOp].retOut;
     CPVar &retDst = cfVars.unitVars[dstOp].retIn;
-    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+    unsigned backedge =
+        cfdfc.backedges.contains(channel)
+            ? 1
+            : 0; // AYA: replace 1 with the number of tags where needed
 
     // If the channel isn't a backedge, its throughput equals the difference
     // between the fluid retiming of tokens at its endpoints. Otherwise, it is
