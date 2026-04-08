@@ -348,3 +348,29 @@ handshake.func @extui_extui(%arg0: !handshake.channel<i8>) -> !handshake.channel
   %ext1 = extui %ext0 : <i16> to <i32>
   end %ext1 : <i32>
 }
+
+// -----
+
+// CHECK-LABEL:   handshake.func @mux_cycle(
+// CHECK-SAME:                              %[[VAL_0:.*]]: !handshake.channel<i16>, %[[VAL_1:.*]]: !handshake.channel<i1>, %[[VAL_2:.*]]: !handshake.control<>,
+// CHECK-SAME:                              %[[VAL_3:.*]]: !handshake.channel<i1>, ...) -> (!handshake.channel<i8>, !handshake.control<>) attributes {argNames = ["var0", "var1", "start", "bool"], resNames = ["out0", "end"]} {
+// CHECK:           %[[VAL_4:.*]] = source : <>
+// CHECK:           %[[VAL_5:.*]] = constant %[[VAL_4]] {value = 0 : i16} : <>, <i16>
+// CHECK:           %[[VAL_6:.*]] = cmpi eq, %[[VAL_0]], %[[VAL_5]] : <i16>
+// CHECK:           %[[VAL_7:.*]], %[[VAL_8:.*]] = cond_br %[[VAL_6]], %[[VAL_6]] : <i1>, <i1>
+// CHECK:           %[[VAL_9:.*]] = br %[[VAL_1]] : <i1>
+// CHECK:           %[[VAL_10:.*]] = mux %[[VAL_3]] {{\[}}%[[VAL_8]], %[[VAL_9]]] : <i1>, [<i1>, <i1>] to <i1>
+// CHECK:           %[[VAL_11:.*]] = extui %[[VAL_10]] : <i1> to <i8>
+// CHECK:           end %[[VAL_11]], %[[VAL_2]] : <i8>, <>
+// CHECK:         }
+handshake.func @mux_cycle(%arg0: !handshake.channel<i16>, %arg1: !handshake.channel<i1>, %arg2: !handshake.control<>, %arg3: !handshake.channel<i1>, ...) -> (!handshake.channel<i8>, !handshake.control<>) attributes {argNames = ["var0", "var1", "start", "bool"], resNames = ["out0", "end"]} {
+  %0 = source : <>
+  %1 = constant %0 {value = 0 : i16} : <>, <i16>
+  %3 = cmpi eq, %arg0, %1 : <i16>
+  %4 = extui %3 : <i1> to <i8>
+  %trueResult_2, %falseResult_3 = cond_br %3, %4 : <i1>, <i8>
+  %13 = extui %arg1 : <i1> to <i8>
+  %14 = br %13 : <i8>
+  %16 = mux %arg3 [%falseResult_3, %14] : <i1>, [<i8>, <i8>] to <i8>
+  end %16, %arg2 : <i8>, <>
+}
