@@ -42,44 +42,28 @@ namespace {
 /// Combine redundant init merges. These merges have one constant input and a
 /// condition input. If two merges are identical, then one of them can be
 /// removed
-struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
+struct CombineInits : public OpRewritePattern<handshake::InitOp> {
+  using OpRewritePattern<handshake::InitOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::InitOp initOp,
                                 PatternRewriter &rewriter) const override {
 
-    // Work only with merges having two inputs
-    if (mergeOp->getNumOperands() != 2)
+    // Work only with init having two inputs
+    if (initOp->getNumOperands() != 1)
       return failure();
-
-    // One of the inputs of the merge must be a constants
-    int constIdx = -1;
-    for (int i = 0; i < 2; i++) {
-      if (isa_and_nonnull<handshake::ConstantOp>(
-              mergeOp.getDataOperands()[i].getDefiningOp()))
-        constIdx = i;
-    }
-
-    if (constIdx == -1)
-      return failure();
-
-    // Get the index of the other input
-    int loopIdx = 1 - constIdx;
 
     // If there are other merges fed from the same input at the loopIdx
-    DenseSet<handshake::MergeOp> redundantInits;
-    for (auto *user : mergeOp.getDataOperands()[loopIdx].getUsers())
-      if (isa_and_nonnull<handshake::MergeOp>(user) && user != mergeOp) {
-        handshake::MergeOp mergeUser = cast<handshake::MergeOp>(user);
-        if (isa_and_nonnull<handshake::ConstantOp>(
-                mergeUser.getDataOperands()[constIdx].getDefiningOp()))
-          redundantInits.insert(mergeUser);
+    DenseSet<handshake::InitOp> redundantInits;
+    for (auto *user : initOp.getOperand().getUsers())
+      if (isa_and_nonnull<handshake::InitOp>(user) && user != initOp) {
+        handshake::InitOp initUser = cast<handshake::InitOp>(user);
+          redundantInits.insert(initUser);
       }
 
     if (redundantInits.empty())
       return failure();
 
     for (auto init : redundantInits) {
-      rewriter.replaceAllUsesWith(init.getResult(), mergeOp.getResult());
+      rewriter.replaceAllUsesWith(init.getResult(), initOp.getResult());
       rewriter.eraseOp(init);
     }
 
@@ -242,6 +226,21 @@ struct RemoveSinkMuxes : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+struct RemoveSinkInits : public OpRewritePattern<handshake::InitOp> {
+  using OpRewritePattern<handshake::InitOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::InitOp initOp,
+                                PatternRewriter &rewriter) const override {
+
+    // The pattern fails if the Mux has any successors
+    if (!initOp.getResult().getUsers().empty())
+      return failure();
+
+    rewriter.eraseOp(initOp);
+    return success();
+  }
+};
+
+
 /// Remove conditional branches that have no successors
 struct RemoveDoubleSinkBranches
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
@@ -391,6 +390,75 @@ struct CombineBranchesSameSign
   }
 };
 
+struct EraseSingleOutputDemuxes : public OpRewritePattern<handshake::DemuxOp> {
+  using OpRewritePattern<handshake::DemuxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::DemuxOp demuxOp,
+                                PatternRewriter &rewriter) const override {
+    ValueRange dataOutputs = demuxOp.getResults();
+    if (dataOutputs.size() != 1)
+      return failure();
+
+    // Insert a sink to consume the demux's select token
+    rewriter.setInsertionPoint(demuxOp);
+    Value select = demuxOp.getSelectOperand();
+    rewriter.create<handshake::SinkOp>(demuxOp->getLoc(), select);
+    Value dataInput = demuxOp.getDataOperand();
+    rewriter.replaceOp(demuxOp, dataInput);
+    return success();
+  }
+};
+
+struct EraseSingleInputMuxes : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+    ValueRange dataOperands = muxOp.getDataOperands();
+    if (dataOperands.size() != 1)
+      return failure();
+
+    // Insert a sink to consume the mux's select token
+    rewriter.setInsertionPoint(muxOp);
+    Value select = muxOp.getSelectOperand();
+    rewriter.create<handshake::SinkOp>(muxOp->getLoc(), select);
+
+    rewriter.replaceOp(muxOp, dataOperands.front());
+    return success();
+  }
+};
+
+struct EraseNoUsesUntagger : public OpRewritePattern<handshake::UntaggerOp> {
+  using OpRewritePattern<handshake::UntaggerOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::UntaggerOp untaggerOp,
+                                PatternRewriter &rewriter) const override {
+    ValueRange untaggerOutputs = untaggerOp.getResults();
+    if (untaggerOutputs.size() != 2)
+      return failure();
+
+    bool notEmpty = false;
+    for(int i = 0; i < untaggerOutputs.size(); i++) {
+       for (auto *user : untaggerOutputs[i].getUsers()) {
+        if(!isa_and_nonnull<handshake::SinkOp>(user)) {
+          notEmpty = true;
+          break;
+        }
+       }
+    }
+
+    if(notEmpty)
+      return failure();
+
+    // Insert a sink to consume the mux's select token
+    // rewriter.setInsertionPoint(untaggerOp);
+    // rewriter.create<handshake::SinkOp>(untaggerOp->getLoc(), untaggerOp.getOperand());
+
+    rewriter.eraseOp(untaggerOp);
+    return success();
+  }
+};
+
 /// Simple driver for the Handshake Combine Branches Merges pass, based on a
 /// greedy pattern rewriter.
 struct HandshakeCombineSteeringLogicPass
@@ -403,9 +471,9 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<RemoveSinkMuxes, RemoveDoubleSinkBranches,
+    patterns.add<RemoveSinkMuxes, RemoveSinkInits, RemoveDoubleSinkBranches,
                  CombineBranchesSameSign, CombineBranchesOppositeSign,
-                 CombineInits, CombineMuxes, RemoveNotCondition>(ctx);
+                 CombineInits, CombineMuxes, RemoveNotCondition, EraseSingleOutputDemuxes, EraseSingleInputMuxes>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
