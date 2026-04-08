@@ -577,7 +577,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
       ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
       if (resProps.maxTrans.value_or(1) >= 1) {
-        resProps.minTrans = std::max(resProps.minTrans, 1U);
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place transparent buffer on merge-like operation's "
@@ -585,7 +585,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
                "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
-        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+        resProps.minOpaque = std::max(resProps.minOpaque, 10U);
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place opaque buffer on merge-like operation's "

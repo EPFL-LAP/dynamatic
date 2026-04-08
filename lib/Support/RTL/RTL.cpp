@@ -470,7 +470,6 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.speculator" ||
       handshakeOp == "handshake.trunci" ||
-      handshakeOp == "handshake.mux" ||
       handshakeOp == "handshake.control_merge" ||
       handshakeOp == "handshake.blocker" ||
       handshakeOp == "handshake.uitofp" ||
@@ -511,6 +510,9 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   ) {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
+  } else if (handshakeOp == "handshake.mux") {
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(1));
   } else if (handshakeOp == "handshake.tagger" || handshakeOp == "handshake.untagger") {
     serializedParams["OUTPUT_EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));

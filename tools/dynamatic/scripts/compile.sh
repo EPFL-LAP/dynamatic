@@ -294,13 +294,14 @@ if [[ $OUT_OF_ORDER_EXECUTION -ne 0 ]]; then
 
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --out-of-order-execution \
+    --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_OOE"
   exit_on_fail "Failed to apply out-of-order execution transformations" \
     "Applied out-of-order execution transformations"
 
   # handshake transformations 2
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
-    --handshake-materialize --handshake-infer-basic-blocks \
+    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_MATERIALIZED"
   exit_on_fail "Failed to apply materialization transformation" \
     "Applied materialization transformation"
@@ -375,7 +376,7 @@ fi
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
 # Export to DOT
-export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
+export_dot "$F_HANDSHAKE_MATERIALIZED" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
