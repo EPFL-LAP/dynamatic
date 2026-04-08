@@ -269,46 +269,19 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
 std::optional<ast::ArrayReadExpression>
 gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
                                                   std::size_t depth) {
-  auto conclusion = typeSystem.checkArrayReadExpressionOpaque(context);
-  if (!conclusion)
-    return std::nullopt;
-  auto [paramConc, indexConc] = *conclusion;
-
-  // Construct a safe indexing expression from an array parameter.
-  auto genWrappedArrayReadFromParam = [&, &indexConc = indexConc](
-                                          const ast::ArrayParameter &param) {
-    ast::ScalarType elementType = param.getElementType();
-    std::size_t mask = param.getDimension() - 1;
-    std::string name = param.getName().str();
-    // Generate an indexing expression.
-    // Has to be an integer.
-    ast::Expression index = safeCastAsNeeded(
-        ast::PrimitiveType::UInt32, generateExpression(indexConc, depth + 1));
-
-    // Bitmask the index to be in range of the array! We use this to avoid
-    // undefined behavior in our programs. In the future we could also add
-    // mechanisms (type systems, or whatever), that restrict expressions to
-    // safe in-range expressions.
-    //
-    // Note: We can use a bitmask here since array parameters that we generate
-    // are all powers-of-2. We do so since the modulo operator is currently
-    // unsupported in dynamatic.
-    return ast::ArrayReadExpression{
-        std::move(elementType), name,
-        ast::BinaryExpression{std::move(index), ast::BinaryExpression::BitAnd,
-                              ast::Constant{static_cast<std::uint32_t>(mask)}}};
-  };
-
-  std::optional<ast::ArrayParameter> arrayParameter =
-      generateArrayParameter(paramConc);
-  if (!arrayParameter)
-    return std::nullopt;
-  return genWrappedArrayReadFromParam(*arrayParameter);
+  return typeSystem.generateArrayReadExpressionOpaque(
+      context,
+      [=](const OpaqueContext &context) {
+        return generateArrayParameter(context);
+      },
+      [=](const OpaqueContext &context) {
+        return safeCastAsNeeded(ast::PrimitiveType::UInt32,
+                                generateExpression(context, depth + 1));
+      });
 }
 
 std::optional<ast::ArrayParameter>
-gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context,
-                                             std::size_t depth) {
+gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context) {
   // With a low chance, skip picking an existing parameter and try to generate
   // a new one.
   if (!random.getRatherLowProbabilityBool()) {
@@ -319,28 +292,22 @@ gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context,
     random.shuffle(copy);
 
     for (const ast::ArrayParameter &iter : copy)
-      if (typeSystem.checkArrayParameterOpaque(iter, context))
+      if (typeSystem.checkExistingArrayParameterOpaque(iter, context))
         return iter;
   }
 
-  std::optional<ast::ScalarType> elementType = generateScalarType(context);
-  if (!elementType)
-    return std::nullopt;
-
-  arrayParameters.push_back(
-      {{std::move(*elementType), generateFreshVarName(),
-        // Generate a power-of-2 dimension to make the modulo operator fast and
-        // easy to implement.
-        // We choose an arbitrary upper-bound of 32 for the dimension for now.
-        static_cast<std::size_t>(1 << random.getInteger(0, 5))},
-       context});
-  if (!typeSystem.checkArrayParameterOpaque(arrayParameters.back().first,
-                                            context)) {
-    arrayParameters.pop_back();
+  std::optional<ast::ArrayParameter> result =
+      typeSystem.generateFreshArrayParameterOpaque(
+          context,
+          [=](const OpaqueContext &context) {
+            return generateScalarType(context);
+          },
+          [=] { return generateFreshVarName(); });
+  if (!result) {
     varCounter--;
     return std::nullopt;
   }
-  return arrayParameters.back().first;
+  return arrayParameters.emplace_back(std::move(*result), context).first;
 }
 
 std::optional<ast::Variable>

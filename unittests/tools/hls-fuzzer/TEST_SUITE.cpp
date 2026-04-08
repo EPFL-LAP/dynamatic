@@ -12,7 +12,7 @@ TYPED_TEST_SUITE_P(TypeSystemTest);
 
 TYPED_TEST_P(TypeSystemTest, OutputCheck) {
   Randomly randomly(/*seed=*/42);
-  TypeParam typeSystem;
+  TypeParam typeSystem(randomly);
   gen::BasicCGenerator generator(randomly, typeSystem,
                                  /*entryContext=*/typeSystem.entryContext);
   std::string s;
@@ -26,10 +26,12 @@ REGISTER_TYPED_TEST_SUITE_P(TypeSystemTest, OutputCheck);
 
 namespace {
 // Bool representing whether a parameter is required.
-class PlusOfTwoParamOnlyTypeSystem
+class PlusOfTwoParamOnlyTypeSystem final
     : public gen::DisallowByDefaultTypeSystem<bool,
                                               PlusOfTwoParamOnlyTypeSystem> {
 public:
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
+
   static std::optional<ConclusionOf<ast::BinaryExpression>>
   checkBinaryExpression(ast::BinaryExpression::Op op, bool mustBeParameter) {
     // Saw a binop, parameter is now required.
@@ -73,10 +75,12 @@ public:
 
 // Bool representing whether an array read expression is required.
 // Otherwise, a 0 constant must be generated.
-class ReturnArrayConstantOnlyTypeSystem
+class ReturnArrayConstantOnlyTypeSystem final
     : public gen::DisallowByDefaultTypeSystem<
           /*createArrayRead=*/bool, ReturnArrayConstantOnlyTypeSystem> {
 public:
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
+
   static std::optional<ConclusionOf<ast::ArrayReadExpression>>
   checkArrayReadExpression(bool createArrayRead) {
     if (!createArrayRead)
@@ -84,15 +88,18 @@ public:
     return ConclusionOf<ast::ArrayReadExpression>{false, false};
   }
 
-  std::optional<ConclusionOf<ast::ArrayParameter>>
-  checkArrayParameter(const ast::ArrayParameter &param, bool createArrayRead) {
-    // TODO: The array dimension is currently random making the test below
-    //       susceptible to internal implementation changes.
-    //       Array parameters (like constants) are terminators with a large
-    //       combination of possible values.
-    //       We probably want to allow the type system to return an array
-    //       parameter to use instead for that reason.
-    return TypeSystem::checkArrayParameter(param, createArrayRead);
+  static std::optional<ast::ArrayParameter> generateFreshArrayParameter(
+      bool context, GenerateCallback<ast::ScalarType, bool> generateScalarType,
+      llvm::function_ref<std::string()> generateFreshVarName) {
+    std::optional<ast::ScalarType> elementType = generateScalarType(context);
+    if (!elementType)
+      return std::nullopt;
+
+    return ast::ArrayParameter{
+        std::move(*elementType),
+        generateFreshVarName(),
+        /*dimension=*/32,
+    };
   }
 
   static std::optional<ConclusionOf<ast::ScalarType>>

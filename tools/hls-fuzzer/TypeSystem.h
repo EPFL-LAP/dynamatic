@@ -58,6 +58,12 @@ class AbstractTypeSystem {
 public:
   virtual ~AbstractTypeSystem();
 
+  /// Callback used by 'generate*' methods to generate subcomponents of an AST
+  /// node.
+  template <typename ASTNode, typename TypingContext = OpaqueContext>
+  using GenerateCallback =
+      llvm::function_ref<std::optional<ASTNode>(const TypingContext &context)>;
+
   virtual ConclusionOf<ast::Function, OpaqueContext>
   checkFunctionOpaque(const OpaqueContext &context) = 0;
 
@@ -92,9 +98,20 @@ public:
   virtual std::optional<ConclusionOf<ast::ArrayReadExpression, OpaqueContext>>
   checkArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
 
+  virtual std::optional<ast::ArrayReadExpression>
+  generateArrayReadExpressionOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::ArrayParameter> generateArrayParameter,
+      GenerateCallback<ast::Expression> generateExpression) = 0;
+
   virtual std::optional<ConclusionOf<ast::ArrayParameter, OpaqueContext>>
-  checkArrayParameterOpaque(const ast::ArrayParameter &,
-                            const OpaqueContext &context) = 0;
+  checkExistingArrayParameterOpaque(const ast::ArrayParameter &,
+                                    const OpaqueContext &context) = 0;
+
+  virtual std::optional<ast::ArrayParameter> generateFreshArrayParameterOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::ScalarType> generateScalarType,
+      llvm::function_ref<std::string()> generateFreshVarName) = 0;
 
   virtual std::optional<
       ConclusionOf<ast::ArrayAssignmentStatement, OpaqueContext>>
@@ -113,18 +130,29 @@ public:
 ///
 /// All type checking is performed under a given context specified as the
 /// 'TypingContext' template parameter.
-/// For every AST construct a corresponding 'check*' method exists.
-/// The input to this method is always the context used to type check the given
-/// AST construct.
-/// Based on the input context the 'check*' method can then derive new contexts
-/// for its subelements or discard the AST-node entirely.
-/// The return type is the so-called conclusion and is different for every
-/// AST construct. It is specified using the 'TypeSystemTraits'.
+/// Two kinds of APIs exist to influence the generator:
+/// * More high-level 'check*' methods for every kind of AST-node, which allow
+///   deriving typing contexts for the sub-elements of the AST-node from the
+///   input context, or rejecting the AST-node entirely.
+///   The return type is the so-called conclusion and is different for every
+///   AST construct. It is specified using the 'TypeSystemTraits'.
 ///
-/// E.g. the conclusion of a binary expression are the contexts that should be
-/// used to type check the left and right operands.
-/// Most 'check*' methods support discarding the AST node entirely, in which
-/// case the conclusion type is wrapped in an optional.
+///   E.g. the conclusion of a binary expression are the contexts that should be
+///   used to type check the left and right operands.
+///   Most 'check*' methods support discarding the AST node entirely, in which
+///   case the conclusion type is wrapped in an optional.
+///
+/// * Lower-level 'generate*' methods for AST-nodes, which allows customizing
+///   the order in which sub-elements of AST-nodes are generated and deriving
+///   typing contexts from properties of the generated AST-nodes.
+///   The default implementations of 'generate*' methods perform left-to-right
+///   generation (as it appears in C syntax) and derive typing contexts for
+///   subelements using the corresponding 'check*' methods.
+///
+///   E.g. the generator function for an array-read expressions can be used to
+///   first generate the array-parameter, and then use the dimension of the
+///   array-parameter to derive a typing context that generates an in-bounds
+///   expression for the indexing expression.
 ///
 /// Note: We call it contexts rather than constraints to match literature, and
 /// as it more generally informs an AST-node generation about the type-system
@@ -169,6 +197,8 @@ template <typename TypingContext, typename Self>
 class TypeSystem : public AbstractTypeSystem {
 
 public:
+  explicit TypeSystem(Randomly &random) : random(random) {}
+
   /// The conclusion type of 'ASTNode' with the given context.
   template <typename ASTNode>
   using ConclusionOf = ConclusionOf<ASTNode, TypingContext>;
@@ -253,13 +283,43 @@ public:
     return {context, context};
   }
 
+  /// Default implementation for generating array-read expressions.
+  /// Derives subelement typing contexts using 'checkArrayReadExpression'.
+  /// The indexing expression is forced to be inbounds of the array parameter by
+  /// using a bitmask. This requires array dimensions to be powers-of-2. This
+  /// is guaranteed by the default implementation of
+  /// 'generateFreshArrayParameter'.
+  std::optional<ast::ArrayReadExpression> generateArrayReadExpression(
+      const TypingContext &context,
+      GenerateCallback<ast::ArrayParameter, TypingContext>
+          generateArrayParameter,
+      GenerateCallback<ast::Expression, TypingContext> generateExpression);
+
   std::optional<ConclusionOf<ast::ArrayParameter>>
-  checkArrayParameter(const ast::ArrayParameter &parameter,
-                      const TypingContext &context) {
+  checkExistingArrayParameter(const ast::ArrayParameter &parameter,
+                              const TypingContext &context) {
     if (!self().checkScalarType(parameter.getElementType(), context))
       return std::nullopt;
 
-    return context;
+    return ConclusionOf<ast::ArrayParameter>{};
+  }
+
+  /// Default implementation for generating a new array parameter.
+  /// Guarantees that a power-of-2 is used for the dimension of the array.
+  std::optional<ast::ArrayParameter> generateFreshArrayParameter(
+      const TypingContext &context,
+      GenerateCallback<ast::ScalarType, TypingContext> generateScalarType,
+      llvm::function_ref<std::string()> generateFreshVarName) {
+    std::optional<ast::ScalarType> elementType = generateScalarType(context);
+    if (!elementType)
+      return std::nullopt;
+
+    return ast::ArrayParameter{
+        std::move(*elementType), generateFreshVarName(),
+        // Generate a power-of-2 dimension to make the modulo operator fast and
+        // easy to implement.
+        // We choose an arbitrary upper-bound of 32 for the dimension for now.
+        static_cast<std::size_t>(1 << random.getInteger(0, 5))};
   }
 
   static ConclusionOf<ast::ArrayAssignmentStatement>
@@ -333,11 +393,28 @@ public:
         self().checkArrayReadExpression(context.cast<TypingContext>()));
   }
 
+  std::optional<ast::ArrayReadExpression> generateArrayReadExpressionOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::ArrayParameter> generateArrayParameter,
+      GenerateCallback<ast::Expression> generateExpression) final {
+    return self().generateArrayReadExpression(convert(context),
+                                              convert(generateArrayParameter),
+                                              convert(generateExpression));
+  }
+
   std::optional<dynamatic::ConclusionOf<ast::ArrayParameter, OpaqueContext>>
-  checkArrayParameterOpaque(const ast::ArrayParameter &node,
-                            const OpaqueContext &context) final {
-    return convert(
-        self().checkArrayParameter(node, context.cast<TypingContext>()));
+  checkExistingArrayParameterOpaque(const ast::ArrayParameter &node,
+                                    const OpaqueContext &context) final {
+    return convert(self().checkExistingArrayParameter(
+        node, context.cast<TypingContext>()));
+  }
+
+  std::optional<ast::ArrayParameter> generateFreshArrayParameterOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::ScalarType> generateScalarType,
+      llvm::function_ref<std::string()> generateFreshVarName) final {
+    return convert(self().generateFreshArrayParameter(
+        convert(context), convert(generateScalarType), generateFreshVarName));
   }
 
   std::optional<
@@ -358,6 +435,17 @@ private:
 
   static OpaqueContext convert(TypingContext &&context) {
     return OpaqueContext(context);
+  }
+
+  static const TypingContext &convert(const OpaqueContext &context) {
+    return context.cast<TypingContext>();
+  }
+
+  template <class Ret, class... Args>
+  static auto convert(llvm::function_ref<Ret(Args...)> function) {
+    return [function](auto &&...args) {
+      return convert(function(convert(std::forward<decltype(args)>(args)...)));
+    };
   }
 
   template <class T>
@@ -403,18 +491,25 @@ private:
                                              std::index_sequence<indices...>) {
     return TupleLike<OpaqueContext>{convert(get<indices>(tuple))...};
   }
+
+protected:
+  Randomly &random;
 };
 
 /// A noop-system which uses all the default implementations in 'TypeSystem'.
 /// Puts no constraints onto the base generator.
-class NoopTypeSystem : public TypeSystem<std::monostate, NoopTypeSystem> {};
+class NoopTypeSystem : public TypeSystem<std::monostate, NoopTypeSystem> {
+public:
+  using TypeSystem::TypeSystem;
+};
 
 /// Convenience type system that disallows every AST constructs (besides
 /// functions) by default.
 template <typename TypingContext, typename Self>
 class DisallowByDefaultTypeSystem : public TypeSystem<TypingContext, Self> {
-
 public:
+  using TypeSystem<TypingContext, Self>::TypeSystem;
+
   static std::optional<ConclusionOf<ast::BinaryExpression, TypingContext>>
   checkBinaryExpression(ast::BinaryExpression::Op, const TypingContext &) {
     return std::nullopt;
@@ -461,7 +556,8 @@ public:
   }
 
   std::optional<ConclusionOf<ast::ArrayParameter, TypingContext>>
-  checkArrayParameter(const ast::ArrayParameter &, const TypingContext &) {
+  checkExistingArrayParameter(const ast::ArrayParameter &,
+                              const TypingContext &) {
     return std::nullopt;
   }
 
@@ -471,6 +567,46 @@ public:
     return std::nullopt;
   }
 };
+
+template <typename TypingContext, typename Self>
+std::optional<ast::ArrayReadExpression>
+TypeSystem<TypingContext, Self>::generateArrayReadExpression(
+    const TypingContext &context,
+    GenerateCallback<ast::ArrayParameter, TypingContext> generateArrayParameter,
+    GenerateCallback<ast::Expression, TypingContext> generateExpression) {
+  std::optional conclusion = self().checkArrayReadExpression(context);
+  if (!conclusion)
+    return std::nullopt;
+  auto [paramConc, indexConc] = *conclusion;
+
+  std::optional<ast::ArrayParameter> arrayParameter =
+      generateArrayParameter(paramConc);
+  if (!arrayParameter)
+    return std::nullopt;
+
+  std::optional<ast::Expression> index = generateExpression(indexConc);
+  if (!index)
+    return std::nullopt;
+
+  ast::ScalarType elementType = arrayParameter->getElementType();
+  assert(llvm::isPowerOf2_64(arrayParameter->getDimension()) &&
+         "default implementation depends on dimensions being powers of 2");
+  std::size_t mask = arrayParameter->getDimension() - 1;
+  std::string name = arrayParameter->getName().str();
+
+  // Bitmask the index to be in range of the array! We use this to avoid
+  // undefined behavior in our programs. In the future we could also add
+  // mechanisms (type systems, or whatever), that restrict expressions to
+  // safe in-range expressions.
+  //
+  // Note: We can use a bitmask here since array parameters that we generate
+  // are all powers-of-2. We do so since the modulo operator is currently
+  // unsupported in dynamatic.
+  return ast::ArrayReadExpression{
+      std::move(elementType), name,
+      ast::BinaryExpression{std::move(*index), ast::BinaryExpression::BitAnd,
+                            ast::Constant{static_cast<std::uint32_t>(mask)}}};
+}
 
 } // namespace dynamatic::gen
 

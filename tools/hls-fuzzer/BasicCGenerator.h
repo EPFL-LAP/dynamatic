@@ -105,7 +105,7 @@ private:
                               std::size_t depth = 0);
 
   std::optional<ast::ArrayParameter>
-  generateArrayParameter(const OpaqueContext &context, std::size_t depth = 0);
+  generateArrayParameter(const OpaqueContext &context);
 
   std::optional<ast::Variable>
   generateScalarParameter(const OpaqueContext &constraints,
