@@ -543,7 +543,15 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ArrayParameter &parameter);
 
 /// Tag type representing the 'void' type from C.
-struct VoidType {};
+struct VoidType {
+  friend bool operator==(const VoidType &lhs, const VoidType &rhs) {
+    return true;
+  }
+
+  friend bool operator!=(const VoidType &lhs, const VoidType &rhs) {
+    return !(lhs == rhs);
+  }
+};
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const VoidType &) {
   return os << "void";

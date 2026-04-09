@@ -377,25 +377,11 @@ gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
       "It must always be possible to generate a return type");
 }
 
-constexpr std::size_t MAX_STATEMENTS = 10;
-
 std::vector<ast::Statement>
 gen::BasicCGenerator::generateStatementList(const OpaqueContext &context) {
-  std::vector<ast::Statement> result;
-  // TODO: Type systems should have better control over the number of
-  //       statements and in what order they are generated.
-  //       Right now they are always generated last statement to first.
-  std::size_t numStatements = random.getInteger<std::size_t>(0, MAX_STATEMENTS);
-  result.reserve(numStatements);
-  for (std::size_t i = 0; i < numStatements; i++) {
-    std::optional<ast::Statement> maybeStat = generateStatement(context);
-    if (!maybeStat)
-      break;
-
-    result.push_back(std::move(*maybeStat));
-  }
-  std::reverse(result.begin(), result.end());
-  return result;
+  return typeSystem.generateStatementListOpaque(
+      context,
+      [=](const OpaqueContext &context) { return generateStatement(context); });
 }
 
 std::optional<ast::Statement>
@@ -406,25 +392,14 @@ gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
 std::optional<ast::ArrayAssignmentStatement>
 gen::BasicCGenerator::generateArrayAssignmentStatement(
     const OpaqueContext &context) {
-  auto conclusion = typeSystem.checkArrayAssignmentStatementOpaque(context);
-  if (!conclusion)
-    return std::nullopt;
-
-  auto &&[param, index, value] = *conclusion;
-  std::optional<ast::ArrayParameter> parameter = generateArrayParameter(param);
-  if (!parameter)
-    return std::nullopt;
-
-  ast::Expression castAsNeeded = safeCastAsNeeded(ast::PrimitiveType::UInt32,
-                                                  generateExpression(index, 0));
-  castAsNeeded = ast::BinaryExpression{
-      std::move(castAsNeeded), ast::BinaryExpression::BitAnd,
-      ast::Constant{static_cast<std::uint32_t>(parameter->getDimension() - 1)}};
-  return ast::ArrayAssignmentStatement{
-      parameter->getName().str(),
-      castAsNeeded,
-      generateExpression(value, 0),
-  };
+  return typeSystem.generateArrayAssignmentStatementOpaque(
+      context,
+      [=](const OpaqueContext &context) {
+        return generateArrayParameter(context);
+      },
+      [=](const OpaqueContext &context) {
+        return generateExpression(context, 0);
+      });
 }
 
 ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
