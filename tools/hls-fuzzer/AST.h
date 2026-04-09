@@ -354,7 +354,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 class UnaryExpression {
 public:
   enum Op {
-    BitwiseNot,
+    MIN_VALUE,
+    BitwiseNot = MIN_VALUE,
     BoolNot,
     Minus,
     MAX_VALUE = Minus,
@@ -368,6 +369,8 @@ public:
   const Expression &getExpression() const { return expression; }
 
   ScalarType getType() const;
+
+  static bool isLegalOperandType(Op op, const ScalarType &type);
 
 private:
   Op op;

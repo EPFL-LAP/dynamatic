@@ -73,6 +73,13 @@ public:
   checkBinaryExpression(ast::BinaryExpression::Op op,
                         const BitwidthTypingContext &context) const;
 
+  static std::optional<ConclusionOf<ast::UnaryExpression>>
+  checkUnaryExpression(ast::UnaryExpression::Op,
+                       const BitwidthTypingContext &) {
+    // TODO: Figure out and implement logic here.
+    return std::nullopt;
+  }
+
   ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(const BitwidthTypingContext &context) const;
 
