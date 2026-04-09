@@ -594,6 +594,44 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
       }
     }
 
+    for (auto fork : funcOp.getOps<handshake::ForkOp>()) {
+
+      for (auto res : fork->getResults()) {
+        ChannelBufProps &resProps = channelProps[res];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, 10U);
+        } else {
+          fork->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+      }
+    }
+
+    for (auto tagger : funcOp.getOps<handshake::TaggerOp>()) {
+      ChannelBufProps &resProps = channelProps[tagger->getResult(0)];
+
+      Value res = tagger->getResult(0);
+      int i = 0;
+      bool flag = false;
+      for (auto usr : res.getUsers()) {
+        if (isa_and_nonnull<handshake::UntaggerOp>(usr))
+          flag = true;
+        i++;
+      }
+      if (i == 1 && flag)
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
+    }
+
+    for (auto demux : funcOp.getOps<handshake::DemuxOp>()) {
+      for (auto res : demux.getResults()) {
+        ChannelBufProps &resProps = channelProps[res];
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
+      }
+    }
+
     // Place the minimal number of buffers (as specified by the buffering
     // constraints on each channel) for each channel, deducting internal unit
     // buffers at the same time
