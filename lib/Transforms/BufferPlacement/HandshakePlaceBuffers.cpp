@@ -577,7 +577,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
       ChannelBufProps &resProps = channelProps[mergeLikeOp->getResult(0)];
       if (resProps.maxTrans.value_or(1) >= 1) {
-        resProps.minTrans = std::max(resProps.minTrans, 1U);
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place transparent buffer on merge-like operation's "
@@ -585,12 +585,50 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
                "yield an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
-        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
+        resProps.minOpaque = std::max(resProps.minOpaque, 10U);
       } else {
         mergeLikeOp->emitWarning()
             << "Cannot place opaque buffer on merge-like operation's "
                "output due to channel-specific buffering constraints. This may "
                "yield an invalid buffering.";
+      }
+    }
+
+    for (auto fork : funcOp.getOps<handshake::ForkOp>()) {
+
+      for (auto res : fork->getResults()) {
+        ChannelBufProps &resProps = channelProps[res];
+        if (resProps.maxTrans.value_or(1) >= 1) {
+          resProps.minTrans = std::max(resProps.minTrans, 10U);
+        } else {
+          fork->emitWarning()
+              << "Cannot place transparent buffer on merge-like operation's "
+                 "output due to channel-specific buffering constraints. This "
+                 "may "
+                 "yield an invalid buffering.";
+        }
+      }
+    }
+
+    for (auto tagger : funcOp.getOps<handshake::TaggerOp>()) {
+      ChannelBufProps &resProps = channelProps[tagger->getResult(0)];
+
+      Value res = tagger->getResult(0);
+      int i = 0;
+      bool flag = false;
+      for (auto usr : res.getUsers()) {
+        if (isa_and_nonnull<handshake::UntaggerOp>(usr))
+          flag = true;
+        i++;
+      }
+      if (i == 1 && flag)
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
+    }
+
+    for (auto demux : funcOp.getOps<handshake::DemuxOp>()) {
+      for (auto res : demux.getResults()) {
+        ChannelBufProps &resProps = channelProps[res];
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
       }
     }
 

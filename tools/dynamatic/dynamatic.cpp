@@ -291,6 +291,8 @@ public:
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
+  static constexpr llvm::StringLiteral OUT_OF_ORDER_EXECUTION =
+      "out-of-order-execution";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -319,6 +321,7 @@ public:
                           "accesses, use with caution!"});
     addFlag({STRAIGHT_TO_QUEUE,
              "Use straight to queue to connect the circuit to the LSQ"});
+    addFlag({OUT_OF_ORDER_EXECUTION, "Use out-of-order execution strategy"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -700,6 +703,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   // If unspecified, we place a OB + TB after every merge to guarantee
   // the deadlock freeness.
   std::string buffers = "on-merges";
+  std::string outOfOrderExecution =
+      args.flags.contains(OUT_OF_ORDER_EXECUTION) ? "1" : "0";
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
   std::string milpSolver = "gurobi";
@@ -741,7 +746,8 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, milpSolver, straightToQueue);
+                 fastTokenDelivery, milpSolver, straightToQueue, sharing,
+                 outOfOrderExecution);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

@@ -254,8 +254,9 @@ def _generate_forwarding(extra_signals: ExtraSignals) -> str:
     # Example:
     # outs_spec <= index_spec or outs_inner_spec;
     for signal_name in extra_signals:
+        # removing index from inputs becuse it is not tagged in mux(TODO: check for other extra signals)
         forwarding_assignments.extend(generate_signal_wise_forwarding(
-            ["index", "outs_inner"], ["outs"], signal_name))
+            ["outs_inner"], ["outs"], signal_name))
 
     return "\n  ".join(forwarding_assignments)
 
@@ -272,8 +273,7 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extr
         }, {
             "name": "index",
             "bitwidth": index_bitwidth,
-            # TODO: Extra signals for index port are not tested
-            "extra_signals": extra_signals
+            "extra_signals": {}
         }],
         [{
             "name": "outs",
@@ -296,6 +296,12 @@ def _generate_mux_signal_manager(name, size, index_bitwidth, data_bitwidth, extr
         data_bitwidth, concat_layout)
     forwarding_assignments = _generate_forwarding(extra_signals)
 
+    # Outs data assignment
+    if data_bitwidth > 0:
+        outs_data_assignment = "  outs <= outs_inner;"
+    else:
+        outs_data_assignment = ""
+
     architecture = f"""
 -- Architecture of signal manager (mux)
 architecture arch of {name} is
@@ -309,7 +315,7 @@ begin
   -- Forwarding logic
   {forwarding_assignments}
 
-  outs <= outs_inner;
+  {outs_data_assignment}
   outs_valid <= outs_inner_valid;
   outs_inner_ready <= outs_ready;
 

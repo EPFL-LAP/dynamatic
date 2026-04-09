@@ -20,6 +20,7 @@ DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
+OUT_OF_ORDER_EXECUTION=${15}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -51,12 +52,14 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_MATERIALIZED="$COMP_DIR/handshake_materialized.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
+F_HANDSHAKE_OOE="$COMP_DIR/out_of_order.mlir"
 
 # ============================================================================ #
 # Helper funtions
@@ -268,7 +271,6 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
@@ -280,10 +282,36 @@ else
     --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
+fi
+
+  # out-of-order-execution transformations
+if [[ $OUT_OF_ORDER_EXECUTION -ne 0 ]]; then
+
+  echo_info "Applying out-of-order execution transformations"
+
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --out-of-order-execution \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE_OOE"
+  exit_on_fail "Failed to apply out-of-order execution transformations" \
+    "Applied out-of-order execution transformations"
+
+  # handshake transformations 2
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_OOE" \
+    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_MATERIALIZED"
+  exit_on_fail "Failed to apply materialization transformation" \
+    "Applied materialization transformation"
+else
+  # handshake transformations 2
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_MATERIALIZED"
+  exit_on_fail "Failed to apply materialization transformation" \
+    "Applied materialization transformation"
 fi
 
 # Credit-based sharing
@@ -299,7 +327,7 @@ fi
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_MATERIALIZED" \
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER timing-models=$DYNAMATIC_DIR/data/components.json" \
@@ -329,7 +357,7 @@ else
   # To enable debug information, make sure that Dynamatic is built with Debug
   # mode and add "--debug-only=<DEBUG_TYPE>" to the binary call below. Check
   # out the value of <DEBUG_TYPE> in the cpp source files.
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_MATERIALIZED" \
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-milp-models \
@@ -348,7 +376,7 @@ fi
 exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
 
 # Export to DOT
-export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
+export_dot "$F_HANDSHAKE_MATERIALIZED" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then

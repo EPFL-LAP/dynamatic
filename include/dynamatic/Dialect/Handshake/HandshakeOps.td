@@ -409,7 +409,8 @@ def MuxOp : Handshake_Op<"mux", [
   Pure,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "selectOperand"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>,
+  LacksExtraSignals<"selectOperand">,
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
@@ -447,7 +448,8 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   Pure, HasClock,
   VariadicHasElement<"dataOperands">,
   AllDataTypesMatchWithVariadic<"dataOperands", ["result"]>,
-  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result", "index"]>,
+  AllExtraSignalsMatchWithVariadic<"dataOperands", ["result"]>,
+  LacksExtraSignals<"index">,
   // Interface declarations
   DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
   DeclareOpInterfaceMethods<EagerForkLikeOpInterface, []>,
@@ -519,13 +521,14 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<DataBitwidthInterface, ["getDataBitwidth"]>,
 ]> {
   let summary = "conditional branch operation";
   let description = [{
     The cbranch operation represents a conditional
     branch.  The data input is propagated to one of the two outputs
-    based on the condition input.
+    based on the select input.
 
     Example:
 
@@ -547,6 +550,82 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
+  }];
+  let extraClassDefinition = [{
+    unsigned $cppClass::getDataBitwidth() {
+      return ::mlir::cast<ChannelType>(getDataOperand().getType()).getIntOrFloatBitWidth();
+    }
+  }];
+}
+
+def DemuxOp : Handshake_Op<"demux", [
+  AllDataTypesMatchWithVariadic<"result", ["dataOperand"]>,
+  AllExtraSignalsMatchWithVariadic<"result", ["dataOperand"]>,
+  LacksExtraSignals<"selectOperand">,
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
+]> {
+  let summary = "demux operation";
+  let description = [{
+    The demux operation represents a variadic conditional
+    branch.  The data input is propagated to one of the outputs
+    based on the condition input.
+
+    Example:
+
+    ```mlir
+    %result = demux %cond, %data : !handshake.channel<i1>,
+      !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins ChannelType:$selectOperand,
+                       HandshakeType:$dataOperand);
+  let results = (outs Variadic<HandshakeType>:$result);
+
+  let assemblyFormat = [{
+    `[` $selectOperand `]` $dataOperand attr-dict `:` 
+      type($selectOperand) `,` functional-type($dataOperand, results)
+  }];
+
+  //let assemblyFormat = [{
+  // $selectOperand `,` $dataOperand attr-dict
+  //    `:` type($selectOperand) `,`  functional-type($dataOperand, results)
+  //}];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "index" : "ins";
+    }
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+def ExtractOp : Handshake_Op<"extract", [
+  Pure,
+  HasExtraSignal<"operand">,
+  IsSimpleHandshake<"result">,
+  DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  ]> {
+  let summary = "extract operation";
+  let description = [{
+    The extract operation takes a data channel with additional signals (such as tags or spec bits)
+    as input and removes these extra signals, returning only the core data.
+
+    Example:
+
+    ```mlir
+    extract %data : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$operand);
+  let results = (outs HandshakeType:$result);
+
+  let assemblyFormat = [{
+    $operand attr-dict `:`  custom<HandshakeType>(type($operand)) `,`  custom<HandshakeType>(type($result))
   }];
 }
 
@@ -657,6 +736,111 @@ def NotIOp : Handshake_Op<"noti", [
   let arguments = (ins ChannelType:$operand);
   let results = (outs ChannelType:$result);
   let assemblyFormat = "$operand attr-dict `:` type($result)";
+}
+
+//===----------------------------------------------------------------------===//
+// Out-of-Order Execution Operations
+//===----------------------------------------------------------------------===//
+
+def FreeTagsFifoOp : Handshake_Op<"free_tags_fifo", [
+  Pure,
+  //AllDataTypesMatch<["tagOperand", "tagOut"]>
+]> {
+  let summary = "fifo operation for tags.";
+  let description = [{
+    The `free_tags_fifo` operation represents a FIFO queue that supplies tags ready for reuse.
+    It takes free tags as input and outputs a free tag, giving it to the Tagger when necessary
+    Example:
+
+    ```mlir
+      free_tags_fifo %tagOut : <i2>, <i2>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$tagOperand);
+
+  let results = (outs HandshakeType:$tagOut);
+
+  let assemblyFormat = [{
+    $tagOperand attr-dict `:`  custom<HandshakeType>(type($tagOperand)) `,`  custom<HandshakeType>(type($tagOut))
+  }];
+}
+
+def TaggerOp : Handshake_Op<"tagger", [
+  Pure, 
+  HasUniqueTagInSecondOperand<"dataOperand", "dataOut">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Tagger operation for tagging data with tag signals.";
+  let description = [{
+    The `tagger` operation attaches extra tag bits as extra signals to the data payload.
+
+    Example:
+
+    ```mlir
+    %dataOut = tagger[%tagOperand] %dataOperand : (!handshake.channel<i32>, !handshake.channel<i2>) -> !handshake.channel<i32, [tag0: i2]>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataOperand,
+     HandshakeType:$tagOperand   
+  );
+
+  let results = (outs HandshakeType:$dataOut);
+
+  let assemblyFormat = [{
+    `[` $tagOperand `]` $dataOperand attr-dict `:` functional-type(operands, results)
+  }];
+
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "ins" : "tagIn";
+    }
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "outs";
+    }
+  }];
+}
+
+def UntaggerOp : Handshake_Op<"untagger", [
+  Pure, 
+  HasUniqueTagInSecondOperand<"dataOut", "dataOperand">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Untagger operation for extracting tag signals and forwarding data.";
+  let description = [{
+    The `untagger` operation extracts the extra tag bits previously attached to a data payload by the tagger. 
+
+    Example:
+
+    ```mlir
+    %dataOut, %tagOut = untagger %dataOperand : (!handshake.channel<i32, [tag0: i2]>) -> (!handshake.channel<i32>, !handshake.channel<i2>)
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$dataOperand);
+
+  let results = (outs HandshakeType:$dataOut,
+    HandshakeType:$tagOut
+  );
+
+  let assemblyFormat = [{
+    $dataOperand attr-dict `:` functional-type(operands, results)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < 1 && "index too high");
+      return "ins";
+    }
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < 2 && "index too high");
+      return idx == 0 ? "outs" : "tagOut";
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1071,7 +1255,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"saveCtrl">,
+  // IsSimpleHandshake<"saveCtrl">,
   IsIntSizedChannel<1, "saveCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
@@ -1160,10 +1344,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
 
 def SpecSaveOp : Handshake_Op<"spec_save", [
   AllDataTypesMatch<["dataIn", "dataOut"]>,
-  AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
-  LacksSpecTag<"dataIn">,
-  HasValidSpecTag<"dataOut">,
-  IsSimpleHandshake<"ctrl">,
+  // AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
+  // LacksSpecTag<"dataIn">,
+  // HasValidSpecTag<"dataOut">,
+  // IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {

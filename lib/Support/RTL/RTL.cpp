@@ -315,6 +315,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.uitofp" ||
       handshakeOp == "handshake.sitofp" ||
       handshakeOp == "handshake.fptosi" ||
+      handshakeOp == "handshake.extract" ||
       handshakeOp == "handshake.rigidifier" ||
       handshakeOp == "handshake.ori" ||
       handshakeOp == "handshake.shrsi" ||
@@ -345,7 +346,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
   } else if (handshakeOp == "handshake.cond_br" ||
              handshakeOp == "handshake.select") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getInputType(1));
-  } else if (handshakeOp == "handshake.constant") {
+  } else if (handshakeOp == "handshake.constant"|| handshakeOp == "handshake.free_tags_fifo") {
     serializedParams["BITWIDTH"] = getBitwidthString(modType.getOutputType(0));
   } else if (handshakeOp == "handshake.control_merge") {
     serializedParams["DATA_BITWIDTH"] =
@@ -364,7 +365,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getOutputType(1));
-  } else if (handshakeOp == "handshake.mux") {
+  } else if (handshakeOp == "handshake.mux" || handshakeOp == "handshake.demux") {
     serializedParams["INDEX_BITWIDTH"] =
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
@@ -379,6 +380,16 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
         getBitwidthString(modType.getInputType(0));
     serializedParams["DATA_BITWIDTH"] =
         getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.tagger") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(0));
+    serializedParams["TAG_BITWIDTH"] =
+        getBitwidthString(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.untagger") {
+    serializedParams["DATA_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(0));
+    serializedParams["TAG_BITWIDTH"] =
+        getBitwidthString(modType.getOutputType(1));
   } else if (handshakeOp == "handshake.mem_controller" ||
              handshakeOp == "handshake.lsq") {
     serializedParams["DATA_BITWIDTH"] =
@@ -459,13 +470,13 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.speculator" ||
       handshakeOp == "handshake.trunci" ||
-      handshakeOp == "handshake.mux" ||
       handshakeOp == "handshake.control_merge" ||
       handshakeOp == "handshake.blocker" ||
       handshakeOp == "handshake.uitofp" ||
       handshakeOp == "handshake.sitofp" ||
       handshakeOp == "handshake.fptosi" ||
       handshakeOp == "handshake.lazy_fork" ||
+      handshakeOp == "handshake.extract" ||
       handshakeOp == "handshake.divf" ||
       handshakeOp == "handshake.ori" ||
       handshakeOp == "handshake.shrsi" ||
@@ -499,10 +510,19 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   ) {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
+  } else if (handshakeOp == "handshake.mux") {
+    serializedParams["EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(1));
+  } else if (handshakeOp == "handshake.tagger" || handshakeOp == "handshake.untagger") {
+    serializedParams["OUTPUT_EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getOutputType(0));
+    serializedParams["INPUT_EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(0));
   } else if (
       // clang-format off
       handshakeOp == "handshake.source" ||
-      handshakeOp == "handshake.non_spec"
+      handshakeOp == "handshake.non_spec"||
+      handshakeOp == "handshake.demux"
       // clang-format on
   ) {
     serializedParams["EXTRA_SIGNALS"] =
@@ -513,7 +533,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "mem_to_bram" ||
       handshakeOp == "handshake.lsq" ||
       handshakeOp == "handshake.sharing_wrapper" ||
-      handshakeOp == "handshake.ram"
+      handshakeOp == "handshake.ram"||
+      handshakeOp == "handshake.free_tags_fifo"
       // clang-format on
   ) {
     // Skip

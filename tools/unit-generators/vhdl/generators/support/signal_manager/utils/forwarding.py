@@ -25,5 +25,14 @@ def generate_forwarding_expression_for_signal(signal_name: str, in_extra_signal_
     if signal_name == "spec":
         return " or ".join(in_extra_signal_names)
 
+    """
+    Tags are guaranteed to be the same across all input ports.
+    We can use the first input port's tag for all output ports.
+    """
+    if signal_name.startswith("tag"):
+        if in_extra_signal_names:
+            return in_extra_signal_names[0]
+        raise ValueError(f"{signal_name} requires at least one signal")
+
     raise ValueError(
         f"Unsupported forwarding method for extra signal: {signal_name}")

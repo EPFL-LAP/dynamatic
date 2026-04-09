@@ -602,6 +602,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             // Bitwidth
             addType("DATA_TYPE", cbrOp.getDataOperand());
           })
+      .Case<handshake::DemuxOp>([&](handshake::DemuxOp demuxOp) {
+        // Number of output data channels, data bitwidth, and select bitwidth
+        addUnsigned("SIZE", demuxOp->getResults().size());
+        addType("DATA_TYPE", demuxOp.getDataOperand());
+        addType("SELECT_TYPE", demuxOp.getSelectOperand());
+          })
       .Case<handshake::SourceOp>([&](auto) {
         // No discrimianting parameters, just to avoid falling into the
         // default case for sources
@@ -719,7 +725,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           handshake::MaxSIOp,
           handshake::MaxUIOp,
           handshake::MinSIOp,
-          handshake::MinUIOp
+          handshake::MinUIOp,
+          handshake::ExtractOp
           // clang-format on
           >([&](auto) {
         // Bitwidth
@@ -758,6 +765,28 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           })
       .Case<handshake::ReadyRemoverOp, handshake::ValidMergerOp>([&](auto) {
         // No parameters needed for these operations
+      })
+      .Case<handshake::TaggerOp>([&](handshake::TaggerOp taggerOp) {
+          // Data bitwidth
+          addType("DATA_TYPE", taggerOp.getDataOperand());
+          addType("TAG_TYPE", taggerOp.getTagOperand());
+      })
+      .Case<handshake::UntaggerOp>([&](handshake::UntaggerOp untaggerOp) {
+          addType("DATA_TYPE", untaggerOp.getDataOperand());
+          addType("TAG_TYPE", untaggerOp.getTagOut());
+      })
+      .Case<handshake::FreeTagsFifoOp>([&](handshake::FreeTagsFifoOp fifo) {
+          // Tag bitwidth and fifo depth
+          addType("TAG_TYPE", fifo.getTagOut());
+          ChannelType ct =
+            dyn_cast_or_null<ChannelType>(fifo.getTagOut().getType());
+          if (!ct) {
+            op->emitError() << "FreeTagsFifoOp tag type must be an integer type";
+            unsupported = true;
+            return;
+          }
+          addUnsigned("FIFO_DEPTH",
+            fifo->getAttrOfType<IntegerAttr>("fifo_depth").getUInt());
       })
       .Case<handshake::RAMOp>([&](handshake::RAMOp ramOp) {
         MemRefType resType = ramOp.getResult().getType();
@@ -2149,6 +2178,8 @@ public:
         ConvertToHWInstance<handshake::NDWireOp>,
         ConvertToHWInstance<handshake::ConditionalBranchOp>,
         ConvertToHWInstance<handshake::BranchOp>,
+        ConvertToHWInstance<handshake::DemuxOp>,
+        ConvertToHWInstance<handshake::ExtractOp>,
         ConvertToHWInstance<handshake::MergeOp>,
         ConvertToHWInstance<handshake::ControlMergeOp>,
         ConvertToHWInstance<handshake::MuxOp>,
@@ -2208,7 +2239,12 @@ public:
         ConvertToHWInstance<handshake::SpecSaveCommitOp>,
         ConvertToHWInstance<handshake::SpeculatorOp>,
         ConvertToHWInstance<handshake::SpeculatingBranchOp>,
-        ConvertToHWInstance<handshake::NonSpecOp>
+        ConvertToHWInstance<handshake::NonSpecOp>,
+        
+        // Out-of-order execution operations
+        ConvertToHWInstance<handshake::TaggerOp>,
+        ConvertToHWInstance<handshake::UntaggerOp>,
+        ConvertToHWInstance<handshake::FreeTagsFifoOp>
         // clang-format on
         >(typeConverter, funcOp->getContext());
 
