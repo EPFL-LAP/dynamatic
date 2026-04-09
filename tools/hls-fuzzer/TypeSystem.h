@@ -116,6 +116,16 @@ public:
   virtual std::optional<
       ConclusionOf<ast::ArrayAssignmentStatement, OpaqueContext>>
   checkArrayAssignmentStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual std::optional<ast::ArrayAssignmentStatement>
+  generateArrayAssignmentStatementOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::ArrayParameter> generateArrayParameter,
+      GenerateCallback<ast::Expression> generateExpression) = 0;
+
+  virtual std::vector<ast::Statement> generateStatementListOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::Statement> generateStatement) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -199,6 +209,8 @@ class TypeSystem : public AbstractTypeSystem {
 public:
   explicit TypeSystem(Randomly &random) : random(random) {}
 
+  using Context = TypingContext;
+
   /// The conclusion type of 'ASTNode' with the given context.
   template <typename ASTNode>
   using ConclusionOf = ConclusionOf<ASTNode, TypingContext>;
@@ -254,7 +266,8 @@ public:
         })
         .Case([&](const ast::ScalarType *scalar)
                   -> std::optional<ConclusionOf<ast::ReturnType>> {
-          if (!self().checkScalarType(*scalar, context))
+          if (std::optional optional = self().checkScalarType(*scalar, context);
+              !optional)
             return std::nullopt;
 
           return ConclusionOf<ast::ReturnType>{};
@@ -263,7 +276,9 @@ public:
 
   std::optional<ConclusionOf<ast::Constant>>
   checkConstant(const ast::Constant &constant, const TypingContext &context) {
-    if (!self().checkScalarType(constant.getType(), context))
+    if (std::optional optional =
+            self().checkScalarType(constant.getType(), context);
+        !optional)
       return std::nullopt;
 
     return constant;
@@ -272,7 +287,9 @@ public:
   std::optional<ConclusionOf<ast::ScalarParameter>>
   checkScalarParameter(const ast::ScalarParameter &parameter,
                        const TypingContext &context) {
-    if (!self().checkScalarType(parameter.getDataType(), context))
+    if (std::optional optional =
+            self().checkScalarType(parameter.getDataType(), context);
+        !optional)
       return std::nullopt;
 
     return context;
@@ -298,7 +315,9 @@ public:
   std::optional<ConclusionOf<ast::ArrayParameter>>
   checkExistingArrayParameter(const ast::ArrayParameter &parameter,
                               const TypingContext &context) {
-    if (!self().checkScalarType(parameter.getElementType(), context))
+    if (std::optional optional =
+            self().checkScalarType(parameter.getElementType(), context);
+        !optional)
       return std::nullopt;
 
     return ConclusionOf<ast::ArrayParameter>{};
@@ -326,6 +345,18 @@ public:
   checkArrayAssignmentStatement(const TypingContext &context) {
     return {context, context, context};
   }
+
+  std::optional<ast::ArrayAssignmentStatement> generateArrayAssignmentStatement(
+      const TypingContext &context,
+      GenerateCallback<ast::ArrayParameter, TypingContext>
+          generateArrayParameter,
+      GenerateCallback<ast::Expression, TypingContext> generateExpression);
+
+  /// Generate a list of statements from the given context.
+  /// Default implementation generates a random amount of statements.
+  std::vector<ast::Statement> generateStatementList(
+      const TypingContext &context,
+      GenerateCallback<ast::Statement, TypingContext> generateStatement);
 
   // Implementations of the virtual methods in 'AbstractTypeSystem'.
   // These are automatically implemented to unbox the 'TypingContext's out of
@@ -424,6 +455,23 @@ public:
         self().checkArrayAssignmentStatement(context.cast<TypingContext>()));
   }
 
+  std::optional<ast::ArrayAssignmentStatement>
+  generateArrayAssignmentStatementOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::ArrayParameter> generateArrayParameter,
+      GenerateCallback<ast::Expression> generateExpression) final {
+    return self().generateArrayAssignmentStatement(
+        convert(context), convert(generateArrayParameter),
+        convert(generateExpression));
+  }
+
+  std::vector<ast::Statement> generateStatementListOpaque(
+      const OpaqueContext &context,
+      GenerateCallback<ast::Statement> generateStatement) final {
+    return convert(self().generateStatementList(convert(context),
+                                                convert(generateStatement)));
+  }
+
 private:
   Self &self() { return static_cast<Self &>(*this); }
 
@@ -501,6 +549,8 @@ protected:
 class NoopTypeSystem : public TypeSystem<std::monostate, NoopTypeSystem> {
 public:
   using TypeSystem::TypeSystem;
+
+  ~NoopTypeSystem() override;
 };
 
 /// Convenience type system that disallows every AST constructs (besides
@@ -508,7 +558,8 @@ public:
 template <typename TypingContext, typename Self>
 class DisallowByDefaultTypeSystem : public TypeSystem<TypingContext, Self> {
 public:
-  using TypeSystem<TypingContext, Self>::TypeSystem;
+  using Base = TypeSystem<TypingContext, Self>;
+  using Base::Base;
 
   static std::optional<ConclusionOf<ast::BinaryExpression, TypingContext>>
   checkBinaryExpression(ast::BinaryExpression::Op, const TypingContext &) {
@@ -561,10 +612,10 @@ public:
     return std::nullopt;
   }
 
-  static std::optional<
-      ConclusionOf<ast::ArrayAssignmentStatement, TypingContext>>
-  checkArrayAssignmentStatement(const TypingContext &) {
-    return std::nullopt;
+  static std::vector<ast::Statement> generateStatementList(
+      const TypingContext &,
+      typename Base::template GenerateCallback<ast::Statement, TypingContext>) {
+    return {};
   }
 };
 
@@ -606,6 +657,64 @@ TypeSystem<TypingContext, Self>::generateArrayReadExpression(
       std::move(elementType), name,
       ast::BinaryExpression{std::move(*index), ast::BinaryExpression::BitAnd,
                             ast::Constant{static_cast<std::uint32_t>(mask)}}};
+}
+
+template <typename TypingContext, typename Self>
+std::optional<ast::ArrayAssignmentStatement>
+TypeSystem<TypingContext, Self>::generateArrayAssignmentStatement(
+    const TypingContext &context,
+    GenerateCallback<ast::ArrayParameter, TypingContext> generateArrayParameter,
+    GenerateCallback<ast::Expression, TypingContext> generateExpression) {
+  std::optional conclusion = self().checkArrayAssignmentStatement(context);
+  if (!conclusion)
+    return std::nullopt;
+
+  auto &&[param, index, value] = *conclusion;
+  std::optional<ast::ArrayParameter> parameter = generateArrayParameter(param);
+  if (!parameter)
+    return std::nullopt;
+
+  assert(llvm::isPowerOf2_64(parameter->getDimension()) &&
+         "default implementation depends on dimensions being powers of 2");
+
+  std::optional<ast::Expression> maybeIndexExpression =
+      generateExpression(index);
+  if (!maybeIndexExpression)
+    return std::nullopt;
+
+  std::optional<ast::Expression> valueExpression = generateExpression(value);
+  if (!valueExpression)
+    return std::nullopt;
+
+  return ast::ArrayAssignmentStatement{
+      parameter->getName().str(),
+      ast::BinaryExpression{std::move(*maybeIndexExpression),
+                            ast::BinaryExpression::BitAnd,
+                            ast::Constant{static_cast<std::uint32_t>(
+                                parameter->getDimension() - 1)}},
+      std::move(*valueExpression),
+  };
+}
+
+template <typename TypingContext, typename Self>
+std::vector<ast::Statement>
+TypeSystem<TypingContext, Self>::generateStatementList(
+    const TypingContext &context,
+    GenerateCallback<ast::Statement, TypingContext> generateStatement) {
+  constexpr std::size_t MAX_STATEMENTS = 10;
+
+  std::vector<ast::Statement> result;
+  std::size_t numStatements = random.getInteger<std::size_t>(0, MAX_STATEMENTS);
+  result.reserve(numStatements);
+  for (std::size_t i = 0; i < numStatements; i++) {
+    std::optional<ast::Statement> maybeStat = generateStatement(context);
+    if (!maybeStat)
+      break;
+
+    result.push_back(std::move(*maybeStat));
+  }
+  std::reverse(result.begin(), result.end());
+  return result;
 }
 
 } // namespace dynamatic::gen

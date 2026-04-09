@@ -29,6 +29,8 @@ add_llvm_executable(hls-fuzzer
         targets/BitwidthOptimizationsTarget.cpp
         targets/BitwidthTypeSystem.cpp
         targets/DynamaticTypeSystem.cpp
+        targets/LSQNoDepTypeSystem.cpp
+        targets/LSQOptimizationsTarget.cpp
         targets/RandomCTarget.cpp
         targets/TargetUtils.cpp
 )
