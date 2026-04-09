@@ -3019,6 +3019,7 @@ LogicalResult experimental::ftd::addGsaGates(
 
         // Replace the new condition value
         conditionValue = initOp->getResult(0);
+        conditionValue = initOp->getResult(0);
         conditionValue.setType(channelifyType(conditionValue.getType()));
 
       }
