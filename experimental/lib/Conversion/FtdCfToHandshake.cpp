@@ -287,8 +287,8 @@ struct FtdCfToHandshakePass
 
     patterns.add<
         // LowerFuncToHandshake,
-        ConvertConstants, AllocaOpConversion, ConvertCalls,
-        ConvertUndefinedValues, GetGlobalOpConversion, GlobalOpConversion,
+        /*ConvertConstants,*/ AllocaOpConversion, ConvertCalls,
+        /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -400,6 +400,93 @@ struct FtdCfToHandshakePass
 };
 } // namespace
 
+/// Converts undefined operations (LLVM::UndefOp) with a default "0"
+/// constant triggered by the start signal of the corresponding function.
+/// This is usually associated to uninitialized variables in the code
+static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
+                                            handshake::FuncOp &funcOp,
+                                            NameAnalysis &namer) {
+
+  // Get the start value of the current function
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  // For each undefined value
+  auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
+
+  for (auto undefOp : undefinedValues) {
+    // Create an attribute of the appropriate type for the constant
+    auto resType = undefOp.getRes().getType();
+    TypedAttr cstAttr;
+    if (isa<IndexType>(resType)) {
+      auto intType = rewriter.getIntegerType(32);
+      cstAttr = rewriter.getIntegerAttr(intType, 0);
+    } else if (isa<IntegerType>(resType)) {
+      cstAttr = rewriter.getIntegerAttr(resType, 0);
+    } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
+      cstAttr = rewriter.getFloatAttr(floatType, 0.0);
+    } else {
+      auto intType = rewriter.getIntegerType(32);
+      cstAttr = rewriter.getIntegerAttr(intType, 0);
+    }
+
+    // Create a constant with a default value and replace the undefined value
+    rewriter.setInsertionPoint(undefOp);
+    auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
+                                                        cstAttr, startValue);
+    cstOp->setDialectAttrs(undefOp->getAttrDictionary());
+    undefOp.getResult().replaceAllUsesWith(cstOp.getResult());
+    namer.replaceOp(cstOp, cstOp);
+    rewriter.replaceOp(undefOp, cstOp.getResult());
+  }
+
+  return success();
+}
+
+/// Convers arith-level constants to handshake-level constants. Constants are
+/// triggered by the start value of the corresponding function. The FTD
+/// algorithm is then in charge of connecting the constants to the rest of the
+/// network, in order for them to be re-generated
+static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
+                                      handshake::FuncOp &funcOp,
+                                      NameAnalysis &namer) {
+
+  // Get the start value of the current function
+  auto startValue = (Value)funcOp.getArguments().back();
+  llvm::DenseMap<Block *, Value> sourcesPerBlock;
+
+  // For each constant
+  auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
+  for (auto cstOp : constants) {
+
+    rewriter.setInsertionPoint(cstOp);
+
+    // This variable will work as activation value for the constant. If the
+    // constant is considered as sourcable, this will be the output of a source
+    // component, otherwise it remains startValue
+    auto controlValue = startValue;
+
+    // Continue the conversion by obtaining the size of the constnat
+    TypedAttr valueAttr = cstOp.getValue();
+
+    if (isa<IndexType>(valueAttr.getType())) {
+      auto intType = rewriter.getIntegerType(32);
+      valueAttr = IntegerAttr::get(
+          intType, cast<IntegerAttr>(valueAttr).getValue().trunc(32));
+    }
+
+    auto newCstOp = rewriter.create<handshake::ConstantOp>(
+        cstOp.getLoc(), valueAttr, controlValue);
+
+    newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
+
+    // Replace the constant and the usage of its result
+    namer.replaceOp(cstOp, newCstOp);
+    cstOp.getResult().replaceAllUsesWith(newCstOp.getResult());
+    rewriter.replaceOp(cstOp, newCstOp->getResults());
+  }
+  return success();
+}
+
 using ArgReplacements = DenseMap<BlockArgument, OpResult>;
 
 LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
@@ -487,8 +574,8 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
       assert(cond && "Failed to remap condition");
       Value ctrl = block.getArguments().back();
       rewriter.setInsertionPoint(condBr);
-      rewriter.create<handshake::ConditionalBranchOp>(
-          condBr.getLoc(), cond, ctrl);
+      rewriter.create<handshake::ConditionalBranchOp>(condBr.getLoc(), cond,
+                                                      ctrl);
     }
   }
 
@@ -509,6 +596,13 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // functions introduce new data dependencies that are then passed to FTD for
   // correctly delivering data between them like any real data dependencies
   if (failed(verifyAndCreateMemInterfaces(funcOp, rewriter, memInfo)))
+    return failure();
+
+  // Convert the constants and undefined values from the `arith` dialect to
+  // the `handshake` dialect, while also using the start value as their
+  // control value
+  if (failed(convertConstants(rewriter, funcOp, namer)) ||
+      failed(convertUndefinedValues(rewriter, funcOp, namer)))
     return failure();
 
   // id basic block
