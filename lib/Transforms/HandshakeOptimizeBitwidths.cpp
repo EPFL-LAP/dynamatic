@@ -1032,24 +1032,20 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     }
 
     // Determine the achievable optimized width for operands inside the cycle
-    unsigned optWidth = 0;
-    for (ChannelVal mergedVal : allMergedValues) {
-      optWidth = std::max(
-          optWidth,
-          backtrackToMinimalValue(mergedVal).first.getType().getDataBitWidth());
-    }
+    ExtWidth optWidth = computeDataForwardResult(
+        llvm::map_to_vector(allMergedValues, [](ChannelVal val) {
+          return backtrackToMinimalValue(val);
+        }));
 
-    // Get the minimal valuue of all data operands
+    // Get the minimal value of all data operands
     SmallVector<ExtValue> minDataOperands;
     for (Value oprd : dataOperands)
       minDataOperands.push_back(
           getMinimalValueWithExtType(cast<ChannelVal>(oprd)));
 
-    ExtType resultExt = computeDataForwardResult(minDataOperands, optWidth);
-
     // Check whether we managed to optimize anything
     unsigned dataWidth = channelVal.getType().getDataBitWidth();
-    if (optWidth >= dataWidth)
+    if (optWidth.bitWidth >= dataWidth)
       return failure();
 
     // Create a new operation as well as appropriate bitwidth modification
@@ -1058,15 +1054,16 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     SmallVector<Value> newOperands;
     SmallVector<Value> newResults;
     SmallVector<Type> newResTypes;
-    Type newDataType = rewriter.getIntegerType(optWidth);
+    Type newDataType = rewriter.getIntegerType(optWidth.bitWidth);
     Type newChannelType = channelVal.getType().withDataType(newDataType);
-    cfg.getNewOperands(optWidth, minDataOperands, rewriter, newOperands);
+    cfg.getNewOperands(optWidth.bitWidth, minDataOperands, rewriter,
+                       newOperands);
     cfg.getResultTypes(newChannelType, newResTypes);
     rewriter.setInsertionPoint(op);
     Op newOp = cfg.createOp(newResTypes, newOperands, rewriter);
     namer.replaceOp(op, newOp);
     inheritBB(op, newOp);
-    cfg.modResults(newOp, dataWidth, resultExt, rewriter, newResults);
+    cfg.modResults(newOp, dataWidth, optWidth.extType, rewriter, newResults);
 
     // Replace uses of the original operation's results with the results of the
     // optimized operation we just created
