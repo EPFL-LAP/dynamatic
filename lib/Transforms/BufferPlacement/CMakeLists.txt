@@ -9,6 +9,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
   MAPBUFBuffers.cpp
+  Johnson.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
