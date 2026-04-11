@@ -46,6 +46,36 @@ static void logLine(const char *msg) {
   f << msg << "\n";
 }
 
+static void inheritBB(Operation *from, Operation *to) {
+  if (auto bbAttr = from->getAttr("handshake.bb"))
+    to->setAttr("handshake.bb", bbAttr);
+}
+
+static Location getConditionLocOrFallback(Value condition,
+                                          Operation *fallback) {
+  if (Operation *defOp = condition.getDefiningOp())
+    return defOp->getLoc();
+  return fallback->getLoc();
+}
+
+static void inheritConditionBBOrFallback(Value condition, Operation *fallback,
+                                         Operation *to) {
+  if (Operation *defOp = condition.getDefiningOp()) {
+    if (auto bbAttr = defOp->getAttr("handshake.bb")) {
+      to->setAttr("handshake.bb", bbAttr);
+      return;
+    }
+  }
+  inheritBB(fallback, to);
+}
+
+static void refreshBranchAttrsFromCondition(
+    handshake::ConditionalBranchOp branchOp, Operation *fallback) {
+  Value condition = branchOp.getConditionOperand();
+  branchOp->setLoc(getConditionLocOrFallback(condition, fallback));
+  inheritConditionBBOrFallback(condition, fallback, branchOp);
+}
+
 namespace {
 
 /// Combine redundant init merges. These merges have one constant input and a
@@ -460,7 +490,7 @@ struct RemoveNotCondition
     rewriter.replaceAllUsesWith(condBranchOp.getFalseResult(),
                                 newBranch.getTrueResult());
 
-    newBranch->setAttr("handshake.bb", condBranchOp->getAttr("handshake.bb"));
+    refreshBranchAttrsFromCondition(newBranch, condBranchOp);
     rewriter.eraseOp(condBranchOp);
 
     logLine("[HandshakeCombineSteeringLogic] RemoveNotCondition applied\n");
@@ -553,6 +583,7 @@ struct SimplifyKnownConditionBranch
 
         // Replace condition operand of downstream branch
         br->setOperand(0, constOp.getResult());
+        refreshBranchAttrsFromCondition(br, br);
 
         changed = true;
       }
@@ -620,29 +651,6 @@ struct EliminateConstantCondBranch
     return success();
   }
 };
-
-static void inheritBB(Operation *from, Operation *to) {
-  if (auto bbAttr = from->getAttr("handshake.bb"))
-    to->setAttr("handshake.bb", bbAttr);
-}
-
-static Location getConditionLocOrFallback(Value condition,
-                                          Operation *fallback) {
-  if (Operation *defOp = condition.getDefiningOp())
-    return defOp->getLoc();
-  return fallback->getLoc();
-}
-
-static void inheritConditionBBOrFallback(Value condition, Operation *fallback,
-                                         Operation *to) {
-  if (Operation *defOp = condition.getDefiningOp()) {
-    if (auto bbAttr = defOp->getAttr("handshake.bb")) {
-      to->setAttr("handshake.bb", bbAttr);
-      return;
-    }
-  }
-  inheritBB(fallback, to);
-}
 
 /// Match:
 ///   br_mux  : cond_br (mux %c [d0, d1]), %data
