@@ -23,8 +23,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include <fstream>
 #include <cassert>
+#include <fstream>
 
 // [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
@@ -40,7 +40,9 @@ using namespace mlir;
 using namespace dynamatic;
 
 static void logLine(const char *msg) {
-  std::ofstream f("/home/yuqin/dynamatic-scripts/TempOutputs/HandshakeCombineSteeringLogic.txt", std::ios::app);
+  std::ofstream f("/home/yuqin/dynamatic-scripts/TempOutputs/"
+                  "HandshakeCombineSteeringLogic.txt",
+                  std::ios::app);
   f << msg << "\n";
 }
 
@@ -49,45 +51,28 @@ namespace {
 /// Combine redundant init merges. These merges have one constant input and a
 /// condition input. If two merges are identical, then one of them can be
 /// removed
-struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
+struct CombineInits : public OpRewritePattern<handshake::InitOp> {
+  using OpRewritePattern<handshake::InitOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::InitOp initOp,
                                 PatternRewriter &rewriter) const override {
 
-    // Work only with merges having two inputs
-    if (mergeOp->getNumOperands() != 2)
+    // Work only with init having two inputs
+    if (initOp->getNumOperands() != 1)
       return failure();
-
-    // One of the inputs of the merge must be a constants
-    int constIdx = -1;
-    for (int i = 0; i < 2; i++) {
-      if (isa_and_nonnull<handshake::ConstantOp>(
-              mergeOp.getDataOperands()[i].getDefiningOp()))
-        constIdx = i;
-    }
-
-    if (constIdx == -1)
-      return failure();
-
-    // Get the index of the other input
-    int loopIdx = 1 - constIdx;
 
     // If there are other merges fed from the same input at the loopIdx
-    DenseSet<handshake::MergeOp> redundantInits;
-    for (auto *user : mergeOp.getDataOperands()[loopIdx].getUsers())
-      if (isa_and_nonnull<handshake::MergeOp>(user) && user != mergeOp) {
-        handshake::MergeOp mergeUser = cast<handshake::MergeOp>(user);
-        if (isa_and_nonnull<handshake::ConstantOp>(
-                mergeUser.getDataOperands()[constIdx].getDefiningOp()))
-          redundantInits.insert(mergeUser);
+    DenseSet<handshake::InitOp> redundantInits;
+    for (auto *user : initOp.getOperand().getUsers())
+      if (isa_and_nonnull<handshake::InitOp>(user) && user != initOp) {
+        handshake::InitOp initUser = cast<handshake::InitOp>(user);
+        redundantInits.insert(initUser);
       }
 
     if (redundantInits.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineInits applied");
     for (auto init : redundantInits) {
-      rewriter.replaceAllUsesWith(init.getResult(), mergeOp.getResult());
+      rewriter.replaceAllUsesWith(init.getResult(), initOp.getResult());
       rewriter.eraseOp(init);
     }
 
@@ -330,8 +315,9 @@ struct CombineEquivalentBranches
     if (redundant.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineEquivalentBranches applied\n");
-      for (auto br : redundant) {
+    logLine(
+        "[HandshakeCombineSteeringLogic] CombineEquivalentBranches applied\n");
+    for (auto br : redundant) {
       rewriter.replaceAllUsesWith(br.getTrueResult(),
                                   condBranchOp.getTrueResult());
       rewriter.replaceAllUsesWith(br.getFalseResult(),
@@ -355,7 +341,9 @@ struct RemoveUnusedOp : public OpRewritePattern<OpTy> {
         return failure();
     }
 
-    logLine(("[HandshakeCombineSteeringLogic] RemoveUnusedOp<" + std::string(OpTy::getOperationName()) + "> applied").c_str());
+    logLine(("[HandshakeCombineSteeringLogic] RemoveUnusedOp<" +
+             std::string(OpTy::getOperationName()) + "> applied")
+                .c_str());
     rewriter.eraseOp(op);
     return success();
   }
@@ -414,7 +402,8 @@ struct CombineBranchesOppositeSign
     if (redundantBranches.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineBranchesOppositeSign applied\n");
+    logLine("[HandshakeCombineSteeringLogic] CombineBranchesOppositeSign "
+            "applied\n");
     // Erase the redundant branch
     for (auto br : redundantBranches) {
       rewriter.replaceAllUsesWith(br.getFalseResult(),
@@ -519,22 +508,19 @@ struct SimplifyKnownConditionBranch
         rewriter.setInsertionPoint(br);
 
         // Create source as trigger
-        auto sourceOp =
-            rewriter.create<handshake::SourceOp>(br.getLoc());
+        auto sourceOp = rewriter.create<handshake::SourceOp>(br.getLoc());
         if (auto bbAttr = br->getAttr("handshake.bb"))
           sourceOp->setAttr("handshake.bb", bbAttr);
 
         // Build the i1 attribute
         auto i1Type = rewriter.getIntegerType(1);
-        auto cstAttr =
-            rewriter.getIntegerAttr(i1Type, knownCondTrue ? 1 : 0);
+        auto cstAttr = rewriter.getIntegerAttr(i1Type, knownCondTrue ? 1 : 0);
 
         // Check if the condition operand is channelified
         Type condType = branchOutput.getType();
         handshake::ConstantOp constOp;
 
-        if (auto channelType =
-                dyn_cast<handshake::ChannelType>(condType)) {
+        if (auto channelType = dyn_cast<handshake::ChannelType>(condType)) {
           // Channelified: use 4-arg constructor (loc, resultType, attr, ctrl)
           // matching the pattern from the existing codebase
           constOp = rewriter.create<handshake::ConstantOp>(
@@ -556,10 +542,12 @@ struct SimplifyKnownConditionBranch
     };
 
     replaceDownstreamCond(condBranchOp.getTrueResult(), /*outputIsTrue=*/true);
-    replaceDownstreamCond(condBranchOp.getFalseResult(), /*outputIsTrue=*/false);
+    replaceDownstreamCond(condBranchOp.getFalseResult(),
+                          /*outputIsTrue=*/false);
 
     if (changed)
-      logLine("[HandshakeCombineSteeringLogic] SimplifyKnownConditionBranch applied\n");
+      logLine("[HandshakeCombineSteeringLogic] SimplifyKnownConditionBranch "
+              "applied\n");
     return changed ? success() : failure();
   }
 };
@@ -594,23 +582,151 @@ struct EliminateConstantCondBranch
     if (!notTakenResult.use_empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] EliminateConstantCondBranch applied\n");
+    logLine("[HandshakeCombineSteeringLogic] EliminateConstantCondBranch "
+            "applied\n");
     // Short-circuit the always-taken side
     rewriter.replaceAllUsesWith(takenResult, condBranchOp.getDataOperand());
 
     // Erase the branch
     rewriter.eraseOp(condBranchOp);
-    
+
     // Clean up the constant + source if they have no other users
     if (constOp.getResult().use_empty()) {
       Value trigger = constOp.getCtrl();
       rewriter.eraseOp(constOp);
-      if (auto sourceOp = dyn_cast_or_null<handshake::SourceOp>(
-              trigger.getDefiningOp())) {
+      if (auto sourceOp =
+              dyn_cast_or_null<handshake::SourceOp>(trigger.getDefiningOp())) {
         if (sourceOp.getResult().use_empty())
           rewriter.eraseOp(sourceOp);
       }
     }
+    return success();
+  }
+};
+
+static void inheritBB(Operation *from, Operation *to) {
+  if (auto bbAttr = from->getAttr("handshake.bb"))
+    to->setAttr("handshake.bb", bbAttr);
+}
+
+static Location getConditionLocOrFallback(Value condition,
+                                          Operation *fallback) {
+  if (Operation *defOp = condition.getDefiningOp())
+    return defOp->getLoc();
+  return fallback->getLoc();
+}
+
+static void inheritConditionBBOrFallback(Value condition, Operation *fallback,
+                                         Operation *to) {
+  if (Operation *defOp = condition.getDefiningOp()) {
+    if (auto bbAttr = defOp->getAttr("handshake.bb")) {
+      to->setAttr("handshake.bb", bbAttr);
+      return;
+    }
+  }
+  inheritBB(fallback, to);
+}
+
+/// Match:
+///   br_mux  : cond_br (mux %c [d0, d1]), %data
+///   br_base : cond_br %c, %data
+///
+/// Rewrite br_mux into:
+///   br_outer : cond_br %c, %data
+///   br_inner : cond_br %x, <selected outer branch output>
+///
+/// The newly created outer branch is intentionally left structurally identical
+/// to br_base so that CombineEquivalentBranches can fold them afterwards.
+/// This rewrite is only valid when:
+///   - exactly one mux input is a constant
+///   - branch output emptiness matches the constant value:
+///       const 1 => true unused, false used
+///       const 0 => false unused, true used
+///   - if the constant is mux input 0, innerBranch is fed from outer.false
+///   - if the constant is mux input 1, innerBranch is fed from outer.true
+struct SplitBranchWithMuxCondition
+    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+  using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
+                                PatternRewriter &rewriter) const override {
+
+    auto muxOp = dyn_cast_or_null<handshake::MuxOp>(
+        condBranchOp.getConditionOperand().getDefiningOp());
+    if (!muxOp || muxOp.getNumOperands() != 3)
+      return failure();
+
+    int constIdx = -1;
+    int nonConstIdx = -1;
+    handshake::ConstantOp constOp;
+    for (int idx = 0; idx < 2; ++idx) {
+      if (auto candidate = dyn_cast_or_null<handshake::ConstantOp>(
+              muxOp.getDataOperands()[idx].getDefiningOp())) {
+        // Checking that we have not found constants before
+        if (constIdx != -1)
+          return failure();
+        constIdx = idx;
+        constOp = candidate;
+      } else {
+        if (nonConstIdx != -1)
+          return failure();
+        nonConstIdx = idx;
+      }
+    }
+
+    if (constIdx == -1 || nonConstIdx == -1)
+      return failure();
+
+    auto constAttr = dyn_cast<IntegerAttr>(constOp.getValueAttr());
+    if (!constAttr)
+      return failure();
+    bool constValue = constAttr.getValue().getBoolValue();
+
+    Value baseCond = muxOp.getSelectOperand();
+    Value dataOperand = condBranchOp.getDataOperand();
+
+    // Keep the rewrite profitable: the outer branch should be mergeable with an
+    // already existing branch on the same data and condition.
+    auto redundantBranches =
+        findRedundantBranches(baseCond, dataOperand, condBranchOp);
+    if (redundantBranches.empty())
+      return failure();
+
+    bool trueEmpty = condBranchOp.getTrueResult().use_empty();
+    bool falseEmpty = condBranchOp.getFalseResult().use_empty();
+    // Exactly one of the two outputs of the branch must be empty
+    if (trueEmpty == falseEmpty)
+      return failure();
+
+    // The empty output should be consistent with the value of the constant
+    if (constValue) {
+      if (!trueEmpty || falseEmpty)
+        return failure();
+    } else {
+      if (trueEmpty || !falseEmpty)
+        return failure();
+    }
+
+    Value nestedCond = muxOp.getDataOperands()[nonConstIdx];
+
+    rewriter.setInsertionPoint(condBranchOp);
+
+    auto outerBranch = rewriter.create<handshake::ConditionalBranchOp>(
+        getConditionLocOrFallback(baseCond, condBranchOp), baseCond,
+        dataOperand);
+    inheritConditionBBOrFallback(baseCond, condBranchOp, outerBranch);
+
+    Value outerToInner = nonConstIdx == 0 ? outerBranch.getFalseResult()
+                                          : outerBranch.getTrueResult();
+
+    auto innerBranch = rewriter.create<handshake::ConditionalBranchOp>(
+        getConditionLocOrFallback(nestedCond, condBranchOp), nestedCond,
+        outerToInner);
+    inheritConditionBBOrFallback(nestedCond, condBranchOp, innerBranch);
+
+    logLine("[HandshakeCombineSteeringLogic] SplitBranchWithMuxCondition "
+            "applied\n");
+    rewriter.replaceOp(condBranchOp, {innerBranch.getTrueResult(),
+                                      innerBranch.getFalseResult()});
     return success();
   }
 };
@@ -631,11 +747,11 @@ struct HandshakeCombineSteeringLogicPass
                  RemoveUnusedOp<handshake::ConditionalBranchOp>,
                  RemoveUnusedOp<handshake::ConstantOp>,
                  RemoveUnusedOp<handshake::SourceOp>,
-                 RemoveUnusedOp<handshake::NotIOp>,
-                 CombineBranchesOppositeSign,
-                 CombineInits, CombineMuxes, RemoveNotCondition,
-                 SimplifyKnownConditionBranch, EliminateConstantCondBranch,
-                 CombineEquivalentMuxes, CombineEquivalentBranches>(ctx);
+                 RemoveUnusedOp<handshake::NotIOp>, SplitBranchWithMuxCondition,
+                 CombineBranchesOppositeSign, CombineInits, CombineMuxes,
+                 RemoveNotCondition, SimplifyKnownConditionBranch,
+                 EliminateConstantCondBranch, CombineEquivalentMuxes,
+                 CombineEquivalentBranches>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
