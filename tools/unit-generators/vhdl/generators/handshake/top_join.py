@@ -34,7 +34,7 @@ entity {name} is
     outs_ready   : in std_logic;
     -- outputs
     outs_valid   : out std_logic;
-    ins_ready    : in std_logic_vector({size} - 1 downto 0);
+    ins_ready    : out std_logic_vector({size} - 1 downto 0)
   );
 end entity;
 
