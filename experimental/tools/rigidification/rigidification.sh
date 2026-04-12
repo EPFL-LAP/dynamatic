@@ -123,14 +123,14 @@ exit_on_fail "Failed to check formal properties" \
 printf "\n[INFO] Parsing and saving formal verification results\n" >&2
 python "$SMV_RESULT_PARSER" "$F_FORMAL_PROP" "$F_NUXMV_PROP" $RESULT_PARSE_FLAGS
 PARSE_RESULT=$?
-if [ ! -z $VERIFY_INVARIANTS ]; then
+if [ $VERIFY_INVARIANTS ]; then
   # exit if failed to verify
-  if [ ! -z $PARSE_RESULT ]; then
-    echo "At least one invariant was not verifiable"
-    exit 1
-  else
+  if [ $PARSE_RESULT -eq 0 ]; then
     echo "All properties proven by 1-induction"
     exit 0
+  else
+    echo "At least one invariant was not verifiable"
+    exit 1
   fi
 fi
 
