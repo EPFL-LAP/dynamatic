@@ -169,38 +169,38 @@ static SmallVector<ProdConsMemDep> identifyMemoryDependencies(
 
   // Add a self-dependency for blocks with STORE operation that are in a loop
   // and have no dependency from any producer in the same or an inner loop.
-  for (handshake::MemPortOpInterface op : operations) {
-    // Only consider STORE operations
-    if (!isa<handshake::StoreOp>(op))
-      continue;
+  // for (handshake::MemPortOpInterface op : operations) {
+  //   // Only consider STORE operations
+  //   if (!isa<handshake::StoreOp>(op))
+  //     continue;
 
-    Block *bb = op->getBlock();
+  //   Block *bb = op->getBlock();
 
-    // Skip if block is not inside a loop
-    const CFGLoop *bbLoop = li.getLoopFor(bb);
-    if (!bbLoop)
-      continue;
+  //   // Skip if block is not inside a loop
+  //   const CFGLoop *bbLoop = li.getLoopFor(bb);
+  //   if (!bbLoop)
+  //     continue;
 
-    // Check if a self-dependency already exists
-    bool hasSelfDep = llvm::find_if(allMemDeps, [bb](ProdConsMemDep p) {
-                        return p.prodBb == bb && p.consBb == bb;
-                      }) != allMemDeps.end();
-    if (hasSelfDep)
-      continue;
+  //   // Check if a self-dependency already exists
+  //   bool hasSelfDep = llvm::find_if(allMemDeps, [bb](ProdConsMemDep p) {
+  //                       return p.prodBb == bb && p.consBb == bb;
+  //                     }) != allMemDeps.end();
+  //   if (hasSelfDep)
+  //     continue;
 
-    // Check if any existing dependency for this block comes from a producer
-    // in the same loop or inner loop
-    bool hasPredInSameOrInnerLoop =
-        llvm::any_of(allMemDeps, [bb, &li](const ProdConsMemDep &dep) {
-          return dep.consBb == bb &&
-                 ftd::isSameOrInnerLoopBlocks(dep.prodBb, bb, li);
-        });
+  //   // Check if any existing dependency for this block comes from a producer
+  //   // in the same loop or inner loop
+  //   bool hasPredInSameOrInnerLoop =
+  //       llvm::any_of(allMemDeps, [bb, &li](const ProdConsMemDep &dep) {
+  //         return dep.consBb == bb &&
+  //                ftd::isSameOrInnerLoopBlocks(dep.prodBb, bb, li);
+  //       });
 
-    // If no such producer exists, add a self-dependency
-    if (!hasPredInSameOrInnerLoop) {
-      allMemDeps.push_back(ProdConsMemDep(bb, bb));
-    }
-  }
+  //   // If no such producer exists, add a self-dependency
+  //   if (!hasPredInSameOrInnerLoop) {
+  //     allMemDeps.push_back(ProdConsMemDep(bb, bb));
+  //   }
+  // }
 
   return allMemDeps;
 }
@@ -488,11 +488,10 @@ struct CapturedEdgeInfo {
 };
 
 /// Capture the CFG topology and branch condition Values of a handshake::FuncOp
-/// while it still has restored multi-block structure. Both pieces of information
-/// are destroyed by removeNetworkCMerges + flattenFunction and are needed later
-/// to construct the ShadowCFG for addRegen / addSupp.
-static void captureCFGTopology(handshake::FuncOp funcOp,
-                               unsigned &numBlocks,
+/// while it still has restored multi-block structure. Both pieces of
+/// information are destroyed by removeNetworkCMerges + flattenFunction and are
+/// needed later to construct the ShadowCFG for addRegen / addSupp.
+static void captureCFGTopology(handshake::FuncOp funcOp, unsigned &numBlocks,
                                SmallVector<CapturedEdgeInfo> &edges,
                                DenseMap<unsigned, Value> &capturedConditions) {
   Region &region = funcOp.getRegion();
@@ -528,8 +527,9 @@ static void captureCFGTopology(handshake::FuncOp funcOp,
       return;
     unsigned bbIdx = bbAttr.getUInt();
     Value cond = brOp.getConditionOperand();
-    bool fromCmerge = cond.getDefiningOp() &&
-                      llvm::isa<handshake::ControlMergeOp>(cond.getDefiningOp());
+    bool fromCmerge =
+        cond.getDefiningOp() &&
+        llvm::isa<handshake::ControlMergeOp>(cond.getDefiningOp());
     // Always prefer a non-cmerge condition; keep the first non-cmerge one found
     if (!capturedConditions.contains(bbIdx)) {
       // First condition seen for this BB — always capture
@@ -596,7 +596,8 @@ static ftd::ShadowCFG buildShadowFromCapturedTopology(
 /// Remove the cmerge network, flatten the function, and run FTD gating on the
 /// flattened IR using a temporary ShadowCFG reconstructed from the original
 /// multi-block topology.
-static LogicalResult runPostCmergeFtd(handshake::FuncOp funcOp, MLIRContext *ctx,
+static LogicalResult runPostCmergeFtd(handshake::FuncOp funcOp,
+                                      MLIRContext *ctx,
                                       bool resolveCondPlaceholders) {
   ConversionPatternRewriter rewriter(ctx);
 
