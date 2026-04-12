@@ -69,8 +69,9 @@ static void inheritConditionBBOrFallback(Value condition, Operation *fallback,
   inheritBB(fallback, to);
 }
 
-static void refreshBranchAttrsFromCondition(
-    handshake::ConditionalBranchOp branchOp, Operation *fallback) {
+static void
+refreshBranchAttrsFromCondition(handshake::ConditionalBranchOp branchOp,
+                                Operation *fallback) {
   Value condition = branchOp.getConditionOperand();
   branchOp->setLoc(getConditionLocOrFallback(condition, fallback));
   inheritConditionBBOrFallback(condition, fallback, branchOp);
@@ -372,6 +373,42 @@ struct CombineEquivalentBranches
       rewriter.eraseOp(br);
     }
 
+    return success();
+  }
+};
+
+/// Remove a lazy fork that only forwards its input into another lazy fork.
+/// This matches the S2Q shape where output #1 was meant for the LSQ but ended
+/// up unused, while output #0 only feeds a successor lazy fork.
+struct BypassRedundantLazyFork
+    : public OpRewritePattern<handshake::LazyForkOp> {
+  using OpRewritePattern<handshake::LazyForkOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::LazyForkOp forkOp,
+                                PatternRewriter &rewriter) const override {
+
+    if (forkOp->getNumResults() != 2)
+      return failure();
+
+    Value forwarded = forkOp->getResult(0);
+    Value lsqOutput = forkOp->getResult(1);
+
+    if (!lsqOutput.use_empty())
+      return failure();
+
+    if (!forwarded.hasOneUse())
+      return failure();
+
+    auto *user = *forwarded.getUsers().begin();
+    auto succFork = dyn_cast<handshake::LazyForkOp>(user);
+    if (!succFork)
+      return failure();
+
+    if (succFork.getOperand() != forwarded)
+      return failure();
+
+    logLine("[HandshakeCombineSteeringLogic] BypassRedundantLazyFork applied");
+    succFork->setOperand(0, forkOp.getOperand());
+    rewriter.eraseOp(forkOp);
     return success();
   }
 };
@@ -768,7 +805,7 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<RemoveUnusedOp<handshake::MuxOp>,
+    patterns.add<BypassRedundantLazyFork, RemoveUnusedOp<handshake::MuxOp>,
                  RemoveUnusedOp<handshake::ConditionalBranchOp>,
                  RemoveUnusedOp<handshake::ConstantOp>,
                  RemoveUnusedOp<handshake::SourceOp>,
