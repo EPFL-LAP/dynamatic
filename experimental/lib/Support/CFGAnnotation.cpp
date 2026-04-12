@@ -270,7 +270,14 @@ dynamatic::experimental::cfg::restoreCfStructure(handshake::FuncOp &funcOp,
   for (auto &[source, _] : edges)
     blocksList.push_back(source);
   std::sort(blocksList.begin(), blocksList.end());
-  blocksList.push_back(blocksList.back() + 1);
+  if (blocksList.empty()) {
+    // A function with a single block and no outgoing branches serializes to an
+    // empty edge set. Rebuild it as the trivial block 0 CFG instead of
+    // dereferencing an empty vector.
+    blocksList.push_back(0);
+  } else {
+    blocksList.push_back(blocksList.back() + 1);
+  }
 
   // Maintains the current block under analysis: all the operations in block 0
   // are maintained in the same location, while the others operations are
