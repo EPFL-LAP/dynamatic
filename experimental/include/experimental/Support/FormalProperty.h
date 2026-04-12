@@ -28,11 +28,11 @@ class FormalProperty {
 public:
   enum class TAG { OPT, INVAR, ERROR };
   enum class TYPE {
-    AOB /* Absence Of Backpressure */,
-    VEQ /* Valid EQuivalence */,
-    EFNAO /* Eager Fork Not All Output sent */,
-    CSOAFAF, /* Copied Slots Of Active Forks Are Full */
-    RPF,     /* Reconvergent Path Flow */
+    AbsenceOfBackpressure,
+    ValidEquivalence,
+    EagerForkNotAllOutputSent,
+    CopiedSlotsOfActiveForksAreFull,
+    ReconvergentPathFlow,
   };
 
   TAG getTag() const { return tag; }
@@ -111,7 +111,7 @@ public:
   ~AbsenceOfBackpressure() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::AOB;
+    return fp->getType() == TYPE::AbsenceOfBackpressure;
   }
 
 private:
@@ -147,7 +147,7 @@ public:
   ~ValidEquivalence() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::VEQ;
+    return fp->getType() == TYPE::ValidEquivalence;
   }
 
 private:
@@ -186,7 +186,7 @@ public:
   ~EagerForkNotAllOutputSent() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::EFNAO;
+    return fp->getType() == TYPE::EagerForkNotAllOutputSent;
   }
 
 private:
@@ -222,7 +222,7 @@ public:
   ~CopiedSlotsOfActiveForkAreFull() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::CSOAFAF;
+    return fp->getType() == TYPE::CopiedSlotsOfActiveForksAreFull;
   }
 
 private:
@@ -260,7 +260,7 @@ public:
   ~ReconvergentPathFlow() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::RPF;
+    return fp->getType() == TYPE::ReconvergentPathFlow;
   }
 
 private:

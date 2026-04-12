@@ -28,7 +28,8 @@ def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"
     Option<"annotateInvariants", "annotate-invariants", "bool", "false",
     "Annotate invariants to assist k-inductive proofs">,
     Option<"annotateProperties", "annotate-properties", "bool", "true",
-    "Do not annotate properties for optimizations">
+    "Do not annotate properties for optimizations">,
+    Option<"annotateList", "annotate-list", "std::string", "", "list of properties to annotate">
     ];
 }
 
