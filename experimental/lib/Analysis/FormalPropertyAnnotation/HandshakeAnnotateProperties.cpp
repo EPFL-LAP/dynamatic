@@ -191,6 +191,14 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
     return success();
   }
 
+  if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(curOp)) {
+    CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, latencyOp,
+                                     originFork);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+    return success();
+  }
+
   if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(curOp)) {
     // TODO: Which of the previous paths should be followed?
     return success();

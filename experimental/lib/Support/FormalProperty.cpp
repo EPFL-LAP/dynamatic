@@ -309,7 +309,17 @@ CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
   sentStateNamers = forkOpI.getInternalSentStateNamers();
   auto slots = bufferOpI.getInternalSlotStateNamers();
   // last slot is the copied slot!
-  copiedSlot = slots[slots.size() - 1];
+  copiedSlot = std::make_unique<BufferSlotFullNamer>(slots[slots.size() - 1]);
+}
+
+CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
+    uint64_t id, TAG tag, handshake::LatencyInterface &latencyOpI,
+    handshake::EagerForkLikeOpInterface &forkOpI)
+    : FormalProperty(id, tag, TYPE::CopiedSlotsOfActiveForksAreFull) {
+  sentStateNamers = forkOpI.getInternalSentStateNamers();
+  auto slots = latencyOpI.getPipelineSlots();
+  // last slot is the copied slot!
+  copiedSlot = std::make_unique<PipelineSlotNamer>(slots[slots.size() - 1]);
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
@@ -317,8 +327,8 @@ llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
   for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
     channels.push_back(state.toInnerJSON());
   }
-  return llvm::json::Object({{FORK_CHANNELS_LIT, channels},
-                             {COPIED_SLOT_LIT, copiedSlot.toInnerJSON()}});
+  return llvm::json::Object(
+      {{FORK_CHANNELS_LIT, channels}, {COPIED_SLOT_LIT, copiedSlot->toJSON()}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -342,8 +352,7 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 
   const llvm::json::Value *bufferSlotJSON = obj->get(COPIED_SLOT_LIT);
   assert(bufferSlotJSON && "missing COPIED_SLOT_LIT in CSOAFAF json");
-  prop->copiedSlot =
-      *handshake::BufferSlotFullNamer::fromInnerJSON(*bufferSlotJSON, path);
+  prop->copiedSlot = InternalStateNamer::fromJSON(*bufferSlotJSON, path);
 
   return prop;
 }

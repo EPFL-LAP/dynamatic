@@ -208,7 +208,7 @@ public:
   std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
     return sentStateNamers;
   }
-  handshake::BufferSlotFullNamer getCopiedSlot() { return copiedSlot; }
+  const handshake::InternalStateNamer &getCopiedSlot() { return *copiedSlot; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -217,7 +217,10 @@ public:
 
   CopiedSlotsOfActiveForkAreFull() = default;
   CopiedSlotsOfActiveForkAreFull(uint64_t id, TAG tag,
-                                 handshake::BufferLikeOpInterface &bufferOp,
+                                 handshake::BufferLikeOpInterface &bufferOpI,
+                                 handshake::EagerForkLikeOpInterface &forkOp);
+  CopiedSlotsOfActiveForkAreFull(uint64_t id, TAG tag,
+                                 handshake::LatencyInterface &latencyOpI,
                                  handshake::EagerForkLikeOpInterface &forkOp);
   ~CopiedSlotsOfActiveForkAreFull() = default;
 
@@ -227,7 +230,7 @@ public:
 
 private:
   std::vector<handshake::EagerForkSentNamer> sentStateNamers;
-  handshake::BufferSlotFullNamer copiedSlot;
+  std::unique_ptr<handshake::InternalStateNamer> copiedSlot;
   inline static const StringLiteral FORK_CHANNELS_LIT = "fork_channels";
   inline static const StringLiteral COPIED_SLOT_LIT = "copied_slot";
 };
