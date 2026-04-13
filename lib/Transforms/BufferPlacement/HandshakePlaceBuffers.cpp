@@ -211,6 +211,8 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+
+  // AYA: TODO: This is where I should add the timing of the OOE units
   //
   // Read the operations' timing models from disk
   TimingDatabase timingDB;
@@ -433,39 +435,24 @@ struct CircuitEdge {
   Value channel;
 };
 
-static bool isBranchLike(Operation *op) {
-  return isa<handshake::BranchOp, handshake::ConditionalBranchOp>(op);
+static bool isBackedgeSourceLike(Operation *op) {
+  do {
+    if (!op)
+      return false;
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::CmpIOp, handshake::CmpFOp>(op))
+      return true;
+    if (isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+            handshake::TruncIOp>(op))
+      op = op->getOperand(0).getDefiningOp();
+    else
+      return false;
+  } while (true);
 }
 
-static unsigned getBBOrder(Operation *op) {
-  if (std::optional<unsigned> bb = getLogicBB(op))
-    return *bb;
-  return std::numeric_limits<unsigned>::max();
-}
-
-static bool isBetterBackedge(const CircuitEdge &lhs, const CircuitEdge &rhs) {
-  auto lhsDstBB = getBBOrder(lhs.dst), rhsDstBB = getBBOrder(rhs.dst);
-  if (lhsDstBB != rhsDstBB)
-    return lhsDstBB < rhsDstBB;
-
-  auto lhsSrcBB = getBBOrder(lhs.src), rhsSrcBB = getBBOrder(rhs.src);
-  if (lhsSrcBB != rhsSrcBB)
-    return lhsSrcBB < rhsSrcBB;
-
-  auto lhsDstName = getUniqueName(lhs.dst), rhsDstName = getUniqueName(rhs.dst);
-  if (lhsDstName != rhsDstName)
-    return lhsDstName < rhsDstName;
-
-  auto lhsSrcName = getUniqueName(lhs.src), rhsSrcName = getUniqueName(rhs.src);
-  if (lhsSrcName != rhsSrcName)
-    return lhsSrcName < rhsSrcName;
-
-  return false;
-}
-
-/// Finds one canonical branch-like -> merge-like backward channel per cyclic
-/// SCC in the handshake graph. This is more stable than trying to assign one
-/// edge to every simple cycle when cycles overlap.
+/// Finds all loop-feedback-source -> merge-like backward channels per cyclic
+/// SCC in the handshake graph. Grouping by SCC remains more stable than trying
+/// to assign channels to every simple cycle when cycles overlap.
 static mlir::DenseSet<Value>
 findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
   SmallVector<Operation *> ops;
@@ -546,23 +533,17 @@ findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
     if (!isCyclic)
       continue;
 
-    std::optional<CircuitEdge> bestEdge;
     for (const CircuitEdge &edge : edges) {
       if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
         continue;
       if (!isBackedge(edge.channel))
         continue;
-      if (!isBranchLike(edge.src))
+      if (!isBackedgeSourceLike(edge.src))
         continue;
       if (!isa<handshake::MergeLikeOpInterface>(edge.dst))
         continue;
-
-      if (!bestEdge || isBetterBackedge(edge, *bestEdge))
-        bestEdge = edge;
+      backwardChannels.insert(edge.channel);
     }
-
-    if (bestEdge)
-      backwardChannels.insert(bestEdge->channel);
   }
 
   return backwardChannels;
