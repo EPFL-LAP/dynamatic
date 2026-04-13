@@ -2229,24 +2229,24 @@ static void insertDirectSuppression(
   if (locConsControlDepsFull.empty()) {
     if (locGraph->newCons == locGraph->sinkBB) {
       builder.setInsertionPointToStart(consumer->getBlock());
-      auto prodBBAttr = IntegerAttr::get(
+      auto consBBAttr = IntegerAttr::get(
           IntegerType::get(builder.getContext(), 32, IntegerType::Unsigned),
-          prodBBIdx);
+          consBBIdx);
       auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
       src->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      src->setAttr("handshake.bb", prodBBAttr);
+      src->setAttr("handshake.bb", consBBAttr);
       auto cstAttr = builder.getIntegerAttr(builder.getIntegerType(1), 1);
       auto constOp = builder.create<handshake::ConstantOp>(
           consumer->getLoc(), cstAttr, src.getResult());
       constOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      constOp->setAttr("handshake.bb", prodBBAttr);
+      constOp->setAttr("handshake.bb", consBBAttr);
 
       Value supData = connection;
       auto branchOp = builder.create<handshake::ConditionalBranchOp>(
           consumer->getLoc(), ftd::getListTypes(supData.getType()),
           constOp.getResult(), supData);
       branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      branchOp->setAttr("handshake.bb", prodBBAttr);
+      branchOp->setAttr("handshake.bb", consBBAttr);
 
       for (auto &use : llvm::make_early_inc_range(connection.getUses())) {
         if (use.getOwner() != consumer)
@@ -2427,11 +2427,11 @@ static void insertDirectSuppression(
     std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
     BDD *bdd = buildBDD(fSup, cofactorList);
     Value branchCond =
-        bddToCircuit(builder, bdd, producerBlock, registry, {}, bi,
+        bddToCircuit(builder, bdd, consumer->getBlock(), registry, {}, bi,
                      nullptr, &shadow);
-    auto prodBBAttr = IntegerAttr::get(
+    auto consBBAttr = IntegerAttr::get(
         IntegerType::get(builder.getContext(), 32, IntegerType::Unsigned),
-        prodBBIdx);
+        consBBIdx);
 
     // Cascaded Upstream Filter
     if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
@@ -2439,7 +2439,7 @@ static void insertDirectSuppression(
       std::vector<std::string> cofactorListDP(blocksDP.begin(), blocksDP.end());
       BDD *bddDP = buildBDD(fSupDP, cofactorListDP);
       Value dpBranchCond =
-          bddToCircuit(builder, bddDP, producerBlock, registry, {}, bi,
+          bddToCircuit(builder, bddDP, consumer->getBlock(), registry, {}, bi,
                        nullptr, &shadow);
 
       // Upstream logic filters the SUPPRESSION SIGNAL.
@@ -2450,7 +2450,7 @@ static void insertDirectSuppression(
           consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
           dpBranchCond, branchCond);
       dpBranchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      dpBranchOp->setAttr("handshake.bb", prodBBAttr);
+      dpBranchOp->setAttr("handshake.bb", consBBAttr);
       branchCond = dpBranchOp.getFalseResult();
     }
 
@@ -2458,7 +2458,7 @@ static void insertDirectSuppression(
         consumer->getLoc(), ftd::getListTypes(supData.getType()), branchCond,
         supData);
     branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-    branchOp->setAttr("handshake.bb", prodBBAttr);
+    branchOp->setAttr("handshake.bb", consBBAttr);
     supData = branchOp.getFalseResult();
 
     // Take into account the possibility of a mux to get the condition input
@@ -2472,7 +2472,7 @@ static void insertDirectSuppression(
           consumer->getOperand(0) == connection &&
           use.getOperandNumber() != 0) {
         auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
-        setBBAttr(src, producerBlock, builder);
+        setBBAttr(src, consumer->getBlock(), builder);
         auto innerType =
             connection.getType().cast<handshake::ChannelType>().getDataType();
         auto attr =
@@ -2480,7 +2480,7 @@ static void insertDirectSuppression(
         auto cst = builder.create<handshake::ConstantOp>(
             consumer->getLoc(), connection.getType(), attr, src.getResult());
         cst->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-        setBBAttr(cst, producerBlock, builder);
+        setBBAttr(cst, consumer->getBlock(), builder);
         use.set(cst.getResult());
         continue;
       }
