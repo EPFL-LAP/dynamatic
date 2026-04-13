@@ -73,6 +73,20 @@ using ExtValue = std::pair<ChannelVal, ExtType>;
 /// Holds a set of operations that were already visisted during backtracking.
 using VisitedOps = SmallPtrSet<Operation *, 4>;
 
+SmallVector<handshake::CmpIOp> getCmpOpsForBoundOpt(ChannelVal condVal);
+bool isBoundTightForBoundOpt(Value bound);
+Value getBranchToOptimizeForBoundOpt(handshake::ConditionalBranchOp condOp,
+                                     handshake::CmpIOp cmpOp,
+                                     bool isDataLhs);
+unsigned getRealOptWidthForBoundOpt(handshake::CmpIOp cmpOp,
+                                    unsigned optWidth, bool isDataLhs);
+bool optBranchIfPossibleForBoundOpt(ChannelVal optBranch, unsigned optWidth,
+                                    ExtType ext, PatternRewriter &rewriter);
+std::optional<std::pair<unsigned, ExtType>>
+getBoundedBranchWidth(ChannelVal branchVal);
+std::optional<std::pair<unsigned, ExtType>>
+getConstantWidthForBoundOpt(ChannelVal val);
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -1612,7 +1626,8 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     ChannelVal trueRes = cast<ChannelVal>(condOp.getTrueResult()),
                falseRes = cast<ChannelVal>(condOp.getFalseResult());
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
-    for (handshake::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
+    for (handshake::CmpIOp cmpOp :
+         getCmpOpsForBoundOpt(condOp.getConditionOperand())) {
       ExtValue minLhs = backtrackToMinimalValue(cmpOp.getLhs());
       ExtValue minRhs = backtrackToMinimalValue(cmpOp.getRhs());
 
@@ -1632,11 +1647,12 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
         continue;
 
       // Determine whether one of the branches can be optimized and by how much
-      Value branch = getBranchToOptimize(condOp, cmpOp, isDataLhs);
+      Value branch =
+          getBranchToOptimizeForBoundOpt(condOp, cmpOp, isDataLhs);
       if (!branch)
         continue;
-      if (isBoundTight(isDataLhs ? minRhs.first : minLhs.first))
-        width = getRealOptWidth(cmpOp, width, isDataLhs);
+      if (isBoundTightForBoundOpt(isDataLhs ? minRhs.first : minLhs.first))
+        width = getRealOptWidthForBoundOpt(cmpOp, width, isDataLhs);
 
       // Keep track of the best optimization opportunity found so far for the
       // branch
@@ -1653,11 +1669,13 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     rewriter.setInsertionPointAfter(condOp);
     bool anyOptPerformed = false;
     if (trueBranch.has_value())
-      anyOptPerformed |= optBranchIfPossible(trueRes, trueBranch->first,
-                                             trueBranch->second, rewriter);
+      anyOptPerformed |=
+          optBranchIfPossibleForBoundOpt(trueRes, trueBranch->first,
+                                         trueBranch->second, rewriter);
     if (falseBranch.has_value())
-      anyOptPerformed |= optBranchIfPossible(falseRes, falseBranch->first,
-                                             falseBranch->second, rewriter);
+      anyOptPerformed |=
+          optBranchIfPossibleForBoundOpt(falseRes, falseBranch->first,
+                                         falseBranch->second, rewriter);
 
     if (anyOptPerformed)
       ++bitwidthReduced;
@@ -1665,40 +1683,15 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
   }
 
 private:
-  /// Returns the list of comparison operations involved in the computation of
-  /// the given conditional value (which must have i1 type). All of the
-  /// comparisons' respective result are ANDed to compute the given value.
-  SmallVector<handshake::CmpIOp> getCmpOps(ChannelVal condVal) const;
-
-  /// Determines whether the bound that the data operand is compared with is
-  /// tight, i.e. whether being strictly closer to 0 than it means we can
-  /// represent the number using one less bit than the bound itself.
-  bool isBoundTight(Value bound) const;
-
-  /// Determines which branch may be optimized based on the nature of the
-  /// comparison and the side of the data operand to the conditional branch.
-  Value getBranchToOptimize(handshake::ConditionalBranchOp condOp,
-                            handshake::CmpIOp cmpOp, bool isDataLhs) const;
-
-  /// Returns the real optimized bitwidth assuming that the bound against which
-  /// the comparison is performed is provably tight. The real optimized bitwidth
-  /// may be one less than the one passed as argument or identical.
-  unsigned getRealOptWidth(handshake::CmpIOp cmpOp, unsigned optWidth,
-                           bool isDataLhs) const;
-
-  /// Optimizes the branch output provided as argument to the given bitwidth is
-  /// there is any benefit in doing so. Returns true if any optimization is
-  /// performed; otherwise returns false;
-  bool optBranchIfPossible(ChannelVal optBranch, unsigned optWidth, ExtType ext,
-                           PatternRewriter &rewriter) const;
-
   Pass::Statistic &bitwidthReduced;
 };
 
 } // namespace
 
+namespace {
+
 SmallVector<handshake::CmpIOp>
-ArithBoundOpt::getCmpOps(ChannelVal condVal) const {
+getCmpOpsForBoundOpt(ChannelVal condVal) {
   ExtValue minVal = backtrackToMinimalValue(condVal);
 
   // Stop when reaching function arguments
@@ -1715,15 +1708,15 @@ ArithBoundOpt::getCmpOps(ChannelVal condVal) const {
   // itself, which doesn't invalidate our optimization
   if (handshake::AndIOp andOp = dyn_cast<handshake::AndIOp>(defOp)) {
     SmallVector<handshake::CmpIOp> cmpOps;
-    llvm::copy(getCmpOps(andOp.getLhs()), std::back_inserter(cmpOps));
-    llvm::copy(getCmpOps(andOp.getRhs()), std::back_inserter(cmpOps));
+    llvm::copy(getCmpOpsForBoundOpt(andOp.getLhs()), std::back_inserter(cmpOps));
+    llvm::copy(getCmpOpsForBoundOpt(andOp.getRhs()), std::back_inserter(cmpOps));
     return cmpOps;
   }
 
   return {};
 }
 
-bool ArithBoundOpt::isBoundTight(Value bound) const {
+bool isBoundTightForBoundOpt(Value bound) {
   // Bound must be a constant
   auto cstOp =
       dyn_cast_if_present<handshake::ConstantOp>(bound.getDefiningOp());
@@ -1745,9 +1738,9 @@ bool ArithBoundOpt::isBoundTight(Value bound) const {
   return computeRequiredBitwidth(val) == computeRequiredBitwidth(centVal) + 1;
 }
 
-Value ArithBoundOpt::getBranchToOptimize(handshake::ConditionalBranchOp condOp,
-                                         handshake::CmpIOp cmpOp,
-                                         bool isDataLhs) const {
+Value getBranchToOptimizeForBoundOpt(handshake::ConditionalBranchOp condOp,
+                                     handshake::CmpIOp cmpOp,
+                                     bool isDataLhs) {
   Value falseRes = condOp.getFalseResult(), trueRes = condOp.getTrueResult();
   switch (cmpOp.getPredicate()) {
   case handshake::CmpIPredicate::eq:
@@ -1771,9 +1764,9 @@ Value ArithBoundOpt::getBranchToOptimize(handshake::ConditionalBranchOp condOp,
   }
 }
 
-unsigned ArithBoundOpt::getRealOptWidth(handshake::CmpIOp cmpOp,
-                                        unsigned optWidth,
-                                        bool isDataLhs) const {
+unsigned getRealOptWidthForBoundOpt(handshake::CmpIOp cmpOp,
+                                    unsigned optWidth,
+                                    bool isDataLhs) {
   switch (cmpOp.getPredicate()) {
   case handshake::CmpIPredicate::ult:
     // x < BOUND / BOUND < x
@@ -1790,9 +1783,9 @@ unsigned ArithBoundOpt::getRealOptWidth(handshake::CmpIOp cmpOp,
   }
 }
 
-bool ArithBoundOpt::optBranchIfPossible(ChannelVal optBranch, unsigned optWidth,
-                                        ExtType ext,
-                                        PatternRewriter &rewriter) const {
+bool optBranchIfPossibleForBoundOpt(ChannelVal optBranch, unsigned optWidth,
+                                    ExtType ext,
+                                    PatternRewriter &rewriter) {
   // Check whether we will get any benefit from the optimization
   unsigned dataWidth = getUsefulResultWidth(optBranch);
   if (optWidth >= dataWidth)
@@ -1806,6 +1799,156 @@ bool ArithBoundOpt::optBranchIfPossible(ChannelVal optBranch, unsigned optWidth,
   rewriter.replaceAllUsesExcept(optBranch, extVal, truncVal.getDefiningOp());
   return true;
 }
+
+std::optional<std::pair<unsigned, ExtType>>
+getBoundedBranchWidth(ChannelVal branchVal) {
+  auto condOp =
+      dyn_cast_or_null<handshake::ConditionalBranchOp>(branchVal.getDefiningOp());
+  if (!condOp)
+    return std::nullopt;
+
+  ChannelVal dataOperand = cast<ChannelVal>(condOp.getDataOperand());
+  ExtValue minDataOperand = backtrackToMinimalValue(dataOperand);
+
+  std::optional<std::pair<unsigned, ExtType>> bestWidth;
+
+  auto considerBranch = [&](Value branch, unsigned width, ExtType ext) {
+    if (branch != branchVal)
+      return;
+    if (!bestWidth || width < bestWidth->first)
+      bestWidth = std::make_pair(width, ext);
+  };
+
+  for (handshake::CmpIOp cmpOp : getCmpOpsForBoundOpt(condOp.getConditionOperand())) {
+    ExtValue minLhs = backtrackToMinimalValue(cmpOp.getLhs());
+    ExtValue minRhs = backtrackToMinimalValue(cmpOp.getRhs());
+
+    unsigned width;
+    bool isDataLhs;
+    ExtType branchExt;
+    if (minDataOperand == minLhs) {
+      width = getConstantWidthForBoundOpt(minRhs.first)
+                  .value_or(std::make_pair(
+                      minRhs.first.getType().getDataBitWidth(), minRhs.second))
+                  .first;
+      isDataLhs = true;
+      branchExt = minLhs.second;
+    } else if (minDataOperand == minRhs) {
+      width = getConstantWidthForBoundOpt(minLhs.first)
+                  .value_or(std::make_pair(
+                      minLhs.first.getType().getDataBitWidth(), minLhs.second))
+                  .first;
+      isDataLhs = false;
+      branchExt = minRhs.second;
+    } else {
+      continue;
+    }
+
+    Value branch = getBranchToOptimizeForBoundOpt(condOp, cmpOp, isDataLhs);
+    if (!branch)
+      continue;
+    if (isBoundTightForBoundOpt(isDataLhs ? minRhs.first : minLhs.first))
+      width = getRealOptWidthForBoundOpt(cmpOp, width, isDataLhs);
+
+    considerBranch(branch, width, branchExt);
+  }
+
+  return bestWidth;
+}
+
+std::optional<std::pair<unsigned, ExtType>>
+getConstantWidthForBoundOpt(ChannelVal val) {
+  auto cstOp = dyn_cast_if_present<handshake::ConstantOp>(val.getDefiningOp());
+  if (!cstOp)
+    return std::nullopt;
+
+  auto intAttr = dyn_cast<IntegerAttr>(cstOp.getValue());
+  if (!intAttr || !intAttr.getValue().isSingleWord())
+    return std::nullopt;
+
+  APInt cstVal = intAttr.getValue();
+  ExtType ext = cstVal.isNegative() ? ExtType::SEXT : ExtType::ZEXT;
+  return std::make_pair(computeRequiredBitwidth(cstVal), ext);
+}
+
+/// Optimizes muxes whose data operands include branch outputs with widths that
+/// can be bounded from the branch condition. This is especially useful for FTD
+/// MU-like muxes, where the branch-bound information may otherwise fail to
+/// propagate to the mux result.
+struct MuxBranchBoundOpt : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  MuxBranchBoundOpt(Pass::Statistic &bitwidthReduced, MLIRContext *ctx,
+                    NameAnalysis &namer)
+      : OpRewritePattern<handshake::MuxOp>(ctx),
+        bitwidthReduced(bitwidthReduced), namer(namer) {}
+
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+    ChannelVal result = asTypedIfLegal(muxOp.getResult());
+    if (!result)
+      return failure();
+
+    unsigned currentWidth = result.getType().getDataBitWidth();
+    unsigned optWidth = 0;
+    SmallVector<ExtType> operandExts;
+    operandExts.reserve(muxOp.getDataOperands().size());
+
+    for (Value operand : muxOp.getDataOperands()) {
+      ChannelVal channelOperand = cast<ChannelVal>(operand);
+      ExtValue minOperand = getMinimalValueWithExtType(channelOperand);
+      unsigned operandWidth = minOperand.first.getType().getDataBitWidth();
+      ExtType operandExt = minOperand.second;
+
+      if (auto cstWidth = getConstantWidthForBoundOpt(minOperand.first)) {
+        operandWidth = cstWidth->first;
+        operandExt = cstWidth->second;
+      }
+
+      if (auto boundedWidth = getBoundedBranchWidth(channelOperand)) {
+        operandWidth = std::min(operandWidth, boundedWidth->first);
+        operandExt = boundedWidth->second;
+      }
+
+      optWidth = std::max(optWidth, operandWidth);
+      operandExts.push_back(operandExt);
+    }
+
+    if (optWidth >= currentWidth)
+      return failure();
+
+    SmallVector<Value, 3> newOperands;
+    newOperands.push_back(muxOp.getSelectOperand());
+    for (auto [operand, ext] :
+         llvm::zip_equal(muxOp.getDataOperands(), operandExts))
+      newOperands.push_back(modBitWidth({cast<ChannelVal>(operand), ext},
+                                        optWidth, rewriter));
+
+    Type newDataType = rewriter.getIntegerType(optWidth);
+    Type newChannelType = result.getType().withDataType(newDataType);
+    rewriter.setInsertionPoint(muxOp);
+    auto newMuxOp = rewriter.create<handshake::MuxOp>(muxOp.getLoc(),
+                                                      newChannelType,
+                                                      newOperands.front(),
+                                                      ArrayRef<Value>(
+                                                          newOperands).drop_front());
+    inheritBB(muxOp, newMuxOp);
+    namer.replaceOp(muxOp, newMuxOp);
+
+    Value replacement =
+        modBitWidth({cast<ChannelVal>(newMuxOp.getResult()), ExtType::SEXT},
+                    currentWidth, rewriter);
+    rewriter.replaceOp(muxOp, replacement);
+    ++bitwidthReduced;
+    return success();
+  }
+
+private:
+  Pass::Statistic &bitwidthReduced;
+  NameAnalysis &namer;
+};
+
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Pass driver
@@ -1956,6 +2099,8 @@ void HandshakeOptimizeBitwidthsPass::addForwardPatterns(
                  ForwardCycleOpt<handshake::MuxOp, MuxDataConfig>,
                  ForwardCycleOpt<handshake::ControlMergeOp, CMergeDataConfig>>(
       bitwidthReduced, ctx, getAnalysis<NameAnalysis>());
+  fwPatterns.add<MuxBranchBoundOpt>(bitwidthReduced, ctx,
+                                    getAnalysis<NameAnalysis>());
 
   // arith operations
   addArithPatterns(fwPatterns, true);
