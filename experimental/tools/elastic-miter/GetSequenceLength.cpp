@@ -44,36 +44,75 @@ static std::string stripString(const std::string &string) {
   return newString;
 }
 
+static bool isSeqGenerator(StringRef line) {
+  return line.startswith("seq_generator_");
+}
+
+static bool isSeqGeneratorOuts(StringRef line) {
+  if (!isSeqGenerator(line))
+    return false;
+  return line.split('.').second.starts_with("outs");
+}
+
+static bool isSeqGeneratorCounter(StringRef line) {
+  if (!isSeqGenerator(line))
+    return false;
+  return line.split('.').second.starts_with("counter");
+}
+
+static bool isSaturatedSeqGeneratorCounter(StringRef line,
+                                           unsigned nrOfTokens) {
+  if (!isSeqGeneratorCounter(line))
+    return false;
+  auto strValue = line.split('=').second.trim();
+  unsigned counterValue = std::stoi(strValue.str());
+
+  assert(counterValue <= nrOfTokens &&
+         "Counter value exceeds the number of tokens");
+  return counterValue == nrOfTokens;
+}
+
+static StringRef getSeqGeneratorName(StringRef line) {
+  return line.split('.').first;
+}
+
+static bool isModel(StringRef line, StringRef modelName) {
+  return line.starts_with(modelName.str() + ".");
+}
+
+static bool isNDWire(StringRef line, StringRef modelName) {
+  return line.starts_with(modelName.str() + ".ndw");
+}
+
 // Get the set of states given the path to file containing the output to the
 // nuXmv command "print_reachable_states -v;". A set element is defined by a
 // string which is the concatenation of the state values, as represented in the
 // output file.
 // Example:
 // State 1:
-//   seq_generator_C.dataOut0 = FALSE
+//   seq_generator_C.outs = TRUE
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = TRUE
 // State 2:
-//   seq_generator_C.dataOut0 = TRUE
-//   model.ndw_in_C.state = running
-//   model.fork_control.regBlock0.reg_value = TRUE
-// State 3:
-//   seq_generator_C.dataOut0 = TRUE
+//   seq_generator_C.outs = TRUE
 //   model.ndw_in_C.state = sleeping
 //   model.fork_control.regBlock0.reg_value = TRUE
-// State 4:
-//   seq_generator_C.dataOut0 = FALSE
+// State 3:
+//   seq_generator_C.outs = TRUE
 //   model.ndw_in_C.state = running
 //   model.fork_control.regBlock0.reg_value = FALSE
-// Here State 1, 2, and 3 are equivalent, since they only differ in variables
-// outside of the circuit being tested (the ND wire is not considered part of
-// the circuit).
-// State 4 is a new distict state, as the model.fork_control.regBlock0.reg_value
-// is different for the other three states.
-// So in this example we have two unique states.
+// State 4:
+//   seq_generator_C.outs = FALSE
+//   model.ndw_in_C.state = running
+//   model.fork_control.regBlock0.reg_value = FALSE
+// Here State 1 and 2 are equivalent, since they only differ in the NDWire
+// state, which is not considered for optimization.
+// State 3 is a new distict state, as the model.fork_control.regBlock0.reg_value
+// is updated. State 4 is also a new distinct state, as the seq_generator_C.outs
+// is updated. So this example has three unique states.
 static FailureOr<llvm::StringSet<>>
-getStateSet(const std::filesystem::path &filePath,
-            const std::string &modelName) {
+getStateSet(const std::filesystem::path &filePath, const std::string &modelName,
+            unsigned nrOfTokens) {
   std::ifstream file(filePath);
   llvm::StringSet<> states;
   std::string line, currentState;
@@ -99,13 +138,17 @@ getStateSet(const std::filesystem::path &filePath,
     if (!recording)
       continue;
 
-    // Skip if it doesn't start with "miter." or starts with "miter.ndw",
-    // indicating it is a ND wire
-    if (line.find(modelName + ".", 0) != 0 ||
-        line.find(modelName + ".ndw", 0) == 0) {
-      continue;
+    if (isSeqGeneratorOuts(line)) {
+      // Include the value the sequence generator is emitting
+      currentState += line + "\n";
+    } else if (nrOfTokens > 0 &&
+               isSaturatedSeqGeneratorCounter(line, nrOfTokens)) {
+      // If the sequence generator is no longer emitting, include the state
+      currentState += getSeqGeneratorName(line).str() + ".no_emission = TRUE\n";
+    } else if (isModel(line, modelName) && !isNDWire(line, modelName)) {
+      // Include the state except for the ND wires
+      currentState += line + "\n";
     }
-    currentState += line + "\n";
   }
   file.close();
 
@@ -118,17 +161,16 @@ getStateSet(const std::filesystem::path &filePath,
 
 // Count how many states are in the set reached by infinite tokens but are not
 // in the set reached by finite tokens.
-static FailureOr<size_t>
-compareReachableStates(const std::string &modelName,
-                       const std::filesystem::path &infinitePath,
-                       const std::filesystem::path &finitePath) {
+static FailureOr<size_t> compareReachableStates(
+    const std::string &modelName, const std::filesystem::path &infinitePath,
+    const std::filesystem::path &finitePath, unsigned nrOfTokens) {
 
-  auto failOrInfiniteStates = getStateSet(infinitePath, modelName);
+  auto failOrInfiniteStates = getStateSet(infinitePath, modelName, nrOfTokens);
   if (failed(failOrInfiniteStates)) {
     llvm::errs() << "Failed to get the state set with infinite tokens.\n";
     return failure();
   }
-  auto failOrFiniteStates = getStateSet(finitePath, modelName);
+  auto failOrFiniteStates = getStateSet(finitePath, modelName, nrOfTokens);
   if (failed(failOrFiniteStates)) {
     llvm::errs() << "Failed to get the state set with finite tokens.\n";
     return failure();
@@ -247,7 +289,8 @@ FailureOr<size_t> getSequenceLength(MLIRContext &context,
     auto failOrNrOfDifferences =
         dynamatic::experimental::compareReachableStates(
             smvModelName, outputDir / "inf_states.txt",
-            outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"));
+            outputDir / ("states_" + std::to_string(numberOfTokens) + ".txt"),
+            numberOfTokens);
     if (failed(failOrNrOfDifferences)) {
       llvm::errs() << "Failed to compare the number of reachable states with "
                    << numberOfTokens << " tokens.\n";
