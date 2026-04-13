@@ -33,6 +33,7 @@ public:
     EFNAO /* Eager Fork Not All Output sent */,
     CSOAFAF, /* Copied Slots Of Active Forks Are Full */
     RPF,     /* Reconvergent Path Flow */
+    IOGSingleToken,
   };
 
   TAG getTag() const { return tag; }
@@ -266,6 +267,23 @@ public:
 private:
   std::vector<FlowExpression> equations;
   inline static const StringLiteral EQUATIONS_LIT = "equations";
+};
+
+class IOGSingleToken : public FormalProperty {
+public:
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<IOGSingleToken>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  IOGSingleToken() = default;
+  IOGSingleToken(unsigned long id, TAG tag);
+  ~IOGSingleToken() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::IOGSingleToken;
+  }
+
+private:
 };
 
 class FormalPropertyTable {

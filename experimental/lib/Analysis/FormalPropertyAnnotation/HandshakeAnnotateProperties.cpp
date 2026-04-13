@@ -280,6 +280,304 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   return success();
 }
 
+namespace {
+struct IOG {
+  IOG() = default;
+  std::unordered_set<Operation *> units;
+  llvm::DenseSet<mlir::Value> channels;
+  mlir::Value entry;
+
+  bool contains(Operation *op) {
+    auto iter = units.find(op);
+    return iter != units.end();
+  }
+
+  bool contains(mlir::Value channel) {
+    auto iter = channels.find(channel);
+    return iter != channels.end();
+  }
+
+  void debug() {
+    std::vector<mlir::Value> stack;
+    llvm::DenseSet<mlir::Value> visited;
+    stack.push_back(entry);
+    visited.insert(entry);
+    while (!stack.empty()) {
+      mlir::Value channel = stack.back();
+      stack.pop_back();
+      Operation *prev = channel.getDefiningOp();
+      if (prev == nullptr) {
+        llvm::errs() << "entry";
+      } else {
+        llvm::errs() << getUniqueName(prev);
+      }
+      Operation *next = channel.getUses().begin()->getOwner();
+      assert(next);
+      assert(contains(next));
+      llvm::errs() << " -> " << getUniqueName(next) << "\n";
+      for (mlir::Value out : next->getResults()) {
+        if (auto iter = visited.find(out); iter != visited.end())
+          continue;
+        if (contains(out)) {
+          visited.insert(out);
+          stack.push_back(out);
+        }
+      }
+    }
+  }
+};
+
+struct IOGFinderCheckpoint {
+  IOG partial;
+  // Stack of channels at the edge that are not yet inserted into the IOG
+  std::vector<mlir::Value> unhandled;
+  // Set of channels that have been declared illegal by local rules
+  llvm::DenseSet<mlir::Value> illegals;
+  // Is the partial IOG still following the rules? Note that DONE does not
+  // actually mean done, as the `unhandled` stack should also be empty.
+  enum PROGRESS { ILLEGAL, PARTIAL, DONE };
+  PROGRESS progress = PARTIAL;
+  Operation *endOp;
+  std::vector<mlir::Value> entries;
+
+  PROGRESS getProgress() {
+    if (progress == ILLEGAL)
+      return ILLEGAL;
+    if (!unhandled.empty())
+      return PARTIAL;
+    return progress;
+  }
+
+  bool isLegal(mlir::Value channel) {
+    auto iter = illegals.find(channel);
+    return iter == illegals.end();
+  }
+
+  void follow(mlir::Value channel) {
+    if (!isLegal(channel)) {
+      // A non-legal channel has been followed, so mark this IOG as non-valid
+      progress = ILLEGAL;
+      return;
+    }
+    if (partial.contains(channel)) {
+      return;
+    }
+    unhandled.push_back(channel);
+  }
+
+  void makeIllegal(mlir::Value channel) {
+    if (partial.contains(channel))
+      progress = ILLEGAL;
+    // The legality of unhandled channels is checked in getNextOp
+    illegals.insert(channel);
+  }
+
+  Operation *getNextOp() {
+    // Stop making progress if an illegal edge has been taken
+    if (progress == ILLEGAL) {
+      return nullptr;
+    }
+
+    // Handle the `endOp` if it has not yet been inserted into the IOG
+    if (!partial.contains(endOp)) {
+      return endOp;
+    }
+
+    if (unhandled.empty()) {
+      // All handling done!
+      return nullptr;
+    }
+
+    // Look at channel at the top of the `unhandled` stack
+    auto channel = unhandled.back();
+
+    // If this channel has been marked as illegal, abort this branch
+    if (!isLegal(channel)) {
+      progress = ILLEGAL;
+      return nullptr;
+    }
+
+    // If this channel is one of the target entry channels, mark the appropriate
+    // `entry` of the IOG and set the state accordingly
+    if (std::find(entries.begin(), entries.end(), channel) != entries.end()) {
+      partial.entry = channel;
+      progress = DONE;
+    }
+
+    // To fully handle a channel, both the operation before and after have to be
+    // handled
+    Operation *before = channel.getDefiningOp();
+    if (before && !partial.contains(before)) {
+      partial.units.insert(before);
+      return before;
+    }
+
+    Operation *after = channel.getUses().begin()->getOwner();
+    if (after && !partial.contains(after)) {
+      partial.units.insert(after);
+      return after;
+    }
+
+    // Both sides of this channel have been handled, so this channel is done and
+    // can be removed/inserted into the appropriate locations
+    unhandled.pop_back();
+    partial.channels.insert(channel);
+
+    // Return next channel on unhandled stack
+    return getNextOp();
+  }
+};
+
+struct IOGFinder {
+  IOGFinder() = default;
+  ~IOGFinder() = default;
+  std::vector<IOGFinderCheckpoint> partials;
+  std::vector<IOG> finals;
+
+  // This function takes a checkpoint and a list of channels. For each channel
+  // c, it pushes the IOG where *only* channel c is taken, and all the rest are
+  // illegal. Used for forks (which only allow exactly one of its outputs) and
+  // join operations (which only allow exactly one of its inputs)
+  template <typename T>
+  void followSingle(const IOGFinderCheckpoint &checkpoint, T options) {
+    for (mlir::Value channel : options) {
+      IOGFinderCheckpoint goHere = checkpoint;
+      goHere.follow(channel);
+      for (mlir::Value other : options) {
+        if (channel == other)
+          continue;
+        goHere.makeIllegal(other);
+      }
+      partials.push_back(goHere);
+    }
+  }
+
+  // Take a step towards computing all IOGs. Does nothing if there are no
+  // partial IOGs.
+  // Example usage:
+  // IOGFinder finder = ...
+  // while (!finder.partials.empty()) {
+  //   finder.step();
+  // }
+  void step() {
+    if (partials.empty())
+      return;
+    auto checkpoint = partials.back();
+    partials.pop_back();
+    if (checkpoint.progress == IOGFinderCheckpoint::PROGRESS::ILLEGAL)
+      return;
+
+    Operation *op = checkpoint.getNextOp();
+    if (op == nullptr) {
+      if (checkpoint.progress == IOGFinderCheckpoint::PROGRESS::DONE) {
+        finals.push_back(checkpoint.partial);
+      }
+      return;
+    }
+    checkpoint.partial.units.insert(op);
+
+    if (auto endOp = dyn_cast<EndOp>(op)) {
+      followSingle(checkpoint, endOp.getOperands());
+    } else if (auto bufOp = dyn_cast<BufferOp>(op)) {
+      checkpoint.follow(bufOp.getOperand());
+      checkpoint.follow(bufOp.getResult());
+      partials.push_back(checkpoint);
+    } else if (auto condBr = dyn_cast<ConditionalBranchOp>(op)) {
+      checkpoint.follow(condBr.getTrueResult());
+      checkpoint.follow(condBr.getFalseResult());
+      followSingle(checkpoint, condBr.getOperands());
+    } else if (auto forkOp = dyn_cast<ForkOp>(op)) {
+      checkpoint.follow(forkOp.getOperand());
+      followSingle(checkpoint, forkOp.getResults());
+    } else if (auto muxOp = dyn_cast<MuxOp>(op)) {
+      // Either all data inputs, or the select input. Output always
+      checkpoint.follow(muxOp.getResult());
+      auto dataFollower = checkpoint;
+      auto selectFollower = checkpoint;
+      for (auto data : muxOp.getDataOperands()) {
+        dataFollower.follow(data);
+        selectFollower.makeIllegal(data);
+      }
+
+      dataFollower.makeIllegal(muxOp.getSelectOperand());
+      selectFollower.follow(muxOp.getSelectOperand());
+
+      partials.push_back(dataFollower);
+      partials.push_back(selectFollower);
+    } else if (auto cmerge = dyn_cast<ControlMergeOp>(op)) {
+      for (auto data : cmerge.getDataOperands()) {
+        checkpoint.follow(data);
+      }
+      followSingle(checkpoint, cmerge.getResults());
+    } else if (auto arithOp = dyn_cast<ArithOpInterface>(op)) {
+      checkpoint.follow(arithOp->getResults()[0]);
+      followSingle(checkpoint, arithOp->getOperands());
+    } else if (isa<SourceOp, SinkOp, StoreOp>(op)) {
+      // These operations can not be part of an IOG, as they generate/consume
+      // tokens. This means that the partial IOGs looking at these operations
+      // can be discarded, so nothing needs to be done
+    } else if (auto loadOp = dyn_cast<LoadOp>(op)) {
+      checkpoint.follow(loadOp.getAddress());
+      checkpoint.follow(loadOp.getAddressResult());
+      checkpoint.follow(loadOp.getData());
+      checkpoint.follow(loadOp.getDataResult());
+      partials.push_back(checkpoint);
+    } else if (auto memCon = dyn_cast<MemoryControllerOp>(op)) {
+      // Memory controllers will be handled at the annotation part. To make sure
+      // this IOG is not discarded, this checkpoint is added back to the stack
+      // of partial IOGs
+      partials.push_back(checkpoint);
+    } else {
+      op->emitError("unhandled case in IOG finding");
+    }
+  }
+};
+
+std::vector<IOG> findAllIOGsWithEndOp(std::vector<mlir::Value> entries,
+                                      EndOp endOp) {
+  IOGFinder finder{};
+  auto x = IOGFinderCheckpoint{
+      .partial = IOG(),
+      .unhandled = std::vector<mlir::Value>(),
+      .illegals = llvm::DenseSet<mlir::Value>(),
+      .endOp = endOp,
+      .entries = std::move(entries),
+  };
+  finder.partials.push_back(x);
+
+  // Compute all IOGs
+  while (!finder.partials.empty()) {
+    finder.step();
+  }
+  return finder.finals;
+}
+
+std::vector<IOG> findAllIOGs(ModuleOp modOp) {
+  std::vector<IOG> ret{};
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    // Each argument corresponds to an entry node.
+    std::vector<mlir::Value> arguments;
+    for (mlir::Value arg : funcOp.getRegion().getArguments()) {
+      arguments.push_back(arg);
+    }
+
+    for (auto &op : funcOp.getOps()) {
+      if (auto endOp = dyn_cast<EndOp>(op)) {
+        for (auto &x : findAllIOGsWithEndOp(arguments, endOp)) {
+          ret.push_back(x);
+        }
+      }
+    }
+  }
+  for (auto &x : ret) {
+    llvm::errs() << "---------DEBUG----------\n";
+    x.debug();
+    llvm::errs() << "------------------------\n";
+  }
+  return ret;
+}
+} // namespace
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -294,6 +592,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
       return signalPassFailure();
     if (failed(annotateReconvergentPathFlow(modOp)))
       return signalPassFailure();
+
+    findAllIOGs(modOp);
   }
 
   llvm::json::Value jsonVal(std::move(propertyTable));
