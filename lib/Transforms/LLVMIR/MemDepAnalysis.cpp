@@ -291,6 +291,15 @@ bool InstructionDependenceInfo::hasRevTokenDependence(Instruction *srcInst,
 
 std::optional<int64_t> getDistance(Dependence *d) {
   unsigned innerMostLoopLevel = d->getLevels();
+
+  if (innerMostLoopLevel == 0) {
+    LLVM_DEBUG({
+      llvm::errs() << "The two memory accesses are not surrounded by any "
+                      "common loops, returning a null distance.\n";
+    });
+    return std::nullopt;
+  }
+
   const auto *dist = d->getDistance(innerMostLoopLevel);
 
   LLVM_DEBUG(llvm::errs() << "Distance cannot be calculated at all!");
