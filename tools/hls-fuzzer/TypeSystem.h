@@ -206,7 +206,9 @@ public:
 
   std::optional<ConclusionOf<ast::Constant>>
   checkConstant(const ast::Constant &constant, const TypingContext &context) {
-    if (!self().checkScalarType(constant.getType(), context))
+    if (std::optional optional =
+            self().checkScalarType(constant.getType(), context);
+        !optional)
       return std::nullopt;
 
     return constant;
@@ -215,7 +217,9 @@ public:
   std::optional<ConclusionOf<ast::ScalarParameter>>
   checkScalarParameter(const ast::ScalarParameter &parameter,
                        const TypingContext &context) {
-    if (!self().checkScalarType(parameter.getDataType(), context))
+    if (std::optional optional =
+            self().checkScalarType(parameter.getDataType(), context);
+        !optional)
       return std::nullopt;
 
     return context;
@@ -229,7 +233,9 @@ public:
   std::optional<ConclusionOf<ast::ArrayParameter>>
   checkArrayParameter(const ast::ArrayParameter &parameter,
                       const TypingContext &context) {
-    if (!self().checkScalarType(parameter.getElementType(), context))
+    if (std::optional optional =
+            self().checkScalarType(parameter.getElementType(), context);
+        !optional)
       return std::nullopt;
 
     return context;
@@ -362,7 +368,10 @@ private:
 
 /// A noop-system which uses all the default implementations in 'TypeSystem'.
 /// Puts no constraints onto the base generator.
-class NoopTypeSystem : public TypeSystem<std::monostate, NoopTypeSystem> {};
+class NoopTypeSystem final : public TypeSystem<std::monostate, NoopTypeSystem> {
+public:
+  ~NoopTypeSystem() override;
+};
 
 /// Convenience type system that disallows every AST constructs (besides
 /// functions) by default.
