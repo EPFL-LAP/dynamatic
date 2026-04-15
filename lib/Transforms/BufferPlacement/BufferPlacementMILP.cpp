@@ -80,6 +80,8 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
 
 /// [FPGA24] Returns whether the unit has variable latency.
 static bool hasVariableLatencyUnit(Operation *unit) {
+  if (!unit)
+    return false;
   if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
     auto memOp = findMemInterface(loadOp.getAddress());
     if (isa_and_present<handshake::LSQOp>(memOp))
@@ -113,6 +115,8 @@ computeCycleLatency(const SimpleCycle &cycle,
 
   for (NodeIdType nodeId : cycle.nodes) {
     Operation *op = graph.nodes[nodeId].op;
+    if (!op)
+      continue;
     double unitLatency = 0.0;
     (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
     latency += unitLatency;
@@ -142,6 +146,8 @@ static double computeCycleBaseLatency(
   double latency = 0.0;
   for (NodeIdType nodeId : cycle.nodes) {
     Operation *op = graph.nodes[nodeId].op;
+    if (!op)
+      continue;
     double unitLatency = 0.0;
     (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
     latency += unitLatency;
@@ -1248,9 +1254,12 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
       LinExpr pathLatency;
 
       for (NodeIdType nodeId : simplePath.nodes) {
+        Operation *unitOp = graph->nodes[nodeId].op;
+        if (!unitOp)
+          continue;
         double unitLat = 0.0;
-        (void)timingDB.getLatency(graph->nodes[nodeId].op, SignalType::DATA,
-                                  unitLat, targetPeriod);
+        (void)timingDB.getLatency(unitOp, SignalType::DATA, unitLat,
+                                  targetPeriod);
         pathLatency += unitLat;
       }
 
