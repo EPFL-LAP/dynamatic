@@ -15,8 +15,10 @@
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graph_utility.hpp>
@@ -28,6 +30,7 @@
 #include <fstream>
 #include <numeric>
 #include <queue>
+#include <set>
 
 #define DEBUG_TYPE "latency-and-occupancy-balancing-support"
 
@@ -43,10 +46,15 @@ void renumber_vertex_indices(BoostDataflowSubgraph const &) {}
 
 namespace dynamatic {
 
+using namespace dynamatic::handshake;
+
 ///=== RECONVERGENT PATH FINDER ===///
 
 std::string
 CFGTransitionSequenceSubgraph::getNodeLabel(NodeIdType nodeId) const {
+  if (nodes[nodeId].isSyntheticStartFork)
+    return "synthetic_start_fork\\nStep: " +
+           std::to_string(getNodeStep(nodeId));
   auto opName = nodes[nodeId].op->getAttrOfType<mlir::StringAttr>(
       NameAnalysis::ATTR_NAME);
   return opName.str() + "\\nStep: " + std::to_string(getNodeStep(nodeId));
@@ -149,6 +157,56 @@ void CFGTransitionSequenceSubgraph::buildGraphFromSequence(
       }
     }
   }
+
+  addSyntheticStartForkForBalancing();
+}
+
+void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
+  if (nodes.empty())
+    return;
+
+  // mlir::Value is not LessThanComparable
+  // Order pairs by (node id, opaque pointer).
+  std::set<std::pair<NodeIdType, uintptr_t>> seen;
+  for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
+    if (isa<mlir::MemRefType>(arg.getType()) || arg.getUsers().empty())
+      continue;
+    Operation *user = *arg.getUsers().begin();
+    std::optional<unsigned> optBB = getLogicBB(user);
+    if (!optBB)
+      continue;
+    for (const auto &[step, bb] : stepToBB) {
+      if (bb != *optBB)
+        continue;
+      auto it = nodeMap.find({user, step});
+      if (it == nodeMap.end())
+        continue;
+      seen.insert({it->second, reinterpret_cast<uintptr_t>(
+                                   arg.getAsOpaquePointer())});
+    }
+  }
+
+  llvm::errs() << "=== Synthetic start fork block arguments ===\n";
+  handshake::PortNamer namer(funcOp);
+  for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
+    if (isa<mlir::MemRefType>(arg.getType()))
+      continue;
+    llvm::errs() << "  arg #" << arg.getArgNumber() << " \""
+                 << namer.getInputName(arg.getArgNumber()) << "\": "
+                 << arg.getType() << "\n";
+  }
+
+  if (seen.size() < 2)
+    return;
+
+  NodeIdType forkId = addNode(nullptr, true);
+  nodeIdToStep[forkId] = 0;
+
+  for (const auto &pr : seen)
+    addEdge(forkId, pr.first,
+            Value::getFromOpaquePointer(
+                reinterpret_cast<const void *>(pr.second)),
+            DataflowGraphEdgeType::INTRA_BB);
 }
 
 std::vector<ReconvergentPath>
@@ -647,10 +705,40 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
       addEdge(srcId, dstId, channel);
     }
   }
+
+  addSyntheticStartForkForBalancing();
+}
+
+void SynchronizingCyclesFinderGraph::addSyntheticStartForkForBalancing() {
+  if (nodes.empty())
+    return;
+
+  std::set<std::pair<NodeIdType, uintptr_t>> seen;
+  for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
+    if (isa<mlir::MemRefType>(arg.getType()) || arg.getUsers().empty())
+      continue;
+    Operation *user = *arg.getUsers().begin();
+    auto it = opToNodeId.find(user);
+    if (it == opToNodeId.end())
+      continue;
+    seen.insert({it->second, reinterpret_cast<uintptr_t>(
+                                 arg.getAsOpaquePointer())});
+  }
+
+  if (seen.size() < 2)
+    return;
+
+  NodeIdType forkId = addNode(nullptr, true);
+  for (const auto &pr : seen)
+    addEdge(forkId, pr.first,
+            Value::getFromOpaquePointer(
+                reinterpret_cast<const void *>(pr.second)));
 }
 
 std::string
 SynchronizingCyclesFinderGraph::getNodeLabel(NodeIdType nodeId) const {
+  if (nodes[nodeId].isSyntheticStartFork)
+    return "synthetic_start_fork";
   return nodes[nodeId].op->getName().getStringRef().str();
 }
 

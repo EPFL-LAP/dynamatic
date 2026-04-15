@@ -28,6 +28,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <list>
@@ -116,29 +117,12 @@ void OccupancyBalancingLP::setup() {
     return;
   }
 
-  /// Collect all channels from CFDFCs
-  mlir::DenseSet<Value> allChannelsSet;
-  for (CFDFC *cfdfc : cfdfcs) {
-    for (Value channel : cfdfc->channels) {
-      allChannelsSet.insert(channel);
-    }
+  SmallVector<Value> allChannels;
+  for (auto &[channel, _] : channelProps) {
+    if (isa<MemRefType>(channel.getType()))
+      continue;
+    allChannels.push_back(channel);
   }
-  /// Also include channels from reconvergent paths (including non-CFDFC edges)
-  /// This ensures LP2 handles entry/exit paths that LP1 balanced.
-  for (const auto &pathWithGraph : reconvergentPaths) {
-    const ReconvergentPath &path = pathWithGraph.path;
-    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
-    for (NodeIdType nodeId : path.nodeIds) {
-      for (EdgeIdType edgeId : graph->adjList[nodeId]) {
-        const auto &edge = graph->edges[edgeId];
-        if (path.nodeIds.count(edge.dstId)) {
-          allChannelsSet.insert(edge.channel);
-        }
-      }
-    }
-  }
-
-  SmallVector<Value> allChannels(allChannelsSet.begin(), allChannelsSet.end());
   if (allChannels.empty()) {
     unsatisfiable = true;
     return;
@@ -423,8 +407,7 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
 
       if (isMergeLike) {
         PlacementResult &result = placement[channel];
-        // if (result.numOneSlotDV == 0)
-        //   result.numOneSlotDV = 1;
+
         result.numOneSlotR = 1;
         llvm::errs() << "  Adding R for merge-like: "
                      << getUniqueName(*channel.getUses().begin()) << "\n";
@@ -432,51 +415,38 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
     }
   }
 
-  /// Buffer forks connected to memory controllers.
-  /// TODO: We will model this in the MILP soon, but for now we just add buffers
-  /// here.
-  for (Operation &op : funcInfo.funcOp.getOps()) {
-    auto forkOp = dyn_cast<handshake::ForkOp>(op);
-    if (!forkOp)
-      continue;
-
-    bool connectsToMemCtrl = false;
-    for (Value res : forkOp.getResults()) {
-      for (Operation *user : res.getUsers()) {
-        if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(user)) {
-          connectsToMemCtrl = true;
-          break;
-        }
-      }
-      if (connectsToMemCtrl)
-        break;
-    }
-
-    if (!connectsToMemCtrl)
-      continue;
-
-    for (Value res : forkOp.getResults()) {
-      if (!placement.count(res)) {
-        PlacementResult result;
-        result.numFifoNone = 1;
-        placement[res] = result;
-      }
-    }
-  }
-
-  /// Buffer memory controller end signals (di_end, idx_end).
-  for (Operation &op : funcInfo.funcOp.getOps()) {
-    if (!isa<handshake::MemoryControllerOp, handshake::LSQOp>(op))
-      continue;
-
-    for (Value res : op.getResults()) {
-      if (!isa<handshake::ControlType>(res.getType()))
+  /// Buffer the path from cond_br to EndOp. 
+  auto *terminator = funcInfo.funcOp.getBodyBlock()->getTerminator();
+  if (auto endOp = dyn_cast<handshake::EndOp>(terminator)) {
+    for (Value operand : endOp->getOperands()) {
+      Operation *producer = operand.getDefiningOp();
+      if (!producer)
         continue;
 
-      if (!placement.count(res)) {
-        PlacementResult result;
+      // Walk backward to check whether this path comes from a cond_br.
+      Value cur = operand;
+      bool fromCondBr = false;
+      while (cur) {
+        Operation *op = cur.getDefiningOp();
+        if (!op)
+          break;
+        if (isa<handshake::ConditionalBranchOp>(op)) {
+          fromCondBr = true;
+          break;
+        }
+        if (op->getNumOperands() == 1)
+          cur = op->getOperand(0);
+        else
+          break;
+      }
+
+      if (!fromCondBr)
+        continue;
+
+      PlacementResult &result = placement[operand];
+      if (result.numFifoNone == 0 && result.numOneSlotDV == 0 &&
+          result.numCounterBuffer == 0) {
         result.numFifoNone = 1;
-        placement[res] = result;
       }
     }
   }
