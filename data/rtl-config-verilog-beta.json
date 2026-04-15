@@ -230,8 +230,8 @@
     "hdl": "verilog"
   },
   {
-    "name": "handshake.not",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t not -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "name": "handshake.noti",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t noti -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "generic": "$DYNAMATIC/data/verilog/support/logic.v",
