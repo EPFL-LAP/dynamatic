@@ -33,6 +33,10 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::CSOAFAF;
   if (s == "RPF")
     return FormalProperty::TYPE::RPF;
+  if (s == "IOGSingleToken")
+    return FormalProperty::TYPE::IOGSingleToken;
+  if (s == "IOGConsecutiveTokens")
+    return FormalProperty::TYPE::IOGConsecutiveTokens;
 
   return std::nullopt;
 }
@@ -49,6 +53,10 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "CSOAFAF";
   case TYPE::RPF:
     return "RPF";
+  case TYPE::IOGSingleToken:
+    return "IOGSingleToken";
+  case TYPE::IOGConsecutiveTokens:
+    return "IOGConsecutiveTokens";
   }
 }
 
@@ -108,6 +116,11 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
                                                     path.field(INFO_LIT));
   case TYPE::RPF:
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::IOGSingleToken:
+    assert(false && "todo");
+    return nullptr;
+  case TYPE::IOGConsecutiveTokens:
+    return IOGConsecutiveTokens::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -379,6 +392,76 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
 
   return prop;
 }
+
+// IOGConsecutiveTokens
+
+llvm::json::Value IOGConsecutiveTokens::extraInfoToJSON() const {
+  std::vector<llvm::json::Value> sentsJSON;
+  sentsJSON.reserve(sents.size());
+  for (auto &sent : sents) {
+    sentsJSON.push_back(sent.toInnerJSON());
+  }
+  llvm::json::Value sentsValue = sentsJSON;
+
+  return llvm::json::Object({{SLOT1_LIT, slot1->toJSON()},
+                             {SLOT2_LIT, slot2->toJSON()},
+                             {SENTS_LIT, sentsValue}});
+}
+
+std::unique_ptr<IOGConsecutiveTokens>
+IOGConsecutiveTokens::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<IOGConsecutiveTokens>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::Object *obj = info.getAsObject();
+  assert(obj);
+  if (auto iter = obj->find(SLOT1_LIT); iter != obj->end()) {
+    prop->slot1 = InternalStateNamer::fromJSON(iter->second, path);
+  } else {
+    path.report(json::ERR_MISSING_VALUE);
+    return nullptr;
+  }
+
+  if (auto iter = obj->find(SLOT2_LIT); iter != obj->end()) {
+    prop->slot2 = InternalStateNamer::fromJSON(iter->second, path);
+  } else {
+    path.report(json::ERR_MISSING_VALUE);
+    return nullptr;
+  }
+
+  if (auto iter = obj->find(SENTS_LIT); iter != obj->end()) {
+    llvm::json::Array *sentsArray = iter->second.getAsArray();
+    assert(sentsArray);
+    prop->sents.reserve(sentsArray->size());
+    for (const llvm::json::Value &sentValue : *sentsArray) {
+      auto innerJSON = EagerForkSentNamer::fromInnerJSON(sentValue, path);
+      assert(innerJSON);
+      prop->sents.push_back(*innerJSON);
+    }
+  } else {
+    path.report(json::ERR_MISSING_VALUE);
+  }
+
+  /*
+  auto prop = std::make_unique<IOGConsecutiveTokens>();
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+
+  const llvm::json::Object *obj = info.getAsObject();
+  if (!obj)
+    return nullptr;
+  assert(false && "TODO");
+  */
+  return prop;
+}
+
+IOGConsecutiveTokens::IOGConsecutiveTokens(
+    unsigned long id, TAG tag, std::unique_ptr<InternalStateNamer> slot1,
+    std::unique_ptr<InternalStateNamer> slot2,
+    std::vector<EagerForkSentNamer> sents)
+    : FormalProperty(id, tag, TYPE::IOGConsecutiveTokens),
+      slot1(std::move(slot1)), slot2(std::move(slot2)),
+      sents(std::move(sents)) {}
 
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database

@@ -34,6 +34,7 @@ public:
     CSOAFAF, /* Copied Slots Of Active Forks Are Full */
     RPF,     /* Reconvergent Path Flow */
     IOGSingleToken,
+    IOGConsecutiveTokens,
   };
 
   TAG getTag() const { return tag; }
@@ -284,6 +285,33 @@ public:
   }
 
 private:
+};
+
+class IOGConsecutiveTokens : public FormalProperty {
+public:
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<IOGConsecutiveTokens>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  IOGConsecutiveTokens() = default;
+  IOGConsecutiveTokens(unsigned long id, TAG tag,
+                       std::unique_ptr<InternalStateNamer> slot1,
+                       std::unique_ptr<InternalStateNamer> slot2,
+                       std::vector<EagerForkSentNamer> sents);
+  ~IOGConsecutiveTokens() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::IOGConsecutiveTokens;
+  }
+
+  std::unique_ptr<InternalStateNamer> slot1;
+  std::unique_ptr<InternalStateNamer> slot2;
+  std::vector<EagerForkSentNamer> sents;
+
+private:
+  inline static const StringLiteral SLOT1_LIT = "slot1";
+  inline static const StringLiteral SLOT2_LIT = "slot2";
+  inline static const StringLiteral SENTS_LIT = "sents";
 };
 
 class FormalPropertyTable {
