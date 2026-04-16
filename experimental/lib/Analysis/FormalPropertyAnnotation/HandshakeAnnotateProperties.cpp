@@ -407,223 +407,175 @@ void IOGPath::computeForwardPathFromBackPath() {
   }
 }
 
-struct IOGFinderCheckpoint {
-  IOG partial;
+struct IOGCandidate {
+  IOG iog;
   // Stack of channels at the edge that are not yet inserted into the IOG
-  std::vector<mlir::Value> unhandled;
+  std::vector<mlir::Value> dfsQueue;
   // Set of channels that have been declared illegal by local rules
-  llvm::DenseSet<mlir::Value> illegals;
-  // Is the partial IOG still following the rules? Note that DONE does not
-  // actually mean done, as the `unhandled` stack should also be empty.
-  enum PROGRESS { ILLEGAL, PARTIAL, DONE };
-  PROGRESS progress = PARTIAL;
+  llvm::DenseSet<mlir::Value> illegalChannels;
 
-  IOGFinderCheckpoint() = default;
-  IOGFinderCheckpoint(mlir::Value entry) {
-    partial.entry = entry;
-    follow(entry);
-    progress = DONE;
-  }
+  // Is the partial IOG contained within this struct invalid? I.e., is an
+  // illegal edge part of the IOG?
+  bool invalidIOG = false;
 
-  PROGRESS getProgress() {
-    if (progress == ILLEGAL)
-      return ILLEGAL;
-    if (!unhandled.empty())
-      return PARTIAL;
-    return progress;
+  IOGCandidate() = default;
+  IOGCandidate(mlir::Value entry) {
+    iog.entry = entry;
+    markFollowed(entry);
   }
 
   bool isLegal(mlir::Value channel) {
-    auto iter = illegals.find(channel);
-    return iter == illegals.end();
+    auto iter = illegalChannels.find(channel);
+    return iter == illegalChannels.end();
   }
 
-  void follow(mlir::Value channel) {
+  void markFollowed(mlir::Value channel) {
     if (!isLegal(channel)) {
       // A non-legal channel has been followed, so mark this IOG as non-valid
-      progress = ILLEGAL;
+      invalidIOG = true;
       return;
     }
-    if (partial.contains(channel)) {
+    if (iog.contains(channel)) {
       return;
     }
-    unhandled.push_back(channel);
-    partial.channels.insert(channel);
+    dfsQueue.push_back(channel);
+    iog.channels.insert(channel);
   }
 
-  void makeIllegal(mlir::Value channel) {
-    if (partial.contains(channel)) {
-      progress = ILLEGAL;
+  void markIllegal(mlir::Value channel) {
+    if (iog.contains(channel)) {
+      invalidIOG = true;
     }
     // The legality of unhandled channels is checked in getNextOp
-    illegals.insert(channel);
+    illegalChannels.insert(channel);
   }
 
-  Operation *getNextOp() {
+  std::optional<Operation *> getNextOpToAdd() {
     // Stop making progress if an illegal edge has been taken
-    if (progress == ILLEGAL) {
-      return nullptr;
+    if (invalidIOG) {
+      return std::nullopt;
     }
 
-    if (unhandled.empty()) {
+    if (dfsQueue.empty()) {
       // All handling done!
-      return nullptr;
+      return std::nullopt;
     }
 
     // Look at channel at the top of the `unhandled` stack
-    auto channel = unhandled.back();
+    auto channel = dfsQueue.back();
 
     // If this channel has been marked as illegal, abort this branch
     if (!isLegal(channel)) {
-      progress = ILLEGAL;
-      return nullptr;
+      invalidIOG = true;
+      return std::nullopt;
     }
 
     // To fully handle a channel, both the operation before and after have to be
     // handled
     Operation *before = channel.getDefiningOp();
-    if (before && !partial.contains(before)) {
-      partial.units.insert(before);
+    if (before && !iog.contains(before)) {
+      iog.units.insert(before);
       return before;
     }
 
     Operation *after = channel.getUses().begin()->getOwner();
-    if (after && !partial.contains(after)) {
-      partial.units.insert(after);
+    if (after && !iog.contains(after)) {
+      iog.units.insert(after);
       return after;
     }
 
     // Both sides of this channel have been handled, so this channel is done and
     // can be removed/inserted into the appropriate locations
-    unhandled.pop_back();
+    dfsQueue.pop_back();
 
     // Return next channel on unhandled stack
-    return getNextOp();
+    return getNextOpToAdd();
   }
 };
 
-struct IOGFinder {
-  IOGFinder() = default;
-  ~IOGFinder() = default;
-  std::vector<IOGFinderCheckpoint> partials;
-  std::vector<IOG> finals;
-
-  // This function takes a checkpoint and a list of channels. For each channel
-  // c, it pushes the IOG where *only* channel c is taken, and all the rest are
-  // illegal. Used for forks (which only allow exactly one of its outputs) and
-  // join operations (which only allow exactly one of its inputs)
-  template <typename T>
-  void followSingle(const IOGFinderCheckpoint &checkpoint, T options) {
-    size_t n = 0;
-    mlir::Value singleTaken = nullptr;
-    for (mlir::Value channel : options) {
-      if (checkpoint.partial.contains(channel)) {
-        n += 1;
-        singleTaken = channel;
-      }
-    }
-    if (n == 1) {
-      IOGFinderCheckpoint goHere = checkpoint;
-      // singleTaken is already part of the IOG, so no need to follow it
-      // goHere.follow(singleTaken);
-      for (mlir::Value other : options) {
-        if (other == singleTaken) {
-          continue;
-        }
-        goHere.makeIllegal(other);
-      }
-      partials.push_back(goHere);
-      return;
-    }
-    if (n > 1) {
-      // Multiple paths taken, but only single is allowed! => No IOGs from this
-      // branch
-      return;
-    }
-    for (mlir::Value channel : options) {
-      IOGFinderCheckpoint goHere = checkpoint;
-      goHere.follow(channel);
-      for (mlir::Value other : options) {
-        if (channel == other)
-          continue;
-        goHere.makeIllegal(other);
-      }
-      partials.push_back(goHere);
-    }
+class IOGFinder {
+public:
+  IOGFinder(mlir::Value entry) {
+    IOGCandidate cp(entry);
+    candidates.push_back(cp);
   }
+  ~IOGFinder() = default;
 
   // Take a step towards computing all IOGs. Does nothing if there are no
   // partial IOGs.
   // Example usage:
   // IOGFinder finder = ...
-  // while (!finder.partials.empty()) {
+  // while (!finder.isDone()) {
   //   finder.step();
   // }
+  // auto iogs = finder.getIOGs();
   void step() {
-    if (partials.empty())
+    if (candidates.empty())
       return;
-    auto checkpoint = partials.back();
-    partials.pop_back();
-    if (checkpoint.progress == IOGFinderCheckpoint::PROGRESS::ILLEGAL)
+    auto candidate = std::move(candidates.back());
+    candidates.pop_back();
+    if (candidate.invalidIOG)
       return;
 
-    Operation *op = checkpoint.getNextOp();
-    if (op == nullptr) {
-      if (checkpoint.progress == IOGFinderCheckpoint::PROGRESS::DONE) {
-        finals.push_back(checkpoint.partial);
+    std::optional<Operation *> optOp = candidate.getNextOpToAdd();
+    if (optOp == std::nullopt) {
+      if (!candidate.invalidIOG) {
+        finals.push_back(candidate.iog);
       }
       return;
     }
-    checkpoint.partial.units.insert(op);
+    Operation *op = *optOp;
+
+    candidate.iog.units.insert(op);
 
     if (auto endOp = dyn_cast<EndOp>(op)) {
-      followSingle(checkpoint, endOp.getOperands());
+      followSingle(candidate, endOp.getOperands());
     } else if (auto bufOp = dyn_cast<BufferOp>(op)) {
-      checkpoint.follow(bufOp.getOperand());
-      checkpoint.follow(bufOp.getResult());
-      partials.push_back(checkpoint);
+      candidate.markFollowed(bufOp.getOperand());
+      candidate.markFollowed(bufOp.getResult());
+      candidates.push_back(candidate);
     } else if (auto condBr = dyn_cast<ConditionalBranchOp>(op)) {
-      checkpoint.follow(condBr.getTrueResult());
-      checkpoint.follow(condBr.getFalseResult());
-      followSingle(checkpoint, condBr.getOperands());
+      candidate.markFollowed(condBr.getTrueResult());
+      candidate.markFollowed(condBr.getFalseResult());
+      followSingle(candidate, condBr.getOperands());
     } else if (auto forkOp = dyn_cast<ForkOp>(op)) {
-      checkpoint.follow(forkOp.getOperand());
-      followSingle(checkpoint, forkOp.getResults());
+      candidate.markFollowed(forkOp.getOperand());
+      followSingle(candidate, forkOp.getResults());
     } else if (auto muxOp = dyn_cast<MuxOp>(op)) {
       // Either all data inputs, or the select input. Output always
-      checkpoint.follow(muxOp.getResult());
-      auto dataFollower = checkpoint;
-      auto selectFollower = checkpoint;
+      candidate.markFollowed(muxOp.getResult());
+      auto dataFollower = candidate;
+      auto selectFollower = candidate;
       for (auto data : muxOp.getDataOperands()) {
-        dataFollower.follow(data);
-        selectFollower.makeIllegal(data);
+        dataFollower.markFollowed(data);
+        selectFollower.markIllegal(data);
       }
 
-      dataFollower.makeIllegal(muxOp.getSelectOperand());
-      selectFollower.follow(muxOp.getSelectOperand());
+      dataFollower.markIllegal(muxOp.getSelectOperand());
+      selectFollower.markFollowed(muxOp.getSelectOperand());
 
-      partials.push_back(dataFollower);
-      partials.push_back(selectFollower);
+      candidates.push_back(dataFollower);
+      candidates.push_back(selectFollower);
     } else if (auto cmerge = dyn_cast<ControlMergeOp>(op)) {
       for (auto data : cmerge.getDataOperands()) {
-        checkpoint.follow(data);
+        candidate.markFollowed(data);
       }
-      followSingle(checkpoint, cmerge.getResults());
+      followSingle(candidate, cmerge.getResults());
     } else if (auto arithOp = dyn_cast<ArithOpInterface>(op)) {
-      checkpoint.follow(arithOp->getResults()[0]);
-      followSingle(checkpoint, arithOp->getOperands());
+      candidate.markFollowed(arithOp->getResults()[0]);
+      followSingle(candidate, arithOp->getOperands());
     } else if (auto sourceOp = dyn_cast<SourceOp>(op)) {
       // SourceOps can not be part of an IOG, as they act like entry nodes. This
       // means that the partial IOGs looking at these operations can be
       // discarded, so nothing needs to be done
     } else if (isa<SinkOp, StoreOp>(op)) {
-      partials.push_back(checkpoint);
+      candidates.push_back(candidate);
     } else if (auto loadOp = dyn_cast<LoadOp>(op)) {
-      checkpoint.follow(loadOp.getAddress());
+      candidate.markFollowed(loadOp.getAddress());
       // checkpoint.follow(loadOp.getAddressResult());
       // checkpoint.follow(loadOp.getData());
-      checkpoint.follow(loadOp.getDataResult());
-      partials.push_back(checkpoint);
+      candidate.markFollowed(loadOp.getDataResult());
+      candidates.push_back(candidate);
     } else if (auto memCon = dyn_cast<MemoryControllerOp>(op)) {
       // MemoryControllers are only accessed by control signals during this
       // annotation, as the edges between loadOps/storeOps and the MC are not
@@ -633,16 +585,69 @@ struct IOGFinder {
       op->emitError("unhandled case in IOG finding");
     }
   }
+
+  inline bool isDone() { return candidates.empty(); }
+
+  inline std::vector<IOG> getIOGs() {
+    assert(isDone());
+    return std::move(finals);
+  }
+
+private:
+  // This function takes a checkpoint and a list of channels. For each channel
+  // c, it pushes the IOG where *only* channel c is taken, and all the rest are
+  // illegal. Used for forks (which only allow exactly one of its outputs) and
+  // join operations (which only allow exactly one of its inputs)
+  template <typename T>
+  void followSingle(const IOGCandidate &checkpoint, T options) {
+    size_t n = 0;
+    mlir::Value singleTaken = nullptr;
+    for (mlir::Value channel : options) {
+      if (checkpoint.iog.contains(channel)) {
+        n += 1;
+        singleTaken = channel;
+      }
+    }
+    if (n == 1) {
+      IOGCandidate goHere = checkpoint;
+      // singleTaken is already part of the IOG, so no need to follow it
+      // goHere.follow(singleTaken);
+      for (mlir::Value other : options) {
+        if (other == singleTaken) {
+          continue;
+        }
+        goHere.markIllegal(other);
+      }
+      candidates.push_back(goHere);
+      return;
+    }
+    if (n > 1) {
+      // Multiple paths taken, but only single is allowed! => No IOGs from this
+      // branch
+      return;
+    }
+    for (mlir::Value channel : options) {
+      IOGCandidate goHere = checkpoint;
+      goHere.markFollowed(channel);
+      for (mlir::Value other : options) {
+        if (channel == other)
+          continue;
+        goHere.markIllegal(other);
+      }
+      candidates.push_back(goHere);
+    }
+  }
+
+  std::vector<IOGCandidate> candidates;
+  std::vector<IOG> finals;
 };
 
 std::vector<IOG> findAllIOGsWithEntry(mlir::Value entry) {
-  IOGFinder finder{};
-  IOGFinderCheckpoint cp(entry);
-  finder.partials.push_back(cp);
-  while (!finder.partials.empty()) {
+  IOGFinder finder(entry);
+  while (!finder.isDone()) {
     finder.step();
   }
-  return finder.finals;
+  return finder.getIOGs();
 }
 
 std::vector<IOG> findAllIOGs(ModuleOp modOp) {
@@ -650,8 +655,8 @@ std::vector<IOG> findAllIOGs(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     // Each argument corresponds to an entry node.
     for (mlir::Value arg : funcOp.getRegion().getArguments()) {
-      for (auto &x : findAllIOGsWithEntry(arg)) {
-        ret.push_back(x);
+      for (auto &iog : findAllIOGsWithEntry(arg)) {
+        ret.push_back(std::move(iog));
       }
     }
   }
@@ -690,26 +695,6 @@ followPathAndGetCopiedSents(const IOGPath &path) {
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
-  llvm::errs() << "performing IOG Consecutive tokens pass\n";
-  llvm::errs() << "---------DEBUG----------\n";
-  iog.debug();
-  llvm::errs() << "---------UNITS----------\n";
-  for (auto *op : iog.units) {
-    llvm::errs() << getUniqueName(op) << "\n";
-  }
-  llvm::errs() << "---------CHANNELS-------\n";
-  for (auto channel : iog.channels) {
-    Operation *before = channel.getDefiningOp();
-    if (before == nullptr) {
-      llvm::errs() << "entry";
-    } else {
-      llvm::errs() << getUniqueName(before);
-    }
-    Operation *after = channel.getUses().begin()->getOwner();
-    assert(after);
-    llvm::errs() << " -> " << getUniqueName(after) << "\n";
-  }
-  llvm::errs() << "------------------------\n";
   std::vector<BufferLikeOpInterface> slots;
   for (auto &op : iog.units) {
     if (auto slot = dyn_cast<BufferLikeOpInterface>(op)) {
@@ -741,7 +726,7 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
 
       auto slot1Namer = slot1->getTokenCountNamer();
       auto slot2Namer = slot2->getTokenCountNamer();
-      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::OPT,
+      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::INVAR,
                                     std::move(slot1Namer),
                                     std::move(slot2Namer), copiedSents);
       uid++;
@@ -756,12 +741,10 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-#if 0
   if (failed(annotateAbsenceOfBackpressure(modOp)))
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
-#endif
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();
