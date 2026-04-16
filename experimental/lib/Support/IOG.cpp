@@ -3,58 +3,69 @@
 #include "mlir/IR/BuiltinOps.h"
 
 namespace dynamatic {
-IOGPath::IOGPath(const IOG &iog, Operation *fromArg, Operation *toArg)
-    : from(fromArg), to(toArg) {
-  assert(from && iog.contains(from));
-  assert(to && iog.contains(to));
-  computeBackPath(iog);
-  if (!exists()) {
-    return;
-  }
-  computeForwardPathFromBackPath();
-}
-
-void IOGPath::computeBackPath(const IOG &iog) {
-  std::vector<mlir::Value> stack;
-  for (mlir::Value out : from->getResults()) {
-    if (!iog.contains(out)) {
-      continue;
-    }
-    stack.push_back(out);
-  }
+IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
+    : start(startA), end(endA) {
+  std::vector<Operation *> stack;
+  stack.push_back(start);
+  std::unordered_set<Operation *> forward;
   while (!stack.empty()) {
-    mlir::Value channel = stack.back();
+    Operation *op = stack.back();
     stack.pop_back();
-    Operation *next = channel.getUses().begin()->getOwner();
-    assert(next);
-    assert(iog.contains(next));
-    if (prevSet.find(next) != prevSet.end()) {
+
+    if (forward.find(op) != forward.end()) {
       continue;
     }
-    prevSet.insert({next, channel});
-    if (next == to) {
-      return;
+
+    forward.insert(op);
+
+    if (op == end) {
+      continue;
     }
 
-    for (mlir::Value out : next->getResults()) {
-      if (!iog.contains(out)) {
-        // Only consider channels part of the IOG
+    for (auto channel : op->getResults()) {
+      if (!iog.contains(channel)) {
         continue;
       }
-      stack.push_back(out);
+      Operation *next = channel.getUses().begin()->getOwner();
+      assert(iog.contains(next));
+      stack.push_back(next);
     }
   }
-}
 
-void IOGPath::computeForwardPathFromBackPath() {
-  assert(exists());
-  Operation *cur = to;
-  while (cur != from) {
-    mlir::Value channel = stepBack(cur);
-    Operation *prev = channel.getDefiningOp();
-    assert(prev);
-    forwardSet.insert({prev, channel});
-    cur = prev;
+  stack.push_back(end);
+  std::unordered_set<Operation *> back;
+
+  while (!stack.empty()) {
+    Operation *op = stack.back();
+    stack.pop_back();
+
+    if (back.find(op) != back.end()) {
+      continue;
+    }
+
+    back.insert(op);
+
+    if (op == start) {
+      continue;
+    }
+
+    for (auto channel : op->getOperands()) {
+      if (!iog.contains(channel)) {
+        continue;
+      }
+      Operation *next = channel.getDefiningOp();
+      if (next == nullptr) {
+        continue;
+      }
+      assert(iog.contains(next));
+      stack.push_back(next);
+    }
+  }
+
+  for (Operation *op : forward) {
+    if (back.find(op) != back.end()) {
+      units.insert(op);
+    }
   }
 }
 

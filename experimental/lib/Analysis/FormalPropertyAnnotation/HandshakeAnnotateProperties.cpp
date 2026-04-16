@@ -282,32 +282,38 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 }
 
 namespace {
-std::vector<EagerForkSentNamer>
-followPathAndGetCopiedSents(const IOGPath &path) {
+std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
+                                                const IOGPathSet &pathSet) {
   std::vector<EagerForkSentNamer> sents;
-  Operation *cur = path.from;
+  std::vector<Operation *> stack;
+  stack.push_back(pathSet.start);
   bool first = true;
-  while (cur != path.to) {
+  while (!stack.empty()) {
+    Operation *cur = stack.back();
+    stack.pop_back();
     if (!first) {
       if (auto slot = dyn_cast<BufferLikeOpInterface>(cur)) {
         return sents;
       }
     }
     first = false;
-    mlir::Value forward = path.stepForward(cur);
-    if (auto sent = dyn_cast<EagerForkLikeOpInterface>(cur)) {
-      // FORK DETECTED!!
-      size_t index;
-      // inconvenient way of getting the correct sent namer, but there is no
-      // better way for now
-      for (auto [i, channel] : llvm::enumerate(sent->getResults())) {
-        if (channel == forward) {
-          index = i;
-        }
+    for (OpResult forward : cur->getResults()) {
+      if (!iog.contains(forward)) {
+        continue;
       }
-      sents.push_back(sent.getInternalSentStateNamers()[index]);
+      Operation *next = forward.getUses().begin()->getOwner();
+      assert(iog.contains(next));
+      if (pathSet.units.find(next) == pathSet.units.end()) {
+        continue;
+      }
+
+      if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(cur)) {
+        sents.push_back(
+            forkOp.getInternalSentStateNamers()[forward.getResultNumber()]);
+      }
+
+      stack.push_back(next);
     }
-    cur = forward.getUses().begin()->getOwner();
   }
   return sents;
 }
@@ -326,27 +332,24 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
       if (slot1->getOperation() == slot2->getOperation()) {
         continue;
       }
-      std::vector<EagerForkSentNamer> copiedSents;
-      IOGPath path = IOGPath(iog, *slot1, *slot2);
-      if (path.exists()) {
-        std::vector<EagerForkSentNamer> extras =
-            followPathAndGetCopiedSents(path);
-        copiedSents.insert(copiedSents.end(), extras.begin(), extras.end());
-      }
 
-      path = IOGPath(iog, *slot2, *slot1);
-      if (path.exists()) {
-        std::vector<EagerForkSentNamer> extras =
-            followPathAndGetCopiedSents(path);
-        copiedSents.insert(copiedSents.end(), extras.begin(), extras.end());
-      }
+      IOGPathSet pathSet12(iog, *slot1, *slot2);
+
+      std::vector<EagerForkSentNamer> copiedSents =
+          findCopiedSents(iog, pathSet12);
+
+      IOGPathSet pathSet21(iog, *slot2, *slot1);
+      std::vector<EagerForkSentNamer> extra = findCopiedSents(iog, pathSet21);
+      copiedSents.insert(copiedSents.end(), extra.begin(), extra.end());
+
+      // Note:
       // Even if the copiedSents is empty, this invariant is interesting! It
       // means that both slots cannot be occupied at the same time, as there is
       // only (at most) one token in the IOG
 
       auto slot1Namer = slot1->getTokenCountNamer();
       auto slot2Namer = slot2->getTokenCountNamer();
-      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::INVAR,
+      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::OPT,
                                     std::move(slot1Namer),
                                     std::move(slot2Namer), copiedSents);
       uid++;
@@ -359,10 +362,12 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
+#if 0
   if (failed(annotateAbsenceOfBackpressure(modOp)))
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
+#endif
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();

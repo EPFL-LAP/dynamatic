@@ -3,34 +3,27 @@
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
-
 #include <unordered_set>
+
+// An In-order graph (IOG) of a dataflow circuit is a subgraph of the dataflow
+// circuit. It contains one and only one entry channel (i.e. an argument of a
+// FuncOp) which can reach all other operations using only channels part of the
+// IOG. The IOG does not lose or gain any tokens: For any merge/mux, all the
+// data inputs must be contained in the IOG, and for any fork, only a single
+// output can be part of the IOG. Similarly, all branch outputs are part of the
+// IOG, and for each join-operation, only a single input is part of the IOG.
+// This way, there is a fixed number of tokens within the IOG.
 
 namespace dynamatic {
 struct IOG;
-struct IOGPath;
+struct IOGPathSet;
 
-struct IOGPath {
-  std::unordered_map<Operation *, mlir::Value> prevSet;
-  std::unordered_map<Operation *, mlir::Value> forwardSet;
-  Operation *from;
-  Operation *to;
-  IOGPath(const IOG &iog, Operation *from, Operation *to);
+struct IOGPathSet {
+  IOGPathSet(const IOG &iog, Operation *start, Operation *end);
 
-  void computeBackPath(const IOG &iog);
-  void computeForwardPathFromBackPath();
-
-  inline bool exists() const { return prevSet.find(to) != prevSet.end(); }
-  mlir::Value stepBack(Operation *cur) const {
-    auto iter = prevSet.find(cur);
-    assert(iter != prevSet.end());
-    return iter->second;
-  }
-  mlir::Value stepForward(Operation *cur) const {
-    auto iter = forwardSet.find(cur);
-    assert(iter != forwardSet.end());
-    return iter->second;
-  }
+  std::unordered_set<Operation *> units;
+  Operation *start;
+  Operation *end;
 };
 
 struct IOG {
