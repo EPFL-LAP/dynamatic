@@ -72,6 +72,18 @@ def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
      }],
      "std::vector<BufferSlotFullNamer>", "getInternalSlotStateNamers", (ins)
    >,
+   InterfaceMethod<[{
+       Get the internal state namer of the number of tokens currently
+       contained within this operation.
+     }],
+     "std::unique_ptr<InternalStateNamer>", "getTokenCountNamer", (ins), [{
+       Operation *op = $_op.getOperation();
+       auto name = op->getAttrOfType<::mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+       if (!name)
+         return nullptr;
+       return std::make_unique<TokenCountNamer>(name.str());
+     }]
+   >,
   ];
 }
 

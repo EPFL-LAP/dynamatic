@@ -1298,8 +1298,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       std::string propertyString = llvm::join(eqs, " & ");
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<IOGConsecutiveTokens>(property.get())) {
-      // buffer1.slot_full | buffer2.slot_full -> fork3.outs1_sent |
-      // fork4.outs0_sent
+      // buffer1.slotted_token_count > 0 & buffer2.slotted_token_count > 0 ->
+      // fork3.outs1_sent | fork4.outs0_sent
       std::string right;
       if (p->sents.empty()) {
         right = "FALSE";
@@ -1311,9 +1311,11 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
         }
         right = llvm::join(sentNames, " | ");
       }
+      assert(p->slot1);
+      assert(p->slot2);
       std::string full =
-          llvm::formatv("({0} & {1}) -> ({2})", p->slot1->getSMVName(),
-                        p->slot2->getSMVName(), right);
+          llvm::formatv("(({0} > 0) & ({1} > 0)) -> ({2})",
+                        p->slot1->getSMVName(), p->slot2->getSMVName(), right);
       data.properties[p->getId()] = {full, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";

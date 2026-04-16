@@ -32,6 +32,7 @@ struct InternalStateNamer {
     PipelineSlot,
     Constrained,
     MemoryControllerSlot,
+    TokenCount,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -74,6 +75,7 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
   static constexpr llvm::StringLiteral MEMORY_CONTROLLER_SLOT =
       "MemoryControllerSlot";
+  static constexpr llvm::StringLiteral TOKEN_COUNT = "TokenCount";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -283,6 +285,31 @@ struct PipelineSlotNamer : InternalStateNamer {
   unsigned slotIndex;
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "pipeline_index";
+};
+
+struct TokenCountNamer : InternalStateNamer {
+  TokenCountNamer() = default;
+  TokenCountNamer(const std::string &opName)
+      : InternalStateNamer(TYPE::TokenCount), opName(opName) {}
+  ~TokenCountNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::TokenCount;
+  }
+
+  inline std::string getSMVName() const override {
+    return llvm::formatv("{0}.slotted_token_count", opName);
+  }
+
+  inline llvm::json::Value toInnerJSON() const override {
+    return llvm::json::Object({{OPERATION_LIT, opName}});
+  }
+
+  std::unique_ptr<TokenCountNamer> static fromInnerJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
+  std::string opName;
+
+  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
 };
 
 struct MemoryControllerSlotNamer : InternalStateNamer {

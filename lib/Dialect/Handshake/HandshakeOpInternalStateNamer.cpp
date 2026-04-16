@@ -14,6 +14,9 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::Constrained;
   if (s == MEMORY_CONTROLLER_SLOT)
     return TYPE::MemoryControllerSlot;
+  if (s == TOKEN_COUNT)
+    return TYPE::TokenCount;
+  llvm::errs() << "unknown type\n";
   return std::nullopt;
 }
 
@@ -29,6 +32,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return CONSTRAINED.str();
   case TYPE::MemoryControllerSlot:
     return MEMORY_CONTROLLER_SLOT.str();
+  case TYPE::TokenCount:
+    return TOKEN_COUNT.str();
   }
 }
 
@@ -66,6 +71,10 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
     break;
   case TYPE::Constrained:
     assert(false && "todo");
+    break;
+  case TYPE::TokenCount:
+    prop = TokenCountNamer::fromInnerJSON(inner, path);
+    assert(prop && "inner token count failed");
     break;
   case TYPE::MemoryControllerSlot:
     prop = MemoryControllerSlotNamer::fromInnerJSON(inner, path);
@@ -134,6 +143,16 @@ PipelineSlotNamer::fromInnerJSON(const llvm::json::Value &value,
       !mapper.map(SLOT_INDEX_LIT, index))
     return nullptr;
   prop->slotIndex = index;
+  return prop;
+}
+
+std::unique_ptr<TokenCountNamer>
+TokenCountNamer::fromInnerJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  auto prop = std::make_unique<TokenCountNamer>();
+  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName))
+    return nullptr;
   return prop;
 }
 

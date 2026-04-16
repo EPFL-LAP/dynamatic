@@ -738,25 +738,12 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
       // Even if the copiedSents is empty, this invariant is interesting! It
       // means that both slots cannot be occupied at the same time, as there is
       // only (at most) one token in the IOG
-      auto slots1 = slot1->getInternalSlotStateNamers();
-      auto slots2 = slot2->getInternalSlotStateNamers();
-      /*
-      if (slots1.size() != 1) {
-        assert(false && "todo");
-        return failure();
-      }
-      if (slots2.size() != 1) {
-        assert(false && "todo");
-        return failure();
-      }
-      */
-      std::unique_ptr<InternalStateNamer> slotStart =
-          std::make_unique<BufferSlotFullNamer>(slots1[0]);
-      std::unique_ptr<InternalStateNamer> slotEnd =
-          std::make_unique<BufferSlotFullNamer>(slots2[0]);
+
+      auto slot1Namer = slot1->getTokenCountNamer();
+      auto slot2Namer = slot2->getTokenCountNamer();
       auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::OPT,
-                                    std::move(slotStart), std::move(slotEnd),
-                                    copiedSents);
+                                    std::move(slot1Namer),
+                                    std::move(slot2Namer), copiedSents);
       uid++;
       propertyTable.push_back(p.toJSON());
     }
