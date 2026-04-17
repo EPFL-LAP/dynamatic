@@ -55,6 +55,7 @@ show_property -o $F_NUXMV_PROP;
 time;
 quit"
 else
+  ANNOTATE_FLAGS="annotate-invariants"
   NUXMV_SCRIPT="set verbose_level 0;
 set pp_list cpp;
 set counter_examples 0;
