@@ -295,8 +295,8 @@ public:
 
   IOGConsecutiveTokens() = default;
   IOGConsecutiveTokens(unsigned long id, TAG tag,
-                       std::unique_ptr<InternalStateNamer> slot1,
-                       std::unique_ptr<InternalStateNamer> slot2,
+                       std::shared_ptr<InternalStateNamer> slot1,
+                       std::shared_ptr<InternalStateNamer> slot2,
                        std::vector<EagerForkSentNamer> sents);
   ~IOGConsecutiveTokens() = default;
 
@@ -304,8 +304,8 @@ public:
     return fp->getType() == TYPE::IOGConsecutiveTokens;
   }
 
-  std::unique_ptr<InternalStateNamer> slot1;
-  std::unique_ptr<InternalStateNamer> slot2;
+  std::shared_ptr<InternalStateNamer> slot1;
+  std::shared_ptr<InternalStateNamer> slot2;
   std::vector<EagerForkSentNamer> sents;
 
 private:

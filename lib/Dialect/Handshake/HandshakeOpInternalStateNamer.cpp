@@ -1,4 +1,5 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -16,6 +17,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::MemoryControllerSlot;
   if (s == TOKEN_COUNT)
     return TYPE::TokenCount;
+  if (s == PIPELINE_TOKEN_COUNT)
+    return TYPE::PipelineTokenCount;
   llvm::errs() << "unknown type\n";
   return std::nullopt;
 }
@@ -34,6 +37,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return MEMORY_CONTROLLER_SLOT.str();
   case TYPE::TokenCount:
     return TOKEN_COUNT.str();
+  case TYPE::PipelineTokenCount:
+    return PIPELINE_TOKEN_COUNT.str();
   }
 }
 
@@ -75,6 +80,10 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
   case TYPE::TokenCount:
     prop = TokenCountNamer::fromInnerJSON(inner, path);
     assert(prop && "inner token count failed");
+    break;
+  case TYPE::PipelineTokenCount:
+    prop = PipelineTokenCountNamer::fromInnerJSON(inner, path);
+    assert(prop && "pipeline token count failed");
     break;
   case TYPE::MemoryControllerSlot:
     prop = MemoryControllerSlotNamer::fromInnerJSON(inner, path);
@@ -146,6 +155,16 @@ PipelineSlotNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
+std::unique_ptr<PipelineTokenCountNamer>
+PipelineTokenCountNamer::fromInnerJSON(const llvm::json::Value &value,
+                                       llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  auto prop = std::make_unique<PipelineTokenCountNamer>();
+  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName))
+    return nullptr;
+  return prop;
+}
+
 std::unique_ptr<TokenCountNamer>
 TokenCountNamer::fromInnerJSON(const llvm::json::Value &value,
                                llvm::json::Path path) {
@@ -186,6 +205,41 @@ MemoryControllerSlotNamer::fromInnerJSON(const llvm::json::Value &value,
     return nullptr;
   prop->portType = (PortType)t;
   return prop;
+}
+
+std::vector<std::unique_ptr<InternalStateNamer>>
+getAllSlotsOfOperation(Operation *op) {
+  std::vector<std::unique_ptr<InternalStateNamer>> ret;
+  if (auto latencyOp = dyn_cast<LatencyInterface>(op)) {
+    auto slots = latencyOp.getPipelineSlots();
+    for (auto &slot : slots) {
+      ret.push_back(std::make_unique<PipelineSlotNamer>(slot));
+    }
+  }
+  if (auto bufferOp = dyn_cast<BufferLikeOpInterface>(op)) {
+    auto slots = bufferOp.getInternalSlotStateNamers();
+    for (auto &slot : slots) {
+      ret.push_back(std::make_unique<BufferSlotFullNamer>(slot));
+    }
+  }
+  return ret;
+}
+
+std::optional<std::unique_ptr<InternalStateNamer>>
+getTokenCountNamerOfOperation(Operation *op) {
+  if (isa<LatencyInterface>(op) && isa<BufferLikeOpInterface>(op)) {
+    assert(false &&
+           "cannot handle token count of operations with latency and slots");
+    return std::nullopt;
+  }
+
+  if (auto latencyOp = dyn_cast<LatencyInterface>(op)) {
+    return std::make_unique<PipelineTokenCountNamer>(getUniqueName(op).str());
+  }
+  if (auto bufferOp = dyn_cast<BufferLikeOpInterface>(op)) {
+    return std::make_unique<TokenCountNamer>(getUniqueName(op).str());
+  }
+  return std::nullopt;
 }
 
 } // namespace handshake

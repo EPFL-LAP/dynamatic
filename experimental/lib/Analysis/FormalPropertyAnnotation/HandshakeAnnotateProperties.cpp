@@ -292,7 +292,8 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
     Operation *cur = stack.back();
     stack.pop_back();
     if (!first) {
-      if (auto slot = dyn_cast<BufferLikeOpInterface>(cur)) {
+      auto slots = getAllSlotsOfOperation(cur);
+      if (!slots.empty()) {
         return sents;
       }
     }
@@ -321,24 +322,29 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
-  std::vector<BufferLikeOpInterface> slots;
+  std::vector<std::pair<Operation *, std::shared_ptr<InternalStateNamer>>>
+      slotOps;
   for (auto &op : iog.units) {
-    if (auto slot = dyn_cast<BufferLikeOpInterface>(op)) {
-      slots.push_back(slot);
+    auto slotCountNamer = getTokenCountNamerOfOperation(op);
+    if (slotCountNamer.has_value()) {
+      assert(*slotCountNamer);
+      slotOps.push_back({op, std::move(*slotCountNamer)});
     }
   }
-  for (auto slot1 = slots.begin(); slot1 != slots.end(); ++slot1) {
-    for (auto slot2 = slot1 + 1; slot2 != slots.end(); ++slot2) {
-      if (slot1->getOperation() == slot2->getOperation()) {
+  for (auto slot1 = slotOps.begin(); slot1 != slotOps.end(); ++slot1) {
+    for (auto slot2 = slot1 + 1; slot2 != slotOps.end(); ++slot2) {
+      if (slot1 == slot2) {
+        // TODO: Handle loops, i.e. if the slot contains >=2 tokens, there
+        // should be a copied fork within a loop
         continue;
       }
 
-      IOGPathSet pathSet12(iog, *slot1, *slot2);
+      IOGPathSet pathSet12(iog, slot1->first, slot2->first);
 
       std::vector<EagerForkSentNamer> copiedSents =
           findCopiedSents(iog, pathSet12);
 
-      IOGPathSet pathSet21(iog, *slot2, *slot1);
+      IOGPathSet pathSet21(iog, slot2->first, slot1->first);
       std::vector<EagerForkSentNamer> extra = findCopiedSents(iog, pathSet21);
       copiedSents.insert(copiedSents.end(), extra.begin(), extra.end());
 
@@ -347,11 +353,8 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
       // means that both slots cannot be occupied at the same time, as there is
       // only (at most) one token in the IOG
 
-      auto slot1Namer = slot1->getTokenCountNamer();
-      auto slot2Namer = slot2->getTokenCountNamer();
-      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::OPT,
-                                    std::move(slot1Namer),
-                                    std::move(slot2Namer), copiedSents);
+      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::INVAR,
+                                    slot1->second, slot2->second, copiedSents);
       uid++;
       propertyTable.push_back(p.toJSON());
     }
@@ -362,12 +365,10 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-#if 0
   if (failed(annotateAbsenceOfBackpressure(modOp)))
     return signalPassFailure();
   if (failed(annotateValidEquivalence(modOp)))
     return signalPassFailure();
-#endif
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return signalPassFailure();

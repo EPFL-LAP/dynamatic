@@ -11,11 +11,18 @@ namespace handshake {
 struct InternalStateNamer;
 struct EagerForkSentNamer;
 struct BufferSlotFullNamer;
+struct TokenCountNamer;
 struct PipelineSlotNamer;
+struct PipelineTokenCountNamer;
 struct ConstrainedNamer;
 struct ConstrainedEagerForkSentNamer;
 struct ConstrainedBufferSlotFullNamer;
 struct MemoryControllerSlotNamer;
+
+std::vector<std::unique_ptr<InternalStateNamer>>
+getAllSlotsOfOperation(Operation *op);
+std::optional<std::unique_ptr<InternalStateNamer>>
+getTokenCountNamerOfOperation(Operation *op);
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
@@ -29,10 +36,11 @@ struct InternalStateNamer {
   enum class TYPE {
     EagerForkSent,
     BufferSlotFull,
+    TokenCount,
     PipelineSlot,
+    PipelineTokenCount,
     Constrained,
     MemoryControllerSlot,
-    TokenCount,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -76,6 +84,8 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral MEMORY_CONTROLLER_SLOT =
       "MemoryControllerSlot";
   static constexpr llvm::StringLiteral TOKEN_COUNT = "TokenCount";
+  static constexpr llvm::StringLiteral PIPELINE_TOKEN_COUNT =
+      "PipelineTokenCount";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -287,6 +297,33 @@ struct PipelineSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "pipeline_index";
 };
 
+struct PipelineTokenCountNamer : InternalStateNamer {
+  PipelineTokenCountNamer() = default;
+  PipelineTokenCountNamer(const std::string &opName)
+      : InternalStateNamer(TYPE::PipelineTokenCount), opName(opName) {}
+  ~PipelineTokenCountNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::PipelineTokenCount;
+  }
+
+  inline std::string getSMVName() const override {
+    return llvm::formatv(
+        "{0}.inner_handshake_manager.inner_delay_buffer.pipeline_token_count",
+        opName);
+  }
+
+  inline llvm::json::Value toInnerJSON() const override {
+    return llvm::json::Object({{OPERATION_LIT, opName}});
+  }
+
+  std::unique_ptr<PipelineTokenCountNamer> static fromInnerJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
+  std::string opName;
+
+  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
+};
+
 struct TokenCountNamer : InternalStateNamer {
   TokenCountNamer() = default;
   TokenCountNamer(const std::string &opName)
@@ -360,6 +397,7 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral PORT_TYPE_LIT = "port_type";
   static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
 };
+
 } // namespace handshake
 } // namespace dynamatic
 
