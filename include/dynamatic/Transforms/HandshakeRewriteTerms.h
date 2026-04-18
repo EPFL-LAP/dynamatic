@@ -1,4 +1,5 @@
-//===- Passes.h - Transformation passes registration ------------*- C++ -*-===//
+//===- HandshakeRewriteTerms.h - Rewrite Terms in Handshake Operation Sequences
+//-----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,29 +7,27 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains declarations to register transformation passes.
+// This file declares the --handshake-rewrite-terms pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_PASSES_H
-#define DYNAMATIC_TRANSFORMS_PASSES_H
+#ifndef DYNAMATIC_TRANSFORMS_HANDSHAKEREWRITETERMS_H
+#define DYNAMATIC_TRANSFORMS_HANDSHAKEREWRITETERMS_H
 
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
-#include "dynamatic/Transforms/HandshakeRewriteTerms.h"
-
 namespace dynamatic {
 
-/// Generate the code for registering passes.
-#define GEN_PASS_DECL
-#define GEN_PASS_REGISTRATION
+#define GEN_PASS_DECL_HANDSHAKEREWRITETERMS
+#define GEN_PASS_DEF_HANDSHAKEREWRITETERMS
 #include "dynamatic/Transforms/Passes.h.inc"
+
+std::unique_ptr<dynamatic::DynamaticPass> rewriteHandshakeTerms();
 
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_PASSES_H
+#endif // DYNAMATIC_TRANSFORMS_HANDSHAKEREWRITETERMS_H

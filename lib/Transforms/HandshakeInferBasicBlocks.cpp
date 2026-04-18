@@ -21,6 +21,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/Casting.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -81,7 +82,9 @@ static LogicalResult inferLogicBB(Operation *op, unsigned &logicBB) {
     Operation *defOp = opr.getDefiningOp();
     std::optional<unsigned> oprBB = defOp ? getLogicBB(defOp) : ENTRY_BB;
     if (failed(mergeInferredBB(oprBB))) {
-      return failure();
+      // return failure();
+      //  Aya: commented the above and added instead break;
+      break;
     }
   }
 
@@ -89,6 +92,16 @@ static LogicalResult inferLogicBB(Operation *op, unsigned &logicBB) {
     logicBB = *infBB;
     return success();
   }
+
+  // Aya: Added an additional way for inferring a basic block which is important
+  // for components added by the Term Rewrite Pass
+  if (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(op)) {
+    handshake::ConditionalBranchOp br =
+        cast<handshake::ConditionalBranchOp>(op);
+    logicBB = *getLogicBB(br.getConditionOperand().getDefiningOp());
+    return success();
+  }
+
   return failure();
 }
 
