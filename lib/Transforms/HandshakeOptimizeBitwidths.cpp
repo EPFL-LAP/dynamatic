@@ -1516,6 +1516,26 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     unsigned optWidth = std::max(minLhs.getType().getDataBitWidth(),
                                  minRhs.getType().getDataBitWidth());
     unsigned actualWidth = cmpOp.getLhs().getType().getDataBitWidth();
+
+    // An extra bit is required to account for bits added by sign-extension.
+    // This is regardless of whether the comparison is signed or not, but for
+    // different reasons:
+    // * In a signed-comparison we mustn't accidentally treat the top-bit of the
+    //   zero-extended operand as the sign-bit and therefore mustn't erase the
+    //   zero-extension through truncation.
+    //   Example: cmpi sge zext(101), sext(10) must be done using 4, not 3 bits.
+    // * In an unsigned-comparison, we must preserve the fact that
+    //   sign-extension of a negative number will insert a 1-bit upfront which
+    //   changes the result.
+    //   Example: cmpi uge zext(110), sext(10) must be done using 4, not 3 bits.
+    if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
+         minLhs.getType().getDataBitWidth() >=
+             minRhs.getType().getDataBitWidth()) ||
+        (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
+         minRhs.getType().getDataBitWidth() >=
+             minLhs.getType().getDataBitWidth()))
+      optWidth += 1;
+
     if (optWidth >= actualWidth)
       return failure();
 
