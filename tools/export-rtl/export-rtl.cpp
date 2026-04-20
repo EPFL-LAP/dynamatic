@@ -1422,13 +1422,13 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
     if (verifyInvariants) {
       if (tag == FormalProperty::TAG::INVAR) {
-        os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
+        os << "INVARSPEC NAME invariant" << id << " := " << property << ";\n";
       }
     } else {
       if (tag == FormalProperty::TAG::OPT)
         os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
       else if (tag == FormalProperty::TAG::INVAR) {
-        os << "-- " << id << "\n";
+        os << "-- invariant" << id << "\n";
         os << "INVAR " << property << ";\n";
       }
     }
