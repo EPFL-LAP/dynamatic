@@ -14,7 +14,12 @@ KERNEL_NAME=$4
 VIVADO_PATH=$5
 VIVADO_FPU=$6
 SIMULATOR_NAME=$7
-HDL_TYPE=$8
+CLOCK_PERIOD=$8
+
+if [ -z "$CLOCK_PERIOD" ]; then
+  CLOCK_PERIOD="4.0"
+fi
+HDL_TYPE=$9
 
 # Generated directories/files
 SIM_DIR="$(realpath "$OUTPUT_DIR/sim")"
@@ -98,6 +103,7 @@ if [ "$VIVADO_FPU" = "true" ]; then
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   --simulator="$SIMULATOR_NAME" \
+  --clock-period="$CLOCK_PERIOD" \
   --hdl="$HDL_TYPE" \
   --vivado-fpu \
   > "../report.txt" 2>&1
@@ -107,6 +113,7 @@ else
   --kernel-name="$KERNEL_NAME" \
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   --simulator="$SIMULATOR_NAME" \
+  --clock-period="$CLOCK_PERIOD" \
   --hdl="$HDL_TYPE" \
   > "../report.txt" 2>&1
 fi

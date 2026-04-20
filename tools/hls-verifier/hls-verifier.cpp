@@ -146,6 +146,9 @@ int main(int argc, char **argv) {
       cl::desc("Simulator of choice (options: xsim, ghdl, vsim, verilator)"),
       cl::value_desc("Simulator of choice"), cl::init("vsim"));
 
+  cl::opt<double> clockPeriod("clock-period", cl::desc("Clock period in ns"),
+                              cl::value_desc("clock period"), cl::init(4.0));
+
   cl::opt<std::string> hdlType("hdl",
                                cl::desc("HDL used for simulation. Can either "
                                         "be 'vhdl' (default) or 'verilog'"),
@@ -189,7 +192,8 @@ int main(int argc, char **argv) {
 
   HdlType hdl = (hdlType == "verilog") ? VERILOG : VHDL;
 
-  VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU, hdl);
+  VerificationContext ctx(simPathName, hlsKernelName, &funcOp, vivadoFPU,
+                          clockPeriod, hdl);
 
   // Generate hls_verify_<hlsKernelName>.vhd
   vhdlTbCodegen(ctx);
