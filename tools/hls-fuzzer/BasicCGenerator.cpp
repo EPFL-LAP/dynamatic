@@ -318,9 +318,9 @@ gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context,
     llvm::copy(llvm::make_first_range(arrayParameters), copy.begin());
     random.shuffle(copy);
 
-    for (const ast::ArrayParameter &iter : copy)
-      if (typeSystem.checkArrayParameterOpaque(iter, context))
-        return iter;
+    for (const ast::ArrayParameter &candidateParam : copy)
+      if (typeSystem.checkArrayParameterOpaque(candidateParam, context))
+        return candidateParam;
   }
 
   std::optional<ast::ScalarType> elementType = generateScalarType(context);
@@ -397,6 +397,8 @@ std::optional<ast::ScalarType> gen::BasicCGenerator::generateScalarType(
 
 ast::ReturnType
 gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
+  // Candidates for return types are all primitive types as well as 'void'.
+  // (i.e., one more than the number of primitive types).
   std::array<ast::ReturnType, ast::PrimitiveType::ALL_PRIMITIVES.size() + 1>
       candidates;
   llvm::copy(ast::PrimitiveType::ALL_PRIMITIVES, candidates.begin());
@@ -448,8 +450,9 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
   if (!parameter)
     return std::nullopt;
 
-  ast::Expression castAsNeeded = safeCastAsNeeded(ast::PrimitiveType::UInt32,
-                                                  generateExpression(index, 0));
+  ast::Expression castAsNeeded = safeCastAsNeeded(
+      /*to=*/ast::PrimitiveType::UInt32,
+      generateExpression(/*context=*/index, /*depth=*/0));
   castAsNeeded = ast::BinaryExpression{
       std::move(castAsNeeded), ast::BinaryExpression::BitAnd,
       ast::Constant{static_cast<std::uint32_t>(parameter->getDimension() - 1)}};

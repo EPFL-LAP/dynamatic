@@ -83,7 +83,7 @@ private:
   ast::ReturnStatement
   generateReturnStatement(const OpaqueContext &constraints);
 
-  ast::Expression generateExpression(const OpaqueContext &constraint,
+  ast::Expression generateExpression(const OpaqueContext &context,
                                      std::size_t depth);
 
   std::optional<ast::Expression>

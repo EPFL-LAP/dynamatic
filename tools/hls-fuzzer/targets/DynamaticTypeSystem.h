@@ -63,10 +63,11 @@ public:
   checkArrayAssignmentStatement(DynamaticTypingContext context) {
     return ConclusionOf<ast::ArrayAssignmentStatement>{
         // Forward the context to the array parameter as is.
-        context,
+        /*parameter=*/context,
         // Indexing expression must be an integer.
+        /*index=*/
         DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
-        context,
+        /*value=*/context,
     };
   }
 
