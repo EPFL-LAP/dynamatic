@@ -1629,12 +1629,12 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     //   sign-extension of a negative number will insert a 1-bit upfront which
     //   changes the result.
     //   Example: cmpi uge zext(110), sext(10) must be done using 4, not 3 bits.
-    if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
-         minLhs.getType().getDataBitWidth() >=
-             minRhs.getType().getDataBitWidth()) ||
-        (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
-         minRhs.getType().getDataBitWidth() >=
-             minLhs.getType().getDataBitWidth()))
+    if ((lhsExtValue.getExtType() == ExtType::ZEXT &&
+         rhsExtValue.getExtType() == ExtType::SEXT &&
+         lhsExtValue.getDataBitWidth() >= rhsExtValue.getDataBitWidth()) ||
+        (rhsExtValue.getExtType() == ExtType::ZEXT &&
+         lhsExtValue.getExtType() == ExtType::SEXT &&
+         rhsExtValue.getDataBitWidth() >= lhsExtValue.getDataBitWidth()))
       optWidth += 1;
 
     if (optWidth >= actualWidth)
