@@ -990,6 +990,7 @@ public:
 
     // Step 0: Check each handshake operation is marked with the path of the
     // blif file
+    bool hasBlifImpl = false;
     funcOp->walk([&](Operation *op) {
       if (isa<handshake::FuncOp>(op))
         return;
@@ -999,7 +1000,7 @@ public:
                      << " does not implement the BLIFImplInterface\n";
         llvm::errs()
             << "Make sure to run the pass that marks handshake operations "
-               "with BLIF file paths (--mark-handshake-blif-impl) before "
+               "with BLIF file paths (--handshake-mark-blif-impl) before "
                "this pass\n";
         return signalPassFailure();
       }
@@ -1008,8 +1009,20 @@ public:
         // Write out warning
         llvm::errs() << "Warning: Handshake operation " << getUniqueName(op)
                      << " has an empty BLIF file path\n";
+      } else {
+        hasBlifImpl = true;
       }
     });
+
+    if (!hasBlifImpl) {
+      llvm::errs()
+          << "No handshake operations with BLIF implementations found.\n";
+      llvm::errs()
+          << "Make sure to run the pass that marks handshake operations "
+             "with BLIF file paths (--handshake-mark-blif-impl) before "
+             "this pass\n";
+      return signalPassFailure();
+    }
 
     // Step 1: unbundle all handshake types in the handshake operations
     HandshakeUnbundler unbundler(modOp);
