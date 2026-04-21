@@ -380,6 +380,15 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
 
 void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
                                      SmallVector<CFGPath> &paths) {
+
+  if (this->successors.empty()) {
+    assert(
+        from == 0 && to == 0 &&
+        "If the CFG has no edges, then we must have a single BB with ID == 0");
+    paths = {{0}};
+    return;
+  }
+
   // Both blocks must exist in the CFG
   assert(successors.contains(from) && "source block must exist in the CFG");
   assert(successors.contains(to) && "destination block must exist in the CFG");
@@ -691,7 +700,6 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
 }
 
 bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
-  assert(path.size() >= 2 && "path must have at least two blocks");
   return isGIIDRec(predecessor, oprd, path) == GIIDStatus::SUCCEED;
 }
 

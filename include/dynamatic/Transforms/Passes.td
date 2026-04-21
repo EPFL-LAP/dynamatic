@@ -119,6 +119,11 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
+
+  let statistics = [
+    Statistic<"loadsRerouted", "Loads rerouted", "Number of load operations that have been rerouted">,
+    Statistic<"storesRerouted", "Stores rerouted", "Number of store operations that have been rerouted">,
+  ];
 }
 
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {

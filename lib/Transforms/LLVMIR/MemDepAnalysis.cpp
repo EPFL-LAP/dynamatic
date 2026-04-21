@@ -35,6 +35,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/CFG.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -84,8 +85,9 @@ public:
   ///
   /// NOTE: here our goal is to prove the existence of such a dependency (which
   /// can help us eliminating WAR dependency).
-  bool hasGlobalInOrderInstrDependency(Instruction *dstInst,
-                                       Instruction *srcInst);
+  bool hasTokenDependence(Instruction *dstInst, Instruction *srcInst);
+
+  bool hasRevTokenDependence(Instruction *srcInst, Instruction *dstInst);
 
 private:
   const LoopInfo &loopInfo;
@@ -127,8 +129,8 @@ bool instructionAlwaysDepends(const CFGPath &currentPath, Instruction *srcInst,
     // Else, its operands are active dependences too
     if (auto *phiNode = dyn_cast<PHINode>(inst)) {
       // For Phi nodes, the active dependent values may be different in the
-      // different predecessors BB, so we store them in this map for now. We add
-      // it to the Path.Val set before recursive calls
+      // different predecessors BB, so we store them in this map for now. We
+      // add it to the Path.Val set before recursive calls
       for (auto &predBB : phiNode->blocks()) {
         auto *value = phiNode->getIncomingValueForBlock(predBB);
         if (!(isa<Argument>(value) || isa<Constant>(value)))
@@ -191,24 +193,113 @@ bool instructionAlwaysDepends(const CFGPath &currentPath, Instruction *srcInst,
   return depends;
 }
 
-bool InstructionDependenceInfo::hasGlobalInOrderInstrDependency(
-    Instruction *dstInst, Instruction *srcInst) {
+static bool instructionAlwaysRevDepends(CFGPath path, Instruction *dstInst,
+                                        std::set<Loop *> &ls) {
+  int len = path.blocks.size();
+  BasicBlock *curBb = path.blocks.back();
+  BasicBlock *predBb = (len > 1) ? path.blocks[len - 2] : nullptr;
+  auto activeVals = path.vals[curBb];
 
+  /// Determine active values of the current basic block
+  /// For each instruction in the current basic block, its operands are
+  /// checked to see whether they are present in the current set of active
+  /// dependences.
+  /// If so, the instruction which has the operand is itself reverse
+  /// dependent.
+  for (auto &inst : *curBb) {
+    if (isa<BranchInst>(&inst) || isa<DbgInfoIntrinsic>(&inst))
+      continue;
+
+    std::vector<Value *> operands;
+    if (const auto *pi = dyn_cast<PHINode>(&inst)) {
+      /* For a PHI node, the only relevant operand is decided by the
+       * prev BB */
+      if (predBb != nullptr)
+        operands.push_back(pi->getIncomingValueForBlock(predBb));
+    } else {
+      for (auto *op : inst.operand_values())
+        operands.push_back(op);
+    }
+    /* If any of the operands has revdep on LI, this value does too */
+    for (auto *op : operands)
+      if (activeVals.find(op) != activeVals.end())
+        activeVals.insert(&inst);
+  }
+
+  bool depends = true;
+  if (dstInst->getParent() == curBb) {
+    depends = activeVals.find(dstInst) != activeVals.end();
+  } else if (inLoopLatches(curBb, ls)) {
+    /* This depends on having a canonical loop structure. Loops will
+     * have a single latch with a single successor: the loop header.
+     * Continuing across an edge from a latch to header for any loop in
+     * LS is not allowed. */
+  } else {
+    const unsigned numSucc = curBb->getTerminator()->getNumSuccessors();
+    depends = (numSucc > 0);
+
+    for (auto *succBB : successors(curBb)) {
+      if (!depends)
+        break;
+
+      /* Skip successor BB if no active values have been added in this
+       * call to TokenRevDepends */
+      if (std::find(path.blocks.begin(), path.blocks.end(), succBB) !=
+          path.blocks.end()) {
+        if (path.vals[succBB] == activeVals)
+          continue;
+      }
+
+      /* If next BB has not been sufficiently explored, explore again */
+      CFGPath succBBPath = path;
+      succBBPath.blocks.push_back(succBB);
+      succBBPath.vals[succBB] = activeVals;
+
+      depends &= instructionAlwaysRevDepends(succBBPath, dstInst, ls);
+    }
+  }
+  return depends;
+}
+
+bool InstructionDependenceInfo::hasTokenDependence(Instruction *dstInst,
+                                                   Instruction *srcInst) {
   CFGPath cfgPath;
   auto *bb = dstInst->getParent();
   cfgPath.blocks.push_back(bb);
   cfgPath.vals[bb] = {dstInst};
+  auto loopSet = std::set<Loop *>();
+  for (Loop *loop = loopInfo.getLoopFor(dstInst->getParent()); loop != nullptr;
+       loop = loop->getParentLoop())
+    loopSet.insert(loop);
+  return instructionAlwaysDepends(cfgPath, srcInst, loopSet);
+}
+
+bool InstructionDependenceInfo::hasRevTokenDependence(Instruction *srcInst,
+                                                      Instruction *dstInst) {
+  CFGPath p;
+  auto *bb = srcInst->getParent();
+  p.blocks.push_back(bb);
+  p.vals[bb] = {srcInst};
 
   auto loopSet = std::set<Loop *>();
   for (Loop *loop = loopInfo.getLoopFor(dstInst->getParent()); loop != nullptr;
        loop = loop->getParentLoop())
     loopSet.insert(loop);
 
-  return instructionAlwaysDepends(cfgPath, srcInst, loopSet);
+  return instructionAlwaysRevDepends(p, dstInst, loopSet);
 }
 
 std::optional<int64_t> getDistance(Dependence *d) {
   unsigned innerMostLoopLevel = d->getLevels();
+
+  if (innerMostLoopLevel == 0) {
+    LLVM_DEBUG({
+      llvm::errs() << "The two memory accesses are not surrounded by any "
+                      "common loops, returning a null distance.\n";
+    });
+    return std::nullopt;
+  }
+
   const auto *dist = d->getDistance(innerMostLoopLevel);
 
   LLVM_DEBUG(llvm::errs() << "Distance cannot be calculated at all!");
@@ -503,17 +594,9 @@ public:
         // dependency of store on secondInst is **always** enforced by data
         // dependency).
         //
-        // @Jiahui17: IMPORTANT NOTE: The original code also calls
-        // "hasReverseDependency" (which tries to find storeInst starting from
-        // secondInst instead). I think this is redundant to have both.
-        //
-        // Original code (I renamed hasTokenDependence to
-        // hasGlobalInOrderInstrDependency):
-        // https://github.com/lana555/dynamatic/blob/46f17ddcba58ffa77d33b988ab927f25abd6ab38/elastic-circuits/MemElemInfo/TokenDependenceInfo.cpp#L184-L211
-        //
         bool hasDependency =
-            instrDependenceInfo.hasGlobalInOrderInstrDependency(storeInst,
-                                                                secondInst);
+            instrDependenceInfo.hasTokenDependence(storeInst, secondInst) ||
+            instrDependenceInfo.hasRevTokenDependence(storeInst, secondInst);
 
         auto *loadInst = dyn_cast_or_null<LoadInst>(secondInst);
         if (loadInst != nullptr && hasDependency) {
@@ -572,8 +655,11 @@ struct IndexAnalysis {
   }
 
   std::vector<Instruction *> otherInsts;
-  std::set<InstPairType> instRAWlist;
-  std::set<InstPairType> instWAWlist;
+
+  // NOTE: in the legacy implementation they were called "instRAWlist". But this
+  // was actually imprecise, as this contains also RAW dependencies.
+  std::set<InstPairType> dependentReadAndWritePairs;
+  std::set<InstPairType> dependentWriteAndWritePairs;
   std::set<BasicBlock *> bbList;
   std::map<BasicBlock *, int> bbToScopMap;
   std::map<Instruction *, Value *> instToBase;
@@ -662,6 +748,7 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
         return false;
       if (instToScopId.count(b) == 0)
         return false;
+
       return (instToScopId.at(a) == instToScopId.at(b));
     }
   };
@@ -766,9 +853,9 @@ void MemDepAnalysisPass::processScop(Scop &scop,
     // instPair is a store instruction. Thus, checking the type of the second
     // instruction tells us whther it is a RAW/WAW dependency
     if (pair.second->mayWriteToMemory())
-      indexAnalysis.instWAWlist.insert(pair);
+      indexAnalysis.dependentWriteAndWritePairs.insert(pair);
     else
-      indexAnalysis.instRAWlist.insert(pair);
+      indexAnalysis.dependentReadAndWritePairs.insert(pair);
   }
 
   scopMeta.push_back(meta);
@@ -804,8 +891,19 @@ MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
 
       // Instructions are in the same scop: use the result from IndexAnalysis
       if (sameScopHelper.sameScop(loadInst, storeInst)) {
-        if (indexAnalysis.instRAWlist.count(rawPair) > 0)
+        if (indexAnalysis.dependentReadAndWritePairs.count(rawPair))
           depPairList.push_back(rawPair);
+
+        LLVM_DEBUG({
+          if (!indexAnalysis.dependentReadAndWritePairs.count(rawPair)) {
+            llvm::dbgs() << "--------------------------------------------\n";
+            llvm::dbgs() << "The following memory access instruction pair "
+                            "proven to be independent according to polyhedral "
+                            "analysis:\n";
+            loadInst->dump();
+            storeInst->dump();
+          }
+        });
         continue;
       }
 
@@ -815,7 +913,16 @@ MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
 
       // If they always or sometimes alias:
       if (aliasResult != AliasResult::NoAlias) {
-        depPairList.push_back(rawPair);
+        // If the pair of load/store potentially access the same memory
+        // location, then we consider two cases:
+        //   1. If it is possible to reach from the load inst to the store, then
+        //   we add the WAR dependency
+        //   2. If it is possible to reach from the store inst to the load, then
+        //   we add the RAW dep
+        if (isPotentiallyReachable(storeInst, loadInst))
+          depPairList.emplace_back(storeInst, loadInst);
+        if (isPotentiallyReachable(loadInst, storeInst))
+          depPairList.emplace_back(loadInst, storeInst);
       }
     }
     // Find WAW dependencies
@@ -834,9 +941,9 @@ MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
 
       // Instructions are in the same scop: use the result from IndexAnalysis
       if (sameScopHelper.sameScop(storeInst, secondStoreInst)) {
-        if (indexAnalysis.instWAWlist.count(pair) > 0)
+        if (indexAnalysis.dependentWriteAndWritePairs.count(pair) > 0)
           depPairList.push_back(pair);
-        else if (indexAnalysis.instWAWlist.count(pairRev) > 0)
+        else if (indexAnalysis.dependentWriteAndWritePairs.count(pairRev) > 0)
           depPairList.push_back(pairRev);
         continue;
       }
