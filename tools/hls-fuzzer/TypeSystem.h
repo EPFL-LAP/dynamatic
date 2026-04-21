@@ -224,7 +224,8 @@ public:
         })
         .Case([&](const ast::ScalarType *scalar)
                   -> std::optional<ConclusionOf<ast::ReturnType>> {
-          if (!self().checkScalarType(*scalar, context))
+          if (std::optional optional = self().checkScalarType(*scalar, context);
+              !optional)
             return std::nullopt;
 
           return ConclusionOf<ast::ReturnType>{};
