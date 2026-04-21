@@ -265,13 +265,23 @@
       {
         "name": "DV_LATENCY",
         "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS dv_latency=$DV_LATENCY bitwidth=$BITWIDTH buffer_type='\"$BUFFER_TYPE\"' extra_signals=$EXTRA_SIGNALS"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      {
+        "name": "NUM_SLOTS",
+        "type": "unsigned"
       },
       {
         "name": "BUFFER_TYPE",
         "type": "string"
       }
     ],
-    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS dv_latency=$DV_LATENCY bitwidth=$BITWIDTH buffer_type='\"$BUFFER_TYPE\"' extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH buffer_type='\"$BUFFER_TYPE\"' extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.fork",
