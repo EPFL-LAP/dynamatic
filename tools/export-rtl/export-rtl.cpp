@@ -268,6 +268,9 @@ struct WriteModData {
   /// Writes the module's internal signal declarations.
   void writeSignalDeclarations(SignalDeclarationWriter writeDeclaration);
 
+  /// Writes VHDL simulation assertions that fire when a channel is stalled.
+  void writeStallAssertion();
+
   using SignalAssignmentWriter = void (*)(const llvm::Twine &dst,
                                           const llvm::Twine &src,
                                           raw_indented_ostream &os);
@@ -519,6 +522,40 @@ void WriteModData::writeSignalDeclarations(
                                ? getRawType(intType)
                                : convertToInclusiveArrayBound(intType),
                            os);
+        });
+  }
+}
+
+void WriteModData::writeStallAssertion() {
+  auto isNotBlockArg = [](auto valAndName) -> bool {
+    return !isa<BlockArgument>(valAndName.first);
+  };
+
+  for (auto &valueAndName : make_filter_range(signals, isNotBlockArg)) {
+    llvm::TypeSwitch<Type, void>(valueAndName.first.getType())
+        .Case<ChannelType>([&](ChannelType) {
+          std::string name = valueAndName.second;
+          os << "process(clk)\n";
+          os << "begin\n";
+          os << llvm::formatv(
+              "assert not ({0} = '1' and {1} = '0' and rst = '0') report "
+              "\"Stall in channel {0} -> {1}\" "
+              "severity note;\n",
+              getInternalSignalName(name, SignalType::VALID),
+              getInternalSignalName(name, SignalType::READY));
+          os << "end process;\n";
+        })
+        .Case<ControlType>([&](auto) {
+          std::string name = valueAndName.second;
+          os << "process(clk)\n";
+          os << "begin\n";
+          os << llvm::formatv(
+              "assert not ({0} = '1' and {1} = '0' and rst = '0') report "
+              "\"Stall in channel {0} -> {1}\" "
+              "severity note;\n",
+              getInternalSignalName(name, SignalType::VALID),
+              getInternalSignalName(name, SignalType::READY));
+          os << "end process;\n";
         });
   }
 }
@@ -866,6 +903,8 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   os.unindent();
   os << "\nbegin\n\n";
   os.indent();
+
+  data.writeStallAssertion();
 
   // Architecture implementation
   data.writeSignalAssignments(
