@@ -297,7 +297,8 @@ INSTANTIATE_TEST_SUITE_P(
       "test_double",
       "unused_arg",
       "test_bool_array",
-      "test_divui"
+      "test_divui",
+      "test_fneg"
       ),
       [](const auto &info) { return info.param; });
 

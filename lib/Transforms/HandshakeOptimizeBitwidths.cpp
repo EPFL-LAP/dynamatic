@@ -402,7 +402,7 @@ static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
   // with 3 bits would be wrong however, since sext(OR 101, sext(01) to i3)
   // would extend with 1s, merely due to the bitwidth reduction.
   // The extra bit prevents this behavior.
-  if (lhs.extType == ExtType::ZEXT && lhs.bitWidth > rhs.bitWidth)
+  if (lhs.extType == ExtType::ZEXT && lhs.bitWidth >= rhs.bitWidth)
     return {ExtType::SEXT, 1 + lhs.bitWidth};
 
   return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth)};
@@ -1032,24 +1032,20 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     }
 
     // Determine the achievable optimized width for operands inside the cycle
-    unsigned optWidth = 0;
-    for (ChannelVal mergedVal : allMergedValues) {
-      optWidth = std::max(
-          optWidth,
-          backtrackToMinimalValue(mergedVal).first.getType().getDataBitWidth());
-    }
+    ExtWidth optWidth = computeDataForwardResult(
+        llvm::map_to_vector(allMergedValues, [](ChannelVal val) {
+          return backtrackToMinimalValue(val);
+        }));
 
-    // Get the minimal valuue of all data operands
+    // Get the minimal value of all data operands
     SmallVector<ExtValue> minDataOperands;
     for (Value oprd : dataOperands)
       minDataOperands.push_back(
           getMinimalValueWithExtType(cast<ChannelVal>(oprd)));
 
-    ExtType resultExt = computeDataForwardResult(minDataOperands, optWidth);
-
     // Check whether we managed to optimize anything
     unsigned dataWidth = channelVal.getType().getDataBitWidth();
-    if (optWidth >= dataWidth)
+    if (optWidth.bitWidth >= dataWidth)
       return failure();
 
     // Create a new operation as well as appropriate bitwidth modification
@@ -1058,15 +1054,16 @@ struct ForwardCycleOpt : public OpRewritePattern<Op> {
     SmallVector<Value> newOperands;
     SmallVector<Value> newResults;
     SmallVector<Type> newResTypes;
-    Type newDataType = rewriter.getIntegerType(optWidth);
+    Type newDataType = rewriter.getIntegerType(optWidth.bitWidth);
     Type newChannelType = channelVal.getType().withDataType(newDataType);
-    cfg.getNewOperands(optWidth, minDataOperands, rewriter, newOperands);
+    cfg.getNewOperands(optWidth.bitWidth, minDataOperands, rewriter,
+                       newOperands);
     cfg.getResultTypes(newChannelType, newResTypes);
     rewriter.setInsertionPoint(op);
     Op newOp = cfg.createOp(newResTypes, newOperands, rewriter);
     namer.replaceOp(op, newOp);
     inheritBB(op, newOp);
-    cfg.modResults(newOp, dataWidth, resultExt, rewriter, newResults);
+    cfg.modResults(newOp, dataWidth, optWidth.extType, rewriter, newResults);
 
     // Replace uses of the original operation's results with the results of the
     // optimized operation we just created
@@ -1519,6 +1516,26 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     unsigned optWidth = std::max(minLhs.getType().getDataBitWidth(),
                                  minRhs.getType().getDataBitWidth());
     unsigned actualWidth = cmpOp.getLhs().getType().getDataBitWidth();
+
+    // An extra bit is required to account for bits added by sign-extension.
+    // This is regardless of whether the comparison is signed or not, but for
+    // different reasons:
+    // * In a signed-comparison we mustn't accidentally treat the top-bit of the
+    //   zero-extended operand as the sign-bit and therefore mustn't erase the
+    //   zero-extension through truncation.
+    //   Example: cmpi sge zext(101), sext(10) must be done using 4, not 3 bits.
+    // * In an unsigned-comparison, we must preserve the fact that
+    //   sign-extension of a negative number will insert a 1-bit upfront which
+    //   changes the result.
+    //   Example: cmpi uge zext(110), sext(10) must be done using 4, not 3 bits.
+    if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
+         minLhs.getType().getDataBitWidth() >=
+             minRhs.getType().getDataBitWidth()) ||
+        (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
+         minRhs.getType().getDataBitWidth() >=
+             minLhs.getType().getDataBitWidth()))
+      optWidth += 1;
+
     if (optWidth >= actualWidth)
       return failure();
 
