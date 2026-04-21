@@ -4,23 +4,23 @@ from generators.support.signal_manager.utils.concat import get_concat_extra_sign
 
 def generate_counter_buffer(name, params):
     bitwidth = params["bitwidth"]
-    num_slots = params["num_slots"]
+    dv_latency = int(params["dv_latency"])
     extra_signals = params.get("extra_signals", None)
 
     if extra_signals:
-        return _generate_counter_buffer_signal_manager(name, num_slots, bitwidth, extra_signals)
+        return _generate_counter_buffer_signal_manager(name, dv_latency, bitwidth, extra_signals)
     if bitwidth == 0:
-        return _generate_counter_buffer_dataless(name, num_slots)
+        return _generate_counter_buffer_dataless(name, dv_latency)
     else:
-        return _generate_counter_buffer(name, num_slots, bitwidth)
+        return _generate_counter_buffer(name, dv_latency, bitwidth)
 
 
-def _counter_width(num_slots):
-    return 1 if num_slots <= 1 else (num_slots - 1).bit_length()
+def _counter_width(dv_latency):
+    return 1 if dv_latency <= 1 else (dv_latency - 1).bit_length()
 
 
-def _generate_counter_buffer_dataless(name, num_slots):
-    cnt_w = _counter_width(num_slots)
+def _generate_counter_buffer_dataless(name, dv_latency):
+    cnt_w = _counter_width(dv_latency)
 
     entity = f"""
 library ieee;
@@ -63,13 +63,13 @@ begin
       elsif occupied = '0' then
         if ins_valid = '1' then
           occupied <= '1';
-          delayCnt <= to_unsigned({num_slots - 1}, {cnt_w});
+          delayCnt <= to_unsigned({dv_latency - 1}, {cnt_w});
         end if;
       elsif delayCnt > to_unsigned(0, {cnt_w}) then
         delayCnt <= delayCnt - 1;
       elsif outs_ready = '1' then
         if ins_valid = '1' then
-          delayCnt <= to_unsigned({num_slots - 1}, {cnt_w});
+          delayCnt <= to_unsigned({dv_latency - 1}, {cnt_w});
         else
           occupied <= '0';
         end if;
@@ -82,9 +82,9 @@ end architecture;
     return entity + architecture
 
 
-def _generate_counter_buffer(name, num_slots, bitwidth):
+def _generate_counter_buffer(name, dv_latency, bitwidth):
     inner_name = f"{name}_inner"
-    dependencies = _generate_counter_buffer_dataless(inner_name, num_slots)
+    dependencies = _generate_counter_buffer_dataless(inner_name, dv_latency)
 
     entity = f"""
 library ieee;
@@ -144,7 +144,7 @@ end architecture;
     return dependencies + entity + architecture
 
 
-def _generate_counter_buffer_signal_manager(name, num_slots, bitwidth, extra_signals):
+def _generate_counter_buffer_signal_manager(name, dv_latency, bitwidth, extra_signals):
     extra_signals_bitwidth = get_concat_extra_signals_bitwidth(extra_signals)
     return generate_concat_signal_manager(
         name,
@@ -161,6 +161,6 @@ def _generate_counter_buffer_signal_manager(name, num_slots, bitwidth, extra_sig
         extra_signals,
         lambda inner_name: _generate_counter_buffer(
             inner_name,
-            num_slots,
+            dv_latency,
             bitwidth + extra_signals_bitwidth
         ))
