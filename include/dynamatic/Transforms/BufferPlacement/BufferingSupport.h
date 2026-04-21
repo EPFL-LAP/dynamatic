@@ -177,9 +177,8 @@ struct PlacementResult {
   unsigned numOneSlotDVR = 0;
   /// The number of SHIFT_REG_BREAK_DV that should be placed.
   unsigned numShiftRegDV = 0;
-  /// The number of COUNTER_BUFFER's that should be placed.
-  unsigned numCounterBuffer = 0;
-  /// The per-instance latency (NUM_SLOTS) for each COUNTER_BUFFER to place.
+  /// The per-instance latency for each COUNTER_BUFFER to place. The number of
+  /// counter buffers is counterBufferLatencies.size().
   SmallVector<unsigned, 2> counterBufferLatencies;
 };
 

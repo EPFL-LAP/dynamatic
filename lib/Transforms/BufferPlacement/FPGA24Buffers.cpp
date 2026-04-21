@@ -246,8 +246,6 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
           result.counterBufferLatencies.push_back(delay);
       }
 
-      result.numCounterBuffer = result.counterBufferLatencies.size();
-
       /// If occupancy requires more one-token buffers than those used to carry
       /// latency, add transparent slots for pure storage.
       if (numSlots > kCounter)
@@ -261,13 +259,12 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
                         handshake::ControlMergeOp>(srcOp) &&
         srcOp->getNumOperands() > 1 && isChannelOnCycle(channel)) {
       result.numOneSlotR = 1;
-      if (result.numOneSlotDV == 0 && result.numCounterBuffer == 0)
+      if (result.numOneSlotDV == 0 && result.counterBufferLatencies.empty())
         result.counterBufferLatencies.push_back(1);
-      result.numCounterBuffer = result.counterBufferLatencies.size();
     }
 
     if (result.numFifoNone > 0 || result.numOneSlotDV > 0 ||
-        result.numOneSlotR > 0 || result.numCounterBuffer > 0) {
+        result.numOneSlotR > 0 || !result.counterBufferLatencies.empty()) {
       placement[channel] = result;
     }
   }

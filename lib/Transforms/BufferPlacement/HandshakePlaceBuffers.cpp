@@ -756,15 +756,8 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement,
       placeBuffer(BufferType::ONE_SLOT_BREAK_R, 1);
     }
 
-    // Prefer explicit per-instance counter buffer delays when available.
     for (unsigned delay : placeRes.counterBufferLatencies)
       placeBuffer(BufferType::COUNTER_BUFFER, /*numSlots=*/1, delay);
-    // Backward-compatible fallback for single counter-buffer encoding.
-    if (placeRes.counterBufferLatencies.empty()) {
-      for (unsigned i = 0; i < placeRes.numCounterBuffer; ++i)
-        placeBuffer(BufferType::COUNTER_BUFFER, /*numSlots=*/1,
-                    /*dvLatency=*/1);
-    }
 
     unsigned totalChannelLatency = 0;
     for (auto bufOp : placedBuffers) {
