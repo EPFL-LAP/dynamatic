@@ -279,6 +279,7 @@ def BufferOp : Handshake_Op<"buffer", [
           resolvedDvLatency = numSlots;
           break;
         case BufferType::COUNTER_BUFFER:
+          // Legality of (bufferType, dvLatency) checked by BufferOp::verify()
           resolvedDvLatency = dvLatency.value_or(0);
           break;
       }
