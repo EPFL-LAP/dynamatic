@@ -69,9 +69,5 @@ def _generate_control_merge(name, size, index_type, data_type):
   outs := data;
   index := inner_control_merge.index;
 
-  outs_sent := inner_control_merge.outs_sent;
-  index_sent := inner_control_merge.index_sent;
-  slot_full := inner_control_merge.slot_full;
-
 {_generate_control_merge_dataless(f"{name}__control_merge_dataless", size, index_type)}
 """
