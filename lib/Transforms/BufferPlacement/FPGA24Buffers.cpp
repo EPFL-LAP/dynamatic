@@ -62,6 +62,7 @@ void LatencyBalancingMILP::setup() {
     return;
 
   addLatencyBalancingVars(reconvergentPaths, syncCyclePairs);
+  addChannelPropertyLatencyConstraints();
   addReconvergentPathConstraints(reconvergentPaths);
   addSyncCycleConstraints(syncCyclePairs, syncGraph);
   addStallPropagationConstraints(reconvergentPaths, syncCyclePairs, syncGraph);
@@ -171,6 +172,7 @@ void OccupancyBalancingLP::setup() {
 
   addMinOccupancyConstraints(requiredOccupancy, channelOccupancy);
   addBackedgeConstraints(cfdfcs, channelOccupancy);
+  addChannelPropertyOccupancyConstraints(allChannels, channelOccupancy);
 
   this->setOccupancyBalancingObjective(allChannels, channelOccupancy);
 
@@ -186,6 +188,17 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
     unsigned latencyCycles = 0;
     if (latencyResult.channelExtraLatency.count(channel)) {
       latencyCycles = latencyResult.channelExtraLatency.lookup(channel);
+    }
+
+    /// Respect minOpaque from channelProps: if the channel requires opaque
+    /// buffer(s), ensure latencyCycles is at least minOpaque so that
+    /// extractResult places opaque (DV-breaking) buffers, not transparent ones.
+    handshake::ChannelBufProps &props = channelProps[channel];
+    if (props.minOpaque > 0 && latencyCycles < props.minOpaque) {
+      latencyCycles = props.minOpaque;
+    }
+    if (props.minOpaque > 0 && numSlots < props.minOpaque) {
+      numSlots = props.minOpaque;
     }
 
     /// Ensure at least 1 slot if there's latency

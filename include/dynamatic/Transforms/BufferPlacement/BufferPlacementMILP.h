@@ -460,6 +460,18 @@ protected:
   /// [FPGA24] Sets LP1 objective prioritizing stall removal and low latency.
   void setLatencyBalancingObjective();
 
+  /// [FPGA24] Constrains unbufferizable channels (maxOpaque==0 and
+  /// maxTrans==0) to have zero extra latency and no buffer presence in the
+  /// latency-balancing LP.
+  void addChannelPropertyLatencyConstraints();
+
+  /// [FPGA24] Constrains channel occupancy based on channel buffering
+  /// properties: zero occupancy for unbufferizable channels and minimum-slot
+  /// enforcement from the IR annotations.
+  void addChannelPropertyOccupancyConstraints(
+      ArrayRef<Value> channels,
+      DenseMap<Value, CPVar> &channelOccupancy);
+
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
   void forEachIOPair(Operation *op,
