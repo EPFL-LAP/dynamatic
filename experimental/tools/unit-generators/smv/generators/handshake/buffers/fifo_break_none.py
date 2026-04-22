@@ -31,6 +31,7 @@ MODULE {name}(ins_valid, outs_ready)
     DEFINE
     outs_valid := full | ins_valid;
     ins_ready := (!full) | outs_ready;
+    slot_0_full := full;
 """
 
 
@@ -52,6 +53,8 @@ MODULE {name}(ins, ins_valid, outs_ready)
     outs := full ? reg : ins;
     outs_valid := full | ins_valid;
     ins_ready := (!full) | outs_ready;
+    slot_0_full := full;
+    data_0 := reg;
 """
 
 

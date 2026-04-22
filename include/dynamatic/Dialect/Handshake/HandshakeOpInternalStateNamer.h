@@ -194,9 +194,9 @@ struct ConstrainedEagerForkSentNamer : ConstrainedNamer {
 struct BufferSlotFullNamer : InternalStateNamer {
   BufferSlotFullNamer() = default;
   BufferSlotFullNamer(const std::string &opName, const std::string &slotName,
-                      size_t slotSize)
+                      const std::string &dataName, size_t slotSize)
       : InternalStateNamer(TYPE::BufferSlotFull), opName(opName),
-        slotName(slotName), slotSize(slotSize) {}
+        slotName(slotName), dataName(dataName), slotSize(slotSize) {}
   ~BufferSlotFullNamer() = default;
 
   static inline bool classof(const InternalStateNamer *fp) {
@@ -206,12 +206,13 @@ struct BufferSlotFullNamer : InternalStateNamer {
   ConstrainedBufferSlotFullNamer constrain(int32_t value);
 
   inline std::string getSMVName() const override {
-    return llvm::formatv("{0}.{1}_full", opName, slotName).str();
+    return llvm::formatv("{0}.{1}", opName, slotName).str();
   }
   inline llvm::json::Value toInnerJSON() const override {
     return llvm::json::Object({
         {OPERATION_LIT, opName},
         {SLOT_NAME_LIT, slotName},
+        {DATA_NAME_LIT, dataName},
         {SLOT_SIZE_LIT, slotSize},
     });
   }
@@ -221,9 +222,11 @@ struct BufferSlotFullNamer : InternalStateNamer {
 
   std::string opName;
   std::string slotName;
+  std::string dataName;
   size_t slotSize;
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral SLOT_NAME_LIT = "slot_name";
+  static constexpr llvm::StringLiteral DATA_NAME_LIT = "data_name";
   static constexpr llvm::StringLiteral SLOT_SIZE_LIT = "slot_size";
 };
 
@@ -234,8 +237,11 @@ struct ConstrainedBufferSlotFullNamer : ConstrainedNamer {
   ~ConstrainedBufferSlotFullNamer() = default;
 
   inline std::string getSMVName() const override {
-    return llvm::formatv("{0} & ({1}.data = {2})", base.getSMVName(),
-                         base.opName, smvValue(base.slotSize, value))
+    // Assuming buffer1 contains a 32bit slot:
+    // buffer1.slot_full & (buffer1.slot_data = 0ud32_1)
+    return llvm::formatv("{0} & ({1}.{2} = {3})", base.getSMVName(),
+                         base.opName, base.dataName,
+                         smvValue(base.slotSize, value))
         .str();
   }
 
