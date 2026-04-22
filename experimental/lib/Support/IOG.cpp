@@ -113,6 +113,15 @@ struct IOGCandidate {
     illegalChannels.insert(channel);
   }
 
+  // Get an operation that needs to be added to the IOG:
+  // OP_BEFORE ---channel--> OP_AFTER
+  // 1. Pop an edge from the unhandled edges stack
+  // 2. Check if OP_BEFORE has been handled already. If not, return it for
+  // handling
+  // 3. Check if OP_AFTER has been handled already. If not, return it for
+  // handling
+  // 4. Both sides of this edge have been added, so mark this edge as done and
+  // repeat for the next edge on the stack
   std::optional<Operation *> getNextOpToAdd() {
     // Stop making progress if an illegal edge has been taken
     if (invalidIOG) {
@@ -173,6 +182,13 @@ public:
   //   finder.step();
   // }
   // auto iogs = finder.getIOGs();
+  //
+  //
+  // The algorithm works as follows:
+  // 1. Pick a candidate IOG to work on
+  // 2. Within this IOG, get the next operation that should be added to the IOG
+  // 3. Handle the operation according to local rules, eliminating the candidate
+  // or splitting into multiple possible possibilities as necessary
   void step() {
     if (candidates.empty())
       return;
@@ -190,8 +206,18 @@ public:
     }
     Operation *op = *optOp;
 
-    candidate.iog.units.insert(op);
+    handleUnit(candidate, op);
+  }
 
+  // Handles an operation for a specific IOG candidate by:
+  //
+  // 1. Inserting the unit into the IOG
+  // 2. Marking necessary edges as followed (e.g. all merge inputs)
+  // 3. Splitting into multiple potential candidates if necessary: For example,
+  // only a single fork output can be followed, so there is a different possible
+  // IOG for each output
+  void handleUnit(IOGCandidate candidate, Operation *op) {
+    candidate.iog.units.insert(op);
     if (auto endOp = dyn_cast<EndOp>(op)) {
       followSingle(candidate, endOp.getOperands());
     } else if (auto bufOp = dyn_cast<BufferOp>(op)) {
@@ -228,11 +254,9 @@ public:
     } else if (auto arithOp = dyn_cast<ArithOpInterface>(op)) {
       candidate.markFollowed(arithOp->getResults()[0]);
       followSingle(candidate, arithOp->getOperands());
-    } else if (auto sourceOp = dyn_cast<SourceOp>(op)) {
-      // SourceOps can not be part of an IOG, as they act like entry nodes. This
-      // means that the partial IOGs looking at these operations can be
-      // discarded, so nothing needs to be done
     } else if (isa<SinkOp, StoreOp>(op)) {
+      // These act as terminating units, and no further edges need to be
+      // followed
       candidates.push_back(candidate);
     } else if (auto loadOp = dyn_cast<LoadOp>(op)) {
       candidate.markFollowed(loadOp.getAddress());
@@ -240,7 +264,11 @@ public:
       // checkpoint.follow(loadOp.getData());
       candidate.markFollowed(loadOp.getDataResult());
       candidates.push_back(candidate);
-    } else if (auto memCon = dyn_cast<MemoryControllerOp>(op)) {
+    } else if (isa<SourceOp, MemoryControllerOp>(op)) {
+      // SourceOps can not be part of an IOG, as they act like entry nodes. This
+      // means that the partial IOGs looking at these operations can be
+      // discarded, so nothing needs to be done
+      //
       // MemoryControllers are only accessed by control signals during this
       // annotation, as the edges between loadOps/storeOps and the MC are not
       // added to the IOG. These control signals usually grant trivial IOGs that
