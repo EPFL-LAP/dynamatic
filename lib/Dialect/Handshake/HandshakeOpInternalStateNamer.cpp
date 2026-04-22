@@ -114,6 +114,7 @@ BufferSlotFullNamer::fromInnerJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<BufferSlotFullNamer>();
   if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
       !mapper.map(SLOT_NAME_LIT, prop->slotName) ||
+      !mapper.map(DATA_NAME_LIT, prop->dataName) ||
       !mapper.map(SLOT_SIZE_LIT, prop->slotSize))
     return nullptr;
   return prop;
