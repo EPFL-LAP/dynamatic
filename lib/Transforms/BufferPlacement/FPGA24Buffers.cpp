@@ -415,7 +415,7 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
     }
   }
 
-  /// Buffer the path from cond_br to EndOp. 
+  /// Buffer the paths to EndOp (<out0> or <end>) that represent the function end. (The ones not directly produced by memory controllers.)
   auto *terminator = funcInfo.funcOp.getBodyBlock()->getTerminator();
   if (auto endOp = dyn_cast<handshake::EndOp>(terminator)) {
     for (Value operand : endOp->getOperands()) {
@@ -423,24 +423,8 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
       if (!producer)
         continue;
 
-      // Walk backward to check whether this path comes from a cond_br.
-      Value cur = operand;
-      bool fromCondBr = false;
-      while (cur) {
-        Operation *op = cur.getDefiningOp();
-        if (!op)
-          break;
-        if (isa<handshake::ConditionalBranchOp>(op)) {
-          fromCondBr = true;
-          break;
-        }
-        if (op->getNumOperands() == 1)
-          cur = op->getOperand(0);
-        else
-          break;
-      }
-
-      if (!fromCondBr)
+      // Skip memory-completion paths; they do not represent function end.
+      if (isa<handshake::MemoryOpInterface>(producer))
         continue;
 
       PlacementResult &result = placement[operand];
