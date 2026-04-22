@@ -1430,6 +1430,50 @@ void BufferPlacementMILP::setLatencyBalancingObjective() {
   model->setMaximizeObjective(-objective);
 }
 
+void BufferPlacementMILP::addChannelPropertyLatencyConstraints() {
+  for (auto &[channel, chVars] : vars.channelVars) {
+    handshake::ChannelBufProps &props = channelProps[channel];
+    std::string name = getUniqueName(*channel.getUses().begin());
+
+    bool maxOpaqueIsZero =
+        props.maxOpaque.has_value() && *props.maxOpaque == 0;
+    bool maxTransIsZero = props.maxTrans.has_value() && *props.maxTrans == 0;
+
+    if (maxOpaqueIsZero && maxTransIsZero) {
+      model->addConstr(chVars.dataLatency == 0, "fpga24_unbuf_L_" + name);
+      model->addConstr(chVars.bufPresent == 0, "fpga24_unbuf_R_" + name);
+    }
+  }
+}
+
+void BufferPlacementMILP::addChannelPropertyOccupancyConstraints(
+    ArrayRef<Value> channels, DenseMap<Value, CPVar> &channelOccupancy) {
+  for (Value channel : channels) {
+    if (!channelOccupancy.count(channel))
+      continue;
+    handshake::ChannelBufProps &props = channelProps[channel];
+    std::string name = getUniqueName(*channel.getUses().begin());
+
+    bool maxOpaqueIsZero =
+        props.maxOpaque.has_value() && *props.maxOpaque == 0;
+    bool maxTransIsZero = props.maxTrans.has_value() && *props.maxTrans == 0;
+
+    if (maxOpaqueIsZero && maxTransIsZero) {
+      model->addConstr(channelOccupancy[channel] == 0,
+                       "fpga24_unbuf_N_" + name);
+      continue;
+    }
+
+    unsigned minSlots = props.minOpaque + props.minTrans;
+    if (minSlots == 0)
+      minSlots = props.minSlots;
+    if (minSlots > 0) {
+      model->addConstr(channelOccupancy[channel] >= minSlots,
+                       "fpga24_minSlots_N_" + name);
+    }
+  }
+}
+
 void BufferPlacementMILP::forEachIOPair(
     Operation *op, const std::function<void(Value, Value)> &callback) {
   for (Value opr : op->getOperands()) {
