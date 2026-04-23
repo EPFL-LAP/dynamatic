@@ -433,12 +433,67 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ArrayReadExpression &arrayReadExpression);
 
 /// AST-Node representing a return statement in C.
-struct ReturnStatement {
-  const Expression returnValue;
+class ReturnStatement {
+public:
+  explicit ReturnStatement(Expression returnValue)
+      : returnValue(std::move(returnValue)) {}
+
+  const Expression &getReturnValue() const { return returnValue; }
+
+private:
+  Expression returnValue;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ReturnStatement &statement);
+
+/// AST-Node representing an assignment to an element of an array.
+/// Note that we model this as a top-level statement despite this being an
+/// expression in C.
+class ArrayAssignmentStatement {
+public:
+  ArrayAssignmentStatement(std::string arrayParameter,
+                           Expression indexingExpression,
+                           Expression valueExpression)
+      : arrayParameter(std::move(arrayParameter)),
+        indexingExpression(std::move(indexingExpression)),
+        valueExpression(std::move(valueExpression)) {}
+
+  llvm::StringRef getArrayParameter() const { return arrayParameter; }
+
+  const Expression &getIndexingExpression() const { return indexingExpression; }
+
+  /// Returns the value that will be assigned to the element.
+  const Expression &getValueExpression() const { return valueExpression; }
+
+private:
+  std::string arrayParameter;
+  Expression indexingExpression;
+  Expression valueExpression;
+};
+
+llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const ArrayAssignmentStatement &arrayAssignmentStatement);
+
+class Statement {
+  using Variant = std::variant<ArrayAssignmentStatement>;
+
+public:
+  Statement() = default;
+
+  template <class T, std::enable_if_t<std::is_constructible_v<Variant, T> &&
+                                      !std::is_same_v<std::decay_t<Variant>, T>>
+                         * = nullptr>
+  /*implicit*/ Statement(T &&arg)
+      : statement(std::make_shared<Variant>(std::forward<T>(arg))) {}
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                       const Statement &statement);
+
+private:
+  std::shared_ptr<const Variant> statement;
+};
 
 /// AST-Node representing a scalar function parameter in C.
 class ScalarParameter {
@@ -487,14 +542,28 @@ private:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ArrayParameter &parameter);
 
+/// Tag type representing the 'void' type from C.
+struct VoidType {};
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const VoidType &) {
+  return os << "void";
+}
+
+using ReturnType = std::variant<VoidType, ScalarType>;
+
 /// AST-Node representing a function in C.
 /// Functions are currently limited to just a return statement.
 struct Function {
-  const ScalarType returnType;
+  /// Void or a return type.
+  const ReturnType returnType;
   const std::string name;
   const std::vector<ScalarParameter> scalarParameters;
   const std::vector<ArrayParameter> arrayParameters;
-  const ReturnStatement returnStatement;
+
+  const std::vector<Statement> statements;
+  /// The return statement at the end of a function iff it does not have a void
+  /// return type.
+  const std::optional<ReturnStatement> returnStatement;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Function &function);

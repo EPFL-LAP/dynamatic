@@ -58,10 +58,10 @@ auto gen::BasicCGenerator::generateFreshScalarParameter(
 }
 
 ast::ReturnStatement
-gen::BasicCGenerator::generateFunctionBody(const OpaqueContext &context) {
+gen::BasicCGenerator::generateReturnStatement(const OpaqueContext &context) {
   ast::Expression expression = generateExpression(context, 0);
-  return ast::ReturnStatement{
-      safeCastAsNeeded(returnType, std::move(expression))};
+  return ast::ReturnStatement{safeCastAsNeeded(
+      llvm::cast<ast::ScalarType>(returnType), std::move(expression))};
 }
 
 constexpr std::size_t MAX_DEPTH = 4;
@@ -299,6 +299,16 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
                               ast::Constant{static_cast<std::uint32_t>(mask)}}};
   };
 
+  std::optional<ast::ArrayParameter> arrayParameter =
+      generateArrayParameter(paramConc);
+  if (!arrayParameter)
+    return std::nullopt;
+  return genWrappedArrayReadFromParam(*arrayParameter);
+}
+
+std::optional<ast::ArrayParameter>
+gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context,
+                                             std::size_t depth) {
   // With a low chance, skip picking an existing parameter and try to generate
   // a new one.
   if (!random.getRatherLowProbabilityBool()) {
@@ -308,12 +318,12 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
     llvm::copy(llvm::make_first_range(arrayParameters), copy.begin());
     random.shuffle(copy);
 
-    for (const ast::ArrayParameter &iter : copy)
-      if (typeSystem.checkArrayParameterOpaque(iter, paramConc))
-        return genWrappedArrayReadFromParam(iter);
+    for (const ast::ArrayParameter &candidateParam : copy)
+      if (typeSystem.checkArrayParameterOpaque(candidateParam, context))
+        return candidateParam;
   }
 
-  std::optional<ast::ScalarType> elementType = generateScalarType(paramConc);
+  std::optional<ast::ScalarType> elementType = generateScalarType(context);
   if (!elementType)
     return std::nullopt;
 
@@ -323,14 +333,14 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
         // easy to implement.
         // We choose an arbitrary upper-bound of 32 for the dimension for now.
         static_cast<std::size_t>(1 << random.getInteger(0, 5))},
-       paramConc});
+       context});
   if (!typeSystem.checkArrayParameterOpaque(arrayParameters.back().first,
-                                            paramConc)) {
+                                            context)) {
     arrayParameters.pop_back();
     varCounter--;
     return std::nullopt;
   }
-  return genWrappedArrayReadFromParam(arrayParameters.back().first);
+  return arrayParameters.back().first;
 }
 
 std::optional<ast::Variable>
@@ -385,16 +395,84 @@ std::optional<ast::ScalarType> gen::BasicCGenerator::generateScalarType(
   return std::nullopt;
 }
 
+ast::ReturnType
+gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
+  // Candidates for return types are all primitive types as well as 'void'.
+  // (i.e., one more than the number of primitive types).
+  std::array<ast::ReturnType, ast::PrimitiveType::ALL_PRIMITIVES.size() + 1>
+      candidates;
+  llvm::copy(ast::PrimitiveType::ALL_PRIMITIVES, candidates.begin());
+  candidates.back() = ast::VoidType{};
+  random.shuffle(candidates);
+  for (const ast::ReturnType &iter : candidates)
+    if (typeSystem.checkReturnTypeOpaque(iter, context))
+      return iter;
+
+  llvm::report_fatal_error(
+      "It must always be possible to generate a return type");
+}
+
+constexpr std::size_t MAX_STATEMENTS = 10;
+
+std::vector<ast::Statement>
+gen::BasicCGenerator::generateStatementList(const OpaqueContext &context) {
+  std::vector<ast::Statement> result;
+  // TODO: Type systems should have better control over the number of
+  //       statements and in what order they are generated.
+  //       Right now they are always generated last statement to first.
+  std::size_t numStatements = random.getInteger<std::size_t>(0, MAX_STATEMENTS);
+  result.reserve(numStatements);
+  for (std::size_t i = 0; i < numStatements; i++) {
+    std::optional<ast::Statement> maybeStat = generateStatement(context);
+    if (!maybeStat)
+      break;
+
+    result.push_back(std::move(*maybeStat));
+  }
+  std::reverse(result.begin(), result.end());
+  return result;
+}
+
+std::optional<ast::Statement>
+gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
+  return generateArrayAssignmentStatement(context);
+}
+
+std::optional<ast::ArrayAssignmentStatement>
+gen::BasicCGenerator::generateArrayAssignmentStatement(
+    const OpaqueContext &context) {
+  auto conclusion = typeSystem.checkArrayAssignmentStatementOpaque(context);
+  if (!conclusion)
+    return std::nullopt;
+
+  auto &&[param, index, value] = *conclusion;
+  std::optional<ast::ArrayParameter> parameter = generateArrayParameter(param);
+  if (!parameter)
+    return std::nullopt;
+
+  ast::Expression castAsNeeded = safeCastAsNeeded(
+      /*to=*/ast::PrimitiveType::UInt32,
+      generateExpression(/*context=*/index, /*depth=*/0));
+  castAsNeeded = ast::BinaryExpression{
+      std::move(castAsNeeded), ast::BinaryExpression::BitAnd,
+      ast::Constant{static_cast<std::uint32_t>(parameter->getDimension() - 1)}};
+  return ast::ArrayAssignmentStatement{
+      parameter->getName().str(),
+      castAsNeeded,
+      generateExpression(value, 0),
+  };
+}
+
 ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
   auto conclusion = typeSystem.checkFunctionOpaque(entryContext);
-  std::optional<ast::ScalarType> maybeReturnType =
-      generateScalarType(conclusion.returnType);
-  if (!maybeReturnType)
-    llvm::report_fatal_error(
-        "it must always be possible to generate a return type");
+  returnType = generateReturnType(conclusion.returnType);
+  std::optional<ast::ReturnStatement> returnStatement;
+  if (!std::holds_alternative<ast::VoidType>(returnType))
+    returnStatement = generateReturnStatement(conclusion.returnStatement);
 
-  returnType = std::move(*maybeReturnType);
-  ast::ReturnStatement body = generateFunctionBody(conclusion.returnStatement);
+  std::vector<ast::Statement> statementList =
+      generateStatementList(conclusion.returnStatement);
+
   auto scalarRange = llvm::make_first_range(scalarParameters);
   auto arrayRange = llvm::make_first_range(arrayParameters);
   return ast::Function{
@@ -402,7 +480,8 @@ ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
       std::string(functionName),
       std::vector(scalarRange.begin(), scalarRange.end()),
       std::vector(arrayRange.begin(), arrayRange.end()),
-      std::move(body),
+      statementList,
+      std::move(returnStatement),
   };
 }
 
@@ -433,8 +512,8 @@ gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
           while (!constant) {
             constant = generateConstant(context);
           }
-          // C++ does not allow implicit casts in array constructors, so we must
-          // cast the constant explicitly.
+          // C++ does not allow implicit casts in array constructors, so we
+          // must cast the constant explicitly.
           os << safeCastAsNeeded(parameter.getElementType(), *constant);
         });
     os << "};\n";

@@ -342,7 +342,20 @@ ast::operator<<(llvm::raw_ostream &os,
 
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const ReturnStatement &statement) {
-  return os << "return " << statement.returnValue << ";";
+  return os << "return " << statement.getReturnValue() << ";";
+}
+
+llvm::raw_ostream &
+ast::operator<<(llvm::raw_ostream &os,
+                const ArrayAssignmentStatement &arrayAssignmentStatement) {
+  return os << arrayAssignmentStatement.getArrayParameter() << '['
+            << arrayAssignmentStatement.getIndexingExpression()
+            << "] = " << arrayAssignmentStatement.getValueExpression() << ';';
+}
+
+llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
+                                   const Statement &statement) {
+  return os << *statement.statement;
 }
 
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
@@ -362,7 +375,11 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
 
   mlir::raw_indented_ostream indentedOstream(os);
   indentedOstream.indent();
-  indentedOstream << function.returnStatement;
+  for (auto &iter : function.statements)
+    indentedOstream << iter;
+  if (function.returnStatement)
+    indentedOstream << *function.returnStatement;
+
   os << "\n}\n";
   return os;
 }
