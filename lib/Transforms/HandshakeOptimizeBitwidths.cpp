@@ -348,7 +348,9 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
 
 /// Transfer function for mul operations or alike.
 static ExtWidth mulWidth(ExtWidth lhs, ExtWidth rhs) {
-  return {ExtType::NONE, lhs.bitWidth + rhs.bitWidth};
+  canonicalizeCommutativeExtensionType(lhs, rhs);
+  // Sign-extend if any of the operands are sign-extended.
+  return {rhs.extType, lhs.bitWidth + rhs.bitWidth};
 }
 
 /// Transfer function for div/rem operations or alike.
