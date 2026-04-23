@@ -36,13 +36,13 @@ handshake.func @test_and_sext_zext(%arg0: !handshake.channel<i1>, %arg1: !handsh
 // -----
 
 // CHECK-LABEL:   handshake.func @test_and_sext_sext(
-// CHECK-SAME:                                  %[[VAL_0:.*]]: !handshake.channel<i1>,
-// CHECK-SAME:                                  %[[VAL_1:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["var2", "start"], resNames = ["out0", "end"]} {
-// CHECK:           %[[VAL_2:.*]] = extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : <i1> to <i8>
-// CHECK:           %[[VAL_3:.*]] = source {handshake.bb = 0 : ui32} : <>
-// CHECK:           %[[VAL_4:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 71 : i8} : <>, <i8>
-// CHECK:           %[[VAL_5:.*]] = andi %[[VAL_2]], %[[VAL_4]] {handshake.bb = 0 : ui32} : <i8>
-// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i8> to <i32>
+// CHECK-SAME:                                       %[[VAL_0:.*]]: !handshake.channel<i1>,
+// CHECK-SAME:                                       %[[VAL_1:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["var2", "start"], resNames = ["out0", "end"]} {
+// CHECK:           %[[VAL_2:.*]] = extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : <i1> to <i7>
+// CHECK:           %[[VAL_3:.*]] = constant %[[VAL_4:.*]] {handshake.bb = 0 : ui32, value = -57 : i7} : <>, <i7>
+// CHECK:           %[[VAL_4]] = source {handshake.bb = 0 : ui32} : <>
+// CHECK:           %[[VAL_5:.*]] = andi %[[VAL_2]], %[[VAL_3]] {handshake.bb = 0 : ui32} : <i7>
+// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i7> to <i32>
 // CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_6]], %[[VAL_1]] : <i32>, <>
 // CHECK:         }
 handshake.func @test_and_sext_sext(%arg0: !handshake.channel<i1>, %arg2: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["var2", "start"], resNames = ["out0", "end"]} {

@@ -188,21 +188,6 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
   ];
 }
 
-def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
-                                              ["mlir::arith::ArithDialect"]> {
-  let summary = "Minimizes the bitwidth of all Handshake constants.";
-  let description = [{
-    Rewrites constant operations with the minimum required bitwidth to support
-    the constants' values. The pass inserts extension operations as needed to
-    ensure consistency with users of constant operations. The pass also pays
-    attention to not create duplicated constants indirectly due to the
-    minimization process.
-  }];
-  let options =
-    [Option<"optNegatives", "opt-negatives", "bool", "false",
-            "If true, allows bitwidth optimization of negative values.">];
-}
-
 def HandshakeReplaceMemoryInterfaces : DynamaticPass<
   "handshake-replace-memory-interfaces"
 > {

@@ -170,13 +170,13 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   }
 
   fs::path handshakeTransformed = compOutDir / "handshakeTransformed.mlir";
-  if (!runSubprocess(
-          {DYNAMATIC_OPT_BIN, handshake.string(),
-           "--handshake-analyze-lsq-usage",
-           "--handshake-replace-memory-interfaces",
-           "--handshake-minimize-cst-width", "--handshake-optimize-bitwidths",
-           "--handshake-materialize", "--handshake-infer-basic-blocks"},
-          handshakeTransformed)) {
+  if (!runSubprocess({DYNAMATIC_OPT_BIN, handshake.string(),
+                      "--handshake-analyze-lsq-usage",
+                      "--handshake-replace-memory-interfaces",
+                      "--handshake-optimize-bitwidths",
+                      "--handshake-materialize",
+                      "--handshake-infer-basic-blocks"},
+                     handshakeTransformed)) {
     std::cerr << "Failed to apply transformations to handshake\n";
     return false;
   }
