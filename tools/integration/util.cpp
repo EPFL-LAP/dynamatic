@@ -60,6 +60,11 @@ int runIntegrationTest(IntegrationTestData &config) {
               << std::endl;
     return -1;
   }
+
+  if (config.verifyInvariants) {
+    scriptFile << "verify-invariants" << std::endl;
+  }
+
   // Verify Verilog works correctly
   if (config.testVerilog) {
     scriptFile << "write-hdl --hdl verilog" << std::endl
