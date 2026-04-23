@@ -795,10 +795,22 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
     return failure();
   }
 
-  // Collect the unbundled operands for the terminator
+  // Collect the unbundled operands for the terminator.
+  // Order must match the output port order declared by unbundlePorts for a
+  // funcOp: first the ready signals for every input argument, then the
+  // data+valid signals for every result (EndOp operand).
   SmallVector<Value> hwTermOperands;
+
+  // 1. Ready signals for every function input argument.
+  for (auto [i, arg] : llvm::enumerate(topFunction.getArguments())) {
+    ReadyPortInfo portInfo{"", hw::ModulePort::Direction::Input, arg};
+    auto unbundledValues =
+        findOrCreateUnbundledValues(1, &portInfo, endOp.getLoc());
+    hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
+  }
+
+  // 2. Data + valid signals for every EndOp operand (function results).
   for (Value operand : endOp.getOperands()) {
-    // Get the data bitwidth of the operand
     unsigned dataBitwidth = 0;
     if (auto channelType = operand.getType().dyn_cast<handshake::ChannelType>())
       dataBitwidth = channelType.getDataType().cast<IntegerType>().getWidth();
@@ -807,29 +819,18 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
     else if (auto intType = operand.getType().dyn_cast<IntegerType>())
       dataBitwidth = intType.getWidth();
     else
-      dataBitwidth =
-          0; // For control types and other types, we treat them as 0 bits
+      dataBitwidth = 0;
     SmallVector<Value> unbundledValues;
     if (dataBitwidth > 0) {
-      // Add data signals
       DataPortInfo portInfo{"", hw::ModulePort::Direction::Output, operand, 0,
                             dataBitwidth};
       unbundledValues =
           findOrCreateUnbundledValues(dataBitwidth, &portInfo, endOp.getLoc());
       hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
     }
-    // Add valid signals
     ValidPortInfo validPortInfo{"", hw::ModulePort::Direction::Output, operand};
     unbundledValues =
         findOrCreateUnbundledValues(1, &validPortInfo, endOp.getLoc());
-    hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
-  }
-  // Check also the inputs of the topFuncOp whose ready signals are connected
-  // to the terminator
-  for (auto [i, arg] : llvm::enumerate(topFunction.getArguments())) {
-    ReadyPortInfo portInfo{"", hw::ModulePort::Direction::Input, arg};
-    auto unbundledValues =
-        findOrCreateUnbundledValues(1, &portInfo, endOp.getLoc());
     hwTermOperands.append(unbundledValues.begin(), unbundledValues.end());
   }
   topHWModule.getBodyBlock()->getTerminator()->setOperands(hwTermOperands);
@@ -1005,9 +1006,14 @@ public:
       }
       std::string blifFilePath = blifImplInterface.getBLIFImpl().str();
       if (blifFilePath.empty()) {
+        // If the operation is an EndOp, it is expected to not have a BLIF file
+        // path since it will be converted to the terminator of the top module,
+        // so we can skip the warning in this case
+        if (isa<handshake::EndOp>(op))
+          return;
         // Write out warning
-        llvm::errs() << "Warning: Handshake operation " << getUniqueName(op)
-                     << " has an empty BLIF file path\n";
+        llvm ::errs() << "Warning: Handshake operation " << getUniqueName(op)
+                      << " has an empty BLIF file path\n";
       }
     });
 
