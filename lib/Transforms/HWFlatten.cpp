@@ -67,7 +67,29 @@ struct FlattenModulesPass
 } // namespace
 
 void FlattenModulesPass::runOnOperation() {
+  MLIRContext *ctx = &getContext();
   Operation *top = getOperation();
+
+  // Pre-pass: annotate the op that drives each output port of every hw module
+  // with "hw.module_name" and "hw.port_name" attributes before inlining.
+  // Because inlineRegion clones the body (shouldClone=true), these attributes
+  // are preserved in the flattened parent.
+  top->walk([&](hw::HWModuleOp module) {
+    auto *outputOp = module.getBodyBlock()->getTerminator();
+    unsigned outIdx = 0;
+    for (auto &port : module.getPortList()) {
+      if (port.isInput())
+        continue;
+      Value outputVal = outputOp->getOperand(outIdx);
+      StringAttr modName = StringAttr::get(ctx, module.getName());
+      StringAttr portName = port.name;
+      if (Operation *defOp = outputVal.getDefiningOp()) {
+        defOp->setAttr("hw.module_name", modName);
+        defOp->setAttr("hw.port_name", portName);
+      }
+      ++outIdx;
+    }
+  });
 
   // Record which modules are instantiated before we start inlining, so we
   // know which ones to erase afterwards.
