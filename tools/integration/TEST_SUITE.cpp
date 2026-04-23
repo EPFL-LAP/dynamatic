@@ -409,36 +409,23 @@ INSTANTIATE_TEST_SUITE_P(Tiny, VerifyInvariantsFixture,
                          [](const auto &info) { return info.param; });
 
 TEST_P(VerifyInvariantsFixture, basic) {
-  std::string name = GetParam();
-  fs::path cSourcePath =
-      fs::path(DYNAMATIC_ROOT) / "integration-test" / name / (name + ".c");
-  std::string tmpFilename = "tmp_" + GetParam() + ".dyn";
-  std::ofstream scriptFile(tmpFilename);
-  if (!scriptFile.is_open()) {
-    std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
-    EXPECT_EQ(0, -1);
-  }
-  scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
-             << "set-src " << cSourcePath.string() << std::endl
-             << "compile" << std::endl
-             << "verify-invariants" << std::endl
-             << "exit" << std::endl;
-  scriptFile.close();
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useRigidification = false,
+      .verifyInvariants = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "on-merges",
+      .simTime = -1
+      // clang-format on
+  };
 
-  fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
-  fs::path dynamaticOutPath =
-      cSourcePath.parent_path() / "out" / "dynamatic_out.txt";
-  fs::path dynamaticErrPath =
-      cSourcePath.parent_path() / "out" / "dynamatic_err.txt";
-  std::string cmd = dynamaticPath.string() + " --exit-on-failure --run ";
-  cmd += tmpFilename;
-  cmd += " 1> ";
-  cmd += dynamaticOutPath;
-  cmd += " 2> ";
-  cmd += dynamaticErrPath;
-
-  int status = system(cmd.c_str());
-  EXPECT_EQ(status, 0);
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
 }
 
 TEST_P(RigidificationFixture, basic) {

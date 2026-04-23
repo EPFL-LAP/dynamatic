@@ -33,6 +33,7 @@ struct IntegrationTestData {
   bool useSharing = false;
   // Use model checking to remove redundant logic.
   bool useRigidification = false;
+  bool verifyInvariants = false;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
 
