@@ -372,6 +372,12 @@ static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
   if (rhs.extType <= ExtType::ZEXT)
     return {ExtType::ZEXT, std::min(lhs.bitWidth, rhs.bitWidth)};
 
+  // Similarly, if one operand is zero-extended, then the bitwidth of the
+  // zero-extended operand can be used since any bits further than its bitwidth
+  // is guaranteed to be zero, causing the corresponding result bit to be zero.
+  if (lhs.extType == ExtType::ZEXT)
+    return {ExtType::ZEXT, lhs.bitWidth};
+
   // Sign-extension might fill with 1-bits, meaning all bits of the larger
   // operand are part of the effective result bitwidth.
   // A sign-extension of the result is required to replicate the top bit.
