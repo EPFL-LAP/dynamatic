@@ -31,6 +31,7 @@ List of options:
   --use-prebuilt-llvm                  : download and use the prebuilt LLVM
   --enable-cbc                         : enable the CBC milp solver
   --enable-abc                         : enable the ABC logic synthesis tool
+  --enable-yosys                       : enable the Yosys logic synthesis tool
   --build-legacy-lsq                   : build the legacy chisel-based lsq
   --check | -c                         : run tests during build
   --help | -h                          : display this help message
@@ -145,6 +146,7 @@ BUILD_CHIESEL_LSQ=0
 ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
 CMAKE_DYNAMATIC_ENABLE_ABC=""
+CMAKE_DYNAMATIC_ENABLE_YOSYS=""
 LLVM_DIR="$PWD/llvm-project/build"
 
 # Loop over command line arguments and update script variables
@@ -210,6 +212,9 @@ do
               ;;
           "--enable-abc")
               CMAKE_DYNAMATIC_ENABLE_ABC="-DDYNAMATIC_ENABLE_ABC=ON"
+              ;;
+          "--enable-yosys")
+              CMAKE_DYNAMATIC_ENABLE_YOSYS="-DDYNAMATIC_ENABLE_YOSYS=ON"
               ;;
           "--build-legacy-lsq")
               BUILD_CHIESEL_LSQ=1
@@ -365,6 +370,7 @@ if should_run_cmake ; then
             $CMAKE_DYNAMATIC_ENABLE_XLS \
             $CMAKE_DYNAMATIC_ENABLE_CBC \
             $CMAKE_DYNAMATIC_ENABLE_ABC \
+            $CMAKE_DYNAMATIC_ENABLE_YOSYS \
             $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
 
     LLVM_DIR="../build/llvm-project"
@@ -382,6 +388,7 @@ if should_run_cmake ; then
         $CMAKE_DYNAMATIC_ENABLE_XLS \
         $CMAKE_DYNAMATIC_ENABLE_CBC \
         $CMAKE_DYNAMATIC_ENABLE_ABC \
+        $CMAKE_DYNAMATIC_ENABLE_YOSYS \
         $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   fi
   exit_on_fail "Failed to cmake dynamatic"
