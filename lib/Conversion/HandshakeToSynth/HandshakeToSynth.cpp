@@ -1015,8 +1015,8 @@ public:
         if (isa<handshake::EndOp>(op))
           return;
         // Write out warning
-        llvm::errs() << "Warning: Handshake operation " << getUniqueName(op)
-                     << " has an empty BLIF file path\n";
+        llvm ::errs() << "Warning: Handshake operation " << getUniqueName(op)
+                      << " has an empty BLIF file path\n";
       } else {
         hasBlifImpl = true;
       }
