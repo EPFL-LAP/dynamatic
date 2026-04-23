@@ -216,7 +216,7 @@ def main():
             test_name = old_row["name"]
 
             if "cycles" not in old_row:
-                print(f"Warning: the CI test {name} does not have performance record!", file=sys.stderr)
+                print(f"Warning: the CI test {test_name} does not have performance record!", file=sys.stderr)
                 continue
 
             old_cycles = old_row["cycles"]
