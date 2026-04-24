@@ -731,6 +731,12 @@ class LSQ:
 
         # Load
 
+        ldq_head_oh_p0 = LogicVec(
+            ctx, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries)
+        if self.configs.pipe0:
+            ldq_head_oh_p0.regInit(init=0)
+        arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
+
         ldq_alloc_p0 = LogicArray(
             ctx, 'ldq_alloc_p0', pipe0_type, self.configs.numLdqEntries)
         ldq_addr_valid_p0 = LogicArray(
@@ -770,15 +776,26 @@ class LSQ:
             else:
                 arch += Op(ctx, can_load_p0[i], 'not',
                            load_conflict[i], 'and', load_req_valid[i])
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, can_load[i], 'not',
-                       ldq_issue[i], 'and', can_load_p0[i])
 
-        ldq_head_oh_p0 = LogicVec(
-            ctx, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries)
-        if self.configs.pipe0:
-            ldq_head_oh_p0.regInit(init=0)
-        arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
+        if self.configs.issueOldestLoads is not None:
+            load_candidates_vecarray = LogicVecArray(ctx, 'load_candidates_vecarray', 'w', self.configs.issueOldestLoads, self.configs.numLdqEntries)
+            load_allowed_vecarray = LogicVecArray(ctx, 'load_allowed_vecarray', 'w', self.configs.issueOldestLoads, self.configs.numLdqEntries)
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, (load_candidates_vecarray, 0, i), ldq_alloc_p0[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', ldq_issue[i])
+            for i in range(self.configs.issueOldestLoads):
+                arch += CyclicPriorityMasking(ctx, load_allowed_vecarray[i], load_candidates_vecarray[i], ldq_head_oh_p0)
+                if i != self.configs.issueOldestLoads - 1:
+                    # remove the selected load from the candidate list for the next iteration
+                    arch += Op(ctx, load_candidates_vecarray[i+1], load_candidates_vecarray[i], 'and', 'not', load_allowed_vecarray[i])
+
+            # reduce the load_allowed_vecarray to a single load_allowed array
+            load_allowed = LogicArray(ctx, 'load_allowed', 'w', self.configs.numLdqEntries)
+            arch += Reduce(ctx, load_allowed, load_allowed_vecarray, 'or')
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, can_load[i], load_allowed[i], 'and', can_load_p0[i])
+        else:
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i])
 
         can_load_list = []
         can_load_list.append(can_load)

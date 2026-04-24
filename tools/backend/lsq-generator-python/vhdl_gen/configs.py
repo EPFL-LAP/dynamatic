@@ -77,6 +77,10 @@ class Configs:
     # implies fallbackIssueLoad=True, fallbackIssueStore=True, bypass=False)
     inOrder: bool = False
 
+    # synthetic issue restrictions: restricts which loads can be issued
+    # If not None, only allow the N oldest pending (allocated but not issued) loads to be issued
+    issueOldestLoads: int | None = None
+
     def __init__(self, config: dict) -> None:
         self.name = config["name"]
         self.dataW = config["dataWidth"]
@@ -143,6 +147,14 @@ class Configs:
         if headLag is not None:
             self.headLag = bool(headLag)
 
+        ### ISSUE RESTRICTION ###
+        self.issueOldestLoads = None
+        issueOldestLoads = get_env("LSQ_ISSUE_OLDEST_LOADS")
+        if issueOldestLoads is not None:
+            self.issueOldestLoads = int(issueOldestLoads)
+            if self.issueOldestLoads >= self.numLdqEntries:
+                self.issueOldestLoads = None  # not needed
+
         ### COMPUTED VALUES ###
 
         if self.inOrder:
@@ -188,3 +200,9 @@ class Configs:
             # duplicated a load # issued by another load channel in the same cycle. Multiple load channels are not
             # currently used by Dynamatic, so this is left as future work.
             assert self.numLdMem == 1, "Fallback issue is only supported for single load port configuration."
+
+        # synthetic issue restrictions
+        if self.issueOldestLoads is not None:
+            assert self.issueOldestLoads > 0, "issueOldestLoads must be positive."
+            assert self.issueOldestLoads <= self.numLdqEntries, "issueOldestLoads cannot be greater than the number of load queue entries."
+            assert not self.fallbackIssueLoad, "issueOldestLoads is not compatible with fallback issue for loads."
