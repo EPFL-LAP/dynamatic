@@ -791,16 +791,10 @@ class LSQ:
             arch += CyclicPriorityMasking(
                 ctx, load_idx_tmp_oh[w], can_load_list[w], ldq_head_oh_p0)
             arch += Reduce(ctx, load_en_tmp[w], can_load_list[w], 'or')
-            if (w+1 != self.configs.numLdMem):
-                load_idx_oh_LogicArray = LogicArray(
-                    ctx, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries)
-                arch += VecToArray(ctx,
-                                   load_idx_oh_LogicArray, load_idx_oh[w])
-                can_load_list.append(LogicArray(
-                    ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
+            if w != self.configs.numLdMem - 1:
+                can_load_list.append(LogicArray(ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
                 for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load_list[w+1][i], 'not',
-                               load_idx_oh_LogicArray[i], 'and', can_load_list[w][i])
+                    arch += Op(ctx, can_load_list[w+1][i], 'not', (load_idx_tmp_oh[w], i), 'and', can_load_list[w][i])
 
         for w in range(self.configs.numLdMem):
             last_load_port = (w == self.configs.numLdMem - 1)
