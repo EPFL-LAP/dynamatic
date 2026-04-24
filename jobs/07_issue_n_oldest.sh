@@ -53,7 +53,7 @@ for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
 		export LSQ_ISSUE_OLDEST_LOADS=$NUM_OLDEST_LOADS
 
 		echo "Running evaluation with pipeline configuration = ${PIPELINE_CONFIG}; LSQ_ISSUE_OLDEST_LOADS = ${NUM_OLDEST_LOADS}"
-		"$RUN_EVALUATION_PY" --synth-lsqs -j 16 \
+		"$RUN_EVALUATION_PY" --no-synth -j 16 \
 			--json "${OUTPUT_SUBDIR}/oldest_loads_${NUM_OLDEST_LOADS}.json"
 	done
 done
