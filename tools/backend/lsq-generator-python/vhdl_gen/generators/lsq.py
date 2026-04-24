@@ -789,15 +789,15 @@ class LSQ:
                     arch += Op(ctx, load_candidates_vecarray[i+1], load_candidates_vecarray[i], 'and', 'not', load_allowed_vecarray[i])
 
             # reduce the load_allowed_vecarray to a single load_allowed array
-            load_allowed = LogicArray(ctx, 'load_allowed', 'w', self.configs.numLdqEntries)
+            load_allowed = LogicVec(ctx, 'load_allowed', 'w', self.configs.numLdqEntries)
             arch += Reduce(ctx, load_allowed, load_allowed_vecarray, 'or')
             for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, can_load[i], load_allowed[i], 'and', can_load_p0[i])
+                arch += Op(ctx, can_load[i], (load_allowed, i), 'and', can_load_p0[i])
         else:
             for i in range(0, self.configs.numLdqEntries):
                 arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i])
 
-        can_load_list = []
+        can_load_list: list[LogicArray] = []
         can_load_list.append(can_load)
 
         # temporary (pre-fallback) signals
