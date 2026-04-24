@@ -26,6 +26,7 @@
 #include "dynamatic/Conversion/Passes.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
 #include "dynamatic/Dialect/Synth/SynthOps.h"
+#include "llvm/Support/raw_ostream.h"
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKETOSYNTH
 #include "dynamatic/Conversion/Passes.h.inc"
@@ -52,6 +53,7 @@ namespace dynamatic {
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <cctype>
 #include <string>
@@ -857,9 +859,9 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
 
 // Function to populate a single hw module by importing the corresponding BLIF
 // netlist and swapping the module body.
-mlir::LogicalResult
-populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
-                 llvm::DenseSet<StringRef> &populatedModules) {
+mlir::LogicalResult populateHWModule(mlir::ModuleOp modOp, hw::InstanceOp inst,
+                                     llvm::StringSet<> &populatedModules) {
+
   mlir::SymbolTable symTable(modOp);
   // Look up the hw module definition referenced by this instance.
   hw::HWModuleOp hwModule =
@@ -936,7 +938,7 @@ mlir::LogicalResult populateAllHWModules(mlir::ModuleOp modOp,
   topMod.walk([&](hw::InstanceOp inst) { instances.push_back(inst); });
 
   // Collect all already populated modules to avoid duplicate work
-  llvm::DenseSet<StringRef> populatedModules;
+  llvm::StringSet<> populatedModules;
   for (hw::InstanceOp inst : instances)
     if (mlir::failed(populateHWModule(modOp, inst, populatedModules)))
       return mlir::failure();
