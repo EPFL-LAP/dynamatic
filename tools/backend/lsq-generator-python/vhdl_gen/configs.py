@@ -80,6 +80,10 @@ class Configs:
     # synthetic issue restrictions: restricts which loads can be issued
     # If not None, only allow the N oldest pending (allocated but not issued) loads to be issued
     issueOldestLoads: int | None = None
+    # What set of loads we consider when determining the oldest N loads for issue restriction:
+    # - issuable: the oldest N loads which are issuable (= allocated, not issued, and address available)
+    # - contiguous: the oldest issuable load, and then the N-1 next buffer entries (regardless of their status)
+    issueOldestLoadsType: str = "issuable"
 
     def __init__(self, config: dict) -> None:
         self.name = config["name"]
@@ -154,6 +158,7 @@ class Configs:
             self.issueOldestLoads = int(issueOldestLoads)
             if self.issueOldestLoads >= self.numLdqEntries:
                 self.issueOldestLoads = None  # not needed
+        self.issueOldestLoadsType = os.environ.get("LSQ_ISSUE_OLDEST_LOADS_TYPE", "issuable")
 
         ### COMPUTED VALUES ###
 
@@ -206,3 +211,5 @@ class Configs:
             assert self.issueOldestLoads > 0, "issueOldestLoads must be positive."
             assert self.issueOldestLoads <= self.numLdqEntries, "issueOldestLoads cannot be greater than the number of load queue entries."
             assert not self.fallbackIssueLoad, "issueOldestLoads is not compatible with fallback issue for loads."
+        assert self.issueOldestLoadsType in ["issuable", "contiguous"], \
+            "Invalid value for LSQ_ISSUE_OLDEST_LOADS_TYPE environment variable: must be 'issuable' or 'contiguous'"
