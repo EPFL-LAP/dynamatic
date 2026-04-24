@@ -11,6 +11,10 @@ PIPELINE_CONFIGS=(
 	"headlag"
 	"headlag_pipe0"
 )
+ISSUE_TYPES=(
+	"issuable"
+	"contiguous"
+)
 
 export SYNTHESIS_CLOCK_PERIOD_NS="2.5"
 export LSQ_NO_BYPASS=1
@@ -25,36 +29,41 @@ Experiment 7: Issue N oldest loads
 - pipeline configurations: ${PIPELINE_CONFIGS[*]}
 - LSQ size: ${LSQ_SIZE} entries
 - LSQ_ISSUE_OLDEST_LOADS values: ${NUM_OLDEST_LOADS_VALUES[*]}
+- LSQ_ISSUE_OLDEST_LOADS_TYPE values: ${ISSUE_TYPES[*]}
 - git revision: ${GIT_REVISION}
 EOF
 
-for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
-	OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}"
-	echo "Output directory for pipeline configuration = ${PIPELINE_CONFIG}: ${OUTPUT_SUBDIR}"
-	mkdir -p "${OUTPUT_SUBDIR}"
+for ISSUE_TYPE in "${ISSUE_TYPES[@]}"; do
+	export LSQ_ISSUE_OLDEST_LOADS_TYPE=$ISSUE_TYPE
 
-	export LSQ_PIPE_COMP_EN=0
-	export LSQ_PIPE0_EN=0
-	export LSQ_PIPE1_EN=0
-	export LSQ_HEAD_LAG_EN=0
-	if [[ "$PIPELINE_CONFIG" == *"pipecomp"* ]]; then
-		export LSQ_PIPE_COMP_EN=1
-	fi
-	if [[ "$PIPELINE_CONFIG" == *"pipe0"* ]]; then
-		export LSQ_PIPE0_EN=1
-	fi
-	if [[ "$PIPELINE_CONFIG" == *"pipe1"* ]]; then
-		export LSQ_PIPE1_EN=1
-	fi
-	if [[ "$PIPELINE_CONFIG" == *"headlag"* ]]; then
-		export LSQ_HEAD_LAG_EN=1
-	fi
+	for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
+		export LSQ_PIPE_COMP_EN=0
+		export LSQ_PIPE0_EN=0
+		export LSQ_PIPE1_EN=0
+		export LSQ_HEAD_LAG_EN=0
+		if [[ "$PIPELINE_CONFIG" == *"pipecomp"* ]]; then
+			export LSQ_PIPE_COMP_EN=1
+		fi
+		if [[ "$PIPELINE_CONFIG" == *"pipe0"* ]]; then
+			export LSQ_PIPE0_EN=1
+		fi
+		if [[ "$PIPELINE_CONFIG" == *"pipe1"* ]]; then
+			export LSQ_PIPE1_EN=1
+		fi
+		if [[ "$PIPELINE_CONFIG" == *"headlag"* ]]; then
+			export LSQ_HEAD_LAG_EN=1
+		fi
 
-	for NUM_OLDEST_LOADS in "${NUM_OLDEST_LOADS_VALUES[@]}"; do
-		export LSQ_ISSUE_OLDEST_LOADS=$NUM_OLDEST_LOADS
+		OUTPUT_SUBDIR="${OUTPUT_DIR}/${ISSUE_TYPE}/${PIPELINE_CONFIG}"
+		echo "Output directory for issue type = ${ISSUE_TYPE}, pipeline configuration = ${PIPELINE_CONFIG}: ${OUTPUT_SUBDIR}"
+		mkdir -p "${OUTPUT_SUBDIR}"
 
-		echo "Running evaluation with pipeline configuration = ${PIPELINE_CONFIG}; LSQ_ISSUE_OLDEST_LOADS = ${NUM_OLDEST_LOADS}"
-		"$RUN_EVALUATION_PY" --no-synth -j 16 \
-			--json "${OUTPUT_SUBDIR}/oldest_loads_${NUM_OLDEST_LOADS}.json"
+		for NUM_OLDEST_LOADS in "${NUM_OLDEST_LOADS_VALUES[@]}"; do
+			export LSQ_ISSUE_OLDEST_LOADS=$NUM_OLDEST_LOADS
+
+			echo "Running evaluation with issue type = ${ISSUE_TYPE}; pipeline configuration = ${PIPELINE_CONFIG}; LSQ_ISSUE_OLDEST_LOADS = ${NUM_OLDEST_LOADS}"
+			"$RUN_EVALUATION_PY" --no-synth -j 16 \
+				--json "${OUTPUT_SUBDIR}/oldest_loads_${NUM_OLDEST_LOADS}.json"
+		done
 	done
 done
