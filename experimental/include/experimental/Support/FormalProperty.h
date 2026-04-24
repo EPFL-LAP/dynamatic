@@ -28,11 +28,11 @@ class FormalProperty {
 public:
   enum class TAG { OPT, INVAR, ERROR };
   enum class TYPE {
-    AOB /* Absence Of Backpressure */,
-    VEQ /* Valid EQuivalence */,
-    EFNAO /* Eager Fork Not All Output sent */,
-    CSOAFAF, /* Copied Slots Of Active Forks Are Full */
-    RPF,     /* Reconvergent Path Flow */
+    AbsenceOfBackpressure,
+    ValidEquivalence,
+    EagerForkNotAllOutputSent,
+    CopiedSlotsOfActiveForksAreFull,
+    ReconvergentPathFlow,
   };
 
   TAG getTag() const { return tag; }
@@ -111,7 +111,7 @@ public:
   ~AbsenceOfBackpressure() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::AOB;
+    return fp->getType() == TYPE::AbsenceOfBackpressure;
   }
 
 private:
@@ -147,7 +147,7 @@ public:
   ~ValidEquivalence() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::VEQ;
+    return fp->getType() == TYPE::ValidEquivalence;
   }
 
 private:
@@ -186,7 +186,7 @@ public:
   ~EagerForkNotAllOutputSent() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::EFNAO;
+    return fp->getType() == TYPE::EagerForkNotAllOutputSent;
   }
 
 private:
@@ -208,7 +208,7 @@ public:
   std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
     return sentStateNamers;
   }
-  handshake::BufferSlotFullNamer getCopiedSlot() { return copiedSlot; }
+  const handshake::InternalStateNamer &getCopiedSlot() { return *copiedSlot; }
 
   llvm::json::Value extraInfoToJSON() const override;
 
@@ -217,17 +217,20 @@ public:
 
   CopiedSlotsOfActiveForkAreFull() = default;
   CopiedSlotsOfActiveForkAreFull(uint64_t id, TAG tag,
-                                 handshake::BufferLikeOpInterface &bufferOp,
+                                 handshake::BufferLikeOpInterface &bufferOpI,
+                                 handshake::EagerForkLikeOpInterface &forkOp);
+  CopiedSlotsOfActiveForkAreFull(uint64_t id, TAG tag,
+                                 handshake::LatencyInterface &latencyOpI,
                                  handshake::EagerForkLikeOpInterface &forkOp);
   ~CopiedSlotsOfActiveForkAreFull() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::CSOAFAF;
+    return fp->getType() == TYPE::CopiedSlotsOfActiveForksAreFull;
   }
 
 private:
   std::vector<handshake::EagerForkSentNamer> sentStateNamers;
-  handshake::BufferSlotFullNamer copiedSlot;
+  std::unique_ptr<handshake::InternalStateNamer> copiedSlot;
   inline static const StringLiteral FORK_CHANNELS_LIT = "fork_channels";
   inline static const StringLiteral COPIED_SLOT_LIT = "copied_slot";
 };
@@ -260,7 +263,7 @@ public:
   ~ReconvergentPathFlow() = default;
 
   static bool classof(const FormalProperty *fp) {
-    return fp->getType() == TYPE::RPF;
+    return fp->getType() == TYPE::ReconvergentPathFlow;
   }
 
 private:

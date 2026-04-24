@@ -59,6 +59,18 @@ public:
     };
   }
 
+  static std::optional<ConclusionOf<ast::ArrayAssignmentStatement>>
+  checkArrayAssignmentStatement(DynamaticTypingContext context) {
+    return ConclusionOf<ast::ArrayAssignmentStatement>{
+        // Forward the context to the array parameter as is.
+        /*parameter=*/context,
+        // Indexing expression must be an integer.
+        /*index=*/
+        DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
+        /*value=*/context,
+    };
+  }
+
 private:
   Randomly &random;
 };

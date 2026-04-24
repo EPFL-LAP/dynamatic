@@ -70,6 +70,8 @@ private:
   unsigned int uid;
   json::Array propertyTable;
 
+  LogicalResult annotateProperty(ModuleOp modOp, FormalProperty::TYPE t);
+  LogicalResult annotateQueriedProperties();
   LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
@@ -189,6 +191,14 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
     return success();
   }
 
+  if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(curOp)) {
+    CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, latencyOp,
+                                     originFork);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+    return success();
+  }
+
   if (auto mergeOp = dyn_cast<handshake::MergeLikeOpInterface>(curOp)) {
     // TODO: Which of the previous paths should be followed?
     return success();
@@ -280,20 +290,59 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   return success();
 }
 
-void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
+                                                  FormalProperty::TYPE t) {
+  switch (t) {
+  case FormalProperty::TYPE::AbsenceOfBackpressure:
+    return annotateAbsenceOfBackpressure(modOp);
+  case FormalProperty::TYPE::ValidEquivalence:
+    return annotateValidEquivalence(modOp);
+  case FormalProperty::TYPE::EagerForkNotAllOutputSent:
+    return annotateEagerForkNotAllOutputSent(modOp);
+  case FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull:
+    return annotateCopiedSlotsOfAllForks(modOp);
+  case FormalProperty::TYPE::ReconvergentPathFlow:
+    return annotateReconvergentPathFlow(modOp);
+  }
+  return failure();
+}
+LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
   ModuleOp modOp = getOperation();
-
-  if (failed(annotateAbsenceOfBackpressure(modOp)))
-    return signalPassFailure();
-  if (failed(annotateValidEquivalence(modOp)))
-    return signalPassFailure();
+  LogicalResult res = success();
+  if (annotateList != "") {
+    for (auto &elem : llvm::split(annotateList, ',')) {
+      std::string typeStr = elem.trim().str();
+      if (auto t = FormalProperty::typeFromStr(typeStr)) {
+        if (failed(annotateProperty(modOp, *t)))
+          res = failure();
+      } else {
+        llvm::errs() << typeStr << " is not a property\n";
+        res = failure();
+      }
+    }
+    return res;
+  }
+  if (annotateProperties) {
+    if (failed(annotateAbsenceOfBackpressure(modOp)))
+      return failure();
+    if (failed(annotateValidEquivalence(modOp)))
+      return failure();
+  }
   if (annotateInvariants) {
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
-      return signalPassFailure();
+      return failure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
-      return signalPassFailure();
+      return failure();
     if (failed(annotateReconvergentPathFlow(modOp)))
-      return signalPassFailure();
+      return failure();
+  }
+  return success();
+}
+
+void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
+  if (failed(annotateQueriedProperties())) {
+    return signalPassFailure();
   }
 
   llvm::json::Value jsonVal(std::move(propertyTable));

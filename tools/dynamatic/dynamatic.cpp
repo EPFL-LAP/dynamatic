@@ -281,6 +281,15 @@ public:
   CommandResult execute(CommandArguments &args) override;
 };
 
+class VerifyInvariants : public Command {
+public:
+  VerifyInvariants(FrontendState &state)
+      : Command("verify-invariants",
+                "Verifies the correctness of invariants generated", state) {}
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
 class Compile : public Command {
 public:
   static constexpr llvm::StringLiteral FAST_TOKEN_DELIVERY =
@@ -691,6 +700,20 @@ CommandResult SetCP::execute(CommandArguments &args) {
   return CommandResult::FAIL;
 }
 
+CommandResult VerifyInvariants::execute(CommandArguments &args) {
+  if (!state.sourcePathIsSet(keyword))
+    return CommandResult::FAIL;
+
+  std::string script = state.dynamaticPath + getSeparator() +
+                       "experimental/tools/rigidification/rigidification.sh";
+
+  std::string handshakeExport = state.getOutputDir() + getSeparator() + "comp" +
+                                getSeparator() + "handshake_export.mlir";
+
+  return execCmd(script, state.dynamaticPath, state.getOutputDir(),
+                 state.getKernelName(), handshakeExport, "--verify-invariants");
+}
+
 CommandResult Compile::execute(CommandArguments &args) {
   // We need the source path to be set
   if (!state.sourcePathIsSet(keyword))
@@ -925,6 +948,7 @@ int main(int argc, char **argv) {
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<SetOutputDir>(state);
+  commands.add<VerifyInvariants>(state);
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);

@@ -52,6 +52,7 @@ class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
+class VerifyInvariantsFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
   IntegrationTestData config{
@@ -402,6 +403,30 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
 // clang-format on
 
 #ifdef DYNAMATIC_ENABLE_LEQ_BINARIES
+
+INSTANTIATE_TEST_SUITE_P(Tiny, VerifyInvariantsFixture,
+                         testing::Values("fir", "iir", "matvec"),
+                         [](const auto &info) { return info.param; });
+
+TEST_P(VerifyInvariantsFixture, basic) {
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useRigidification = false,
+      .verifyInvariants = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "on-merges",
+      .simTime = -1
+      // clang-format on
+  };
+
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
 
 TEST_P(RigidificationFixture, basic) {
   IntegrationTestData config{
