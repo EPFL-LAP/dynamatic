@@ -12,7 +12,6 @@ def generate_sink(name, params):
         return _generate_sink(name, data_type)
 
 
-
 def _generate_sink_dataless(name):
     return f"""
 MODULE {name}(ins_valid)
@@ -31,6 +30,7 @@ MODULE {name}(ins, ins_valid)
   DEFINE
   ins_ready  :=  TRUE;
 """
+
 
 def _generate_iog_terminating_sink_dataless(name):
     return f"""
