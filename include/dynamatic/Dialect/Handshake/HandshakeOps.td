@@ -567,6 +567,10 @@ def SinkOp : Handshake_Op<"sink"> {
     ```
   }];
 
+  let extraClassDeclaration = [{
+    bool terminatesIOG();
+    BufferSlotFullNamer getTerminatingSlot();
+  }];
   let arguments = (ins HandshakeType:$operand);
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))

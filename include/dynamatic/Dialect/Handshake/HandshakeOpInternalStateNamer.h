@@ -19,6 +19,7 @@ struct ConstrainedEagerForkSentNamer;
 struct ConstrainedBufferSlotFullNamer;
 struct MemoryControllerSlotNamer;
 struct EntrySlotNamer;
+struct TerminatingSinkNamer;
 
 std::vector<std::unique_ptr<InternalStateNamer>>
 getAllSlotsOfOperation(Operation *op);

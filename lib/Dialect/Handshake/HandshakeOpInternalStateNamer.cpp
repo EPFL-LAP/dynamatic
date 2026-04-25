@@ -235,6 +235,13 @@ getAllSlotsOfOperation(Operation *op) {
       ret.push_back(std::make_unique<PipelineSlotNamer>(slot));
     }
   }
+  if (auto sinkOp = dyn_cast<SinkOp>(op)) {
+    if (sinkOp.terminatesIOG()) {
+      ret.push_back(
+          std::make_unique<BufferSlotFullNamer>(sinkOp.getTerminatingSlot()));
+    }
+    return ret;
+  }
   if (auto loadOp = dyn_cast<LoadOp>(op)) {
     // TODO: Handle LoadOp for MC slot
     auto slots = loadOp.getInternalSlotStateNamers();
