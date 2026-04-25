@@ -409,8 +409,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   }
 
   for (SinkOp sink : sinks) {
-    auto x = UnitAttr::get(modOp.getContext());
-    sink->setAttr("IOG_TERMINATOR", x);
+    auto unitAttr = UnitAttr::get(modOp.getContext());
+    sink->setAttr("IOG_TERMINATOR", unitAttr);
   }
 
   if (failed(annotateAbsenceOfBackpressure(modOp)))

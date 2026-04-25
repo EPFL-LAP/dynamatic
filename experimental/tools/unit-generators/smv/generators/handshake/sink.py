@@ -29,6 +29,7 @@ MODULE {name}(ins_valid)
   -- output
   DEFINE
   ins_ready  :=  !full;
+  full_full := full;
 """
 
 def _generate_iog_terminator(name, data_type):
@@ -44,6 +45,7 @@ MODULE {name}(ins, ins_valid)
   -- output
   DEFINE
   ins_ready  :=  !full;
+  full_full := full;
 """
 
 def _generate_sink_dataless(name):

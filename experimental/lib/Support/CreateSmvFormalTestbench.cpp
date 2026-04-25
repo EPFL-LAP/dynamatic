@@ -375,7 +375,7 @@ std::string createSmvFormalTestbench(const SmvTestbenchConfig &config) {
 
   if (config.syncOutput) {
     wrapper << instantiateJoin(config.modelSmvName, config.results) << "\n";
-    wrapper << "  DEFINE global_ready := TRUE;\n";
+    wrapper << "  DEFINE global_ready := FALSE;\n";
 
   } else {
     wrapper << instantiateSinks(config.modelSmvName, config.results) << "\n";

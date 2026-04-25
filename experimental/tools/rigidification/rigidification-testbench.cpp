@@ -100,7 +100,7 @@ integration-tests/fir/out/hdl/ --mlir intregation-tests/fir/out/comp/hw.mlir/n)D
         .results = res,
         .modelSmvName = kernelName,
         .nrOfTokens = 1,
-        .generateExactNrOfTokens = false,
+        .generateExactNrOfTokens = true,
         .syncOutput = true};
 
     std::string wrapper =
