@@ -117,8 +117,7 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::RPF:
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
   case TYPE::IOGSingleToken:
-    assert(false && "todo");
-    return nullptr;
+    return IOGSingleToken::fromJSON(value, path.field(INFO_LIT));
   case TYPE::IOGConsecutiveTokens:
     return IOGConsecutiveTokens::fromJSON(value, path.field(INFO_LIT));
   }
@@ -390,6 +389,63 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
     prop->equations.push_back(FlowExpression::fromJSON(eq, path));
   }
 
+  return prop;
+}
+
+// IOGSingleToken
+
+llvm::json::Value IOGSingleToken::extraInfoToJSON() const {
+  std::vector<llvm::json::Value> slotsJSON;
+  slotsJSON.reserve(slots.size());
+  for (auto &namer : slots) {
+    slotsJSON.push_back(namer->toJSON());
+  }
+  llvm::json::Value slotsValue = slotsJSON;
+
+  std::vector<llvm::json::Value> forksJSON;
+  forksJSON.reserve(forks.size());
+  for (auto &sent : forks) {
+    forksJSON.push_back(sent.toInnerJSON());
+  }
+  llvm::json::Value forksValue = forksJSON;
+
+  return llvm::json::Object({{SLOTS_LIT, slotsValue}, {FORKS_LIT, forksValue}});
+}
+
+std::unique_ptr<IOGSingleToken>
+IOGSingleToken::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  auto prop = std::make_unique<IOGSingleToken>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::Object *obj = info.getAsObject();
+  assert(obj);
+  if (auto iter = obj->find(SLOTS_LIT); iter != obj->end()) {
+    llvm::json::Array *slotsArray = iter->second.getAsArray();
+    assert(slotsArray);
+    prop->slots.reserve(slotsArray->size());
+    for (const llvm::json::Value &sentValue : *slotsArray) {
+      auto json = InternalStateNamer::fromJSON(sentValue, path);
+      assert(json);
+      prop->slots.push_back(std::move(json));
+    }
+  } else {
+    path.report(json::ERR_MISSING_VALUE);
+    return nullptr;
+  }
+  if (auto iter = obj->find(FORKS_LIT); iter != obj->end()) {
+    llvm::json::Array *forksArray = iter->second.getAsArray();
+    assert(forksArray);
+    prop->forks.reserve(forksArray->size());
+    for (const llvm::json::Value &sentValue : *forksArray) {
+      auto innerJSON = EagerForkSentNamer::fromInnerJSON(sentValue, path);
+      assert(innerJSON);
+      prop->forks.push_back(*innerJSON);
+    }
+  } else {
+    path.report(json::ERR_MISSING_VALUE);
+    return nullptr;
+  }
   return prop;
 }
 

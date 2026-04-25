@@ -18,6 +18,7 @@ struct ConstrainedNamer;
 struct ConstrainedEagerForkSentNamer;
 struct ConstrainedBufferSlotFullNamer;
 struct MemoryControllerSlotNamer;
+struct EntrySlotNamer;
 
 std::vector<std::unique_ptr<InternalStateNamer>>
 getAllSlotsOfOperation(Operation *op);
@@ -41,6 +42,7 @@ struct InternalStateNamer {
     PipelineTokenCount,
     Constrained,
     MemoryControllerSlot,
+    EntrySlot,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -83,6 +85,7 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
   static constexpr llvm::StringLiteral MEMORY_CONTROLLER_SLOT =
       "MemoryControllerSlot";
+  static constexpr llvm::StringLiteral ENTRY_SLOT = "EntrySlot";
   static constexpr llvm::StringLiteral TOKEN_COUNT = "TokenCount";
   static constexpr llvm::StringLiteral PIPELINE_TOKEN_COUNT =
       "PipelineTokenCount";
@@ -396,6 +399,34 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "slot_index";
   static constexpr llvm::StringLiteral PORT_TYPE_LIT = "port_type";
   static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
+};
+
+struct EntrySlotNamer : InternalStateNamer {
+  // a_valid
+  // b_valid
+  // y_start_valid
+  // x_start_valid
+  // start_valid
+  EntrySlotNamer() = default;
+  EntrySlotNamer(const std::string &name)
+      : InternalStateNamer(TYPE::EntrySlot), argName(name) {}
+  ~EntrySlotNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::EntrySlot;
+  }
+
+  inline std::string getSMVName() const override {
+    return llvm::formatv("{0}_valid", argName);
+  }
+
+  inline llvm::json::Value toInnerJSON() const override {
+    return llvm::json::Object({{ARG_NAME_LIT, argName}});
+  }
+  std::unique_ptr<EntrySlotNamer> static fromInnerJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
+  std::string argName;
+  static constexpr llvm::StringLiteral ARG_NAME_LIT = "arg_name";
 };
 
 } // namespace handshake

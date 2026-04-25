@@ -277,14 +277,23 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   IOGSingleToken() = default;
-  IOGSingleToken(unsigned long id, TAG tag);
+  IOGSingleToken(unsigned long id, TAG tag,
+                 std::vector<std::unique_ptr<InternalStateNamer>> slots,
+                 std::vector<EagerForkSentNamer> forks)
+      : FormalProperty(id, tag, TYPE::IOGSingleToken), slots(std::move(slots)),
+        forks(std::move(forks)){};
   ~IOGSingleToken() = default;
 
   static bool classof(const FormalProperty *fp) {
     return fp->getType() == TYPE::IOGSingleToken;
   }
 
+  std::vector<std::unique_ptr<InternalStateNamer>> slots;
+  std::vector<EagerForkSentNamer> forks;
+
 private:
+  inline static const StringLiteral SLOTS_LIT = "slots";
+  inline static const StringLiteral FORKS_LIT = "forks";
 };
 
 class IOGConsecutiveTokens : public FormalProperty {

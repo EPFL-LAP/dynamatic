@@ -82,7 +82,7 @@ struct IOGCandidate {
   bool invalidIOG = false;
 
   IOGCandidate() = default;
-  IOGCandidate(mlir::Value entry) {
+  IOGCandidate(BlockArgument entry) {
     iog.entry = entry;
     markFollowed(entry);
   }
@@ -168,7 +168,7 @@ struct IOGCandidate {
 using namespace dynamatic::handshake;
 class IOGFinder {
 public:
-  IOGFinder(mlir::Value entry) {
+  IOGFinder(BlockArgument entry) {
     IOGCandidate cp(entry);
     candidates.push_back(cp);
   }
@@ -334,7 +334,7 @@ private:
   std::vector<IOG> finals;
 };
 
-std::vector<IOG> findAllIOGsWithEntry(mlir::Value entry) {
+std::vector<IOG> findAllIOGsWithEntry(BlockArgument entry) {
   IOGFinder finder(entry);
   while (!finder.isDone()) {
     finder.step();
@@ -348,7 +348,7 @@ std::vector<IOG> findAllIOGs(ModuleOp modOp) {
   std::vector<IOG> ret{};
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     // Each argument corresponds to an entry node.
-    for (mlir::Value arg : funcOp.getRegion().getArguments()) {
+    for (BlockArgument arg : funcOp.getRegion().getArguments()) {
       for (auto &iog : findAllIOGsWithEntry(arg)) {
         ret.push_back(std::move(iog));
       }

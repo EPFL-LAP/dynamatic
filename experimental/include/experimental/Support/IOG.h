@@ -30,7 +30,7 @@ struct IOG {
   IOG() = default;
   std::unordered_set<Operation *> units;
   llvm::DenseSet<mlir::Value> channels;
-  mlir::Value entry;
+  BlockArgument entry;
 
   inline bool contains(Operation *op) const {
     auto iter = units.find(op);

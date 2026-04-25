@@ -1297,6 +1297,30 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       }
       std::string propertyString = llvm::join(eqs, " & ");
       data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<IOGSingleToken>(property.get())) {
+      // count(slot1, slot2, ...) = 1 + count(fork1, fork2, ...)
+      std::vector<std::string> smvSlots(0);
+      smvSlots.reserve(p->slots.size());
+      for (auto &slot : p->slots) {
+        smvSlots.push_back(slot->getSMVName());
+      }
+      // smvSlots cannot be empty, as each IOG contains at least the entry slot
+
+      std::vector<std::string> smvForks(0);
+      smvForks.reserve(p->forks.size());
+      for (auto &fork : p->forks) {
+        smvForks.push_back(fork.getSMVName());
+      }
+      std::string rhs;
+      if (smvForks.empty()) {
+        rhs = "1";
+      } else {
+        rhs = llvm::formatv("1 + count({0})", llvm::join(smvForks, ", "));
+      }
+
+      std::string propertyString =
+          llvm::formatv("count({0}) = {1}", llvm::join(smvSlots, ", "), rhs);
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<IOGConsecutiveTokens>(property.get())) {
       // buffer1.slotted_token_count > 0 & buffer2.slotted_token_count > 0 ->
       // fork3.outs1_sent | fork4.outs0_sent
@@ -1313,10 +1337,10 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       }
       assert(p->slot1);
       assert(p->slot2);
-      std::string full =
+      std::string propertyString =
           llvm::formatv("(({0} > 0) & ({1} > 0)) -> ({2})",
                         p->slot1->getSMVName(), p->slot2->getSMVName(), right);
-      data.properties[p->getId()] = {full, propertyTag};
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();

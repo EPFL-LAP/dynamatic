@@ -82,6 +82,7 @@ private:
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
+  LogicalResult annotateIOGSingleToken(const IOG &iog);
   LogicalResult annotateIOGConsecutiveTokens(const IOG &iog);
 };
 
@@ -321,6 +322,39 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
 } // namespace
 
 LogicalResult
+HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(const IOG &iog) {
+  std::vector<std::unique_ptr<InternalStateNamer>> slots(0);
+  Operation *op = iog.entry.getOwner()->getParentOp();
+  auto nameAttr =
+      op->getAttrOfType<ArrayAttr>("argNames")[iog.entry.getArgNumber()];
+  std::string name = dyn_cast<StringAttr>(nameAttr).str();
+
+  slots.push_back(std::make_unique<EntrySlotNamer>(name));
+  std::vector<EagerForkSentNamer> forks(0);
+  for (auto &op : iog.units) {
+    for (auto &slot : getAllSlotsOfOperation(op)) {
+      slots.push_back(std::move(slot));
+    }
+    if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(op)) {
+      auto forkSlots = forkOp.getInternalSentStateNamers();
+      int count = 0;
+      for (auto [i, channel] : llvm::enumerate(forkOp->getResults())) {
+        if (iog.contains(channel)) {
+          forks.push_back(forkSlots[i]);
+          count += 1;
+        }
+      }
+      assert(count == 1);
+    }
+  }
+  auto p = IOGSingleToken(uid, FormalProperty::TAG::INVAR, std::move(slots),
+                          std::move(forks));
+  uid++;
+  propertyTable.push_back(p.toJSON());
+  return success();
+}
+
+LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
   std::vector<std::pair<Operation *, std::shared_ptr<InternalStateNamer>>>
       slotOps;
@@ -364,6 +398,20 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
 
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
+  auto iogs = findAllIOGs(modOp);
+  llvm::DenseSet<SinkOp> sinks;
+  for (auto &iog : iogs) {
+    for (Operation *unit : iog.units) {
+      if (auto sinkOp = dyn_cast<SinkOp>(unit)) {
+        sinks.insert(sinkOp);
+      }
+    }
+  }
+
+  for (SinkOp sink : sinks) {
+    auto x = UnitAttr::get(modOp.getContext());
+    sink->setAttr("IOG_TERMINATOR", x);
+  }
 
   if (failed(annotateAbsenceOfBackpressure(modOp)))
     return signalPassFailure();
@@ -377,8 +425,9 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     if (failed(annotateReconvergentPathFlow(modOp)))
       return signalPassFailure();
 
-    auto iogs = findAllIOGs(modOp);
     for (const auto &iog : iogs) {
+      if (failed(annotateIOGSingleToken(iog)))
+        return signalPassFailure();
       if (failed(annotateIOGConsecutiveTokens(iog)))
         return signalPassFailure();
     }

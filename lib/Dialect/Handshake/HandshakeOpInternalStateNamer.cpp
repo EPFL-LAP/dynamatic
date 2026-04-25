@@ -15,6 +15,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::Constrained;
   if (s == MEMORY_CONTROLLER_SLOT)
     return TYPE::MemoryControllerSlot;
+  if (s == ENTRY_SLOT)
+    return TYPE::EntrySlot;
   if (s == TOKEN_COUNT)
     return TYPE::TokenCount;
   if (s == PIPELINE_TOKEN_COUNT)
@@ -35,6 +37,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return CONSTRAINED.str();
   case TYPE::MemoryControllerSlot:
     return MEMORY_CONTROLLER_SLOT.str();
+  case TYPE::EntrySlot:
+    return ENTRY_SLOT.str();
   case TYPE::TokenCount:
     return TOKEN_COUNT.str();
   case TYPE::PipelineTokenCount:
@@ -88,6 +92,10 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
   case TYPE::MemoryControllerSlot:
     prop = MemoryControllerSlotNamer::fromInnerJSON(inner, path);
     assert(prop && "mc slot failed");
+    break;
+  case TYPE::EntrySlot:
+    prop = EntrySlotNamer::fromInnerJSON(inner, path);
+    assert(prop && "entry slot failed");
     break;
   }
   prop->type = type;
@@ -207,6 +215,16 @@ MemoryControllerSlotNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
+std::unique_ptr<EntrySlotNamer>
+EntrySlotNamer::fromInnerJSON(const llvm::json::Value &value,
+                              llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  auto prop = std::make_unique<EntrySlotNamer>();
+  if (!mapper || !mapper.map(ARG_NAME_LIT, prop->argName))
+    return nullptr;
+  return prop;
+}
+
 std::vector<std::unique_ptr<InternalStateNamer>>
 getAllSlotsOfOperation(Operation *op) {
   std::vector<std::unique_ptr<InternalStateNamer>> ret;
@@ -216,6 +234,7 @@ getAllSlotsOfOperation(Operation *op) {
       ret.push_back(std::make_unique<PipelineSlotNamer>(slot));
     }
   }
+  // TODO: Handle LoadOp for MC slot
   if (auto bufferOp = dyn_cast<BufferLikeOpInterface>(op)) {
     auto slots = bufferOp.getInternalSlotStateNamers();
     for (auto &slot : slots) {

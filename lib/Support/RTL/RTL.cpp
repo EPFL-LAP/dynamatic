@@ -286,6 +286,12 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
+  if (handshakeOp == "handshake.sink") {
+    bool x = modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)
+                 .contains("IOG_TERMINATOR");
+    serializedParams["IOG_TERMINATOR"] = x ? "True" : "False";
+  }
+
   LogicalResult gotBitwidth =
       registerBitwidthParameter(modOp, handshakeOp, modType);
   LogicalResult gotExtraSignals =
