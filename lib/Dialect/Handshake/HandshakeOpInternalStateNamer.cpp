@@ -1,5 +1,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -234,7 +235,28 @@ getAllSlotsOfOperation(Operation *op) {
       ret.push_back(std::make_unique<PipelineSlotNamer>(slot));
     }
   }
-  // TODO: Handle LoadOp for MC slot
+  if (auto loadOp = dyn_cast<LoadOp>(op)) {
+    // TODO: Handle LoadOp for MC slot
+    auto slots = loadOp.getInternalSlotStateNamers();
+    auto *mcOp = loadOp.getAddressResult().getUses().begin()->getOwner();
+    assert(mcOp);
+    auto mc = dyn_cast<MemoryControllerOp>(mcOp);
+    assert(mc);
+    size_t nLoads = mc.getNumLoadPorts();
+    std::optional<MemoryControllerSlotNamer> mcSlot;
+    for (size_t i = 0; i < nLoads; ++i) {
+      if (mc.getLoadPort(i)->getLoadOp() == loadOp) {
+        assert(!mcSlot.has_value());
+        mcSlot = mc.getLoadPortSlotNamer(i);
+      }
+    }
+    assert(mcSlot);
+    ret.push_back(std::make_unique<BufferSlotFullNamer>(slots[0]));
+    ret.push_back(std::make_unique<MemoryControllerSlotNamer>(*mcSlot));
+    ret.push_back(std::make_unique<BufferSlotFullNamer>(slots[1]));
+    return ret;
+  }
+
   if (auto bufferOp = dyn_cast<BufferLikeOpInterface>(op)) {
     auto slots = bufferOp.getInternalSlotStateNamers();
     for (auto &slot : slots) {
