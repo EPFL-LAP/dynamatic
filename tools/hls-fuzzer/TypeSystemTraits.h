@@ -86,6 +86,14 @@ struct TypeSystemTraits<ast::BinaryExpression> : TypeSystemTraitsDefaults {
 };
 
 template <>
+struct TypeSystemTraits<ast::UnaryExpression> : TypeSystemTraitsDefaults {
+
+  /// Type constraint for the expression the operation is applied on.
+  template <typename TypingContext>
+  using Conclusions = TypingContext;
+};
+
+template <>
 struct TypeSystemTraits<ast::CastExpression> : TypeSystemTraitsDefaults {
 
   /// Type constraints for the target type followed
