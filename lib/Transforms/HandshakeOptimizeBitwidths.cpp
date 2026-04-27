@@ -337,12 +337,24 @@ static void canonicalizeCommutativeExtensionType(ExtWidth &lhs, ExtWidth &rhs) {
     std::swap(lhs, rhs);
 }
 
-/// Transfer function for add/sub operations or alike.
+/// Transfer function for add operations or alike.
 static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
   canonicalizeCommutativeExtensionType(lhs, rhs);
   if (rhs.extType <= ExtType::ZEXT)
     return {ExtType::ZEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 
+  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+}
+
+/// Transfer function for sub operations or alike.
+static ExtWidth subWidth(ExtWidth lhs, ExtWidth rhs) {
+  // Subtraction logic can be broken down using other operations as follows:
+  // sub(a, b) = add(a, ~b + 1) = add(a, xor(b, sext(-1)) + 1)
+  // Applying the forward function from 'xor' we can conclude that rhs is
+  // always sign-extended if reduced in bitwidth.
+
+  // We apply the logic from 'add' here, but with the assumption that 'rhs' is
+  // SEXT.
   return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 }
 
@@ -1960,9 +1972,10 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
     RewritePatternSet &patterns, bool forward) {
   MLIRContext *ctx = patterns.getContext();
 
-  patterns.add<ArithSingleType<handshake::AddIOp>,
-               ArithSingleType<handshake::SubIOp>>(
+  patterns.add<ArithSingleType<handshake::AddIOp>>(
       bitwidthReduced, forward, addWidth, ctx, getAnalysis<NameAnalysis>());
+  patterns.add<ArithSingleType<handshake::SubIOp>>(
+      bitwidthReduced, forward, subWidth, ctx, getAnalysis<NameAnalysis>());
 
   patterns.add<ArithSingleType<handshake::MulIOp>>(
       bitwidthReduced, true, mulWidth, ctx, getAnalysis<NameAnalysis>());
