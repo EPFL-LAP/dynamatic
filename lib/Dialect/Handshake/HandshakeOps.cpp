@@ -427,6 +427,7 @@ LogicalResult BufferOp::verify() {
   // this is additional verification
   // so both attributes have already been verified as present
   int numSlots = getNumSlots();
+  int64_t dvLatency = getLatencyDV();
   BufferType bufferType = getBufferType();
 
   if ((bufferType == BufferType::ONE_SLOT_BREAK_DV ||
@@ -436,6 +437,48 @@ LogicalResult BufferOp::verify() {
     return emitOpError("buffer type '")
            << stringifyEnum(bufferType) << "' requires NUM_SLOTS = 1, but got "
            << numSlots;
+  }
+
+  auto emitLatencyError = [&](int64_t expectedLatency) -> LogicalResult {
+    return emitOpError("buffer type '")
+           << stringifyEnum(bufferType)
+           << "' requires DV_LATENCY = " << expectedLatency << ", but got "
+           << dvLatency;
+  };
+
+  switch (bufferType) {
+  case BufferType::ONE_SLOT_BREAK_R:
+  case BufferType::FIFO_BREAK_NONE:
+    if (dvLatency != 0)
+      return emitLatencyError(0);
+    break;
+  case BufferType::ONE_SLOT_BREAK_DV:
+  case BufferType::FIFO_BREAK_DV:
+  case BufferType::ONE_SLOT_BREAK_DVR:
+    if (dvLatency != 1)
+      return emitLatencyError(1);
+    break;
+  case BufferType::SHIFT_REG_BREAK_DV:
+    if (dvLatency != numSlots) {
+      return emitOpError("buffer type '")
+             << stringifyEnum(bufferType)
+             << "' requires DV_LATENCY = NUM_SLOTS (" << numSlots
+             << "), but got " << dvLatency;
+    }
+    break;
+  case BufferType::COUNTER_BUFFER:
+    if (numSlots != 1) {
+      return emitOpError("buffer type '")
+             << stringifyEnum(bufferType)
+             << "' stores a single token and requires NUM_SLOTS = 1, but got "
+             << numSlots;
+    }
+    if (dvLatency < 1) {
+      return emitOpError("buffer type '")
+             << stringifyEnum(bufferType)
+             << "' requires DV_LATENCY >= 1, but got " << dvLatency;
+    }
+    break;
   }
 
   return success();

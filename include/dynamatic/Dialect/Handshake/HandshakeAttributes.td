@@ -257,7 +257,10 @@ def Handshake_BufferTypeAttr : I64EnumAttr<
       /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share the same
       /// handshake control signals, causing them to accept or stall inputs
       /// simultaneously.
-      I64EnumAttrCase<"SHIFT_REG_BREAK_DV", 5>
+      I64EnumAttrCase<"SHIFT_REG_BREAK_DV", 5>,
+      
+      /// COUNTER_BUFFER: Holds one token for a given number of cycles.
+      I64EnumAttrCase<"COUNTER_BUFFER", 6>
     ]> {
   let cppNamespace = "::dynamatic::handshake";
 }
