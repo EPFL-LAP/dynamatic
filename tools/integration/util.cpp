@@ -67,7 +67,7 @@ int runIntegrationTest(IntegrationTestData &config) {
 
   // Verify Verilog works correctly
   if (config.testVerilog) {
-    scriptFile << "write-hdl --hdl verilog" << std::endl
+    scriptFile << "write-hdl --hdl verilog-beta" << std::endl
                << "simulate" << std::endl;
   }
   // Verify VHDL works correctly
