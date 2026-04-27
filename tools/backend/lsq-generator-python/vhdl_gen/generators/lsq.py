@@ -777,7 +777,7 @@ class LSQ:
                 arch += Op(ctx, can_load_p0[i], 'not',
                            load_conflict[i], 'and', load_req_valid[i])
 
-        if self.configs.issueOldestLoads is not None:
+        if self.configs.issueOldestLoads is not None and self.configs.numLdPorts > 0:
             load_allowed = LogicVec(ctx, 'load_allowed', 'w', self.configs.numLdqEntries)
 
             if self.configs.issueOldestLoadsType in ["issuable", "contiguous"]:  # global
