@@ -83,6 +83,8 @@ class Configs:
     # What set of loads we consider when determining the oldest N loads for issue restriction:
     # - issuable: the oldest N loads which are issuable (= allocated, not issued, and address available)
     # - contiguous: the oldest issuable load, and then the N-1 next buffer entries (regardless of their status)
+    # - per-port-issuable: like issueable, but each load port considered separately
+    # - per-port-contiguous: like contiguous, but each load port considered separately
     issueOldestLoadsType: str = "issuable"
 
     def __init__(self, config: dict) -> None:
@@ -211,5 +213,5 @@ class Configs:
             assert self.issueOldestLoads > 0, "issueOldestLoads must be positive."
             assert self.issueOldestLoads <= self.numLdqEntries, "issueOldestLoads cannot be greater than the number of load queue entries."
             assert not self.fallbackIssueLoad, "issueOldestLoads is not compatible with fallback issue for loads."
-        assert self.issueOldestLoadsType in ["issuable", "contiguous"], \
-            "Invalid value for LSQ_ISSUE_OLDEST_LOADS_TYPE environment variable: must be 'issuable' or 'contiguous'"
+            assert self.issueOldestLoadsType in ["issuable", "contiguous", "per-port-issuable", "per-port-contiguous"], \
+                "Invalid value for LSQ_ISSUE_OLDEST_LOADS_TYPE environment variable: must be 'issuable', 'contiguous', 'per-port-issuable', or 'per-port-contiguous'"
