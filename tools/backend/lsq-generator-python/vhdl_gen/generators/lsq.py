@@ -809,17 +809,33 @@ class LSQ:
                 else:
                     assert False, f"Unsupported issueOldestLoadsType: {self.configs.issueOldestLoadsType}"
             else:  # per-port
+                # one-hot port index
                 ldq_port_idx_oh_p0 = LogicVecArray(
-                    ctx, 'ldq_port_idx_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numLdPorts)
-                if self.configs.pipe0:
-                    ldq_port_idx_oh_p0.regInit()
-                for i in range(self.configs.numLdqEntries):
-                    if self.configs.ldpAddrW > 0:
-                        assert ldq_port_idx is not None
-                        arch += BitsToOH(ctx, ldq_port_idx_oh_p0[i], ldq_port_idx[i])
-                    else:
-                        assert ldq_port_idx is None
-                        assert self.configs.numLdPorts == 1
+                    ctx, 'ldq_port_idx_oh_p0', 'w', self.configs.numLdqEntries, self.configs.numLdPorts)
+
+                if self.configs.ldpAddrW > 0:
+                    # ldq_port_idx pipeline: pcomp stage
+                    assert ldq_port_idx is not None
+                    ldq_port_idx_pcomp = LogicVecArray(
+                        ctx, 'ldq_port_idx_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.ldpAddrW)
+                    if self.configs.pipeComp:
+                        ldq_port_idx_pcomp.regInit()
+                    for i in range(self.configs.numLdqEntries):
+                        arch += Op(ctx, ldq_port_idx_pcomp[i], ldq_port_idx[i])
+                    # ldq_port_idx pipeline: p0 stage
+                    ldq_port_idx_p0 = LogicVecArray(
+                        ctx, 'ldq_port_idx_p0', pipe0_type, self.configs.numLdqEntries, self.configs.ldpAddrW)
+                    if self.configs.pipe0:
+                        ldq_port_idx_p0.regInit()
+                    for i in range(self.configs.numLdqEntries):
+                        arch += Op(ctx, ldq_port_idx_p0[i], ldq_port_idx_pcomp[i])
+                    # one-hot encoder
+                    for i in range(self.configs.numLdqEntries):
+                        arch += BitsToOH(ctx, ldq_port_idx_oh_p0[i], ldq_port_idx_p0[i])
+                else:
+                    assert ldq_port_idx is None
+                    assert self.configs.numLdPorts == 1
+                    for i in range(self.configs.numLdqEntries):
                         arch += Op(ctx, ldq_port_idx_oh_p0[i], 1)
 
                 load_allowed_per_port = LogicVecArray(ctx, f'load_allowed_per_port', 'w', self.configs.numLdPorts, self.configs.numLdqEntries)
@@ -862,7 +878,7 @@ class LSQ:
                     arch += Reduce(ctx, load_allowed_per_port[p], load_allowed_vecarray_portp, 'or')
                 arch += Reduce(ctx, load_allowed, load_allowed_per_port, 'or')
             for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, can_load[i], (load_allowed, i), 'and', can_load_p0[i])
+                arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i], 'and', (load_allowed, i))
         else:
             for i in range(0, self.configs.numLdqEntries):
                 arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i])
