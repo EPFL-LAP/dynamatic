@@ -442,7 +442,7 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
 
       PlacementResult &result = placement[operand];
       if (result.numFifoNone == 0 && result.numOneSlotDV == 0 &&
-          result.numCounterBuffer == 0) {
+          result.counterBufferLatencies.empty()) {
         result.numFifoNone = 1;
       }
     }
