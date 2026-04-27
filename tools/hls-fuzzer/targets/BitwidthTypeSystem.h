@@ -88,9 +88,8 @@ public:
   checkConstant(const ast::Constant &constant,
                 const BitwidthTypingContext &context) const;
 
-  std::optional<ConclusionOf<ast::BinaryExpression>>
-  checkBinaryExpression(ast::BinaryExpression::Op op,
-                        const BitwidthTypingContext &context) const;
+  bool discardBinaryExpression(ast::BinaryExpression::Op op,
+                               const BitwidthTypingContext &context) const;
 
   static std::optional<ConclusionOf<ast::UnaryExpression>>
   checkUnaryExpression(ast::UnaryExpression::Op,
@@ -99,11 +98,17 @@ public:
     return std::nullopt;
   }
 
+  DependencyArray<ast::BinaryExpression>
+  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) final;
+
   ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(const BitwidthTypingContext &context) const;
 
   static ConclusionOf<ast::Function>
   checkFunction(const BitwidthTypingContext &context);
+
+  DependencyArray<ast::ArrayReadExpression>
+  getArrayReadExpressionContextDependencies() override;
 
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range

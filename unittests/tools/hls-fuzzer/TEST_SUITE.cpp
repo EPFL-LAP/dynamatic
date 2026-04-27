@@ -26,17 +26,24 @@ REGISTER_TYPED_TEST_SUITE_P(TypeSystemTest, OutputCheck);
 
 namespace {
 // Bool representing whether a parameter is required.
-class PlusOfTwoParamOnlyTypeSystem
+class PlusOfTwoParamOnlyTypeSystem final
     : public gen::DisallowByDefaultTypeSystem<bool,
                                               PlusOfTwoParamOnlyTypeSystem> {
 public:
-  static std::optional<ConclusionOf<ast::BinaryExpression>>
-  checkBinaryExpression(ast::BinaryExpression::Op op, bool mustBeParameter) {
-    // Saw a binop, parameter is now required.
-    if (!mustBeParameter && op == ast::BinaryExpression::Plus)
-      return ConclusionOf<ast::BinaryExpression>{true, true};
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
 
-    return std::nullopt;
+  static bool discardBinaryExpression(ast::BinaryExpression::Op op,
+                                      bool mustBeParameter) {
+    return mustBeParameter || op != ast::BinaryExpression::Plus;
+  }
+
+  gen::DependencyArray<ast::BinaryExpression>
+  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op) override {
+    return {
+        Dependency<ast::BinaryExpression>(true),
+        Dependency<ast::BinaryExpression>(true),
+        Dependency<ast::BinaryExpression>(true),
+    };
   }
 
   static std::optional<ConclusionOf<ast::ScalarParameter>>
@@ -73,15 +80,23 @@ public:
 
 // Bool representing whether an array read expression is required.
 // Otherwise, a 0 constant must be generated.
-class ReturnArrayConstantOnlyTypeSystem
+class ReturnArrayConstantOnlyTypeSystem final
     : public gen::DisallowByDefaultTypeSystem<
           /*createArrayRead=*/bool, ReturnArrayConstantOnlyTypeSystem> {
 public:
-  static std::optional<ConclusionOf<ast::ArrayReadExpression>>
-  checkArrayReadExpression(bool createArrayRead) {
-    if (!createArrayRead)
-      return std::nullopt;
-    return ConclusionOf<ast::ArrayReadExpression>{false, false};
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
+
+  static bool discardArrayReadExpression(bool createArrayRead) {
+    return !createArrayRead;
+  }
+
+  gen::DependencyArray<ast::ArrayReadExpression>
+  getArrayReadExpressionContextDependencies() override {
+    return gen::DependencyArray<ast::ArrayReadExpression>{
+        Dependency<ast::ArrayReadExpression>(false),
+        Dependency<ast::ArrayReadExpression>(false),
+        copyFromParent<ast::ArrayReadExpression>(),
+    };
   }
 
   std::optional<ConclusionOf<ast::ArrayParameter>>

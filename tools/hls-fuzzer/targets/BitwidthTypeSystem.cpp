@@ -48,46 +48,74 @@ auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
       constant.value);
 }
 
-auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
-    ast::BinaryExpression::Op op, const BitwidthTypingContext &context) const
-    -> std::optional<ConclusionOf<ast::BinaryExpression>> {
+bool dynamatic::gen::BitwidthTypeSystem::discardBinaryExpression(
+    ast::BinaryExpression::Op op, const BitwidthTypingContext &context) const {
   switch (op) {
-  case ast::BinaryExpression::BitAnd: {
-    // Bitand is distributive: Sub-expressions can assume they are truncated
-    // as well.
-    std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
-    if (!req)
-      return ConclusionOf<ast::BinaryExpression>{ResultIsTruncated{},
-                                                 ResultIsTruncated{}};
+  case ast::BinaryExpression::BitAnd:
+  case ast::BinaryExpression::BitOr:
+  case ast::BinaryExpression::BitXor:
+    // Always allowed.
+    return false;
 
-    // Otherwise, one operand is constrained to of the given maximum bitwidth
-    // while the other can assume it is being truncated.
-    // The choice of whether the left or right-hand-side is constrained is
-    // arbitrary.
-    return ConclusionOf<ast::BinaryExpression>{
-        ResultIsTruncated{}, getInterestingBitWidthInRange(*req)};
-  }
+  case ast::BinaryExpression::ShiftRight:
   case ast::BinaryExpression::ShiftLeft:
-    // TODO: Left shift is distributive for the shifted operand but not the
-    //       shift-amount.
-    //       Under a fixed bitwidth, we can also choose bitwidths for both
-    //       operands such that it fits within a fixed bitwidth.
-    return std::nullopt;
+    // TODO: Implement logic for these.
+    return true;
 
   case ast::BinaryExpression::Plus:
   case ast::BinaryExpression::Mul:
   case ast::BinaryExpression::Minus:
-    if (context.resultIsTruncated())
-      return ConclusionOf<ast::BinaryExpression>{ResultIsTruncated{},
-                                                 ResultIsTruncated{}};
+    // Only allowed if truncated.
+    return context.resultIsTruncated();
 
-    // TODO: We can choose bitwidths for the left and right operands of these
-    //       expressions here to fit a maximum bitwidth.
-    return std::nullopt;
+  case ast::BinaryExpression::Greater:
+  case ast::BinaryExpression::GreaterEqual:
+  case ast::BinaryExpression::Less:
+  case ast::BinaryExpression::LessEqual:
+  case ast::BinaryExpression::Equal:
+  case ast::BinaryExpression::NotEqual:
+    if (globalMaxBitwidth == 1) {
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "Discarding NotEqualExpression as the maximum global "
+               "bitwidth == 1, which requires the comparison to be done "
+               "on 0-bit integers (which does not exist in C)";
+      });
+      return true;
+    }
+    return false;
+  }
+  llvm_unreachable("all enum cases handled");
+}
 
-  case ast::BinaryExpression::ShiftRight:
-    // TODO: Figure out constraints here.
-    return std::nullopt;
+auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
+    ast::BinaryExpression::Op op) -> DependencyArray<ast::BinaryExpression> {
+  switch (op) {
+  case ast::BinaryExpression::BitAnd:
+    return {
+        Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        Dependency<ast::BinaryExpression, PARENT_DEPENDENCY>(
+            [&](const BitwidthTypingContext &context) -> BitwidthTypingContext {
+              // Bitand is distributive: Sub-expressions can assume they are
+              // truncated as well.
+              std::optional<std::uint8_t> req =
+                  context.bitwidthRequirementOrNone();
+              if (!req)
+                return ResultIsTruncated{};
+
+              return getInterestingBitWidthInRange(*req);
+            }),
+        copyFromParent<ast::BinaryExpression>(),
+    };
+
+  case ast::BinaryExpression::Plus:
+  case ast::BinaryExpression::Minus:
+  case ast::BinaryExpression::Mul:
+    return DependencyArray<ast::BinaryExpression>{
+        Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        copyFromParent<ast::BinaryExpression>(),
+    };
   case ast::BinaryExpression::Greater:
   case ast::BinaryExpression::GreaterEqual:
   case ast::BinaryExpression::Less:
@@ -108,24 +136,19 @@ auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
     // TODO: The sign-extension of the inputs is dependent on whether the type
     //       of the operands are signed or not. We could track this
     //       theoretically.
-    if (globalMaxBitwidth == 1) {
-      LLVM_DEBUG({
-        llvm::dbgs()
-            << "Discarding NotEqualExpression as the maximum global "
-               "bitwidth == 1, which requires the comparison to be done "
-               "on 0-bit integers (which does not exist in C)";
-      });
-      return std::nullopt;
-    }
-
-    return ConclusionOf<ast::BinaryExpression>{
-        {getInterestingBitWidthInRange(globalMaxBitwidth - 1)},
-        {getInterestingBitWidthInRange(globalMaxBitwidth - 1)}};
+    return {
+        Dependency<ast::BinaryExpression>(
+            getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
+        Dependency<ast::BinaryExpression>(
+            getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
+        copyFromParent<ast::BinaryExpression>(),
+    };
 
   case ast::BinaryExpression::BitOr:
   case ast::BinaryExpression::BitXor:
-    // Distribute regarding truncation.
-    return ConclusionOf<ast::BinaryExpression>{context, context};
+  case ast::BinaryExpression::ShiftLeft:
+  case ast::BinaryExpression::ShiftRight:
+    return TypeSystem::getBinaryExpressionContextDependencies(op);
   }
   llvm_unreachable("all enum cases handled");
 }
@@ -145,6 +168,23 @@ auto dynamatic::gen::BitwidthTypeSystem::checkFunction(
   return ConclusionOf<ast::Function>{
       /*returnType=*/ResultIsTruncated{},
       /*returnStatement=*/context,
+  };
+}
+
+auto dynamatic::gen::BitwidthTypeSystem::
+    getArrayReadExpressionContextDependencies()
+        -> DependencyArray<ast::ArrayReadExpression> {
+  return DependencyArray<ast::ArrayReadExpression>{
+      copyFromParent<ast::ArrayReadExpression>(),
+      Dependency<ast::ArrayReadExpression, /*arrayParameter*/ 0>(
+          [&](const BitwidthTypingContext &,
+              const ast::ArrayParameter &parameter) {
+            assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
+                   "implementation depends on dimensions being powers of 2");
+            return BitwidthTypingContext{std::min<std::uint8_t>(
+                llvm::Log2_64(parameter.getDimension()), globalMaxBitwidth)};
+          }),
+      copyFromParent<ast::ArrayReadExpression>(),
   };
 }
 

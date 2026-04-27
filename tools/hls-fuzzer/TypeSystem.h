@@ -4,14 +4,16 @@
 #include "Randomly.h"
 #include "TypeSystemTraits.h"
 
+#include "llvm/ADT/FunctionExtras.h"
+
 #include <any>
 
 namespace dynamatic::gen {
 
 /// Opaque wrapper which type-erases a context used during type checking.
-/// It allows users of 'AbstractTypeSystem' to pass contexts returned by
-/// 'check*' methods, to other 'check*' methods without needing to know the
-/// real context type used by the underlying type system.
+/// It allows users of 'AbstractTypeSystem' to pass contexts around between
+/// methods without needing to know the real context type used by the underlying
+/// type system.
 ///
 /// We call the type opaque since it does not implement any behavior based
 /// on the contained context beyond being able to pass it around.
@@ -31,9 +33,225 @@ public:
     return *std::any_cast<TypingContext>(&container);
   }
 
+  // Enable noop casts to 'OpaqueContext'.
+  template <>
+  const OpaqueContext &cast<OpaqueContext>() const {
+    return *this;
+  }
+
 private:
   std::any container;
 };
+
+/// Sentinel value representing a dependency on the parent context.
+constexpr std::size_t PARENT_DEPENDENCY = -1;
+
+/// Class responsible for telling the generator how to calculate the input
+/// 'TypingContext' for a given subelement of 'ASTNode'.
+/// The subelement whose input-context we are calculating for is given by its
+/// position within 'DependencyTuple'. See that type definition for more
+/// information.
+///
+/// The class is called 'Dependency' as it allows specifying a dependency on
+/// previously calculated contexts + previously generated subelements using
+/// 'inputIndices'.
+/// The indices in 'inputIndices' refer to the index of the given subelement
+/// this instance depends on within 'TypeSystemTraits<ASTNode>::SubElements'.
+/// The special value 'PARENT_DEPENDENCY' represents depending on the
+/// input-context of 'ASTNode'.
+/// It is the user's responsibility to not create cyclic dependencies.
+template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
+class Dependency {
+
+  template <typename Tuple, std::size_t current, std::size_t... remaining>
+  struct CalcCompFn {
+    // Recursive case.
+    using type = typename CalcCompFn<
+        decltype(std::tuple_cat(
+            std::declval<Tuple>(),
+            std::declval<std::conditional_t<
+                current == PARENT_DEPENDENCY,
+                // Parent case, only add the context.
+                std::tuple<const TypingContext &>,
+                // Add both the context and the ASTNode to the arguments.
+                std::tuple<
+                    const TypingContext &,
+                    const std::tuple_element_t<
+                        std::min(current,
+                                 std::tuple_size_v<typename TypeSystemTraits<
+                                         ASTNode>::SubElements> -
+                                     1),
+                        typename TypeSystemTraits<ASTNode>::SubElements>
+                        &>>>())),
+        remaining...>::type;
+  };
+
+  // Terminating end-case
+  template <class... Args, std::size_t current>
+  struct CalcCompFn<std::tuple<Args...>, current> {
+    using type = TypingContext(Args...);
+  };
+
+  using ContextComputationFn =
+      typename CalcCompFn<std::tuple<>, inputIndices..., 0>::type;
+
+public:
+  /// Constructs a 'Dependency' from a function.
+  /// The signature of the function is dependent on 'inputIndices'.
+  /// Specifically, for every element of 'inputIndices' and in the order as
+  /// given in 'inputIndices', the arguments are:
+  /// * The parent 'TypingContext' if the value is 'PARENT_DEPENDENCY'
+  /// * The output 'TypingContext' of the 'i'th subelement of 'ASTNode' followed
+  ///   by the subelement's AST node itself.
+  ///
+  /// Example:
+  /// Dependency<Context, ast::BinaryExpression, /*rhs*/ 1, PARENT_DEPENDENCY>(
+  ///   [](const Context& rhsContext, const ast::Expression& rhs,
+  ///      const Context& parentContext) -> Context {
+  ///     ...
+  ///   }
+  /// )
+  ///
+  /// The function should always return a 'TypingContext'. All parameters are
+  /// passed as const-references.
+  explicit Dependency(std::function<ContextComputationFn> computationFn)
+      : computationFn(std::move(computationFn)) {}
+
+  /// Convenience constructor from a constant 'TypingContext' without any
+  /// dependencies.
+  explicit Dependency(TypingContext context)
+      : Dependency(
+            [context = std::move(context)](auto &&...) { return context; }) {}
+
+  template <typename... Args>
+  TypingContext operator()(Args &&...args) const {
+    return computationFn(std::forward<Args>(args)...);
+  }
+
+private:
+  static_assert(((inputIndices <
+                      std::tuple_size_v<
+                          typename TypeSystemTraits<ASTNode>::SubElements> ||
+                  inputIndices == PARENT_DEPENDENCY) &&
+                 ...),
+                "input indices must refer to subelements or the parent");
+
+  std::function<ContextComputationFn> computationFn;
+};
+
+/// Opaque-wrapper over 'Dependency' that can be constructed from any instance
+/// of 'Dependency' with the same 'ASTNode'.
+/// Users should construct 'Dependency' instances instead.
+///
+/// Mainly used as a return type in 'AbstractTypeSystem' where templates cannot
+/// or shouldn't be used.
+template <typename ASTNode>
+class OpaqueDependency {
+  template <typename Tuple>
+  struct OpaqueContextTupleImpl;
+
+  template <typename... NonTerminals>
+  struct OpaqueContextTupleImpl<std::tuple<NonTerminals...>> {
+    using type = std::tuple<
+        std::optional<std::conditional_t<true, OpaqueContext, NonTerminals>>...,
+        std::optional<OpaqueContext>>;
+  };
+
+  template <typename Tuple>
+  struct NonTerminalsTupleImpl;
+
+  template <typename... NonTerminals>
+  struct NonTerminalsTupleImpl<std::tuple<NonTerminals...>> {
+    using type = std::tuple<std::optional<NonTerminals>...>;
+  };
+
+public:
+  /// Tuple of optionals of all subelements of this ASTNode.
+  /// This is used to have one consistent API with which to call an
+  /// 'OpaqueDependency' to calculate a context.
+  /// Elements are optional, since they may not yet have been constructed.
+  using SubElementsTuple = typename NonTerminalsTupleImpl<
+      typename TypeSystemTraits<ASTNode>::SubElements>::type;
+
+  /// Tuple of optionals of all contexts of this ASTNode.
+  /// This is used to have one consistent API with which to call an
+  /// 'OpaqueDependency' to calculate a context.
+  /// Elements are optional, since they may not yet have been calculated.
+  using ContextTuple = typename OpaqueContextTupleImpl<
+      typename TypeSystemTraits<ASTNode>::SubElements>::type;
+
+  /// Constructs an 'OpaqueDependency' from a 'Dependency'.
+  template <typename TypingContext, std::size_t... inputIndices>
+  /*implicit*/ OpaqueDependency(
+      Dependency<TypingContext, ASTNode, inputIndices...> &&dep)
+      : dep(std::move(dep)),
+        computationFn(+[](const std::any &dep,
+                          const SubElementsTuple &subElements,
+                          const ContextTuple &contexts) -> OpaqueContext {
+          // Construct a tuple of all arguments that 'dep' should be called
+          // with.
+          // This mainly uses 'inputIndices' to index into 'subElements' and
+          // 'contexts'.
+          // The logic here simply unwraps the optionals: It assumes that the
+          // required contexts and subelements have already been generated.
+          auto argTuple = std::tuple_cat([&](auto &&integral) {
+            constexpr std::size_t index = decltype(integral){};
+            if constexpr (index == PARENT_DEPENDENCY) {
+              // Parent context.
+              return std::forward_as_tuple(
+                  std::get<std::tuple_size_v<ContextTuple> - 1>(contexts)
+                      ->template cast<TypingContext>());
+            } else {
+              // Subelement context + ASTNode.
+              return std::forward_as_tuple(
+                  std::get<index>(contexts)->template cast<TypingContext>(),
+                  *std::get<index>(subElements));
+            }
+          }(std::integral_constant<std::size_t, inputIndices>{})...);
+
+          return OpaqueContext(std::apply(
+              *std::any_cast<
+                  Dependency<TypingContext, ASTNode, inputIndices...>>(&dep),
+              std::move(argTuple)));
+        }) {
+
+    static std::array<std::size_t, sizeof...(inputIndices)> storage{
+        inputIndices...};
+    this->inputIndices = storage;
+  }
+
+  /// Returns the indices of the subelements (or parent) that this dependency
+  /// depends on.
+  llvm::ArrayRef<std::size_t> getInputDependencies() const {
+    return inputIndices;
+  }
+
+  /// Calculates the context from the currently calculated subelements and
+  /// contexts. Internal API that should only be used by the generator.
+  OpaqueContext operator()(const SubElementsTuple &subElements,
+                           const ContextTuple &contexts) const {
+    return computationFn(dep, subElements, contexts);
+  }
+
+private:
+  std::any dep;
+  OpaqueContext (*computationFn)(const std::any &dep,
+                                 const SubElementsTuple &nonTerminals,
+                                 const ContextTuple &tuple);
+  llvm::ArrayRef<std::size_t> inputIndices;
+};
+
+/// Array of dependencies returned by 'AbstractTypeSystem' for every 'ASTNode'.
+/// The array contains as many elements as there are subelements in 'ASTNode'
+/// plus one.
+/// The corresponding index in the array corresponds to the 'OpaqueDependency'
+/// instance used to calculate the input context for that subelement.
+/// The special last element in the array corresponds to calculating the output
+/// 'context' for the 'ASTNode'.
+template <typename ASTNode>
+using DependencyArray = std::array<
+    OpaqueDependency<ASTNode>,
+    std::tuple_size_v<typename TypeSystemTraits<ASTNode>::SubElements> + 1>;
 
 /// Abstract base class for all type systems. Users of a type system such as
 /// the C generator use this interface in conjunction with 'OpaqueContext' to be
@@ -50,24 +268,42 @@ private:
 ///
 /// The 'TypeSystem' base class below should be used instead to automate this by
 /// overriding all the methods in  'AbstractTypeSystem' that box and unbox
-/// 'OpaqueContext's and dispatch to corresponding (non-opaque) 'check*' methods
+/// 'OpaqueContext's and dispatch to corresponding (non-opaque) methods
 /// in the derived class.
 /// It also offers common and convenient default implementations of 'check*'
-/// methods.
+/// and 'discard*' methods.
 class AbstractTypeSystem {
+protected:
+  /// Returns an instance of 'Dependency' which simply forwards the context from
+  /// the parent to the subelement.
+  template <typename ASTNode>
+  static auto copyFromParent() {
+    return Dependency<OpaqueContext, ASTNode, PARENT_DEPENDENCY>(
+        [](const OpaqueContext &context) { return context; });
+  }
+
 public:
   virtual ~AbstractTypeSystem();
 
   virtual ConclusionOf<ast::Function, OpaqueContext>
   checkFunctionOpaque(const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::BinaryExpression, OpaqueContext>>
-  checkBinaryExpressionOpaque(ast::BinaryExpression::Op op,
-                              const OpaqueContext &context) = 0;
+  /// Returns true if the generator should discard this binary expression based
+  /// on the given input context.
+  virtual bool discardBinaryExpressionOpaque(ast::BinaryExpression::Op op,
+                                             const OpaqueContext &context) = 0;
 
   virtual std::optional<ConclusionOf<ast::UnaryExpression, OpaqueContext>>
   checkUnaryExpressionOpaque(ast::UnaryExpression::Op op,
                              const OpaqueContext &context) = 0;
+
+  virtual DependencyArray<ast::BinaryExpression>
+  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) {
+    // Default implementation: Simply propagates the context to the subelements.
+    return {copyFromParent<ast::BinaryExpression>(),
+            copyFromParent<ast::BinaryExpression>(),
+            copyFromParent<ast::BinaryExpression>()};
+  }
 
   virtual std::optional<ConclusionOf<ast::Variable, OpaqueContext>>
   checkVariableOpaque(const OpaqueContext &context) = 0;
@@ -93,8 +329,16 @@ public:
   checkScalarParameterOpaque(const ast::ScalarParameter &,
                              const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::ArrayReadExpression, OpaqueContext>>
-  checkArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
+  virtual bool
+  discardArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
+
+  virtual DependencyArray<ast::ArrayReadExpression>
+  getArrayReadExpressionContextDependencies() {
+    return DependencyArray<ast::ArrayReadExpression>{
+        copyFromParent<ast::ArrayReadExpression>(),
+        copyFromParent<ast::ArrayReadExpression>(),
+        copyFromParent<ast::ArrayReadExpression>()};
+  }
 
   virtual std::optional<ConclusionOf<ast::ArrayParameter, OpaqueContext>>
   checkArrayParameterOpaque(const ast::ArrayParameter &,
@@ -115,20 +359,34 @@ public:
 /// used when generating sub-elements of an AST-node or 2) rejecting AST-nodes
 /// entirely based on the current type context.
 ///
-/// All type checking is performed under a given context specified as the
-/// 'TypingContext' template parameter.
-/// For every AST construct a corresponding 'check*' method exists.
-/// The input to this method is always the context used to type check the given
-/// AST construct.
-/// Based on the input context the 'check*' method can then derive new contexts
-/// for its subelements or discard the AST-node entirely.
-/// The return type is the so-called conclusion and is different for every
-/// AST construct. It is specified using the 'TypeSystemTraits'.
+/// There are currently two APIs to achieve this:
+/// 1) The dependency API
+/// 2) the 'check*' API.
+/// The latter is considered deprecated and implements a subset of
+/// functionality of the dependency API.
 ///
-/// E.g. the conclusion of a binary expression are the contexts that should be
-/// used to type check the left and right operands.
-/// Most 'check*' methods support discarding the AST node entirely, in which
-/// case the conclusion type is wrapped in an optional.
+/// Regardless of API, all type checking is performed under a given context
+/// specified as the 'TypingContext' template parameter.
+/// Every AST node is initially generated using an input context
+/// passed into the 'check*' method or 'discard*' method of the AST node which
+/// may discard the AST node.
+/// Otherwise, new contexts for the subelements of the AST node can be derived.
+///
+/// The dependency API allows specifying an implicit order in which contexts
+/// should be calculated.
+/// Specifically, an instance of 'Dependency' can specify that it depends on the
+/// context and AST node of a sibling subelement in addition to, or instead of
+/// the parent input context.
+/// Example:
+/// Given the C expression 'a[i]', an input context can be derived for
+/// generating 'i' using knowledge gained from the output context and AST node
+/// 'a'.
+/// The generator uses this knowledge to generate the AST node of 'a' before
+/// 'i'.
+/// 'check*' methods in contrast only implement deriving subelement contexts
+/// from the parent input context.
+/// They return a tuple of 'TypingContext's for every subelement of 'ASTNode',
+/// the so-called conclusion type.
 ///
 /// Note: We call it contexts rather than constraints to match literature, and
 /// as it more generally informs an AST-node generation about the type-system
@@ -177,6 +435,9 @@ public:
   template <typename ASTNode>
   using ConclusionOf = ConclusionOf<ASTNode, TypingContext>;
 
+  template <typename ASTNode, std::size_t... inputIndices>
+  using Dependency = Dependency<TypingContext, ASTNode, inputIndices...>;
+
   /// Shorthand for derived classes to be able to call the default
   /// implementation of methods.
   using Super = TypeSystem;
@@ -190,10 +451,9 @@ public:
     return {context, context};
   }
 
-  static ConclusionOf<ast::BinaryExpression>
-  checkBinaryExpression(ast::BinaryExpression::Op,
-                        const TypingContext &context) {
-    return {context, context};
+  static bool discardBinaryExpression(ast::BinaryExpression::Op,
+                                      const TypingContext &) {
+    return false;
   }
 
   static ConclusionOf<ast::UnaryExpression>
@@ -262,9 +522,8 @@ public:
     return context;
   }
 
-  static ConclusionOf<ast::ArrayReadExpression>
-  checkArrayReadExpression(const TypingContext &context) {
-    return {context, context};
+  static bool discardArrayReadExpression(const TypingContext &) {
+    return false;
   }
 
   std::optional<ConclusionOf<ast::ArrayParameter>>
@@ -293,11 +552,9 @@ public:
     return convert(self().checkFunction(context.cast<TypingContext>()));
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::BinaryExpression, OpaqueContext>>
-  checkBinaryExpressionOpaque(ast::BinaryExpression::Op op,
-                              const OpaqueContext &context) final {
-    return convert(
-        self().checkBinaryExpression(op, context.cast<TypingContext>()));
+  bool discardBinaryExpressionOpaque(ast::BinaryExpression::Op op,
+                                     const OpaqueContext &context) final {
+    return self().discardBinaryExpression(op, context.cast<TypingContext>());
   }
 
   std::optional<dynamatic::ConclusionOf<ast::UnaryExpression, OpaqueContext>>
@@ -349,11 +606,8 @@ public:
         self().checkScalarParameter(node, context.cast<TypingContext>()));
   }
 
-  std::optional<
-      dynamatic::ConclusionOf<ast::ArrayReadExpression, OpaqueContext>>
-  checkArrayReadExpressionOpaque(const OpaqueContext &context) final {
-    return convert(
-        self().checkArrayReadExpression(context.cast<TypingContext>()));
+  bool discardArrayReadExpressionOpaque(const OpaqueContext &context) final {
+    return self().discardArrayReadExpression(context.cast<TypingContext>());
   }
 
   std::optional<dynamatic::ConclusionOf<ast::ArrayParameter, OpaqueContext>>
@@ -441,9 +695,9 @@ template <typename TypingContext, typename Self>
 class DisallowByDefaultTypeSystem : public TypeSystem<TypingContext, Self> {
 
 public:
-  static std::optional<ConclusionOf<ast::BinaryExpression, TypingContext>>
-  checkBinaryExpression(ast::BinaryExpression::Op, const TypingContext &) {
-    return std::nullopt;
+  static bool discardBinaryExpression(ast::BinaryExpression::Op,
+                                      const TypingContext &) {
+    return true;
   }
 
   static std::optional<ConclusionOf<ast::UnaryExpression, TypingContext>>
@@ -486,10 +740,7 @@ public:
     return std::nullopt;
   }
 
-  static std::optional<ConclusionOf<ast::ArrayReadExpression, TypingContext>>
-  checkArrayReadExpression(const TypingContext &) {
-    return std::nullopt;
-  }
+  static bool discardArrayReadExpression(const TypingContext &) { return true; }
 
   std::optional<ConclusionOf<ast::ArrayParameter, TypingContext>>
   checkArrayParameter(const ast::ArrayParameter &, const TypingContext &) {

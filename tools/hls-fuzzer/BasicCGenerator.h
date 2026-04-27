@@ -141,6 +141,142 @@ private:
   std::size_t varCounter = 0;
   AbstractTypeSystem &typeSystem;
   OpaqueContext entryContext;
+
+  /// Returns a tuple of 'std::integral_constant's for every element in 'is'.
+  template <std::size_t... is>
+  constexpr static auto getIndicesTuple(std::index_sequence<is...>) {
+    return std::tuple{std::integral_constant<std::size_t, is>{}...};
+  }
+
+  template <typename ASTNode,
+            typename = typename TypeSystemTraits<ASTNode>::SubElements>
+  struct GenerateWithDependencies;
+
+  template <typename ASTNode, typename... SubElements>
+  struct GenerateWithDependencies<ASTNode, std::tuple<SubElements...>> {
+    std::optional<ASTNode>
+    operator()(const OpaqueContext &parentContext,
+               const DependencyArray<ASTNode> &dependencies,
+               llvm::function_ref<
+                   std::optional<SubElements>(OpaqueContext)>... generators,
+               llvm::function_ref<std::optional<ASTNode>(SubElements &&...)>
+                   constructor) const {
+      typename OpaqueDependency<ASTNode>::SubElementsTuple subElements;
+
+      // TODO: For now subelement generators cannot yet return an output
+      //       context. We assume output context == input context.
+      typename OpaqueDependency<ASTNode>::ContextTuple contexts;
+      std::get<sizeof...(SubElements)>(contexts) = parentContext;
+
+      // Calculate a topological order between all dependencies.
+      // To do so we use a worklist of elements whose dependencies are all
+      // satisfied and an edge list that for every node 'i', contains all
+      // outgoing edges.
+      // This is opposite from 'OpaqueDependency' which returns the incoming
+      // edges.
+
+      // Note: We use 'std::array' here everywhere since the bounds are known
+      // and small.
+      std::size_t workListSize = 0;
+      std::array<std::size_t, sizeof...(SubElements)> worklist;
+
+      std::array<std::size_t, sizeof...(SubElements)> forwardEdgeCount{};
+      std::array<std::array<std::size_t, sizeof...(SubElements)>,
+                 sizeof...(SubElements)>
+          forwardEdgeList{};
+      std::array<std::size_t, sizeof...(SubElements)> incomingEdgeCount{};
+      for (auto &&[index, iter] :
+           llvm::enumerate(llvm::ArrayRef(dependencies).drop_back())) {
+        if (iter.getInputDependencies().empty() ||
+            iter.getInputDependencies() == llvm::ArrayRef{PARENT_DEPENDENCY}) {
+          // No dependency (besides the parent context which is satisfied).
+          worklist[workListSize++] = index;
+        } else {
+          // Build the outgoing edge list but do keep track of the number of
+          // incoming edges.
+          for (auto fromIndex : iter.getInputDependencies())
+            if (fromIndex != PARENT_DEPENDENCY) {
+              forwardEdgeList[fromIndex][forwardEdgeCount[fromIndex]++] = index;
+              ++incomingEdgeCount[index];
+            }
+        }
+      }
+
+      std::size_t topoOrderSize = 0;
+      std::array<std::size_t, sizeof...(SubElements)> topoOrder;
+      while (workListSize > 0) {
+        std::size_t index = worklist[--workListSize];
+        topoOrder[topoOrderSize++] = index;
+        // "Remove" all outgoing edges from 'index'.
+        // If a node has no more incoming edges add it to the worklist.
+        for (auto &&m : llvm::ArrayRef(forwardEdgeList[index])
+                            .take_front(forwardEdgeCount[index]))
+          if (--incomingEdgeCount[m] == 0)
+            worklist[workListSize++] = m;
+      }
+
+      // Finally, generate the subelements in topological order.
+      for (std::size_t iter : topoOrder) {
+        // We need to use fold-expressions over compile time constants to be
+        // able to index into 'contexts' and 'subElements'.
+        // The conditional-expressions are just if-conditions that perform a
+        // given assignment if 'iter' matches that current 'index'.
+        bool success = std::apply(
+            [&](auto &&...indices) {
+              return ([&](auto indexT) {
+                if (iter != indexT)
+                  return true;
+
+                constexpr std::size_t index = decltype(indexT){};
+
+                auto &context = std::get<index>(contexts);
+                // First generate the context for the subelement.
+                context = dependencies[iter](subElements, contexts);
+                // Now generate the subelement.
+                std::get<index>(subElements) =
+                    std::get<index>(std::make_tuple(generators...))(*context);
+                // Check whether we were successful.
+                return std::get<index>(subElements).has_value();
+              }(indices) &&
+                      ...);
+            },
+            getIndicesTuple(std::index_sequence_for<SubElements...>{}));
+
+        // Discard this AST node if we failed to generate a subelement.
+        if (!success)
+          return std::nullopt;
+      }
+      // Lastly, generate the output context.
+      std::get<sizeof...(SubElements)>(contexts) =
+          dependencies[sizeof...(SubElements)](subElements, contexts);
+
+      // And call the constructor with all subelements.
+      // It should be safe to dereference all optionals since they have been
+      // guaranteed to have been generated.
+      return std::apply(
+          [&](auto &&...values) { return constructor(std::move(*values)...); },
+          std::move(subElements));
+    }
+  };
+
+  /// Callable object used to generate an 'ASTNode' from its subelements.
+  /// The signature of the object can be thought of as:
+  ///
+  /// (const OpaqueContext &parentContext,
+  ///  const DependencyArray<ASTNode> &dependencies,
+  ///  llvm::function_ref<
+  ///      std::optional<SubElements>(OpaqueContext)>... generators,
+  ///  llvm::function_ref<std::optional<ASTNode>(SubElements &&...)>
+  ///      constructor) -> std::optional<ASTNode>
+  ///  where 'SubElements' are the subelements of 'ASTNode' specified in
+  ///  'TypeSystemTraits<ASTNode>::SubElements'.
+  ///
+  /// 'parentContext' is the input context, 'generators' are callbacks to
+  /// generate every corresponding subelement of 'ASTNode' and 'constructor'
+  /// the final callback to construct 'ASTNode' from the subelements.
+  template <typename ASTNode>
+  constexpr static auto generateWithDependencies =
+      GenerateWithDependencies<ASTNode>{};
 };
 
 } // namespace dynamatic::gen

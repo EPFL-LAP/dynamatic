@@ -34,13 +34,15 @@ public:
 
   /// Discard 'op' based on the mode in 'context' and forward constraint to
   /// the operands as required.
-  static std::optional<ConclusionOf<ast::BinaryExpression>>
-  checkBinaryExpression(ast::BinaryExpression::Op op,
-                        DynamaticTypingContext context);
+  static bool discardBinaryExpression(ast::BinaryExpression::Op op,
+                                      DynamaticTypingContext context);
 
   std::optional<ConclusionOf<ast::UnaryExpression>>
   checkUnaryExpression(ast::UnaryExpression::Op op,
                        DynamaticTypingContext context) const;
+
+  DependencyArray<ast::BinaryExpression>
+  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) final;
 
   ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(DynamaticTypingContext context) const {
@@ -53,14 +55,15 @@ public:
     };
   }
 
-  static std::optional<ConclusionOf<ast::ArrayReadExpression>>
-  checkArrayReadExpression(DynamaticTypingContext context) {
-    return ConclusionOf<ast::ArrayReadExpression>{
-        // Forward the context to the array parameter as is.
-        context,
-        // Indexing expression must be an integer.
-        DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
-    };
+  DependencyArray<ast::ArrayReadExpression>
+  getArrayReadExpressionContextDependencies() final {
+    return DependencyArray<ast::ArrayReadExpression>{
+        copyFromParent<ast::ArrayReadExpression>(),
+        Dependency<ast::ArrayReadExpression>([] {
+          return DynamaticTypingContext{
+              DynamaticTypingContext::IntegerRequired};
+        }),
+        copyFromParent<ast::ArrayReadExpression>()};
   }
 
   static std::optional<ConclusionOf<ast::ArrayAssignmentStatement>>
