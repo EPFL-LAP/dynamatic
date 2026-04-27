@@ -14,6 +14,8 @@ PIPELINE_CONFIGS=(
 ISSUE_TYPES=(
 	"issuable"
 	"contiguous"
+	"per-port-issuable"
+	"per-port-contiguous"
 )
 
 export SYNTHESIS_CLOCK_PERIOD_NS="2.5"
