@@ -1658,7 +1658,9 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     ChannelVal trueRes = cast<ChannelVal>(condOp.getTrueResult()),
                falseRes = cast<ChannelVal>(condOp.getFalseResult());
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
-    for (handshake::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
+    bool singleComp = false;
+    for (handshake::CmpIOp cmpOp :
+         getCmpOps(condOp.getConditionOperand(), singleComp)) {
       ExtValue minLhs = backtrackToMinimalValue(cmpOp.getLhs());
       ExtValue minRhs = backtrackToMinimalValue(cmpOp.getRhs());
 
@@ -1731,8 +1733,16 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       if (branchOutputToOptimize == trueRes) {
         if (!trueBranch.has_value() || width < trueBranch.value().first)
           trueBranch = std::make_pair(width, branchExt);
-      } else if (!falseBranch.has_value() || width < falseBranch.value().first)
-        falseBranch = std::make_pair(width, branchExt);
+      } else {
+        // Only optimize the false branch if there is only one comparison op
+        // (i.e., no conjunction) since determining the bounds implied by only
+        // "some" predicates being true and false is much harder.
+        // TODO: We can apply the same optimizations as is done for conjuncts
+        //       in the true branch with disjuncts in the false branch.
+        if (singleComp &&
+            (!falseBranch.has_value() || width < falseBranch.value().first))
+          falseBranch = std::make_pair(width, branchExt);
+      }
     }
 
     // Optimize both branches if possible (in non-degenerate code, only one
@@ -1756,7 +1766,10 @@ private:
   /// Returns the list of comparison operations involved in the computation of
   /// the given conditional value (which must have i1 type). All of the
   /// comparisons' respective result are ANDed to compute the given value.
-  SmallVector<handshake::CmpIOp> getCmpOps(ChannelVal condVal) const;
+  /// Additionally, sets 'single' to true if there is no conjunction and exactly
+  /// one comparison.
+  SmallVector<handshake::CmpIOp> getCmpOps(ChannelVal condVal,
+                                           bool &single) const;
 
   /// Determines whether the bound that the data operand is compared with is
   /// tight, i.e. whether being strictly closer to 0 than it means we can
@@ -1785,8 +1798,9 @@ private:
 
 } // namespace
 
-SmallVector<handshake::CmpIOp>
-ArithBoundOpt::getCmpOps(ChannelVal condVal) const {
+SmallVector<handshake::CmpIOp> ArithBoundOpt::getCmpOps(ChannelVal condVal,
+                                                        bool &single) const {
+  single = false;
   ExtValue minVal = backtrackToMinimalValue(condVal);
 
   // Stop when reaching function arguments
@@ -1795,16 +1809,19 @@ ArithBoundOpt::getCmpOps(ChannelVal condVal) const {
     return {};
 
   // If we have reached a comparison operation, return it
-  if (handshake::CmpIOp cmpOp = dyn_cast<handshake::CmpIOp>(defOp))
+  if (handshake::CmpIOp cmpOp = dyn_cast<handshake::CmpIOp>(defOp)) {
+    single = true;
     return {cmpOp};
+  }
 
   // If we have reached a logical and, backtrack through both its operands as it
   // means the branch condition will be more restrictive than the comparison
   // itself, which doesn't invalidate our optimization
   if (handshake::AndIOp andOp = dyn_cast<handshake::AndIOp>(defOp)) {
     SmallVector<handshake::CmpIOp> cmpOps;
-    llvm::copy(getCmpOps(andOp.getLhs()), std::back_inserter(cmpOps));
-    llvm::copy(getCmpOps(andOp.getRhs()), std::back_inserter(cmpOps));
+    bool dummy;
+    llvm::copy(getCmpOps(andOp.getLhs(), dummy), std::back_inserter(cmpOps));
+    llvm::copy(getCmpOps(andOp.getRhs(), dummy), std::back_inserter(cmpOps));
     return cmpOps;
   }
 
