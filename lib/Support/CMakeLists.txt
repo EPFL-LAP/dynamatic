@@ -3,6 +3,7 @@ add_dynamatic_library(DynamaticSupport
   Backedge.cpp
   BLIFFileManager.cpp
   BLIFGenerator.cpp
+  RTLGenerator.cpp
   CFG.cpp
   DOT.cpp
   MILP.cpp
