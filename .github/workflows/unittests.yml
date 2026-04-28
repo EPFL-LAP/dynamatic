@@ -51,13 +51,14 @@ jobs:
             gzip libreadline-dev \
             libboost-all-dev pkg-config python3.12 \
             python3.12-venv python3.12-dev \
-            ghdl verilator
+            ghdl verilator \
+            flex bison tcl-dev
 
       - name: Verify Python 3.12
         run: python3.12 --version
 
       - name: build
-        run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
+        run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --enable-yosys --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
