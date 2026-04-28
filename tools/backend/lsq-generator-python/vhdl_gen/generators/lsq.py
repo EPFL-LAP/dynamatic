@@ -969,6 +969,41 @@ class LSQ:
                 arch += Op(ctx, fallback_store_en_if_valid, 'not', fallback_load_is_oldest, 'and', 'not', load_outstanding)
 
         # Store
+        assert not self.configs.bypass, "Bypass is not yet supported. Please set bypass to false."
+        assert not self.configs.pipeComp, "Pipelined store issue is not yet supported. Please set pipeComp to false."
+        assert not self.configs.pipe0, "Pipelined store issue is not yet supported. Please set pipe0 to false."
+        assert not self.configs.fallbackIssueStore, "Fallback store issue is not yet supported. Please set fallbackIssueStore to false."
+        assert not self.configs.inOrder, "In-order issue is not yet supported. Please set inOrder to false."
+
+        store_req_valid = LogicArray(ctx, 'store_req_valid', 'w', self.configs.numStqEntries)
+        for i in range(self.configs.numStqEntries):
+            arch += Op(ctx, store_req_valid[i], stq_alloc[i], 'and', stq_addr_valid[i], 'and', stq_data_valid[i])
+
+        store_candidate_req_valid = Logic(ctx, 'store_candidate_req_valid', 'w')
+        store_candidate_addr = LogicVec(ctx, 'store_candidate_addr', 'w', self.configs.stqAddrW)
+        store_candidate_data = LogicVec(ctx, 'store_candidate_data', 'w', self.configs.dataW)
+        store_candidate_is_older = LogicArray(ctx, 'store_candidate_is_older', 'w', self.configs.numLdqEntries)
+
+        # FIXME: There is some messyness here with the pipeComp pipeline. For some signals, it is safe to not pipeline them, but for others, it is not.
+        arch += MuxLookUp(ctx, store_candidate_req_valid, store_req_valid, stq_issue)
+        arch += MuxLookUp(ctx, store_candidate_addr, stq_addr, stq_issue)
+        arch += MuxLookUp(ctx, store_candidate_data, stq_data, stq_issue)
+        for i in range(self.configs.numLdqEntries):
+            arch += Op(ctx, store_candidate_is_older[i], MuxIndex(store_is_older[i], stq_issue))
+
+        store_compare_addr_same = LogicArray(ctx, 'store_compare_addr_same', 'w', self.configs.numLdqEntries)
+        for i in range(self.configs.numLdqEntries):
+            arch += Op(ctx, store_compare_addr_same[i], "'1'", 'when', ldq_addr[i], '=', store_candidate_addr, 'else', '\'0\'')
+
+        store_compare_conflict = LogicArray(ctx, 'store_compare_conflict', 'w', self.configs.numLdqEntries)
+        for i in range(self.configs.numLdqEntries):
+            arch += Op(ctx, store_compare_conflict[i],
+                       ldq_alloc[i], 'and',  # load is allocated
+                       'not', load_completed[i], 'and',  # load has not completed yet
+                       'not', store_candidate_is_older[i], 'and',  # store is younger
+                       '(', store_compare_addr_same[i], 'or', 'not', ldq_addr_valid[i], ')',  # address conflicts or load address is missing
+                       )
+
         # When pipelining (pipe0) is enabled, this uses look-ahead to the next store entry to reduce the critical path.
         # Both the current and next stores are checked for validity and conflicts, and the result is multiplexed "late
         # in the clock cycle" to reduce the critical path. When pipelining is disabled, only the current store entry is
@@ -1058,7 +1093,7 @@ class LSQ:
         else:
             # without pipelining: only consider current store entry
             arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_curr)
-            arch += Op(ctx, store_req_valid_p0, store_req_valid_curr)
+            # arch += Op(ctx, store_req_valid_p0, store_req_valid_curr)
             if self.configs.fallbackIssueLoad or self.configs.fallbackIssueStore:
                 for i in range(self.configs.numLdqEntries):
                     arch += Op(ctx, store_is_older_arr_p0[i], store_is_older_arr_curr[i])
@@ -1079,7 +1114,11 @@ class LSQ:
         arch += Op(ctx, store_issue_stall_p0, 'not', store_issue_stall_reset, 'and', '(', store_issue_stall_p0, 'or', store_issue_stall_set, ')')
 
         # The store conflicts with any load
-        arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
+        # arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
+
+        # FIXME: Temporarily hook in here while the old logic is still around.
+        arch += Op(ctx, store_req_valid_p0, store_candidate_req_valid)
+        arch += Reduce(ctx, store_conflict, store_compare_conflict, 'or')
 
         arch += Op(ctx, store_idx, stq_issue)
         # The store can be issued when it is valid AND store issue is not stalled AND (no conflict OR it is older than the fallback load).
