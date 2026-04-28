@@ -1737,6 +1737,8 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
         // Only optimize the false branch if there is only one comparison op
         // (i.e., no conjunction) since determining the bounds implied by only
         // "some" predicates being true and false is much harder.
+        // TODO: We can apply the same optimizations as is done for conjuncts
+        //       in the true branch with disjuncts in the false branch.
         if (singleComp &&
             (!falseBranch.has_value() || width < falseBranch.value().first))
           falseBranch = std::make_pair(width, branchExt);
