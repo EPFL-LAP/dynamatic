@@ -793,6 +793,15 @@ class LSQ:
         if numLoadCandidates == 1:
             arch += Op(ctx, load_idx_oh[0], load_candidates_oh[0])
             arch += Op(ctx, load_en[0], load_can_issue[0])
+        elif numLoadCandidates == 2:
+            arch += Op(ctx, load_idx_oh[0], load_candidates_oh[0], 'when', load_can_issue[0], 'else', load_candidates_oh[1])
+            arch += Op(ctx, load_en[0], load_can_issue[0], 'or', load_can_issue[1])
+        elif numLoadCandidates == 3:
+            arch += Op(ctx, load_idx_oh[0],
+                       load_candidates_oh[0], 'when', load_can_issue[0], 'else',
+                       load_candidates_oh[1], 'when', load_can_issue[1], 'else',
+                       load_candidates_oh[2])
+            arch += Op(ctx, load_en[0], load_can_issue[0], 'or', load_can_issue[1], 'or', load_can_issue[2])
         else:
             # find the first (oldest) load candidate with load_can_issue == 1
             tmp_masking_base = LogicVec(ctx, 'tmp_masking_base', 'w', numLoadCandidates)
