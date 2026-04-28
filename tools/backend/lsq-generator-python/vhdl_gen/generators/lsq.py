@@ -738,40 +738,53 @@ class LSQ:
         assert self.configs.numLdMem == 1, "Multiple load ports are not yet supported. Please set numLdMem to 1."
 
         numLoadCandidates = 2
+        numLoadCandidatesForMasking = numLoadCandidates + 1
 
         # find issuable load entries
         load_issuable = LogicVec(ctx, 'load_issuable', 'w', self.configs.numLdqEntries)
-        load_masking_vecarray = LogicVecArray(ctx, 'load_masking_vecarray', 'w', numLoadCandidates, self.configs.numLdqEntries)
-        load_candidates_oh = LogicVecArray(ctx, 'load_candidates', 'w', numLoadCandidates, self.configs.numLdqEntries)
-        load_candidates_req_valid = LogicArray(ctx, 'load_candidate_valid', 'w', numLoadCandidates)
-
         for i in range(self.configs.numLdqEntries):
             arch += Op(ctx, (load_issuable, i), ldq_alloc[i], 'and', ldq_addr_valid[i], 'and', 'not', ldq_issue[i])
+
+        load_masking_vecarray = LogicVecArray(ctx, 'load_masking_vecarray', 'w', numLoadCandidatesForMasking, self.configs.numLdqEntries)
+        load_masking_candidates_oh = LogicVecArray(ctx, 'load_masking_candidates_oh', 'r', numLoadCandidatesForMasking, self.configs.numLdqEntries)
+        load_masking_candidates_oh.regInit(init=[0]*numLoadCandidatesForMasking)
 
         # recursive cyclic priority masking to find the first `numLoadCandidates` load candidates
         arch += Op(ctx, load_masking_vecarray[0], load_issuable)
         for i in range(numLoadCandidates):
-            arch += CyclicPriorityMasking(ctx, load_candidates_oh[i], load_masking_vecarray[i], ldq_head_oh)
+            arch += CyclicPriorityMasking(ctx, load_masking_candidates_oh[i], load_masking_vecarray[i], ldq_head_oh)
             if i != numLoadCandidates - 1:
                 # mask out the selected candidate for the next round of priority masking
-                arch += Op(ctx, load_masking_vecarray[i+1], load_masking_vecarray[i], 'and', 'not', load_candidates_oh[i])
+                arch += Op(ctx, load_masking_vecarray[i+1], load_masking_vecarray[i], 'and', 'not', load_masking_candidates_oh[i])
+
+        # select load candidates based on last-cycle issue
+        ldq_issue_update = Logic(ctx, 'ldq_issue_update', 'r')
+        ldq_issue_update.regInit(init=0)
+        arch += Reduce(ctx, ldq_issue_update, ldq_issue_set, 'or')
+
+        load_candidates_oh = LogicVecArray(ctx, 'load_candidates_oh', 'w', numLoadCandidates, self.configs.numLdqEntries)
         for i in range(numLoadCandidates):
-            arch += Reduce(ctx, load_candidates_req_valid[i], load_candidates_oh[i], 'or')
+            arch += Op(ctx, load_candidates_oh[i], load_masking_candidates_oh[i + 1], 'when', ldq_issue_update, 'else', load_masking_candidates_oh[i])
+
+        load_candidates_req_valid = LogicArray(ctx, 'load_candidates_req_valid', 'w', numLoadCandidates)
+        for i in range(numLoadCandidates):
+            arch += Reduce(ctx, load_candidates_req_valid[i], load_masking_candidates_oh[i], 'or')
 
         # FIXME: There is some messyness here with the pipeComp pipeline. For some signals, it is safe to not pipeline them, but for others, it is not.
         load_candidates_addr = LogicVecArray(ctx, 'load_candidates_addr', 'w', numLoadCandidates, self.configs.addrW)
         load_candidates_is_younger = LogicVecArray(ctx, 'load_candidates_is_younger', 'w', numLoadCandidates, self.configs.numStqEntries)
 
         for i in range(numLoadCandidates):
-            arch += Mux1H(ctx, load_candidates_addr[i], ldq_addr, load_candidates_oh[i])
+            arch += Mux1H(ctx, load_candidates_addr[i], ldq_addr, load_masking_candidates_oh[i])
         for i in range(numLoadCandidates):
-            arch += Mux1H(ctx, load_candidates_is_younger[i], store_is_older, load_candidates_oh[i])
+            arch += Mux1H(ctx, load_candidates_is_younger[i], store_is_older, load_masking_candidates_oh[i])
 
         load_compare_addr_same = LogicVecArray(ctx, 'load_compare_addr_same', 'w', numLoadCandidates, self.configs.numStqEntries)
         for i in range(numLoadCandidates):
             for j in range(self.configs.numStqEntries):
                 arch += Op(ctx, (load_compare_addr_same, i, j), "'1'", 'when', (load_candidates_addr, i), '=', (stq_addr, j), 'else', "'0'")
 
+        # FIXME: These signals should now mostly be pipelined after introducing the previous pipline stage.
         load_compare_conflict = LogicVecArray(ctx, 'load_compare_conflict', 'w', numLoadCandidates, self.configs.numStqEntries)
         for i in range(numLoadCandidates):
             for j in range(self.configs.numStqEntries):
@@ -791,16 +804,16 @@ class LSQ:
             arch += Op(ctx, load_can_issue[i], load_candidates_req_valid[i], 'and', 'not', load_conflict[i])
 
         if numLoadCandidates == 1:
-            arch += Op(ctx, load_idx_oh[0], load_candidates_oh[0])
+            arch += Op(ctx, load_idx_oh[0], load_masking_candidates_oh[0])
             arch += Op(ctx, load_en[0], load_can_issue[0])
         elif numLoadCandidates == 2:
-            arch += Op(ctx, load_idx_oh[0], load_candidates_oh[0], 'when', load_can_issue[0], 'else', load_candidates_oh[1])
+            arch += Op(ctx, load_idx_oh[0], load_masking_candidates_oh[0], 'when', load_can_issue[0], 'else', load_masking_candidates_oh[1])
             arch += Op(ctx, load_en[0], load_can_issue[0], 'or', load_can_issue[1])
         elif numLoadCandidates == 3:
             arch += Op(ctx, load_idx_oh[0],
-                       load_candidates_oh[0], 'when', load_can_issue[0], 'else',
-                       load_candidates_oh[1], 'when', load_can_issue[1], 'else',
-                       load_candidates_oh[2])
+                       load_masking_candidates_oh[0], 'when', load_can_issue[0], 'else',
+                       load_masking_candidates_oh[1], 'when', load_can_issue[1], 'else',
+                       load_masking_candidates_oh[2])
             arch += Op(ctx, load_en[0], load_can_issue[0], 'or', load_can_issue[1], 'or', load_can_issue[2])
         else:
             # find the first (oldest) load candidate with load_can_issue == 1
@@ -809,7 +822,7 @@ class LSQ:
             load_candidate_select_oh = LogicVec(ctx, 'load_candidate_select_oh', 'w', numLoadCandidates)
             arch += CyclicPriorityMasking(ctx, load_candidate_select_oh, load_can_issue, tmp_masking_base)
 
-            arch += Mux1H(ctx, load_idx_oh[0], load_candidates_oh, load_candidate_select_oh)
+            arch += Mux1H(ctx, load_idx_oh[0], load_masking_candidates_oh, load_candidate_select_oh)
             arch += Reduce(ctx, load_en[0], load_can_issue, 'or')
 
         if self.configs.fallbackIssueLoad or self.configs.fallbackIssueStore:
