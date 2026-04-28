@@ -730,185 +730,78 @@ class LSQ:
                            )
 
         # Load
+        assert not self.configs.bypass, "Bypass is not yet supported. Please set bypass to false."
+        assert not self.configs.pipeComp, "Pipelined store issue is not yet supported. Please set pipeComp to false."
+        assert not self.configs.pipe0, "Pipelined store issue is not yet supported. Please set pipe0 to false."
+        assert not self.configs.fallbackIssueLoad, "Fallback load issue is not yet supported. Please set fallbackIssueLoad to false."
+        assert not self.configs.inOrder, "In-order issue is not yet supported. Please set inOrder to false."
+        assert self.configs.numLdMem == 1, "Multiple load ports are not yet supported. Please set numLdMem to 1."
 
-        ldq_head_oh_p0 = LogicVec(
-            ctx, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries)
-        if self.configs.pipe0:
-            ldq_head_oh_p0.regInit(init=0)
-        arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
+        numLoadCandidates = 2
 
-        ldq_alloc_p0 = LogicArray(
-            ctx, 'ldq_alloc_p0', pipe0_type, self.configs.numLdqEntries)
-        ldq_addr_valid_p0 = LogicArray(
-            ctx, 'ldq_addr_valid_p0', pipe0_type, self.configs.numLdqEntries)
-        load_conflict = LogicArray(
-            ctx, 'load_conflict', 'w', self.configs.numLdqEntries)
-        load_req_valid = LogicArray(
-            ctx, 'load_req_valid', 'w', self.configs.numLdqEntries)
-        can_load = LogicArray(
-            ctx, 'can_load', 'w', self.configs.numLdqEntries)
-        can_load_p0 = LogicArray(
-            ctx, 'can_load_p0', pipe0_type, self.configs.numLdqEntries)
-        if self.configs.pipe0:
-            ldq_alloc_p0.regInit(init=[0]*self.configs.numLdqEntries)
-            ldq_addr_valid_p0.regInit(init=[0]*self.configs.numLdqEntries)
-            can_load_p0.regInit(init=[0]*self.configs.numLdqEntries)
+        # find issuable load entries
+        load_issuable = LogicVec(ctx, 'load_issuable', 'w', self.configs.numLdqEntries)
+        load_masking_vecarray = LogicVecArray(ctx, 'load_masking_vecarray', 'w', numLoadCandidates, self.configs.numLdqEntries)
+        load_candidates_oh = LogicVecArray(ctx, 'load_candidates', 'w', numLoadCandidates, self.configs.numLdqEntries)
+        load_candidates_req_valid = LogicArray(ctx, 'load_candidate_valid', 'w', numLoadCandidates)
 
-        # Pipeline
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, ldq_alloc_p0[i], ldq_alloc_pcomp[i])
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, ldq_addr_valid_p0[i], ldq_addr_valid_pcomp[i])
-        # The load conflicts with any store
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Reduce(ctx,
-                           load_conflict[i], ld_st_conflict[i], 'or')
-        # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-        # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-        for i in range(0, self.configs.numLdqEntries):
-            arch += Op(ctx, load_req_valid[i], ldq_alloc_pcomp[i],
-                       'and', ldq_addr_valid_pcomp[i])
-        # Generate list for loads that does not face dependency issue.
-        # In in-order mode, the regular load path is suppressed entirely; only the fallback path issues loads.
-        for i in range(0, self.configs.numLdqEntries):
-            if self.configs.inOrder:
-                arch += Op(ctx, can_load_p0[i], 0)
-            else:
-                arch += Op(ctx, can_load_p0[i], 'not',
-                           load_conflict[i], 'and', load_req_valid[i])
+        for i in range(self.configs.numLdqEntries):
+            arch += Op(ctx, (load_issuable, i), ldq_alloc[i], 'and', ldq_addr_valid[i], 'and', 'not', ldq_issue[i])
 
-        if self.configs.issueOldestLoads is not None and self.configs.numLdPorts > 0:
-            load_allowed = LogicVec(ctx, 'load_allowed', 'w', self.configs.numLdqEntries)
+        # recursive cyclic priority masking to find the first `numLoadCandidates` load candidates
+        arch += Op(ctx, load_masking_vecarray[0], load_issuable)
+        for i in range(numLoadCandidates):
+            arch += CyclicPriorityMasking(ctx, load_candidates_oh[i], load_masking_vecarray[i], ldq_head_oh)
+            if i != numLoadCandidates - 1:
+                # mask out the selected candidate for the next round of priority masking
+                arch += Op(ctx, load_masking_vecarray[i+1], load_masking_vecarray[i], 'and', 'not', load_candidates_oh[i])
+        for i in range(numLoadCandidates):
+            arch += Reduce(ctx, load_candidates_req_valid[i], load_candidates_oh[i], 'or')
 
-            if self.configs.issueOldestLoadsType in ["issuable", "contiguous"]:  # global
-                load_candidates = LogicVec(ctx, 'load_candidates', 'w', self.configs.numLdqEntries)
-                # prepare issuable loads: allocated, address valid, and not yet issued
-                for i in range(self.configs.numLdqEntries):
-                    arch += Op(ctx, (load_candidates, i), ldq_alloc_p0[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', ldq_issue[i])
+        # FIXME: There is some messyness here with the pipeComp pipeline. For some signals, it is safe to not pipeline them, but for others, it is not.
+        load_candidates_addr = LogicVecArray(ctx, 'load_candidates_addr', 'w', numLoadCandidates, self.configs.addrW)
+        load_candidates_is_younger = LogicVecArray(ctx, 'load_candidates_is_younger', 'w', numLoadCandidates, self.configs.numStqEntries)
 
-                if self.configs.issueOldestLoadsType == "issuable":
-                    load_allowed_vecarray = LogicVecArray(ctx, 'load_allowed_vecarray', 'w', self.configs.issueOldestLoads, self.configs.numLdqEntries)
-                    load_candidates_vecarray = LogicVecArray(ctx, 'load_candidates_vecarray', 'w', self.configs.issueOldestLoads, self.configs.numLdqEntries)
-                    arch += Op(ctx, load_candidates_vecarray[0], load_candidates)
-                    for i in range(self.configs.issueOldestLoads):
-                        arch += CyclicPriorityMasking(ctx, load_allowed_vecarray[i], load_candidates_vecarray[i], ldq_head_oh_p0)
-                        if i != self.configs.issueOldestLoads - 1:
-                            # remove the selected load from the candidate list for the next iteration
-                            arch += Op(ctx, load_candidates_vecarray[i+1], load_candidates_vecarray[i], 'and', 'not', load_allowed_vecarray[i])
-                    # reduce the load_allowed_vecarray to a single load_allowed array
-                    arch += Reduce(ctx, load_allowed, load_allowed_vecarray, 'or')
-                elif self.configs.issueOldestLoadsType == "contiguous":
-                    load_allowed_vecarray = LogicVecArray(ctx, 'load_allowed_vecarray', 'w', self.configs.issueOldestLoads, self.configs.numLdqEntries)
-                    arch += CyclicPriorityMasking(ctx, load_allowed_vecarray[0], load_candidates, ldq_head_oh_p0)
-                    for i in range(1, self.configs.issueOldestLoads):
-                        # cyclic left shift of the oldest-load one-hot by i positions
-                        for j in range(self.configs.numLdqEntries):
-                            arch += Op(ctx, (load_allowed_vecarray[i], j), (load_allowed_vecarray[0], (j - i) % self.configs.numLdqEntries))
-                    # reduce the load_allowed_vecarray to a single load_allowed array
-                    arch += Reduce(ctx, load_allowed, load_allowed_vecarray, 'or')
-                else:
-                    assert False, f"Unsupported issueOldestLoadsType: {self.configs.issueOldestLoadsType}"
-            else:  # per-port
-                # one-hot port index
-                ldq_port_idx_oh_p0 = LogicVecArray(
-                    ctx, 'ldq_port_idx_oh_p0', 'w', self.configs.numLdqEntries, self.configs.numLdPorts)
+        for i in range(numLoadCandidates):
+            arch += Mux1H(ctx, load_candidates_addr[i], ldq_addr, load_candidates_oh[i])
+        for i in range(numLoadCandidates):
+            arch += Mux1H(ctx, load_candidates_is_younger[i], store_is_older, load_candidates_oh[i])
 
-                if self.configs.ldpAddrW > 0:
-                    # ldq_port_idx pipeline: pcomp stage
-                    assert ldq_port_idx is not None
-                    ldq_port_idx_pcomp = LogicVecArray(
-                        ctx, 'ldq_port_idx_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.ldpAddrW)
-                    if self.configs.pipeComp:
-                        ldq_port_idx_pcomp.regInit()
-                    for i in range(self.configs.numLdqEntries):
-                        arch += Op(ctx, ldq_port_idx_pcomp[i], ldq_port_idx[i])
-                    # ldq_port_idx pipeline: p0 stage
-                    ldq_port_idx_p0 = LogicVecArray(
-                        ctx, 'ldq_port_idx_p0', pipe0_type, self.configs.numLdqEntries, self.configs.ldpAddrW)
-                    if self.configs.pipe0:
-                        ldq_port_idx_p0.regInit()
-                    for i in range(self.configs.numLdqEntries):
-                        arch += Op(ctx, ldq_port_idx_p0[i], ldq_port_idx_pcomp[i])
-                    # one-hot encoder
-                    for i in range(self.configs.numLdqEntries):
-                        arch += BitsToOH(ctx, ldq_port_idx_oh_p0[i], ldq_port_idx_p0[i])
-                else:
-                    assert ldq_port_idx is None
-                    assert self.configs.numLdPorts == 1
-                    for i in range(self.configs.numLdqEntries):
-                        arch += Op(ctx, ldq_port_idx_oh_p0[i], 1)
+        load_compare_addr_same = LogicVecArray(ctx, 'load_compare_addr_same', 'w', numLoadCandidates, self.configs.numStqEntries)
+        for i in range(numLoadCandidates):
+            for j in range(self.configs.numStqEntries):
+                arch += Op(ctx, (load_compare_addr_same, i, j), "'1'", 'when', (load_candidates_addr, i), '=', (stq_addr, j), 'else', "'0'")
 
-                load_allowed_per_port = LogicVecArray(ctx, f'load_allowed_per_port', 'w', self.configs.numLdPorts, self.configs.numLdqEntries)
-                for p in range(self.configs.numLdPorts):
-                    load_candidates_portp = LogicVec(ctx, f'load_candidates_port{p}', 'w', self.configs.numLdqEntries)
-                    # prepare issuable loads: allocated, address valid, and not yet issued
-                    for i in range(self.configs.numLdqEntries):
-                        arch += Op(ctx, (load_candidates_portp, i), ldq_alloc_p0[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', ldq_issue[i], 'and', (ldq_port_idx_oh_p0, i, p))
-                    load_allowed_vecarray_portp = LogicVecArray(ctx, f'load_allowed_vecarray_port{p}', 'w', self.configs.issueOldestLoads, self.configs.numLdqEntries)
+        load_compare_conflict = LogicVecArray(ctx, 'load_compare_conflict', 'w', numLoadCandidates, self.configs.numStqEntries)
+        for i in range(numLoadCandidates):
+            for j in range(self.configs.numStqEntries):
+                arch += Op(ctx, (load_compare_conflict, i, j),
+                           (stq_alloc, j), 'and',  # store is allocated
+                           'not', (store_completed, j), 'and',  # store has not completed yet
+                           (load_candidates_is_younger, i, j), 'and',  # load is younger
+                           '(', (load_compare_addr_same, i, j), 'or', 'not', (stq_addr_valid, j), ')'  # address conflicts or store address is missing
+                           )
 
-                    if self.configs.issueOldestLoadsType == "per-port-issuable":
-                        load_candidates_vecarray_portp = LogicVecArray(ctx, f'load_candidates_vecarray_port{p}', 'w', self.configs.issueOldestLoads, self.configs.numLdqEntries)
-                        arch += Op(ctx, load_candidates_vecarray_portp[0], load_candidates_portp)
-                        for i in range(self.configs.issueOldestLoads):
-                            arch += CyclicPriorityMasking(ctx, load_allowed_vecarray_portp[i], load_candidates_vecarray_portp[i], ldq_head_oh_p0)
-                            if i != self.configs.issueOldestLoads - 1:
-                                # remove the selected load from the candidate list for the next iteration
-                                arch += Op(ctx, load_candidates_vecarray_portp[i+1], load_candidates_vecarray_portp[i], 'and', 'not', load_allowed_vecarray_portp[i])
-                    elif self.configs.issueOldestLoadsType == "per-port-contiguous":
-                        # create a bitmask with all entries belonging to the port
-                        load_portp = LogicVec(ctx, f'load_portp{p}', 'w', self.configs.numLdqEntries)
-                        for i in range(self.configs.numLdqEntries):
-                            arch += Op(ctx, (load_portp, i), (ldq_port_idx_oh_p0, i, p))
+        load_conflict = LogicArray(ctx, 'load_conflict', 'w', numLoadCandidates)
+        for i in range(numLoadCandidates):
+            arch += Reduce(ctx, load_conflict[i], load_compare_conflict[i], 'or')
 
-                        # first entry: the oldest issuable load belonging to the port
-                        arch += CyclicPriorityMasking(ctx, load_allowed_vecarray_portp[0], load_candidates_portp, ldq_head_oh_p0)
+        load_can_issue = LogicArray(ctx, 'load_can_issue', 'w', numLoadCandidates)
+        for i in range(numLoadCandidates):
+            arch += Op(ctx, load_can_issue[i], load_candidates_req_valid[i], 'and', 'not', load_conflict[i])
 
-                        # This is complicated now. We want the next entry that belongs to the same port, regardless of whether it is allocated/issuable or not.
-                        # To do this, we perform cyclic priority masking on all elements belonging to the port. As a base, we use the one-hot of the previously
-                        # selected entry, cyclically shifted by one position to start searching from the next entry.
-                        for i in range(1, self.configs.issueOldestLoads):
-                            load_masking_base_portp_i = LogicVec(ctx, f'load_masking_base_port{p}_{i}', 'w', self.configs.numLdqEntries)
-                            for j in range(self.configs.numLdqEntries):
-                                arch += Op(ctx, (load_masking_base_portp_i, j), (load_allowed_vecarray_portp[i-1], (j - 1) % self.configs.numLdqEntries))
-                            arch += CyclicPriorityMasking(ctx, load_allowed_vecarray_portp[i], load_portp, load_masking_base_portp_i)
-
-                    else:
-                        assert False, f"Unsupported issueOldestLoadsType: {self.configs.issueOldestLoadsType}"
-                    # reduce the load_allowed_vecarray to a single load_allowed array
-                    arch += Reduce(ctx, load_allowed_per_port[p], load_allowed_vecarray_portp, 'or')
-                arch += Reduce(ctx, load_allowed, load_allowed_per_port, 'or')
-            for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i], 'and', (load_allowed, i))
+        if numLoadCandidates == 1:
+            arch += Op(ctx, load_idx_oh[0], load_candidates_oh[0])
+            arch += Op(ctx, load_en[0], load_can_issue[0])
         else:
-            for i in range(0, self.configs.numLdqEntries):
-                arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i])
+            # find the first (oldest) load candidate with load_can_issue == 1
+            tmp_masking_base = LogicVec(ctx, 'tmp_masking_base', 'w', numLoadCandidates)
+            arch += Op(ctx, tmp_masking_base, 1)
+            load_candidate_select_oh = LogicVec(ctx, 'load_candidate_select_oh', 'w', numLoadCandidates)
+            arch += CyclicPriorityMasking(ctx, load_candidate_select_oh, load_can_issue, tmp_masking_base)
 
-        can_load_list: list[LogicArray] = []
-        can_load_list.append(can_load)
-
-        # temporary (pre-fallback) signals
-        load_idx_tmp_oh = LogicVecArray(ctx, 'load_idx_tmp_oh', 'w', self.configs.numLdMem, self.configs.numLdqEntries)
-        load_en_tmp = LogicArray(ctx, 'load_en_tmp', 'w', self.configs.numLdMem)
-
-        for w in range(self.configs.numLdMem):
-            arch += CyclicPriorityMasking(
-                ctx, load_idx_tmp_oh[w], can_load_list[w], ldq_head_oh_p0)
-            arch += Reduce(ctx, load_en_tmp[w], can_load_list[w], 'or')
-            if w != self.configs.numLdMem - 1:
-                can_load_list.append(LogicArray(ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load_list[w+1][i], 'not', (load_idx_tmp_oh[w], i), 'and', can_load_list[w][i])
-
-        for w in range(self.configs.numLdMem):
-            last_load_port = (w == self.configs.numLdMem - 1)
-            if self.configs.fallbackIssueLoad and last_load_port:
-                # last load port: use fallback load (if any) as the first priority, then service other loads (from _tmp)
-                arch += Op(ctx, load_idx_oh[w], fallback_load_idx_oh, 'when', fallback_load_en, 'else', load_idx_tmp_oh[w])
-                arch += Op(ctx, load_en[w], fallback_load_en, 'or', load_en_tmp[w])
-            else:
-                # non-last load port: use _tmp signals directly
-                arch += Op(ctx, load_idx_oh[w], load_idx_tmp_oh[w])
-                arch += Op(ctx, load_en[w], load_en_tmp[w])
+            arch += Mux1H(ctx, load_idx_oh[0], load_candidates_oh, load_candidate_select_oh)
+            arch += Reduce(ctx, load_en[0], load_can_issue, 'or')
 
         if self.configs.fallbackIssueLoad or self.configs.fallbackIssueStore:
             # Fallback Load / Store
