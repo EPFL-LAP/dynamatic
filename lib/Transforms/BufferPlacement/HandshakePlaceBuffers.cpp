@@ -23,7 +23,6 @@
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -35,7 +34,13 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 #include <filesystem>
+#include <functional>
 #include <string>
+
+#include "mlir/Support/LLVM.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringSet.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -47,7 +52,7 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    COST_AWARE("costaware"), MAPBUF("mapbuf"), FPGA24("fpga24");
+    COST_AWARE("costaware"), MAPBUF("mapbuf");
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
@@ -172,8 +177,7 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   } else if (
       // clang-format off
       algorithm == FPGA20 ||
-      algorithm == FPL22 || 
-      algorithm == FPGA24 ||
+      algorithm == FPL22 ||
       algorithm == COST_AWARE ||
       algorithm == MAPBUF
       // clang-format on
@@ -207,6 +211,8 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   }
 
   ModuleOp modOp = llvm::dyn_cast<ModuleOp>(getOperation());
+
+  // AYA: TODO: This is where I should add the timing of the OOE units
   //
   // Read the operations' timing models from disk
   TimingDatabase timingDB;
@@ -227,9 +233,10 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
+    // AYA commented this out
     // Check IR invariants and parse basic block archs from disk
-    if (failed(checkFuncInvariants(info)))
-      return failure();
+    // if (failed(checkFuncInvariants(info)))
+    //   return failure();
 
     // Get CFDFCs from the function unless the functions has no archs (i.e.,
     // it has a single block) in which case there are no CFDFCs
@@ -376,10 +383,207 @@ static void logFuncInfo(FuncInfo &info) {
     os << "- Number of channels: " << cf->channels.size() << "\n";
     os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
     os.unindent();
+
+    // AYA: Added this from Jiahui to write the CFDFCs in DOT for debugging
+    // cf->writeDot("AYAA-cfdfc_" + std::to_string(idx) + ".dot");
   }
 
   os.flush();
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// AYA: The following functions are for identifying backward edges in the
+// circuit graph
+static void
+printBackwardChannels(const llvm::DenseSet<Value> &backwardChannels) {
+  llvm::errs() << "=== Backward Channels (with src/dst ops) ===\n";
+  int idx = 0;
+
+  for (Value v : backwardChannels) {
+    llvm::errs() << "Channel " << idx++ << ":\n";
+
+    // Source operation
+    if (Operation *srcOp = v.getDefiningOp()) {
+      llvm::errs() << "  Source: ";
+      srcOp->print(llvm::errs());
+      llvm::errs() << "\n";
+    } else {
+      llvm::errs() << "  Source: <block argument>\n";
+    }
+
+    // Destination operations
+    for (auto &use : v.getUses()) {
+      Operation *dstOp = use.getOwner();
+      llvm::errs() << "  Destination: ";
+      dstOp->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+    llvm::errs() << "\n";
+  }
+
+  if (backwardChannels.empty())
+    llvm::errs() << "(empty)\n";
+}
+
+// Aya: The following captivates the necessary logic for extracting back edges
+// in cycles
+namespace {
+
+struct CircuitEdge {
+  Operation *src;
+  Operation *dst;
+  Value channel;
+};
+
+static bool isBackedgeSourceLike(Operation *op) {
+  do {
+    if (!op)
+      return false;
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::CmpIOp, handshake::CmpFOp>(op))
+      return true;
+    if (isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+            handshake::TruncIOp>(op))
+      op = op->getOperand(0).getDefiningOp();
+    else
+      return false;
+  } while (true);
+}
+
+static bool isBackedgeDestinationLike(Operation *op) {
+  if (isa<handshake::MergeLikeOpInterface>(op))
+    return true;
+
+  auto notOp = dyn_cast<handshake::NotIOp>(op);
+  if (!notOp)
+    return false;
+
+  return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
+    return isa<handshake::MergeLikeOpInterface>(user);
+  });
+}
+
+/// Finds all loop-feedback-source -> merge-like backward channels per cyclic
+/// SCC in the handshake graph. Grouping by SCC remains more stable than trying
+/// to assign channels to every simple cycle when cycles overlap.
+static mlir::DenseSet<Value>
+findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
+  SmallVector<Operation *> ops;
+  SmallVector<CircuitEdge> edges;
+  llvm::DenseMap<Operation *, SmallVector<Operation *, 4>> succs;
+
+  for (Operation &op : funcOp.getOps()) {
+    ops.push_back(&op);
+    succs[&op] = {};
+  }
+
+  for (Operation *src : ops) {
+    for (Value result : src->getResults()) {
+      for (OpOperand &use : result.getUses()) {
+        Operation *dst = use.getOwner();
+
+        if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(dst))
+          continue;
+
+        edges.push_back({src, dst, result});
+        succs[src].push_back(dst);
+      }
+    }
+  }
+
+  llvm::DenseMap<Operation *, unsigned> index, lowlink;
+  llvm::DenseSet<Operation *> onStack;
+  SmallVector<Operation *> stack;
+  SmallVector<SmallVector<Operation *>> sccs;
+  unsigned nextIndex = 0;
+
+  std::function<void(Operation *)> strongConnect = [&](Operation *op) {
+    index[op] = nextIndex;
+    lowlink[op] = nextIndex;
+    ++nextIndex;
+    stack.push_back(op);
+    onStack.insert(op);
+
+    for (Operation *succ : succs[op]) {
+      if (!index.contains(succ)) {
+        strongConnect(succ);
+        lowlink[op] = std::min(lowlink[op], lowlink[succ]);
+      } else if (onStack.contains(succ)) {
+        lowlink[op] = std::min(lowlink[op], index[succ]);
+      }
+    }
+
+    if (lowlink[op] != index[op])
+      return;
+
+    SmallVector<Operation *> scc;
+    while (true) {
+      Operation *top = stack.pop_back_val();
+      onStack.erase(top);
+      scc.push_back(top);
+      if (top == op)
+        break;
+    }
+    sccs.push_back(std::move(scc));
+  };
+
+  for (Operation *op : ops) {
+    if (!index.contains(op))
+      strongConnect(op);
+  }
+
+  mlir::DenseSet<Value> backwardChannels;
+  for (const auto &scc : sccs) {
+    llvm::DenseSet<Operation *> sccNodes(scc.begin(), scc.end());
+
+    bool isCyclic = scc.size() > 1;
+    if (!isCyclic) {
+      Operation *only = scc.front();
+      isCyclic = llvm::any_of(edges, [&](const CircuitEdge &edge) {
+        return edge.src == only && edge.dst == only;
+      });
+    }
+    if (!isCyclic)
+      continue;
+
+    for (const CircuitEdge &edge : edges) {
+      if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
+        continue;
+      if (!isBackedge(edge.channel))
+        continue;
+      if (!isBackedgeSourceLike(edge.src))
+        continue;
+      if (!isBackedgeDestinationLike(edge.dst))
+        continue;
+      backwardChannels.insert(edge.channel);
+    }
+  }
+
+  return backwardChannels;
+}
+
+} // namespace
+
+// useful in debugging
+// static void printCycles(const CycleList &cycles) {
+//   llvm::errs() << "=== Circuit Cycles ===\n";
+//   int cycleIdx = 0;
+
+//   for (const auto &cycle : cycles) {
+//     llvm::errs() << "Cycle " << cycleIdx++ << " (" << cycle.size()
+//                  << " ops):\n";
+
+//     for (Operation *op : cycle) {
+//       llvm::errs() << "  - ";
+//       op->print(llvm::errs());
+//       llvm::errs() << "\n";
+//     }
+
+//     llvm::errs() << "\n";
+//   }
+// }
+
+////////////////////////////////////////////////////////////////////////////////////
 
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    std::vector<CFDFC> &cfdfcs) {
@@ -398,6 +602,25 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     bbs.insert(arch.srcBB);
     bbs.insert(arch.dstBB);
   }
+
+  //////////// AYA added the following to identify all graph cycles in the
+  /// circuit graph
+  // Identify the cycles and the backward channels in your circuit
+  llvm::errs() << "\nBefore findALlCycles\n";
+
+  // CycleList circuitCycles =
+  // findAllCycles(info.funcOp);
+  // // llvm::errs() << "\nAfter findALlCycles\n";
+
+  // AYA TO AYA: The goal is to send mlir::DenseSet<Value> backwardChannels
+  // structure to the constructor of CFDFC below.
+  // GraphForJohnson johnsonGraph(info.funcOp);
+  // CycleList circuitCycles = johnsonGraph.findAllCycles();
+
+  // printCycles(circuitCycles);
+  mlir::DenseSet<Value> backwardChannels =
+      findBackwardChannelPerCyclicRegion(info.funcOp);
+  printBackwardChannels(backwardChannels);
 
   // Set of selected archs
   ArchSet selectedArchs;
@@ -423,7 +646,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs);
+    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs, backwardChannels);
   } while (!firstCFDFC);
 
   return success();
@@ -532,12 +755,6 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     return solveMILP<fpl22::OutOfCycleBuffers>(
         placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
   }
-
-  if (algorithm == FPGA24) {
-    fpga24::FPGA24Buffers solver(solverKind, timeout, info, timingDB, targetCP);
-    return solver.solve(placement);
-  }
-
   if (algorithm == COST_AWARE) {
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-cost-aware";

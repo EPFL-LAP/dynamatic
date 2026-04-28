@@ -24,6 +24,7 @@
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/LLVM.h"
 #include "experimental/Support/StdProfiler.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace dynamatic {
 namespace buffer {
@@ -58,13 +59,20 @@ struct CFDFC {
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
-  CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
+  CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
+        DenseSet<Value> backwardChannels);
 
   // Determines whether the channel is a "CFDFC backedge" i.e., the first
   // channel along a sequence of backedges from a source block to a destination
   // block. The distinction is important for the buffer placement MILP, which
   // uses backedges to determine where to insert "tokens" in the circuit.
   static bool isCFDFCBackedge(Value val);
+
+  // Determines whether the channel has a corresponding CFG edge.
+  bool isCFGCompliant(unsigned srcBB, unsigned dstBB);
+
+  // AYA: Added this from Jiahui to write the CFDFCs in DOT for debugging
+  // void writeDot(const std::string &fileName);
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are
