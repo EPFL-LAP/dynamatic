@@ -1972,6 +1972,18 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   return success();
 }
 
+bool CmpIOp::isSignedComparison() {
+  switch (getPredicate()) {
+  case CmpIPredicate::slt:
+  case CmpIPredicate::sle:
+  case CmpIPredicate::sgt:
+  case CmpIPredicate::sge:
+    return true;
+  default:
+    return false;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // ExtSIOp
 //===----------------------------------------------------------------------===//

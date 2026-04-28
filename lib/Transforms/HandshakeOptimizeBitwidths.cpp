@@ -1548,13 +1548,25 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     //   sign-extension of a negative number will insert a 1-bit upfront which
     //   changes the result.
     //   Example: cmpi uge zext(110), sext(10) must be done using 4, not 3 bits.
-    if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
-         minLhs.getType().getDataBitWidth() >=
-             minRhs.getType().getDataBitWidth()) ||
-        (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
-         minRhs.getType().getDataBitWidth() >=
-             minLhs.getType().getDataBitWidth()))
-      optWidth += 1;
+    //
+    // In a signed comparison we even require an extra bit if both operands
+    // are zero-extended. This is to make sure the sign-bit is guaranteed to be
+    // zero.
+    if (cmpOp.isSignedComparison()) {
+      if ((extLhs == ExtType::ZEXT && minLhs.getType().getDataBitWidth() >=
+                                          minRhs.getType().getDataBitWidth()) ||
+          (extRhs == ExtType::ZEXT && minRhs.getType().getDataBitWidth() >=
+                                          minLhs.getType().getDataBitWidth()))
+        optWidth++;
+    } else {
+      if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
+           minLhs.getType().getDataBitWidth() >=
+               minRhs.getType().getDataBitWidth()) ||
+          (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
+           minRhs.getType().getDataBitWidth() >=
+               minLhs.getType().getDataBitWidth()))
+        optWidth += 1;
+    }
 
     if (optWidth >= actualWidth)
       return failure();
