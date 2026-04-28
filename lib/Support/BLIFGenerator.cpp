@@ -13,8 +13,8 @@
 
 #include "dynamatic/Support/BLIFGenerator.h"
 #include "dynamatic/Support/RTLGenerator.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Operation.h"
+#include "llvm/Support/raw_ostream.h"
 #include <filesystem>
 #include <fstream>
 
@@ -26,8 +26,7 @@ BLIFGenerator::BLIFGenerator(const std::string &blifDirPath,
                              mlir::Operation *op,
                              const std::string &expectedBlifPath)
     : blifDirPath(blifDirPath), yosysExecutable(yosysExecutable),
-      abcExecutable(abcExecutable), op(op),
-      expectedBlifPath(expectedBlifPath) {
+      abcExecutable(abcExecutable), op(op), expectedBlifPath(expectedBlifPath) {
   namespace fs = std::filesystem;
   dynamaticRoot =
       (fs::path(blifDirPath) / ".." / "..").lexically_normal().string();
@@ -39,9 +38,9 @@ bool BLIFGenerator::generate() {
   std::string opName = op->getName().getStringRef().str();
   std::string opShortName = opName.substr(opName.find('.') + 1);
 
-  fs::path rtlConfigPath = (fs::path(blifDirPath) / ".." /
-                             "rtl-config-verilog-beta.json")
-                                .lexically_normal();
+  fs::path rtlConfigPath =
+      (fs::path(blifDirPath) / ".." / "rtl-config-verilog-beta.json")
+          .lexically_normal();
 
   RTLGenerator rtlGen(rtlConfigPath.string(), dynamaticRoot, blifDirPath, op);
   if (!rtlGen.generate()) {
