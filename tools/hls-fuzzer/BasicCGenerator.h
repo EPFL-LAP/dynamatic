@@ -90,6 +90,10 @@ private:
   generateBinaryExpression(ast::BinaryExpression::Op op,
                            const OpaqueContext &constraints, std::size_t depth);
 
+  std::optional<ast::Expression>
+  generateUnaryExpression(ast::UnaryExpression::Op op,
+                          const OpaqueContext &context, std::size_t depth);
+
   std::optional<ast::ConditionalExpression>
   generateConditionalExpression(const OpaqueContext &constraint,
                                 std::size_t depth);

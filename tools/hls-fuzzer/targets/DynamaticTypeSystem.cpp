@@ -55,3 +55,28 @@ auto dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
   }
   llvm_unreachable("all enum values handled");
 }
+
+auto dynamatic::gen::DynamaticTypeSystem::checkUnaryExpression(
+    ast::UnaryExpression::Op op, DynamaticTypingContext context) const
+    -> std::optional<ConclusionOf<ast::UnaryExpression>> {
+  switch (op) {
+  case ast::UnaryExpression::BitwiseNot:
+    // Requires an integer, produces an integer.
+    if (context.constraint != DynamaticTypingContext::IntegerRequired)
+      return std::nullopt;
+
+    return context;
+  case ast::UnaryExpression::BoolNot:
+    // Can only be generated if an integer is required.
+    if (context.constraint != DynamaticTypingContext::IntegerRequired)
+      return std::nullopt;
+
+    // However, the operand itself may be of any type since boolean conversions
+    // are supported.
+    return DynamaticTypingContext{
+        random.fromEnum<DynamaticTypingContext::Constraint>()};
+  case ast::UnaryExpression::Minus:
+    return {context};
+  }
+  llvm_unreachable("all enum values handled");
+}

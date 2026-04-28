@@ -65,6 +65,10 @@ public:
   checkBinaryExpressionOpaque(ast::BinaryExpression::Op op,
                               const OpaqueContext &context) = 0;
 
+  virtual std::optional<ConclusionOf<ast::UnaryExpression, OpaqueContext>>
+  checkUnaryExpressionOpaque(ast::UnaryExpression::Op op,
+                             const OpaqueContext &context) = 0;
+
   virtual std::optional<ConclusionOf<ast::Variable, OpaqueContext>>
   checkVariableOpaque(const OpaqueContext &context) = 0;
 
@@ -192,6 +196,11 @@ public:
     return {context, context};
   }
 
+  static ConclusionOf<ast::UnaryExpression>
+  checkUnaryExpression(ast::UnaryExpression::Op, const TypingContext &context) {
+    return {context};
+  }
+
   static ConclusionOf<ast::Variable>
   checkVariable(const TypingContext &context) {
     return {context};
@@ -289,6 +298,13 @@ public:
                               const OpaqueContext &context) final {
     return convert(
         self().checkBinaryExpression(op, context.cast<TypingContext>()));
+  }
+
+  std::optional<dynamatic::ConclusionOf<ast::UnaryExpression, OpaqueContext>>
+  checkUnaryExpressionOpaque(ast::UnaryExpression::Op op,
+                             const OpaqueContext &context) final {
+    return convert(
+        self().checkUnaryExpression(op, context.cast<TypingContext>()));
   }
 
   std::optional<dynamatic::ConclusionOf<ast::Variable, OpaqueContext>>
@@ -427,6 +443,11 @@ class DisallowByDefaultTypeSystem : public TypeSystem<TypingContext, Self> {
 public:
   static std::optional<ConclusionOf<ast::BinaryExpression, TypingContext>>
   checkBinaryExpression(ast::BinaryExpression::Op, const TypingContext &) {
+    return std::nullopt;
+  }
+
+  static std::optional<ConclusionOf<ast::UnaryExpression, TypingContext>>
+  checkUnaryExpression(ast::UnaryExpression::Op, const TypingContext &) {
     return std::nullopt;
   }
 

@@ -88,6 +88,13 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
         return self->generateBinaryExpression(op, context, depth);
       });
     }
+    for (auto op : enumRange<ast::UnaryExpression::Op>()) {
+      generators.emplace_back([op](BasicCGenerator *self,
+                                   const OpaqueContext &context,
+                                   std::size_t depth) {
+        return self->generateUnaryExpression(op, context, depth);
+      });
+    }
     generators.emplace_back(&BasicCGenerator::generateCastExpression);
     generators.emplace_back(&BasicCGenerator::generateArrayReadExpression);
     if (random.getRatherLowProbabilityBool())
@@ -189,6 +196,34 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
     return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
   }
   llvm_unreachable("all enum cases handled");
+}
+
+std::optional<ast::Expression>
+gen::BasicCGenerator::generateUnaryExpression(ast::UnaryExpression::Op op,
+                                              const OpaqueContext &context,
+                                              std::size_t depth) {
+  auto conclusion = typeSystem.checkUnaryExpressionOpaque(op, context);
+  if (!conclusion)
+    return std::nullopt;
+
+  ast::Expression operand = generateExpression(*conclusion, depth + 1);
+
+  // Perform explicit casts to a legal operand type if the operand type is not
+  // legal for the given operation.
+  // This would e.g. cast 'double's that are meant to be applied to '~' to a
+  // random type that can be legally used with '~'.
+  if (!ast::UnaryExpression::isLegalOperandType(op, operand.getType())) {
+    std::optional<ast::ScalarType> scalarType = generateScalarType(
+        context, /*toExclude=*/[&](const ast::ScalarType &value) {
+          return !ast::UnaryExpression::isLegalOperandType(op, value);
+        });
+    if (!scalarType)
+      return std::nullopt;
+
+    operand = safeCastAsNeeded(*scalarType, std::move(operand));
+  }
+
+  return ast::UnaryExpression{op, std::move(operand)};
 }
 
 std::optional<ast::ConditionalExpression>

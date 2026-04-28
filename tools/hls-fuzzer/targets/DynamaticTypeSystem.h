@@ -38,6 +38,10 @@ public:
   checkBinaryExpression(ast::BinaryExpression::Op op,
                         DynamaticTypingContext context);
 
+  std::optional<ConclusionOf<ast::UnaryExpression>>
+  checkUnaryExpression(ast::UnaryExpression::Op op,
+                       DynamaticTypingContext context) const;
+
   ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(DynamaticTypingContext context) const {
     // Condition can be either a floating point type or integer type.
