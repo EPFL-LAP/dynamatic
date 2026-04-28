@@ -483,3 +483,35 @@ handshake.func @subiFW_extui(%arg0: !handshake.channel<i8>, %arg1: !handshake.ch
   %res = subi %ext0, %ext1 : <i32>
   end %res : <i32>
 }
+
+// -----
+
+// CHECK-LABEL:   handshake.func @cmpi_sge_ui_ui(
+// CHECK-SAME:                                %[[VAL_0:.*]]: !handshake.channel<i8>, %[[VAL_1:.*]]: !handshake.channel<i8>,
+// CHECK-SAME:                                %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i1> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = extui %[[VAL_0]] {handshake.bb = 0 : ui32} : <i8> to <i9>
+// CHECK:           %[[VAL_4:.*]] = extui %[[VAL_1]] {handshake.bb = 0 : ui32} : <i8> to <i9>
+// CHECK:           %[[VAL_5:.*]] = cmpi sge, %[[VAL_4]], %[[VAL_3]] : <i9>
+// CHECK:           end %[[VAL_5]] : <i1>
+// CHECK:         }
+handshake.func @cmpi_sge_ui_ui(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i8>, %start: !handshake.control<>) -> !handshake.channel<i1> {
+  %ext0 = extui %arg0 : <i8> to <i32>
+  %ext1 = extui %arg1 : <i8> to <i32>
+  %res = cmpi sge, %ext1, %ext0 : <i32>
+  end %res : <i1>
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @cmpi_sge_si_si(
+// CHECK-SAME:                                %[[VAL_0:.*]]: !handshake.channel<i8>, %[[VAL_1:.*]]: !handshake.channel<i8>,
+// CHECK-SAME:                                %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i1> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = cmpi sge, %[[VAL_1]], %[[VAL_0]] : <i8>
+// CHECK:           end %[[VAL_3]] : <i1>
+// CHECK:         }
+handshake.func @cmpi_sge_si_si(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i8>, %start: !handshake.control<>) -> !handshake.channel<i1> {
+  %ext0 = extsi %arg0 : <i8> to <i32>
+  %ext1 = extsi %arg1 : <i8> to <i32>
+  %res = cmpi sge, %ext1, %ext0 : <i32>
+  end %res : <i1>
+}

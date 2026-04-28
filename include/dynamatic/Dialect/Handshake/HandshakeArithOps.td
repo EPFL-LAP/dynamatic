@@ -353,6 +353,13 @@ def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi", [
 
   let arguments = (ins Handshake_CmpIPredicateAttr:$predicate, ChannelType:$lhs,
                        ChannelType:$rhs);
+
+  let extraClassDeclaration = [{
+    /// Returns true if the comparison explicitly cares about the sign bit.
+    /// Note that this excludes 'eq' and 'ne' since they do not assign
+    /// special semantics to the sign bit.
+    bool isSignedComparison();
+  }];
 }
 
 def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
