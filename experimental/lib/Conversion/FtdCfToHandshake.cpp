@@ -442,6 +442,27 @@ static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
   return success();
 }
 
+/// Determines whether it is possible to transform an arith-level constant into
+/// a Handshake-level constant that is triggered by an always-triggering source
+/// component without compromising the circuit semantics (e.g., without
+/// triggering a memory operation before the circuit "starts"). Returns false if
+/// the Handshake-level constant that replaces the input must instead be
+/// connected to the control-only network; returns true otherwise. This function
+/// assumes that the rest of the std-level operations have already been
+/// converted to their Handshake equivalent.
+/// NOTE: I doubt this works in half-degenerate cases, but this is the logic
+/// that legacy Dynamatic follows.
+static bool isCstSourcable(arith::ConstantOp cstOp) {
+  std::function<bool(Operation *)> isValidUser = [&](Operation *user) -> bool {
+    if (isa<UnrealizedConversionCastOp>(user))
+      return llvm::all_of(user->getUsers(), isValidUser);
+    return !isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+                handshake::LoadOp, handshake::StoreOp>(user);
+  };
+
+  return llvm::all_of(cstOp->getUsers(), isValidUser);
+}
+
 /// Convers arith-level constants to handshake-level constants. Constants are
 /// triggered by the start value of the corresponding function. The FTD
 /// algorithm is then in charge of connecting the constants to the rest of the
@@ -463,7 +484,17 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
     // This variable will work as activation value for the constant. If the
     // constant is considered as sourcable, this will be the output of a source
     // component, otherwise it remains startValue
-    auto controlValue = startValue;
+    // auto controlValue = startValue;
+
+    // Determine the new constant's control input
+    Value controlValue;
+    // if (isCstSourcable(cstOp)) {
+    //   auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
+    //   inheritBB(cstOp, sourceOp);
+    //   controlValue = sourceOp.getResult();
+    // } else {
+    controlValue = startValue;
+    // }
 
     // Continue the conversion by obtaining the size of the constnat
     TypedAttr valueAttr = cstOp.getValue();

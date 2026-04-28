@@ -1453,8 +1453,8 @@ ConvertConstants::matchAndRewrite(arith::ConstantOp cstOp,
   //   inheritBB(cstOp, sourceOp);
   //   controlVal = sourceOp.getResult();
   // } else {
-    controlVal = getBlockControl(cstOp);
- // }
+  controlVal = getBlockControl(cstOp);
+  //}
 
   TypedAttr cstAttr = cstOp.getValue();
   // Convert IndexType'd values to equivalent signless integers

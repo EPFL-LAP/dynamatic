@@ -79,6 +79,55 @@ refreshBranchAttrsFromCondition(handshake::ConditionalBranchOp branchOp,
 
 namespace {
 
+/// Check if two values are functionally equivalent:
+///   - Same SSA value, OR
+///   - Both are ConstantOps with the same attribute value, OR
+///   - Both are NotIOps whose inputs are themselves equivalent (recursive)
+static bool areEquivalentValues(Value a, Value b) {
+  if (a == b)
+    return true;
+
+  if (a.getType() != b.getType())
+    return false;
+
+  Operation *defA = a.getDefiningOp();
+  Operation *defB = b.getDefiningOp();
+  if (!defA || !defB)
+    return false;
+
+  if (auto constA = dyn_cast<handshake::ConstantOp>(defA)) {
+    if (auto constB = dyn_cast<handshake::ConstantOp>(defB))
+      return constA.getValueAttr() == constB.getValueAttr();
+    return false;
+  }
+
+  if (auto notA = dyn_cast<handshake::NotIOp>(defA)) {
+    if (auto notB = dyn_cast<handshake::NotIOp>(defB))
+      return areEquivalentValues(notA.getOperand(), notB.getOperand());
+    return false;
+  }
+
+  return false;
+}
+
+static FailureOr<int>
+getSingleConstantOperandIndex(handshake::MergeOp mergeOp) {
+  int constIdx = -1;
+  for (int i = 0; i < 2; i++) {
+    if (!isa_and_nonnull<handshake::ConstantOp>(
+            mergeOp.getDataOperands()[i].getDefiningOp()))
+      continue;
+
+    if (constIdx != -1)
+      return failure();
+    constIdx = i;
+  }
+
+  if (constIdx == -1)
+    return failure();
+  return constIdx;
+}
+
 /// Combine redundant init merges. These merges have one constant input and a
 /// condition input. If two merges are identical, then one of them can be
 /// removed
@@ -91,29 +140,36 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
     if (mergeOp->getNumOperands() != 2)
       return failure();
 
-    // One of the inputs of the merge must be a constants
-    int constIdx = -1;
-    for (int i = 0; i < 2; i++) {
-      if (isa_and_nonnull<handshake::ConstantOp>(
-              mergeOp.getDataOperands()[i].getDefiningOp()))
-        constIdx = i;
-    }
-
-    if (constIdx == -1)
+    // Exactly one of the inputs of the merge must be a constant.
+    FailureOr<int> maybeConstIdx = getSingleConstantOperandIndex(mergeOp);
+    if (failed(maybeConstIdx))
       return failure();
+    int constIdx = *maybeConstIdx;
 
     // Get the index of the other input
     int loopIdx = 1 - constIdx;
 
-    // If there are other merges fed from the same input at the loopIdx
-    DenseSet<handshake::MergeOp> redundantInits;
-    for (auto *user : mergeOp.getDataOperands()[loopIdx].getUsers())
-      if (isa_and_nonnull<handshake::MergeOp>(user) && user != mergeOp) {
-        handshake::MergeOp mergeUser = cast<handshake::MergeOp>(user);
-        if (isa_and_nonnull<handshake::ConstantOp>(
-                mergeUser.getDataOperands()[constIdx].getDefiningOp()))
-          redundantInits.insert(mergeUser);
-      }
+    SmallVector<handshake::MergeOp> redundantInits;
+    mergeOp->getParentRegion()->walk([&](handshake::MergeOp mergeUser) {
+      if (mergeUser == mergeOp)
+        return;
+      if (mergeUser->getNumOperands() != 2)
+        return;
+
+      FailureOr<int> maybeUserConstIdx =
+          getSingleConstantOperandIndex(mergeUser);
+      if (failed(maybeUserConstIdx) || *maybeUserConstIdx != constIdx)
+        return;
+
+      if (!areEquivalentValues(mergeUser.getDataOperands()[constIdx],
+                               mergeOp.getDataOperands()[constIdx]))
+        return;
+      if (!areEquivalentValues(mergeUser.getDataOperands()[loopIdx],
+                               mergeOp.getDataOperands()[loopIdx]))
+        return;
+
+      redundantInits.push_back(mergeUser);
+    });
 
     if (redundantInits.empty())
       return failure();
@@ -122,6 +178,34 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
     for (auto init : redundantInits) {
       rewriter.replaceAllUsesWith(init.getResult(), mergeOp.getResult());
       rewriter.eraseOp(init);
+    }
+
+    return success();
+  }
+};
+
+/// Combine NotIOps that have functionally identical inputs.
+struct CombineEquivalentNotIOps : public OpRewritePattern<handshake::NotIOp> {
+  using OpRewritePattern<handshake::NotIOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::NotIOp notOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<handshake::NotIOp> redundant;
+
+    notOp->getParentRegion()->walk([&](handshake::NotIOp otherNot) {
+      if (otherNot == notOp)
+        return;
+      if (!areEquivalentValues(otherNot.getOperand(), notOp.getOperand()))
+        return;
+      redundant.push_back(otherNot);
+    });
+
+    if (redundant.empty())
+      return failure();
+
+    logLine("[HandshakeCombineSteeringLogic] CombineEquivalentNotIOps applied");
+    for (auto notUser : redundant) {
+      rewriter.replaceAllUsesWith(notUser.getResult(), notOp.getResult());
+      rewriter.eraseOp(notUser);
     }
 
     return success();
@@ -268,34 +352,6 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
     return success();
   }
 };
-
-/// Check if two values are functionally equivalent:
-///   - Same SSA value, OR
-///   - Both are ConstantOps with the same attribute value, OR
-///   - Both are NotIOps whose inputs are themselves equivalent (recursive)
-static bool areEquivalentValues(Value a, Value b) {
-  if (a == b)
-    return true;
-
-  Operation *defA = a.getDefiningOp();
-  Operation *defB = b.getDefiningOp();
-  if (!defA || !defB)
-    return false;
-
-  if (auto constA = dyn_cast<handshake::ConstantOp>(defA)) {
-    if (auto constB = dyn_cast<handshake::ConstantOp>(defB))
-      return constA.getValueAttr() == constB.getValueAttr();
-    return false;
-  }
-
-  if (auto notA = dyn_cast<handshake::NotIOp>(defA)) {
-    if (auto notB = dyn_cast<handshake::NotIOp>(defB))
-      return areEquivalentValues(notA.getOperand(), notB.getOperand());
-    return false;
-  }
-
-  return false;
-}
 
 /// Combine MuxOps that have functionally identical inputs.
 struct CombineEquivalentMuxes : public OpRewritePattern<handshake::MuxOp> {
@@ -805,15 +861,15 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add<BypassRedundantLazyFork, RemoveUnusedOp<handshake::MuxOp>,
+    patterns.add</*BypassRedundantLazyFork, */ RemoveUnusedOp<handshake::MuxOp>,
                  RemoveUnusedOp<handshake::ConditionalBranchOp>,
                  RemoveUnusedOp<handshake::ConstantOp>,
                  RemoveUnusedOp<handshake::SourceOp>,
                  RemoveUnusedOp<handshake::NotIOp>, SplitBranchWithMuxCondition,
-                 CombineBranchesOppositeSign, CombineInits, CombineMuxes,
-                 RemoveNotCondition, SimplifyKnownConditionBranch,
-                 EliminateConstantCondBranch, CombineEquivalentMuxes,
-                 CombineEquivalentBranches>(ctx);
+                 CombineBranchesOppositeSign, CombineEquivalentNotIOps,
+                 CombineInits, CombineMuxes, RemoveNotCondition,
+                 SimplifyKnownConditionBranch, EliminateConstantCondBranch,
+                 CombineEquivalentMuxes, CombineEquivalentBranches>(ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };

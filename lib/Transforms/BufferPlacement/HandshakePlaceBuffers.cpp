@@ -450,6 +450,19 @@ static bool isBackedgeSourceLike(Operation *op) {
   } while (true);
 }
 
+static bool isBackedgeDestinationLike(Operation *op) {
+  if (isa<handshake::MergeLikeOpInterface>(op))
+    return true;
+
+  auto notOp = dyn_cast<handshake::NotIOp>(op);
+  if (!notOp)
+    return false;
+
+  return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
+    return isa<handshake::MergeLikeOpInterface>(user);
+  });
+}
+
 /// Finds all loop-feedback-source -> merge-like backward channels per cyclic
 /// SCC in the handshake graph. Grouping by SCC remains more stable than trying
 /// to assign channels to every simple cycle when cycles overlap.
@@ -540,7 +553,7 @@ findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
         continue;
       if (!isBackedgeSourceLike(edge.src))
         continue;
-      if (!isa<handshake::MergeLikeOpInterface>(edge.dst))
+      if (!isBackedgeDestinationLike(edge.dst))
         continue;
       backwardChannels.insert(edge.channel);
     }
