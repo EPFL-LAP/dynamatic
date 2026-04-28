@@ -980,7 +980,7 @@ class LSQ:
             arch += Op(ctx, store_req_valid[i], stq_alloc[i], 'and', stq_addr_valid[i], 'and', stq_data_valid[i])
 
         store_candidate_req_valid = Logic(ctx, 'store_candidate_req_valid', 'w')
-        store_candidate_addr = LogicVec(ctx, 'store_candidate_addr', 'w', self.configs.stqAddrW)
+        store_candidate_addr = LogicVec(ctx, 'store_candidate_addr', 'w', self.configs.addrW)
         store_candidate_data = LogicVec(ctx, 'store_candidate_data', 'w', self.configs.dataW)
         store_candidate_is_older = LogicArray(ctx, 'store_candidate_is_older', 'w', self.configs.numLdqEntries)
 
