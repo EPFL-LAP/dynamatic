@@ -9,8 +9,8 @@
 //
 // This file contains the function to retrieve the path of the blif file for a
 // given handshake operation. The path is created by combining the base path
-// contining all the blif files and the operation name and parameters. The file
-// is expected to be named in the format <op_name>_<param1>_<param2>_..._.blif.
+// containing all the blif files, the operation name, and the parameter values
+// returned by getRTLParameters() via the RTLAttrInterface.
 // If the file does not exist, an attempt is made to generate it using
 // BLIFGenerator (requires Yosys and ABC to be configured at build time).
 //
@@ -25,6 +25,19 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 
 namespace dynamatic {
+
+// Converts a single NamedAttribute value from getRTLParameters() to a string.
+// TypeAttr(HandshakeType) -> data bitwidth; IntegerAttr -> integer; StringAttr
+// -> string.
+static std::string rtlParamToString(mlir::Attribute attr) {
+  if (auto ta = mlir::dyn_cast<mlir::TypeAttr>(attr))
+    return std::to_string(handshake::getHandshakeTypeBitWidth(ta.getValue()));
+  if (auto ia = mlir::dyn_cast<mlir::IntegerAttr>(attr))
+    return std::to_string(ia.getValue().getZExtValue());
+  if (auto sa = mlir::dyn_cast<mlir::StringAttr>(attr))
+    return sa.str();
+  return "";
+}
 
 // Function to combine parameter values, module type and blif directory path
 // to create the blif file path
@@ -43,262 +56,30 @@ BLIFFileManager::combineBlifFilePath(std::string moduleType,
 // Function to retrieve the path of the blif file for a given handshake
 // operation
 std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
-  // Depending on the operation type, there is a different number and type of
-  // parameters. For now, we use a switch hard-coded on the operation type. In
-  // the future, this should be improved by allowing extraction of parameter
-  // information from the operation itself
+  // EndOp has no hardware implementation.
+  if (mlir::isa<handshake::EndOp>(op))
+    return "";
+
+  // Get op name, strip dialect prefix (e.g. "handshake.addi" -> "addi").
   std::string moduleType = op->getName().getStringRef().str();
-  // Erase the dialect name from the moduleType
   moduleType = moduleType.substr(moduleType.find('.') + 1);
-  std::string blifFileName;
-  std::string
-      genComponent; // full component name looked up in the JSON config (=
-                    // moduleType + extraSuffix, e.g. "fork_dataless").
-  std::vector<std::string>
-      genParams; // ordered parameter values matching the JSON generic params.
 
-  llvm::TypeSwitch<Operation *>(op)
-      .Case<handshake::AddIOp, handshake::AndIOp, handshake::OrIOp,
-            handshake::ShLIOp, handshake::ShRSIOp, handshake::ShRUIOp,
-            handshake::SubIOp, handshake::XOrIOp, handshake::MulIOp,
-            handshake::DivSIOp, handshake::DivUIOp, handshake::SelectOp,
-            handshake::SIToFPOp, handshake::FPToSIOp>([&](auto) {
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-        std::string dw = std::to_string(dataWidth);
-        blifFileName = combineBlifFilePath(moduleType, {dw});
-        genComponent = moduleType;
-        genParams = {dw};
-      })
-      .Case<handshake::CmpIOp>([&](handshake::CmpIOp cmpOp) {
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-        std::string dw = std::to_string(dataWidth);
-        std::string predStr = stringifyEnum(cmpOp.getPredicate()).str();
-        blifFileName = combineBlifFilePath(moduleType, {dw, predStr});
-        genComponent = moduleType;
-        genParams = {dw, predStr};
-      })
-      .Case<handshake::ConstantOp>([&](handshake::ConstantOp constOp) {
-        handshake::ChannelType cstType = constOp.getResult().getType();
-        unsigned dataWidth = cstType.getDataBitWidth();
-        std::string dw = std::to_string(dataWidth);
-        // Build a binary string of the constant value (MSB first, dataWidth
-        // characters) so that different values get distinct BLIF files and
-        // the correct value is passed to the Verilog generator.
-        auto valueAttr = constOp->getAttrOfType<mlir::IntegerAttr>("value");
-        llvm::APInt apVal = valueAttr.getValue();
-        std::string binStr(dataWidth, '0');
-        for (unsigned i = 0; i < dataWidth; ++i)
-          binStr[dataWidth - 1 - i] = apVal[i] ? '1' : '0';
-        blifFileName = combineBlifFilePath(moduleType, {dw, binStr});
-        genComponent = moduleType;
-        genParams = {dw, binStr};
-      })
-      .Case<handshake::BranchOp, handshake::SinkOp>([&](auto) {
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-        if (dataWidth == 0) {
-          blifFileName = combineBlifFilePath(moduleType, {}, "_dataless");
-          genComponent = moduleType + "_dataless";
-          genParams = {};
-        } else {
-          std::string dw = std::to_string(dataWidth);
-          blifFileName = combineBlifFilePath(moduleType, {dw});
-          genComponent = moduleType;
-          genParams = {dw};
-        }
-      })
-      .Case<handshake::BufferOp>([&](handshake::BufferOp bufOp) {
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-        unsigned numSlots = static_cast<unsigned>(bufOp.getNumSlots());
-        bool isDataless = (dataWidth == 0);
-        std::string dw = std::to_string(dataWidth);
-        std::string ns = std::to_string(numSlots);
+  // Retrieve all RTL parameters from the op via the interface.
+  auto iface = mlir::cast<handshake::RTLAttrInterface>(op);
+  auto paramsOrErr = iface.getRTLParameters();
+  if (mlir::failed(paramsOrErr)) {
+    llvm::errs() << "BLIFFileManager: getRTLParameters() failed for `"
+                 << moduleType << "`\n";
+    return "";
+  }
 
-        // Map BufferType enum to the JSON module-name base and whether
-        // NUM_SLOTS is a range parameter in the BLIF path.
-        std::string base;
-        bool hasNumSlots = false;
-        switch (bufOp.getBufferType()) {
-        case handshake::BufferType::ONE_SLOT_BREAK_DV:
-          base = "oehb";
-          break;
-        case handshake::BufferType::ONE_SLOT_BREAK_R:
-          base = "tehb";
-          break;
-        case handshake::BufferType::FIFO_BREAK_NONE:
-          base = "tfifo";
-          hasNumSlots = true;
-          break;
-        case handshake::BufferType::ONE_SLOT_BREAK_DVR:
-          base = "one_slot_break_dvr";
-          break;
-        case handshake::BufferType::SHIFT_REG_BREAK_DV:
-          base = "shift_reg_break_dv";
-          hasNumSlots = true;
-          break;
-        default:
-          blifFileName = "";
-          return;
-        }
+  // Convert all parameter values to strings for path construction.
+  std::vector<std::string> paramStrs;
+  paramStrs.reserve(paramsOrErr->size());
+  for (const auto &p : *paramsOrErr)
+    paramStrs.push_back(rtlParamToString(p.getValue()));
 
-        std::string component = base + (isDataless ? "_dataless" : "");
-        std::vector<std::string> params;
-        if (hasNumSlots)
-          params.push_back(ns);
-        if (!isDataless)
-          params.push_back(dw);
-
-        blifFileName = combineBlifFilePath(component, params);
-        genComponent = component;
-        genParams = params;
-      })
-      .Case<handshake::ConditionalBranchOp>(
-          [&](handshake::ConditionalBranchOp cbrOp) {
-            unsigned dataWidth = handshake::getHandshakeTypeBitWidth(
-                cbrOp.getDataOperand().getType());
-            if (dataWidth == 0) {
-              blifFileName = combineBlifFilePath(moduleType, {}, "_dataless");
-              genComponent = moduleType + "_dataless";
-              genParams = {};
-            } else {
-              std::string dw = std::to_string(dataWidth);
-              blifFileName = combineBlifFilePath(moduleType, {dw});
-              genComponent = moduleType;
-              genParams = {dw};
-            }
-          })
-      .Case<handshake::ControlMergeOp>([&](handshake::ControlMergeOp cmergeOp) {
-        unsigned size = cmergeOp.getDataOperands().size();
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(cmergeOp.getResult().getType());
-        unsigned indexType =
-            handshake::getHandshakeTypeBitWidth(cmergeOp.getIndex().getType());
-        if (dataWidth == 0) {
-          std::string sz = std::to_string(size);
-          std::string it = std::to_string(indexType);
-          blifFileName = combineBlifFilePath(moduleType, {sz, it}, "_dataless");
-          genComponent = moduleType + "_dataless";
-          genParams = {sz, it};
-        } else {
-          assert(false && "ControlMerge with data not supported yet");
-        }
-      })
-      .Case<handshake::ExtSIOp, handshake::ExtUIOp, handshake::ExtFOp,
-            handshake::TruncIOp, handshake::TruncFOp>([&](auto extOp) {
-        unsigned inputWidth =
-            handshake::getHandshakeTypeBitWidth(extOp.getOperand().getType());
-        unsigned outputWidth =
-            handshake::getHandshakeTypeBitWidth(extOp.getResult().getType());
-        std::string iw = std::to_string(inputWidth);
-        std::string ow = std::to_string(outputWidth);
-        blifFileName = combineBlifFilePath(moduleType, {iw, ow});
-        genComponent = moduleType;
-        genParams = {iw, ow};
-      })
-      .Case<handshake::ForkOp, handshake::LazyForkOp>([&](auto) {
-        unsigned size = op->getNumResults();
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(op->getOperand(0).getType());
-        std::string sz = std::to_string(size);
-        if (dataWidth == 0) {
-          blifFileName = combineBlifFilePath(moduleType, {sz}, "_dataless");
-          genComponent = moduleType + "_dataless";
-          genParams = {sz};
-        } else {
-          std::string dw = std::to_string(dataWidth);
-          blifFileName = combineBlifFilePath(moduleType, {sz, dw}, "_type");
-          genComponent = moduleType + "_type";
-          genParams = {sz, dw};
-        }
-      })
-      .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
-        unsigned size = muxOp.getDataOperands().size();
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(muxOp.getResult().getType());
-        unsigned selectType = handshake::getHandshakeTypeBitWidth(
-            muxOp.getSelectOperand().getType());
-        std::string sz = std::to_string(size);
-        std::string dw = std::to_string(dataWidth);
-        std::string st = std::to_string(selectType);
-        blifFileName = combineBlifFilePath(moduleType, {sz, dw, st});
-        genComponent = moduleType;
-        genParams = {sz, dw, st};
-      })
-      .Case<handshake::MergeOp>([&](handshake::MergeOp mergeOp) {
-        unsigned size = mergeOp.getDataOperands().size();
-        unsigned dataWidth = handshake::getHandshakeTypeBitWidth(
-            mergeOp.getDataOperands()[0].getType());
-        std::string sz = std::to_string(size);
-        std::string dw = std::to_string(dataWidth);
-        // If dataWidth is 0, we use a special "_dataless" suffix
-        if (dataWidth == 0) {
-          blifFileName = combineBlifFilePath(moduleType, {sz}, "_dataless");
-          genComponent = moduleType + "_dataless";
-          genParams = {sz};
-        } else {
-          // If not, we generate the regular merge
-          blifFileName = combineBlifFilePath(moduleType, {sz, dw});
-          genComponent = moduleType;
-          genParams = {sz, dw};
-        }
-      })
-      .Case<handshake::LoadOp, handshake::StoreOp>([&](auto lsOp) {
-        unsigned dataWidth =
-            handshake::getHandshakeTypeBitWidth(lsOp.getDataInput().getType());
-        unsigned addrType = handshake::getHandshakeTypeBitWidth(
-            lsOp.getAddressInput().getType());
-        std::string dw = std::to_string(dataWidth);
-        std::string at = std::to_string(addrType);
-        blifFileName = combineBlifFilePath(moduleType, {dw, at});
-        genComponent = moduleType;
-        genParams = {dw, at};
-      })
-      .Case<handshake::SourceOp>([&](auto) {
-        blifFileName = combineBlifFilePath(moduleType, {});
-        genComponent = moduleType;
-        genParams = {};
-      })
-      .Case<handshake::EndOp>([&](auto) {
-        // EndOp is a function terminator with no hardware implementation.
-        blifFileName = "";
-      })
-      .Case<handshake::MemoryControllerOp>([&](handshake::MemoryControllerOp
-                                                   mcOp) {
-        assert(
-            false &&
-            "MemoryController is not currently handled since "
-            "it has one side of the ports in handshake and the "
-            "other side as non-handshake. This requires a more complex "
-            "HandshakeToSynth conversion that is not currently implemented.");
-        MCPorts ports = mcOp.getPorts();
-        unsigned numControls = ports.getNumPorts<ControlPort>();
-        unsigned numLoads = ports.getNumPorts<LoadPort>();
-        unsigned numStores = ports.getNumPorts<StorePort>();
-        std::string nc = std::to_string(numControls);
-        std::string nl = std::to_string(numLoads);
-        std::string ns = std::to_string(numStores);
-        std::string dw = std::to_string(ports.dataWidth);
-        std::string aw = std::to_string(ports.addrWidth);
-
-        if (numControls == 0 && numStores == 0) {
-          genComponent = "mem_controller_storeless";
-          genParams = {nl, dw, aw};
-        } else if (numLoads == 0) {
-          genComponent = "mem_controller_loadless";
-          genParams = {nc, ns, dw, aw};
-        } else {
-          genComponent = "mem_controller";
-          genParams = {nc, nl, ns, dw, aw};
-        }
-        blifFileName = combineBlifFilePath(genComponent, genParams);
-      })
-      .Default([&](auto) { blifFileName = ""; });
-
-  if (blifFileName.empty())
-    return blifFileName;
+  std::string blifFileName = combineBlifFilePath(moduleType, paramStrs);
 
   // Check if the file exists; if not, attempt to generate it.
   if (!std::filesystem::exists(blifFileName)) {
@@ -306,8 +87,8 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
     llvm::errs() << "[BLIFFileManager] BLIF file missing, generating: "
                  << blifFileName << "\n";
     BLIFGenerator gen(blifDirPath, DYNAMATIC_YOSYS_EXECUTABLE,
-                      DYNAMATIC_ABC_EXECUTABLE);
-    bool ok = gen.generate(genComponent, genParams);
+                      DYNAMATIC_ABC_EXECUTABLE, op, blifFileName);
+    bool ok = gen.generate();
     if (!ok || !std::filesystem::exists(blifFileName)) {
       llvm::errs() << "Failed to generate BLIF file for operation `"
                    << getUniqueName(op) << "`: " << blifFileName
@@ -334,7 +115,6 @@ std::string legalizeDataPortName(StringRef baseName, unsigned bit,
                                  unsigned width) {
   if (width == 1)
     return baseName.str();
-  // Reuse the formatArrayName() helper from Step 1 / Layer 2.
   return formatArrayName(baseName.str(), bit, width);
 }
 
@@ -389,8 +169,6 @@ void legalizeBlifPortNames(SmallVector<std::string> &names) {
       result.push_back(root);
     } else {
       if (idx == 1) {
-        // Back-patch the root entry (index 0) to have the "[0]" suffix,
-        // since it was originally stored without an index.
         auto *it = std::find(result.begin(), result.end(), root);
         assert(it != result.end() && "index-0 port not found for back-patch");
         *it = formatArrayName(root, 0);
