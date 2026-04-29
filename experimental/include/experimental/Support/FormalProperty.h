@@ -284,7 +284,7 @@ public:
                  std::vector<std::unique_ptr<InternalStateNamer>> slots,
                  std::vector<EagerForkSentNamer> forks)
       : FormalProperty(id, tag, TYPE::IOGSingleToken), slots(std::move(slots)),
-        forks(std::move(forks)){};
+        forks(std::move(forks)) {};
   ~IOGSingleToken() = default;
 
   static bool classof(const FormalProperty *fp) {
