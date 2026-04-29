@@ -380,7 +380,6 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
 
 void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
                                      SmallVector<CFGPath> &paths) {
-
   if (this->successors.empty()) {
     assert(
         from == 0 && to == 0 &&
@@ -391,7 +390,6 @@ void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
 
   // Both blocks must exist in the CFG
   assert(successors.contains(from) && "source block must exist in the CFG");
-  assert(successors.contains(to) && "destination block must exist in the CFG");
 
   mlir::SetVector<unsigned> pathSoFar;
   pathSoFar.insert(from);
