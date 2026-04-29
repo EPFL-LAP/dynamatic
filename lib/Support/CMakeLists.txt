@@ -1,9 +1,8 @@
 add_dynamatic_library(DynamaticSupport
   Attribute.cpp
   Backedge.cpp
+  BackendGenerator.cpp
   BLIFFileManager.cpp
-  BLIFGenerator.cpp
-  RTLGenerator.cpp
   CFG.cpp
   DOT.cpp
   MILP.cpp

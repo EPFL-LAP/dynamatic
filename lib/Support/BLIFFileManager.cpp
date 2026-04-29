@@ -17,8 +17,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Support/BLIFFileManager.h"
-#include "dynamatic/Support/BLIFGenerator.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/BackendGenerator.h"
+#include "mlir/IR/Operation.h"
 #include "llvm/Support/raw_ostream.h"
+#include <filesystem>
+#include <regex>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -42,9 +48,9 @@ static std::string rtlParamToString(mlir::Attribute attr) {
 // Function to combine parameter values, module type and blif directory path
 // to create the blif file path
 std::string
-BLIFFileManager::combineBlifFilePath(std::string moduleType,
-                                     std::vector<std::string> paramValues,
-                                     std::string extraSuffix) {
+BLIFFileManager::combineBlifFilePath(const std::string &moduleType,
+                                     const std::vector<std::string> &paramValues,
+                                     const std::string &extraSuffix) {
   std::string blifFilePath = blifDirPath + "/" + moduleType + extraSuffix;
   for (const auto &paramValue : paramValues) {
     blifFilePath += "/" + paramValue;
@@ -85,10 +91,12 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
   if (!std::filesystem::exists(blifFileName)) {
 #if defined(DYNAMATIC_YOSYS_EXECUTABLE) && defined(DYNAMATIC_ABC_EXECUTABLE)
     llvm::errs() << "BLIF file missing, generating: " << blifFileName << "\n";
-    BLIFGenerator gen(blifDirPath, dynamaticRootPath, RTLJSONFile,
-                      DYNAMATIC_YOSYS_EXECUTABLE, DYNAMATIC_ABC_EXECUTABLE, op,
-                      blifFileName);
-    bool ok = gen.generate();
+    BackendGenerator gen(
+        BackendGenerator::Backend::BLIF,
+        BackendGenerator::BLIFParams{rtlJsonFile, dynamaticRootPath, blifDirPath,
+                                     DYNAMATIC_YOSYS_EXECUTABLE,
+                                     DYNAMATIC_ABC_EXECUTABLE});
+    bool ok = gen.generate(op);
     if (!ok || !std::filesystem::exists(blifFileName)) {
       llvm::errs() << "Failed to generate BLIF file for operation `"
                    << getUniqueName(op) << "`: " << blifFileName

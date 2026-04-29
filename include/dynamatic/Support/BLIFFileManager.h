@@ -1,5 +1,4 @@
-//===- BLIFFileManager.h - Support functions for BLIF importer -*- C++
-//-*-===//
+//===- BLIFFileManager.h - Support functions for BLIF importer -*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,49 +6,45 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the function to retrieve the path of the blif file for a
-// given handshake operation. The path is created by combining the base path
-// contining all the blif files and the operation name and parameters. The file
-// is expected to be named in the format <op_name>_<param1>_<param2>_..._.blif.
-// If the file does not exist, an error is emitted.
+// Retrieves the BLIF file path for a given Handshake operation by combining
+// the base BLIF directory, the operation name, and its RTL parameter values.
+// If the file does not exist and Yosys+ABC are configured, it is generated
+// on demand via BackendGenerator.
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#ifndef DYNAMATIC_SUPPORT_BLIFFILEMANAGER_H
+#define DYNAMATIC_SUPPORT_BLIFFILEMANAGER_H
+
 #include "dynamatic/Support/LLVM.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include <filesystem>
-#include <regex>
+#include "llvm/ADT/SmallVector.h"
+#include <string>
+#include <vector>
+
+namespace mlir {
+class Operation;
+} // namespace mlir
 
 namespace dynamatic {
 
 class BLIFFileManager {
 public:
-  // Constructor for the BLIFFileManager class
   BLIFFileManager(std::string blifDirPath, std::string dynamaticRootPath,
-                  std::string RTLJSONFile)
-      : blifDirPath(blifDirPath), dynamaticRootPath(dynamaticRootPath),
-        RTLJSONFile(RTLJSONFile) {}
+                  std::string rtlJsonFile)
+      : blifDirPath(std::move(blifDirPath)),
+        dynamaticRootPath(std::move(dynamaticRootPath)),
+        rtlJsonFile(std::move(rtlJsonFile)) {}
 
-  // Function to combine parameter values, module type and blif directory path
-  // to create the blif file path
-  std::string combineBlifFilePath(std::string moduleType,
-                                  std::vector<std::string> paramValues,
-                                  std::string extraSuffix = "");
+  std::string combineBlifFilePath(const std::string &moduleType,
+                                  const std::vector<std::string> &paramValues,
+                                  const std::string &extraSuffix = "");
 
-  // Function to retrieve the path of the blif file for a given handshake
-  // operation
   std::string getBlifFilePathForHandshakeOp(mlir::Operation *op);
 
 private:
-  // String containing the base path of the blif files
   std::string blifDirPath;
-  // String containing the path to the Dynamatic root directory
   std::string dynamaticRootPath;
-  // String containing the path to the RTL JSON file
-  std::string RTLJSONFile;
+  std::string rtlJsonFile;
 };
 
 // Formats a bit-indexed port name: "sig[bit]".
@@ -66,15 +61,17 @@ std::string legalizeControlPortName(const std::string &name,
 
 // Converts a (root, index) pair into the canonical "root[index]" form.
 // If root already contains "[N]", the old index is linearised with
-//  arrayWidth before adding index.
+// arrayWidth before adding index.
 // Example: formatArrayName("data[2]", 3, 4) becomes "data[11]"  (2*4 + 3)
 std::string formatArrayName(const std::string &root, unsigned index,
                             unsigned arrayWidth = 0);
 
 // Legalizes a list of handshake port names by converting the "root_N" index
 // pattern (used internally by NamedIOInterface) into the "root[N]" array
-// notation expected by the BLIF importer
+// notation expected by the BLIF importer.
 // Example: ["data_0", "data_1", "valid"] -> ["data[0]", "data[1]", "valid"]
-void legalizeBlifPortNames(mlir::SmallVector<std::string> &names);
+void legalizeBlifPortNames(llvm::SmallVector<std::string> &names);
 
 } // namespace dynamatic
+
+#endif // DYNAMATIC_SUPPORT_BLIFFILEMANAGER_H
