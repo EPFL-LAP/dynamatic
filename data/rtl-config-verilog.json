@@ -566,6 +566,34 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "DV_LATENCY", "type": "unsigned", "lb": 1 },
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "COUNTER_BUFFER", "generic": false },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-eq": 0,
+        "extra-eq": 0,
+        "generic": false
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t buffer -p num_slots=$NUM_SLOTS dv_latency=$DV_LATENCY bitwidth=$BITWIDTH buffer_type='\"$BUFFER_TYPE\"' extra_signals=$EXTRA_SIGNALS",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.buffer",
+    "parameters": [
+      { "name": "BUFFER_TYPE", "type": "string", "eq": "COUNTER_BUFFER", "generic": false },
+      { "name": "NUM_SLOTS", "type": "unsigned", "lb": 1 },
+      { "name": "DV_LATENCY", "type": "unsigned", "lb": 1 },
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t buffer -p num_slots=$NUM_SLOTS dv_latency=$DV_LATENCY bitwidth=$BITWIDTH buffer_type='\"$BUFFER_TYPE\"' extra_signals=$EXTRA_SIGNALS",
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.ndwire",
     "parameters": [
       {

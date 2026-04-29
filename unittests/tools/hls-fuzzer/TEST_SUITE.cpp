@@ -112,8 +112,8 @@ public:
   }
 
   constexpr static std::string_view result =
-      R"(double test(double var0[32]) {
-  return var0[((uint32_t)(0) & 31u)];
+      R"(double test(double var0[16]) {
+  return var0[((uint32_t)((0)) & (15u))];
 }
 )";
 

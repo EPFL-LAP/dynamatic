@@ -64,6 +64,25 @@ public:
   checkScalarType(const ast::ScalarType &scalarType,
                   const BitwidthTypingContext &);
 
+  std::optional<ConclusionOf<ast::ReturnType>>
+  checkReturnType(const ast::ReturnType &returnType,
+                  const BitwidthTypingContext &context) {
+    // Disallow void.
+    if (llvm::isa<ast::VoidType>(returnType))
+      return std::nullopt;
+
+    return Super::checkReturnType(returnType, context);
+  }
+
+  /// Disallow array-assignment statements.
+  /// There is no rationale for doing so beyond the fact that we don't need
+  /// them, since we can just generate expression trees, and that it makes
+  /// synthesis faster.
+  static std::optional<ConclusionOf<ast::ArrayAssignmentStatement>>
+  checkArrayAssignmentStatement(const BitwidthTypingContext &) {
+    return std::nullopt;
+  }
+
   /// Forces constants to fit in the given bitwidth requirement.
   std::optional<ConclusionOf<ast::Constant>>
   checkConstant(const ast::Constant &constant,
@@ -72,6 +91,13 @@ public:
   std::optional<ConclusionOf<ast::BinaryExpression>>
   checkBinaryExpression(ast::BinaryExpression::Op op,
                         const BitwidthTypingContext &context) const;
+
+  static std::optional<ConclusionOf<ast::UnaryExpression>>
+  checkUnaryExpression(ast::UnaryExpression::Op,
+                       const BitwidthTypingContext &) {
+    // TODO: Figure out and implement logic here.
+    return std::nullopt;
+  }
 
   ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(const BitwidthTypingContext &context) const;

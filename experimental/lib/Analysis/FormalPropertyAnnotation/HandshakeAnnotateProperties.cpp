@@ -70,6 +70,8 @@ private:
   unsigned int uid;
   json::Array propertyTable;
 
+  LogicalResult annotateProperty(ModuleOp modOp, FormalProperty::TYPE t);
+  LogicalResult annotateQueriedProperties(const std::vector<IOG> &iogs);
   LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
@@ -185,6 +187,14 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateCopiedSlotsRec(
   // be annotated
   if (auto bufferOp = dyn_cast<handshake::BufferLikeOpInterface>(curOp)) {
     CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, bufferOp,
+                                     originFork);
+    propertyTable.push_back(p.toJSON());
+    uid++;
+    return success();
+  }
+
+  if (auto latencyOp = dyn_cast<handshake::LatencyInterface>(curOp)) {
+    CopiedSlotsOfActiveForkAreFull p(uid, FormalProperty::TAG::INVAR, latencyOp,
                                      originFork);
     propertyTable.push_back(p.toJSON());
     uid++;
@@ -396,6 +406,70 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
   return success();
 }
 
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
+                                                  FormalProperty::TYPE t) {
+  switch (t) {
+  case FormalProperty::TYPE::AbsenceOfBackpressure:
+    return annotateAbsenceOfBackpressure(modOp);
+  case FormalProperty::TYPE::ValidEquivalence:
+    return annotateValidEquivalence(modOp);
+  case FormalProperty::TYPE::EagerForkNotAllOutputSent:
+    return annotateEagerForkNotAllOutputSent(modOp);
+  case FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull:
+    return annotateCopiedSlotsOfAllForks(modOp);
+  case FormalProperty::TYPE::ReconvergentPathFlow:
+    return annotateReconvergentPathFlow(modOp);
+  case FormalProperty::TYPE::IOGSingleToken:
+  case FormalProperty::TYPE::IOGConsecutiveTokens:
+    assert(false &&
+           "TODO: IOG as pass so that this function has access to IOGs");
+    return failure();
+  }
+  return failure();
+}
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
+    const std::vector<IOG> &iogs) {
+  ModuleOp modOp = getOperation();
+  LogicalResult res = success();
+  if (annotateList != "") {
+    for (auto &elem : llvm::split(annotateList, ',')) {
+      std::string typeStr = elem.trim().str();
+      if (auto t = FormalProperty::typeFromStr(typeStr)) {
+        if (failed(annotateProperty(modOp, *t)))
+          res = failure();
+      } else {
+        llvm::errs() << typeStr << " is not a property\n";
+        res = failure();
+      }
+    }
+    return res;
+  }
+  if (annotateProperties) {
+    if (failed(annotateAbsenceOfBackpressure(modOp)))
+      return failure();
+    if (failed(annotateValidEquivalence(modOp)))
+      return failure();
+  }
+  if (annotateInvariants) {
+    if (failed(annotateEagerForkNotAllOutputSent(modOp)))
+      return failure();
+    if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return failure();
+    if (failed(annotateReconvergentPathFlow(modOp)))
+      return failure();
+
+    for (const auto &iog : iogs) {
+      if (failed(annotateIOGSingleToken(iog)))
+        return failure();
+      if (failed(annotateIOGConsecutiveTokens(iog)))
+        return failure();
+    }
+  }
+  return success();
+}
+
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
   auto iogs = findAllIOGs(modOp);
@@ -413,24 +487,8 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
     sink->setAttr("IOG_TERMINATOR", unitAttr);
   }
 
-  if (failed(annotateAbsenceOfBackpressure(modOp)))
+  if (failed(annotateQueriedProperties(iogs))) {
     return signalPassFailure();
-  if (failed(annotateValidEquivalence(modOp)))
-    return signalPassFailure();
-  if (annotateInvariants) {
-    if (failed(annotateEagerForkNotAllOutputSent(modOp)))
-      return signalPassFailure();
-    if (failed(annotateCopiedSlotsOfAllForks(modOp)))
-      return signalPassFailure();
-    if (failed(annotateReconvergentPathFlow(modOp)))
-      return signalPassFailure();
-
-    for (const auto &iog : iogs) {
-      if (failed(annotateIOGSingleToken(iog)))
-        return signalPassFailure();
-      if (failed(annotateIOGConsecutiveTokens(iog)))
-        return signalPassFailure();
-    }
   }
 
   llvm::json::Value jsonVal(std::move(propertyTable));

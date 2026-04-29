@@ -86,6 +86,14 @@ struct TypeSystemTraits<ast::BinaryExpression> : TypeSystemTraitsDefaults {
 };
 
 template <>
+struct TypeSystemTraits<ast::UnaryExpression> : TypeSystemTraitsDefaults {
+
+  /// Type constraint for the expression the operation is applied on.
+  template <typename TypingContext>
+  using Conclusions = TypingContext;
+};
+
+template <>
 struct TypeSystemTraits<ast::CastExpression> : TypeSystemTraitsDefaults {
 
   /// Type constraints for the target type followed
@@ -108,6 +116,9 @@ struct TypeSystemTraits<ast::ConditionalExpression> : TypeSystemTraitsDefaults {
 
 template <>
 struct TypeSystemTraits<ast::ScalarType> : TypeSystemTraitsDefaults {};
+
+template <>
+struct TypeSystemTraits<ast::ReturnType> : TypeSystemTraitsDefaults {};
 
 template <>
 struct TypeSystemTraits<ast::Constant> : TypeSystemTraitsDefaults {
@@ -141,6 +152,15 @@ struct TypeSystemTraits<ast::ArrayParameter> {
   /// test bench generation.
   template <typename TypingContext>
   using Conclusions = TypingContext;
+};
+
+template <>
+struct TypeSystemTraits<ast::ArrayAssignmentStatement> {
+
+  template <typename TypingContext>
+  using Conclusions =
+      std::tuple</*parameter=*/TypingContext, /*index=*/TypingContext,
+                 /*value=*/TypingContext>;
 };
 
 } // namespace dynamatic

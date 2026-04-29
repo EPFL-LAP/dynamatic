@@ -337,7 +337,7 @@ static void canonicalizeCommutativeExtensionType(ExtWidth &lhs, ExtWidth &rhs) {
     std::swap(lhs, rhs);
 }
 
-/// Transfer function for add/sub operations or alike.
+/// Transfer function for add operations or alike.
 static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
   canonicalizeCommutativeExtensionType(lhs, rhs);
   if (rhs.extType <= ExtType::ZEXT)
@@ -346,9 +346,23 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
   return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 }
 
+/// Transfer function for sub operations or alike.
+static ExtWidth subWidth(ExtWidth lhs, ExtWidth rhs) {
+  // Subtraction logic can be broken down using other operations as follows:
+  // sub(a, b) = add(a, ~b + 1) = add(a, xor(b, sext(-1)) + 1)
+  // Applying the forward function from 'xor' we can conclude that rhs is
+  // always sign-extended if reduced in bitwidth.
+
+  // We apply the logic from 'add' here, but with the assumption that 'rhs' is
+  // SEXT.
+  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+}
+
 /// Transfer function for mul operations or alike.
 static ExtWidth mulWidth(ExtWidth lhs, ExtWidth rhs) {
-  return {ExtType::NONE, lhs.bitWidth + rhs.bitWidth};
+  canonicalizeCommutativeExtensionType(lhs, rhs);
+  // Sign-extend if any of the operands are sign-extended.
+  return {rhs.extType, lhs.bitWidth + rhs.bitWidth};
 }
 
 /// Transfer function for div/rem operations or alike.
@@ -371,6 +385,12 @@ static ExtWidth andWidth(ExtWidth lhs, ExtWidth rhs) {
   // "a = 01, b = 01" and zero-extending the result.
   if (rhs.extType <= ExtType::ZEXT)
     return {ExtType::ZEXT, std::min(lhs.bitWidth, rhs.bitWidth)};
+
+  // Similarly, if one operand is zero-extended, then the bitwidth of the
+  // zero-extended operand can be used since any bits further than its bitwidth
+  // is guaranteed to be zero, causing the corresponding result bit to be zero.
+  if (lhs.extType == ExtType::ZEXT)
+    return {ExtType::ZEXT, lhs.bitWidth};
 
   // Sign-extension might fill with 1-bits, meaning all bits of the larger
   // operand are part of the effective result bitwidth.
@@ -402,7 +422,7 @@ static ExtWidth orWidth(ExtWidth lhs, ExtWidth rhs) {
   // with 3 bits would be wrong however, since sext(OR 101, sext(01) to i3)
   // would extend with 1s, merely due to the bitwidth reduction.
   // The extra bit prevents this behavior.
-  if (lhs.extType == ExtType::ZEXT && lhs.bitWidth > rhs.bitWidth)
+  if (lhs.extType == ExtType::ZEXT && lhs.bitWidth >= rhs.bitWidth)
     return {ExtType::SEXT, 1 + lhs.bitWidth};
 
   return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth)};
@@ -1516,6 +1536,26 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     unsigned optWidth = std::max(minLhs.getType().getDataBitWidth(),
                                  minRhs.getType().getDataBitWidth());
     unsigned actualWidth = cmpOp.getLhs().getType().getDataBitWidth();
+
+    // An extra bit is required to account for bits added by sign-extension.
+    // This is regardless of whether the comparison is signed or not, but for
+    // different reasons:
+    // * In a signed-comparison we mustn't accidentally treat the top-bit of the
+    //   zero-extended operand as the sign-bit and therefore mustn't erase the
+    //   zero-extension through truncation.
+    //   Example: cmpi sge zext(101), sext(10) must be done using 4, not 3 bits.
+    // * In an unsigned-comparison, we must preserve the fact that
+    //   sign-extension of a negative number will insert a 1-bit upfront which
+    //   changes the result.
+    //   Example: cmpi uge zext(110), sext(10) must be done using 4, not 3 bits.
+    if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
+         minLhs.getType().getDataBitWidth() >=
+             minRhs.getType().getDataBitWidth()) ||
+        (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
+         minRhs.getType().getDataBitWidth() >=
+             minLhs.getType().getDataBitWidth()))
+      optWidth += 1;
+
     if (optWidth >= actualWidth)
       return failure();
 
@@ -1932,9 +1972,10 @@ void HandshakeOptimizeBitwidthsPass::addArithPatterns(
     RewritePatternSet &patterns, bool forward) {
   MLIRContext *ctx = patterns.getContext();
 
-  patterns.add<ArithSingleType<handshake::AddIOp>,
-               ArithSingleType<handshake::SubIOp>>(
+  patterns.add<ArithSingleType<handshake::AddIOp>>(
       bitwidthReduced, forward, addWidth, ctx, getAnalysis<NameAnalysis>());
+  patterns.add<ArithSingleType<handshake::SubIOp>>(
+      bitwidthReduced, forward, subWidth, ctx, getAnalysis<NameAnalysis>());
 
   patterns.add<ArithSingleType<handshake::MulIOp>>(
       bitwidthReduced, true, mulWidth, ctx, getAnalysis<NameAnalysis>());

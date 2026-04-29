@@ -38,6 +38,10 @@ public:
   checkBinaryExpression(ast::BinaryExpression::Op op,
                         DynamaticTypingContext context);
 
+  std::optional<ConclusionOf<ast::UnaryExpression>>
+  checkUnaryExpression(ast::UnaryExpression::Op op,
+                       DynamaticTypingContext context) const;
+
   ConclusionOf<ast::ConditionalExpression>
   checkConditionalExpression(DynamaticTypingContext context) const {
     // Condition can be either a floating point type or integer type.
@@ -56,6 +60,18 @@ public:
         context,
         // Indexing expression must be an integer.
         DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
+    };
+  }
+
+  static std::optional<ConclusionOf<ast::ArrayAssignmentStatement>>
+  checkArrayAssignmentStatement(DynamaticTypingContext context) {
+    return ConclusionOf<ast::ArrayAssignmentStatement>{
+        // Forward the context to the array parameter as is.
+        /*parameter=*/context,
+        // Indexing expression must be an integer.
+        /*index=*/
+        DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
+        /*value=*/context,
     };
   }
 

@@ -1,5 +1,9 @@
 #include "BitwidthTypeSystem.h"
 
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "bitwidth-type-system"
+
 auto dynamatic::gen::BitwidthTypeSystem::checkScalarType(
     const ast::ScalarType &scalarType, const BitwidthTypingContext &context)
     -> std::optional<ConclusionOf<ast::ScalarType>> {
@@ -93,9 +97,30 @@ auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
     // These operations consume all bits to produce its result, we cannot
     // leave it unconstrained, otherwise the input expressions must be done
     // with higher bitwidths.
+
+    // C performs automatic promotion to 'int' for all data types that are
+    // smaller than 'int'. This might cause sign-extension in which case the
+    // semantics are not equal to just performing the comparison at a given
+    // bitwidth. If the comparison must be done with 'n' bits, the operands
+    // then have to be computable with 'n - 1' bits.
+    // We account for that by requiring one less bit than the global maximum
+    // for the operands.
+    // TODO: The sign-extension of the inputs is dependent on whether the type
+    //       of the operands are signed or not. We could track this
+    //       theoretically.
+    if (globalMaxBitwidth == 1) {
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "Discarding NotEqualExpression as the maximum global "
+               "bitwidth == 1, which requires the comparison to be done "
+               "on 0-bit integers (which does not exist in C)";
+      });
+      return std::nullopt;
+    }
+
     return ConclusionOf<ast::BinaryExpression>{
-        {getInterestingBitWidthInRange(globalMaxBitwidth)},
-        {getInterestingBitWidthInRange(globalMaxBitwidth)}};
+        {getInterestingBitWidthInRange(globalMaxBitwidth - 1)},
+        {getInterestingBitWidthInRange(globalMaxBitwidth - 1)}};
 
   case ast::BinaryExpression::BitOr:
   case ast::BinaryExpression::BitXor:
