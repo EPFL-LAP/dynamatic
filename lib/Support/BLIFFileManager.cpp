@@ -88,13 +88,10 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
 
   // Check if the file exists; if not, attempt to generate it.
   if (!std::filesystem::exists(blifFileName)) {
-#if defined(DYNAMATIC_YOSYS_EXECUTABLE) && defined(DYNAMATIC_ABC_EXECUTABLE)
     llvm::errs() << "BLIF file missing, generating: " << blifFileName << "\n";
-    BackendGenerator gen(
-        BackendGenerator::Backend::BLIF,
-        BackendGenerator::BLIFParams{rtlJsonFile, dynamaticRootPath,
-                                     blifDirPath, DYNAMATIC_YOSYS_EXECUTABLE,
-                                     DYNAMATIC_ABC_EXECUTABLE});
+    BackendGenerator gen(BackendGenerator::Backend::BLIF,
+                         BackendGenerator::BackendParams{
+                             rtlJsonFile, dynamaticRootPath, blifDirPath});
     bool ok = gen.generate(op);
     if (!ok || !std::filesystem::exists(blifFileName)) {
       llvm::errs() << "Failed to generate BLIF file for operation `"
@@ -102,15 +99,6 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
                    << ". Ensure that Yosys and ABC are correctly configured.\n";
       assert(false && "BLIF generation failed");
     }
-#else
-    llvm::errs() << "BLIF file for operation `" << getUniqueName(op)
-                 << "` does not exist: " << blifFileName
-                 << ". Check the file path specified for this operation is "
-                    "correct. If it is not present, you should generate it "
-                    "using the blif script generator.\n";
-    assert(false && "Check the file path specified for this operation is "
-                    "built correctly");
-#endif
   }
   return blifFileName;
 }

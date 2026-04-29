@@ -49,17 +49,10 @@ The high-level overview of the code is the following:
 
 ### Backend Parameters
 
-Depending on the selected backend:
-
-#### VerilogParams
 - `rtlConfigPath`: Path to the JSON RTL configuration file
 - `dynamaticRoot`: Root path of the Dynamatic repository (used in substitutions)
 - `outputBaseDir`: Base directory for generated files
 
-#### BLIFParams
-- Includes all fields from `VerilogParams`, plus:
-- `yosysExecutable`: Path to the **Yosys** binary
-- `abcExecutable`: Path to the **ABC** binary
 
 ---
 
@@ -148,5 +141,7 @@ Parameters are extracted from the operation using the MLIR function `handshake::
 ### BLIF Backend
 - **Yosys**
 - **ABC**
+
+Both these tools are automatically installed when using the flags `--enable-abc` and `--enable-yosys` when building Dynamatic with the `build.sh` script. If there is a specific choice of the versions of both tools, please include the binaries of both tools in the `PATH` variable.
 
 Paths to these tools must be provided through the backend parameters.
