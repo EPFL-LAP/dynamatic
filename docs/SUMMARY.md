@@ -52,7 +52,7 @@
 
 - [Design Decision Proposals]()
   - [Add/Remove/Promote Extra Signals](DeveloperGuide/DesignDecisionProposals/AddRemovePromoteExtraSignals.md)
-  - [Backend Generator](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BackendGenerator.md)
+  - [Backend Generator](DeveloperGuide/DesignDecisionProposals/BackendGenerator.md)
   - [Circuit Interface](DeveloperGuide/DesignDecisionProposals/CircuitInterface.md)
   - [Type System](DeveloperGuide/DesignDecisionProposals/TypeSystem.md)
   - [Wait Synchronization](DeveloperGuide/DesignDecisionProposals/WaitSynchronization.md)
