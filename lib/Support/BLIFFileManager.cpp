@@ -47,10 +47,9 @@ static std::string rtlParamToString(mlir::Attribute attr) {
 
 // Function to combine parameter values, module type and blif directory path
 // to create the blif file path
-std::string
-BLIFFileManager::combineBlifFilePath(const std::string &moduleType,
-                                     const std::vector<std::string> &paramValues,
-                                     const std::string &extraSuffix) {
+std::string BLIFFileManager::combineBlifFilePath(
+    const std::string &moduleType, const std::vector<std::string> &paramValues,
+    const std::string &extraSuffix) {
   std::string blifFilePath = blifDirPath + "/" + moduleType + extraSuffix;
   for (const auto &paramValue : paramValues) {
     blifFilePath += "/" + paramValue;
@@ -93,8 +92,8 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
     llvm::errs() << "BLIF file missing, generating: " << blifFileName << "\n";
     BackendGenerator gen(
         BackendGenerator::Backend::BLIF,
-        BackendGenerator::BLIFParams{rtlJsonFile, dynamaticRootPath, blifDirPath,
-                                     DYNAMATIC_YOSYS_EXECUTABLE,
+        BackendGenerator::BLIFParams{rtlJsonFile, dynamaticRootPath,
+                                     blifDirPath, DYNAMATIC_YOSYS_EXECUTABLE,
                                      DYNAMATIC_ABC_EXECUTABLE});
     bool ok = gen.generate(op);
     if (!ok || !std::filesystem::exists(blifFileName)) {
