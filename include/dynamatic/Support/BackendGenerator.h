@@ -20,14 +20,11 @@
 #ifndef DYNAMATIC_SUPPORT_BACKENDGENERATOR_H
 #define DYNAMATIC_SUPPORT_BACKENDGENERATOR_H
 
+#include "mlir/IR/Operation.h"
 #include <filesystem>
 #include <string>
 #include <variant>
 #include <vector>
-
-namespace mlir {
-class Operation;
-} // namespace mlir
 
 namespace dynamatic {
 
