@@ -23,6 +23,8 @@ namespace dynamatic {
 class BLIFGenerator {
 public:
   BLIFGenerator(const std::string &blifDirPath,
+                const std::string &dynamaticRootPath,
+                const std::string &RTLJSONFile,
                 const std::string &yosysExecutable,
                 const std::string &abcExecutable, mlir::Operation *op,
                 const std::string &expectedBlifPath);
@@ -38,6 +40,7 @@ public:
 
 private:
   std::string blifDirPath;      /// Absolute path to the BLIF directory.
+  std::string RTLJSONFile;      /// Path to the RTL JSON configuration file.
   std::string dynamaticRoot;    /// Dynamatic root, derived from blifDirPath.
   std::string yosysExecutable;  /// Path to the Yosys binary.
   std::string abcExecutable;    /// Path to the ABC binary.

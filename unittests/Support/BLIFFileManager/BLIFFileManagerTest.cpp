@@ -23,6 +23,14 @@
 #error                                                                         \
     "BLIF_TEST_DIR must be defined as a compiler definition pointing to data/aig"
 #endif
+#ifndef DYNAMATIC_ROOT
+#error                                                                         \
+    "DYNAMATIC_ROOT must be defined as a compiler definition pointing to the Dynamatic root directory"
+#endif
+#ifndef RTL_JSON_FILE
+#error                                                                         \
+    "RTL_JSON_FILE must be defined as a compiler definition pointing to the RTL JSON configuration file"
+#endif
 
 using namespace dynamatic;
 using namespace dynamatic::handshake;
@@ -33,7 +41,8 @@ protected:
   mlir::MLIRContext ctx;
   BLIFFileManager manager;
 
-  BLIFFileManagerTest() : manager(BLIF_TEST_DIR) {}
+  BLIFFileManagerTest()
+      : manager(BLIF_TEST_DIR, DYNAMATIC_ROOT, RTL_JSON_FILE) {}
 
   void SetUp() override {
     mlir::DialectRegistry registry;

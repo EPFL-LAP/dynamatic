@@ -18,7 +18,9 @@ target_link_libraries(
 target_compile_definitions(
   blif-file-manager-unit-tests
   PRIVATE
-  BLIF_TEST_DIR="${CMAKE_SOURCE_DIR}/data/aig"
+  BLIF_TEST_DIR="${CMAKE_SOURCE_DIR}/aig_folder/"
+  DYNAMATIC_ROOT="${CMAKE_SOURCE_DIR}/"
+  RTL_JSON_FILE="${CMAKE_SOURCE_DIR}/data/rtl-config-verilog-beta.json"
 )
 
 enable_testing()
@@ -40,4 +42,4 @@ add_custom_target(
   DEPENDS blif-file-manager-unit-tests
 )
 
-add_to_unit_testing(run-blif-file-manager-tests)
+add_to_unit_testing(check-dynamatic run-blif-file-manager-tests)

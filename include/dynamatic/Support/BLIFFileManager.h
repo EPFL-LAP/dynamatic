@@ -28,7 +28,10 @@ namespace dynamatic {
 class BLIFFileManager {
 public:
   // Constructor for the BLIFFileManager class
-  BLIFFileManager(std::string blifDirPath) : blifDirPath(blifDirPath) {}
+  BLIFFileManager(std::string blifDirPath, std::string dynamaticRootPath,
+                  std::string RTLJSONFile)
+      : blifDirPath(blifDirPath), dynamaticRootPath(dynamaticRootPath),
+        RTLJSONFile(RTLJSONFile) {}
 
   // Function to combine parameter values, module type and blif directory path
   // to create the blif file path
@@ -43,6 +46,10 @@ public:
 private:
   // String containing the base path of the blif files
   std::string blifDirPath;
+  // String containing the path to the Dynamatic root directory
+  std::string dynamaticRootPath;
+  // String containing the path to the RTL JSON file
+  std::string RTLJSONFile;
 };
 
 // Formats a bit-indexed port name: "sig[bit]".

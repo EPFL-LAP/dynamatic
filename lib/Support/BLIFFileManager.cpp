@@ -85,8 +85,9 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
   if (!std::filesystem::exists(blifFileName)) {
 #if defined(DYNAMATIC_YOSYS_EXECUTABLE) && defined(DYNAMATIC_ABC_EXECUTABLE)
     llvm::errs() << "BLIF file missing, generating: " << blifFileName << "\n";
-    BLIFGenerator gen(blifDirPath, DYNAMATIC_YOSYS_EXECUTABLE,
-                      DYNAMATIC_ABC_EXECUTABLE, op, blifFileName);
+    BLIFGenerator gen(blifDirPath, dynamaticRootPath, RTLJSONFile,
+                      DYNAMATIC_YOSYS_EXECUTABLE, DYNAMATIC_ABC_EXECUTABLE, op,
+                      blifFileName);
     bool ok = gen.generate();
     if (!ok || !std::filesystem::exists(blifFileName)) {
       llvm::errs() << "Failed to generate BLIF file for operation `"
