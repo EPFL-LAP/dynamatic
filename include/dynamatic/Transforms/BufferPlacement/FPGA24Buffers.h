@@ -115,6 +115,10 @@ private:
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
   void setup();
+
+  /// Translates binary opaque/transparent channel properties into LP1 latency
+  /// constraints. Slot-count properties are handled by the occupancy LP.
+  void addChannelPropertyLatencyConstraints();
 };
 
 class OccupancyBalancingLP : public BufferPlacementMILP {
@@ -139,6 +143,11 @@ private:
   DenseMap<Value, CPVar> channelOccupancy;
 
   void setup();
+
+  /// Translates channel slot-count properties into LP2 occupancy constraints,
+  /// using the LP1 latency result as the opaque-presence decision.
+  void addChannelPropertyOccupancyConstraints(
+      ArrayRef<Value> channels, DenseMap<Value, CPVar> &channelOccupancy);
 };
 
 class FPGA24Buffers {

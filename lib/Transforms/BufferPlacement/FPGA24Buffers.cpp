@@ -71,6 +71,27 @@ void LatencyBalancingMILP::setup() {
   markReadyToOptimize();
 }
 
+void LatencyBalancingMILP::addChannelPropertyLatencyConstraints() {
+  for (auto &[channel, chVars] : vars.channelVars) {
+    handshake::ChannelBufProps &props = channelProps[channel];
+    std::string name = getUniqueName(*channel.getUses().begin());
+
+    /// As in `FPGA20Buffers::addCustomChannelConstraints`, `minOpaque` only
+    /// forces the binary "data/valid is broken" decision. The total slot count
+    /// is handled in the occupancy LP.
+    if (props.minOpaque > 0) {
+      model->addConstr(chVars.bufPresent == 1, "fpga24_forceOpaque_R_" + name);
+    }
+
+    if (props.maxOpaque.has_value() && *props.maxOpaque == 0) {
+      model->addConstr(chVars.dataLatency == 0,
+                       "fpga24_forceTransparent_L_" + name);
+      model->addConstr(chVars.bufPresent == 0,
+                       "fpga24_forceTransparent_R_" + name);
+    }
+  }
+}
+
 /// The latency variable L_c is the number of extra latencies to be added to a
 /// channel. It will be used in the input of the occupancy balancing LP. Defined
 /// in (Paper: Section 4, Table 1).
@@ -179,6 +200,45 @@ void OccupancyBalancingLP::setup() {
   markReadyToOptimize();
 }
 
+void OccupancyBalancingLP::addChannelPropertyOccupancyConstraints(
+    ArrayRef<Value> channels, DenseMap<Value, CPVar> &channelOccupancy) {
+  for (Value channel : channels) {
+    if (!channelOccupancy.count(channel))
+      continue;
+    handshake::ChannelBufProps &props = channelProps[channel];
+    std::string name = getUniqueName(*channel.getUses().begin());
+    CPVar &n = channelOccupancy[channel];
+
+    bool hasOpaqueLatency =
+        latencyResult.channelExtraLatency.lookup(channel) > 0;
+
+    /// Same case split as `FPGA20Buffers::addCustomChannelConstraints`, with
+    /// `hasOpaqueLatency` replacing FPGA20's binary data-buffer variable.
+    if (props.minOpaque > 0) {
+      if (props.minTrans > 0) {
+        unsigned minTotal = props.minOpaque + props.minTrans;
+        model->addConstr(n >= minTotal, "fpga24_minOpaqueAndTrans_N_" + name);
+      } else {
+        model->addConstr(n >= props.minOpaque, "fpga24_minOpaque_N_" + name);
+      }
+    } else if (props.minTrans > 0) {
+      model->addConstr(n >= props.minTrans + (hasOpaqueLatency ? 1 : 0),
+                       "fpga24_minTrans_N_" + name);
+    } else if (props.minSlots > 0) {
+      model->addConstr(n >= props.minSlots, "fpga24_minSlots_N_" + name);
+    }
+
+    if (props.maxOpaque.has_value() && props.maxTrans.has_value()) {
+      unsigned maxSlots = *props.maxOpaque + *props.maxTrans;
+      if (maxSlots == 0) {
+        model->addConstr(n == 0, "fpga24_noSlots_N_" + name);
+      } else {
+        model->addConstr(n <= maxSlots, "fpga24_maxSlots_N_" + name);
+      }
+    }
+  }
+}
+
 void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
   for (auto &[channel, var] : channelOccupancy) {
     double occupancy = model->getValue(var);
@@ -188,17 +248,6 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
     unsigned latencyCycles = 0;
     if (latencyResult.channelExtraLatency.count(channel)) {
       latencyCycles = latencyResult.channelExtraLatency.lookup(channel);
-    }
-
-    /// Respect minOpaque from channelProps: if the channel requires opaque
-    /// buffer(s), ensure latencyCycles is at least minOpaque so that
-    /// extractResult places opaque (DV-breaking) buffers, not transparent ones.
-    handshake::ChannelBufProps &props = channelProps[channel];
-    if (props.minOpaque > 0 && latencyCycles < props.minOpaque) {
-      latencyCycles = props.minOpaque;
-    }
-    if (props.minOpaque > 0 && numSlots < props.minOpaque) {
-      numSlots = props.minOpaque;
     }
 
     /// Ensure at least 1 slot if there's latency
@@ -428,7 +477,8 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
     }
   }
 
-  /// Buffer the paths to EndOp (<out0> or <end>) that represent the function end. (The ones not directly produced by memory controllers.)
+  /// Buffer the paths to EndOp (<out0> or <end>) that represent the function
+  /// end. (The ones not directly produced by memory controllers.)
   auto *terminator = funcInfo.funcOp.getBodyBlock()->getTerminator();
   if (auto endOp = dyn_cast<handshake::EndOp>(terminator)) {
     for (Value operand : endOp->getOperands()) {

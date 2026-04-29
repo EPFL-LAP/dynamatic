@@ -155,6 +155,32 @@ static double computeCycleBaseLatency(
   return latency;
 }
 
+static double computeCycleForcedLatencyLowerBound(
+    const SimpleCycle &cycle,
+    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
+    const llvm::MapVector<Value, ChannelBufProps> &channelProps,
+    const TimingDatabase &timingDB, double targetPeriod) {
+  double latency =
+      computeCycleBaseLatency(cycle, graph, timingDB, targetPeriod);
+
+  for (size_t i = 0; i < cycle.nodes.size(); ++i) {
+    NodeIdType src = cycle.nodes[i];
+    NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId != dst)
+        continue;
+
+      Value channel = graph.edges[edgeId].channel;
+      const auto *propsIt = channelProps.find(channel);
+      if (propsIt != channelProps.end() && propsIt->second.minOpaque > 0)
+        latency += 1.0;
+      break;
+    }
+  }
+
+  return latency;
+}
+
 double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
     Value channel, SignalType signalType) const {
   if (!bufModel)
@@ -1392,18 +1418,18 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     }
 
     assert(!cycles.empty() && "empty cycle list should have been skipped");
-    auto maxCycleIt =
-        std::max_element(cycles.begin(), cycles.end(),
-                         [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
-                           return computeCycleBaseLatency(
-                                      lhs, cfdfcGraph, timingDB, targetPeriod) <
-                                  computeCycleBaseLatency(
-                                      rhs, cfdfcGraph, timingDB, targetPeriod);
-                         });
-    double maxBaseLatency = computeCycleBaseLatency(*maxCycleIt, cfdfcGraph,
-                                                    timingDB, targetPeriod);
+    auto maxCycleIt = std::max_element(
+        cycles.begin(), cycles.end(),
+        [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
+          return computeCycleForcedLatencyLowerBound(
+                     lhs, cfdfcGraph, channelProps, timingDB, targetPeriod) <
+                 computeCycleForcedLatencyLowerBound(
+                     rhs, cfdfcGraph, channelProps, timingDB, targetPeriod);
+        });
+    double maxRequiredLatency = computeCycleForcedLatencyLowerBound(
+        *maxCycleIt, cfdfcGraph, channelProps, timingDB, targetPeriod);
 
-    double iiCFC = std::max(1.0, std::ceil(maxBaseLatency));
+    double iiCFC = std::max(1.0, std::ceil(maxRequiredLatency));
     computedII = std::max(computedII, iiCFC);
     iiMap[cfdfc] = iiCFC;
 
@@ -1428,50 +1454,6 @@ void BufferPlacementMILP::setLatencyBalancingObjective() {
     objective += fpga24::LATENCY_WEIGHT * chVars.dataLatency;
   }
   model->setMaximizeObjective(-objective);
-}
-
-void BufferPlacementMILP::addChannelPropertyLatencyConstraints() {
-  for (auto &[channel, chVars] : vars.channelVars) {
-    handshake::ChannelBufProps &props = channelProps[channel];
-    std::string name = getUniqueName(*channel.getUses().begin());
-
-    bool maxOpaqueIsZero =
-        props.maxOpaque.has_value() && *props.maxOpaque == 0;
-    bool maxTransIsZero = props.maxTrans.has_value() && *props.maxTrans == 0;
-
-    if (maxOpaqueIsZero && maxTransIsZero) {
-      model->addConstr(chVars.dataLatency == 0, "fpga24_unbuf_L_" + name);
-      model->addConstr(chVars.bufPresent == 0, "fpga24_unbuf_R_" + name);
-    }
-  }
-}
-
-void BufferPlacementMILP::addChannelPropertyOccupancyConstraints(
-    ArrayRef<Value> channels, DenseMap<Value, CPVar> &channelOccupancy) {
-  for (Value channel : channels) {
-    if (!channelOccupancy.count(channel))
-      continue;
-    handshake::ChannelBufProps &props = channelProps[channel];
-    std::string name = getUniqueName(*channel.getUses().begin());
-
-    bool maxOpaqueIsZero =
-        props.maxOpaque.has_value() && *props.maxOpaque == 0;
-    bool maxTransIsZero = props.maxTrans.has_value() && *props.maxTrans == 0;
-
-    if (maxOpaqueIsZero && maxTransIsZero) {
-      model->addConstr(channelOccupancy[channel] == 0,
-                       "fpga24_unbuf_N_" + name);
-      continue;
-    }
-
-    unsigned minSlots = props.minOpaque + props.minTrans;
-    if (minSlots == 0)
-      minSlots = props.minSlots;
-    if (minSlots > 0) {
-      model->addConstr(channelOccupancy[channel] >= minSlots,
-                       "fpga24_minSlots_N_" + name);
-    }
-  }
 }
 
 void BufferPlacementMILP::forEachIOPair(
