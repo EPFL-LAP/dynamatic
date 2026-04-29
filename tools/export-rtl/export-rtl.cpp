@@ -1443,7 +1443,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   writeIncludes(data);
   os << "\n\n";
 
-  os << "MODULE " << modOp.getSymName() << " (";
+  os << "MODULE " << modOp.getSymName() << " (testbench, ";
 
   data.writeIO([](const llvm::Twine &name, PortType dir,
                   std::optional<unsigned> type,

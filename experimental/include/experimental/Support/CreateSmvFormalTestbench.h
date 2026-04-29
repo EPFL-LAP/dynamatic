@@ -48,6 +48,8 @@ struct SmvTestbenchConfig {
   // Determines if the outputs are synchronized with a join or if they are
   // consumed by sinks
   bool syncOutput = false;
+
+  bool deadBufferOutput = true;
 };
 
 // Create a wrapper for the provided SMV file.

@@ -34,6 +34,7 @@ static std::string instantiateModuleUnderTest(
     const SmallVector<std::pair<std::string, mlir::Type>> &results,
     bool syncOutput = false) {
   SmallVector<std::string> inputVariables;
+  inputVariables.push_back("self");
   for (const auto &argument : arguments) {
     // The current handshake2smv conversion also creates a dataOut port when it
     // is of type control
@@ -373,9 +374,16 @@ std::string createSmvFormalTestbench(const SmvTestbenchConfig &config) {
                                         config.results, config.syncOutput)
           << "\n";
 
-  if (config.syncOutput) {
+  if (config.deadBufferOutput) {
     wrapper << instantiateJoin(config.modelSmvName, config.results) << "\n";
-    wrapper << "  DEFINE global_ready := FALSE;\n";
+    wrapper << "  VAR end_full : boolean;\n";
+    wrapper << "  ASSIGN\n";
+    wrapper << "  init(end_full) := FALSE;\n";
+    wrapper << "  next(end_full) := end_full | join_global.outs_valid;\n";
+    wrapper << "  DEFINE global_ready := !end_full;\n";
+  } else if (config.syncOutput) {
+    wrapper << instantiateJoin(config.modelSmvName, config.results) << "\n";
+    wrapper << "  DEFINE global_ready := TRUE;\n";
 
   } else {
     wrapper << instantiateSinks(config.modelSmvName, config.results) << "\n";

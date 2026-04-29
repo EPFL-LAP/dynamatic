@@ -32,6 +32,7 @@ MODULE {name}(ins_valid)
   full_full := full;
 """
 
+
 def _generate_iog_terminator(name, data_type):
     return f"""
 MODULE {name}(ins, ins_valid)
@@ -47,6 +48,7 @@ MODULE {name}(ins, ins_valid)
   ins_ready  :=  !full;
   full_full := full;
 """
+
 
 def _generate_sink_dataless(name):
     return f"""
