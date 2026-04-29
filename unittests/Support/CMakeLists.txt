@@ -1,1 +1,2 @@
 add_subdirectory(ConstraintProgramming)
+add_subdirectory(BLIFFileManager)
