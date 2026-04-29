@@ -52,6 +52,7 @@
 
 - [Design Decision Proposals]()
   - [Add/Remove/Promote Extra Signals](DeveloperGuide/DesignDecisionProposals/AddRemovePromoteExtraSignals.md)
+  - [Backend Generator](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BackendGenerator.md)
   - [Circuit Interface](DeveloperGuide/DesignDecisionProposals/CircuitInterface.md)
   - [Type System](DeveloperGuide/DesignDecisionProposals/TypeSystem.md)
   - [Wait Synchronization](DeveloperGuide/DesignDecisionProposals/WaitSynchronization.md)
@@ -80,7 +81,6 @@
   - [Synth]()
     - [Blif Exporter](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifExporter.md)
     - [Blif File Manager](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BLIFFileManager.md)
-    - [Blif Generator](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BLIFGenerator.md)
     - [Blif Importer](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifImporter.md)
     - [Handshake To Synth Conversion](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/HandshakeToSynthConversion.md)
     - [Mark Blif File](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/MarkBlifFile.md)
