@@ -101,7 +101,7 @@ integration-tests/fir/out/hdl/ --mlir intregation-tests/fir/out/comp/hw.mlir/n)D
         .modelSmvName = kernelName,
         .nrOfTokens = 1,
         .generateExactNrOfTokens = true,
-        .syncOutput = true};
+        .deadBufferOutput = true};
 
     std::string wrapper =
         dynamatic::experimental::createSmvFormalTestbench(smvConfig);
