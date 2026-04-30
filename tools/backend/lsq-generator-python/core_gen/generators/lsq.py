@@ -211,7 +211,7 @@ class LSQ:
             memStartReady = Logic(em, "memStartReady", "w", force_reg=True)
             memEndValid = Logic(em, "memEndValid", "w", force_reg=True)
             ctrlEndReady = Logic(em, "ctrlEndReady", "w", force_reg=True)
-            temp_gen_mem = Logic(em, "TEMP_GEN_MEM", "w", force_reg=True)
+            temp_gen_mem = Logic(em, "TEMP_GEN_MEM", "w")
 
             #! The memory completion signal cannot be set to 1 when any group is allocating:
             no_curr_ga = ~reduce_bin(BinOp.OR, [Val(group_init_valid_i, i) for i in range(group_init_valid_i.length)])
