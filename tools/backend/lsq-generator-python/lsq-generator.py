@@ -603,7 +603,6 @@ class LSQWrapper:
             "w",
             self.lsq_config.numStMem,
             dyn_comp=True,
-            force_reg=True,
         )
         wresp_valid = LogicArray(
             em,
