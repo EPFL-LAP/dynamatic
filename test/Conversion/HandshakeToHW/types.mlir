@@ -7,7 +7,7 @@
 // CHECK:           hw.instance "sink0" @handshake_sink_0(ins: %[[VAL_0]]: !handshake.channel<i32>, clk: %[[VAL_2]]: i1, rst: %[[VAL_3]]: i1) -> ()
 // CHECK:           hw.output %[[VAL_1]] : !handshake.control<>
 // CHECK:         }
-// CHECK:         hw.module.extern @handshake_sink_0(in %[[VAL_5:.*]] : !handshake.channel<i32>, in %[[VAL_6:.*]] : i1, in %[[VAL_7:.*]] : i1) attributes {hw.name = "handshake.sink", hw.parameters = {DATA_TYPE = !handshake.channel<i32>}}
+// CHECK:         hw.module.extern @handshake_sink_0(in %[[VAL_5:.*]] : !handshake.channel<i32>, in %[[VAL_6:.*]] : i1, in %[[VAL_7:.*]] : i1) attributes {hw.name = "handshake.sink", hw.parameters = {DATA_TYPE = !handshake.channel<i32>, IOG_TERMINATOR = {{(true|false)}}}}
 handshake.func @dontChangeTypes(%arg : !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.control<> {
   sink %arg : <i32>
   end %start : <>

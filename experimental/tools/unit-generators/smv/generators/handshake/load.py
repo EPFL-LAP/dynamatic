@@ -28,6 +28,8 @@ MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_read
   addr_full := inner_addr_one_slot_break_r.slot_0_full;
   data_full := inner_data_one_slot_break_r.slot_0_full;
 
+  slotted_token_count := count(addr_full, data_full);
+
 {generate_one_slot_break_r(f"{name}__addr_one_slot_break_r", {ATTR_BITWIDTH: addr_type.bitwidth})}
 {generate_one_slot_break_r(f"{name}__data_one_slot_break_r", {ATTR_BITWIDTH: data_type.bitwidth})}
 """

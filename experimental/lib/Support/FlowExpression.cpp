@@ -447,6 +447,7 @@ LogicalResult FlowEquationExtractor::extractBufferOp(BufferOp bufferOp) {
     // in = next + slot
     // Then, `in` is set to `next`
     auto slot = FlowVariable(FlowInternalState(slotNamer));
+    slot.indexTokenTracker = in.indexTokenTracker;
     FlowVariable next = in.nextInternal();
     if (failed(extractSlotEquation(in, next, slot))) {
       return failure();

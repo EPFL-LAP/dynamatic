@@ -26,6 +26,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
+#include "experimental/Support/IOG.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -57,7 +58,6 @@ namespace experimental {
 // [END Boilerplate code for the MLIR pass]
 
 namespace {
-
 struct HandshakeAnnotatePropertiesPass
     : public dynamatic::experimental::impl::HandshakeAnnotatePropertiesBase<
           HandshakeAnnotatePropertiesPass> {
@@ -71,7 +71,7 @@ private:
   json::Array propertyTable;
 
   LogicalResult annotateProperty(ModuleOp modOp, FormalProperty::TYPE t);
-  LogicalResult annotateQueriedProperties();
+  LogicalResult annotateQueriedProperties(const std::vector<IOG> &iogs);
   LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
   LogicalResult annotateValidEquivalenceBetweenOps(Operation &op1,
@@ -84,6 +84,8 @@ private:
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
+  LogicalResult annotateIOGSingleToken(const IOG &iog);
+  LogicalResult annotateIOGConsecutiveTokens(const IOG &iog);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -290,6 +292,120 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   return success();
 }
 
+namespace {
+std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
+                                                const IOGPathSet &pathSet) {
+  std::vector<EagerForkSentNamer> sents;
+  std::vector<Operation *> stack;
+  stack.push_back(pathSet.start);
+  bool first = true;
+  while (!stack.empty()) {
+    Operation *cur = stack.back();
+    stack.pop_back();
+    if (!first) {
+      auto slots = getAllSlotsOfOperation(cur);
+      if (!slots.empty()) {
+        return sents;
+      }
+    }
+    first = false;
+    for (OpResult forward : cur->getResults()) {
+      if (!iog.contains(forward)) {
+        continue;
+      }
+      Operation *next = forward.getUses().begin()->getOwner();
+      assert(iog.contains(next));
+      if (pathSet.units.find(next) == pathSet.units.end()) {
+        continue;
+      }
+
+      if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(cur)) {
+        sents.push_back(
+            forkOp.getInternalSentStateNamers()[forward.getResultNumber()]);
+      }
+
+      stack.push_back(next);
+    }
+  }
+  return sents;
+}
+} // namespace
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(const IOG &iog) {
+  std::vector<std::unique_ptr<InternalStateNamer>> slots(0);
+  Operation *op = iog.entry.getOwner()->getParentOp();
+  auto nameAttr =
+      op->getAttrOfType<ArrayAttr>("argNames")[iog.entry.getArgNumber()];
+  std::string name = dyn_cast<StringAttr>(nameAttr).str();
+
+  slots.push_back(std::make_unique<EntrySlotNamer>(name));
+  std::vector<EagerForkSentNamer> forks(0);
+  for (auto &op : iog.units) {
+    for (auto &slot : getAllSlotsOfOperation(op)) {
+      slots.push_back(std::move(slot));
+    }
+    if (auto forkOp = dyn_cast<EagerForkLikeOpInterface>(op)) {
+      auto forkSlots = forkOp.getInternalSentStateNamers();
+      int count = 0;
+      for (auto [i, channel] : llvm::enumerate(forkOp->getResults())) {
+        if (iog.contains(channel)) {
+          forks.push_back(forkSlots[i]);
+          count += 1;
+        }
+      }
+      assert(count == 1);
+    }
+  }
+  auto p = IOGSingleToken(uid, FormalProperty::TAG::INVAR, std::move(slots),
+                          std::move(forks));
+  uid++;
+  propertyTable.push_back(p.toJSON());
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
+  std::vector<std::pair<Operation *, std::shared_ptr<InternalStateNamer>>>
+      slotOps;
+  for (auto &op : iog.units) {
+    auto slotCountNamer = getTokenCountNamerOfOperation(op);
+    if (slotCountNamer.has_value()) {
+      assert(*slotCountNamer);
+      slotOps.push_back({op, std::move(*slotCountNamer)});
+    }
+  }
+  for (auto slot1 = slotOps.begin(); slot1 != slotOps.end(); ++slot1) {
+    for (auto slot2 = slot1 + 1; slot2 != slotOps.end(); ++slot2) {
+      if (slot1 == slot2) {
+        // TODO: Handle loops, i.e. if the slot contains >=2 tokens, there
+        // should be a copied fork within a loop
+        continue;
+      }
+
+      IOGPathSet pathSet12(iog, slot1->first, slot2->first);
+
+      std::vector<EagerForkSentNamer> copiedSents =
+          findCopiedSents(iog, pathSet12);
+
+      IOGPathSet pathSet21(iog, slot2->first, slot1->first);
+      std::vector<EagerForkSentNamer> extra = findCopiedSents(iog, pathSet21);
+      copiedSents.insert(copiedSents.end(), extra.begin(), extra.end());
+
+      // Note:
+      // Even if the copiedSents is empty, this invariant is interesting! It
+      // means that both slots cannot be occupied at the same time, as there is
+      // only (at most) one token in the IOG
+
+      auto p = IOGConsecutiveTokens(uid, FormalProperty::TAG::INVAR,
+                                    slot1->second, slot2->second, copiedSents);
+      uid++;
+      propertyTable.push_back(p.toJSON());
+    }
+  }
+  return success();
+}
+
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
                                                   FormalProperty::TYPE t) {
@@ -304,10 +420,17 @@ HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
     return annotateCopiedSlotsOfAllForks(modOp);
   case FormalProperty::TYPE::ReconvergentPathFlow:
     return annotateReconvergentPathFlow(modOp);
+  case FormalProperty::TYPE::IOGSingleToken:
+  case FormalProperty::TYPE::IOGConsecutiveTokens:
+    assert(false &&
+           "TODO: IOG as pass so that this function has access to IOGs");
+    return failure();
   }
   return failure();
 }
-LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
+    const std::vector<IOG> &iogs) {
   ModuleOp modOp = getOperation();
   LogicalResult res = success();
   if (annotateList != "") {
@@ -336,12 +459,35 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
       return failure();
     if (failed(annotateReconvergentPathFlow(modOp)))
       return failure();
+
+    for (const auto &iog : iogs) {
+      if (failed(annotateIOGSingleToken(iog)))
+        return failure();
+      if (failed(annotateIOGConsecutiveTokens(iog)))
+        return failure();
+    }
   }
   return success();
 }
 
 void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
-  if (failed(annotateQueriedProperties())) {
+  ModuleOp modOp = getOperation();
+  auto iogs = findAllIOGs(modOp);
+  llvm::DenseSet<SinkOp> sinks;
+  for (auto &iog : iogs) {
+    for (Operation *unit : iog.units) {
+      if (auto sinkOp = dyn_cast<SinkOp>(unit)) {
+        sinks.insert(sinkOp);
+      }
+    }
+  }
+
+  for (SinkOp sink : sinks) {
+    auto unitAttr = UnitAttr::get(modOp.getContext());
+    sink->setAttr("IOG_TERMINATOR", unitAttr);
+  }
+
+  if (failed(annotateQueriedProperties(iogs))) {
     return signalPassFailure();
   }
 

@@ -25,6 +25,7 @@ MODULE {name} (ins_valid, outs_ready)
   ins_ready := !outs_valid_i | outs_ready;
   outs_valid := outs_valid_i;
   slot_0_full := outs_valid_i;
+  slotted_token_count := count(slot_0_full);
 """
 
 
@@ -48,6 +49,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
   outs_valid := inner_one_slot_break_dv.outs_valid;
   outs := data;
   slot_0_full := inner_one_slot_break_dv.outs_valid_i;
+  slotted_token_count := inner_one_slot_break_dv.slotted_token_count;
 
 {_generate_one_slot_break_dv_dataless(f"{name}__one_slot_break_dv_dataless")}
 """

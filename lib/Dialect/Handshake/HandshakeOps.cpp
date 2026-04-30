@@ -654,6 +654,17 @@ LogicalResult ConstantOp::verify() {
 }
 
 bool JoinOp::isControl() { return true; }
+bool SinkOp::terminatesIOG() {
+  return getOperation()->hasAttr("IOG_TERMINATOR");
+}
+
+BufferSlotFullNamer SinkOp::getTerminatingSlot() {
+  assert(terminatesIOG());
+  Operation *op = getOperation();
+  std::string name =
+      op->getAttrOfType<::mlir::StringAttr>(NameAnalysis::ATTR_NAME).str();
+  return BufferSlotFullNamer(name, "full", 0);
+}
 
 /// Based on mlir::func::CallOp::verifySymbolUses
 LogicalResult InstanceOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
