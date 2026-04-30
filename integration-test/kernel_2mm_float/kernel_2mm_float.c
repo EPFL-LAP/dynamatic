@@ -8,15 +8,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Integration.h"
-#include "kernel_2mm_float.h"
 #include <stdlib.h>
 
-void kernel_2mm_float(in_float_t alpha, in_float_t beta,
-                      inout_float_t tmp[N][N], in_float_t A[N][N],
-                      in_float_t B[N][N], in_float_t C[N][N],
-                      inout_float_t D[N][N]) {
-  int i, j, k;
+#define NI 10
+#define NJ 10
+#define NK 10
+#define NL 10
+#define N 10
 
+void kernel_2mm_float(float alpha, float beta, float tmp[N][N], float A[N][N],
+                      float B[N][N], float C[N][N], float D[N][N]) {
+  int i, j, k;
   for (i = 0; i < NI; i++)
     for (j = 0; j < NJ; j++) {
       float x = 0.0;
@@ -34,13 +36,13 @@ void kernel_2mm_float(in_float_t alpha, in_float_t beta,
 }
 
 int main(void) {
-  in_float_t alpha;
-  in_float_t beta;
-  in_float_t tmp[N][N];
-  in_float_t A[N][N];
-  in_float_t B[N][N];
-  in_float_t C[N][N];
-  inout_float_t D[N][N];
+  float alpha;
+  float beta;
+  float tmp[N][N];
+  float A[N][N];
+  float B[N][N];
+  float C[N][N];
+  float D[N][N];
 
   alpha = 1;
   beta = 1;

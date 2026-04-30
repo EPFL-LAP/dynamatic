@@ -33,6 +33,7 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          traits #[HasParent<"handshake::FuncOp">,
          DeclareOpInterfaceMethods<NamedIOInterface>,
          DeclareOpInterfaceMethods<ControlInterface>,
+         DeclareOpInterfaceMethods<RTLAttrInterface>,
          DeclareOpInterfaceMethods<BLIFImplInterface>]> {
 }
 
@@ -214,11 +215,19 @@ def InstanceOp : Handshake_Op<"instance", [
   let assemblyFormat = [{
     $module `(` $opOperands `)` attr-dict `:` functional-type($opOperands, results)
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    InstanceOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def BufferOp : Handshake_Op<"buffer", [
   HasClock, SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -299,6 +308,25 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
 
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BufferOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ::llvm::SmallVector<::mlir::NamedAttribute> params;
+      params.push_back({::mlir::StringAttr::get(ctx, "BITWIDTH"),
+                        ::mlir::TypeAttr::get(getOperand().getType())});
+      params.push_back({::mlir::StringAttr::get(ctx, "NUM_SLOTS"),
+                        ::mlir::IntegerAttr::get(ui32, (unsigned)getNumSlots())});
+      if (getBufferType() == ::dynamatic::handshake::BufferType::COUNTER_BUFFER)
+        params.push_back({::mlir::StringAttr::get(ctx, "DV_LATENCY"),
+                          ::mlir::IntegerAttr::get(ui32, (unsigned)getLatencyDV())});
+      params.push_back({::mlir::StringAttr::get(ctx, "BUFFER_TYPE"),
+                        ::mlir::StringAttr::get(ctx, stringifyEnum(getBufferType()))});
+      return params;
+    }
+  }];
 }
 
 def InitOp : Handshake_Op<"init", [
@@ -321,6 +349,14 @@ def InitOp : Handshake_Op<"init", [
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    InitOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def NDWireOp : Handshake_Op<"ndwire", [
@@ -336,6 +372,17 @@ def NDWireOp : Handshake_Op<"ndwire", [
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    NDWireOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -357,6 +404,20 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = [{
     custom<SingleTypedHandshakeOp>($operand, attr-dict,
                                    type($operand), type($result))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumResults())},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -420,6 +481,20 @@ def MergeOp : Handshake_Op<"merge", [
   let assemblyFormat = [{
     $dataOperands attr-dict `:` custom<HandshakeType>(type($result))
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    MergeOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumOperands())},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
+    }
+  }];
 }
 
 def MuxOp : Handshake_Op<"mux", [
@@ -458,6 +533,22 @@ def MuxOp : Handshake_Op<"mux", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    MuxOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)getDataOperands().size())},
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())},
+        {::mlir::StringAttr::get(ctx, "INDEX_BITWIDTH"),
+         ::mlir::TypeAttr::get(getSelectOperand().getType())}
+      };
+    }
+  }];
 }
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
@@ -503,6 +594,22 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ControlMergeOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)getDataOperands().size())},
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())},
+        {::mlir::StringAttr::get(ctx, "INDEX_BITWIDTH"),
+         ::mlir::TypeAttr::get(getIndex().getType())}
+      };
+    }
+  }];
 }
 
 def BranchOp : Handshake_Op<"br", [
@@ -526,6 +633,17 @@ def BranchOp : Handshake_Op<"br", [
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($result))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BranchOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -565,6 +683,17 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ConditionalBranchOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getDataOperand().getType())}
+      };
+    }
+  }];
 }
 
 def SinkOp : Handshake_Op<"sink"> {
@@ -583,6 +712,17 @@ def SinkOp : Handshake_Op<"sink"> {
   let arguments = (ins HandshakeType:$operand);
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SinkOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -610,6 +750,14 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   ];
 
   let assemblyFormat = "attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SourceOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -631,6 +779,18 @@ def JoinOp : Handshake_Op<"join", [
   let arguments = (ins Variadic<ControlType>:$data);
   let results = (outs ControlType:$result);
   let assemblyFormat = "$data attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    JoinOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumOperands())}
+      };
+    }
+  }];
 }
 
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
@@ -653,6 +813,20 @@ def BlockerOp : Handshake_Op<"blocker", [
   let arguments = (ins Variadic<ChannelType>:$data);
   let results = (outs ChannelType:$result);
   let assemblyFormat = "$data attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BlockerOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumOperands())},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
+    }
+  }];
 }
 
 def NotIOp : Handshake_Op<"noti", [
@@ -674,6 +848,17 @@ def NotIOp : Handshake_Op<"noti", [
   let arguments = (ins ChannelType:$operand);
   let results = (outs ChannelType:$result);
   let assemblyFormat = "$operand attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    NotIOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -770,6 +955,14 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     std::optional<LoadPort> getLoadPort(size_t index);
     MemoryControllerSlotNamer getLoadPortSlotNamer(size_t index);
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    MemoryControllerOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def LSQOp : Handshake_Op<"lsq", [
@@ -864,6 +1057,14 @@ def LSQOp : Handshake_Op<"lsq", [
     /// materialized when called. The returned values are guaranteed to be in
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    LSQOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
   }];
 }
 
@@ -962,6 +1163,17 @@ def LoadOp : Handshake_MemPortOp<"load", [
       assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    LoadOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getData().getType())},
+        {::mlir::StringAttr::get(ctx, "ADDR_BITWIDTH"),
+         ::mlir::TypeAttr::get(getAddress().getType())}
+      };
+    }
   }];
 
 }
@@ -1001,6 +1213,17 @@ def StoreOp : Handshake_MemPortOp<"store", [
 
     std::string $cppClass::getResultName(unsigned int idx) {
       return (idx == 0) ? "addrOut" : "dataToMem";
+    }
+    
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    StoreOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getData().getType())},
+        {::mlir::StringAttr::get(ctx, "ADDR_BITWIDTH"),
+         ::mlir::TypeAttr::get(getAddress().getType())}
+      };
     }
   }];
 }
@@ -1052,6 +1275,14 @@ def RAMOp : Handshake_Op<"ram", []>  {
   }];
 
   let results = (outs AnyStaticShapeMemRef:$result);
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    RAMOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1081,6 +1312,13 @@ def EndOp : Handshake_Op<"end", [
   }];
 
   let hasVerifier = 1;
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    EndOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1176,6 +1414,17 @@ def SpeculatorOp : Handshake_Op<"speculator", [
         return "ctrl_sc_branch";
       }
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpeculatorOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getDataOut().getType())},
+        {::mlir::StringAttr::get(ctx, "FIFO_DEPTH"),
+         ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32), getFifoDepth())}
+      };
+    }
   }];
 }
 
@@ -1221,6 +1470,15 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpecSaveOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
     }
   }];
 }
@@ -1270,6 +1528,15 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpecCommitOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
+    }
   }];
 }
 
@@ -1311,6 +1578,17 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpecSaveCommitOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())},
+        {::mlir::StringAttr::get(ctx, "FIFO_DEPTH"),
+         ::mlir::TypeAttr::get(getCtrl().getType())}
+      };
     }
   }];
 }
@@ -1360,6 +1638,17 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       assert(idx < getNumResults() && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpeculatingBranchOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getTrueResult().getType())},
+        {::mlir::StringAttr::get(ctx, "SPEC_TAG_BITWIDTH"),
+         ::mlir::TypeAttr::get(getTagFromOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -1399,6 +1688,15 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "dataOut";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    NonSpecOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
     }
   }];
 }
@@ -1457,6 +1755,24 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`
       functional-type(operands, results)
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SharingWrapperOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand(0).getType())},
+        {::mlir::StringAttr::get(ctx, "LATENCY"),
+        ::mlir::IntegerAttr::get(ui32, (unsigned)getLatency())},
+        {::mlir::StringAttr::get(ctx, "NUM_SHARED_OPERANDS"),
+        ::mlir::IntegerAttr::get(ui32, (unsigned)getNumSharedOperands())},
+        {::mlir::StringAttr::get(ctx, "CREDITS"),
+        ::mlir::DenseI64ArrayAttr::get(ctx, getCredits())}
+      };
+    }
   }];
 }
 
@@ -1524,6 +1840,13 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BundleOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def UnbundleOp : Handshake_Op<"unbundle", [
@@ -1586,6 +1909,13 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    UnbundleOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
@@ -1615,8 +1945,16 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     std::string $cppClass::getResultName(unsigned idx = 0) {
       return "outs";
     }
-  }];
 
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ReadyRemoverOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
+  }];
 }
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
@@ -1650,8 +1988,18 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     assert(idx < getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }
-  }];
 
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ValidMergerOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "LEFT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getLhsIn().getType())},
+        {::mlir::StringAttr::get(ctx, "RIGHT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getRhsIn().getType())}
+      };
+    }
+  }];
 }
 
 

@@ -7,14 +7,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "kernel_3mm_float.h"
 #include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-void kernel_3mm_float(in_float_t A[N][N], in_float_t B[N][N],
-                      in_float_t C[N][N], in_float_t D[N][N],
-                      inout_float_t E[N][N], inout_float_t F[N][N],
-                      inout_float_t G[N][N]) {
+#define NI 10
+#define NJ 10
+#define NK 10
+#define NL 10
+#define NM 10
+#define N 10
+
+void kernel_3mm_float(float A[N][N], float B[N][N], float C[N][N],
+                      float D[N][N], float E[N][N], float F[N][N],
+                      float G[N][N]) {
   int i, j, k;
 
   for (i = 0; i < NI; i++)
@@ -42,13 +47,13 @@ void kernel_3mm_float(in_float_t A[N][N], in_float_t B[N][N],
 }
 
 int main(void) {
-  in_float_t A[N][N];
-  in_float_t B[N][N];
-  in_float_t C[N][N];
-  in_float_t D[N][N];
-  inout_float_t E[N][N];
-  inout_float_t F[N][N];
-  inout_float_t G[N][N];
+  float A[N][N];
+  float B[N][N];
+  float C[N][N];
+  float D[N][N];
+  float E[N][N];
+  float F[N][N];
+  float G[N][N];
 
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
