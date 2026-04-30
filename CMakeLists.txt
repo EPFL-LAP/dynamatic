@@ -268,10 +268,45 @@ if(DYNAMATIC_ENABLE_ABC)
 
     FetchContent_MakeAvailable(abc)
     add_compile_definitions(DYNAMATIC_ENABLE_ABC)
+    add_compile_definitions("DYNAMATIC_ABC_EXECUTABLE=\"${CMAKE_BINARY_DIR}/_deps/abc-build/abc\"")
   else()
     message(FATAL_ERROR "ABC integration is not tested on the OS you use!")
   endif()
 endif()
+
+#-------------------------------------------------------------------------------
+# Yosys setup
+#-------------------------------------------------------------------------------
+
+if(DYNAMATIC_ENABLE_YOSYS)
+  if (UNIX)
+
+    FetchContent_Declare(
+      yosys
+      GIT_REPOSITORY https://github.com/ETHZ-DYNAMO/yosys.git
+      GIT_TAG v1.0.0
+      GIT_SUBMODULES ""
+    )
+    add_custom_target(yosys-submodules
+      COMMAND git submodule update --init --recursive
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/_deps/yosys-src
+    )
+
+    add_custom_target(build-yosys ALL
+      COMMAND make -j
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/_deps/yosys-src
+    )
+
+    add_dependencies(build-yosys yosys-submodules)
+
+    FetchContent_MakeAvailable(yosys)
+    add_compile_definitions(DYNAMATIC_ENABLE_YOSYS)
+    add_compile_definitions("DYNAMATIC_YOSYS_EXECUTABLE=\"${CMAKE_BINARY_DIR}/_deps/yosys-src/yosys\"")
+  else()
+    message(FATAL_ERROR "Yosys integration is not tested on the OS you use!")
+  endif()
+endif()
+
 
 #-------------------------------------------------------------------------------
 # Python (Virtual Environment)
