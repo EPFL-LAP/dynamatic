@@ -16,6 +16,7 @@ struct ConstrainedNamer;
 struct ConstrainedEagerForkSentNamer;
 struct ConstrainedBufferSlotFullNamer;
 struct MemoryControllerSlotNamer;
+struct EffectiveSlotNamer;
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
@@ -32,6 +33,7 @@ struct InternalStateNamer {
     PipelineSlot,
     Constrained,
     MemoryControllerSlot,
+    EffectiveSlot,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -74,6 +76,7 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
   static constexpr llvm::StringLiteral MEMORY_CONTROLLER_SLOT =
       "MemoryControllerSlot";
+  static constexpr llvm::StringLiteral EFFECTIVE_SLOT = "EffectiveSlot";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -332,6 +335,29 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "slot_index";
   static constexpr llvm::StringLiteral PORT_TYPE_LIT = "port_type";
   static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
+};
+
+// EffectiveSlotNamer generates the SMV that is TRUE if and only if the
+// targetted slot 1. contains data and 2. is not duplicated by an eager fork.
+struct EffectiveSlotNamer : InternalStateNamer {
+  EffectiveSlotNamer() = default;
+  EffectiveSlotNamer(std::unique_ptr<InternalStateNamer> slot,
+                     std::vector<EagerForkSentNamer> copiedSents)
+      : InternalStateNamer(TYPE::EffectiveSlot), slot(std::move(slot)),
+        copiedSents(std::move(copiedSents)) {}
+  ~EffectiveSlotNamer() = default;
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::EffectiveSlot;
+  }
+
+  std::string getSMVName() const override;
+  llvm::json::Value toInnerJSON() const override;
+  std::unique_ptr<EffectiveSlotNamer> static fromInnerJSON(
+      const llvm::json::Value &value, llvm::json::Path path);
+  std::unique_ptr<InternalStateNamer> slot;
+  std::vector<EagerForkSentNamer> copiedSents;
+  static constexpr llvm::StringLiteral SLOT_LIT = "slot";
+  static constexpr llvm::StringLiteral COPIED_SENTS_LIT = "copied_sents";
 };
 } // namespace handshake
 } // namespace dynamatic
