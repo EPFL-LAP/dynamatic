@@ -33,6 +33,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull;
   if (s == "ReconvergentPathFlow")
     return FormalProperty::TYPE::ReconvergentPathFlow;
+  if (s == "EntryTokenOrder")
+    return FormalProperty::TYPE::EntryTokenOrder;
 
   return std::nullopt;
 }
@@ -49,6 +51,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "CopiedSlotsOfActiveForksAreFull";
   case TYPE::ReconvergentPathFlow:
     return "ReconvergentPathFlow";
+  case TYPE::EntryTokenOrder:
+    return "EntryTokenOrder";
   }
 }
 
@@ -108,6 +112,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
                                                     path.field(INFO_LIT));
   case TYPE::ReconvergentPathFlow:
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::EntryTokenOrder:
+    return EntryTokenOrder::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -384,6 +390,34 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
 
   for (const llvm::json::Value &eq : *arr) {
     prop->equations.push_back(FlowExpression::fromJSON(eq, path));
+  }
+
+  return prop;
+}
+
+llvm::json::Value EntryTokenOrder::extraInfoToJSON() const {
+  std::vector<llvm::json::Value> jsonEqs{};
+  jsonEqs.reserve(slots.size());
+
+  for (auto &slot : slots) {
+    jsonEqs.push_back(slot.toInnerJSON());
+  }
+  return llvm::json::Array(jsonEqs);
+}
+
+std::unique_ptr<EntryTokenOrder>
+EntryTokenOrder::fromJSON(const llvm::json::Value &value,
+                          llvm::json::Path path) {
+  auto prop = std::make_unique<EntryTokenOrder>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  const llvm::json::Array *arr = info.getAsArray();
+  if (!arr)
+    return nullptr;
+
+  for (const llvm::json::Value &slot : *arr) {
+    auto namer = EffectiveSlotNamer::fromInnerJSON(slot, path);
+    prop->slots.push_back(std::move(*namer));
   }
 
   return prop;

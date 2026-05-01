@@ -84,6 +84,8 @@ private:
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
+  LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge);
+  LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -290,6 +292,100 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   return success();
 }
 
+std::vector<ControlMergeOp> findEntryCMerge(mlir::Value start) {
+  std::vector<ControlMergeOp> ret;
+  std::vector<mlir::Value> stack;
+  stack.push_back(start);
+  while (!stack.empty()) {
+    mlir::Value cur = stack.back();
+    stack.pop_back();
+
+    Operation *next = cur.getUses().begin()->getOwner();
+    if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
+      ret.push_back(cmerge);
+    }
+    if (isa<BufferOp, ForkOp>(next)) {
+      for (mlir::Value channel : next->getResults()) {
+        stack.push_back(channel);
+      }
+    }
+  }
+  return ret;
+}
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
+    ControlMergeOp cmerge) {
+  struct PartialPath {
+    std::vector<EffectiveSlotNamer> slots;
+    mlir::Value cur;
+  };
+  std::vector<PartialPath> stack;
+  EffectiveSlotNamer mergeSlot(std::make_unique<BufferSlotFullNamer>(
+      cmerge.getInternalSlotStateNamers()[0]));
+  PartialPath start = {
+      .slots = {},
+      .cur = cmerge.getIndex(),
+  };
+  start.slots.push_back(mergeSlot);
+  stack.push_back(start);
+  while (!stack.empty()) {
+    PartialPath path = stack.back();
+    stack.pop_back();
+
+    Operation *next = path.cur.getUses().begin()->getOwner();
+    if (auto mux = dyn_cast<MuxOp>(next)) {
+      // Path is terminated by MuxOp, so this is the end of the path
+      llvm::errs() << "annotating new property\n";
+      EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots);
+      propertyTable.push_back(p.toJSON());
+      continue;
+    }
+    if (auto buffer = dyn_cast<BufferOp>(next)) {
+      for (auto &slot : buffer.getInternalSlotStateNamers()) {
+        path.slots.push_back(
+            EffectiveSlotNamer(std::make_unique<BufferSlotFullNamer>(slot)));
+      }
+      path.cur = buffer.getResult();
+      stack.push_back(std::move(path));
+      continue;
+    }
+    if (auto fork = dyn_cast<ForkOp>(next)) {
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
+        PartialPath nextPath = {
+            .slots = path.slots,
+            .cur = channel,
+        };
+        EffectiveSlotNamer &back = nextPath.slots.back();
+        llvm::errs() << path.slots.size() << " " << nextPath.slots.size()
+                     << "\n";
+        llvm::errs() << sents[i].getSMVName() << "\n";
+        llvm::errs() << back.getSMVName() << "\n";
+        back.copiedSents.push_back(sents[i]);
+        stack.push_back(nextPath);
+      }
+      continue;
+    }
+
+    assert(false && "unexpected op detected!");
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder(ModuleOp modOp) {
+  for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (BlockArgument arg : funcOp.getRegion().getArguments()) {
+      for (auto cmerge : findEntryCMerge(arg)) {
+        if (failed(annotateEntryTokenOrderPaths(cmerge))) {
+          return failure();
+        }
+      }
+    }
+  }
+  return success();
+}
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
                                                   FormalProperty::TYPE t) {
@@ -304,6 +400,8 @@ HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
     return annotateCopiedSlotsOfAllForks(modOp);
   case FormalProperty::TYPE::ReconvergentPathFlow:
     return annotateReconvergentPathFlow(modOp);
+  case FormalProperty::TYPE::EntryTokenOrder:
+    return annotateEntryTokenOrder(modOp);
   }
   return failure();
 }
@@ -336,6 +434,9 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
       return failure();
     if (failed(annotateReconvergentPathFlow(modOp)))
       return failure();
+    if (failed(annotateEntryTokenOrder(modOp)))
+      return failure();
+    llvm::errs() << "invariants annotated\n";
   }
   return success();
 }

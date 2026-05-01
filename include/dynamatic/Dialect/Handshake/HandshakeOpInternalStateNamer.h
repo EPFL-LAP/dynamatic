@@ -341,20 +341,24 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
 // targetted slot 1. contains data and 2. is not duplicated by an eager fork.
 struct EffectiveSlotNamer : InternalStateNamer {
   EffectiveSlotNamer() = default;
-  EffectiveSlotNamer(std::unique_ptr<InternalStateNamer> slot,
-                     std::vector<EagerForkSentNamer> copiedSents)
+  EffectiveSlotNamer(std::unique_ptr<InternalStateNamer> slot)
       : InternalStateNamer(TYPE::EffectiveSlot), slot(std::move(slot)),
-        copiedSents(std::move(copiedSents)) {}
+        copiedSents(std::vector<EagerForkSentNamer>()) {}
   ~EffectiveSlotNamer() = default;
   static inline bool classof(const InternalStateNamer *fp) {
     return fp->type == TYPE::EffectiveSlot;
+  }
+
+  inline void addCopiedSent(EagerForkSentNamer sent) {
+    copiedSents.push_back(std::move(sent));
   }
 
   std::string getSMVName() const override;
   llvm::json::Value toInnerJSON() const override;
   std::unique_ptr<EffectiveSlotNamer> static fromInnerJSON(
       const llvm::json::Value &value, llvm::json::Path path);
-  std::unique_ptr<InternalStateNamer> slot;
+
+  std::shared_ptr<InternalStateNamer> slot;
   std::vector<EagerForkSentNamer> copiedSents;
   static constexpr llvm::StringLiteral SLOT_LIT = "slot";
   static constexpr llvm::StringLiteral COPIED_SENTS_LIT = "copied_sents";
