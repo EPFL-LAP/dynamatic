@@ -1,5 +1,5 @@
 add_dynamatic_library(DynamaticDuplication
-  DuplicationLogic.cpp
+  PipelineDuplication.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

@@ -107,7 +107,7 @@ def PipelineDuplication : DynamaticPass<"pipeline-duplication"> {
     Adds an additional connection for the fork and duplicates the addition, multiplication,
     and more of the pipeline, with a hardcoded value that we know should come up often.
   }];
-  let constructor = "dynamatic::createPipelineDuplicationPass()";
+  let options = [];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

@@ -8,8 +8,22 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+using namespace llvm;
+using namespace mlir;
 using namespace dynamatic;
+using namespace dynamatic::buffer;
+using namespace dynamatic::handshake;
+using namespace dynamatic::experimental;
 
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKERIGIDIFICATION
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 namespace {
   /*
   struct AddConstantBranch : public OpRewritePattern<arith::AddfOp> {
@@ -68,7 +82,10 @@ namespace {
 
   // wrapper
   struct PipelineDuplicationPass 
-      : public dynamatic::impl::PipelineDuplicationBase<PipelineDuplicationPass> {
+      : public dynamatic::experimental::impl::PipelineDuplicationBase<
+      PipelineDuplicationPass> {
+
+    using PipelineDuplicationBase::PipelineDuplicationBase;
 
     void runDynamaticPass() override {
       mlir::ModuleOp mod = getOperation();
@@ -87,10 +104,6 @@ namespace {
   
 } // namespace
 
-/// Implementation of the pass constructor
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createPipelineDuplicationPass() {
-  return std::make_unique<PipelineDuplicationPass>();
-}
 
 /// Rewrite pattern that will match on all muxes in the IR and replace each of
 /// them with a merge taking the same inputs (except the `select` input which
