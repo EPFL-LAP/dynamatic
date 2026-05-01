@@ -15,6 +15,7 @@
 #define EXPERIMENTAL_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/DynamaticPass.h"
+#include "experimental/Transforms/Duplication/DuplicationLogic.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
 

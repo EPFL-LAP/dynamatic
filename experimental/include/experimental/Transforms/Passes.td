@@ -101,4 +101,13 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
+def PipelineDuplication : DynamaticPass<"pipeline-duplication"> {
+  let summary = "Duplicates calculations with a hardcoded value";
+  let description = [{
+    Adds an additional connection for the fork and duplicates the addition, multiplication,
+    and more of the pipeline, with a hardcoded value that we know should come up often.
+  }];
+  let constructor = "dynamatic::createPipelineDuplicationPass()";
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
