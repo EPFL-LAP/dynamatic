@@ -1,5 +1,5 @@
 // Include some other useful headers.
-#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Analysis/NameAnalysis.h" // needed
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -24,11 +24,7 @@
 #include <ostream>
 
 using namespace llvm;
-using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::buffer;
-using namespace dynamatic::handshake;
-using namespace dynamatic::experimental;
 
 // [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
@@ -40,75 +36,73 @@ namespace experimental {
 } // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
 namespace {
-  /*
-  struct AddConstantBranch : public OpRewritePattern<arith::AddfOp> {
-    using OpRewritePattern<arith::AddfOp>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(arith::AddfOp op, PatternRewriter &rewriter) const override {
-      // Find the end of my pipeline with addf, to get the same constants
-      auto nameAttr = op->getAttrOfType<StringAttr>("handshake.name");
-      if (!nameAttr || nameAttr.getValue() != "addf0")
-        return failure();
+struct PipelineDuplicationPass 
+    : public dynamatic::experimental::impl::PipelineDuplicationBase<
+    PipelineDuplicationPass> {
 
-      if (op->hasAttr("processed")) // is this necessary?
-        return failure();
-    
-      Location loc = op.getLoc();
+  using PipelineDuplicationBase::PipelineDuplicationBase;
 
-      // get the other constants
-      auto mulfOp = op.getLhs().getDefiningOp<arith::MulfOp>();
-      if (!mulfOp) return failure();
+  void runDynamaticPass() override {
+    mlir::ModuleOp modOp = getOperation();
+    MLIRContext *ctx = &getContext();
 
-      // constants -2.0 and 15.0 that are used for the other operations
-      Value cnstNegTwo = mulfOp.getRhs();
-      Value cnstFifteen = op.getRhs();
+    // Find addf0 operation
+    OpBuilder builder(ctx);
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    Operation *rawOp = namer.getOp("addf0");
+    if (!rawOp) {
+      llvm::errs() << "No operation named \"addf0\" exists\n";
+      return signalPassFailure();
+    }
+    auto op = dyn_cast<mlir::arith::AddFOp>(rawOp);
+    if (!op) return signalPassFailure();
 
-      // actually create the new values
-      Value cnstFive = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(rewriter.getF64Type(), 5.0));
+    Location loc = op.getLoc();
 
-      Value newMulf = rewriter.create<arith::MulfOp>(loc, cstFive, cstNegTwo).getResult();
-      Value newAddf = rewriter.create<arith::AddfOp>(loc, newMulf, cstFifteen).getResult();
-      Value newTrunc = rewriter.create<arith::TruncfOp>(
-        loc, rewriter.getF32Type(), newAddf).getResult();
+    // Find the preceding MulFOp to extract constants
+    auto mulfOp = op.getLhs().getDefiningOp<mlir::arith::MulFOp>();
+    if (!mulfOp)
+      return signalPassFailure();
 
-      
-      for (auto *user : op.getResult().getUsers()) {
-      if (auto truncOp = dyn_cast<arith::TruncfOp>(user)) {
+    Value cnstNegTwo = mulfOp.getRhs();
+    Value cnstFifteen = op.getRhs();
+
+    // Set insertion point after the original add operation (necessary?)
+    builder.setInsertionPointAfter(op);
+
+    // Create new duplicated pipeline logic
+    Value cnstFive = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(builder.getF64Type(), 5.0));
+
+    // is .getResult() needed?
+    Value newMulf =
+        builder.create<mlir::arith::MulFOp>(loc, cnstFive, cnstNegTwo);
+    Value newAddf =
+        builder.create<mlir::arith::AddFOp>(loc, newMulf, cnstFifteen);
+    Value newTrunc =
+        builder.create<mlir::arith::TruncFOp>(loc, builder.getF32Type(), newAddf);
+
+    // Navigate the IR to find the store operation downstream
+    for (auto *user : op.getResult().getUsers()) {
+      if (auto truncOp = dyn_cast<mlir::arith::TruncFOp>(user)) {
         for (auto *truncUser : truncOp.getResult().getUsers()) {
-          if (auto storeOp = dyn_cast<memref::StoreOp>(truncUser)) {
-            
-            Value sharedIndex = storeOp.getIndices()[0]; 
+          if (auto storeOp = dyn_cast<mlir::memref::StoreOp>(truncUser)) {
+            Value sharedIndex = storeOp.getIndices()[0];
             Value targetMemref = storeOp.getMemref();
 
-            // Create the 4th branch store
-            rewriter.create<memref::StoreOp>(loc, newTrunc, targetMemref, sharedIndex);
+            // Create the new duplicated store branch
+            auto newStore = builder.create<mlir::memref::StoreOp>(
+                loc, newTrunc, targetMemref, sharedIndex);
+            
+            // Inherit Basic Block information
+            inheritBB(storeOp, newStore);
             break;
           }
         }
       }
-      }
-      op->setAttr("processed", rewriter.getUnitAttr());
-      return success();
     }
-  };
-  */
-
-
-  // wrapper
-  struct PipelineDuplicationPass 
-      : public dynamatic::experimental::impl::PipelineDuplicationBase<
-      PipelineDuplicationPass> {
-
-    using PipelineDuplicationBase::PipelineDuplicationBase;
-
-    void runDynamaticPass() override;
-  };
+  }
+};
   
 } // namespace
-
-void PipelineDuplicationPass::runDynamaticPass() {
-  FormalPropertyTable table;
-
-}
-
