@@ -1,5 +1,6 @@
 // Include some other useful headers.
 #include "dynamatic/Analysis/NameAnalysis.h" // needed
+#include "mlir/Dialect/MemRef/IR/MemRef.h" // needed
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
