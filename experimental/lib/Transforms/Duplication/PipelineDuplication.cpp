@@ -1,5 +1,3 @@
-#include "experimental/Transforms/Duplication/DuplicationLogic.h"
-
 // Include some other useful headers.
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
@@ -109,23 +107,18 @@ namespace {
   
 } // namespace
 
-void HandshakeRigidificationPass::runDynamaticPass() {
+void PipelineDuplicationPass::runDynamaticPass() {
   FormalPropertyTable table;
-  if (failed(table.addPropertiesFromJSON(jsonPath)))
-    llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
-  for (const auto &property : table.getProperties()) {
-    if (property->getTag() == FormalProperty::TAG::OPT &&
-        property->getCheck() != std::nullopt && *property->getCheck()) {
-
-      if (auto *p = dyn_cast<AbsenceOfBackpressure>(property.get())) {
-        if (failed(insertReadyRemover(*p)))
-          return signalPassFailure();
-
-      } else if (auto *p = dyn_cast<ValidEquivalence>(property.get())) {
-        if (failed(insertValidMerger(*p)))
-          return signalPassFailure();
-      }
-    }
-  }
 }
+
+namespace dynamatic {
+namespace experimental {
+
+std::unique_ptr<::mlir::Pass> createPipelineDuplication() {
+  return std::make_unique<PipelineDuplicationPass>();
+}
+
+} // namespace experimental
+} // namespace dynamatic
+
