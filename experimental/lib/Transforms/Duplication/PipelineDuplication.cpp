@@ -1,12 +1,29 @@
 #include "experimental/Transforms/Duplication/DuplicationLogic.h"
 
 // Include some other useful headers.
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h" // maybe use the other dialect?
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "experimental/Support/FormalProperty.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/JSON.h"
+#include <fstream>
+#include <ostream>
 
 using namespace llvm;
 using namespace mlir;
@@ -19,7 +36,7 @@ using namespace dynamatic::experimental;
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 namespace experimental {
-#define GEN_PASS_DEF_HANDSHAKERIGIDIFICATION
+#define GEN_PASS_DEF_PIPELINEDUPLICATION
 #include "experimental/Transforms/Passes.h.inc"
 } // namespace experimental
 } // namespace dynamatic
@@ -87,47 +104,28 @@ namespace {
 
     using PipelineDuplicationBase::PipelineDuplicationBase;
 
-    void runDynamaticPass() override {
-      mlir::ModuleOp mod = getOperation();
-      MLIRContext *ctx = &getContext();
-
-      RewritePatternSet patterns{ctx};
-      // patterns.add<AddConstantBranch>(ctx);
-      patterns.add<ReplaceMuxWithMerge>(ctx);
-
-
-      mlir::GreedyRewriteConfig config;
-      if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
-        return signalPassFailure();
-    };
+    void runDynamaticPass() override;
   };
   
 } // namespace
 
+void HandshakeRigidificationPass::runDynamaticPass() {
+  FormalPropertyTable table;
+  if (failed(table.addPropertiesFromJSON(jsonPath)))
+    llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
-/// Rewrite pattern that will match on all muxes in the IR and replace each of
-/// them with a merge taking the same inputs (except the `select` input which
-/// merges do not have due to their undeterministic nature).
-/// Code taken from the tutorial. Change back when the project order works and 
-/// it compiles without errors
-struct ReplaceMuxWithMerge : public OpRewritePattern<handshake::MuxOp> {
-  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+  for (const auto &property : table.getProperties()) {
+    if (property->getTag() == FormalProperty::TAG::OPT &&
+        property->getCheck() != std::nullopt && *property->getCheck()) {
 
-  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
-                                PatternRewriter &rewriter) const override {
-    // Retrieve all mux inputs except the `select`
-    ValueRange dataOperands = muxOp.getDataOperands();
-    // Create a merge in the IR at the mux's position and with the same data
-    // inputs (or operands, in MLIR jargon)
-    handshake::MergeOp mergeOp =
-        rewriter.create<handshake::MergeOp>(muxOp.getLoc(), dataOperands);
-    // Make the merge part of the same basic block (BB) as the mux
-    inheritBB(muxOp, mergeOp);
-    // Retrieve the merge's output (or result, in MLIR jargon)
-    Value mergeResult = mergeOp.getResult();
-    // Replace usages of the mux's output with the new merge's output
-    rewriter.replaceOp(muxOp, mergeResult);
-    // Signal that the pattern succeeded in rewriting the mux
-    return success();
+      if (auto *p = dyn_cast<AbsenceOfBackpressure>(property.get())) {
+        if (failed(insertReadyRemover(*p)))
+          return signalPassFailure();
+
+      } else if (auto *p = dyn_cast<ValidEquivalence>(property.get())) {
+        if (failed(insertValidMerger(*p)))
+          return signalPassFailure();
+      }
+    }
   }
-};
+}
