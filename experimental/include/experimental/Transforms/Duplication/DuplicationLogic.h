@@ -17,8 +17,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_DUPLICATIONLOGIC
 #include "dynamatic/Transforms/Passes.h.inc"
 
-/// The pass constructor, with the same name we specified in TableGen in the
-/// previous subsection.
+/// The pass constructor, with the same name we specified in TableGen 
 std::unique_ptr<dynamatic::DynamaticPass> createPipelineDuplicationPass();
 
 } // namespace dynamatic

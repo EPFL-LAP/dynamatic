@@ -8,18 +8,10 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-
-// [START Boilerplate code for the MLIR pass]
-#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
-namespace dynamatic {
-namespace experimental {
-#define GEN_PASS_DEF_DUPLICATIONLOGIC
-#include "experimental/Transforms/Passes.h.inc"
-} // namespace experimental
-} // namespace dynamatic
-// [END Boilerplate code for the MLIR pass]
+using namespace dynamatic;
 
 namespace {
+  /*
   struct AddConstantBranch : public OpRewritePattern<arith::AddfOp> {
     using OpRewritePattern<arith::AddfOp>::OpRewritePattern;
 
@@ -71,19 +63,25 @@ namespace {
       return success();
     }
   };
+  */
 
 
   // wrapper
   struct PipelineDuplicationPass 
-      : public dynamatic::impl::PiplineDuplicationBase<PipelineDuplicationPass> {
+      : public dynamatic::impl::PipelineDuplicationBase<PipelineDuplicationPass> {
 
     void runDynamaticPass() override {
+      mlir::ModuleOp mod = getOperation();
       MLIRContext *ctx = &getContext();
-      RewritePatternSet patterns{ctx};
-      patterns.add<AddConstantBranch>(ctx);
 
-      if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
-        signalPassFailure();
+      RewritePatternSet patterns{ctx};
+      // patterns.add<AddConstantBranch>(ctx);
+      patterns.add<ReplaceMuxWithMerge>(ctx);
+
+
+      mlir::GreedyRewriteConfig config;
+      if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
+        return signalPassFailure();
     };
   };
   
@@ -93,3 +91,30 @@ namespace {
 std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createPipelineDuplicationPass() {
   return std::make_unique<PipelineDuplicationPass>();
 }
+
+/// Rewrite pattern that will match on all muxes in the IR and replace each of
+/// them with a merge taking the same inputs (except the `select` input which
+/// merges do not have due to their undeterministic nature).
+/// Code taken from the tutorial. Change back when the project order works and 
+/// it compiles without errors
+struct ReplaceMuxWithMerge : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+    // Retrieve all mux inputs except the `select`
+    ValueRange dataOperands = muxOp.getDataOperands();
+    // Create a merge in the IR at the mux's position and with the same data
+    // inputs (or operands, in MLIR jargon)
+    handshake::MergeOp mergeOp =
+        rewriter.create<handshake::MergeOp>(muxOp.getLoc(), dataOperands);
+    // Make the merge part of the same basic block (BB) as the mux
+    inheritBB(muxOp, mergeOp);
+    // Retrieve the merge's output (or result, in MLIR jargon)
+    Value mergeResult = mergeOp.getResult();
+    // Replace usages of the mux's output with the new merge's output
+    rewriter.replaceOp(muxOp, mergeResult);
+    // Signal that the pattern succeeded in rewriting the mux
+    return success();
+  }
+};
