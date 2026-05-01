@@ -112,13 +112,3 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
 }
 
-namespace dynamatic {
-namespace experimental {
-
-std::unique_ptr<::mlir::Pass> createPipelineDuplication() {
-  return std::make_unique<PipelineDuplicationPass>();
-}
-
-} // namespace experimental
-} // namespace dynamatic
-
