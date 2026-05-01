@@ -1001,13 +1001,13 @@ end
 
                 for i in range(0, self.configs.numLdqEntries):
                     for j in range(0, self.configs.numStqEntries):
-                        em_add_assignment(
+                        em.add_assignment(
                             (addr_valid, i, j),
                             Val(ldq_addr_valid, i) & Val(stq_addr_valid, j),
                         )
                 for i in range(0, self.configs.numLdqEntries):
                     for j in range(0, self.configs.numStqEntries):
-                        em_add_assignment(
+                        em.add_assignment(
                             (addr_same, i, j),
                             Bit(1)
                             .when(Val(ldq_addr, i) == Val(stq_addr, j))
