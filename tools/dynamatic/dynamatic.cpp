@@ -291,6 +291,7 @@ public:
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
+  static constexpr llvm::StringLiteral OPTIMIZE_STEERING_REWRITES = "optimize-steering-rewrites";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -319,6 +320,8 @@ public:
                           "accesses, use with caution!"});
     addFlag({STRAIGHT_TO_QUEUE,
              "Use straight to queue to connect the circuit to the LSQ"});
+    addFlag({OPTIMIZE_STEERING_REWRITES,
+             "Use handshake steering-term rewrites"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -711,6 +714,8 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
+  std::string optimizeSteeringRewrite =
+      args.flags.contains(OPTIMIZE_STEERING_REWRITES) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -741,7 +746,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, milpSolver, straightToQueue);
+                 fastTokenDelivery, milpSolver, straightToQueue, optimizeSteeringRewrite);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

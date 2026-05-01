@@ -20,6 +20,7 @@ DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
+OPTIMIZE_STEERING_REWRITES=${14}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -55,6 +56,7 @@ F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
+F_HANDSHAKE_MEM="$COMP_DIR/handshake_mem.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
@@ -263,27 +265,36 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
 
   F_HANDSHAKE=$F_HANDSHAKE_SQ
-
-  # handshake transformations
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-remove-unused-memrefs \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
-
+  F_HANDSHAKE_MEM=$F_HANDSHAKE_SQ
+  
 else
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    > "$F_HANDSHAKE_MEM"
+  exit_on_fail "Failed to apply LSQ transformations" "Applied LSQ transformations"
+fi
+
+if [[ $OPTIMIZE_STEERING_REWRITES -ne 0 ]]; then
+
+  echo_info "Optimize steering rewrites enabled"
+
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_MEM" \
     --handshake-remove-unused-memrefs \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-rewrite-terms \
     --handshake-combine-steering-logic \
     --handshake-materialize --handshake-infer-basic-blocks \
     --handshake-rewrite-terms \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+else #  --handshake-combine-steering-logic ???????TODO
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_MEM" \
+    --handshake-remove-unused-memrefs \
+    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
