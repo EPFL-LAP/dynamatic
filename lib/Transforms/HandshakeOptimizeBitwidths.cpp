@@ -349,10 +349,12 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
   // result.
   // The second bit is required to capture the sign-bit of the result on
   // overflow for the subsequent sign-extension.
+  // We must use sign-extension for the representation of negative values.
   //
-  // Examples: sext(1) + zext(11) in 3 bits results in 010. The addition has to
-  // be done in 4 bits instead such that the result is 1010 and can be
-  // sign-extended back to the original bitwidth.
+  // Example:
+  // sext(01) + zext(11) in 3 bits results in 100. The addition has to
+  // be done in 4 bits instead such that the result is 0100 and can be
+  // zero-extended correctly to the original bitwidth.
   //
   // However, when the smaller of the two bitwidths is the zero-extension,
   // then we don't need the extra bit since the two bits are known to be equal.
