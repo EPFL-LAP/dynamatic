@@ -43,9 +43,9 @@ F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c"
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
-
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_TRANSFORMED_CUSTOM = "$COMP_DIR/cf_transformed_custom.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
@@ -221,8 +221,16 @@ $DYNAMATIC_OPT_BIN \
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
+# add my own transformation
+$DYNAMATIC_OPT_BIN \
+  "$F_CF_TRANSFORMED" \
+  --pipeline-duplication \
+  > "$F_CF_TRANSFORMED_CUSTOM"
+exit_on_fail "Failed to apply my custom transformations" \
+  "Applied custom transformations"
+
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED_CUSTOM" \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
