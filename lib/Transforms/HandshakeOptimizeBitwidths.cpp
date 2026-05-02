@@ -343,7 +343,30 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
   if (rhs.extType <= ExtType::ZEXT)
     return {ExtType::ZEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 
-  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+  // Generally speaking, if there is a mix of sign-extension and zero-extension,
+  // we need *two* extra bits over the max input-bitwidth.
+  // One bit is required to keep the precision the same and not truncate the
+  // result.
+  // The second bit is required to capture the sign-bit of the result on
+  // overflow for the subsequent sign-extension.
+  //
+  // Examples: sext(1) + zext(11) in 3 bits results in 010. The addition has to
+  // be done in 4 bits instead such that the result is 1010 and can be
+  // sign-extended back to the original bitwidth.
+  //
+  // However, when the smaller of the two bitwidths is the zero-extension,
+  // then we don't need the extra bit since the two bits are known to be equal.
+  // Example: sext(yX) + zext(X) in 4 bits results in yyyX + 000X. Regardless
+  // of the value of y and the Xs, the two top bits are guaranteed to be yy.
+  // We can therefore save on one of the two top bits.
+  //
+  // The same applies when both operands are sign-extended: The result of
+  // sext(zXX) + sext(yX) remains the same for any bitwidth >= 4. This can be
+  // shown by case distinction on z and y (both 0s, one of two 1s and both 1s).
+  if (lhs.extType == ExtType::SEXT || lhs.bitWidth < rhs.bitWidth)
+    return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+
+  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 2};
 }
 
 /// Transfer function for sub operations or alike.
@@ -355,7 +378,7 @@ static ExtWidth subWidth(ExtWidth lhs, ExtWidth rhs) {
 
   // We apply the logic from 'add' here, but with the assumption that 'rhs' is
   // SEXT.
-  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+  return addWidth({lhs.extType, lhs.bitWidth}, {ExtType::SEXT, rhs.bitWidth});
 }
 
 /// Transfer function for mul operations or alike.
