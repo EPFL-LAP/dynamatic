@@ -58,37 +58,37 @@ struct PipelineDuplicationPass
     }
     auto op = dyn_cast<mlir::arith::AddFOp>(rawOp);
     if (!op) return signalPassFailure();
-
-    Location loc = op.getLoc();
-
-    // Find the preceding MulFOp to extract constants
-    auto mulfOp = op.getLhs().getDefiningOp<mlir::arith::MulFOp>();
-    if (!mulfOp)
-      return signalPassFailure();
-
-    Value cnstNegTwo = mulfOp.getRhs();
-    Value cnstFifteen = op.getRhs();
-
-    // Set insertion point after the original add operation (necessary?)
-    builder.setInsertionPointAfter(op);
-
-    // Create new duplicated pipeline logic
-    Value cnstFive = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getFloatAttr(builder.getF64Type(), 5.0));
-
-    // is .getResult() needed?
-    Value newMulf =
-        builder.create<mlir::arith::MulFOp>(loc, cnstFive, cnstNegTwo);
-    Value newAddf =
-        builder.create<mlir::arith::AddFOp>(loc, newMulf, cnstFifteen);
-    Value newTrunc =
-        builder.create<mlir::arith::TruncFOp>(loc, builder.getF32Type(), newAddf);
-
     // Navigate the IR to find the store operation downstream
     for (auto *user : op.getResult().getUsers()) {
       if (auto truncOp = dyn_cast<mlir::arith::TruncFOp>(user)) {
         for (auto *truncUser : truncOp.getResult().getUsers()) {
           if (auto storeOp = dyn_cast<mlir::memref::StoreOp>(truncUser)) {
+            // Value sharedIndex = storeOp.getIndices()[0];
+            // Value targetMemref = storeOp.getMemref();
+            
+            builder.setInsertionPoint(storeOp); 
+            Location loc = op.getLoc();
+
+            // Find the preceding MulFOp to extract constants
+            auto mulfOp = op.getLhs().getDefiningOp<mlir::arith::MulFOp>();
+            if (!mulfOp)
+            return signalPassFailure();
+
+            Value cnstNegTwo = mulfOp.getRhs();
+            Value cnstFifteen = op.getRhs();
+            Value cnstFive = builder.create<mlir::arith::ConstantOp>(
+            loc, builder.getFloatAttr(builder.getF64Type(), 5.0));
+
+
+    // is .getResult() needed?
+            Value newMulf =
+               builder.create<mlir::arith::MulFOp>(loc, cnstFive, cnstNegTwo);
+            Value newAddf =
+              builder.create<mlir::arith::AddFOp>(loc, newMulf, cnstFifteen);
+            Value newTrunc =
+               builder.create<mlir::arith::TruncFOp>(loc, builder.getF32Type(), newAddf);
+
+ 
             Value sharedIndex = storeOp.getIndices()[0];
             Value targetMemref = storeOp.getMemref();
 
@@ -102,7 +102,7 @@ struct PipelineDuplicationPass
           }
         }
       }
-    }
+    } 
   }
 };
   

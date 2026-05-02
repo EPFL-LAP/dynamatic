@@ -221,22 +221,17 @@ $DYNAMATIC_OPT_BIN \
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
-# add my own transformation
-$DYNAMATIC_OPT_BIN \
-  "$F_CF_TRANSFORMED" \
-  --pipeline-duplication \
-  > "$F_CF_TRANSFORMED_CUSTOM"
-exit_on_fail "Failed to apply my custom transformations" \
-  "Applied custom transformations"
 
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED_CUSTOM" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+    --pipeline-duplication \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+    --pipeline-duplication \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
