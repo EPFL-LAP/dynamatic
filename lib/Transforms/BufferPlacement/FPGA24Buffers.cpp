@@ -340,7 +340,7 @@ void FPGA24Buffers::findSynchronizationPatterns(
   if (archTransitions.empty())
     return;
 
-  constexpr size_t sequenceLength = 2;
+  constexpr size_t sequenceLength = 4;
   auto sequences =
       enumerateTransitionSequences(archTransitions, sequenceLength);
 
