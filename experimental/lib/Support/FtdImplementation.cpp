@@ -2470,13 +2470,32 @@ static void insertDirectSuppression(
   level0FullDG->containerOp->erase();
   level0ConstrainedDG->containerOp->erase();
   fullDecisionGraph->containerOp->erase();
-  locGraph->containerOp->erase();
 
   // If the activation function is not zero, then a suppress block is to be
   // inserted
   if (fSup->type != experimental::boolean::ExpressionType::Zero) {
     std::set<std::string> blocks = fSup->getVariables();
-    std::vector<std::string> cofactorList(blocks.begin(), blocks.end());
+    DenseMap<Block *, unsigned> rank;
+    unsigned i = 0;
+    for (Block *b : locGraph->topoOrder)
+      if (auto *ob = locGraph->origMap.lookup(b))
+        rank[ob] = i++;
+
+    std::vector<std::string> cofactorList;
+    cofactorList.reserve(blocks.size());
+    std::vector<std::pair<unsigned, std::string>> tmp;
+    for (auto &var : blocks)
+      if (auto blkOpt = bi.getBlockFromCondition(var))
+        if (rank.count(*blkOpt))
+          tmp.emplace_back(rank[*blkOpt], var);
+    llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
+    for (auto &p : tmp)
+      cofactorList.push_back(p.second);
+
+    // llvm::errs() << "[CofactorList] ";
+    // for (const auto &s : cofactorList)
+    //   llvm::errs() << s << " ";
+    // llvm::errs() << "\n";
     BDD *bdd = buildBDD(fSup, cofactorList);
     IntegerAttr connectionBBAttr = targetBBAttr;
     Value branchCond =
@@ -2537,6 +2556,7 @@ static void insertDirectSuppression(
       use.set(supData);
     }
   }
+  locGraph->containerOp->erase();
 }
 
 void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
