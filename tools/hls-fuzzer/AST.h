@@ -189,6 +189,8 @@ public:
   /// Returns true if the given type can directly represent signed values.
   bool isSigned() const;
 
+  bool isInteger() const;
+
   template <typename From>
   friend struct llvm::simplify_type;
 
@@ -590,6 +592,11 @@ inline std::size_t ScalarType::getBitwidth() const {
 
 inline bool ScalarType::isSigned() const {
   return std::visit([&](auto &&value) -> bool { return value.isSigned(); },
+                    *datatype);
+}
+
+inline bool ScalarType::isInteger() const {
+  return std::visit([&](auto &&value) -> bool { return value.isInteger(); },
                     *datatype);
 }
 
