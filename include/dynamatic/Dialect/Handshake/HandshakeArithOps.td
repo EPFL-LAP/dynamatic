@@ -43,6 +43,29 @@ class Handshake_Arith_BinaryOp<string mnemonic, list<Trait> traits = []> :
       assert(idx < 1 && "index too high");
       return "result";
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ::llvm::SmallVector<::mlir::NamedAttribute> params;
+      params.push_back({::mlir::StringAttr::get(ctx, "BITWIDTH"),
+                        ::mlir::TypeAttr::get(getLhs().getType())});
+      if (auto fpuImpl = ::mlir::dyn_cast<FPUImplInterface>(getOperation())) {
+        params.push_back({::mlir::StringAttr::get(ctx, "FPU_IMPL"),
+                          ::mlir::StringAttr::get(ctx, stringifyEnum(fpuImpl.getFPUImpl()))});
+        params.push_back({::mlir::StringAttr::get(ctx, "INTERNAL_DELAY"),
+                          fpuImpl.getInternalDelay()});
+      }
+      if (auto latencyIface = ::mlir::dyn_cast<LatencyInterface>(getOperation())) {
+        auto latency = latencyIface.getLatency();
+        if (::mlir::failed(latency))
+          return ::mlir::failure();
+        params.push_back({::mlir::StringAttr::get(ctx, "LATENCY"),
+                          ::mlir::IntegerAttr::get(ui32, (unsigned)latency.value())});
+      }
+      return params;
+    }
   }];
 }
 
@@ -70,6 +93,17 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
   let results = (outs ChannelType:$outs);
 
   let assemblyFormat = "$ins attr-dict `:` type($outs)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getIns().getType())}
+      };
+    }
+  }];
 }
 
 class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
@@ -94,6 +128,31 @@ class Handshake_Arith_CompareOp<string mnemonic, list<Trait> traits = []> :
       assert(idx < 1 && "index too high");
       return "result";
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ::llvm::SmallVector<::mlir::NamedAttribute> params;
+      params.push_back({::mlir::StringAttr::get(ctx, "PREDICATE"),
+                        ::mlir::StringAttr::get(ctx, stringifyEnum(getPredicate()))});
+      params.push_back({::mlir::StringAttr::get(ctx, "BITWIDTH"),
+                        ::mlir::TypeAttr::get(getLhs().getType())});
+      if (auto fpuImpl = ::mlir::dyn_cast<FPUImplInterface>(getOperation())) {
+        params.push_back({::mlir::StringAttr::get(ctx, "FPU_IMPL"),
+                          ::mlir::StringAttr::get(ctx, stringifyEnum(fpuImpl.getFPUImpl()))});
+        params.push_back({::mlir::StringAttr::get(ctx, "INTERNAL_DELAY"),
+                          fpuImpl.getInternalDelay()});
+      }
+      if (auto latencyIface = ::mlir::dyn_cast<LatencyInterface>(getOperation())) {
+        auto latency = latencyIface.getLatency();
+        if (::mlir::failed(latency))
+          return ::mlir::failure();
+        params.push_back({::mlir::StringAttr::get(ctx, "LATENCY"),
+                          ::mlir::IntegerAttr::get(ui32, (unsigned)latency.value())});
+      }
+      return params;
+    }
   }];
 }
 
@@ -109,6 +168,19 @@ class Handshake_Arith_IToICastOp<string mnemonic, list<Trait> traits = []> :
 
   let hasFolder = 1;
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "INPUT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getIn().getType())},
+        {::mlir::StringAttr::get(ctx, "OUTPUT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getOut().getType())}
+      };
+    }
+  }];
 }
 
 class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
@@ -122,6 +194,17 @@ class Handshake_Arith_FToFCastOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getIn().getType())}
+      };
+    }
+  }];
 }
 
 class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
@@ -135,6 +218,25 @@ class Handshake_Arith_IToFCastOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ::llvm::SmallVector<::mlir::NamedAttribute> params;
+      params.push_back({::mlir::StringAttr::get(ctx, "BITWIDTH"),
+                        ::mlir::TypeAttr::get(getIn().getType())});
+      if (auto latencyIface = ::mlir::dyn_cast<LatencyInterface>(getOperation())) {
+        auto latency = latencyIface.getLatency();
+        if (::mlir::failed(latency))
+          return ::mlir::failure();
+        params.push_back({::mlir::StringAttr::get(ctx, "LATENCY"),
+                          ::mlir::IntegerAttr::get(ui32, (unsigned)latency.value())});
+      }
+      return params;
+    }
+  }];
 }
 
 class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
@@ -148,6 +250,25 @@ class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = "$in attr-dict `:` type($in) `to` type($out)";
 
   // TODO: add folding operation
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ::llvm::SmallVector<::mlir::NamedAttribute> params;
+      params.push_back({::mlir::StringAttr::get(ctx, "BITWIDTH"),
+                        ::mlir::TypeAttr::get(getIn().getType())});
+      if (auto latencyIface = ::mlir::dyn_cast<LatencyInterface>(getOperation())) {
+        auto latency = latencyIface.getLatency();
+        if (::mlir::failed(latency))
+          return ::mlir::failure();
+        params.push_back({::mlir::StringAttr::get(ctx, "LATENCY"),
+                          ::mlir::IntegerAttr::get(ui32, (unsigned)latency.value())});
+      }
+      return params;
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -232,6 +353,13 @@ def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi", [
 
   let arguments = (ins Handshake_CmpIPredicateAttr:$predicate, ChannelType:$lhs,
                        ChannelType:$rhs);
+
+  let extraClassDeclaration = [{
+    /// Returns true if the comparison explicitly cares about the sign bit.
+    /// Note that this excludes 'eq' and 'ne' since they do not assign
+    /// special semantics to the sign bit.
+    bool isSignedComparison();
+  }];
 }
 
 def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
@@ -261,6 +389,49 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
   // It may have extra bits, which could affect the result's type and token.
   let assemblyFormat = "$ctrl attr-dict `:` type($ctrl) `,` type($result)";
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ConstantOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ChannelType cstType = getResult().getType();
+      unsigned bitwidth = cstType.getDataBitWidth();
+      if (bitwidth > 64) {
+        (*this)->emitError() << "Constant value has bitwidth " << bitwidth
+                             << ", but we only support up to 64.";
+        return ::mlir::failure();
+      }
+      TypedAttr valueAttr = getValueAttr();
+      std::string bitValue(bitwidth, '0');
+      if (auto intType = ::mlir::dyn_cast<::mlir::IntegerType>(cstType.getDataType())) {
+        ::llvm::APInt value = ::mlir::cast<::mlir::IntegerAttr>(valueAttr).getValue();
+        uint64_t raw = intType.isUnsignedInteger() ? value.getZExtValue()
+                                                   : (uint64_t)value.getSExtValue();
+        for (unsigned i = 0; i < bitwidth; ++i)
+          bitValue[bitwidth - 1 - i] = ((raw >> i) & 1) ? '1' : '0';
+      } else if (::mlir::isa<::mlir::FloatType>(cstType.getDataType())) {
+        ::mlir::FloatAttr attr = ::mlir::cast<::mlir::FloatAttr>(valueAttr);
+        ::llvm::APInt floatInt = attr.getValue().bitcastToAPInt();
+        if (floatInt.getBitWidth() != 32 && floatInt.getBitWidth() != 64) {
+          (*this)->emitError() << "Constant has unsupported floating point bitwidth.";
+          return ::mlir::failure();
+        }
+        uint64_t raw = floatInt.getZExtValue();
+        for (unsigned i = 0; i < bitwidth; ++i)
+          bitValue[bitwidth - 1 - i] = ((raw >> i) & 1) ? '1' : '0';
+      } else {
+        (*this)->emitError() << "Constant type must be integer or floating point.";
+        return ::mlir::failure();
+      }
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "VALUE"),
+         ::mlir::StringAttr::get(ctx, bitValue)},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::IntegerAttr::get(ui32, bitwidth)}
+      };
+    }
+  }];
 }
 
 def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
@@ -375,6 +546,17 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
     $condition `[` $trueValue `,` $falseValue `]` attr-dict
     `:` type($condition) `,` type($result)
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SelectOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getTrueValue().getType())}
+      };
+    }
+  }];
 }
 
 def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli", [
@@ -416,6 +598,19 @@ def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf", [
 ]>{
   let summary = "Floating-point truncation.";
   // TODO: add canonicalizer
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    TruncFOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "INPUT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getIn().getType())},
+        {::mlir::StringAttr::get(ctx, "OUTPUT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getOut().getType())}
+      };
+    }
+  }];
 }
 
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [Commutative]> {
@@ -462,6 +657,19 @@ def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf", [
 ]>{
   let summary = "Floating point extension.";
   // TODO: add canonicalizer
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ExtFOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "INPUT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getIn().getType())},
+        {::mlir::StringAttr::get(ctx, "OUTPUT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getOut().getType())}
+      };
+    }
+  }];
 }
 
 def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf"> {

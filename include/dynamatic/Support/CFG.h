@@ -170,6 +170,10 @@ public:
 private:
   /// The referenced Handshake function.
   handshake::FuncOp funcOp;
+
+  /// List of basic blocks
+  llvm::DenseSet<unsigned> bbs;
+
   /// Maps each basic blocks in the function to its successors.
   mlir::DenseMap<unsigned, llvm::SmallSet<unsigned, 2>> successors;
 

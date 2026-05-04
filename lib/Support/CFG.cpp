@@ -362,6 +362,7 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
     // Get the source basic block
     std::optional<unsigned> srcBB = getLogicBB(&op);
     assert(srcBB && "source operation must belong to block");
+    this->bbs.insert(*srcBB);
 
     for (OpResult res : op.getResults()) {
       for (Operation *user : res.getUsers()) {
@@ -371,8 +372,10 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
         // Get the destination basic block and store the connection
         std::optional<unsigned> dstBB = getLogicBB(user);
         assert(dstBB && "destination operation must belong to block");
-        if (*srcBB != *dstBB || isBackedge(res, user))
-          successors[*srcBB].insert(*dstBB);
+        if (*srcBB != *dstBB || isBackedge(res, user)) {
+          this->bbs.insert(*dstBB);
+          this->successors[*srcBB].insert(*dstBB);
+        }
       }
     }
   }
@@ -380,7 +383,6 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
 
 void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
                                      SmallVector<CFGPath> &paths) {
-
   if (this->successors.empty()) {
     assert(
         from == 0 && to == 0 &&
@@ -390,8 +392,8 @@ void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
   }
 
   // Both blocks must exist in the CFG
-  assert(successors.contains(from) && "source block must exist in the CFG");
-  assert(successors.contains(to) && "destination block must exist in the CFG");
+  assert(bbs.contains(from) && "source block must exist in the CFG");
+  assert(bbs.contains(to) && "source block must exist in the CFG");
 
   mlir::SetVector<unsigned> pathSoFar;
   pathSoFar.insert(from);

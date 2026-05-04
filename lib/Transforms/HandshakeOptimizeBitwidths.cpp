@@ -343,7 +343,32 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
   if (rhs.extType <= ExtType::ZEXT)
     return {ExtType::ZEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 
-  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+  // Generally speaking, if there is a mix of sign-extension and zero-extension,
+  // we need *two* extra bits over the max input-bitwidth.
+  // One bit is required to keep the precision the same and not truncate the
+  // result.
+  // The second bit is required to capture the sign-bit of the result on
+  // overflow for the subsequent sign-extension.
+  // We must use sign-extension for the representation of negative values.
+  //
+  // Example:
+  // sext(01) + zext(11) in 3 bits results in 100. The addition has to
+  // be done in 4 bits instead such that the result is 0100 and can be
+  // zero-extended correctly to the original bitwidth.
+  //
+  // However, when the smaller of the two bitwidths is the zero-extension,
+  // then we don't need the extra bit since the two bits are known to be equal.
+  // Example: sext(yX) + zext(X) in 4 bits results in yyyX + 000X. Regardless
+  // of the value of y and the Xs, the two top bits are guaranteed to be yy.
+  // We can therefore save on one of the two top bits.
+  //
+  // The same applies when both operands are sign-extended: The result of
+  // sext(zXX) + sext(yX) remains the same for any bitwidth >= 4. This can be
+  // shown by case distinction on z and y (both 0s, one of two 1s and both 1s).
+  if (lhs.extType == ExtType::SEXT || lhs.bitWidth < rhs.bitWidth)
+    return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+
+  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 2};
 }
 
 /// Transfer function for sub operations or alike.
@@ -355,7 +380,7 @@ static ExtWidth subWidth(ExtWidth lhs, ExtWidth rhs) {
 
   // We apply the logic from 'add' here, but with the assumption that 'rhs' is
   // SEXT.
-  return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
+  return addWidth({lhs.extType, lhs.bitWidth}, {ExtType::SEXT, rhs.bitWidth});
 }
 
 /// Transfer function for mul operations or alike.
@@ -1548,13 +1573,25 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     //   sign-extension of a negative number will insert a 1-bit upfront which
     //   changes the result.
     //   Example: cmpi uge zext(110), sext(10) must be done using 4, not 3 bits.
-    if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
-         minLhs.getType().getDataBitWidth() >=
-             minRhs.getType().getDataBitWidth()) ||
-        (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
-         minRhs.getType().getDataBitWidth() >=
-             minLhs.getType().getDataBitWidth()))
-      optWidth += 1;
+    //
+    // In a signed comparison we even require an extra bit if both operands
+    // are zero-extended. This is to make sure the sign-bit is guaranteed to be
+    // zero.
+    if (cmpOp.isSignedComparison()) {
+      if ((extLhs == ExtType::ZEXT && minLhs.getType().getDataBitWidth() >=
+                                          minRhs.getType().getDataBitWidth()) ||
+          (extRhs == ExtType::ZEXT && minRhs.getType().getDataBitWidth() >=
+                                          minLhs.getType().getDataBitWidth()))
+        optWidth++;
+    } else {
+      if ((extLhs == ExtType::ZEXT && extRhs == ExtType::SEXT &&
+           minLhs.getType().getDataBitWidth() >=
+               minRhs.getType().getDataBitWidth()) ||
+          (extRhs == ExtType::ZEXT && extLhs == ExtType::SEXT &&
+           minRhs.getType().getDataBitWidth() >=
+               minLhs.getType().getDataBitWidth()))
+        optWidth += 1;
+    }
 
     if (optWidth >= actualWidth)
       return failure();
@@ -1646,7 +1683,9 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
     ChannelVal trueRes = cast<ChannelVal>(condOp.getTrueResult()),
                falseRes = cast<ChannelVal>(condOp.getFalseResult());
     std::optional<std::pair<unsigned, ExtType>> trueBranch, falseBranch;
-    for (handshake::CmpIOp cmpOp : getCmpOps(condOp.getConditionOperand())) {
+    bool singleComp = false;
+    for (handshake::CmpIOp cmpOp :
+         getCmpOps(condOp.getConditionOperand(), singleComp)) {
       ExtValue minLhs = backtrackToMinimalValue(cmpOp.getLhs());
       ExtValue minRhs = backtrackToMinimalValue(cmpOp.getRhs());
 
@@ -1719,8 +1758,16 @@ struct ArithBoundOpt : public OpRewritePattern<handshake::ConditionalBranchOp> {
       if (branchOutputToOptimize == trueRes) {
         if (!trueBranch.has_value() || width < trueBranch.value().first)
           trueBranch = std::make_pair(width, branchExt);
-      } else if (!falseBranch.has_value() || width < falseBranch.value().first)
-        falseBranch = std::make_pair(width, branchExt);
+      } else {
+        // Only optimize the false branch if there is only one comparison op
+        // (i.e., no conjunction) since determining the bounds implied by only
+        // "some" predicates being true and false is much harder.
+        // TODO: We can apply the same optimizations as is done for conjuncts
+        //       in the true branch with disjuncts in the false branch.
+        if (singleComp &&
+            (!falseBranch.has_value() || width < falseBranch.value().first))
+          falseBranch = std::make_pair(width, branchExt);
+      }
     }
 
     // Optimize both branches if possible (in non-degenerate code, only one
@@ -1744,7 +1791,10 @@ private:
   /// Returns the list of comparison operations involved in the computation of
   /// the given conditional value (which must have i1 type). All of the
   /// comparisons' respective result are ANDed to compute the given value.
-  SmallVector<handshake::CmpIOp> getCmpOps(ChannelVal condVal) const;
+  /// Additionally, sets 'single' to true if there is no conjunction and exactly
+  /// one comparison.
+  SmallVector<handshake::CmpIOp> getCmpOps(ChannelVal condVal,
+                                           bool &single) const;
 
   /// Determines whether the bound that the data operand is compared with is
   /// tight, i.e. whether being strictly closer to 0 than it means we can
@@ -1773,8 +1823,9 @@ private:
 
 } // namespace
 
-SmallVector<handshake::CmpIOp>
-ArithBoundOpt::getCmpOps(ChannelVal condVal) const {
+SmallVector<handshake::CmpIOp> ArithBoundOpt::getCmpOps(ChannelVal condVal,
+                                                        bool &single) const {
+  single = false;
   ExtValue minVal = backtrackToMinimalValue(condVal);
 
   // Stop when reaching function arguments
@@ -1783,16 +1834,19 @@ ArithBoundOpt::getCmpOps(ChannelVal condVal) const {
     return {};
 
   // If we have reached a comparison operation, return it
-  if (handshake::CmpIOp cmpOp = dyn_cast<handshake::CmpIOp>(defOp))
+  if (handshake::CmpIOp cmpOp = dyn_cast<handshake::CmpIOp>(defOp)) {
+    single = true;
     return {cmpOp};
+  }
 
   // If we have reached a logical and, backtrack through both its operands as it
   // means the branch condition will be more restrictive than the comparison
   // itself, which doesn't invalidate our optimization
   if (handshake::AndIOp andOp = dyn_cast<handshake::AndIOp>(defOp)) {
     SmallVector<handshake::CmpIOp> cmpOps;
-    llvm::copy(getCmpOps(andOp.getLhs()), std::back_inserter(cmpOps));
-    llvm::copy(getCmpOps(andOp.getRhs()), std::back_inserter(cmpOps));
+    bool dummy;
+    llvm::copy(getCmpOps(andOp.getLhs(), dummy), std::back_inserter(cmpOps));
+    llvm::copy(getCmpOps(andOp.getRhs(), dummy), std::back_inserter(cmpOps));
     return cmpOps;
   }
 
