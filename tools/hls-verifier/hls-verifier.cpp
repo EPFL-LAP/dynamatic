@@ -152,11 +152,11 @@ int main(int argc, char **argv) {
                                cl::value_desc("HDL for simulation"),
                                cl::init("vhdl"));
 
-  cl::opt<std::size_t> timeout(
-      "timeout",
-      cl::desc("Timeout for the simulation in number of cycles (default: 0 "
-               "i.e., no timeout)"),
-      cl::value_desc("Timeout in cycles"), cl::init(0));
+  cl::opt<std::size_t> timeout("timeout",
+                               cl::desc("Timeout for the simulation in number "
+                                        "of cycles. Use 0 for no timeout"),
+                               cl::value_desc("Timeout in cycles"),
+                               cl::init(500'000));
 
   cl::ParseCommandLineOptions(argc, argv, R"PREFIX(
     This is the hls-verifier tool for comparing C and VHDL/Verilog outputs.
