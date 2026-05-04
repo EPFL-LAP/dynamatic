@@ -76,18 +76,25 @@ struct PipelineDuplicationPass
 
             Value cnstNegTwo = mulfOp.getRhs();
             Value cnstFifteen = op.getRhs();
-            Value cnstFive = builder.create<mlir::arith::ConstantOp>(
+            auto newCnstFive = builder.create<mlir::arith::ConstantOp>(
             loc, builder.getFloatAttr(builder.getF64Type(), 5.0));
+            inheritBB(storeOp, newCnstFive);
+            Value cnstFive = newCnstFive.getResult(); 
 
-
-    // is .getResult() needed?
-            Value newMulf =
+            auto newMulfOp =
                builder.create<mlir::arith::MulFOp>(loc, cnstFive, cnstNegTwo);
-            Value newAddf =
-              builder.create<mlir::arith::AddFOp>(loc, newMulf, cnstFifteen);
-            Value newTrunc =
-               builder.create<mlir::arith::TruncFOp>(loc, builder.getF32Type(), newAddf);
+            inheritBB(storeOp, newMulfOp);
+            Value newMulf = newMulfOp.getResult();
 
+            auto newAddfOp =
+              builder.create<mlir::arith::AddFOp>(loc, newMulf, cnstFifteen);
+            inheritBB(storeOp, newAddfOp);
+            Value newAddf = newAddfOp.getResult();
+
+            auto newTruncOp =
+               builder.create<mlir::arith::TruncFOp>(loc, builder.getF32Type(), newAddf);
+            inheritBB(storeOp, newTruncOp);
+            Value newTrunc = newTruncOp.getResult();
  
             Value sharedIndex = storeOp.getIndices()[0];
             Value targetMemref = storeOp.getMemref();
@@ -95,7 +102,9 @@ struct PipelineDuplicationPass
             // Create the new duplicated store branch
             auto newStore = builder.create<mlir::memref::StoreOp>(
                 loc, newTrunc, targetMemref, sharedIndex);
-            
+            auto originalDeps = storeOp->getAttr("handshake.deps"); 
+            newStore->setAttr("handshake.deps", originalDeps);
+
             // Inherit Basic Block information
             inheritBB(storeOp, newStore);
             break;
