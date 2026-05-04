@@ -35,6 +35,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::ReconvergentPathFlow;
   if (s == "EntryTokenOrder")
     return FormalProperty::TYPE::EntryTokenOrder;
+  if (s == "SingleEntryToken")
+    return FormalProperty::TYPE::SingleEntryToken;
 
   return std::nullopt;
 }
@@ -53,6 +55,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "ReconvergentPathFlow";
   case TYPE::EntryTokenOrder:
     return "EntryTokenOrder";
+  case TYPE::SingleEntryToken:
+    return "SingleEntryToken";
   }
 }
 
@@ -114,6 +118,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EntryTokenOrder:
     return EntryTokenOrder::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::SingleEntryToken:
+    return SingleEntryToken::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -384,6 +390,57 @@ EntryTokenOrder::fromJSON(const llvm::json::Value &value,
   if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
       !mapper.map(ENTRY_VALUE_LIT, prop->entryValue))
     return nullptr;
+  return prop;
+}
+
+llvm::json::Value SingleEntryToken::extraInfoToJSON() const {
+  std::vector<llvm::json::Value> jsonCm{};
+  jsonCm.reserve(cm.size());
+
+  for (auto &slot : cm) {
+    jsonCm.push_back(slot.toInnerJSON());
+  }
+
+  std::vector<llvm::json::Value> jsonEc{};
+  jsonEc.reserve(ec.size());
+
+  for (auto &slot : ec) {
+    jsonEc.push_back(slot.toInnerJSON());
+  }
+
+  return llvm::json::Object({{PATH_CM_LIT, llvm::json::Array(jsonCm)},
+                             {PATH_EC_LIT, llvm::json::Array(jsonEc)}});
+}
+
+std::unique_ptr<SingleEntryToken>
+SingleEntryToken::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<SingleEntryToken>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  auto *infoObj = info.getAsObject();
+  assert(infoObj);
+  const llvm::json::Value *ecVal = infoObj->get(PATH_EC_LIT);
+  assert(ecVal);
+  const llvm::json::Array *ecArr = ecVal->getAsArray();
+  if (!ecArr)
+    return nullptr;
+
+  for (const llvm::json::Value &slot : *ecArr) {
+    auto namer = EffectiveSlotNamer::fromInnerJSON(slot, path);
+    prop->ec.push_back(std::move(*namer));
+  }
+
+  const llvm::json::Value *cmVal = infoObj->get(PATH_EC_LIT);
+  assert(cmVal);
+  const llvm::json::Array *cmArr = cmVal->getAsArray();
+  if (!cmArr)
+    return nullptr;
+
+  for (const llvm::json::Value &slot : *cmArr) {
+    auto namer = EffectiveSlotNamer::fromInnerJSON(slot, path);
+    prop->cm.push_back(std::move(*namer));
+  }
   return prop;
 }
 

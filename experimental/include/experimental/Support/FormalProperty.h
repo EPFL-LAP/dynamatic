@@ -34,6 +34,7 @@ public:
     CopiedSlotsOfActiveForksAreFull,
     ReconvergentPathFlow,
     EntryTokenOrder,
+    SingleEntryToken,
   };
 
   TAG getTag() const { return tag; }
@@ -295,6 +296,33 @@ private:
   int32_t entryValue;
   inline static const StringLiteral SLOTS_LIT = "slots";
   inline static const StringLiteral ENTRY_VALUE_LIT = "entry_value";
+};
+
+class SingleEntryToken : public FormalProperty {
+public:
+  const std::vector<EffectiveSlotNamer> &getEcPath() const { return ec; }
+  const std::vector<EffectiveSlotNamer> &getCmPath() const { return cm; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<SingleEntryToken>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  SingleEntryToken() = default;
+  SingleEntryToken(unsigned long id, TAG tag,
+                   std::vector<EffectiveSlotNamer> ec,
+                   std::vector<EffectiveSlotNamer> cm)
+      : FormalProperty(id, tag, TYPE::SingleEntryToken), ec(std::move(ec)),
+        cm(std::move(cm)) {}
+  ~SingleEntryToken() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::SingleEntryToken;
+  }
+
+private:
+  std::vector<EffectiveSlotNamer> ec;
+  std::vector<EffectiveSlotNamer> cm;
+  inline static const StringLiteral PATH_EC_LIT = "entry_cmerge_path";
+  inline static const StringLiteral PATH_CM_LIT = "cmerge_mux_path";
 };
 
 class FormalPropertyTable {

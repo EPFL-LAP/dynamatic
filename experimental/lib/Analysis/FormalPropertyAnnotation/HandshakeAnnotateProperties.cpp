@@ -87,6 +87,7 @@ private:
   LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge,
                                              int32_t entryValue);
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
+  LogicalResult annotateSingleEntryToken(ModuleOp modOp);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -294,42 +295,77 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 }
 
 namespace {
-std::vector<std::pair<ControlMergeOp, int32_t>>
-findEntryCMerge(mlir::Value start) {
-  std::vector<std::pair<ControlMergeOp, int32_t>> ret;
-  std::vector<mlir::Value> stack;
-  stack.push_back(start);
-  while (!stack.empty()) {
-    mlir::Value cur = stack.back();
-    stack.pop_back();
-
-    OpOperand &operand = *cur.getUses().begin();
-    Operation *next = operand.getOwner();
-    if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
-      int32_t entry;
-      for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
-        if (input == cur) {
-          entry = i;
-        }
-      }
-      ret.emplace_back(cmerge, entry);
-    }
-    if (isa<BufferOp, ForkOp>(next)) {
-      for (mlir::Value channel : next->getResults()) {
-        stack.push_back(channel);
-      }
-    }
-  }
-  return ret;
-}
-} // namespace
-
-LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
-    ControlMergeOp cmerge, int32_t entryValue) {
+struct EntryCMergePath {
+  std::vector<EffectiveSlotNamer> slots;
+  ControlMergeOp cmerge;
+  int32_t entryValue;
+};
+std::vector<EntryCMergePath> findEntryCMergePaths(mlir::Value startChannel) {
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
     mlir::Value cur;
   };
+  std::vector<EntryCMergePath> ret;
+  std::vector<PartialPath> stack;
+  PartialPath start = {
+      .slots = {},
+      .cur = startChannel,
+  };
+  // TODO: Make this an entry slot (which is in a different PR
+  start.slots.push_back(EffectiveSlotNamer());
+  stack.push_back(start);
+  while (!stack.empty()) {
+    PartialPath path = std::move(stack.back());
+    stack.pop_back();
+
+    Operation *next = path.cur.getUses().begin()->getOwner();
+    if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
+      int32_t entry;
+      for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
+        if (input == path.cur) {
+          entry = i;
+        }
+      }
+      EntryCMergePath retPath = {
+          .slots = path.slots,
+          .cmerge = cmerge,
+          .entryValue = entry,
+      };
+      ret.push_back(retPath);
+    }
+    if (auto buffer = dyn_cast<BufferOp>(next)) {
+      for (auto &slot : buffer.getInternalSlotStateNamers()) {
+        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
+      }
+      path.cur = buffer.getResult();
+      stack.push_back(std::move(path));
+      continue;
+    }
+    if (auto fork = dyn_cast<ForkOp>(next)) {
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
+        PartialPath nextPath = {
+            .slots = path.slots,
+            .cur = channel,
+        };
+        assert(!nextPath.slots.empty());
+        EffectiveSlotNamer &back = nextPath.slots.back();
+        back.copiedSents.push_back(sents[i]);
+        stack.push_back(nextPath);
+      }
+      continue;
+    }
+  }
+  return ret;
+}
+
+std::vector<std::vector<EffectiveSlotNamer>>
+findCMergeMuxPaths(ControlMergeOp cmerge) {
+  struct PartialPath {
+    std::vector<EffectiveSlotNamer> slots;
+    mlir::Value cur;
+  };
+  std::vector<std::vector<EffectiveSlotNamer>> ret{};
   std::vector<PartialPath> stack;
   EffectiveSlotNamer mergeSlot(std::make_unique<BufferSlotFullNamer>(
       cmerge.getInternalSlotStateNamers()[0]));
@@ -346,13 +382,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     Operation *next = path.cur.getUses().begin()->getOwner();
     if (auto mux = dyn_cast<MuxOp>(next)) {
       // Path is terminated by MuxOp, so this is the end of the path
-      if (path.slots.size() < 2) {
-        // This path does not contain enough slots to actually mean anything
-        continue;
-      }
-      EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots,
-                        entryValue);
-      propertyTable.push_back(p.toJSON());
+      ret.push_back(std::move(path.slots));
       continue;
     }
     if (auto buffer = dyn_cast<BufferOp>(next)) {
@@ -377,8 +407,17 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
       continue;
     }
 
-    assert(false && "unexpected op detected!");
-    return failure();
+    llvm::report_fatal_error("unexpected op detected");
+  }
+  return ret;
+}
+} // namespace
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
+    ControlMergeOp cmerge, int32_t entryValue) {
+  for (const auto &path : findCMergeMuxPaths(cmerge)) {
+    EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path, entryValue);
+    propertyTable.push_back(p.toJSON());
   }
   return success();
 }
@@ -387,8 +426,9 @@ LogicalResult
 HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder(ModuleOp modOp) {
   for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (BlockArgument arg : funcOp.getRegion().getArguments()) {
-      for (auto [cmerge, entryValue] : findEntryCMerge(arg)) {
-        if (failed(annotateEntryTokenOrderPaths(cmerge, entryValue))) {
+      for (const auto &path : findEntryCMergePaths(arg)) {
+        if (failed(
+                annotateEntryTokenOrderPaths(path.cmerge, path.entryValue))) {
           return failure();
         }
       }
@@ -396,6 +436,22 @@ HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder(ModuleOp modOp) {
   }
   return success();
 }
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
+  for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (BlockArgument arg : funcOp.getRegion().getArguments()) {
+      for (const auto &ec : findEntryCMergePaths(arg)) {
+        for (const auto &cm : findCMergeMuxPaths(ec.cmerge)) {
+          SingleEntryToken p(uid++, FormalProperty::TAG::INVAR, ec.slots, cm);
+          propertyTable.push_back(p.toJSON());
+        }
+      }
+    }
+  }
+  return success();
+}
+
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
                                                   FormalProperty::TYPE t) {
@@ -412,6 +468,8 @@ HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
     return annotateReconvergentPathFlow(modOp);
   case FormalProperty::TYPE::EntryTokenOrder:
     return annotateEntryTokenOrder(modOp);
+  case FormalProperty::TYPE::SingleEntryToken:
+    return annotateSingleEntryToken(modOp);
   }
   return failure();
 }
@@ -446,6 +504,11 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
       return failure();
     if (failed(annotateEntryTokenOrder(modOp)))
       return failure();
+<<<<<<< HEAD
+=======
+    if (failed(annotateSingleEntryToken(modOp)))
+      return failure();
+>>>>>>> 13f33c9bf (annotate invariant 8)
   }
   return success();
 }
