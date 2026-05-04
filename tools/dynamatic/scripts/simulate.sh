@@ -90,6 +90,11 @@ exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen."
 "$IO_GEN_BIN"
 exit_on_fail "Failed to run kernel for IO gen." "Ran kernel for IO gen." 
 
+EXTRA_ARGS=""
+if [ ! -z "$TIMEOUT" ]; then
+  EXTRA_ARGS="--timeout=$TIMEOUT"
+fi
+
 # Simulate and verify design
 echo_info "Launching simulation ($SIMULATOR_NAME)"
 cd "$HLS_VERIFY_DIR"
@@ -101,7 +106,7 @@ if [ "$VIVADO_FPU" = "true" ]; then
   --simulator="$SIMULATOR_NAME" \
   --hdl="$HDL_TYPE" \
   --vivado-fpu \
-  --timeout="$TIMEOUT" \
+  $EXTRA_ARGS \
   > "../report.txt" 2>&1
 else
   "$HLS_VERIFIER_BIN" \
@@ -110,7 +115,7 @@ else
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   --simulator="$SIMULATOR_NAME" \
   --hdl="$HDL_TYPE" \
-  --timeout="$TIMEOUT" \
+  $EXTRA_ARGS \
   > "../report.txt" 2>&1
 fi
 exit_on_fail "Simulation failed" "Simulation succeeded"
