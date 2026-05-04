@@ -52,6 +52,8 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
                     "type is not currently supported\n";
     return mlir::FloatType::getF80(context);
   }
+  if (llvmType->isPointerTy())
+    llvm::report_fatal_error("Pointer values are unsupported");
   LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";);
 
   llvm::report_fatal_error("Unhandled scalar type");
