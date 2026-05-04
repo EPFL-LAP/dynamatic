@@ -15,6 +15,7 @@ VIVADO_PATH=$5
 VIVADO_FPU=$6
 SIMULATOR_NAME=$7
 HDL_TYPE=$8
+TIMEOUT=$9
 
 # Generated directories/files
 SIM_DIR="$(realpath "$OUTPUT_DIR/sim")"
@@ -100,6 +101,7 @@ if [ "$VIVADO_FPU" = "true" ]; then
   --simulator="$SIMULATOR_NAME" \
   --hdl="$HDL_TYPE" \
   --vivado-fpu \
+  --timeout="$TIMEOUT" \
   > "../report.txt" 2>&1
 else
   "$HLS_VERIFIER_BIN" \
@@ -108,6 +110,7 @@ else
   --handshake-mlir="$OUTPUT_DIR/comp/handshake_export.mlir" \
   --simulator="$SIMULATOR_NAME" \
   --hdl="$HDL_TYPE" \
+  --timeout="$TIMEOUT" \
   > "../report.txt" 2>&1
 fi
 exit_on_fail "Simulation failed" "Simulation succeeded"

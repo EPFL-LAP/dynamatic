@@ -679,6 +679,36 @@ void getOutputTagGeneration(mlir::raw_indented_ostream &os,
   }
 }
 
+static void generateTimeoutProcess(mlir::raw_indented_ostream &os,
+                                   VerificationContext &ctx) {
+  if (ctx.timeout == 0)
+    return;
+
+  if (ctx.simLanguage == VHDL) {
+    os << llvm::formatv(R"(
+gen_sim_timeout_proc : process(tb_clk)
+begin
+  if (rising_edge(tb_clk)) then
+    assert ((now - RESET_LATENCY) / (2 * HALF_CLK_PERIOD)) <= {0}
+    report "ERROR: Maximum clock count of {0} reached; Assuming non-termination"
+    severity failure;
+  end if;
+end process;
+)",
+                        ctx.timeout);
+  } else {
+    os << llvm::formatv(R"(
+always @(posedge tb_clk) begin
+    if ($floor(($time - RESET_LATENCY) / (2 * HALF_CLK_PERIOD)) > {0}) begin
+        $display("ERROR: Maximum clock count of {0} reached; Assuming non-termination");
+        $finish;
+    end
+end
+)",
+                        ctx.timeout);
+  }
+}
+
 void vhdlTbCodegen(VerificationContext &ctx) {
 
   std::error_code ec;
@@ -711,6 +741,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
     deriveGlobalCompletionSignal(os, ctx);
     getOutputTagGeneration(os, ctx);
     os << VHDL_COMMON_TB_BODY;
+    generateTimeoutProcess(os, ctx);
     os.unindent();
     os << "end architecture behavior;\n";
     os.flush();
@@ -725,6 +756,7 @@ void vhdlTbCodegen(VerificationContext &ctx) {
     deriveGlobalCompletionSignal(os, ctx);
     getOutputTagGeneration(os, ctx);
     os << VERILOG_COMMON_TB_BODY;
+    generateTimeoutProcess(os, ctx);
     os.unindent();
     os << "endmodule\n";
     os.flush();

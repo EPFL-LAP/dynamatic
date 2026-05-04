@@ -37,9 +37,10 @@ enum HdlType { VHDL, VERILOG };
 struct VerificationContext {
   VerificationContext(const std::string &simPath,
                       const std::string &cFuvFunctionName,
-                      handshake::FuncOp *funcOp, bool vivadoFPU, HdlType hdl)
+                      handshake::FuncOp *funcOp, bool vivadoFPU, HdlType hdl,
+                      std::size_t timeout)
       : simPath(simPath), funcOp(funcOp), kernelName(cFuvFunctionName),
-        vivadoFPU(vivadoFPU), simLanguage(hdl) {}
+        vivadoFPU(vivadoFPU), simLanguage(hdl), timeout(timeout) {}
 
   static const char SEP = std::filesystem::path::preferred_separator;
 
@@ -57,6 +58,9 @@ struct VerificationContext {
 
   // Wheter to use VHDL or VERILOG for the testbench
   HdlType simLanguage;
+
+  // Timeout in number of cycles or 0 if there is none.
+  std::size_t timeout;
 
   bool useVivadoFPU() const { return vivadoFPU; }
 
