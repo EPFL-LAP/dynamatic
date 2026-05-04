@@ -18,7 +18,7 @@ dynamatic::performDifferentialTesting(const std::filesystem::path &sourceFile,
         outputDynamaticInvocation(os, sourceFile, dynamaticPath, R"(
 compile
 write-hdl
-simulate
+simulate --timeout 20000
 )");
         return llvm::Error::success();
       }));
