@@ -402,7 +402,8 @@ llvm::json::Value EntryTokenOrder::extraInfoToJSON() const {
   for (auto &slot : slots) {
     jsonEqs.push_back(slot.toInnerJSON());
   }
-  return llvm::json::Array(jsonEqs);
+  return llvm::json::Object(
+      {{SLOTS_LIT, llvm::json::Array(jsonEqs)}, {ENTRY_VALUE_LIT, entryValue}});
 }
 
 std::unique_ptr<EntryTokenOrder>
@@ -411,7 +412,14 @@ EntryTokenOrder::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<EntryTokenOrder>();
 
   llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
-  const llvm::json::Array *arr = info.getAsArray();
+  auto *infoObj = info.getAsObject();
+  assert(infoObj);
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(ENTRY_VALUE_LIT, prop->entryValue))
+    return nullptr;
+  const llvm::json::Value *slots = infoObj->get(SLOTS_LIT);
+  assert(slots);
+  const llvm::json::Array *arr = slots->getAsArray();
   if (!arr)
     return nullptr;
 

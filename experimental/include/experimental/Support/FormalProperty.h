@@ -275,15 +275,15 @@ private:
 class EntryTokenOrder : public FormalProperty {
 public:
   const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }
-  int32_t getValue() const { return 1; }
+  int32_t getValue() const { return entryValue; }
   llvm::json::Value extraInfoToJSON() const override;
   static std::unique_ptr<EntryTokenOrder>
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
   EntryTokenOrder() = default;
   EntryTokenOrder(unsigned long id, TAG tag,
-                  std::vector<EffectiveSlotNamer> slots)
-      : FormalProperty(id, tag, TYPE::EntryTokenOrder),
-        slots(std::move(slots)) {}
+                  std::vector<EffectiveSlotNamer> slots, int32_t value)
+      : FormalProperty(id, tag, TYPE::EntryTokenOrder), slots(std::move(slots)),
+        entryValue(value) {}
   ~EntryTokenOrder() = default;
 
   static bool classof(const FormalProperty *fp) {
@@ -292,7 +292,9 @@ public:
 
 private:
   std::vector<EffectiveSlotNamer> slots;
+  int32_t entryValue;
   inline static const StringLiteral SLOTS_LIT = "slots";
+  inline static const StringLiteral ENTRY_VALUE_LIT = "entry_value";
 };
 
 class FormalPropertyTable {

@@ -84,7 +84,8 @@ private:
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
-  LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge);
+  LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge,
+                                             int32_t entryValue);
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
 };
 
@@ -292,17 +293,25 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   return success();
 }
 
-std::vector<ControlMergeOp> findEntryCMerge(mlir::Value start) {
-  std::vector<ControlMergeOp> ret;
+std::vector<std::pair<ControlMergeOp, int32_t>>
+findEntryCMerge(mlir::Value start) {
+  std::vector<std::pair<ControlMergeOp, int32_t>> ret;
   std::vector<mlir::Value> stack;
   stack.push_back(start);
   while (!stack.empty()) {
     mlir::Value cur = stack.back();
     stack.pop_back();
 
-    Operation *next = cur.getUses().begin()->getOwner();
+    OpOperand &operand = *cur.getUses().begin();
+    Operation *next = operand.getOwner();
     if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
-      ret.push_back(cmerge);
+      int32_t entry;
+      for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
+        if (input == cur) {
+          entry = i;
+        }
+      }
+      ret.emplace_back(cmerge, entry);
     }
     if (isa<BufferOp, ForkOp>(next)) {
       for (mlir::Value channel : next->getResults()) {
@@ -314,7 +323,7 @@ std::vector<ControlMergeOp> findEntryCMerge(mlir::Value start) {
 }
 
 LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
-    ControlMergeOp cmerge) {
+    ControlMergeOp cmerge, int32_t entryValue) {
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
     mlir::Value cur;
@@ -336,7 +345,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     if (auto mux = dyn_cast<MuxOp>(next)) {
       // Path is terminated by MuxOp, so this is the end of the path
       llvm::errs() << "annotating new property\n";
-      EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots);
+      EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots,
+                        entryValue);
       propertyTable.push_back(p.toJSON());
       continue;
     }
@@ -377,8 +387,8 @@ LogicalResult
 HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder(ModuleOp modOp) {
   for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (BlockArgument arg : funcOp.getRegion().getArguments()) {
-      for (auto cmerge : findEntryCMerge(arg)) {
-        if (failed(annotateEntryTokenOrderPaths(cmerge))) {
+      for (auto [cmerge, entryValue] : findEntryCMerge(arg)) {
+        if (failed(annotateEntryTokenOrderPaths(cmerge, entryValue))) {
           return failure();
         }
       }
