@@ -37,7 +37,7 @@ public:
     return mustBeParameter || op != ast::BinaryExpression::Plus;
   }
 
-  gen::DependencyArray<ast::BinaryExpression>
+  gen::TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionContextDependencies(ast::BinaryExpression::Op) override {
     return {
         Dependency<ast::BinaryExpression>(true),
@@ -90,9 +90,9 @@ public:
     return !createArrayRead;
   }
 
-  gen::DependencyArray<ast::ArrayReadExpression>
+  gen::TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionContextDependencies() override {
-    return gen::DependencyArray<ast::ArrayReadExpression>{
+    return {
         Dependency<ast::ArrayReadExpression>(false),
         Dependency<ast::ArrayReadExpression>(false),
         copyFromParent<ast::ArrayReadExpression>(),

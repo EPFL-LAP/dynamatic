@@ -128,12 +128,15 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
 
   return generateWithDependencies<ast::BinaryExpression>(
       context, typeSystem.getBinaryExpressionContextDependencies(op),
+      /*lhs=*/
       [&](const OpaqueContext &context) -> ast::Expression {
         return generateExpression(context, depth + 1);
       },
+      /*rhs=*/
       [&](const OpaqueContext &context) -> ast::Expression {
         return generateExpression(context, depth + 1);
       },
+      /*constructor=*/
       [&](ast::Expression &&lhs,
           ast::Expression &&rhs) -> std::optional<ast::BinaryExpression> {
         // Perform explicit casts to a legal operand type if neither of the
@@ -315,12 +318,15 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
 
   return generateWithDependencies<ast::ArrayReadExpression>(
       context, typeSystem.getArrayReadExpressionContextDependencies(),
+      /*array parameter=*/
       [&](const OpaqueContext &context) -> std::optional<ast::ArrayParameter> {
         return generateArrayParameter(context);
       },
+      /*index=*/
       [&](const OpaqueContext &context) -> std::optional<ast::Expression> {
         return generateExpression(context, depth + 1);
       },
+      /*constructor=*/
       [&](ast::ArrayParameter &&param, ast::Expression &&expression) {
         ast::ScalarType elementType = param.getElementType();
         std::size_t mask = param.getDimension() - 1;

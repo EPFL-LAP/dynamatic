@@ -98,7 +98,7 @@ public:
     return std::nullopt;
   }
 
-  DependencyArray<ast::BinaryExpression>
+  TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) final;
 
   ConclusionOf<ast::ConditionalExpression>
@@ -107,7 +107,7 @@ public:
   static ConclusionOf<ast::Function>
   checkFunction(const BitwidthTypingContext &context);
 
-  DependencyArray<ast::ArrayReadExpression>
+  TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionContextDependencies() override;
 
 private:

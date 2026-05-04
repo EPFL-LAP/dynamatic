@@ -426,6 +426,9 @@ public:
   /// element type of the array.
   const ScalarType &getType() const { return dataType; }
 
+  constexpr static std::size_t ARRAY_PARAMETER = 0;
+  constexpr static std::size_t INDEX = 1;
+
 private:
   ScalarType dataType;
   std::string arrayParameter;

@@ -61,7 +61,7 @@ constexpr std::size_t PARENT_DEPENDENCY = -1;
 /// input-context of 'ASTNode'.
 /// It is the user's responsibility to not create cyclic dependencies.
 template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
-class Dependency {
+class TransferFn {
 
   template <typename Tuple, std::size_t current, std::size_t... remaining>
   struct CalcCompFn {
@@ -114,13 +114,13 @@ public:
   ///
   /// The function should always return a 'TypingContext'. All parameters are
   /// passed as const-references.
-  explicit Dependency(std::function<ContextComputationFn> computationFn)
+  explicit TransferFn(std::function<ContextComputationFn> computationFn)
       : computationFn(std::move(computationFn)) {}
 
   /// Convenience constructor from a constant 'TypingContext' without any
   /// dependencies.
-  explicit Dependency(TypingContext context)
-      : Dependency(
+  explicit TransferFn(TypingContext context)
+      : TransferFn(
             [context = std::move(context)](auto &&...) { return context; }) {}
 
   template <typename... Args>
@@ -139,14 +139,14 @@ private:
   std::function<ContextComputationFn> computationFn;
 };
 
-/// Opaque-wrapper over 'Dependency' that can be constructed from any instance
-/// of 'Dependency' with the same 'ASTNode'.
-/// Users should construct 'Dependency' instances instead.
+/// Opaque-wrapper over 'TransferFn' that can be constructed from any instance
+/// of 'TransferFn' with the same 'ASTNode'.
+/// Users should construct 'TransferFn' instances instead.
 ///
 /// Mainly used as a return type in 'AbstractTypeSystem' where templates cannot
 /// or shouldn't be used.
 template <typename ASTNode>
-class OpaqueDependency {
+class OpaqueTransferFn {
   template <typename Tuple>
   struct OpaqueContextTupleImpl;
 
@@ -182,8 +182,8 @@ public:
 
   /// Constructs an 'OpaqueDependency' from a 'Dependency'.
   template <typename TypingContext, std::size_t... inputIndices>
-  /*implicit*/ OpaqueDependency(
-      Dependency<TypingContext, ASTNode, inputIndices...> &&dep)
+  /*implicit*/ OpaqueTransferFn(
+      TransferFn<TypingContext, ASTNode, inputIndices...> &&dep)
       : dep(std::move(dep)),
         computationFn(+[](const std::any &dep,
                           const SubElementsTuple &subElements,
@@ -211,7 +211,7 @@ public:
 
           return OpaqueContext(std::apply(
               *std::any_cast<
-                  Dependency<TypingContext, ASTNode, inputIndices...>>(&dep),
+                  TransferFn<TypingContext, ASTNode, inputIndices...>>(&dep),
               std::move(argTuple)));
         }) {
 
@@ -241,16 +241,17 @@ private:
   llvm::ArrayRef<std::size_t> inputIndices;
 };
 
-/// Array of dependencies returned by 'AbstractTypeSystem' for every 'ASTNode'.
+/// Array of transfer functions returned by 'AbstractTypeSystem' for every
+/// 'ASTNode'.
 /// The array contains as many elements as there are subelements in 'ASTNode'
 /// plus one.
-/// The corresponding index in the array corresponds to the 'OpaqueDependency'
+/// The corresponding index in the array corresponds to the 'OpaqueTransferFn'
 /// instance used to calculate the input context for that subelement.
 /// The special last element in the array corresponds to calculating the output
 /// 'context' for the 'ASTNode'.
 template <typename ASTNode>
-using DependencyArray = std::array<
-    OpaqueDependency<ASTNode>,
+using TransferFnArray = std::array<
+    OpaqueTransferFn<ASTNode>,
     std::tuple_size_v<typename TypeSystemTraits<ASTNode>::SubElements> + 1>;
 
 /// Abstract base class for all type systems. Users of a type system such as
@@ -274,11 +275,11 @@ using DependencyArray = std::array<
 /// and 'discard*' methods.
 class AbstractTypeSystem {
 protected:
-  /// Returns an instance of 'Dependency' which simply forwards the context from
+  /// Returns an instance of 'TransferFn' which simply forwards the context from
   /// the parent to the subelement.
   template <typename ASTNode>
   static auto copyFromParent() {
-    return Dependency<OpaqueContext, ASTNode, PARENT_DEPENDENCY>(
+    return TransferFn<OpaqueContext, ASTNode, PARENT_DEPENDENCY>(
         [](const OpaqueContext &context) { return context; });
   }
 
@@ -297,12 +298,12 @@ public:
   checkUnaryExpressionOpaque(ast::UnaryExpression::Op op,
                              const OpaqueContext &context) = 0;
 
-  virtual DependencyArray<ast::BinaryExpression>
+  virtual TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) {
     // Default implementation: Simply propagates the context to the subelements.
-    return {copyFromParent<ast::BinaryExpression>(),
-            copyFromParent<ast::BinaryExpression>(),
-            copyFromParent<ast::BinaryExpression>()};
+    return {/*lhs=*/copyFromParent<ast::BinaryExpression>(),
+            /*rhs=*/copyFromParent<ast::BinaryExpression>(),
+            /*output=*/copyFromParent<ast::BinaryExpression>()};
   }
 
   virtual std::optional<ConclusionOf<ast::Variable, OpaqueContext>>
@@ -332,12 +333,11 @@ public:
   virtual bool
   discardArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
 
-  virtual DependencyArray<ast::ArrayReadExpression>
+  virtual TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionContextDependencies() {
-    return DependencyArray<ast::ArrayReadExpression>{
-        copyFromParent<ast::ArrayReadExpression>(),
-        copyFromParent<ast::ArrayReadExpression>(),
-        copyFromParent<ast::ArrayReadExpression>()};
+    return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
+            /*index=*/copyFromParent<ast::ArrayReadExpression>(),
+            /*output=*/copyFromParent<ast::ArrayReadExpression>()};
   }
 
   virtual std::optional<ConclusionOf<ast::ArrayParameter, OpaqueContext>>
@@ -360,10 +360,10 @@ public:
 /// entirely based on the current type context.
 ///
 /// There are currently two APIs to achieve this:
-/// 1) The dependency API
+/// 1) The transfer functions API
 /// 2) the 'check*' API.
 /// The latter is considered deprecated and implements a subset of
-/// functionality of the dependency API.
+/// functionality of the transfer functions API.
 ///
 /// Regardless of API, all type checking is performed under a given context
 /// specified as the 'TypingContext' template parameter.
@@ -372,9 +372,9 @@ public:
 /// may discard the AST node.
 /// Otherwise, new contexts for the subelements of the AST node can be derived.
 ///
-/// The dependency API allows specifying an implicit order in which contexts
-/// should be calculated.
-/// Specifically, an instance of 'Dependency' can specify that it depends on the
+/// The transfer functions API allows specifying how input contexts for AST
+/// elements should be calculated.
+/// Specifically, an instance of 'TransferFn' can specify that it depends on the
 /// context and AST node of a sibling subelement in addition to, or instead of
 /// the parent input context.
 /// Example:
@@ -436,7 +436,7 @@ public:
   using ConclusionOf = ConclusionOf<ASTNode, TypingContext>;
 
   template <typename ASTNode, std::size_t... inputIndices>
-  using Dependency = Dependency<TypingContext, ASTNode, inputIndices...>;
+  using Dependency = TransferFn<TypingContext, ASTNode, inputIndices...>;
 
   /// Shorthand for derived classes to be able to call the default
   /// implementation of methods.

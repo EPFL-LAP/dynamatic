@@ -41,7 +41,7 @@ public:
   checkUnaryExpression(ast::UnaryExpression::Op op,
                        DynamaticTypingContext context) const;
 
-  DependencyArray<ast::BinaryExpression>
+  TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) final;
 
   ConclusionOf<ast::ConditionalExpression>
@@ -55,15 +55,13 @@ public:
     };
   }
 
-  DependencyArray<ast::ArrayReadExpression>
+  TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionContextDependencies() final {
-    return DependencyArray<ast::ArrayReadExpression>{
-        copyFromParent<ast::ArrayReadExpression>(),
-        Dependency<ast::ArrayReadExpression>([] {
-          return DynamaticTypingContext{
-              DynamaticTypingContext::IntegerRequired};
-        }),
-        copyFromParent<ast::ArrayReadExpression>()};
+    return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
+            /*index=*/
+            Dependency<ast::ArrayReadExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            /*output=*/copyFromParent<ast::ArrayReadExpression>()};
   }
 
   static std::optional<ConclusionOf<ast::ArrayAssignmentStatement>>

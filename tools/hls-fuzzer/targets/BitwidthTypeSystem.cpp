@@ -89,11 +89,12 @@ bool dynamatic::gen::BitwidthTypeSystem::discardBinaryExpression(
 }
 
 auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
-    ast::BinaryExpression::Op op) -> DependencyArray<ast::BinaryExpression> {
+    ast::BinaryExpression::Op op) -> TransferFnArray<ast::BinaryExpression> {
   switch (op) {
   case ast::BinaryExpression::BitAnd:
     return {
-        Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*lhs=*/Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*rhs=*/
         Dependency<ast::BinaryExpression, PARENT_DEPENDENCY>(
             [&](const BitwidthTypingContext &context) -> BitwidthTypingContext {
               // Bitand is distributive: Sub-expressions can assume they are
@@ -105,16 +106,16 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
 
               return getInterestingBitWidthInRange(*req);
             }),
-        copyFromParent<ast::BinaryExpression>(),
+        /*output=*/copyFromParent<ast::BinaryExpression>(),
     };
 
   case ast::BinaryExpression::Plus:
   case ast::BinaryExpression::Minus:
   case ast::BinaryExpression::Mul:
-    return DependencyArray<ast::BinaryExpression>{
-        Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
-        Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
-        copyFromParent<ast::BinaryExpression>(),
+    return {
+        /*lhs=*/Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*rhs=*/Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*output=*/copyFromParent<ast::BinaryExpression>(),
     };
   case ast::BinaryExpression::Greater:
   case ast::BinaryExpression::GreaterEqual:
@@ -137,11 +138,12 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
     //       of the operands are signed or not. We could track this
     //       theoretically.
     return {
+        /*lhs=*/Dependency<ast::BinaryExpression>(
+            getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
+        /*rhs=*/
         Dependency<ast::BinaryExpression>(
             getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
-        Dependency<ast::BinaryExpression>(
-            getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
-        copyFromParent<ast::BinaryExpression>(),
+        /*parent=*/copyFromParent<ast::BinaryExpression>(),
     };
 
   case ast::BinaryExpression::BitOr:
@@ -173,10 +175,12 @@ auto dynamatic::gen::BitwidthTypeSystem::checkFunction(
 
 auto dynamatic::gen::BitwidthTypeSystem::
     getArrayReadExpressionContextDependencies()
-        -> DependencyArray<ast::ArrayReadExpression> {
-  return DependencyArray<ast::ArrayReadExpression>{
-      copyFromParent<ast::ArrayReadExpression>(),
-      Dependency<ast::ArrayReadExpression, /*arrayParameter*/ 0>(
+        -> TransferFnArray<ast::ArrayReadExpression> {
+  return {
+      /*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
+      /*index=*/
+      Dependency<ast::ArrayReadExpression,
+                 ast::ArrayReadExpression::ARRAY_PARAMETER>(
           [&](const BitwidthTypingContext &,
               const ast::ArrayParameter &parameter) {
             assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
@@ -184,7 +188,7 @@ auto dynamatic::gen::BitwidthTypeSystem::
             return BitwidthTypingContext{std::min<std::uint8_t>(
                 llvm::Log2_64(parameter.getDimension()), globalMaxBitwidth)};
           }),
-      copyFromParent<ast::ArrayReadExpression>(),
+      /*output=*/copyFromParent<ast::ArrayReadExpression>(),
   };
 }
 

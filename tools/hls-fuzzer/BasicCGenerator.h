@@ -156,64 +156,75 @@ private:
   struct GenerateWithDependencies<ASTNode, std::tuple<SubElements...>> {
     std::optional<ASTNode>
     operator()(const OpaqueContext &parentContext,
-               const DependencyArray<ASTNode> &dependencies,
+               const TransferFnArray<ASTNode> &transferFunctions,
                llvm::function_ref<
                    std::optional<SubElements>(OpaqueContext)>... generators,
                llvm::function_ref<std::optional<ASTNode>(SubElements &&...)>
                    constructor) const {
-      typename OpaqueDependency<ASTNode>::SubElementsTuple subElements;
+      typename OpaqueTransferFn<ASTNode>::SubElementsTuple subElements;
 
       // TODO: For now subelement generators cannot yet return an output
       //       context. We assume output context == input context.
-      typename OpaqueDependency<ASTNode>::ContextTuple contexts;
+      typename OpaqueTransferFn<ASTNode>::ContextTuple contexts;
       std::get<sizeof...(SubElements)>(contexts) = parentContext;
 
       // Calculate a topological order between all dependencies.
       // To do so we use a worklist of elements whose dependencies are all
       // satisfied and an edge list that for every node 'i', contains all
       // outgoing edges.
-      // This is opposite from 'OpaqueDependency' which returns the incoming
+      // This is opposite from 'OpaqueTransferFn' which returns the incoming
       // edges.
 
       // Note: We use 'std::array' here everywhere since the bounds are known
       // and small.
+      using NodeList = std::array<std::size_t, sizeof...(SubElements)>;
       std::size_t workListSize = 0;
-      std::array<std::size_t, sizeof...(SubElements)> worklist;
+      NodeList worklist{};
 
-      std::array<std::size_t, sizeof...(SubElements)> forwardEdgeCount{};
-      std::array<std::array<std::size_t, sizeof...(SubElements)>,
-                 sizeof...(SubElements)>
-          forwardEdgeList{};
-      std::array<std::size_t, sizeof...(SubElements)> incomingEdgeCount{};
+      // For a given node 'i', contains the number of outgoing edges from that
+      // node.
+      NodeList forwardEdgeCount{};
+      // For a given node 'i', contains the destinations of each outgoing edge
+      // from that node.
+      std::array<NodeList, sizeof...(SubElements)> forwardEdgeList{};
+      // For a given node 'i', contains the number of incoming edges into 'i'.
+      NodeList incomingEdgeCount{};
       for (auto &&[index, iter] :
-           llvm::enumerate(llvm::ArrayRef(dependencies).drop_back())) {
+           llvm::enumerate(llvm::ArrayRef(transferFunctions).drop_back())) {
         if (iter.getInputDependencies().empty() ||
             iter.getInputDependencies() == llvm::ArrayRef{PARENT_DEPENDENCY}) {
           // No dependency (besides the parent context which is satisfied).
           worklist[workListSize++] = index;
-        } else {
-          // Build the outgoing edge list but do keep track of the number of
-          // incoming edges.
-          for (auto fromIndex : iter.getInputDependencies())
-            if (fromIndex != PARENT_DEPENDENCY) {
-              forwardEdgeList[fromIndex][forwardEdgeCount[fromIndex]++] = index;
-              ++incomingEdgeCount[index];
-            }
+          continue;
+        }
+
+        // Build the outgoing edge list but do keep track of the number of
+        // incoming edges.
+        for (auto fromIndex : iter.getInputDependencies()) {
+          if (fromIndex == PARENT_DEPENDENCY)
+            continue;
+
+          forwardEdgeList[fromIndex][forwardEdgeCount[fromIndex]++] = index;
+          ++incomingEdgeCount[index];
         }
       }
 
       std::size_t topoOrderSize = 0;
-      std::array<std::size_t, sizeof...(SubElements)> topoOrder;
+      NodeList topoOrder{};
       while (workListSize > 0) {
         std::size_t index = worklist[--workListSize];
         topoOrder[topoOrderSize++] = index;
         // "Remove" all outgoing edges from 'index'.
-        // If a node has no more incoming edges add it to the worklist.
+        // If a node has no more incoming edges, then it can be scheduled and
+        // added to the worklist.
         for (auto &&m : llvm::ArrayRef(forwardEdgeList[index])
                             .take_front(forwardEdgeCount[index]))
           if (--incomingEdgeCount[m] == 0)
             worklist[workListSize++] = m;
       }
+
+      assert(topoOrderSize == sizeof...(SubElements) &&
+             "transfer function dependency graph contains cycles");
 
       // Finally, generate the subelements in topological order.
       for (std::size_t iter : topoOrder) {
@@ -231,7 +242,7 @@ private:
 
                 auto &context = std::get<index>(contexts);
                 // First generate the context for the subelement.
-                context = dependencies[iter](subElements, contexts);
+                context = transferFunctions[iter](subElements, contexts);
                 // Now generate the subelement.
                 std::get<index>(subElements) =
                     std::get<index>(std::make_tuple(generators...))(*context);
@@ -248,7 +259,7 @@ private:
       }
       // Lastly, generate the output context.
       std::get<sizeof...(SubElements)>(contexts) =
-          dependencies[sizeof...(SubElements)](subElements, contexts);
+          transferFunctions[sizeof...(SubElements)](subElements, contexts);
 
       // And call the constructor with all subelements.
       // It should be safe to dereference all optionals since they have been

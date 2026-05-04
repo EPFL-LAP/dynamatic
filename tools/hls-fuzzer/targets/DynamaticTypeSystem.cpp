@@ -46,7 +46,7 @@ bool dynamatic::gen::DynamaticTypeSystem::discardBinaryExpression(
   llvm_unreachable("all enum values handled");
 }
 
-dynamatic::gen::DependencyArray<dynamatic::ast::BinaryExpression>
+dynamatic::gen::TransferFnArray<dynamatic::ast::BinaryExpression>
 dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionContextDependencies(
     ast::BinaryExpression::Op op) {
   switch (op) {
@@ -55,13 +55,14 @@ dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionContextDependencies(
   case ast::BinaryExpression::BitXor:
   case ast::BinaryExpression::ShiftLeft:
   case ast::BinaryExpression::ShiftRight:
-    return DependencyArray<ast::BinaryExpression>{
-        Dependency<ast::BinaryExpression>(
-            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
-        Dependency<ast::BinaryExpression>(
-            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
-        Dependency<ast::BinaryExpression>(
-            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired})};
+    return {/*lhs=*/Dependency<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            /*rhs=*/
+            Dependency<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            /*output=*/
+            Dependency<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired})};
   default:
     return Super::getBinaryExpressionContextDependencies(op);
   }
