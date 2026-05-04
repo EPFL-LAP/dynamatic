@@ -85,8 +85,8 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
-std::unique_ptr<ConstrainedNamer>
-InternalStateNamer::tryConstrain(int32_t value) {
+std::unique_ptr<InternalStateNamer>
+InternalStateNamer::tryConstrain(int32_t value) const {
   if (auto *namer = dyn_cast<EagerForkSentNamer>(this)) {
     return std::make_unique<ConstrainedEagerForkSentNamer>(
         namer->constrain(value));
@@ -94,6 +94,9 @@ InternalStateNamer::tryConstrain(int32_t value) {
   if (auto *namer = dyn_cast<BufferSlotFullNamer>(this)) {
     return std::make_unique<ConstrainedBufferSlotFullNamer>(
         namer->constrain(value));
+  }
+  if (auto *namer = dyn_cast<EffectiveSlotNamer>(this)) {
+    return namer->constrain(value);
   }
 
   return nullptr;
@@ -111,7 +114,8 @@ EagerForkSentNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
-ConstrainedEagerForkSentNamer EagerForkSentNamer::constrain(int32_t value) {
+ConstrainedEagerForkSentNamer
+EagerForkSentNamer::constrain(int32_t value) const {
   ConstrainedEagerForkSentNamer p(*this, value);
   return p;
 }
@@ -128,7 +132,8 @@ BufferSlotFullNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
-ConstrainedBufferSlotFullNamer BufferSlotFullNamer::constrain(int32_t value) {
+ConstrainedBufferSlotFullNamer
+BufferSlotFullNamer::constrain(int32_t value) const {
   ConstrainedBufferSlotFullNamer p(*this, value);
   return p;
 }
@@ -186,7 +191,7 @@ std::string EffectiveSlotNamer::getSMVName() const {
   std::vector<std::string> sentNames;
   sentNames.reserve(copiedSents.size());
   for (auto &sent : copiedSents) {
-    sentNames.push_back(sent.getSMVName());
+    sentNames.push_back(llvm::formatv("!{0}", sent.getSMVName()));
   }
   return llvm::formatv("({0} & {1})", slot->getSMVName(),
                        llvm::join(sentNames, " & "));

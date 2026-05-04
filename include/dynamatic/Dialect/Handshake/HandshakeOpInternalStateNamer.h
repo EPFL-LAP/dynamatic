@@ -66,7 +66,7 @@ struct InternalStateNamer {
 
   static inline bool classof(const InternalStateNamer *fp) { return true; }
 
-  std::unique_ptr<ConstrainedNamer> tryConstrain(int32_t value);
+  std::unique_ptr<InternalStateNamer> tryConstrain(int32_t value) const;
 
   TYPE type;
   static constexpr llvm::StringLiteral TYPE_LIT = "type";
@@ -149,7 +149,7 @@ struct EagerForkSentNamer : InternalStateNamer {
   std::string channelName;
   size_t channelSize;
 
-  ConstrainedEagerForkSentNamer constrain(int32_t value);
+  ConstrainedEagerForkSentNamer constrain(int32_t value) const;
 
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral CHANNEL_NAME_LIT = "channel_name";
@@ -206,7 +206,7 @@ struct BufferSlotFullNamer : InternalStateNamer {
     return fp->type == TYPE::BufferSlotFull;
   }
 
-  ConstrainedBufferSlotFullNamer constrain(int32_t value);
+  ConstrainedBufferSlotFullNamer constrain(int32_t value) const;
 
   inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}_full", opName, slotName).str();
@@ -351,6 +351,15 @@ struct EffectiveSlotNamer : InternalStateNamer {
 
   inline void addCopiedSent(EagerForkSentNamer sent) {
     copiedSents.push_back(std::move(sent));
+  }
+
+  std::unique_ptr<InternalStateNamer> constrain(int32_t value) const {
+    auto constrainedSlot = slot->tryConstrain(value);
+    EffectiveSlotNamer constrainedNamer(std::move(constrainedSlot));
+    for (const auto &sent : copiedSents) {
+      constrainedNamer.addCopiedSent(sent);
+    }
+    return std::make_unique<EffectiveSlotNamer>(constrainedNamer);
   }
 
   std::string getSMVName() const override;

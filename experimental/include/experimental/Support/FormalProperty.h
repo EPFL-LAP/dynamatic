@@ -274,7 +274,8 @@ private:
 
 class EntryTokenOrder : public FormalProperty {
 public:
-  const std::vector<EffectiveSlotNamer> &getSlots() { return slots; }
+  const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }
+  int32_t getValue() const { return 1; }
   llvm::json::Value extraInfoToJSON() const override;
   static std::unique_ptr<EntryTokenOrder>
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
