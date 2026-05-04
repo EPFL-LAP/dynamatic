@@ -170,7 +170,8 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
   case ast::BinaryExpression::Minus: {
     ast::ScalarType lhsType = lhs.getType();
     ast::ScalarType rhsType = rhs.getType();
-    if (std::max(lhsType.getBitwidth(), rhsType.getBitwidth()) + 1 >= 32) {
+    if (lhsType.isInteger() && rhsType.isInteger() &&
+        std::max(lhsType.getBitwidth(), rhsType.getBitwidth()) + 1 >= 32) {
       // Explicitly promote integers to 'uint32_t' if the operation may
       // overflow to avoid undefined behavior.
       // Otherwise, the operation is performed on 'int32_t' due to C's promotion
@@ -183,7 +184,8 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
   case ast::BinaryExpression::Mul: {
     ast::ScalarType lhsType = lhs.getType();
     ast::ScalarType rhsType = rhs.getType();
-    if (lhsType.getBitwidth() + rhsType.getBitwidth() >= 32) {
+    if (lhsType.isInteger() && rhsType.isInteger() &&
+        lhsType.getBitwidth() + rhsType.getBitwidth() >= 32) {
       // Explicitly promote integers to 'uint32_t' if the operation may
       // overflow to avoid undefined behavior.
       // Otherwise, the operation is performed on 'int32_t' due to C's promotion
