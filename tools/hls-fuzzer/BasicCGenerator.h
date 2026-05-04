@@ -148,8 +148,7 @@ private:
     return std::tuple{std::integral_constant<std::size_t, is>{}...};
   }
 
-  template <typename ASTNode,
-            typename = typename TypeSystemTraits<ASTNode>::SubElements>
+  template <typename ASTNode, typename = typename ASTNode::SubElements>
   struct GenerateWithDependencies;
 
   template <typename ASTNode, typename... SubElements>

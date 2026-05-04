@@ -77,12 +77,10 @@ class TransferFn {
                 std::tuple<
                     const TypingContext &,
                     const std::tuple_element_t<
-                        std::min(current,
-                                 std::tuple_size_v<typename TypeSystemTraits<
-                                         ASTNode>::SubElements> -
-                                     1),
-                        typename TypeSystemTraits<ASTNode>::SubElements>
-                        &>>>())),
+                        std::min(current, std::tuple_size_v<
+                                              typename ASTNode::SubElements> -
+                                              1),
+                        typename ASTNode::SubElements> &>>>())),
         remaining...>::type;
   };
 
@@ -130,8 +128,7 @@ public:
 
 private:
   static_assert(((inputIndices <
-                      std::tuple_size_v<
-                          typename TypeSystemTraits<ASTNode>::SubElements> ||
+                      std::tuple_size_v<typename ASTNode::SubElements> ||
                   inputIndices == PARENT_DEPENDENCY) &&
                  ...),
                 "input indices must refer to subelements or the parent");
@@ -170,15 +167,15 @@ public:
   /// This is used to have one consistent API with which to call an
   /// 'OpaqueDependency' to calculate a context.
   /// Elements are optional, since they may not yet have been constructed.
-  using SubElementsTuple = typename NonTerminalsTupleImpl<
-      typename TypeSystemTraits<ASTNode>::SubElements>::type;
+  using SubElementsTuple =
+      typename NonTerminalsTupleImpl<typename ASTNode::SubElements>::type;
 
   /// Tuple of optionals of all contexts of this ASTNode.
   /// This is used to have one consistent API with which to call an
   /// 'OpaqueDependency' to calculate a context.
   /// Elements are optional, since they may not yet have been calculated.
-  using ContextTuple = typename OpaqueContextTupleImpl<
-      typename TypeSystemTraits<ASTNode>::SubElements>::type;
+  using ContextTuple =
+      typename OpaqueContextTupleImpl<typename ASTNode::SubElements>::type;
 
   /// Constructs an 'OpaqueDependency' from a 'Dependency'.
   template <typename TypingContext, std::size_t... inputIndices>
@@ -250,9 +247,9 @@ private:
 /// The special last element in the array corresponds to calculating the output
 /// 'context' for the 'ASTNode'.
 template <typename ASTNode>
-using TransferFnArray = std::array<
-    OpaqueTransferFn<ASTNode>,
-    std::tuple_size_v<typename TypeSystemTraits<ASTNode>::SubElements> + 1>;
+using TransferFnArray =
+    std::array<OpaqueTransferFn<ASTNode>,
+               std::tuple_size_v<typename ASTNode::SubElements> + 1>;
 
 /// Abstract base class for all type systems. Users of a type system such as
 /// the C generator use this interface in conjunction with 'OpaqueContext' to be

@@ -77,11 +77,6 @@ struct TypeSystemTraits<ast::Variable> : TypeSystemTraitsDefaults {
 };
 
 template <>
-struct TypeSystemTraits<ast::BinaryExpression> : TypeSystemTraitsDefaults {
-  using SubElements = std::tuple<ast::Expression, ast::Expression>;
-};
-
-template <>
 struct TypeSystemTraits<ast::UnaryExpression> : TypeSystemTraitsDefaults {
 
   /// Type constraint for the expression the operation is applied on.
@@ -131,11 +126,6 @@ struct TypeSystemTraits<ast::ScalarParameter> {
   /// test bench generation.
   template <typename TypingContext>
   using Conclusions = TypingContext;
-};
-
-template <>
-struct TypeSystemTraits<ast::ArrayReadExpression> {
-  using SubElements = std::tuple<ast::ArrayParameter, ast::Expression>;
 };
 
 template <>
