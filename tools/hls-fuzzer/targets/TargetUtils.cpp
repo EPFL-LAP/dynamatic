@@ -65,8 +65,7 @@ void dynamatic::outputDynamaticInvocation(
   }
 
   os << "set -o pipefail\n";
-  os << "OUTPUT=$(" << dynamaticPath
-     << " --exit-on-failure <<EOF 2>&1\n";
+  os << "OUTPUT=$(" << dynamaticPath << " --exit-on-failure <<EOF 2>&1\n";
   os << "set-dynamatic-path " << dynamaticSourceRoot.string() << '\n';
   os << "set-src " << sourceFile.filename().string();
   os << "\n" << script.trim() << "\nexit\nEOF\n";
