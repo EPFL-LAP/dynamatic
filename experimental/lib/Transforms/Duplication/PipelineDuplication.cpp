@@ -1,6 +1,5 @@
 // Include some other useful headers.
 #include "dynamatic/Analysis/NameAnalysis.h" // needed
-#include "mlir/Dialect/MemRef/IR/MemRef.h" // needed
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -14,6 +13,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h" // needed
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -21,8 +21,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
-#include <fstream>
-#include <ostream>
 
 using namespace llvm;
 using namespace dynamatic;
@@ -38,9 +36,9 @@ namespace experimental {
 // [END Boilerplate code for the MLIR pass]
 namespace {
 
-struct PipelineDuplicationPass 
+struct PipelineDuplicationPass
     : public dynamatic::experimental::impl::PipelineDuplicationBase<
-    PipelineDuplicationPass> {
+          PipelineDuplicationPass> {
 
   using PipelineDuplicationBase::PipelineDuplicationBase;
 
@@ -57,7 +55,8 @@ struct PipelineDuplicationPass
       return signalPassFailure();
     }
     auto op = dyn_cast<mlir::arith::AddFOp>(rawOp);
-    if (!op) return signalPassFailure();
+    if (!op)
+      return signalPassFailure();
     // Navigate the IR to find the store operation downstream
     for (auto *user : op.getResult().getUsers()) {
       if (auto truncOp = dyn_cast<mlir::arith::TruncFOp>(user)) {
@@ -65,54 +64,22 @@ struct PipelineDuplicationPass
           if (auto storeOp = dyn_cast<mlir::memref::StoreOp>(truncUser)) {
             // Value sharedIndex = storeOp.getIndices()[0];
             // Value targetMemref = storeOp.getMemref();
-            
-            builder.setInsertionPoint(storeOp); 
+
+            builder.setInsertionPoint(storeOp);
             Location loc = op.getLoc();
 
-            // Find the preceding MulFOp to extract constants
-            auto mulfOp = op.getLhs().getDefiningOp<mlir::arith::MulFOp>();
-            if (!mulfOp)
-            return signalPassFailure();
-
-            // Value cnstNegTwo = mulfOp.getRhs();
-            // Value cnstFifteen = op.getRhs();
-            auto newCnstNegTwo = builder.create<mlir::arith::ConstantOp>(
-            loc, builder.getFloatAttr(builder.getF64Type(), -2.0));
-            inheritBB(storeOp, newCnstNegTwo);
-            Value cnstNegTwo = newCnstNegTwo.getResult();
-
-            auto newCnstFifteen = builder.create<mlir::arith::ConstantOp>(
-            loc, builder.getFloatAttr(builder.getF64Type(), 15.0));
-            inheritBB(storeOp, newCnstFifteen);
-            Value cnstFifteen = newCnstFifteen.getResult();
-            
             auto newCnstFive = builder.create<mlir::arith::ConstantOp>(
-            loc, builder.getFloatAttr(builder.getF64Type(), 5.0));
+                loc, builder.getFloatAttr(builder.getF32Type(), 5.0));
             inheritBB(storeOp, newCnstFive);
-            Value cnstFive = newCnstFive.getResult(); 
+            Value cnstFive = newCnstFive.getResult();
 
-            auto newMulfOp =
-               builder.create<mlir::arith::MulFOp>(loc, cnstFive, cnstNegTwo);
-            inheritBB(storeOp, newMulfOp);
-            Value newMulf = newMulfOp.getResult();
-
-            auto newAddfOp =
-              builder.create<mlir::arith::AddFOp>(loc, newMulf, cnstFifteen);
-            inheritBB(storeOp, newAddfOp);
-            Value newAddf = newAddfOp.getResult();
-
-            auto newTruncOp =
-               builder.create<mlir::arith::TruncFOp>(loc, builder.getF32Type(), newAddf);
-            inheritBB(storeOp, newTruncOp);
-            Value newTrunc = newTruncOp.getResult();
- 
             Value sharedIndex = storeOp.getIndices()[0];
             Value targetMemref = storeOp.getMemref();
 
             // Create the new duplicated store branch
             auto newStore = builder.create<mlir::memref::StoreOp>(
-                loc, newTrunc, targetMemref, sharedIndex);
-            auto originalDeps = storeOp->getAttr("handshake.deps"); 
+                loc, cnstFive, targetMemref, sharedIndex);
+            auto originalDeps = storeOp->getAttr("handshake.deps");
             newStore->setAttr("handshake.deps", originalDeps);
 
             // Inherit Basic Block information
@@ -121,8 +88,8 @@ struct PipelineDuplicationPass
           }
         }
       }
-    } 
+    }
   }
 };
-  
+
 } // namespace
