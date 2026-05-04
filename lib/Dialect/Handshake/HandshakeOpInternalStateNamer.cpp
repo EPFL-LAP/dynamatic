@@ -1,4 +1,5 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
+#include "llvm/ADT/StringExtras.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -14,6 +15,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::Constrained;
   if (s == MEMORY_CONTROLLER_SLOT)
     return TYPE::MemoryControllerSlot;
+  if (s == EFFECTIVE_SLOT)
+    return TYPE::EffectiveSlot;
   return std::nullopt;
 }
 
@@ -29,6 +32,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return CONSTRAINED.str();
   case TYPE::MemoryControllerSlot:
     return MEMORY_CONTROLLER_SLOT.str();
+  case TYPE::EffectiveSlot:
+    return EFFECTIVE_SLOT.str();
   }
 }
 
@@ -71,13 +76,17 @@ InternalStateNamer::fromJSON(const llvm::json::Value &value,
     prop = MemoryControllerSlotNamer::fromInnerJSON(inner, path);
     assert(prop && "mc slot failed");
     break;
+  case TYPE::EffectiveSlot:
+    prop = EffectiveSlotNamer::fromInnerJSON(inner, path);
+    assert(prop && "effective slot failed");
+    break;
   }
   prop->type = type;
   return prop;
 }
 
-std::unique_ptr<ConstrainedNamer>
-InternalStateNamer::tryConstrain(int32_t value) {
+std::unique_ptr<InternalStateNamer>
+InternalStateNamer::tryConstrain(int32_t value) const {
   if (auto *namer = dyn_cast<EagerForkSentNamer>(this)) {
     return std::make_unique<ConstrainedEagerForkSentNamer>(
         namer->constrain(value));
@@ -85,6 +94,9 @@ InternalStateNamer::tryConstrain(int32_t value) {
   if (auto *namer = dyn_cast<BufferSlotFullNamer>(this)) {
     return std::make_unique<ConstrainedBufferSlotFullNamer>(
         namer->constrain(value));
+  }
+  if (auto *namer = dyn_cast<EffectiveSlotNamer>(this)) {
+    return namer->constrain(value);
   }
 
   return nullptr;
@@ -102,7 +114,8 @@ EagerForkSentNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
-ConstrainedEagerForkSentNamer EagerForkSentNamer::constrain(int32_t value) {
+ConstrainedEagerForkSentNamer
+EagerForkSentNamer::constrain(int32_t value) const {
   ConstrainedEagerForkSentNamer p(*this, value);
   return p;
 }
@@ -119,7 +132,8 @@ BufferSlotFullNamer::fromInnerJSON(const llvm::json::Value &value,
   return prop;
 }
 
-ConstrainedBufferSlotFullNamer BufferSlotFullNamer::constrain(int32_t value) {
+ConstrainedBufferSlotFullNamer
+BufferSlotFullNamer::constrain(int32_t value) const {
   ConstrainedBufferSlotFullNamer p(*this, value);
   return p;
 }
@@ -166,6 +180,51 @@ MemoryControllerSlotNamer::fromInnerJSON(const llvm::json::Value &value,
       !mapper.map(LOADLESS_LIT, prop->loadless))
     return nullptr;
   prop->portType = (PortType)t;
+  return prop;
+}
+
+std::string EffectiveSlotNamer::getSMVName() const {
+  if (copiedSents.empty()) {
+    return slot->getSMVName();
+  }
+
+  std::vector<std::string> sentNames;
+  sentNames.reserve(copiedSents.size());
+  for (auto &sent : copiedSents) {
+    sentNames.push_back(llvm::formatv("!{0}", sent.getSMVName()));
+  }
+  return llvm::formatv("({0} & {1})", slot->getSMVName(),
+                       llvm::join(sentNames, " & "));
+}
+llvm::json::Value EffectiveSlotNamer::toInnerJSON() const {
+  std::vector<llvm::json::Value> copiedSentsJSON;
+  copiedSentsJSON.reserve(copiedSents.size());
+  for (auto &sent : copiedSents) {
+    copiedSentsJSON.push_back(sent.toInnerJSON());
+  }
+
+  return llvm::json::Object(
+      {{SLOT_LIT, slot->toJSON()}, {COPIED_SENTS_LIT, copiedSentsJSON}});
+}
+
+std::unique_ptr<EffectiveSlotNamer>
+EffectiveSlotNamer::fromInnerJSON(const llvm::json::Value &value,
+                                  llvm::json::Path path) {
+  auto prop = std::make_unique<EffectiveSlotNamer>();
+  auto *obj = value.getAsObject();
+  assert(obj);
+  auto *slotJSON = obj->get(SLOT_LIT);
+  assert(slotJSON);
+  prop->slot = InternalStateNamer::fromJSON(*slotJSON, path);
+
+  const llvm::json::Value *copiedSentsJSON = obj->get(COPIED_SENTS_LIT);
+  assert(copiedSentsJSON);
+  auto *array = copiedSentsJSON->getAsArray();
+  assert(array);
+  for (const llvm::json::Value &sentJSON : *array) {
+    prop->copiedSents.push_back(
+        *EagerForkSentNamer::fromInnerJSON(sentJSON, path));
+  }
   return prop;
 }
 
