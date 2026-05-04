@@ -74,8 +74,18 @@ struct PipelineDuplicationPass
             if (!mulfOp)
             return signalPassFailure();
 
-            Value cnstNegTwo = mulfOp.getRhs();
-            Value cnstFifteen = op.getRhs();
+            // Value cnstNegTwo = mulfOp.getRhs();
+            // Value cnstFifteen = op.getRhs();
+            auto newCnstNegTwo = builder.create<mlir::arith::ConstantOp>(
+            loc, builder.getFloatAttr(builder.getF64Type(), -2.0));
+            inheritBB(storeOp, newCnstNegTwo);
+            Value cnstNegTwo = newCnstNegTwo.getResult();
+
+            auto newCnstFifteen = builder.create<mlir::arith::ConstantOp>(
+            loc, builder.getFloatAttr(builder.getF64Type(), 15.0));
+            inheritBB(storeOp, newCnstFifteen);
+            Value cnstFifteen = newCnstFifteen.getResult();
+            
             auto newCnstFive = builder.create<mlir::arith::ConstantOp>(
             loc, builder.getFloatAttr(builder.getF64Type(), 5.0));
             inheritBB(storeOp, newCnstFive);
