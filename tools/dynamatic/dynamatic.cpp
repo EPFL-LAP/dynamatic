@@ -352,6 +352,7 @@ public:
 class Simulate : public Command {
 public:
   static constexpr llvm::StringLiteral SIMULATOR = "simulator";
+  static constexpr llvm::StringLiteral TIMEOUT = "timeout";
 
   Simulate(FrontendState &state)
       : Command("simulate",
@@ -362,6 +363,8 @@ public:
     addOption({SIMULATOR, "The simulator to use for verification, options are "
                           "'ghdl' (GHDL), 'vsim' (default option: ModelSim), "
                           "'xsim' (Vivado), 'verilator' (Verilator)"});
+    addOption({TIMEOUT, "The timeout for the simulation in cycles. Use 0 "
+                        "(default) for no timeout"});
   }
   CommandResult execute(CommandArguments &args) override;
 };
@@ -800,6 +803,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
+  std::size_t timeout = 0;
   std::string simulator = "vsim";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
 
@@ -811,6 +815,13 @@ CommandResult Simulate::execute(CommandArguments &args) {
       llvm::errs() << "Unknow Simulator '" << it->second
                    << "', possible options are 'ghdl', "
                       "'xsim', 'vsim' and 'verilator'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  if (auto it = args.options.find(TIMEOUT); it != args.options.end()) {
+    if (it->second.getAsInteger(10, timeout)) {
+      llvm::errs() << "Invalid timeout '" << it->second << "'.\n";
       return CommandResult::FAIL;
     }
   }
@@ -831,7 +842,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator, state.hdl);
+                 simulator, state.hdl, std::to_string(timeout));
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {
