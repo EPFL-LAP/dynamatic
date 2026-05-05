@@ -64,10 +64,23 @@ void dynamatic::outputDynamaticInvocation(
       break;
   }
 
-  os << dynamaticPath << " --exit-on-failure <<EOF\n";
+  os << "set -o pipefail\n";
+  os << "exec 5>&1\n";
+  os << "OUTPUT=$(" << dynamaticPath
+     << " --exit-on-failure <<EOF 2>&1 | tee >(cat - >&5)\n";
   os << "set-dynamatic-path " << dynamaticSourceRoot.string() << '\n';
   os << "set-src " << sourceFile.filename().string();
   os << "\n" << script.trim() << "\nexit\nEOF\n";
+  os << R"()
+RET=$?
+# Ignore known issue. See https://github.com/EPFL-LAP/dynamatic/issues/886
+if echo "$OUTPUT" | grep -q "Pointer values are unsupported"; then
+  exit 0
+fi
+if [ "$RET" -ne "0" ]; then
+  exit $RET;
+fi
+)";
 }
 
 dynamatic::AbstractWorker::VerificationResult
@@ -94,7 +107,9 @@ cd $SCRIPT_DIR && )a"
 
   int exitCode = llvm::sys::ExecuteAndWait(
       "/usr/bin/bash", {SHELL, executeCWDFile}, /*Env=*/std::nullopt,
-      /*Redirects=*/{"", "", ""});
+      /*Redirects=*/
+      {"", (workingDirectory / "dynamatic-out.txt").string(),
+       (workingDirectory / "dynamatic-err.txt").string()});
   switch (exitCode) {
     // Normal exit.
   case 0:
