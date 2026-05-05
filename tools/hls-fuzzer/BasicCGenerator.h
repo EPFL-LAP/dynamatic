@@ -98,7 +98,7 @@ private:
   std::optional<ast::CastExpression>
   generateCastExpression(const OpaqueContext &constraint, std::size_t depth);
 
-  ast::Constant getConstantForType(const ast::ScalarType& scalarType) const;
+  ast::Constant getConstantForType(const ast::ScalarType &scalarType) const;
 
   std::optional<ast::Constant> generateConstant(const OpaqueContext &constraint,
                                                 std::size_t depth = 0) const;
