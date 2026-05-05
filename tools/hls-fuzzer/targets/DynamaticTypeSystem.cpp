@@ -55,13 +55,13 @@ dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionContextDependencies(
   case ast::BinaryExpression::BitXor:
   case ast::BinaryExpression::ShiftLeft:
   case ast::BinaryExpression::ShiftRight:
-    return {/*lhs=*/Dependency<ast::BinaryExpression>(DynamaticTypingContext{
+    return {/*lhs=*/TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
                 DynamaticTypingContext::IntegerRequired}),
             /*rhs=*/
-            Dependency<ast::BinaryExpression>(DynamaticTypingContext{
+            TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
                 DynamaticTypingContext::IntegerRequired}),
             /*output=*/
-            Dependency<ast::BinaryExpression>(DynamaticTypingContext{
+            TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
                 DynamaticTypingContext::IntegerRequired})};
   default:
     return Super::getBinaryExpressionContextDependencies(op);

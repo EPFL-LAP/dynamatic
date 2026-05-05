@@ -59,7 +59,7 @@ public:
   getArrayReadExpressionContextDependencies() final {
     return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
             /*index=*/
-            Dependency<ast::ArrayReadExpression>(DynamaticTypingContext{
+            TransferFn<ast::ArrayReadExpression>(DynamaticTypingContext{
                 DynamaticTypingContext::IntegerRequired}),
             /*output=*/copyFromParent<ast::ArrayReadExpression>()};
   }

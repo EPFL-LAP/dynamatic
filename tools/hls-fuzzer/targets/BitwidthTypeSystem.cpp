@@ -93,9 +93,9 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
   switch (op) {
   case ast::BinaryExpression::BitAnd:
     return {
-        /*lhs=*/Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*lhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
         /*rhs=*/
-        Dependency<ast::BinaryExpression, PARENT_DEPENDENCY>(
+        TransferFn<ast::BinaryExpression, PARENT_DEPENDENCY>(
             [&](const BitwidthTypingContext &context) -> BitwidthTypingContext {
               // Bitand is distributive: Sub-expressions can assume they are
               // truncated as well.
@@ -113,8 +113,8 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
   case ast::BinaryExpression::Minus:
   case ast::BinaryExpression::Mul:
     return {
-        /*lhs=*/Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
-        /*rhs=*/Dependency<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*lhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*rhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
         /*output=*/copyFromParent<ast::BinaryExpression>(),
     };
   case ast::BinaryExpression::Greater:
@@ -138,10 +138,10 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
     //       of the operands are signed or not. We could track this
     //       theoretically.
     return {
-        /*lhs=*/Dependency<ast::BinaryExpression>(
+        /*lhs=*/TransferFn<ast::BinaryExpression>(
             getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
         /*rhs=*/
-        Dependency<ast::BinaryExpression>(
+        TransferFn<ast::BinaryExpression>(
             getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
         /*parent=*/copyFromParent<ast::BinaryExpression>(),
     };
@@ -179,7 +179,7 @@ auto dynamatic::gen::BitwidthTypeSystem::
   return {
       /*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
       /*index=*/
-      Dependency<ast::ArrayReadExpression,
+      TransferFn<ast::ArrayReadExpression,
                  ast::ArrayReadExpression::ARRAY_PARAMETER>(
           [&](const BitwidthTypingContext &,
               const ast::ArrayParameter &parameter) {

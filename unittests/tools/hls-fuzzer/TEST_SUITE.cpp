@@ -40,9 +40,9 @@ public:
   gen::TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionContextDependencies(ast::BinaryExpression::Op) override {
     return {
-        Dependency<ast::BinaryExpression>(true),
-        Dependency<ast::BinaryExpression>(true),
-        Dependency<ast::BinaryExpression>(true),
+        TransferFn<ast::BinaryExpression>(true),
+        TransferFn<ast::BinaryExpression>(true),
+        TransferFn<ast::BinaryExpression>(true),
     };
   }
 
@@ -93,8 +93,8 @@ public:
   gen::TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionContextDependencies() override {
     return {
-        Dependency<ast::ArrayReadExpression>(false),
-        Dependency<ast::ArrayReadExpression>(false),
+        TransferFn<ast::ArrayReadExpression>(false),
+        TransferFn<ast::ArrayReadExpression>(false),
         copyFromParent<ast::ArrayReadExpression>(),
     };
   }

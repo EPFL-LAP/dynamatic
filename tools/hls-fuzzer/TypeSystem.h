@@ -433,7 +433,7 @@ public:
   using ConclusionOf = ConclusionOf<ASTNode, TypingContext>;
 
   template <typename ASTNode, std::size_t... inputIndices>
-  using Dependency = TransferFn<TypingContext, ASTNode, inputIndices...>;
+  using TransferFn = TransferFn<TypingContext, ASTNode, inputIndices...>;
 
   /// Shorthand for derived classes to be able to call the default
   /// implementation of methods.
