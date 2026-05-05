@@ -1,0 +1,6 @@
+set-src integration-test/prediction/prediction.c
+compile
+write-hdl
+simulate
+visualize
+exit
