@@ -86,10 +86,14 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
   --handshake-annotate-properties="json-path=$F_FORMAL_PROP $ANNOTATE_FLAGS" \
   > /dev/null
+exit_on_fail "Error during property annotation" \
+  "Annotated properties"
+
 
 # handshake level -> hw level
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
   > "$F_FORMAL_HW"
+exit_on_fail "Error during handshake to hw"
 
 # generate SMV
 "$DYNAMATIC_EXPORT_RTL_BIN" \
@@ -100,6 +104,7 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
   --property-database "$F_FORMAL_PROP" \
   $SMV_GENERATION_FLAGS \
   --dynamatic-path "$DYNAMATIC_DIR"
+exit_on_fail "Error during SMV generation"
 
 # create the testbench
 "$FORMAL_TESTBENCH_GEN" \
