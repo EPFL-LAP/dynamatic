@@ -26,17 +26,24 @@ REGISTER_TYPED_TEST_SUITE_P(TypeSystemTest, OutputCheck);
 
 namespace {
 // Bool representing whether a parameter is required.
-class PlusOfTwoParamOnlyTypeSystem
+class PlusOfTwoParamOnlyTypeSystem final
     : public gen::DisallowByDefaultTypeSystem<bool,
                                               PlusOfTwoParamOnlyTypeSystem> {
 public:
-  static std::optional<ConclusionOf<ast::BinaryExpression>>
-  checkBinaryExpression(ast::BinaryExpression::Op op, bool mustBeParameter) {
-    // Saw a binop, parameter is now required.
-    if (!mustBeParameter && op == ast::BinaryExpression::Plus)
-      return ConclusionOf<ast::BinaryExpression>{true, true};
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
 
-    return std::nullopt;
+  static bool discardBinaryExpression(ast::BinaryExpression::Op op,
+                                      bool mustBeParameter) {
+    return mustBeParameter || op != ast::BinaryExpression::Plus;
+  }
+
+  gen::TransferFnArray<ast::BinaryExpression>
+  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op) override {
+    return {
+        TransferFn<ast::BinaryExpression>(true),
+        TransferFn<ast::BinaryExpression>(true),
+        TransferFn<ast::BinaryExpression>(true),
+    };
   }
 
   static std::optional<ConclusionOf<ast::ScalarParameter>>
@@ -73,15 +80,23 @@ public:
 
 // Bool representing whether an array read expression is required.
 // Otherwise, a 0 constant must be generated.
-class ReturnArrayConstantOnlyTypeSystem
+class ReturnArrayConstantOnlyTypeSystem final
     : public gen::DisallowByDefaultTypeSystem<
           /*createArrayRead=*/bool, ReturnArrayConstantOnlyTypeSystem> {
 public:
-  static std::optional<ConclusionOf<ast::ArrayReadExpression>>
-  checkArrayReadExpression(bool createArrayRead) {
-    if (!createArrayRead)
-      return std::nullopt;
-    return ConclusionOf<ast::ArrayReadExpression>{false, false};
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
+
+  static bool discardArrayReadExpression(bool createArrayRead) {
+    return !createArrayRead;
+  }
+
+  gen::TransferFnArray<ast::ArrayReadExpression>
+  getArrayReadExpressionContextDependencies() override {
+    return {
+        TransferFn<ast::ArrayReadExpression>(false),
+        TransferFn<ast::ArrayReadExpression>(false),
+        copyFromParent<ast::ArrayReadExpression>(),
+    };
   }
 
   std::optional<ConclusionOf<ast::ArrayParameter>>
@@ -112,8 +127,8 @@ public:
   }
 
   constexpr static std::string_view result =
-      R"(double test(double var0[16]) {
-  return var0[((uint32_t)((0)) & (15u))];
+      R"(double test(double var0[1]) {
+  return var0[((uint32_t)((0)) & (0u))];
 }
 )";
 

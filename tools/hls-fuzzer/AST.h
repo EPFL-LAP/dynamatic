@@ -322,6 +322,8 @@ public:
   /// operand for 'op'.
   static bool isLegalOperandType(Op op, const ScalarType &datatype);
 
+  using SubElements = std::tuple<Expression, Expression>;
+
 private:
   Expression lhs;
   Op op;
@@ -405,6 +407,8 @@ private:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ConditionalExpression &ternaryExpression);
 
+class ArrayParameter;
+
 /// Expression representing reading and indexing into an array.
 /// Only array parameters and one-dimensional arrays are currently supported.
 class ArrayReadExpression {
@@ -425,6 +429,11 @@ public:
   /// Returns the result-type of the expression, which is equivalent to the
   /// element type of the array.
   const ScalarType &getType() const { return dataType; }
+
+  using SubElements = std::tuple<ArrayParameter, Expression>;
+
+  constexpr static std::size_t ARRAY_PARAMETER = 0;
+  constexpr static std::size_t INDEX = 1;
 
 private:
   ScalarType dataType;

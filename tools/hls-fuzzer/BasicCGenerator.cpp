@@ -123,79 +123,88 @@ std::optional<ast::Expression>
 gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
                                                const OpaqueContext &context,
                                                std::size_t depth) {
-  auto conclusion = typeSystem.checkBinaryExpressionOpaque(op, context);
-  if (!conclusion)
+  if (typeSystem.discardBinaryExpressionOpaque(op, context))
     return std::nullopt;
-  auto [lhsCons, rhsCons] = *conclusion;
 
-  ast::Expression lhs = generateExpression(lhsCons, depth + 1);
-  ast::Expression rhs = generateExpression(rhsCons, depth + 1);
+  return generateWithDependencies<ast::BinaryExpression>(
+      context, typeSystem.getBinaryExpressionContextDependencies(op),
+      /*lhs=*/
+      [&](const OpaqueContext &context) -> ast::Expression {
+        return generateExpression(context, depth + 1);
+      },
+      /*rhs=*/
+      [&](const OpaqueContext &context) -> ast::Expression {
+        return generateExpression(context, depth + 1);
+      },
+      /*constructor=*/
+      [&](ast::Expression &&lhs,
+          ast::Expression &&rhs) -> std::optional<ast::BinaryExpression> {
+        // Perform explicit casts to a legal operand type if neither of the
+        // expressions are legal for the given operation.
+        // This would e.g. cast 'double's that are meant to be applied to '&' to
+        // a random type that can be legally used with '&'.
+        if (!ast::BinaryExpression::isLegalOperandType(op, lhs.getType()) ||
+            !ast::BinaryExpression::isLegalOperandType(op, rhs.getType())) {
 
-  // Perform explicit casts to a legal operand type if neither of the
-  // expressions are legal for the given operation.
-  // This would e.g. cast 'double's that are meant to be applied to '&' to a
-  // random type that can be legally used with '&'.
-  if (!ast::BinaryExpression::isLegalOperandType(op, lhs.getType()) ||
-      !ast::BinaryExpression::isLegalOperandType(op, rhs.getType())) {
+          std::optional<ast::ScalarType> scalarType = generateScalarType(
+              context, /*toExclude=*/[&](const ast::ScalarType &value) {
+                return !ast::BinaryExpression::isLegalOperandType(op, value);
+              });
+          if (!scalarType)
+            return std::nullopt;
 
-    std::optional<ast::ScalarType> scalarType = generateScalarType(
-        context, /*toExclude=*/[&](const ast::ScalarType &value) {
-          return !ast::BinaryExpression::isLegalOperandType(op, value);
-        });
-    if (!scalarType)
-      return std::nullopt;
+          lhs = safeCastAsNeeded(*scalarType, std::move(lhs));
+          rhs = safeCastAsNeeded(*scalarType, std::move(rhs));
+        }
 
-    lhs = safeCastAsNeeded(*scalarType, std::move(lhs));
-    rhs = safeCastAsNeeded(*scalarType, std::move(rhs));
-  }
+        switch (op) {
+        case ast::BinaryExpression::ShiftLeft:
+        case ast::BinaryExpression::ShiftRight: {
+          ast::ScalarType datatype = lhs.getType();
+          // Restrict the right expression to be in range of the bitwidth.
+          rhs = ast::BinaryExpression{
+              std::move(rhs), ast::BinaryExpression::BitAnd,
+              ast::Constant{static_cast<uint32_t>(datatype.getBitwidth() - 1)}};
 
-  switch (op) {
-  case ast::BinaryExpression::ShiftLeft:
-  case ast::BinaryExpression::ShiftRight: {
-    ast::ScalarType datatype = lhs.getType();
-    // Restrict the right expression to be in range of the bitwidth.
-    rhs = ast::BinaryExpression{
-        std::move(rhs), ast::BinaryExpression::BitAnd,
-        ast::Constant{static_cast<uint32_t>(datatype.getBitwidth() - 1)}};
-
-    // If the left-hand side is a signed integer, make sure the value is at
-    // least 0.
-    // Performing a left-shift on a negative value in C is undefined behavior.
-    if (op == ast::BinaryExpression::ShiftLeft && datatype.isSigned())
-      lhs = generateMinExpression(std::move(lhs),
-                                  ast::Constant{static_cast<uint32_t>(0)});
-    return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
-  }
-  case ast::BinaryExpression::Plus:
-  case ast::BinaryExpression::Minus:
-  case ast::BinaryExpression::Mul: {
-    ast::ScalarType lhsType = lhs.getType();
-    ast::ScalarType rhsType = rhs.getType();
-    if ((lhsType == ast::PrimitiveType::Int32 &&
-         lhsType.getBitwidth() > rhsType.getBitwidth()) ||
-        (rhsType == ast::PrimitiveType::Int32 &&
-         rhsType.getBitwidth() > lhsType.getBitwidth())) {
-      // Promote integers where one operand is an 'int32_t' to 'uint32_t' to
-      // avoid undefined behavior on overflow.
-      lhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(lhs));
-      rhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(rhs));
-    }
-    return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
-  }
-  // case ast::BinaryExpression::Division:
-  break;
-  case ast::BinaryExpression::BitAnd:
-  case ast::BinaryExpression::BitOr:
-  case ast::BinaryExpression::BitXor:
-  case ast::BinaryExpression::Greater:
-  case ast::BinaryExpression::GreaterEqual:
-  case ast::BinaryExpression::Less:
-  case ast::BinaryExpression::LessEqual:
-  case ast::BinaryExpression::Equal:
-  case ast::BinaryExpression::NotEqual:
-    return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
-  }
-  llvm_unreachable("all enum cases handled");
+          // If the left-hand side is a signed integer, make sure the value is
+          // at least 0. Performing a left-shift on a negative value in C is
+          // undefined behavior.
+          if (op == ast::BinaryExpression::ShiftLeft && datatype.isSigned())
+            lhs = generateMinExpression(
+                std::move(lhs), ast::Constant{static_cast<uint32_t>(0)});
+          return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
+        }
+        case ast::BinaryExpression::Plus:
+        case ast::BinaryExpression::Minus:
+        case ast::BinaryExpression::Mul: {
+          ast::ScalarType lhsType = lhs.getType();
+          ast::ScalarType rhsType = rhs.getType();
+          if ((lhsType == ast::PrimitiveType::Int32 &&
+               lhsType.getBitwidth() > rhsType.getBitwidth()) ||
+              (rhsType == ast::PrimitiveType::Int32 &&
+               rhsType.getBitwidth() > lhsType.getBitwidth())) {
+            // Promote integers where one operand is an 'int32_t' to 'uint32_t'
+            // to avoid undefined behavior on overflow.
+            lhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(lhs));
+            rhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(rhs));
+          }
+          return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
+        }
+        // case ast::BinaryExpression::Division:
+        break;
+        case ast::BinaryExpression::BitAnd:
+        case ast::BinaryExpression::BitOr:
+        case ast::BinaryExpression::BitXor:
+        case ast::BinaryExpression::Greater:
+        case ast::BinaryExpression::GreaterEqual:
+        case ast::BinaryExpression::Less:
+        case ast::BinaryExpression::LessEqual:
+        case ast::BinaryExpression::Equal:
+        case ast::BinaryExpression::NotEqual:
+          return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
+        }
+        llvm_unreachable("all enum cases handled");
+      });
 }
 
 std::optional<ast::Expression>
@@ -304,41 +313,43 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
 std::optional<ast::ArrayReadExpression>
 gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
                                                   std::size_t depth) {
-  auto conclusion = typeSystem.checkArrayReadExpressionOpaque(context);
-  if (!conclusion)
+  if (typeSystem.discardArrayReadExpressionOpaque(context))
     return std::nullopt;
-  auto [paramConc, indexConc] = *conclusion;
 
-  // Construct a safe indexing expression from an array parameter.
-  auto genWrappedArrayReadFromParam = [&, &indexConc = indexConc](
-                                          const ast::ArrayParameter &param) {
-    ast::ScalarType elementType = param.getElementType();
-    std::size_t mask = param.getDimension() - 1;
-    std::string name = param.getName().str();
-    // Generate an indexing expression.
-    // Has to be an integer.
-    ast::Expression index = safeCastAsNeeded(
-        ast::PrimitiveType::UInt32, generateExpression(indexConc, depth + 1));
+  return generateWithDependencies<ast::ArrayReadExpression>(
+      context, typeSystem.getArrayReadExpressionContextDependencies(),
+      /*array parameter=*/
+      [&](const OpaqueContext &context) -> std::optional<ast::ArrayParameter> {
+        return generateArrayParameter(context);
+      },
+      /*index=*/
+      [&](const OpaqueContext &context) -> std::optional<ast::Expression> {
+        return generateExpression(context, depth + 1);
+      },
+      /*constructor=*/
+      [&](ast::ArrayParameter &&param, ast::Expression &&expression) {
+        ast::ScalarType elementType = param.getElementType();
+        std::size_t mask = param.getDimension() - 1;
+        std::string name = param.getName().str();
+        // Generate an indexing expression.
+        // Has to be an integer.
+        ast::Expression index =
+            safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(expression));
 
-    // Bitmask the index to be in range of the array! We use this to avoid
-    // undefined behavior in our programs. In the future we could also add
-    // mechanisms (type systems, or whatever), that restrict expressions to
-    // safe in-range expressions.
-    //
-    // Note: We can use a bitmask here since array parameters that we generate
-    // are all powers-of-2. We do so since the modulo operator is currently
-    // unsupported in dynamatic.
-    return ast::ArrayReadExpression{
-        std::move(elementType), name,
-        ast::BinaryExpression{std::move(index), ast::BinaryExpression::BitAnd,
-                              ast::Constant{static_cast<std::uint32_t>(mask)}}};
-  };
-
-  std::optional<ast::ArrayParameter> arrayParameter =
-      generateArrayParameter(paramConc);
-  if (!arrayParameter)
-    return std::nullopt;
-  return genWrappedArrayReadFromParam(*arrayParameter);
+        // Bitmask the index to be in range of the array! We use this to avoid
+        // undefined behavior in our programs. In the future we could also add
+        // mechanisms (type systems, or whatever), that restrict expressions to
+        // safe in-range expressions.
+        //
+        // Note: We can use a bitmask here since array parameters that we
+        // generate are all powers-of-2. We do so since the modulo operator is
+        // currently unsupported in dynamatic.
+        return ast::ArrayReadExpression{
+            std::move(elementType), name,
+            ast::BinaryExpression{
+                std::move(index), ast::BinaryExpression::BitAnd,
+                ast::Constant{static_cast<std::uint32_t>(mask)}}};
+      });
 }
 
 std::optional<ast::ArrayParameter>
