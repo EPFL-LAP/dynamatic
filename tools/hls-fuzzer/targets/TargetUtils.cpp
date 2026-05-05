@@ -65,13 +65,13 @@ void dynamatic::outputDynamaticInvocation(
   }
 
   os << "set -o pipefail\n";
-  os << "OUTPUT=$(" << dynamaticPath << " --exit-on-failure <<EOF 2>&1\n";
+  os << "exec 5>&1\n";
+  os << "OUTPUT=$(" << dynamaticPath << " --exit-on-failure <<EOF 2>&1 | tee >(cat - >&5)\n";
   os << "set-dynamatic-path " << dynamaticSourceRoot.string() << '\n';
   os << "set-src " << sourceFile.filename().string();
   os << "\n" << script.trim() << "\nexit\nEOF\n";
   os << R"()
 RET=$?
-echo "$OUTPUT"
 # Ignore known issue. See https://github.com/EPFL-LAP/dynamatic/issues/886
 if echo "$OUTPUT" | grep -q "Pointer values are unsupported"; then
   exit 0
