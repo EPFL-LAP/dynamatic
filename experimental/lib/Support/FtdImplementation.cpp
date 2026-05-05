@@ -1769,6 +1769,7 @@ struct CyclicDemotionHelper {
 
     // 6. DP suppression: header -> value's block
     BoolExpression *fSupDP = BoolExpression::boolZero();
+    DenseMap<Block *, unsigned> rankDP;  // pre-computed rank for DP graph
     Block *origHeader = levelCFG->origMap.lookup(levelCFG->newProd);
 
     if (origHeader && origHeader != origBlock) {
@@ -1804,6 +1805,14 @@ struct CyclicDemotionHelper {
           }
         }
 
+        // Pre-compute DP rank before erasing
+        {
+          unsigned idx = 0;
+          for (Block *b : dpDG->topoOrder)
+            if (auto *ob = dpDG->origMap.lookup(b))
+              rankDP[ob] = idx++;
+        }
+
         dpDG->containerOp->erase();
       }
       dpLocGraph->containerOp->erase();
@@ -1816,7 +1825,25 @@ struct CyclicDemotionHelper {
 
     if (fSup->type != experimental::boolean::ExpressionType::Zero) {
       std::set<std::string> vars = fSup->getVariables();
-      std::vector<std::string> cofactorList(vars.begin(), vars.end());
+
+      // Sort cofactorList by levelCFG topological order
+      DenseMap<Block *, unsigned> rank;
+      unsigned i = 0;
+      for (Block *b : levelCFG->topoOrder)
+        if (auto *ob = levelCFG->origMap.lookup(b))
+          rank[ob] = i++;
+
+      std::vector<std::string> cofactorList;
+      cofactorList.reserve(vars.size());
+      std::vector<std::pair<unsigned, std::string>> tmp;
+      for (auto &var : vars)
+        if (auto blkOpt = bi.getBlockFromCondition(var))
+          if (rank.count(*blkOpt))
+            tmp.emplace_back(rank[*blkOpt], var);
+      llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
+      for (auto &p : tmp)
+        cofactorList.push_back(p.second);
+
       BDD *bdd = buildBDD(fSup, cofactorList);
       Value branchCond = bddToCircuit(builder, bdd, insertBlock,
                                       levelRegistry, {}, bi,
@@ -1825,8 +1852,19 @@ struct CyclicDemotionHelper {
       // Cascaded DP filter
       if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
         std::set<std::string> dpVarsSet = fSupDP->getVariables();
-        std::vector<std::string> dpCofactorList(dpVarsSet.begin(),
-                                                 dpVarsSet.end());
+
+        // Sort dpCofactorList by DP graph topological order
+        std::vector<std::string> dpCofactorList;
+        dpCofactorList.reserve(dpVarsSet.size());
+        std::vector<std::pair<unsigned, std::string>> tmpDP;
+        for (auto &var : dpVarsSet)
+          if (auto blkOpt = bi.getBlockFromCondition(var))
+            if (rankDP.count(*blkOpt))
+              tmpDP.emplace_back(rankDP[*blkOpt], var);
+        llvm::sort(tmpDP, [](auto &a, auto &b) { return a.first < b.first; });
+        for (auto &p : tmpDP)
+          dpCofactorList.push_back(p.second);
+
         BDD *dpBdd = buildBDD(fSupDP, dpCofactorList);
         Value dpCond = bddToCircuit(builder, dpBdd, insertBlock,
                                     levelRegistry, {}, bi,
@@ -1904,7 +1942,7 @@ struct CyclicDemotionHelper {
 static void insertDirectSuppression(
     mlir::OpBuilder &builder, handshake::FuncOp &funcOp, Operation *consumer,
     Value connection, ftd::ShadowCFG &shadow) {
-
+  // llvm::errs() << "=== Inserting Direct Suppression ===\n";
   Region &shadowRegion = shadow.getRegion();
   ftd::BlockIndexing bi(shadowRegion);
 
@@ -2431,6 +2469,7 @@ static void insertDirectSuppression(
 
   // Suppression Logic between Dominator and Producer (locGraphDP)
   BoolExpression *fSupDP = BoolExpression::boolZero();
+  DenseMap<Block *, unsigned> rankDP;  // pre-computed rank for DP graph
 
   if (dominatorBlock != producerBlock) {
     OpBuilder tmpBuilder2(funcOp.getContext());
@@ -2459,8 +2498,25 @@ static void insertDirectSuppression(
         out << "fSupDP   = " << fSupDP->toString() << "\n\n\n";
       }
 
+      // Pre-compute DP rank before erasing
+      {
+        unsigned idx = 0;
+        for (Block *b : dpFullDG->topoOrder)
+          if (auto *ob = dpFullDG->origMap.lookup(b))
+            rankDP[ob] = idx++;
+      }
+
       dpFullDG->containerOp->erase();
     }
+
+    // Pre-compute DP rank from locGraphDP as fallback if dpFullDG was not built
+    if (rankDP.empty()) {
+      unsigned idx = 0;
+      for (Block *b : locGraphDP->topoOrder)
+        if (auto *ob = locGraphDP->origMap.lookup(b))
+          rankDP[ob] = idx++;
+    }
+
     locGraphDP->containerOp->erase();
   }
 
@@ -2505,7 +2561,18 @@ static void insertDirectSuppression(
     // Cascaded Upstream Filter
     if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
       std::set<std::string> blocksDP = fSupDP->getVariables();
-      std::vector<std::string> cofactorListDP(blocksDP.begin(), blocksDP.end());
+
+      std::vector<std::string> cofactorListDP;
+      cofactorListDP.reserve(blocksDP.size());
+      std::vector<std::pair<unsigned, std::string>> tmpDP;
+      for (auto &var : blocksDP)
+        if (auto blkOpt = bi.getBlockFromCondition(var))
+          if (rankDP.count(*blkOpt))
+            tmpDP.emplace_back(rankDP[*blkOpt], var);
+      llvm::sort(tmpDP, [](auto &a, auto &b) { return a.first < b.first; });
+      for (auto &p : tmpDP)
+        cofactorListDP.push_back(p.second);
+
       BDD *bddDP = buildBDD(fSupDP, cofactorListDP);
       Value dpBranchCond =
           bddToCircuit(builder, bddDP, producerIRBlock, registry, {}, bi,
@@ -2691,9 +2758,25 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
         enumeratePaths(*acyclicDG, bi, locConsControlDeps);
     fBackedge = fBackedge->boolMinimize();
 
-    // 9. Build BDD
+    // 9. Build BDD with topologically sorted cofactorList
     std::set<std::string> vars = fBackedge->getVariables();
-    std::vector<std::string> cofactorList(vars.begin(), vars.end());
+
+    DenseMap<Block *, unsigned> rank;
+    unsigned ri = 0;
+    for (Block *b : acyclicDG->topoOrder)
+      if (auto *ob = acyclicDG->origMap.lookup(b))
+        rank[ob] = ri++;
+
+    std::vector<std::string> cofactorList;
+    cofactorList.reserve(vars.size());
+    std::vector<std::pair<unsigned, std::string>> tmp;
+    for (auto &var : vars)
+      if (auto blkOpt = bi.getBlockFromCondition(var))
+        if (rank.count(*blkOpt))
+          tmp.emplace_back(rank[*blkOpt], var);
+    llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
+    for (auto &p : tmp)
+      cofactorList.push_back(p.second);
 
     BDD *bdd = buildBDD(fBackedge, cofactorList);
     // 10. Convert to Circuit.
@@ -3033,9 +3116,26 @@ LogicalResult experimental::ftd::addGsaGates(
         BoolExpression *fBackedge =
             enumeratePaths(*acyclicDG, bi, locConsControlDeps);       
         fBackedge = fBackedge->boolMinimize();
-        // 9. Build BDD
+
+        // 9. Build BDD with topologically sorted cofactorList
         std::set<std::string> vars = fBackedge->getVariables();
-        std::vector<std::string> cofactorList(vars.begin(), vars.end());
+
+        DenseMap<Block *, unsigned> rank;
+        unsigned ri = 0;
+        for (Block *b : acyclicDG->topoOrder)
+          if (auto *ob = acyclicDG->origMap.lookup(b))
+            rank[ob] = ri++;
+
+        std::vector<std::string> cofactorList;
+        cofactorList.reserve(vars.size());
+        std::vector<std::pair<unsigned, std::string>> tmp;
+        for (auto &var : vars)
+          if (auto blkOpt = bi.getBlockFromCondition(var))
+            if (rank.count(*blkOpt))
+              tmp.emplace_back(rank[*blkOpt], var);
+        llvm::sort(tmp, [](auto &a, auto &b) { return a.first < b.first; });
+        for (auto &p : tmp)
+          cofactorList.push_back(p.second);
 
         BDD *bdd = buildBDD(fBackedge, cofactorList);
         // 10. Convert to Circuit.
