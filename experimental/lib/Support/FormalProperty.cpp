@@ -252,13 +252,6 @@ EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
-  /*
-  std::vector<llvm::json::Value> channels{};
-  // std::string opName = sentStateNamers[0].opName;
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    channels.push_back(state.toInnerJSON());
-  }
-  */
   // Example JSON:
   // [
   //   {

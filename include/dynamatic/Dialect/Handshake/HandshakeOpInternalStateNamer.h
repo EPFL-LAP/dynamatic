@@ -46,23 +46,6 @@ struct InternalStateNamer {
   friend bool fromJSON(const llvm::json::Value &value,
                        std::unique_ptr<InternalStateNamer> &namer,
                        llvm::json::Path path);
-  /*
-  inline llvm::json::Value toJSON() const {
-    // Example:
-    // {
-    //   "type": "EagerForkSent",
-    //   "inner": {
-    //     "operation": "fork1",
-    //     "channel_name": "outs_1",
-    //     "channel_size": 2
-    //   }
-    // }
-    return llvm::json::Object({
-        {TYPE_LIT, typeToStr(type)},
-        {INNER_LIT, toInnerJSON()},
-    });
-  }
-  */
 
   InternalStateNamer() = default;
   InternalStateNamer(TYPE type) : type(type) {}
@@ -120,9 +103,6 @@ struct ConstrainedNamer : InternalStateNamer {
   inline llvm::json::Value toInnerJSON() const override {
     return toJSON(*this);
   }
-
-  std::unique_ptr<InternalStateNamer> static fromInnerJSON(
-      const llvm::json::Value &value, llvm::json::Path path);
 
   int32_t value;
   static constexpr llvm::StringLiteral CONSTRAINT_VALUE_LIT =
@@ -201,9 +181,6 @@ struct ConstrainedEagerForkSentNamer : ConstrainedNamer {
   inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
     return std::make_unique<EagerForkSentNamer>(base);
   }
-  llvm::json::Value toInnerJSON() const override {
-    llvm::report_fatal_error("todo");
-  }
 
   EagerForkSentNamer base;
   static constexpr llvm::StringLiteral BASE_LIT = "base";
@@ -260,16 +237,6 @@ struct ConstrainedBufferSlotFullNamer : ConstrainedNamer {
     return llvm::formatv("{0} & ({1}.data = {2})", base.getSMVName(),
                          base.opName, smvValue(base.slotSize, value))
         .str();
-  }
-
-  /*
-  inline llvm::json::Value toInnerJSON() const override {
-    llvm::json::Value obj = base.toInnerJSON();
-    return llvm::json::Object({{BASE_LIT, obj}, {VALUE_LIT, value}});
-  }
-  */
-  llvm::json::Value toInnerJSON() const override {
-    llvm::report_fatal_error("todo");
   }
 
   inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
