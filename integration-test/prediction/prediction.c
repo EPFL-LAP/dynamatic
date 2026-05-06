@@ -1,7 +1,7 @@
 #include "prediction.h"
 #include "dynamatic/Integration.h"
 
-void loop(inout_int_t a[N], inout_int_t b[N]) {
+void prediction(inout_int_t a[N], inout_int_t b[N]) {
   int x = 0;
   for (unsigned i = 1; i < N; ++i) {
     switch (a[i] * 10) {
@@ -12,18 +12,13 @@ void loop(inout_int_t a[N], inout_int_t b[N]) {
     default:
       x = a[i];
     }
-    if (x == 5) {
-      b[i] = 25;
-    } else if (x == 7) {
-      b[i] = 49;
-    } else {
-      b[i] = x * x;
-    }
+
+    b[i] = x * x * a[i - 1];
   }
 }
 
 int main(void) {
-  in_float_t a[N];
+  in_int_t a[N];
   in_int_t b[N];
   for (unsigned j = 0; j < N; ++j) {
     a[j] = 10;
@@ -33,6 +28,6 @@ int main(void) {
   a[20] = 15;
   a[30] = 20;
 
-  CALL_KERNEL(loop, a, b);
+  CALL_KERNEL(prediction, a, b);
   return 0;
 }
