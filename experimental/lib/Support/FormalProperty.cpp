@@ -252,11 +252,13 @@ EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
+  /*
   std::vector<llvm::json::Value> channels{};
   // std::string opName = sentStateNamers[0].opName;
   for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
     channels.push_back(state.toInnerJSON());
   }
+  */
   // Example JSON:
   // [
   //   {
@@ -280,7 +282,7 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
   //     "operation": "fork0",
   //   }
   // ]
-  return llvm::json::Array(channels);
+  return llvm::json::Array(sentStateNamers);
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
@@ -289,14 +291,8 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::Array *array = info.getAsArray();
-  assert(array &&
-         "expected info of EFNAO to be an array of eager fork outputs");
-  for (auto &stateJSON : *array) {
-    auto sentStateNamer =
-        handshake::EagerForkSentNamer::fromInnerJSON(stateJSON, path);
-    prop->sentStateNamers.push_back(*sentStateNamer);
-  }
+  bool success = llvm::json::fromJSON(info, prop->sentStateNamers, path);
+  assert(success);
   return prop;
 }
 
@@ -323,12 +319,8 @@ CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> channels{};
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    channels.push_back(state.toInnerJSON());
-  }
   return llvm::json::Object(
-      {{FORK_CHANNELS_LIT, channels}, {COPIED_SLOT_LIT, copiedSlot->toJSON()}});
+      {{FORK_CHANNELS_LIT, sentStateNamers}, {COPIED_SLOT_LIT, copiedSlot}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -338,22 +330,10 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
 
-  const llvm::json::Object *obj = info.getAsObject();
-  assert(obj && "CSOAFAF json info not an object");
-
-  const llvm::json::Value *channelNameJSON = obj->get(FORK_CHANNELS_LIT);
-  assert(channelNameJSON && "missing FORK_CHANNELS_LIT in CSOAFAF info");
-  const llvm::json::Array *channelNameJSONs = channelNameJSON->getAsArray();
-  assert(channelNameJSONs && "FORK_CHANNELS_LIT in CSOAFAF is not an array");
-  for (auto &sentJSON : *channelNameJSONs) {
-    prop->sentStateNamers.push_back(
-        *handshake::EagerForkSentNamer::fromInnerJSON(sentJSON, path));
-  }
-
-  const llvm::json::Value *bufferSlotJSON = obj->get(COPIED_SLOT_LIT);
-  assert(bufferSlotJSON && "missing COPIED_SLOT_LIT in CSOAFAF json");
-  prop->copiedSlot = InternalStateNamer::fromJSON(*bufferSlotJSON, path);
-
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(FORK_CHANNELS_LIT, prop->sentStateNamers) ||
+      !mapper.map(COPIED_SLOT_LIT, prop->copiedSlot))
+    return nullptr;
   return prop;
 }
 

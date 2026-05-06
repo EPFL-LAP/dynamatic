@@ -39,6 +39,14 @@ struct InternalStateNamer {
   virtual std::string getSMVName() const = 0;
   virtual llvm::json::Value toInnerJSON() const = 0;
 
+  friend llvm::json::Value
+  toJSON(const std::unique_ptr<InternalStateNamer> &namer);
+  friend llvm::json::Value
+  toJSON(const std::shared_ptr<InternalStateNamer> &namer);
+  friend bool fromJSON(const llvm::json::Value &value,
+                       std::unique_ptr<InternalStateNamer> &namer,
+                       llvm::json::Path path);
+  /*
   inline llvm::json::Value toJSON() const {
     // Example:
     // {
@@ -54,9 +62,7 @@ struct InternalStateNamer {
         {INNER_LIT, toInnerJSON()},
     });
   }
-
-  std::unique_ptr<InternalStateNamer> static fromJSON(
-      const llvm::json::Value &value, llvm::json::Path path);
+  */
 
   InternalStateNamer() = default;
   InternalStateNamer(TYPE type) : type(type) {}
@@ -89,28 +95,38 @@ struct ConstrainedNamer : InternalStateNamer {
 
   virtual std::unique_ptr<InternalStateNamer> getUnconstrained() const = 0;
 
-  inline llvm::json::Value toInnerJSON() const override {
+  inline friend llvm::json::Value toJSON(const ConstrainedNamer &namer) {
     // This assumes the internal state being named is represented as an object.
     // Example for fork8 output 0 constrained to 0:
     // {
-    //   "channel_name": "outs_0",
-    //   "channel_size": 1,
-    //   "operation": "fork8",
+    //   "inner": {
+    //     "channel_name": "outs_0",
+    //     "channel_size": 1,
+    //     "operation": "fork8",
+    //   },
+    //   "type": "EagerForkSent",
     //   "value": 0
     // }
-    llvm::json::Object *objP = getUnconstrained()->toJSON().getAsObject();
-    assert(objP && "internal state namer is a json object");
+    llvm::json::Object *objP = toJSON(namer.getUnconstrained()).getAsObject();
+    assert(objP && "internal state namer should be a json object");
     llvm::json::Object &obj = *objP;
-    obj[CONSTRAINT_VALUE] = value;
+    obj[CONSTRAINT_VALUE_LIT] = namer.value;
 
     return llvm::json::Object(obj);
+  }
+  friend bool fromJSON(const llvm::json::Value &value, ConstrainedNamer &namer,
+                       llvm::json::Path path);
+
+  inline llvm::json::Value toInnerJSON() const override {
+    return toJSON(*this);
   }
 
   std::unique_ptr<InternalStateNamer> static fromInnerJSON(
       const llvm::json::Value &value, llvm::json::Path path);
 
   int32_t value;
-  static constexpr llvm::StringLiteral CONSTRAINT_VALUE = "value";
+  static constexpr llvm::StringLiteral CONSTRAINT_VALUE_LIT =
+      "constrained_value";
 };
 
 // To define a `sent` state of an eager fork, the exact channel that contains
@@ -133,14 +149,15 @@ struct EagerForkSentNamer : InternalStateNamer {
     return llvm::formatv("{0}.{1}_sent", opName, channelName).str();
   }
 
-  inline llvm::json::Value toInnerJSON() const override {
-    return llvm::json::Object({{OPERATION_LIT, opName},
-                               {CHANNEL_NAME_LIT, channelName},
-                               {CHANNEL_SIZE_LIT, channelSize}});
+  friend inline llvm::json::Value toJSON(const EagerForkSentNamer &namer) {
+    return llvm::json::Object({{OPERATION_LIT, namer.opName},
+                               {CHANNEL_NAME_LIT, namer.channelName},
+                               {CHANNEL_SIZE_LIT, namer.channelSize}});
   }
+  friend bool fromJSON(const llvm::json::Value &value,
+                       EagerForkSentNamer &namer, llvm::json::Path path);
 
-  std::unique_ptr<EagerForkSentNamer> static fromInnerJSON(
-      const llvm::json::Value &value, llvm::json::Path path);
+  llvm::json::Value toInnerJSON() const override { return *this; }
 
   std::string opName;
   std::string channelName;
@@ -184,6 +201,9 @@ struct ConstrainedEagerForkSentNamer : ConstrainedNamer {
   inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
     return std::make_unique<EagerForkSentNamer>(base);
   }
+  llvm::json::Value toInnerJSON() const override {
+    llvm::report_fatal_error("todo");
+  }
 
   EagerForkSentNamer base;
   static constexpr llvm::StringLiteral BASE_LIT = "base";
@@ -205,19 +225,22 @@ struct BufferSlotFullNamer : InternalStateNamer {
 
   ConstrainedBufferSlotFullNamer constrain(int32_t value);
 
-  inline std::string getSMVName() const override {
-    return llvm::formatv("{0}.{1}_full", opName, slotName).str();
-  }
-  inline llvm::json::Value toInnerJSON() const override {
+  friend inline llvm::json::Value toJSON(const BufferSlotFullNamer &namer) {
     return llvm::json::Object({
-        {OPERATION_LIT, opName},
-        {SLOT_NAME_LIT, slotName},
-        {SLOT_SIZE_LIT, slotSize},
+        {OPERATION_LIT, namer.opName},
+        {SLOT_NAME_LIT, namer.slotName},
+        {SLOT_SIZE_LIT, namer.slotSize},
     });
   }
 
-  std::unique_ptr<BufferSlotFullNamer> static fromInnerJSON(
-      const llvm::json::Value &value, llvm::json::Path path);
+  friend bool fromJSON(const llvm::json::Value &value,
+                       BufferSlotFullNamer &namer, llvm::json::Path path);
+
+  llvm::json::Value toInnerJSON() const override { return *this; }
+
+  inline std::string getSMVName() const override {
+    return llvm::formatv("{0}.{1}_full", opName, slotName).str();
+  }
 
   std::string opName;
   std::string slotName;
@@ -239,9 +262,14 @@ struct ConstrainedBufferSlotFullNamer : ConstrainedNamer {
         .str();
   }
 
+  /*
   inline llvm::json::Value toInnerJSON() const override {
     llvm::json::Value obj = base.toInnerJSON();
     return llvm::json::Object({{BASE_LIT, obj}, {VALUE_LIT, value}});
+  }
+  */
+  llvm::json::Value toInnerJSON() const override {
+    llvm::report_fatal_error("todo");
   }
 
   inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
@@ -272,13 +300,14 @@ struct PipelineSlotNamer : InternalStateNamer {
         .str();
   }
 
-  inline llvm::json::Value toInnerJSON() const override {
+  friend inline llvm::json::Value toJSON(const PipelineSlotNamer &namer) {
     return llvm::json::Object(
-        {{OPERATION_LIT, opName}, {SLOT_INDEX_LIT, slotIndex}});
+        {{OPERATION_LIT, namer.opName}, {SLOT_INDEX_LIT, namer.slotIndex}});
   }
+  friend bool fromJSON(const llvm::json::Value &value, PipelineSlotNamer &namer,
+                       llvm::json::Path path);
+  llvm::json::Value toInnerJSON() const override { return *this; }
 
-  std::unique_ptr<PipelineSlotNamer> static fromInnerJSON(
-      const llvm::json::Value &value, llvm::json::Path path);
   std::string opName;
   unsigned slotIndex;
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
@@ -315,14 +344,16 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
     }
   }
 
-  inline llvm::json::Value toInnerJSON() const override {
-    return llvm::json::Object({{OPERATION_LIT, opName},
-                               {SLOT_INDEX_LIT, slotIndex},
-                               {PORT_TYPE_LIT, (int)portType},
-                               {LOADLESS_LIT, loadless}});
+  friend inline llvm::json::Value
+  toJSON(const MemoryControllerSlotNamer &namer) {
+    return llvm::json::Object({{OPERATION_LIT, namer.opName},
+                               {SLOT_INDEX_LIT, namer.slotIndex},
+                               {PORT_TYPE_LIT, (int)namer.portType},
+                               {LOADLESS_LIT, namer.loadless}});
   }
-  std::unique_ptr<MemoryControllerSlotNamer> static fromInnerJSON(
-      const llvm::json::Value &value, llvm::json::Path path);
+  friend bool fromJSON(const llvm::json::Value &value,
+                       MemoryControllerSlotNamer &namer, llvm::json::Path path);
+  llvm::json::Value toInnerJSON() const override { return *this; }
 
   std::string opName;
   size_t slotIndex;
