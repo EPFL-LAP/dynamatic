@@ -297,8 +297,7 @@ private:
   // c, it pushes the IOG where *only* channel c is taken, and all the rest are
   // illegal. Used for forks (which only allow exactly one of its outputs) and
   // join operations (which only allow exactly one of its inputs)
-  template <typename T>
-  void followSingle(const IOGCandidate &checkpoint, T options) {
+  void followSingle(const IOGCandidate &checkpoint, ValueRange options) {
     size_t n = 0;
     mlir::Value singleTaken = nullptr;
     for (mlir::Value channel : options) {
