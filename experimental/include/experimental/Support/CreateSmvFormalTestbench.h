@@ -50,7 +50,7 @@ struct SmvTestbenchConfig {
   bool syncOutput = false;
 
   // Determines if the output is modelled as a dead buffer (i.e. accepts one
-  // token, then the output is no longer ready
+  // token, then the output is no longer ready)
   bool deadBufferOutput = false;
 };
 

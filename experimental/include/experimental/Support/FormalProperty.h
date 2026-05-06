@@ -273,6 +273,11 @@ private:
   inline static const StringLiteral EQUATIONS_LIT = "equations";
 };
 
+// An IOG contains a single token at the start (at the entry), and no other
+// tokens will ever enter or leave. Tokens can be duplicated by eager forks, but
+// they keep track of this within their `sent` state. Because of this, the
+// number of occupied slots within an IOG is equal to one plus the number of
+// duplicated tokens by fork.
 class IOGSingleToken : public FormalProperty {
 public:
   llvm::json::Value extraInfoToJSON() const override;
@@ -299,6 +304,13 @@ private:
   inline static const StringLiteral FORKS_LIT = "forks";
 };
 
+// Within an IOG, multiple slots can be occupied when forks duplicate tokens.
+// Whereas the previous invariant only states that there needs to be an active
+// fork somewhere, this invariant determines where the active fork could be: If
+// any two slots are occupied, there must be at least one path connecting them,
+// and for some path p, there must be an active fork along p with the start of p
+// as the copied slot (i.e. no other slots between the fork and the starting
+// slot)
 class IOGConsecutiveTokens : public FormalProperty {
 public:
   llvm::json::Value extraInfoToJSON() const override;

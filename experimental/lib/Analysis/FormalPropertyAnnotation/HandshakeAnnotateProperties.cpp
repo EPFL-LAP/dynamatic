@@ -293,6 +293,11 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 }
 
 namespace {
+// This function finds appropriate fork sent states for the consecutive tokens
+// invariant: Given the IOG and a set of paths from a start buffer to an end
+// buffer, it determines all forks for which:
+// 1. The start buffer is the copied slot of the fork
+// 2. The fork is part of a path from start to end along the IOG
 std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
                                                 const IOGPathSet &pathSet) {
   std::vector<EagerForkSentNamer> sents;

@@ -5,19 +5,13 @@
 #include "mlir/IR/Value.h"
 #include <unordered_set>
 
-// An In-order graph (IOG) of a dataflow circuit is a subgraph of the dataflow
-// circuit. It contains one and only one entry channel (i.e. an argument of a
-// FuncOp) which can reach all other operations using only channels part of the
-// IOG. The IOG does not lose or gain any tokens: For any merge/mux, all the
-// data inputs must be contained in the IOG, and for any fork, only a single
-// output can be part of the IOG. Similarly, all branch outputs are part of the
-// IOG, and for each join-operation, only a single input is part of the IOG.
-// This way, there is a fixed number of tokens within the IOG.
-
 namespace dynamatic {
 struct IOG;
 struct IOGPathSet;
 
+// An IOG path set is a structure that describes a set of paths between two
+// operations: For any unit `u` within the IOG, it says whether there exists a
+// path going through `u` or not.
 struct IOGPathSet {
   IOGPathSet(const IOG &iog, Operation *start, Operation *end);
 
@@ -26,6 +20,14 @@ struct IOGPathSet {
   Operation *end;
 };
 
+// An In-order graph (IOG) of a dataflow circuit is a subgraph of the dataflow
+// circuit. It contains one and only one entry channel (i.e. an argument of a
+// FuncOp) which can reach all other operations using only channels part of the
+// IOG. The IOG does not lose or gain any tokens: For any merge/mux, all the
+// data inputs must be contained in the IOG, and for any fork, only a single
+// output can be part of the IOG. Similarly, all branch outputs are part of the
+// IOG, and for each join-operation, only a single input is part of the IOG.
+// This way, there is a fixed number of tokens within the IOG.
 struct IOG {
   IOG() = default;
   std::unordered_set<Operation *> units;

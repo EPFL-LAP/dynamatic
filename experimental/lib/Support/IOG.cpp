@@ -8,6 +8,8 @@ IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
   std::vector<Operation *> stack;
   stack.push_back(start);
   std::unordered_set<Operation *> forward;
+  // Find all operations reachable by going forward from the start without going
+  // through the end operation
   while (!stack.empty()) {
     Operation *op = stack.back();
     stack.pop_back();
@@ -35,6 +37,9 @@ IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
   stack.push_back(end);
   std::unordered_set<Operation *> back;
 
+  // Find all operations reachable by going backwards from the end without going
+  // through the start operation (i.e. all operations that can reach the end
+  // going forward without going through start)
   while (!stack.empty()) {
     Operation *op = stack.back();
     stack.pop_back();
@@ -62,6 +67,8 @@ IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
     }
   }
 
+  // Any operation that can be reached from the start, and that can reach the
+  // end, is part of a path from start to end
   for (Operation *op : forward) {
     if (back.find(op) != back.end()) {
       units.insert(op);
@@ -188,7 +195,7 @@ public:
   // 1. Pick a candidate IOG to work on
   // 2. Within this IOG, get the next operation that should be added to the IOG
   // 3. Handle the operation according to local rules, eliminating the candidate
-  // or splitting into multiple possible possibilities as necessary
+  // or splitting into multiple possible candidates as necessary
   void step() {
     if (candidates.empty())
       return;
