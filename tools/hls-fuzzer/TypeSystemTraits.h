@@ -77,15 +77,6 @@ struct TypeSystemTraits<ast::Variable> : TypeSystemTraitsDefaults {
 };
 
 template <>
-struct TypeSystemTraits<ast::BinaryExpression> : TypeSystemTraitsDefaults {
-
-  /// Type constraints for the left-hand operand followed by the right-hand
-  /// operand.
-  template <typename TypingContext>
-  using Conclusions = std::tuple</*lhs=*/TypingContext, /*rhs=*/TypingContext>;
-};
-
-template <>
 struct TypeSystemTraits<ast::UnaryExpression> : TypeSystemTraitsDefaults {
 
   /// Type constraint for the expression the operation is applied on.
@@ -135,14 +126,6 @@ struct TypeSystemTraits<ast::ScalarParameter> {
   /// test bench generation.
   template <typename TypingContext>
   using Conclusions = TypingContext;
-};
-
-template <>
-struct TypeSystemTraits<ast::ArrayReadExpression> {
-
-  template <typename TypingContext>
-  using Conclusions =
-      std::tuple</*parameter=*/TypingContext, /*index=*/TypingContext>;
 };
 
 template <>
