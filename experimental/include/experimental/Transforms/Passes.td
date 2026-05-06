@@ -110,4 +110,15 @@ def PipelineDuplication : DynamaticPass<"pipeline-duplication"> {
   let options = [];
 }
 
+def ShortcutPath : DynamaticPass<"add-shortcut-path"> {
+  let summary = "Calculate a possible shortcut with a hardcoded value";
+  let description = [{
+    Adds an additional connection for the fork and duplicates the addition, multiplication,
+    and more of the pipeline, with a hardcoded value that we know should come up often.
+  }];
+  let options = [];
+}
+
+
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

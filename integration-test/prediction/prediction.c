@@ -7,8 +7,7 @@ void prediction(inout_int_t a[N], inout_int_t b[N]) {
     switch (a[i] * 10) {
     case 100:
       x = 5;
-    case 200:
-      x = 7;
+      break;
     default:
       x = a[i];
     }

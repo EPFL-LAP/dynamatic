@@ -231,6 +231,7 @@ if [[ $DISABLE_LSQ -ne 0 ]]; then
     "Forced usage of MC interface in cf"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+    --add-shortcut-path \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
