@@ -896,7 +896,7 @@ class LSQWrapper:
         )
 
         self.lsq_wrapper_str += "\t-- Signals the LSQ core that the store is completed if the MC is ready.\n"
-        self.lsq_wrapper_str += "\t-- NOTE: we assume that MC joins the addr and data, so here we only check the addr ready .\n"
+        self.lsq_wrapper_str += "\t-- NOTE: we assume that MC joins the addr and data, so here we only check the addr ready.\n"
         self.lsq_wrapper_str += (
             "\n"
             + "\t" * (self.tab_level + 2)
