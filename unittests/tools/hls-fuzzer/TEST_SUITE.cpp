@@ -45,7 +45,7 @@ public:
   }
 
   gen::TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op) override {
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op) override {
     return {
         /*lhs=*/TransferFn<ast::BinaryExpression>(
             PlusOfTwoState::FreshParamNeeded),
@@ -104,7 +104,7 @@ public:
   }
 
   gen::TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionContextDependencies() override {
+  getArrayReadExpressionTransferFns() override {
     return {
         /*array parameter=*/TransferFn<ast::ArrayReadExpression>(false),
         /*index=*/TransferFn<ast::ArrayReadExpression>(false),

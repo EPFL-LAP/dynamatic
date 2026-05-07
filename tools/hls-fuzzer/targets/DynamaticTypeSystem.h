@@ -40,13 +40,13 @@ public:
                                      DynamaticTypingContext context);
 
   TransferFnArray<ast::UnaryExpression>
-  getUnaryExpressionContextDependencies(ast::UnaryExpression::Op op) override;
+  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override;
 
   TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) final;
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) final;
 
   TransferFnArray<ast::ConditionalExpression>
-  getConditionalExpressionContextDependencies() override {
+  getConditionalExpressionTransferFns() override {
     return {
         /*condition=*/TransferFn<ast::ConditionalExpression>(
             DynamaticTypingContext{
@@ -58,7 +58,7 @@ public:
   }
 
   TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionContextDependencies() final {
+  getArrayReadExpressionTransferFns() final {
     return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
             /*index=*/
             TransferFn<ast::ArrayReadExpression>(DynamaticTypingContext{
@@ -67,7 +67,7 @@ public:
   }
 
   TransferFnArray<ast::ArrayAssignmentStatement>
-  getArrayAssignmentStatementContextDependencies() override {
+  getArrayAssignmentStatementTransferFns() override {
     return {
         /*array parameter=*/copyFromParent<ast::ArrayAssignmentStatement>(),
         /*index=*/

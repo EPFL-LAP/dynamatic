@@ -303,7 +303,7 @@ protected:
 public:
   virtual ~AbstractTypeSystem();
 
-  virtual TransferFnArray<ast::Function> getFunctionContextDependencies() {
+  virtual TransferFnArray<ast::Function> getFunctionTransferFns() {
     return {
         /*return type=*/copyFromParent<ast::Function>(),
         /*statement list=*/copyFromParent<ast::Function>(),
@@ -313,7 +313,7 @@ public:
   }
 
   virtual TransferFnArray<ast::ReturnStatement>
-  getReturnStatementContextDependencies() {
+  getReturnStatementTransferFns() {
     return {
         /*return value=*/copyFromParent<ast::ReturnStatement>(),
         /*output=*/copyFromParent<ast::ReturnStatement>(),
@@ -326,7 +326,7 @@ public:
                                              const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) {
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) {
     // Default implementation: Simply propagates the context to the subelements.
     return {/*lhs=*/copyFromParent<ast::BinaryExpression>(),
             /*rhs=*/copyFromParent<ast::BinaryExpression>(),
@@ -337,7 +337,7 @@ public:
                                             const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::UnaryExpression>
-  getUnaryExpressionContextDependencies(ast::UnaryExpression::Op op) {
+  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) {
     return {
         /*operand=*/copyFromParent<ast::UnaryExpression>(),
         /*output=*/copyFromParent<ast::UnaryExpression>(),
@@ -346,7 +346,7 @@ public:
 
   virtual bool discardVariableOpaque(const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::Variable> getVariableContextDependencies() {
+  virtual TransferFnArray<ast::Variable> getVariableTransferFns() {
     return {
         /*parameter=*/copyFromParent<ast::Variable>(),
         /*output=*/copyFromParent<ast::Variable>(),
@@ -355,8 +355,7 @@ public:
 
   virtual bool discardCastExpressionOpaque(const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::CastExpression>
-  getCastExpressionContextDependencies() {
+  virtual TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() {
     return {
         /*target type=*/copyFromParent<ast::CastExpression>(),
         /*operand=*/copyFromParent<ast::CastExpression>(),
@@ -368,7 +367,7 @@ public:
   discardConditionalExpressionOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ConditionalExpression>
-  getConditionalExpressionContextDependencies() {
+  getConditionalExpressionTransferFns() {
     // Default implementation: Simply propagates the context to the
     // subelements.
     return {
@@ -397,7 +396,7 @@ public:
   discardFreshScalarParameterOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ScalarParameter>
-  getScalarParameterContextDependencies() {
+  getScalarParameterTransferFns() {
     return {
         /*data type=*/copyFromParent<ast::ScalarParameter>(),
         /*output=*/copyFromParent<ast::ScalarParameter>(),
@@ -408,7 +407,7 @@ public:
   discardArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionContextDependencies() {
+  getArrayReadExpressionTransferFns() {
     return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
             /*index=*/copyFromParent<ast::ArrayReadExpression>(),
             /*output=*/copyFromParent<ast::ArrayReadExpression>()};
@@ -421,8 +420,7 @@ public:
   virtual bool
   discardFreshArrayParameterOpaque(const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::ArrayParameter>
-  getArrayParameterContextDependencies() {
+  virtual TransferFnArray<ast::ArrayParameter> getArrayParameterTransferFns() {
     return {
         /*element type=*/copyFromParent<ast::ArrayParameter>(),
         /*output=*/copyFromParent<ast::ArrayParameter>(),
@@ -433,7 +431,7 @@ public:
   discardArrayAssignmentStatementOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ArrayAssignmentStatement>
-  getArrayAssignmentStatementContextDependencies() {
+  getArrayAssignmentStatementTransferFns() {
     return TransferFnArray<ast::ArrayAssignmentStatement>{
         /*array parameter=*/copyFromParent<ast::ArrayAssignmentStatement>(),
         /*index=*/copyFromParent<ast::ArrayAssignmentStatement>(),
@@ -444,8 +442,7 @@ public:
 
   virtual bool discardStatementListOpaque(const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::StatementList>
-  getStatementListContextDependencies() {
+  virtual TransferFnArray<ast::StatementList> getStatementListTransferFns() {
     return TransferFnArray<ast::StatementList>{
         /*statement list=*/copyFromParent<ast::StatementList>(),
         /*statement=*/copyFromParent<ast::StatementList>(),
@@ -501,7 +498,7 @@ public:
 /// ({integer} |- cond) -> ({A} |- lhs) -> ({A} |- rhs) -> ({A} |- cond ? lhs :
 /// rhs)
 ///
-/// The corresponding 'getConditionalExpressionContextDependencies' method
+/// The corresponding 'getConditionalExpressionTransferFns' method
 /// instead implements:
 /// ({A} |- cond ? lhs : rhs) -> ({integer} |- cond) -> ({A} |- lhs) -> ({A} |-
 /// rhs) where 'A' is the input context and the three clauses correspond to the

@@ -87,7 +87,7 @@ bool dynamatic::gen::BitwidthTypeSystem::discardBinaryExpression(
   llvm_unreachable("all enum cases handled");
 }
 
-auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
+auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionTransferFns(
     ast::BinaryExpression::Op op) -> TransferFnArray<ast::BinaryExpression> {
   switch (op) {
   case ast::BinaryExpression::BitAnd:
@@ -149,14 +149,13 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionContextDependencies(
   case ast::BinaryExpression::BitXor:
   case ast::BinaryExpression::ShiftLeft:
   case ast::BinaryExpression::ShiftRight:
-    return TypeSystem::getBinaryExpressionContextDependencies(op);
+    return TypeSystem::getBinaryExpressionTransferFns(op);
   }
   llvm_unreachable("all enum cases handled");
 }
 
 dynamatic::gen::TransferFnArray<dynamatic::ast::ConditionalExpression>
-dynamatic::gen::BitwidthTypeSystem::
-    getConditionalExpressionContextDependencies() {
+dynamatic::gen::BitwidthTypeSystem::getConditionalExpressionTransferFns() {
   return {
       /*condition=*/TransferFn<ast::ConditionalExpression>(
           BitwidthTypingContext(globalMaxBitwidth)),
@@ -167,7 +166,7 @@ dynamatic::gen::BitwidthTypeSystem::
 }
 
 dynamatic::gen::TransferFnArray<dynamatic::ast::Function>
-dynamatic::gen::BitwidthTypeSystem::getFunctionContextDependencies() {
+dynamatic::gen::BitwidthTypeSystem::getFunctionTransferFns() {
   // Return types are exempt from the bitwidth rules as they're an interface
   // type.
   // Any integer type is allowed in that case.
@@ -179,9 +178,8 @@ dynamatic::gen::BitwidthTypeSystem::getFunctionContextDependencies() {
   };
 }
 
-auto dynamatic::gen::BitwidthTypeSystem::
-    getArrayReadExpressionContextDependencies()
-        -> TransferFnArray<ast::ArrayReadExpression> {
+auto dynamatic::gen::BitwidthTypeSystem::getArrayReadExpressionTransferFns()
+    -> TransferFnArray<ast::ArrayReadExpression> {
   return {
       /*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
       /*index=*/

@@ -95,15 +95,15 @@ public:
   }
 
   TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) final;
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) final;
 
   TransferFnArray<ast::ConditionalExpression>
-  getConditionalExpressionContextDependencies() override;
+  getConditionalExpressionTransferFns() override;
 
-  TransferFnArray<ast::Function> getFunctionContextDependencies() override;
+  TransferFnArray<ast::Function> getFunctionTransferFns() override;
 
   TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionContextDependencies() override;
+  getArrayReadExpressionTransferFns() override;
 
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range

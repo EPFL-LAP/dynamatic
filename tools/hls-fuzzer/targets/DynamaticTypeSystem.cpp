@@ -42,7 +42,7 @@ bool dynamatic::gen::DynamaticTypeSystem::discardBinaryExpression(
 }
 
 dynamatic::gen::TransferFnArray<dynamatic::ast::BinaryExpression>
-dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionContextDependencies(
+dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionTransferFns(
     ast::BinaryExpression::Op op) {
   switch (op) {
   case ast::BinaryExpression::BitAnd:
@@ -59,12 +59,12 @@ dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionContextDependencies(
             TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
                 DynamaticTypingContext::IntegerRequired})};
   default:
-    return Super::getBinaryExpressionContextDependencies(op);
+    return Super::getBinaryExpressionTransferFns(op);
   }
 }
 
 dynamatic::gen::TransferFnArray<dynamatic::ast::UnaryExpression>
-dynamatic::gen::DynamaticTypeSystem::getUnaryExpressionContextDependencies(
+dynamatic::gen::DynamaticTypeSystem::getUnaryExpressionTransferFns(
     ast::UnaryExpression::Op op) {
   switch (op) {
   case ast::UnaryExpression::BitwiseNot:

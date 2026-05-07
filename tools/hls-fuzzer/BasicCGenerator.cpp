@@ -52,7 +52,7 @@ static ast::Expression safeCastAsNeeded(const ast::ScalarType &to,
 ast::ReturnStatement
 gen::BasicCGenerator::generateReturnStatement(const OpaqueContext &context) {
   return *generateWithDependencies<ast::ReturnStatement>(
-      context, typeSystem.getReturnStatementContextDependencies(),
+      context, typeSystem.getReturnStatementTransferFns(),
       /*return value=*/
       [&](const OpaqueContext &context) {
         ast::Expression expression = generateExpression(context, 0);
@@ -131,7 +131,7 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
     return std::nullopt;
 
   return generateWithDependencies<ast::BinaryExpression>(
-      context, typeSystem.getBinaryExpressionContextDependencies(op),
+      context, typeSystem.getBinaryExpressionTransferFns(op),
       /*lhs=*/
       [&](const OpaqueContext &context) -> ast::Expression {
         return generateExpression(context, depth + 1);
@@ -219,7 +219,7 @@ gen::BasicCGenerator::generateUnaryExpression(ast::UnaryExpression::Op op,
     return std::nullopt;
 
   return generateWithDependencies<ast::UnaryExpression>(
-      context, typeSystem.getUnaryExpressionContextDependencies(op),
+      context, typeSystem.getUnaryExpressionTransferFns(op),
       /*operand=*/
       [&](const OpaqueContext &context) {
         return generateExpression(context, depth + 1);
@@ -252,7 +252,7 @@ gen::BasicCGenerator::generateConditionalExpression(
     return std::nullopt;
 
   return generateWithDependencies<ast::ConditionalExpression>(
-      context, typeSystem.getConditionalExpressionContextDependencies(),
+      context, typeSystem.getConditionalExpressionTransferFns(),
       /*condition=*/
       [&](const OpaqueContext &context) {
         return generateExpression(context, depth + 1);
@@ -280,7 +280,7 @@ gen::BasicCGenerator::generateCastExpression(const OpaqueContext &context,
     return std::nullopt;
 
   return generateWithDependencies<ast::CastExpression>(
-      context, typeSystem.getCastExpressionContextDependencies(),
+      context, typeSystem.getCastExpressionTransferFns(),
       /*data type=*/
       [&](const OpaqueContext &context) { return generateScalarType(context); },
       /*operand=*/
@@ -346,7 +346,7 @@ gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
     return std::nullopt;
 
   return generateWithDependencies<ast::ArrayReadExpression>(
-      context, typeSystem.getArrayReadExpressionContextDependencies(),
+      context, typeSystem.getArrayReadExpressionTransferFns(),
       /*array parameter=*/
       [&](const OpaqueContext &context) -> std::optional<ast::ArrayParameter> {
         return generateArrayParameter(context);
@@ -402,7 +402,7 @@ gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context,
     return std::nullopt;
 
   return generateWithDependencies<ast::ArrayParameter>(
-      context, typeSystem.getArrayParameterContextDependencies(),
+      context, typeSystem.getArrayParameterTransferFns(),
       /*element type=*/
       [&](const OpaqueContext &context) { return generateScalarType(context); },
       /*constructor=*/
@@ -423,7 +423,7 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
     return std::nullopt;
 
   return generateWithDependencies<ast::Variable>(
-      context, typeSystem.getVariableContextDependencies(),
+      context, typeSystem.getVariableTransferFns(),
       /*parameter=*/
       [&](const OpaqueContext &context) -> std::optional<ast::ScalarParameter> {
         std::array<std::function<std::optional<ast::ScalarParameter>()>, 2>
@@ -445,7 +445,7 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
             return std::nullopt;
 
           return generateWithDependencies<ast::ScalarParameter>(
-              context, typeSystem.getScalarParameterContextDependencies(),
+              context, typeSystem.getScalarParameterTransferFns(),
               /*datatype=*/
               [&](const OpaqueContext &context) {
                 return generateScalarType(context);
@@ -516,7 +516,7 @@ gen::BasicCGenerator::generateStatementList(const OpaqueContext &context,
     return ast::StatementList();
 
   return generateWithDependencies<ast::StatementList>(
-             context, typeSystem.getStatementListContextDependencies(),
+             context, typeSystem.getStatementListTransferFns(),
              /*statement list=*/
              [&](const OpaqueContext &context) {
                return generateStatementList(context, depth + 1);
@@ -546,7 +546,7 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
     return std::nullopt;
 
   return generateWithDependencies<ast::ArrayAssignmentStatement>(
-      context, typeSystem.getArrayAssignmentStatementContextDependencies(),
+      context, typeSystem.getArrayAssignmentStatementTransferFns(),
       /*array parameter=*/
       [&](const OpaqueContext &context) {
         return generateArrayParameter(context);
@@ -578,7 +578,7 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
 
 ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
   return *generateWithDependencies<ast::Function>(
-      entryContext, typeSystem.getFunctionContextDependencies(),
+      entryContext, typeSystem.getFunctionTransferFns(),
       /*return type=*/
       [&](const OpaqueContext &context) {
         return maybeReturnType = generateReturnType(context);

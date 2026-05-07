@@ -738,6 +738,7 @@ auto enumRange() {
 
 // Enable 'dyn_cast' and friends on 'ScalarType' by delegating to 'dyn_cast' on
 // the variant.
+// E.g. 'ast::PrimitiveType* prim = dyn_cast<ast::PrimitiveType>(scalarType);'
 template <>
 struct llvm::simplify_type<dynamatic::ast::ScalarType> {
   using SimpleType = const dynamatic::ast::ScalarType::Variant;
