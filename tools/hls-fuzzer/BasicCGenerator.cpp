@@ -185,6 +185,11 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
             // overflow to avoid undefined behavior.
             // Otherwise, the operation is performed on 'int32_t' due to C's
             // promotion rules, which has undefined behavior on overflow.
+            //
+            // Note that in LLVM IR signed and unsigned multiplications are
+            // identical operations except for the wraparound behaviour for
+            // unsigned. Signed overflow is defined to be poison via the 'nsw'
+            // flag.
             lhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(lhs));
             rhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(rhs));
           }
@@ -199,6 +204,11 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
             // overflow to avoid undefined behavior.
             // Otherwise, the operation is performed on 'int32_t' due to C's
             // promotion rules, which has undefined behavior on overflow.
+            //
+            // Note that in LLVM IR signed and unsigned multiplications are
+            // identical operations except for the wraparound behaviour for
+            // unsigned. Signed overflow is defined to be poison via the 'nsw'
+            // flag.
             lhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(lhs));
             rhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(rhs));
           }
