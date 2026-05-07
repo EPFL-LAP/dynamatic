@@ -431,7 +431,7 @@ SingleEntryToken::fromJSON(const llvm::json::Value &value,
     prop->ec.push_back(std::move(*namer));
   }
 
-  const llvm::json::Value *cmVal = infoObj->get(PATH_EC_LIT);
+  const llvm::json::Value *cmVal = infoObj->get(PATH_CM_LIT);
   assert(cmVal);
   const llvm::json::Array *cmArr = cmVal->getAsArray();
   if (!cmArr)

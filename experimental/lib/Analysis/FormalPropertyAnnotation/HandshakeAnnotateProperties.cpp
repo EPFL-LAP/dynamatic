@@ -311,8 +311,9 @@ std::vector<EntryCMergePath> findEntryCMergePaths(mlir::Value startChannel) {
       .slots = {},
       .cur = startChannel,
   };
-  // TODO: Make this an entry slot (which is in a different PR
-  start.slots.push_back(EffectiveSlotNamer());
+  // TODO: Make this an entry slot (which is in a different PR)
+  start.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(
+      "TMP_ENTRY_SLOT_REPLACEMENT", "s", 0));
   stack.push_back(start);
   while (!stack.empty()) {
     PartialPath path = std::move(stack.back());
