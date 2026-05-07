@@ -60,55 +60,50 @@ public:
       : globalMaxBitwidth(globalMaxBitwidth), random(random) {}
 
   /// Disallows floats and doubles.
-  static std::optional<ConclusionOf<ast::ScalarType>>
-  checkScalarType(const ast::ScalarType &scalarType,
-                  const BitwidthTypingContext &);
+  static bool discardScalarType(const ast::ScalarType &scalarType,
+                                const BitwidthTypingContext &);
 
-  std::optional<ConclusionOf<ast::ReturnType>>
-  checkReturnType(const ast::ReturnType &returnType,
-                  const BitwidthTypingContext &context) {
+  bool discardReturnType(const ast::ReturnType &returnType,
+                         const BitwidthTypingContext &context) {
     // Disallow void.
     if (llvm::isa<ast::VoidType>(returnType))
-      return std::nullopt;
+      return true;
 
-    return Super::checkReturnType(returnType, context);
+    return Super::discardReturnType(returnType, context);
   }
 
   /// Disallow array-assignment statements.
   /// There is no rationale for doing so beyond the fact that we don't need
   /// them, since we can just generate expression trees, and that it makes
   /// synthesis faster.
-  static std::optional<ConclusionOf<ast::ArrayAssignmentStatement>>
-  checkArrayAssignmentStatement(const BitwidthTypingContext &) {
-    return std::nullopt;
+  static bool discardArrayAssignmentStatement(const BitwidthTypingContext &) {
+    return true;
   }
 
   /// Forces constants to fit in the given bitwidth requirement.
-  std::optional<ConclusionOf<ast::Constant>>
-  checkConstant(const ast::Constant &constant,
-                const BitwidthTypingContext &context) const;
+  std::optional<ast::Constant>
+  discardConstant(const ast::Constant &constant,
+                  const BitwidthTypingContext &context) const;
 
   bool discardBinaryExpression(ast::BinaryExpression::Op op,
                                const BitwidthTypingContext &context) const;
 
-  static std::optional<ConclusionOf<ast::UnaryExpression>>
-  checkUnaryExpression(ast::UnaryExpression::Op,
-                       const BitwidthTypingContext &) {
+  static bool discardUnaryExpression(ast::UnaryExpression::Op,
+                                     const BitwidthTypingContext &) {
     // TODO: Figure out and implement logic here.
-    return std::nullopt;
+    return true;
   }
 
   TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) final;
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) final;
 
-  ConclusionOf<ast::ConditionalExpression>
-  checkConditionalExpression(const BitwidthTypingContext &context) const;
+  TransferFnArray<ast::ConditionalExpression>
+  getConditionalExpressionTransferFns() override;
 
-  static ConclusionOf<ast::Function>
-  checkFunction(const BitwidthTypingContext &context);
+  TransferFnArray<ast::Function> getFunctionTransferFns() override;
 
   TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionContextDependencies() override;
+  getArrayReadExpressionTransferFns() override;
 
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range
