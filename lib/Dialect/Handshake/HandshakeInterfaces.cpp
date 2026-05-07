@@ -461,7 +461,8 @@ std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
   switch (t) {
   case BufferType::ONE_SLOT_BREAK_DV:
     assert(ret.size() == 1);
-    ret[0] = BufferSlotFullNamer(nameAttr.str(), "outs_valid_i", "data", width);
+    ret[0] = BufferSlotFullNamer(nameAttr.str(), /*full value=*/"outs_valid_i",
+                                 /*data value=*/"data", width);
     break;
   case BufferType::ONE_SLOT_BREAK_R:
     assert(ret.size() == 1);
@@ -481,15 +482,10 @@ std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
   case BufferType::FIFO_BREAK_DV:
   case BufferType::ONE_SLOT_BREAK_DVR:
   case BufferType::SHIFT_REG_BREAK_DV:
+  case BufferType::COUNTER_BUFFER:
     llvm::report_fatal_error(
         llvm::formatv("no name for buffer slot of type {0}", t));
   }
-  /*
-  for (size_t i = 0; i < getNumSlots(); ++i) {
-    ret[i] =
-        BufferSlotFullNamer(nameAttr.str(), "slot_" + std::to_string(i), width);
-  }
-  */
   return ret;
 }
 
