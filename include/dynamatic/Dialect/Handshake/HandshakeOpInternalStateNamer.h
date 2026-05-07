@@ -208,7 +208,6 @@ struct BufferSlotFullNamer : InternalStateNamer {
   friend bool fromJSON(const llvm::json::Value &value,
                        BufferSlotFullNamer &namer, llvm::json::Path path);
 
-
   inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}_full", opName, slotName).str();
   }
@@ -305,8 +304,7 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
     }
   }
 
-  inline llvm::json::Value
-  toInnerJSON() const override {
+  inline llvm::json::Value toInnerJSON() const override {
     return llvm::json::Object({{OPERATION_LIT, opName},
                                {SLOT_INDEX_LIT, slotIndex},
                                {PORT_TYPE_LIT, (int)portType},
@@ -324,7 +322,6 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral PORT_TYPE_LIT = "port_type";
   static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
 };
-
 
 // Specialize llvm::json toJSON template for each namer
 inline llvm::json::Value toJSON(const EagerForkSentNamer &namer) {
