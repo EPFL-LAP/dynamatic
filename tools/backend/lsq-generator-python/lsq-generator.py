@@ -406,7 +406,7 @@ class LSQWrapper:
         # wreq_ready, wresp_valid, wresp_id
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
         self.lsq_wrapper_str += (
-            "\t-- Process for wreq_ready, wresp_valid and wresp_id (1)\n"
+            "\t-- Process for wreq_ready, wresp_valid and wresp_id\n"
         )
         self.lsq_wrapper_str += self.reg_init_str
         self.lsq_wrapper_str += "\t" * \
@@ -427,12 +427,12 @@ class LSQWrapper:
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), "'1'")
 
-
         self.lsq_wrapper_str += (
             "\n"
             + "\t" * (self.tab_level + 2)
             + "if "
-            + io_storeEn.getNameWrite() + " = '1' then\n"
+            + io_storeEn.getNameWrite()
+            + " = '1' then\n"
         )
 
         for i in range(self.lsq_config.numStMem):
