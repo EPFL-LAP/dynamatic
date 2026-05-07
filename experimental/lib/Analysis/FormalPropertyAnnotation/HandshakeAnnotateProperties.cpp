@@ -88,6 +88,7 @@ private:
                                              int32_t entryValue);
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
   LogicalResult annotateSingleEntryToken(ModuleOp modOp);
+  LogicalResult annotateExitTokenOrder(ModuleOp modOp);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -456,6 +457,111 @@ HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
           SingleEntryToken p(uid++, FormalProperty::TAG::INVAR, ec.slots, cm);
           propertyTable.push_back(p.toJSON());
         }
+      }
+    }
+  }
+  return success();
+}
+struct BranchOpDecision {
+  // true -> this branch loops towards itself
+  // false -> this branch exits
+  bool trueLoop;
+  bool falseLoop;
+
+  inline bool isDecider() { return trueLoop != falseLoop; }
+};
+
+bool reachable(mlir::Value start, Operation *target) {
+  llvm::DenseSet<Operation *> visited;
+  std::vector<mlir::Value> stack;
+  stack.push_back(start);
+  while (!stack.empty()) {
+    Operation *op = stack.back().getUses().begin()->getOwner();
+    stack.pop_back();
+    if (visited.contains(op)) {
+      continue;
+    }
+    visited.insert(op);
+    if (op == target)
+      return true;
+    if (isa<ArithOpInterface, ConditionalBranchOp, ForkOp, BufferOp, LoadOp,
+            MuxOp, MergeOp, ControlMergeOp>(op)) {
+      for (auto res : op->getResults()) {
+        stack.push_back(res);
+      }
+    }
+  }
+  return false;
+}
+
+BranchOpDecision findBranchLoops(ConditionalBranchOp branch) {
+  BranchOpDecision ret;
+  ret.trueLoop = reachable(branch.getTrueResult(), branch);
+  ret.falseLoop = reachable(branch.getFalseResult(), branch);
+  return ret;
+}
+
+std::vector<EffectiveSlotNamer>
+getConditionHolders(ConditionalBranchOp branch) {
+  std::vector<mlir::Value> stack;
+  stack.push_back(branch.getConditionOperand());
+  std::vector<EagerForkSentNamer> tailingSents;
+  std::vector<EffectiveSlotNamer> backPath;
+  while (!stack.empty()) {
+    mlir::Value cur = stack.back();
+    stack.pop_back();
+    Operation *op = cur.getDefiningOp();
+
+    if (!op) {
+      continue;
+    }
+    if (auto forkOp = dyn_cast<ForkOp>(op)) {
+      auto sents = forkOp.getInternalSentStateNamers();
+      for (auto [i, chan] : llvm::enumerate(forkOp.getResults())) {
+        if (chan == cur) {
+          tailingSents.push_back(sents[i]);
+          break;
+        }
+      }
+      stack.push_back(forkOp.getOperand());
+    }
+    if (auto buffer = dyn_cast<BufferOp>(op)) {
+      std::vector<std::unique_ptr<InternalStateNamer>> slots =
+          getAllSlotsOfOperation(buffer);
+      EffectiveSlotNamer last =
+          EffectiveSlotNamer(std::move(slots.back()), std::move(tailingSents));
+      tailingSents = std::vector<EagerForkSentNamer>();
+      backPath.push_back(last);
+      for (int i = slots.size() - 2; i >= 0; --i) {
+        backPath.emplace_back(std::move(slots[i]));
+      }
+      stack.push_back(buffer.getOperand());
+    }
+
+    if (auto loadOp = dyn_cast<LoadOp>(op)) {
+      auto slots = getAllSlotsOfOperation(loadOp);
+      backPath.emplace_back(std::move(slots[slots.size() - 1]),
+                            std::move(tailingSents));
+    }
+  }
+  // Reverse path so the order corresponds to the circuit order
+  std::reverse(backPath.begin(), backPath.end());
+  return backPath;
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
+  for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto branch = dyn_cast<ConditionalBranchOp>(op)) {
+        auto dec = findBranchLoops(branch);
+        if (!dec.isDecider()) {
+          // Either both branches exit and this invariant is handled by 6
+          // (assuming this branch is part of an IOG), or both branches loop and
+          // this invariant cannot say anything
+          continue;
+        }
+        auto slots = getConditionHolders(branch);
       }
     }
   }
