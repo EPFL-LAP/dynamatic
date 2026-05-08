@@ -443,6 +443,7 @@ LogicalResult FlowEquationExtractor::extractBufferOp(BufferOp bufferOp) {
     auto slot = FlowVariable(FlowInternalState(slotNamer));
     slot.indexTokenTracker = in.indexTokenTracker;
     FlowVariable next = in.nextInternal();
+    slot.indexTokenTracker = in.indexTokenTracker;
     if (failed(extractSlotEquation(in, next, slot))) {
       return failure();
     }

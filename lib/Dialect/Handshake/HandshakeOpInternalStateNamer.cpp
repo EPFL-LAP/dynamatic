@@ -142,6 +142,7 @@ bool fromJSON(const llvm::json::Value &value, BufferSlotFullNamer &namer,
   return mapper &&
          mapper.map(BufferSlotFullNamer::OPERATION_LIT, namer.opName) &&
          mapper.map(BufferSlotFullNamer::SLOT_NAME_LIT, namer.slotName) &&
+         mapper.map(BufferSlotFullNamer::DATA_NAME_LIT, namer.dataName) &&
          mapper.map(BufferSlotFullNamer::SLOT_SIZE_LIT, namer.slotSize);
 }
 
