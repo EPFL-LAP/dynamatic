@@ -494,7 +494,7 @@ std::vector<BufferSlotFullNamer> DeadBufferOp::getInternalSlotStateNamers() {
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
   std::vector<BufferSlotFullNamer> ret;
-  ret.emplace_back(nameAttr.str(), "TMP_DEADBUFFERSLOT", 0);
+  ret.emplace_back(nameAttr.str(), "full", "", 0);
   return ret;
 }
 
