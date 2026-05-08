@@ -254,6 +254,7 @@ struct Variable {
   const ScalarType &getType() const { return datatype; }
 
   using SubElements = std::tuple<ScalarParameter>;
+  constexpr static std::size_t PARAMETER = 0;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Variable &variable);
@@ -478,6 +479,7 @@ public:
   const Expression &getReturnValue() const { return returnValue; }
 
   using SubElements = std::tuple<Expression>;
+  constexpr static std::size_t RETURN_VALUE = 0;
 
 private:
   Expression returnValue;
@@ -586,6 +588,7 @@ public:
   const ScalarType &getDataType() const { return dataType; }
 
   using SubElements = std::tuple<ScalarType>;
+  constexpr static std::size_t DATATYPE = 0;
 
 private:
   ScalarType dataType;
@@ -594,6 +597,21 @@ private:
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ScalarParameter &parameter);
+
+/// Variant of 'ScalarParameter' used to represent an existing 'ScalarParameter'
+/// in the generator.
+/// Unlike 'ScalarParameter' it doesn't have any subelements and is a terminal
+/// similar to 'Constant'.
+class ExistingScalarParameter : public ScalarParameter {
+public:
+  /*implicit*/ ExistingScalarParameter(const ScalarParameter &scalarParameter)
+      : ScalarParameter(scalarParameter) {}
+
+  /*implicit*/ ExistingScalarParameter(ScalarParameter &&scalarParameter)
+      : ScalarParameter(std::move(scalarParameter)) {}
+
+  using SubElements = std::tuple<>;
+};
 
 /// AST-Node representing an array function parameter in C.
 class ArrayParameter {
@@ -614,6 +632,7 @@ public:
   std::size_t getDimension() const { return dimension; }
 
   using SubElements = std::tuple<ScalarType>;
+  constexpr static std::size_t ELEMENT_TYPE = 0;
 
 private:
   ScalarType dataType;
@@ -623,6 +642,21 @@ private:
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const ArrayParameter &parameter);
+
+/// Variant of 'ArrayParameter' used to represent an existing 'ArrayParameter'
+/// in the generator.
+/// Unlike 'ArrayParameter' it doesn't have any subelements and is a terminal
+/// similar to 'Constant'.
+class ExistingArrayParameter : public ArrayParameter {
+public:
+  /*implicit*/ ExistingArrayParameter(const ArrayParameter &arrayParameter)
+      : ArrayParameter(arrayParameter) {}
+
+  /*implicit*/ ExistingArrayParameter(ArrayParameter &&arrayParameter)
+      : ArrayParameter(std::move(arrayParameter)) {}
+
+  using SubElements = std::tuple<>;
+};
 
 /// Tag type representing the 'void' type from C.
 struct VoidType {

@@ -105,7 +105,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionTransferFns(
 
               return getInterestingBitWidthInRange(*req);
             }),
-        /*output=*/copyFromParent<ast::BinaryExpression>(),
+        /*output=*/copyOutputFromParent<ast::BinaryExpression>(),
     };
 
   case ast::BinaryExpression::Plus:
@@ -114,7 +114,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionTransferFns(
     return {
         /*lhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
         /*rhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
-        /*output=*/copyFromParent<ast::BinaryExpression>(),
+        /*output=*/copyOutputFromParent<ast::BinaryExpression>(),
     };
   case ast::BinaryExpression::Greater:
   case ast::BinaryExpression::GreaterEqual:
@@ -142,7 +142,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionTransferFns(
         /*rhs=*/
         TransferFn<ast::BinaryExpression>(
             getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
-        /*parent=*/copyFromParent<ast::BinaryExpression>(),
+        /*output=*/copyOutputFromParent<ast::BinaryExpression>(),
     };
 
   case ast::BinaryExpression::BitOr:
@@ -161,7 +161,7 @@ dynamatic::gen::BitwidthTypeSystem::getConditionalExpressionTransferFns() {
           BitwidthTypingContext(globalMaxBitwidth)),
       /*true value=*/copyFromParent<ast::ConditionalExpression>(),
       /*false value=*/copyFromParent<ast::ConditionalExpression>(),
-      /*output=*/copyFromParent<ast::ConditionalExpression>(),
+      /*output=*/copyOutputFromParent<ast::ConditionalExpression>(),
   };
 }
 
@@ -174,7 +174,7 @@ dynamatic::gen::BitwidthTypeSystem::getFunctionTransferFns() {
       /*return type=*/TransferFn<ast::Function>(ResultIsTruncated{}),
       /*statement list=*/copyFromParent<ast::Function>(),
       /*return statement=*/copyFromParent<ast::Function>(),
-      /*output=*/copyFromParent<ast::Function>(),
+      /*output=*/copyOutputFromParent<ast::Function>(),
   };
 }
 
@@ -192,7 +192,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getArrayReadExpressionTransferFns()
             return BitwidthTypingContext{std::min<std::uint8_t>(
                 llvm::Log2_64(parameter.getDimension()), globalMaxBitwidth)};
           }),
-      /*output=*/copyFromParent<ast::ArrayReadExpression>(),
+      /*output=*/copyOutputFromParent<ast::ArrayReadExpression>(),
   };
 }
 

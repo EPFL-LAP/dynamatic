@@ -31,10 +31,9 @@ RandomCTarget::createWorker(const Options &options, Randomly randomly) const {
 void RandomCWorker::generate(llvm::raw_ostream &os,
                              llvm::StringRef functionName) {
   gen::DynamaticTypeSystem dynamaticTypeSystem(random);
-  gen::BasicCGenerator generator(
-      random, dynamaticTypeSystem,
-      /*entryContext=*/
-      {random.fromEnum<gen::DynamaticTypingContext::Constraint>()});
+  gen::BasicCGenerator generator(random, dynamaticTypeSystem,
+                                 /*entryContext=*/
+                                 {gen::DynamaticTypingContext::Unconstrained});
 
   ast::Function function = generator.generate(functionName);
   os << R"(
