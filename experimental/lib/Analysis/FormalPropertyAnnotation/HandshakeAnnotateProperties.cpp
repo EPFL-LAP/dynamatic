@@ -561,7 +561,10 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
           // this invariant cannot say anything
           continue;
         }
+        // If trueLoop: false output exits => exitValue = 0
+        int32_t exitValue = dec.trueLoop ? 0 : 1;
         auto slots = getConditionHolders(branch);
+        ExitTokenOrder p(uid++, FormalProperty::TAG::INVAR, slots, exitValue);
       }
     }
   }

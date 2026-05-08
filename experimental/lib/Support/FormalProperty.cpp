@@ -37,6 +37,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::EntryTokenOrder;
   if (s == "SingleEntryToken")
     return FormalProperty::TYPE::SingleEntryToken;
+  if (s == "ExitTokenOrder")
+    return FormalProperty::TYPE::ExitTokenOrder;
 
   return std::nullopt;
 }
@@ -57,6 +59,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "EntryTokenOrder";
   case TYPE::SingleEntryToken:
     return "SingleEntryToken";
+  case TYPE::ExitTokenOrder:
+    return "ExitTokenOrder";
   }
 }
 
@@ -120,6 +124,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return EntryTokenOrder::fromJSON(value, path.field(INFO_LIT));
   case TYPE::SingleEntryToken:
     return SingleEntryToken::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::ExitTokenOrder:
+    return ExitTokenOrder::fromJSON(value, path.field(INFO_LIT));
   }
 }
 

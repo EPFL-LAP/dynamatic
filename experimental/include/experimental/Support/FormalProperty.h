@@ -35,6 +35,7 @@ public:
     ReconvergentPathFlow,
     EntryTokenOrder,
     SingleEntryToken,
+    ExitTokenOrder,
   };
 
   TAG getTag() const { return tag; }
@@ -323,6 +324,31 @@ private:
   std::vector<EffectiveSlotNamer> cm;
   inline static const StringLiteral PATH_EC_LIT = "entry_cmerge_path";
   inline static const StringLiteral PATH_CM_LIT = "cmerge_mux_path";
+};
+
+class ExitTokenOrder : public FormalProperty {
+public:
+  const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }
+  int32_t getValue() const { return exitValue; }
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ExitTokenOrder>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  ExitTokenOrder() = default;
+  ExitTokenOrder(unsigned long id, TAG tag,
+                 std::vector<EffectiveSlotNamer> slots, int32_t value)
+      : FormalProperty(id, tag, TYPE::ExitTokenOrder), slots(std::move(slots)),
+        exitValue(value) {}
+  ~ExitTokenOrder() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::ExitTokenOrder;
+  }
+
+private:
+  std::vector<EffectiveSlotNamer> slots;
+  int32_t exitValue;
+  inline static const StringLiteral SLOTS_LIT = "slots";
+  inline static const StringLiteral EXIT_VALUE_LIT = "exit_value";
 };
 
 class FormalPropertyTable {
