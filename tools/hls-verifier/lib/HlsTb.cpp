@@ -464,7 +464,7 @@ void getSignalDeclaration(mlir::raw_indented_ostream &os,
 
   // The interface that indicates the global "start" signal.
   declareReg(ctx, os, "tb_start_valid", std::nullopt, 0);
-  declareWire(ctx, os, "tb_start_ready", std::nullopt, 0);
+  declareWire(ctx, os, "tb_start_ready", std::nullopt, std::nullopt);
 
   // Testbench state signal.
   declareReg(ctx, os, "tb_started");

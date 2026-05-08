@@ -895,12 +895,14 @@ class LSQWrapper:
             "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         )
 
+        self.lsq_wrapper_str += "\t-- Signals the LSQ core that the store is completed if the MC is ready.\n"
+        self.lsq_wrapper_str += "\t-- NOTE: we assume that MC joins the addr and data, so here we only check the addr ready.\n"
         self.lsq_wrapper_str += (
             "\n"
             + "\t" * (self.tab_level + 2)
             + "if "
             + io_storeEn.getNameWrite()
-            + " = '1' then\n"
+            + " = '1'" + " and " + io_stAddrToMC_ready.getNameRead() + " = '1' then\n"
         )
 
         for i in range(self.lsq_config.numStMem):
