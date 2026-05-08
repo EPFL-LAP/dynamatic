@@ -25,48 +25,61 @@ TYPED_TEST_P(TypeSystemTest, OutputCheck) {
 REGISTER_TYPED_TEST_SUITE_P(TypeSystemTest, OutputCheck);
 
 namespace {
-// Bool representing whether a parameter is required.
+
+enum class PlusOfTwoState {
+  PlusNeeded,
+  FreshParamNeeded,
+  ExistingParamNeeded,
+};
+
 class PlusOfTwoParamOnlyTypeSystem final
-    : public gen::DisallowByDefaultTypeSystem<bool,
+    : public gen::DisallowByDefaultTypeSystem<PlusOfTwoState,
                                               PlusOfTwoParamOnlyTypeSystem> {
 public:
   using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
 
   static bool discardBinaryExpression(ast::BinaryExpression::Op op,
-                                      bool mustBeParameter) {
-    return mustBeParameter || op != ast::BinaryExpression::Plus;
+                                      PlusOfTwoState state) {
+    return op != ast::BinaryExpression::Plus ||
+           state != PlusOfTwoState::PlusNeeded;
   }
 
   gen::TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op) override {
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op) override {
     return {
-        TransferFn<ast::BinaryExpression>(true),
-        TransferFn<ast::BinaryExpression>(true),
-        TransferFn<ast::BinaryExpression>(true),
+        /*lhs=*/TransferFn<ast::BinaryExpression>(
+            PlusOfTwoState::FreshParamNeeded),
+        /*rhs=*/
+        TransferFn<ast::BinaryExpression, ast::BinaryExpression::LHS>(
+            PlusOfTwoState::ExistingParamNeeded),
+        /*output=*/copyFromParent<ast::BinaryExpression>(),
     };
   }
 
-  static std::optional<ConclusionOf<ast::ScalarParameter>>
-  checkScalarParameter(const ast::ScalarParameter &, bool mustBeParameter) {
-    if (!mustBeParameter)
-      return std::nullopt;
-
-    return mustBeParameter;
+  static bool discardFreshScalarParameter(PlusOfTwoState state) {
+    return state != PlusOfTwoState::FreshParamNeeded;
   }
 
-  static std::optional<ConclusionOf<ast::Variable>>
-  checkVariable(bool mustBeParameter) {
-    if (mustBeParameter)
-      return mustBeParameter;
-    return std::nullopt;
+  static bool discardExistingScalarParameter(const ast::ScalarParameter &,
+                                             PlusOfTwoState state) {
+    return false;
   }
 
-  static std::optional<ConclusionOf<ast::ScalarType>>
-  checkScalarType(const ast::ScalarType &scalarType, bool) {
-    if (scalarType != ast::PrimitiveType::Double)
-      return std::nullopt;
+  static bool discardVariable(PlusOfTwoState state) {
+    return state == PlusOfTwoState::PlusNeeded;
+  }
 
-    return ConclusionOf<ast::ScalarType>{};
+  static bool discardScalarType(const ast::ScalarType &scalarType,
+                                PlusOfTwoState) {
+    return scalarType != ast::PrimitiveType::Double;
+  }
+
+  bool discardReturnType(const ast::ReturnType &returnType,
+                         PlusOfTwoState state) {
+    if (llvm::isa<ast::VoidType>(returnType))
+      return true;
+
+    return TypeSystem::discardReturnType(returnType, state);
   }
 
   constexpr static std::string_view result =
@@ -75,7 +88,7 @@ public:
 }
 )";
 
-  constexpr static auto entryContext = false;
+  constexpr static auto entryContext = PlusOfTwoState::PlusNeeded;
 };
 
 // Bool representing whether an array read expression is required.
@@ -91,35 +104,27 @@ public:
   }
 
   gen::TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionContextDependencies() override {
+  getArrayReadExpressionTransferFns() override {
     return {
-        TransferFn<ast::ArrayReadExpression>(false),
-        TransferFn<ast::ArrayReadExpression>(false),
-        copyFromParent<ast::ArrayReadExpression>(),
+        /*array parameter=*/TransferFn<ast::ArrayReadExpression>(false),
+        /*index=*/TransferFn<ast::ArrayReadExpression>(false),
+        /*output=*/copyFromParent<ast::ArrayReadExpression>(),
     };
   }
 
-  std::optional<ConclusionOf<ast::ArrayParameter>>
-  checkArrayParameter(const ast::ArrayParameter &param, bool createArrayRead) {
-    // TODO: The array dimension is currently random making the test below
-    //       susceptible to internal implementation changes.
-    //       Array parameters (like constants) are terminators with a large
-    //       combination of possible values.
-    //       We probably want to allow the type system to return an array
-    //       parameter to use instead for that reason.
-    return TypeSystem::checkArrayParameter(param, createArrayRead);
+  static bool discardFreshArrayParameter(bool createArrayRead) { return false; }
+
+  static bool discardScalarType(const ast::ScalarType &scalarType,
+                                bool /*createArrayRead*/) {
+    return scalarType != ast::PrimitiveType::Double;
   }
 
-  static std::optional<ConclusionOf<ast::ScalarType>>
-  checkScalarType(const ast::ScalarType &scalarType, bool /*createArrayRead*/) {
-    if (scalarType != ast::PrimitiveType::Double)
-      return std::nullopt;
-
-    return ConclusionOf<ast::ScalarType>{};
+  bool discardReturnType(const ast::ReturnType &returnType, bool state) {
+    return TypeSystem::discardReturnType(returnType, state);
   }
 
-  static std::optional<ConclusionOf<ast::Constant>>
-  checkConstant(const ast::Constant &, bool createArrayRead) {
+  static std::optional<ast::Constant> discardConstant(const ast::Constant &,
+                                                      bool createArrayRead) {
     if (createArrayRead)
       return std::nullopt;
 
@@ -127,8 +132,8 @@ public:
   }
 
   constexpr static std::string_view result =
-      R"(double test(double var0[1]) {
-  return var0[((uint32_t)((0)) & (0u))];
+      R"(double test(double var0[32]) {
+  return var0[((uint32_t)((0)) & (31u))];
 }
 )";
 

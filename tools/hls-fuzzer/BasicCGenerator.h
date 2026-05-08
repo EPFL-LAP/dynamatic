@@ -77,9 +77,6 @@ private:
     std::optional<ast::ScalarParameter> parameter;
   };
 
-  PendingParameter generateFreshScalarParameter(ast::ScalarType datatype,
-                                                const OpaqueContext &context);
-
   ast::ReturnStatement
   generateReturnStatement(const OpaqueContext &constraints);
 
@@ -100,6 +97,8 @@ private:
 
   std::optional<ast::CastExpression>
   generateCastExpression(const OpaqueContext &constraint, std::size_t depth);
+
+  ast::Constant getConstantForType(const ast::ScalarType &scalarType) const;
 
   std::optional<ast::Constant> generateConstant(const OpaqueContext &constraint,
                                                 std::size_t depth = 0) const;
@@ -126,8 +125,8 @@ private:
 
   ast::ReturnType generateReturnType(const OpaqueContext &context) const;
 
-  std::vector<ast::Statement>
-  generateStatementList(const OpaqueContext &context);
+  ast::StatementList generateStatementList(const OpaqueContext &context,
+                                           size_t depth);
 
   std::optional<ast::Statement> generateStatement(const OpaqueContext &context);
 
@@ -135,9 +134,9 @@ private:
   generateArrayAssignmentStatement(const OpaqueContext &context);
 
   Randomly &random;
-  ast::ReturnType returnType;
-  std::vector<std::pair<ast::ScalarParameter, OpaqueContext>> scalarParameters;
-  std::vector<std::pair<ast::ArrayParameter, OpaqueContext>> arrayParameters;
+  std::optional<ast::ReturnType> maybeReturnType;
+  std::vector<ast::ScalarParameter> scalarParameters;
+  std::vector<ast::ArrayParameter> arrayParameters;
   std::size_t varCounter = 0;
   AbstractTypeSystem &typeSystem;
   OpaqueContext entryContext;

@@ -1,9 +1,10 @@
 #ifndef DYNAMATIC_HLS_FUZZER_TYPE_SYSTEM_GUIDED_GENERATOR
 #define DYNAMATIC_HLS_FUZZER_TYPE_SYSTEM_GUIDED_GENERATOR
 
+#include "AST.h"
 #include "Randomly.h"
-#include "TypeSystemTraits.h"
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FunctionExtras.h"
 
 #include <any>
@@ -82,6 +83,18 @@ class TransferFn {
                                               1),
                         typename ASTNode::SubElements> &>>>())),
         remaining...>::type;
+  };
+
+  // Special case required to still allow parent dependencies when 'ASTNode'
+  // does not have any subelements.
+  template <typename Tuple>
+  struct CalcCompFn<Tuple, PARENT_DEPENDENCY, 0> {
+    // Recursive case.
+    using type = typename CalcCompFn<
+        decltype(std::tuple_cat(
+            std::declval<Tuple>(),
+            std::declval<std::tuple<const TypingContext &>>())),
+        0>::type;
   };
 
   // Terminating end-case
@@ -272,78 +285,170 @@ using TransferFnArray =
 /// and 'discard*' methods.
 class AbstractTypeSystem {
 protected:
-  /// Returns an instance of 'TransferFn' which simply forwards the context from
-  /// the parent to the subelement.
+  /// Returns an instance of 'TransferFn' which simply forwards the context
+  /// from the parent to the subelement.
   template <typename ASTNode>
   static auto copyFromParent() {
-    return TransferFn<OpaqueContext, ASTNode, PARENT_DEPENDENCY>(
-        [](const OpaqueContext &context) { return context; });
+    return copyFrom<ASTNode, PARENT_DEPENDENCY>();
+  }
+
+  /// Returns an instance of 'TransferFn' which forwards the context
+  /// from the given index to the subelement.
+  template <typename ASTNode, std::size_t index>
+  static auto copyFrom() {
+    return TransferFn<OpaqueContext, ASTNode, index>(
+        [](const OpaqueContext &context, auto &&...) { return context; });
   }
 
 public:
   virtual ~AbstractTypeSystem();
 
-  virtual ConclusionOf<ast::Function, OpaqueContext>
-  checkFunctionOpaque(const OpaqueContext &context) = 0;
+  virtual TransferFnArray<ast::Function> getFunctionTransferFns() {
+    return {
+        /*return type=*/copyFromParent<ast::Function>(),
+        /*statement list=*/copyFromParent<ast::Function>(),
+        /*return statement=*/copyFromParent<ast::Function>(),
+        /*output=*/copyFromParent<ast::Function>(),
+    };
+  }
 
-  /// Returns true if the generator should discard this binary expression based
-  /// on the given input context.
+  virtual TransferFnArray<ast::ReturnStatement>
+  getReturnStatementTransferFns() {
+    return {
+        /*return value=*/copyFromParent<ast::ReturnStatement>(),
+        /*output=*/copyFromParent<ast::ReturnStatement>(),
+    };
+  }
+
+  /// Returns true if the generator should discard this binary expression
+  /// based on the given input context.
   virtual bool discardBinaryExpressionOpaque(ast::BinaryExpression::Op op,
                                              const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::UnaryExpression, OpaqueContext>>
-  checkUnaryExpressionOpaque(ast::UnaryExpression::Op op,
-                             const OpaqueContext &context) = 0;
-
   virtual TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionContextDependencies(ast::BinaryExpression::Op op) {
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) {
     // Default implementation: Simply propagates the context to the subelements.
     return {/*lhs=*/copyFromParent<ast::BinaryExpression>(),
             /*rhs=*/copyFromParent<ast::BinaryExpression>(),
             /*output=*/copyFromParent<ast::BinaryExpression>()};
   }
 
-  virtual std::optional<ConclusionOf<ast::Variable, OpaqueContext>>
-  checkVariableOpaque(const OpaqueContext &context) = 0;
+  virtual bool discardUnaryExpressionOpaque(ast::UnaryExpression::Op op,
+                                            const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::CastExpression, OpaqueContext>>
-  checkCastExpressionOpaque(const OpaqueContext &context) = 0;
+  virtual TransferFnArray<ast::UnaryExpression>
+  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) {
+    return {
+        /*operand=*/copyFromParent<ast::UnaryExpression>(),
+        /*output=*/copyFromParent<ast::UnaryExpression>(),
+    };
+  }
 
-  virtual std::optional<ConclusionOf<ast::ConditionalExpression, OpaqueContext>>
-  checkConditionalExpressionOpaque(const OpaqueContext &context) = 0;
+  virtual bool discardVariableOpaque(const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::ScalarType, OpaqueContext>>
-  checkScalarTypeOpaque(const ast::ScalarType &,
+  virtual TransferFnArray<ast::Variable> getVariableTransferFns() {
+    return {
+        /*parameter=*/copyFromParent<ast::Variable>(),
+        /*output=*/copyFromParent<ast::Variable>(),
+    };
+  }
+
+  virtual bool discardCastExpressionOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() {
+    return {
+        /*target type=*/copyFromParent<ast::CastExpression>(),
+        /*operand=*/copyFromParent<ast::CastExpression>(),
+        /*output=*/copyFromParent<ast::CastExpression>(),
+    };
+  }
+
+  virtual bool
+  discardConditionalExpressionOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::ConditionalExpression>
+  getConditionalExpressionTransferFns() {
+    // Default implementation: Simply propagates the context to the
+    // subelements.
+    return {
+        /*condition=*/copyFromParent<ast::ConditionalExpression>(),
+        /*true value=*/copyFromParent<ast::ConditionalExpression>(),
+        /*false value=*/copyFromParent<ast::ConditionalExpression>(),
+        /*output=*/copyFromParent<ast::ConditionalExpression>(),
+    };
+  }
+
+  virtual bool discardScalarTypeOpaque(const ast::ScalarType &scalarType,
+                                       const OpaqueContext &context) = 0;
+
+  virtual bool discardReturnTypeOpaque(const ast::ReturnType &,
+                                       const OpaqueContext &context) = 0;
+
+  virtual std::optional<ast::Constant>
+  discardConstantOpaque(const ast::Constant &,
                         const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::ReturnType, OpaqueContext>>
-  checkReturnTypeOpaque(const ast::ReturnType &,
-                        const OpaqueContext &context) = 0;
+  virtual bool
+  discardExistingScalarParameterOpaque(const ast::ScalarParameter &,
+                                       const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::Constant, OpaqueContext>>
-  checkConstantOpaque(const ast::Constant &, const OpaqueContext &context) = 0;
+  virtual bool
+  discardFreshScalarParameterOpaque(const OpaqueContext &context) = 0;
 
-  virtual std::optional<ConclusionOf<ast::ScalarParameter, OpaqueContext>>
-  checkScalarParameterOpaque(const ast::ScalarParameter &,
-                             const OpaqueContext &context) = 0;
+  virtual TransferFnArray<ast::ScalarParameter>
+  getScalarParameterTransferFns() {
+    return {
+        /*data type=*/copyFromParent<ast::ScalarParameter>(),
+        /*output=*/copyFromParent<ast::ScalarParameter>(),
+    };
+  }
 
   virtual bool
   discardArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionContextDependencies() {
+  getArrayReadExpressionTransferFns() {
     return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
             /*index=*/copyFromParent<ast::ArrayReadExpression>(),
             /*output=*/copyFromParent<ast::ArrayReadExpression>()};
   }
 
-  virtual std::optional<ConclusionOf<ast::ArrayParameter, OpaqueContext>>
-  checkArrayParameterOpaque(const ast::ArrayParameter &,
-                            const OpaqueContext &context) = 0;
+  virtual bool
+  discardExistingArrayParameterOpaque(const ast::ArrayParameter &,
+                                      const OpaqueContext &context) = 0;
 
-  virtual std::optional<
-      ConclusionOf<ast::ArrayAssignmentStatement, OpaqueContext>>
-  checkArrayAssignmentStatementOpaque(const OpaqueContext &context) = 0;
+  virtual bool
+  discardFreshArrayParameterOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::ArrayParameter> getArrayParameterTransferFns() {
+    return {
+        /*element type=*/copyFromParent<ast::ArrayParameter>(),
+        /*output=*/copyFromParent<ast::ArrayParameter>(),
+    };
+  }
+
+  virtual bool
+  discardArrayAssignmentStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::ArrayAssignmentStatement>
+  getArrayAssignmentStatementTransferFns() {
+    return TransferFnArray<ast::ArrayAssignmentStatement>{
+        /*array parameter=*/copyFromParent<ast::ArrayAssignmentStatement>(),
+        /*index=*/copyFromParent<ast::ArrayAssignmentStatement>(),
+        /*value=*/copyFromParent<ast::ArrayAssignmentStatement>(),
+        /*output=*/copyFromParent<ast::ArrayAssignmentStatement>(),
+    };
+  }
+
+  virtual bool discardStatementListOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::StatementList> getStatementListTransferFns() {
+    return TransferFnArray<ast::StatementList>{
+        /*statement list=*/copyFromParent<ast::StatementList>(),
+        /*statement=*/copyFromParent<ast::StatementList>(),
+        /*output=*/copyFromParent<ast::StatementList>(),
+    };
+  }
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -356,20 +461,13 @@ public:
 /// used when generating sub-elements of an AST-node or 2) rejecting AST-nodes
 /// entirely based on the current type context.
 ///
-/// There are currently two APIs to achieve this:
-/// 1) The transfer functions API
-/// 2) the 'check*' API.
-/// The latter is considered deprecated and implements a subset of
-/// functionality of the transfer functions API.
+/// All type checking is performed under a given context specified as the
+/// 'TypingContext' template parameter. Every AST node is initially generated
+/// using an input context passed into the 'discard*' method of the AST node
+/// which may discard the AST node. Otherwise, new contexts for the subelements
+/// of the AST node can be derived.
 ///
-/// Regardless of API, all type checking is performed under a given context
-/// specified as the 'TypingContext' template parameter.
-/// Every AST node is initially generated using an input context
-/// passed into the 'check*' method or 'discard*' method of the AST node which
-/// may discard the AST node.
-/// Otherwise, new contexts for the subelements of the AST node can be derived.
-///
-/// The transfer functions API allows specifying how input contexts for AST
+/// The transfer functions allow specifying how input contexts for AST
 /// elements should be calculated.
 /// Specifically, an instance of 'TransferFn' can specify that it depends on the
 /// context and AST node of a sibling subelement in addition to, or instead of
@@ -380,20 +478,14 @@ public:
 /// 'a'.
 /// The generator uses this knowledge to generate the AST node of 'a' before
 /// 'i'.
-/// 'check*' methods in contrast only implement deriving subelement contexts
-/// from the parent input context.
-/// They return a tuple of 'TypingContext's for every subelement of 'ASTNode',
-/// the so-called conclusion type.
 ///
 /// Note: We call it contexts rather than constraints to match literature, and
 /// as it more generally informs an AST-node generation about the type-system
 /// state rather than necessarily putting requirements on an AST-node
-/// generation. In the future, it'll likely be possible to also output contexts
-/// from sub-expressions to parent-expressions.
-/// An example of such a context would e.g. be the set of all variables used.
+/// generation.
 ///
-/// The logic that should be implemented in the 'check*' methods can be thought
-/// of as inversions of the usual type checking rules seen in literature.
+/// The logic that should be implemented can be thought of as inversions of the
+/// usual type checking rules seen in literature.
 /// E.g. assuming a type system where the context is a two-state variable that
 /// requires the expression to either be an integer type or a floating point
 /// type, then a typing rule for conditional expressions might look as follows:
@@ -406,17 +498,11 @@ public:
 /// ({integer} |- cond) -> ({A} |- lhs) -> ({A} |- rhs) -> ({A} |- cond ? lhs :
 /// rhs)
 ///
-/// The corresponding 'checkConditionalExpression' method instead implements:
+/// The corresponding 'getConditionalExpressionTransferFns' method
+/// instead implements:
 /// ({A} |- cond ? lhs : rhs) -> ({integer} |- cond) -> ({A} |- lhs) -> ({A} |-
-/// rhs) where 'A' is the context passed into the function and the three clauses
-/// correspond to the conclusion type of conditional expressions.
-///
-/// Check methods for terminals are slightly special: They take as input an
-/// already generated terminal node and are always discardable.
-/// All check methods have a default implementation that forwards the current
-/// constraint to all sub-elements.
-/// See the 'TypeSystemTraits' specializations to find the documentation for
-/// various AST-Node's conclusion types.
+/// rhs) where 'A' is the input context and the three clauses correspond to the
+/// input contexts of the sub elements.
 ///
 /// The current implementation how a type system is used in the base generator
 /// has a few constraints:
@@ -426,12 +512,7 @@ public:
 ///   return type.
 template <typename TypingContext, typename Self>
 class TypeSystem : public AbstractTypeSystem {
-
 public:
-  /// The conclusion type of 'ASTNode' with the given context.
-  template <typename ASTNode>
-  using ConclusionOf = ConclusionOf<ASTNode, TypingContext>;
-
   template <typename ASTNode, std::size_t... inputIndices>
   using TransferFn = TransferFn<TypingContext, ASTNode, inputIndices...>;
 
@@ -443,240 +524,157 @@ public:
   // since we use CRTP-techniques to call these. They may be but are not
   // required to be static.
 
-  static ConclusionOf<ast::Function>
-  checkFunction(const TypingContext &context) {
-    return {context, context};
-  }
-
   static bool discardBinaryExpression(ast::BinaryExpression::Op,
                                       const TypingContext &) {
     return false;
   }
 
-  static ConclusionOf<ast::UnaryExpression>
-  checkUnaryExpression(ast::UnaryExpression::Op, const TypingContext &context) {
-    return {context};
+  static bool discardUnaryExpression(ast::UnaryExpression::Op,
+                                     const TypingContext &) {
+    return false;
   }
 
-  static ConclusionOf<ast::Variable>
-  checkVariable(const TypingContext &context) {
-    return {context};
+  static bool discardVariable(const TypingContext &) { return false; }
+
+  static bool discardCastExpression(const TypingContext &) { return false; }
+
+  static bool discardConditionalExpression(const TypingContext &) {
+    return false;
   }
 
-  static ConclusionOf<ast::CastExpression>
-  checkCastExpression(const TypingContext &context) {
-    return {context, context};
+  static bool discardScalarType(const ast::ScalarType &,
+                                const TypingContext &) {
+    return false;
   }
 
-  static ConclusionOf<ast::ConditionalExpression>
-  checkConditionalExpression(const TypingContext &context) {
-    return {context, context, context};
-  }
-
-  static ConclusionOf<ast::ScalarType> checkScalarType(const ast::ScalarType &,
-                                                       const TypingContext &) {
-    return {};
-  }
-
-  std::optional<ConclusionOf<ast::ReturnType>>
-  checkReturnType(const ast::ReturnType &returnType,
-                  const TypingContext &context) {
+  bool discardReturnType(const ast::ReturnType &returnType,
+                         const TypingContext &context) {
     // Default implementation dispatches to 'checkScalarType'.
-    return llvm::TypeSwitch<ast::ReturnType,
-                            std::optional<ConclusionOf<ast::ReturnType>>>(
-               returnType)
-        .Case([](const ast::VoidType *) {
-          return ConclusionOf<ast::ReturnType>{};
-        })
-        .Case([&](const ast::ScalarType *scalar)
-                  -> std::optional<ConclusionOf<ast::ReturnType>> {
-          if (std::optional optional = self().checkScalarType(*scalar, context);
-              !optional)
-            return std::nullopt;
-
-          return ConclusionOf<ast::ReturnType>{};
+    return llvm::TypeSwitch<ast::ReturnType, bool>(returnType)
+        .Case([](const ast::VoidType *) { return false; })
+        .Case([&](const ast::ScalarType *scalar) {
+          return self().discardScalarType(*scalar, context);
         });
   }
 
-  std::optional<ConclusionOf<ast::Constant>>
-  checkConstant(const ast::Constant &constant, const TypingContext &context) {
-    if (std::optional optional =
-            self().checkScalarType(constant.getType(), context);
-        !optional)
+  std::optional<ast::Constant> discardConstant(const ast::Constant &constant,
+                                               const TypingContext &context) {
+    if (self().discardScalarType(constant.getType(), context))
       return std::nullopt;
 
     return constant;
   }
 
-  std::optional<ConclusionOf<ast::ScalarParameter>>
-  checkScalarParameter(const ast::ScalarParameter &parameter,
-                       const TypingContext &context) {
-    if (std::optional optional =
-            self().checkScalarType(parameter.getDataType(), context);
-        !optional)
-      return std::nullopt;
+  bool discardExistingScalarParameter(const ast::ScalarParameter &parameter,
+                                      const TypingContext &context) {
+    return self().discardScalarType(parameter.getDataType(), context);
+  }
 
-    return context;
+  static bool discardFreshScalarParameter(const TypingContext &) {
+    return false;
   }
 
   static bool discardArrayReadExpression(const TypingContext &) {
     return false;
   }
 
-  std::optional<ConclusionOf<ast::ArrayParameter>>
-  checkArrayParameter(const ast::ArrayParameter &parameter,
-                      const TypingContext &context) {
-    if (std::optional optional =
-            self().checkScalarType(parameter.getElementType(), context);
-        !optional)
-      return std::nullopt;
-
-    return context;
+  bool discardExistingArrayParameter(const ast::ArrayParameter &parameter,
+                                     const TypingContext &context) {
+    return self().discardScalarType(parameter.getElementType(), context);
   }
 
-  static ConclusionOf<ast::ArrayAssignmentStatement>
-  checkArrayAssignmentStatement(const TypingContext &context) {
-    return {context, context, context};
+  static bool discardFreshArrayParameter(const TypingContext &) {
+    return false;
   }
+
+  static bool discardArrayAssignmentStatement(const TypingContext &) {
+    return false;
+  }
+
+  static bool discardStatementList(const TypingContext &) { return false; }
 
   // Implementations of the virtual methods in 'AbstractTypeSystem'.
   // These are automatically implemented to unbox the 'TypingContext's out of
   // the opaque contexts, calling the corresponding non-opaque 'check*' method
   // and boxing the result into an opaque context again.
 
-  dynamatic::ConclusionOf<ast::Function, OpaqueContext>
-  checkFunctionOpaque(const OpaqueContext &context) final {
-    return convert(self().checkFunction(context.cast<TypingContext>()));
-  }
-
   bool discardBinaryExpressionOpaque(ast::BinaryExpression::Op op,
                                      const OpaqueContext &context) final {
     return self().discardBinaryExpression(op, context.cast<TypingContext>());
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::UnaryExpression, OpaqueContext>>
-  checkUnaryExpressionOpaque(ast::UnaryExpression::Op op,
-                             const OpaqueContext &context) final {
-    return convert(
-        self().checkUnaryExpression(op, context.cast<TypingContext>()));
+  bool discardUnaryExpressionOpaque(ast::UnaryExpression::Op op,
+                                    const OpaqueContext &context) final {
+    return self().discardUnaryExpression(op, context.cast<TypingContext>());
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::Variable, OpaqueContext>>
-  checkVariableOpaque(const OpaqueContext &context) final {
-    return convert(self().checkVariable(context.cast<TypingContext>()));
+  bool discardVariableOpaque(const OpaqueContext &context) final {
+    return self().discardVariable(context.cast<TypingContext>());
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::CastExpression, OpaqueContext>>
-  checkCastExpressionOpaque(const OpaqueContext &context) final {
-    return convert(self().checkCastExpression(context.cast<TypingContext>()));
+  bool discardCastExpressionOpaque(const OpaqueContext &context) final {
+    return self().discardCastExpression(context.cast<TypingContext>());
   }
 
-  std::optional<
-      dynamatic::ConclusionOf<ast::ConditionalExpression, OpaqueContext>>
-  checkConditionalExpressionOpaque(const OpaqueContext &context) final {
-    return convert(
-        self().checkConditionalExpression(context.cast<TypingContext>()));
+  bool discardConditionalExpressionOpaque(const OpaqueContext &context) final {
+    return self().discardConditionalExpression(context.cast<TypingContext>());
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::ScalarType, OpaqueContext>>
-  checkScalarTypeOpaque(const ast::ScalarType &node,
+  bool discardScalarTypeOpaque(const ast::ScalarType &node,
+                               const OpaqueContext &context) final {
+    return self().discardScalarType(node, context.cast<TypingContext>());
+  }
+
+  bool discardReturnTypeOpaque(const ast::ReturnType &node,
+                               const OpaqueContext &context) final {
+    return self().discardReturnType(node, context.cast<TypingContext>());
+  }
+
+  std::optional<ast::Constant>
+  discardConstantOpaque(const ast::Constant &node,
                         const OpaqueContext &context) final {
-    return convert(self().checkScalarType(node, context.cast<TypingContext>()));
+    return self().discardConstant(node, context.cast<TypingContext>());
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::ReturnType, OpaqueContext>>
-  checkReturnTypeOpaque(const ast::ReturnType &node,
-                        const OpaqueContext &context) final {
-    return convert(self().checkReturnType(node, context.cast<TypingContext>()));
+  bool
+  discardExistingScalarParameterOpaque(const ast::ScalarParameter &node,
+                                       const OpaqueContext &context) final {
+    return self().discardExistingScalarParameter(node,
+                                                 context.cast<TypingContext>());
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::Constant, OpaqueContext>>
-  checkConstantOpaque(const ast::Constant &node,
-                      const OpaqueContext &context) final {
-    return convert(self().checkConstant(node, context.cast<TypingContext>()));
-  }
-
-  std::optional<dynamatic::ConclusionOf<ast::ScalarParameter, OpaqueContext>>
-  checkScalarParameterOpaque(const ast::ScalarParameter &node,
-                             const OpaqueContext &context) final {
-    return convert(
-        self().checkScalarParameter(node, context.cast<TypingContext>()));
+  bool discardFreshScalarParameterOpaque(const OpaqueContext &context) final {
+    return self().discardFreshScalarParameter(context.cast<TypingContext>());
   }
 
   bool discardArrayReadExpressionOpaque(const OpaqueContext &context) final {
     return self().discardArrayReadExpression(context.cast<TypingContext>());
   }
 
-  std::optional<dynamatic::ConclusionOf<ast::ArrayParameter, OpaqueContext>>
-  checkArrayParameterOpaque(const ast::ArrayParameter &node,
-                            const OpaqueContext &context) final {
-    return convert(
-        self().checkArrayParameter(node, context.cast<TypingContext>()));
+  bool discardExistingArrayParameterOpaque(const ast::ArrayParameter &node,
+                                           const OpaqueContext &context) final {
+    return self().discardExistingArrayParameter(node,
+                                                context.cast<TypingContext>());
   }
 
-  std::optional<
-      dynamatic::ConclusionOf<ast::ArrayAssignmentStatement, OpaqueContext>>
-  checkArrayAssignmentStatementOpaque(const OpaqueContext &context) final {
-    return convert(
-        self().checkArrayAssignmentStatement(context.cast<TypingContext>()));
+  bool discardFreshArrayParameterOpaque(const OpaqueContext &context) final {
+    return self().discardFreshArrayParameter(context.cast<TypingContext>());
+  }
+
+  bool
+  discardArrayAssignmentStatementOpaque(const OpaqueContext &context) final {
+    return self().discardArrayAssignmentStatement(
+        context.cast<TypingContext>());
+  }
+
+  bool discardStatementListOpaque(const OpaqueContext &context) final {
+    return self().discardStatementList(context.cast<TypingContext>());
   }
 
 private:
   Self &self() { return static_cast<Self &>(*this); }
 
   const Self &self() const { return static_cast<const Self &>(*this); }
-
-  static OpaqueContext convert(const TypingContext &context) {
-    return OpaqueContext(context);
-  }
-
-  static OpaqueContext convert(TypingContext &&context) {
-    return OpaqueContext(context);
-  }
-
-  template <class T>
-  static auto convert(const T &value) {
-    return value;
-  }
-
-  template <class T>
-  static auto convert(std::optional<T> &&value) {
-    using Ret = decltype(convert(std::move(*value)));
-    if (!value)
-      return std::optional<Ret>{};
-
-    return std::optional<Ret>(convert(std::move(*value)));
-  }
-
-  /// Converts all instances of 'TypingContext' of a tuple-like struct into
-  /// 'OpaqueContext'.
-  /// Tuple-like structs are structs that specialize 'std::tuple_size' and
-  /// implement 'get<size_t>' methods.
-  template <template <typename> typename TupleLike,
-            class Indices = std::make_index_sequence<
-                std::tuple_size<std::decay_t<TupleLike<TypingContext>>>::value>>
-  decltype(auto) convert(TupleLike<TypingContext> &&tuple) {
-    return convertTupleLikeImpl(std::forward<TupleLike<TypingContext>>(tuple),
-                                Indices{});
-  }
-
-  /// Converts all instances of 'TypingContext' in the tuple into
-  /// 'OpaqueContext's.
-  template <class... Args>
-  static decltype(auto) convert(std::tuple<Args...> &&tuple) {
-    return std::apply(
-        [](auto &&...args) {
-          return std::make_tuple(
-              convert(std::forward<decltype(args)>(args))...);
-        },
-        std::move(tuple));
-  }
-
-  template <template <typename> typename TupleLike, std::size_t... indices>
-  static decltype(auto) convertTupleLikeImpl(TupleLike<TypingContext> &&tuple,
-                                             std::index_sequence<indices...>) {
-    return TupleLike<OpaqueContext>{convert(get<indices>(tuple))...};
-  }
 };
 
 /// A noop-system which uses all the default implementations in 'TypeSystem'.
@@ -697,58 +695,57 @@ public:
     return true;
   }
 
-  static std::optional<ConclusionOf<ast::UnaryExpression, TypingContext>>
-  checkUnaryExpression(ast::UnaryExpression::Op, const TypingContext &) {
+  static bool discardUnaryExpression(ast::UnaryExpression::Op,
+                                     const TypingContext &) {
+    return true;
+  }
+
+  static bool discardVariable(const TypingContext &) { return true; }
+
+  static bool discardCastExpression(const TypingContext &) { return true; }
+
+  static bool discardConditionalExpression(const TypingContext &) {
+    return true;
+  }
+
+  static bool discardScalarType(const ast::ScalarType &,
+                                const TypingContext &) {
+    return true;
+  }
+
+  static bool discardReturnType(const ast::ReturnType &,
+                                const TypingContext &) {
+    return true;
+  }
+
+  std::optional<ast::Constant> discardConstant(const ast::Constant &,
+                                               const TypingContext &) {
     return std::nullopt;
   }
 
-  static std::optional<ConclusionOf<ast::Variable, TypingContext>>
-  checkVariable(const TypingContext &) {
-    return std::nullopt;
+  static bool discardExistingScalarParameter(const ast::ScalarParameter &,
+                                             const TypingContext &) {
+    return true;
   }
 
-  static std::optional<ConclusionOf<ast::CastExpression, TypingContext>>
-  checkCastExpression(const TypingContext &) {
-    return std::nullopt;
-  }
-
-  static std::optional<ConclusionOf<ast::ConditionalExpression, TypingContext>>
-  checkConditionalExpression(const TypingContext &) {
-    return std::nullopt;
-  }
-
-  static std::optional<ConclusionOf<ast::ScalarType, TypingContext>>
-  checkScalarType(const ast::ScalarType &, const TypingContext &) {
-    return std::nullopt;
-  }
-
-  static std::optional<ConclusionOf<ast::ReturnType, TypingContext>>
-  checkScalarType(const ast::ReturnType &, const TypingContext &) {
-    return std::nullopt;
-  }
-
-  std::optional<ConclusionOf<ast::Constant, TypingContext>>
-  checkConstant(const ast::Constant &, const TypingContext &) {
-    return std::nullopt;
-  }
-
-  std::optional<ConclusionOf<ast::ScalarParameter, TypingContext>>
-  checkScalarParameter(const ast::ScalarParameter &, const TypingContext &) {
-    return std::nullopt;
+  static bool discardFreshScalarParameter(const TypingContext &) {
+    return true;
   }
 
   static bool discardArrayReadExpression(const TypingContext &) { return true; }
 
-  std::optional<ConclusionOf<ast::ArrayParameter, TypingContext>>
-  checkArrayParameter(const ast::ArrayParameter &, const TypingContext &) {
-    return std::nullopt;
+  static bool discardExistingArrayParameter(const ast::ArrayParameter &,
+                                            const TypingContext &) {
+    return true;
   }
 
-  static std::optional<
-      ConclusionOf<ast::ArrayAssignmentStatement, TypingContext>>
-  checkArrayAssignmentStatement(const TypingContext &) {
-    return std::nullopt;
+  static bool discardFreshArrayParameter(const TypingContext &) { return true; }
+
+  static bool discardArrayAssignmentStatement(const TypingContext &) {
+    return true;
   }
+
+  static bool discardStatementList(const TypingContext &) { return true; }
 };
 
 } // namespace dynamatic::gen

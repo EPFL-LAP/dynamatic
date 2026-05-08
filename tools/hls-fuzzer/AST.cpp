@@ -380,6 +380,11 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
 }
 
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
+                                   const ReturnType &returnType) {
+  return os << returnType.variant;
+}
+
+llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const Function &function) {
   os << function.returnType << ' ' << function.name << '(';
   llvm::interleaveComma(function.scalarParameters, os);
@@ -391,10 +396,10 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
   mlir::raw_indented_ostream indentedOstream(os);
   indentedOstream.indent();
   for (auto &iter : function.statements)
-    indentedOstream << iter;
+    indentedOstream << iter << '\n';
   if (function.returnStatement)
-    indentedOstream << *function.returnStatement;
+    indentedOstream << *function.returnStatement << '\n';
 
-  os << "\n}\n";
+  os << "}\n";
   return os;
 }

@@ -25,8 +25,8 @@ MODULE {name}(addrIn, addrIn_valid, dataFromMem, dataFromMem_valid, addrOut_read
   dataOut := inner_data_one_slot_break_r.outs;
   dataOut_valid := inner_data_one_slot_break_r.outs_valid;
 
-  addr_full := inner_addr_one_slot_break_r.slot_0_full;
-  data_full := inner_data_one_slot_break_r.slot_0_full;
+  addr_full := inner_addr_one_slot_break_r.full;
+  data_full := inner_data_one_slot_break_r.full;
 
   slotted_token_count := count(addr_full, data_full);
 
