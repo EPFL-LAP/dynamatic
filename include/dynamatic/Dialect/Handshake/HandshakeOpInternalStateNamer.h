@@ -323,7 +323,8 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
 };
 
-// Specialize llvm::json toJSON template for each namer
+// Specialize llvm::json toJSON template for each namer so that they can be
+// converted to json automatically by llvm where necessary
 inline llvm::json::Value toJSON(const EagerForkSentNamer &namer) {
   return namer.toInnerJSON();
 }
