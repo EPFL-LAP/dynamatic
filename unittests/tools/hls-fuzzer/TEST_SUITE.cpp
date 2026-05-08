@@ -52,7 +52,7 @@ public:
         /*rhs=*/
         TransferFn<ast::BinaryExpression, ast::BinaryExpression::LHS>(
             PlusOfTwoState::ExistingParamNeeded),
-        /*output=*/copyFromParent<ast::BinaryExpression>(),
+        /*output=*/copyOutputFromParent<ast::BinaryExpression>(),
     };
   }
 
@@ -108,7 +108,7 @@ public:
     return {
         /*array parameter=*/TransferFn<ast::ArrayReadExpression>(false),
         /*index=*/TransferFn<ast::ArrayReadExpression>(false),
-        /*output=*/copyFromParent<ast::ArrayReadExpression>(),
+        /*output=*/copyOutputFromParent<ast::ArrayReadExpression>(),
     };
   }
 
