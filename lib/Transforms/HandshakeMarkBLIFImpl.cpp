@@ -47,8 +47,16 @@ struct HandshakeMarkBLIFImplPass
       llvm::errs() << "BLIF directory path is empty\n";
       return signalPassFailure();
     }
+    if (dynamaticRoot.empty()) {
+      llvm::errs() << "Dynamatic root path is empty\n";
+      return signalPassFailure();
+    }
+    if (RTLJSONFile.empty()) {
+      llvm::errs() << "RTL JSON file path is empty\n";
+      return signalPassFailure();
+    }
     // Generate blif manager with the provided directory path
-    BLIFFileManager blifFileManager(blifDirPath);
+    BLIFFileManager blifFileManager(blifDirPath, dynamaticRoot, RTLJSONFile);
     // Get the module op
     mlir::ModuleOp moduleOp = cast<mlir::ModuleOp>(getOperation());
     // Walk through all handshake operations in the function

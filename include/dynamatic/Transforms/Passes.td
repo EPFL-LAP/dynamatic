@@ -142,7 +142,7 @@ def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> 
     Replaces instances (`handshake::InstanceOp`) of external Handshake functions
     by extra arguments/results in their containing (internal) Handshake
     functions. This is the equivalent of moving RTL modules from inside the
-    Handshake function to outside of it.       
+    Handshake function to outside of it.
   }];
 }
 
@@ -350,7 +350,13 @@ def HandshakeMarkBLIFImpl : Pass<"handshake-mark-blif-impl"> {
   let options = [
     Option<"blifDirPath", "blif-dir-path", "std::string", "",
             "Path to directory containing BLIF files for AIG implementations of "
-            "Handshake operations.">
+            "Handshake operations.">,
+    Option<"dynamaticRoot", "dynamatic-root", "std::string", "",
+            "Path to the root directory of the Dynamatic repository. This is used "
+            "in the RTL generation process if needed.">,
+    Option<"RTLJSONFile", "rtl-json-file", "std::string", "",
+            "Path to JSON-formatted RTL information file. This is used in the RTL "
+            "generation process if needed.">
   ];
 }
 
