@@ -89,7 +89,12 @@
   },
   {
     "name": "handshake.sink",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sink -p bitwidth=$BITWIDTH iog_terminator=$IOG_TERMINATOR",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t sink -p bitwidth=$BITWIDTH",
+    "hdl": "smv"
+  },
+  {
+    "name": "handshake.dead_buffer",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t dead_buffer -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   },
   {

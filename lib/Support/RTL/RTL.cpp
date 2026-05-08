@@ -286,12 +286,6 @@ LogicalResult RTLMatch::registerParameters(hw::HWModuleExternOp &modOp) {
       modOp->template getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME).getValue();
   auto modType = modOp.getModuleType();
 
-  if (handshakeOp == "handshake.sink") {
-    bool x = modOp->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)
-                 .contains("IOG_TERMINATOR");
-    serializedParams["IOG_TERMINATOR"] = x ? "True" : "False";
-  }
-
   LogicalResult gotBitwidth =
       registerBitwidthParameter(modOp, handshakeOp, modType);
   LogicalResult gotExtraSignals =
@@ -315,6 +309,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.merge" ||
       handshakeOp == "handshake.muli" ||
       handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.dead_buffer" ||
       handshakeOp == "handshake.subi" ||
       handshakeOp == "handshake.shli" ||
       handshakeOp == "handshake.blocker" ||
@@ -457,6 +452,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.muli" ||
       handshakeOp == "handshake.select" ||
       handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.dead_buffer" ||
       handshakeOp == "handshake.subf" ||
       handshakeOp == "handshake.extui" ||
       handshakeOp == "handshake.shli" ||

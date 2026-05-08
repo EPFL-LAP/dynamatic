@@ -488,9 +488,18 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
   }
 
   for (SinkOp sink : sinks) {
-    auto unitAttr = UnitAttr::get(modOp.getContext());
-    sink->setAttr("IOG_TERMINATOR", unitAttr);
+    OpBuilder builder(sink);
+    DeadBufferOp deadBuffer =
+        builder.create<DeadBufferOp>(sink.getLoc(), sink.getOperand());
+    sink.erase();
+    for (auto &iog : iogs) {
+      if (iog.contains(sink)) {
+        iog.units.erase(sink);
+        iog.units.insert(deadBuffer);
+      }
+    }
   }
+  getAnalysis<NameAnalysis>().nameAllUnnamedOps();
 
   if (failed(annotateQueriedProperties(iogs))) {
     return signalPassFailure();

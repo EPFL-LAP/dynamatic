@@ -235,13 +235,6 @@ getAllSlotsOfOperation(Operation *op) {
       ret.push_back(std::make_unique<PipelineSlotNamer>(slot));
     }
   }
-  if (auto sinkOp = dyn_cast<SinkOp>(op)) {
-    if (sinkOp.terminatesIOG()) {
-      ret.push_back(
-          std::make_unique<BufferSlotFullNamer>(sinkOp.getTerminatingSlot()));
-    }
-    return ret;
-  }
 
   if (auto endOp = dyn_cast<EndOp>(op)) {
     ret.push_back(std::make_unique<BufferSlotFullNamer>("testbench", "end", 0));

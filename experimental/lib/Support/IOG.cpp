@@ -261,7 +261,7 @@ public:
     } else if (auto arithOp = dyn_cast<ArithOpInterface>(op)) {
       candidate.markFollowed(arithOp->getResults()[0]);
       followSingle(candidate, arithOp->getOperands());
-    } else if (isa<SinkOp, StoreOp>(op)) {
+    } else if (isa<SinkOp, StoreOp, DeadBufferOp>(op)) {
       // These act as terminating units, and no further edges need to be
       // followed
       candidates.push_back(candidate);

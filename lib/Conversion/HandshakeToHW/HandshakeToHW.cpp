@@ -588,7 +588,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::SinkOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
-        addBoolean("IOG_TERMINATOR", op->hasAttr("IOG_TERMINATOR"));
+      })
+      .Case<handshake::DeadBufferOp>([&](auto) {
+        // Bitwidth
+        addType("DATA_TYPE", op->getOperand(0));
       })
       .Case<handshake::BranchOp, handshake::NDWireOp>([&](auto) {
         // Bitwidth
@@ -2150,6 +2153,7 @@ public:
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,
         ConvertToHWInstance<handshake::SinkOp>,
+        ConvertToHWInstance<handshake::DeadBufferOp>,
         ConvertToHWInstance<handshake::ForkOp>,
         ConvertToHWInstance<handshake::LazyForkOp>,
         ConvertToHWInstance<handshake::LoadOp>,
