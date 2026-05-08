@@ -238,7 +238,8 @@ getAllSlotsOfOperation(Operation *op) {
   }
 
   if (auto endOp = dyn_cast<EndOp>(op)) {
-    ret.push_back(std::make_unique<BufferSlotFullNamer>("testbench", "end", 0));
+    ret.push_back(
+        std::make_unique<BufferSlotFullNamer>("testbench", "end", "", 0));
   }
   if (auto loadOp = dyn_cast<LoadOp>(op)) {
     // TODO: Handle LoadOp for MC slot
