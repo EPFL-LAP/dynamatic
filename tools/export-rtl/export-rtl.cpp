@@ -1311,7 +1311,7 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
         std::vector<std::string> laterSlots{};
         laterSlots.emplace_back("TRUE");
         for (auto later = start + 1; later != slots.end(); ++later) {
-          laterSlots.push_back(later->getSMVName());
+          laterSlots.push_back("!" + later->getSMVName());
         }
 
         ends.push_back(llvm::formatv("({0} -> {1})", entryToken,
