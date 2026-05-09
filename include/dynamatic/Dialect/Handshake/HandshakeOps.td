@@ -726,7 +726,7 @@ def SinkOp : Handshake_Op<"sink"> {
   }];
 }
 
-def DeadBufferOp : Handshake_Op<"dead_buffer", [
+def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
   DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
  ]> {
   let summary = "buffer operation without successor";
