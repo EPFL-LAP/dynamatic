@@ -1,6 +1,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "llvm/Support/Casting.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -47,60 +48,111 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
   }
 }
 
-std::unique_ptr<InternalStateNamer>
-InternalStateNamer::fromJSON(const llvm::json::Value &value,
-                             llvm::json::Path path) {
+llvm::json::Value toJSON(const std::unique_ptr<InternalStateNamer> &namer) {
+  // Example:
+  // {
+  //   "type": "EagerForkSent",
+  //   "inner": {
+  //     "operation": "fork1",
+  //     "channel_name": "outs_1",
+  //     "channel_size": 2
+  //   }
+  // }
+  return llvm::json::Object({
+      {InternalStateNamer::TYPE_LIT,
+       InternalStateNamer::typeToStr(namer->type)},
+      {InternalStateNamer::INNER_LIT, namer->toInnerJSON()},
+  });
+}
+
+llvm::json::Value toJSON(const std::shared_ptr<InternalStateNamer> &namer) {
+  return llvm::json::Object({
+      {InternalStateNamer::TYPE_LIT,
+       InternalStateNamer::typeToStr(namer->type)},
+      {InternalStateNamer::INNER_LIT, namer->toInnerJSON()},
+  });
+}
+
+bool fromJSON(const llvm::json::Value &value,
+              std::shared_ptr<InternalStateNamer> &namer,
+              llvm::json::Path path) {
+  std::unique_ptr<InternalStateNamer> unique;
+
+  if (!fromJSON(value, unique, path))
+    return false;
+  namer = std::move(unique);
+  return true;
+}
+
+bool fromJSON(const llvm::json::Value &value,
+              std::unique_ptr<InternalStateNamer> &namer,
+              llvm::json::Path path) {
   std::string typeStr;
   llvm::json::ObjectMapper mapper(value, path);
-  if (!mapper || !mapper.map(TYPE_LIT, typeStr))
-    return nullptr;
+  if (!mapper || !mapper.map(InternalStateNamer::TYPE_LIT, typeStr))
+    return false;
 
-  auto typeOpt = typeFromStr(typeStr);
+  auto typeOpt = InternalStateNamer::typeFromStr(typeStr);
   if (!typeOpt)
-    return nullptr;
-  TYPE type = *typeOpt;
-  llvm::json::Value inner = nullptr;
-  if (const auto *obj = value.getAsObject()) {
-    auto it = obj->find(INNER_LIT);
-    if (it != obj->end())
-      inner = it->second;
-  }
-  std::unique_ptr<InternalStateNamer> prop = nullptr;
+    return false;
+  InternalStateNamer::TYPE type = *typeOpt;
+  namer = nullptr;
+  EagerForkSentNamer ef;
+  BufferSlotFullNamer bs;
+  PipelineSlotNamer ps;
+  MemoryControllerSlotNamer mc;
+  TokenCountNamer tc;
+  PipelineTokenCountNamer ptc;
+  EntrySlotNamer es;
   switch (type) {
-  case TYPE::EagerForkSent:
-    prop = EagerForkSentNamer::fromInnerJSON(inner, path);
-    assert(prop && "inner eager fork failed");
+  case InternalStateNamer::TYPE::EagerForkSent:
+    ef = EagerForkSentNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, ef))
+      return false;
+    namer = std::make_unique<EagerForkSentNamer>(std::move(ef));
     break;
-  case TYPE::BufferSlotFull:
-    prop = BufferSlotFullNamer::fromInnerJSON(inner, path);
-    assert(prop && "inner buffer slot failed");
+  case InternalStateNamer::TYPE::BufferSlotFull:
+    bs = BufferSlotFullNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, bs))
+      return false;
+    namer = std::make_unique<BufferSlotFullNamer>(std::move(bs));
     break;
-  case TYPE::PipelineSlot:
-    prop = PipelineSlotNamer::fromInnerJSON(inner, path);
-    assert(prop && "inner latency slot failed");
+  case InternalStateNamer::TYPE::PipelineSlot:
+    ps = PipelineSlotNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, ps))
+      return false;
+    namer = std::make_unique<PipelineSlotNamer>(std::move(ps));
     break;
-  case TYPE::Constrained:
+  case InternalStateNamer::TYPE::Constrained:
     assert(false && "todo");
     break;
-  case TYPE::TokenCount:
-    prop = TokenCountNamer::fromInnerJSON(inner, path);
-    assert(prop && "inner token count failed");
+  case InternalStateNamer::TYPE::MemoryControllerSlot:
+    mc = MemoryControllerSlotNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, mc))
+      return false;
+    namer = std::make_unique<MemoryControllerSlotNamer>(std::move(mc));
     break;
-  case TYPE::PipelineTokenCount:
-    prop = PipelineTokenCountNamer::fromInnerJSON(inner, path);
-    assert(prop && "pipeline token count failed");
+  case InternalStateNamer::TYPE::TokenCount:
+    tc = TokenCountNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, tc))
+      return false;
+    namer = std::make_unique<TokenCountNamer>(std::move(tc));
     break;
-  case TYPE::MemoryControllerSlot:
-    prop = MemoryControllerSlotNamer::fromInnerJSON(inner, path);
-    assert(prop && "mc slot failed");
+  case InternalStateNamer::TYPE::PipelineTokenCount:
+    ptc = PipelineTokenCountNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, ptc))
+      return false;
+    namer = std::make_unique<PipelineTokenCountNamer>(std::move(ptc));
     break;
-  case TYPE::EntrySlot:
-    prop = EntrySlotNamer::fromInnerJSON(inner, path);
-    assert(prop && "entry slot failed");
+  case InternalStateNamer::TYPE::EntrySlot:
+    es = EntrySlotNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, es))
+      return false;
+    namer = std::make_unique<EntrySlotNamer>(std::move(es));
     break;
   }
-  prop->type = type;
-  return prop;
+  namer->type = type;
+  return true;
 }
 
 std::unique_ptr<ConstrainedNamer>
@@ -117,16 +169,13 @@ InternalStateNamer::tryConstrain(int32_t value) {
   return nullptr;
 }
 
-std::unique_ptr<EagerForkSentNamer>
-EagerForkSentNamer::fromInnerJSON(const llvm::json::Value &value,
-                                  llvm::json::Path path) {
+bool fromJSON(const llvm::json::Value &value, EagerForkSentNamer &namer,
+              llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<EagerForkSentNamer>();
-  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
-      !mapper.map(CHANNEL_NAME_LIT, prop->channelName) ||
-      !mapper.map(CHANNEL_SIZE_LIT, prop->channelSize))
-    return nullptr;
-  return prop;
+  return mapper &&
+         mapper.map(EagerForkSentNamer::OPERATION_LIT, namer.opName) &&
+         mapper.map(EagerForkSentNamer::CHANNEL_NAME_LIT, namer.channelName) &&
+         mapper.map(EagerForkSentNamer::CHANNEL_SIZE_LIT, namer.channelSize);
 }
 
 ConstrainedEagerForkSentNamer EagerForkSentNamer::constrain(int32_t value) {
@@ -134,17 +183,14 @@ ConstrainedEagerForkSentNamer EagerForkSentNamer::constrain(int32_t value) {
   return p;
 }
 
-std::unique_ptr<BufferSlotFullNamer>
-BufferSlotFullNamer::fromInnerJSON(const llvm::json::Value &value,
-                                   llvm::json::Path path) {
+bool fromJSON(const llvm::json::Value &value, BufferSlotFullNamer &namer,
+              llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<BufferSlotFullNamer>();
-  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
-      !mapper.map(SLOT_NAME_LIT, prop->slotName) ||
-      !mapper.map(DATA_NAME_LIT, prop->dataName) ||
-      !mapper.map(SLOT_SIZE_LIT, prop->slotSize))
-    return nullptr;
-  return prop;
+  return mapper &&
+         mapper.map(BufferSlotFullNamer::OPERATION_LIT, namer.opName) &&
+         mapper.map(BufferSlotFullNamer::SLOT_NAME_LIT, namer.slotName) &&
+         mapper.map(BufferSlotFullNamer::DATA_NAME_LIT, namer.dataName) &&
+         mapper.map(BufferSlotFullNamer::SLOT_SIZE_LIT, namer.slotSize);
 }
 
 ConstrainedBufferSlotFullNamer BufferSlotFullNamer::constrain(int32_t value) {
@@ -152,79 +198,60 @@ ConstrainedBufferSlotFullNamer BufferSlotFullNamer::constrain(int32_t value) {
   return p;
 }
 
-std::unique_ptr<PipelineSlotNamer>
-PipelineSlotNamer::fromInnerJSON(const llvm::json::Value &value,
-                                 llvm::json::Path path) {
+bool fromJSON(const llvm::json::Value &value, PipelineSlotNamer &namer,
+              llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<PipelineSlotNamer>();
   int index;
-  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
-      !mapper.map(SLOT_INDEX_LIT, index))
-    return nullptr;
-  prop->slotIndex = index;
-  return prop;
+  if (!mapper || !mapper.map(PipelineSlotNamer::OPERATION_LIT, namer.opName) ||
+      !mapper.map(PipelineSlotNamer::SLOT_INDEX_LIT, index))
+    return false;
+  namer.slotIndex = index;
+  return true;
 }
 
-std::unique_ptr<PipelineTokenCountNamer>
-PipelineTokenCountNamer::fromInnerJSON(const llvm::json::Value &value,
-                                       llvm::json::Path path) {
+bool fromJSON(const llvm::json::Value &value, PipelineTokenCountNamer &namer,
+              llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<PipelineTokenCountNamer>();
-  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName))
-    return nullptr;
-  return prop;
+  return mapper &&
+         mapper.map(PipelineTokenCountNamer::OPERATION_LIT, namer.opName);
 }
 
-std::unique_ptr<TokenCountNamer>
-TokenCountNamer::fromInnerJSON(const llvm::json::Value &value,
-                               llvm::json::Path path) {
+bool fromJSON(const llvm::json::Value &value, TokenCountNamer &namer,
+              llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<TokenCountNamer>();
-  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName))
-    return nullptr;
-  return prop;
+  return mapper && mapper.map(TokenCountNamer::OPERATION_LIT, namer.opName);
 }
 
-std::unique_ptr<InternalStateNamer>
-ConstrainedNamer::fromInnerJSON(const llvm::json::Value &value,
-                                llvm::json::Path path) {
-  auto namer = InternalStateNamer::fromJSON(value, path);
-  assert(namer && "inner json must be an internal state");
+bool fromJSON(const llvm::json::Value &value, ConstrainedNamer &namer,
+              llvm::json::Path path) {
   auto mapper = llvm::json::ObjectMapper(value, path);
+  std::unique_ptr<InternalStateNamer> inner;
   int32_t val;
-  if (!mapper || !mapper.map(CONSTRAINT_VALUE, val))
-    return nullptr;
-
-  if (auto eagerFork = dyn_cast<EagerForkSentNamer>(namer)) {
-    return std::make_unique<ConstrainedEagerForkSentNamer>(
-        eagerFork->constrain(val));
-  }
-  return nullptr;
+  if (!mapper || !mapper.map(ConstrainedNamer::CONSTRAINT_VALUE_LIT, val) ||
+      !mapper.map(ConstrainedNamer::INNER_LIT, inner))
+    return false;
+  namer = *inner->tryConstrain(val);
+  return true;
 }
 
-std::unique_ptr<MemoryControllerSlotNamer>
-MemoryControllerSlotNamer::fromInnerJSON(const llvm::json::Value &value,
-                                         llvm::json::Path path) {
+bool fromJSON(const llvm::json::Value &value, MemoryControllerSlotNamer &namer,
+              llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<MemoryControllerSlotNamer>();
   int t;
-  if (!mapper || !mapper.map(OPERATION_LIT, prop->opName) ||
-      !mapper.map(SLOT_INDEX_LIT, prop->slotIndex) ||
-      !mapper.map(PORT_TYPE_LIT, t) ||
-      !mapper.map(LOADLESS_LIT, prop->loadless))
-    return nullptr;
-  prop->portType = (PortType)t;
-  return prop;
+  if (!mapper ||
+      !mapper.map(MemoryControllerSlotNamer::OPERATION_LIT, namer.opName) ||
+      !mapper.map(MemoryControllerSlotNamer::SLOT_INDEX_LIT, namer.slotIndex) ||
+      !mapper.map(MemoryControllerSlotNamer::PORT_TYPE_LIT, t) ||
+      !mapper.map(MemoryControllerSlotNamer::LOADLESS_LIT, namer.loadless))
+    return false;
+  namer.portType = (MemoryControllerSlotNamer::PortType)t;
+  return true;
 }
 
-std::unique_ptr<EntrySlotNamer>
-EntrySlotNamer::fromInnerJSON(const llvm::json::Value &value,
-                              llvm::json::Path path) {
+bool fromJSON(const llvm::json::Value &value, EntrySlotNamer &namer,
+              llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);
-  auto prop = std::make_unique<EntrySlotNamer>();
-  if (!mapper || !mapper.map(ARG_NAME_LIT, prop->argName))
-    return nullptr;
-  return prop;
+  return mapper && mapper.map(EntrySlotNamer::ARG_NAME_LIT, namer.argName);
 }
 
 std::vector<std::unique_ptr<InternalStateNamer>>
@@ -239,7 +266,7 @@ getAllSlotsOfOperation(Operation *op) {
 
   if (auto endOp = dyn_cast<EndOp>(op)) {
     ret.push_back(
-        std::make_unique<BufferSlotFullNamer>("testbench", "end", "", 0));
+        std::make_unique<BufferSlotFullNamer>("testbench", "end_full", "", 0));
   }
   if (auto loadOp = dyn_cast<LoadOp>(op)) {
     // TODO: Handle LoadOp for MC slot

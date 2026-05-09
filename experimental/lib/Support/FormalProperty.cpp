@@ -264,11 +264,6 @@ EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> channels{};
-  // std::string opName = sentStateNamers[0].opName;
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    channels.push_back(state.toInnerJSON());
-  }
   // Example JSON:
   // [
   //   {
@@ -292,7 +287,7 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
   //     "operation": "fork0",
   //   }
   // ]
-  return llvm::json::Array(channels);
+  return llvm::json::Array(sentStateNamers);
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
@@ -301,14 +296,8 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::Array *array = info.getAsArray();
-  assert(array &&
-         "expected info of EFNAO to be an array of eager fork outputs");
-  for (auto &stateJSON : *array) {
-    auto sentStateNamer =
-        handshake::EagerForkSentNamer::fromInnerJSON(stateJSON, path);
-    prop->sentStateNamers.push_back(*sentStateNamer);
-  }
+  bool success = llvm::json::fromJSON(info, prop->sentStateNamers, path);
+  assert(success);
   return prop;
 }
 
@@ -335,12 +324,8 @@ CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> channels{};
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    channels.push_back(state.toInnerJSON());
-  }
   return llvm::json::Object(
-      {{FORK_CHANNELS_LIT, channels}, {COPIED_SLOT_LIT, copiedSlot->toJSON()}});
+      {{FORK_CHANNELS_LIT, sentStateNamers}, {COPIED_SLOT_LIT, copiedSlot}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -350,22 +335,10 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
 
-  const llvm::json::Object *obj = info.getAsObject();
-  assert(obj && "CSOAFAF json info not an object");
-
-  const llvm::json::Value *channelNameJSON = obj->get(FORK_CHANNELS_LIT);
-  assert(channelNameJSON && "missing FORK_CHANNELS_LIT in CSOAFAF info");
-  const llvm::json::Array *channelNameJSONs = channelNameJSON->getAsArray();
-  assert(channelNameJSONs && "FORK_CHANNELS_LIT in CSOAFAF is not an array");
-  for (auto &sentJSON : *channelNameJSONs) {
-    prop->sentStateNamers.push_back(
-        *handshake::EagerForkSentNamer::fromInnerJSON(sentJSON, path));
-  }
-
-  const llvm::json::Value *bufferSlotJSON = obj->get(COPIED_SLOT_LIT);
-  assert(bufferSlotJSON && "missing COPIED_SLOT_LIT in CSOAFAF json");
-  prop->copiedSlot = InternalStateNamer::fromJSON(*bufferSlotJSON, path);
-
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(FORK_CHANNELS_LIT, prop->sentStateNamers) ||
+      !mapper.map(COPIED_SLOT_LIT, prop->copiedSlot))
+    return nullptr;
   return prop;
 }
 
@@ -404,21 +377,7 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
 // IOGSingleToken
 
 llvm::json::Value IOGSingleToken::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> slotsJSON;
-  slotsJSON.reserve(slots.size());
-  for (auto &namer : slots) {
-    slotsJSON.push_back(namer->toJSON());
-  }
-  llvm::json::Value slotsValue = slotsJSON;
-
-  std::vector<llvm::json::Value> forksJSON;
-  forksJSON.reserve(forks.size());
-  for (auto &sent : forks) {
-    forksJSON.push_back(sent.toInnerJSON());
-  }
-  llvm::json::Value forksValue = forksJSON;
-
-  return llvm::json::Object({{SLOTS_LIT, slotsValue}, {FORKS_LIT, forksValue}});
+  return llvm::json::Object({{SLOTS_LIT, slots}, {FORKS_LIT, forks}});
 }
 
 std::unique_ptr<IOGSingleToken>
@@ -427,50 +386,18 @@ IOGSingleToken::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<IOGSingleToken>();
   llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
 
-  llvm::json::Object *obj = info.getAsObject();
-  assert(obj);
-  if (auto iter = obj->find(SLOTS_LIT); iter != obj->end()) {
-    llvm::json::Array *slotsArray = iter->second.getAsArray();
-    assert(slotsArray);
-    prop->slots.reserve(slotsArray->size());
-    for (const llvm::json::Value &sentValue : *slotsArray) {
-      auto json = InternalStateNamer::fromJSON(sentValue, path);
-      assert(json);
-      prop->slots.push_back(std::move(json));
-    }
-  } else {
-    path.report(json::ERR_MISSING_VALUE);
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
+      !mapper.map(FORKS_LIT, prop->forks))
     return nullptr;
-  }
-  if (auto iter = obj->find(FORKS_LIT); iter != obj->end()) {
-    llvm::json::Array *forksArray = iter->second.getAsArray();
-    assert(forksArray);
-    prop->forks.reserve(forksArray->size());
-    for (const llvm::json::Value &sentValue : *forksArray) {
-      auto innerJSON = EagerForkSentNamer::fromInnerJSON(sentValue, path);
-      assert(innerJSON);
-      prop->forks.push_back(*innerJSON);
-    }
-  } else {
-    path.report(json::ERR_MISSING_VALUE);
-    return nullptr;
-  }
   return prop;
 }
 
 // IOGConsecutiveTokens
 
 llvm::json::Value IOGConsecutiveTokens::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> sentsJSON;
-  sentsJSON.reserve(sents.size());
-  for (auto &sent : sents) {
-    sentsJSON.push_back(sent.toInnerJSON());
-  }
-  llvm::json::Value sentsValue = sentsJSON;
-
-  return llvm::json::Object({{SLOT1_LIT, slot1->toJSON()},
-                             {SLOT2_LIT, slot2->toJSON()},
-                             {SENTS_LIT, sentsValue}});
+  return llvm::json::Object(
+      {{SLOT1_LIT, slot1}, {SLOT2_LIT, slot2}, {SENTS_LIT, sents}});
 }
 
 std::unique_ptr<IOGConsecutiveTokens>
@@ -479,44 +406,11 @@ IOGConsecutiveTokens::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<IOGConsecutiveTokens>();
   llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
 
-  llvm::json::Object *obj = info.getAsObject();
-  assert(obj);
-  if (auto iter = obj->find(SLOT1_LIT); iter != obj->end()) {
-    prop->slot1 = InternalStateNamer::fromJSON(iter->second, path);
-  } else {
-    path.report(json::ERR_MISSING_VALUE);
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOT1_LIT, prop->slot1) ||
+      !mapper.map(SLOT2_LIT, prop->slot2) ||
+      !mapper.map(SENTS_LIT, prop->sents))
     return nullptr;
-  }
-
-  if (auto iter = obj->find(SLOT2_LIT); iter != obj->end()) {
-    prop->slot2 = InternalStateNamer::fromJSON(iter->second, path);
-  } else {
-    path.report(json::ERR_MISSING_VALUE);
-    return nullptr;
-  }
-
-  if (auto iter = obj->find(SENTS_LIT); iter != obj->end()) {
-    llvm::json::Array *sentsArray = iter->second.getAsArray();
-    assert(sentsArray);
-    prop->sents.reserve(sentsArray->size());
-    for (const llvm::json::Value &sentValue : *sentsArray) {
-      auto innerJSON = EagerForkSentNamer::fromInnerJSON(sentValue, path);
-      assert(innerJSON);
-      prop->sents.push_back(*innerJSON);
-    }
-  } else {
-    path.report(json::ERR_MISSING_VALUE);
-  }
-
-  /*
-  auto prop = std::make_unique<IOGConsecutiveTokens>();
-  auto info = prop->parseBaseAndExtractInfo(value, path);
-
-  const llvm::json::Object *obj = info.getAsObject();
-  if (!obj)
-    return nullptr;
-  assert(false && "TODO");
-  */
   return prop;
 }
 

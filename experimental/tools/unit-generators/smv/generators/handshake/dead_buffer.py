@@ -23,7 +23,7 @@ MODULE {name}(ins_valid)
   -- output
   DEFINE
   ins_ready  :=  !full;
-  full_full := full;
+  slotted_token_count := count(full);
 """
 
 
@@ -40,5 +40,5 @@ MODULE {name}(ins, ins_valid)
   -- output
   DEFINE
   ins_ready  :=  !full;
-  full_full := full;
+  slotted_token_count := count(full);
 """
