@@ -268,6 +268,10 @@ LogicalResult FlowEquationExtractor::extractAll(ModuleOp modOp) {
       } else if (isa<SinkOp, SourceOp>(op)) {
         // These operations do not place any constraint on incoming/outgoing
         // lambda channels, and can safely be ignored
+      } else if (auto deadBufferOp = dyn_cast<DeadBufferOp>(op)) {
+        if (failed(extractDeadBufferOp(deadBufferOp))) {
+          res = failure();
+        }
       } else if (auto forkOp = dyn_cast<ForkOp>(op)) {
         if (failed(extractForkOp(forkOp))) {
           res = failure();
@@ -548,6 +552,16 @@ LogicalResult FlowEquationExtractor::extractEndOp(EndOp endOp) {
     FlowVariable in(indexChannelAnalysis, ChannelLambda(inChannel));
     equations.push_back(out - in);
   }
+  return success();
+}
+
+LogicalResult
+FlowEquationExtractor::extractDeadBufferOp(DeadBufferOp deadBufferOp) {
+  FlowVariable in(indexChannelAnalysis,
+                  ChannelLambda(deadBufferOp.getOperand()));
+  auto slot = FlowVariable(
+      FlowInternalState(deadBufferOp.getInternalSlotStateNamers()[0]));
+  equations.push_back(in - slot);
   return success();
 }
 
