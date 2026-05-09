@@ -145,7 +145,7 @@ llvm::json::Value FlowExpression::toJSON() const {
     }
     // int pm = key.pm;
     jsonTerms.emplace_back(
-        llvm::json::Object({{STATE_LIT, state->namer->toJSON()},
+        llvm::json::Object({{STATE_LIT, state->namer},
                             {COEFFICIENT_LIT, value},
                             {CONSTRAINT_LIT, constraintJson}}));
   }
@@ -158,22 +158,16 @@ FlowExpression FlowExpression::fromJSON(const llvm::json::Value &value,
   const llvm::json::Array *arr = value.getAsArray();
   assert(arr && "FlowExpression JSON is not an array");
   for (const llvm::json::Value &termJSON : *arr) {
-    const llvm::json::Object *obj = termJSON.getAsObject();
-    assert(obj && "FlowExpression term JSON not an object");
-    const llvm::json::Value *state = obj->get(STATE_LIT);
-    if (!state) {
-      llvm::report_fatal_error(
-          "FlowExpression term JSON does not contain STATE_LIT");
-    }
-    std::shared_ptr<InternalStateNamer> namer =
-        InternalStateNamer::fromJSON(*state, path);
-    FlowVariable var = FlowVariable(FlowInternalState(namer));
-    int coef;
     llvm::json::ObjectMapper mapper(termJSON, path);
-    if (!mapper || !mapper.map(COEFFICIENT_LIT, coef)) {
-      llvm::report_fatal_error(
-          "FlowExpression term JSON does not contain COEFFICIENT_LIT");
-    }
+    std::unique_ptr<InternalStateNamer> namer;
+    int coef;
+    if (!mapper || !mapper.map(STATE_LIT, namer) ||
+        !mapper.map(COEFFICIENT_LIT, coef))
+      llvm::report_fatal_error("Failed FlowExpression term mapping");
+    std::shared_ptr<InternalStateNamer> sharedNamer = std::move(namer);
+    FlowVariable var = FlowVariable(FlowInternalState(sharedNamer));
+
+    auto *obj = termJSON.getAsObject();
     const llvm::json::Value *constraint = obj->get(CONSTRAINT_LIT);
     assert(constraint && "FlowExpression does not contain CONSTRAINT_LIT");
     if (auto n = constraint->getAsNull()) {
@@ -447,7 +441,9 @@ LogicalResult FlowEquationExtractor::extractBufferOp(BufferOp bufferOp) {
     // in = next + slot
     // Then, `in` is set to `next`
     auto slot = FlowVariable(FlowInternalState(slotNamer));
+    slot.indexTokenTracker = in.indexTokenTracker;
     FlowVariable next = in.nextInternal();
+    slot.indexTokenTracker = in.indexTokenTracker;
     if (failed(extractSlotEquation(in, next, slot))) {
       return failure();
     }

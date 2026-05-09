@@ -28,50 +28,53 @@ public:
   explicit DynamaticTypeSystem(Randomly &random) : random(random) {}
 
   /// Discard 'scalarType' based on the mode in 'context'.
-  static std::optional<ConclusionOf<ast::ScalarType>>
-  checkScalarType(const ast::ScalarType &scalarType,
-                  DynamaticTypingContext context);
+  static bool discardScalarType(const ast::ScalarType &scalarType,
+                                DynamaticTypingContext context);
 
   /// Discard 'op' based on the mode in 'context' and forward constraint to
   /// the operands as required.
-  static std::optional<ConclusionOf<ast::BinaryExpression>>
-  checkBinaryExpression(ast::BinaryExpression::Op op,
-                        DynamaticTypingContext context);
+  static bool discardBinaryExpression(ast::BinaryExpression::Op op,
+                                      DynamaticTypingContext context);
 
-  std::optional<ConclusionOf<ast::UnaryExpression>>
-  checkUnaryExpression(ast::UnaryExpression::Op op,
-                       DynamaticTypingContext context) const;
+  static bool discardUnaryExpression(ast::UnaryExpression::Op op,
+                                     DynamaticTypingContext context);
 
-  ConclusionOf<ast::ConditionalExpression>
-  checkConditionalExpression(DynamaticTypingContext context) const {
-    // Condition can be either a floating point type or integer type.
-    // Either converts to a bool type without issues.
-    return ConclusionOf<ast::ConditionalExpression>{
-        {random.fromEnum<DynamaticTypingContext::Constraint>()},
-        context,
-        context,
+  TransferFnArray<ast::UnaryExpression>
+  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override;
+
+  TransferFnArray<ast::BinaryExpression>
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) final;
+
+  TransferFnArray<ast::ConditionalExpression>
+  getConditionalExpressionTransferFns() override {
+    return {
+        /*condition=*/TransferFn<ast::ConditionalExpression>(
+            DynamaticTypingContext{
+                random.fromEnum<DynamaticTypingContext::Constraint>()}),
+        /*true value=*/copyFromParent<ast::ConditionalExpression>(),
+        /*false value=*/copyFromParent<ast::ConditionalExpression>(),
+        /*output=*/copyFromParent<ast::ConditionalExpression>(),
     };
   }
 
-  static std::optional<ConclusionOf<ast::ArrayReadExpression>>
-  checkArrayReadExpression(DynamaticTypingContext context) {
-    return ConclusionOf<ast::ArrayReadExpression>{
-        // Forward the context to the array parameter as is.
-        context,
-        // Indexing expression must be an integer.
-        DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
-    };
+  TransferFnArray<ast::ArrayReadExpression>
+  getArrayReadExpressionTransferFns() final {
+    return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
+            /*index=*/
+            TransferFn<ast::ArrayReadExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            /*output=*/copyFromParent<ast::ArrayReadExpression>()};
   }
 
-  static std::optional<ConclusionOf<ast::ArrayAssignmentStatement>>
-  checkArrayAssignmentStatement(DynamaticTypingContext context) {
-    return ConclusionOf<ast::ArrayAssignmentStatement>{
-        // Forward the context to the array parameter as is.
-        /*parameter=*/context,
-        // Indexing expression must be an integer.
+  TransferFnArray<ast::ArrayAssignmentStatement>
+  getArrayAssignmentStatementTransferFns() override {
+    return {
+        /*array parameter=*/copyFromParent<ast::ArrayAssignmentStatement>(),
         /*index=*/
-        DynamaticTypingContext{DynamaticTypingContext::IntegerRequired},
-        /*value=*/context,
+        TransferFn<ast::ArrayAssignmentStatement>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*value=*/copyFromParent<ast::ArrayAssignmentStatement>(),
+        /*output=*/copyFromParent<ast::ArrayAssignmentStatement>(),
     };
   }
 

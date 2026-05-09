@@ -418,7 +418,8 @@ std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStateNamers() {
          "Cannot get names of slot states for operation without name");
   handshake::ChannelType ct = getIndex().getType();
 
-  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot", ct.getDataBitWidth());
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot_full", "data",
+                               ct.getDataBitWidth());
   return ret;
 }
 
@@ -429,9 +430,11 @@ std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStateNamers() {
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
 
-  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str(),
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str() + "_full",
+                               "NOT_ACCESSIBLE",
                                getAddress().getType().getDataBitWidth());
-  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str(),
+  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str() + "_full",
+                               "NOT_ACCESSIBLE",
                                getData().getType().getDataBitWidth());
   return ret;
 }
@@ -454,9 +457,34 @@ std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
     assert(false && "Operand of BufferOp is not a channel");
   }
 
-  for (size_t i = 0; i < getNumSlots(); ++i) {
-    ret[i] =
-        BufferSlotFullNamer(nameAttr.str(), "slot_" + std::to_string(i), width);
+  BufferType t = getBufferType();
+  switch (t) {
+  case BufferType::ONE_SLOT_BREAK_DV:
+    assert(ret.size() == 1);
+    ret[0] = BufferSlotFullNamer(nameAttr.str(), /*full value=*/"outs_valid_i",
+                                 /*data value=*/"data", width);
+    break;
+  case BufferType::ONE_SLOT_BREAK_R:
+    assert(ret.size() == 1);
+    ret[0] = BufferSlotFullNamer(nameAttr.str(), "full", "data", width);
+    break;
+  case BufferType::FIFO_BREAK_NONE:
+    if (ret.size() == 1) {
+      ret[0] = BufferSlotFullNamer(nameAttr.str(), "full", "reg", width);
+    } else {
+      for (size_t i = 0; i < ret.size(); ++i) {
+        ret[i] = BufferSlotFullNamer(nameAttr.str(),
+                                     llvm::formatv("b{0}.full", i).str(),
+                                     llvm::formatv("b{0}.reg", i).str(), width);
+      }
+    }
+    break;
+  case BufferType::FIFO_BREAK_DV:
+  case BufferType::ONE_SLOT_BREAK_DVR:
+  case BufferType::SHIFT_REG_BREAK_DV:
+  case BufferType::COUNTER_BUFFER:
+    llvm::report_fatal_error(
+        llvm::formatv("no name for buffer slot of type {0}", t));
   }
   return ret;
 }

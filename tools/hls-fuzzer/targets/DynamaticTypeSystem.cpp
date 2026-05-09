@@ -1,27 +1,21 @@
 #include "DynamaticTypeSystem.h"
 
-auto dynamatic::gen::DynamaticTypeSystem::checkScalarType(
-    const ast::ScalarType &scalarType, DynamaticTypingContext context)
-    -> std::optional<ConclusionOf<ast::ScalarType>> {
+bool dynamatic::gen::DynamaticTypeSystem::discardScalarType(
+    const ast::ScalarType &scalarType, DynamaticTypingContext context) {
   switch (context.constraint) {
   case DynamaticTypingContext::FloatRequired:
-    if (scalarType != ast::PrimitiveType::Float &&
-        scalarType != ast::PrimitiveType::Double)
-      return std::nullopt;
-    return ConclusionOf<ast::ScalarType>{};
+    return scalarType != ast::PrimitiveType::Float &&
+           scalarType != ast::PrimitiveType::Double;
 
   case DynamaticTypingContext::IntegerRequired:
-    if (scalarType == ast::PrimitiveType::Float ||
-        scalarType == ast::PrimitiveType::Double)
-      return std::nullopt;
-    return ConclusionOf<ast::ScalarType>{};
+    return scalarType == ast::PrimitiveType::Float ||
+           scalarType == ast::PrimitiveType::Double;
   }
   llvm_unreachable("all enum cases handled");
 }
 
-auto dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
-    ast::BinaryExpression::Op op, DynamaticTypingContext context)
-    -> std::optional<ConclusionOf<ast::BinaryExpression>> {
+bool dynamatic::gen::DynamaticTypeSystem::discardBinaryExpression(
+    ast::BinaryExpression::Op op, DynamaticTypingContext context) {
   switch (op) {
   case ast::BinaryExpression::BitAnd:
   case ast::BinaryExpression::BitOr:
@@ -29,14 +23,8 @@ auto dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
   case ast::BinaryExpression::ShiftLeft:
   case ast::BinaryExpression::ShiftRight:
     // Bit expressions always yield integer types.
-    if (context.constraint == DynamaticTypingContext::FloatRequired)
-      return std::nullopt;
+    return context.constraint == DynamaticTypingContext::FloatRequired;
 
-    // Operands must be integer types.
-    return ConclusionOf<ast::BinaryExpression>{
-        {DynamaticTypingContext::IntegerRequired},
-        {DynamaticTypingContext::IntegerRequired},
-    };
   case ast::BinaryExpression::Greater:
   case ast::BinaryExpression::GreaterEqual:
   case ast::BinaryExpression::Less:
@@ -44,39 +32,71 @@ auto dynamatic::gen::DynamaticTypeSystem::checkBinaryExpression(
   case ast::BinaryExpression::Equal:
   case ast::BinaryExpression::NotEqual:
     // Equality operations always yield 'int'.
-    if (context.constraint == DynamaticTypingContext::FloatRequired)
-      return std::nullopt;
-    [[fallthrough]];
-
+    return context.constraint == DynamaticTypingContext::FloatRequired;
   case ast::BinaryExpression::Plus:
   case ast::BinaryExpression::Minus:
   case ast::BinaryExpression::Mul:
-    return Super::checkBinaryExpression(op, context);
+    return false;
   }
   llvm_unreachable("all enum values handled");
 }
 
-auto dynamatic::gen::DynamaticTypeSystem::checkUnaryExpression(
-    ast::UnaryExpression::Op op, DynamaticTypingContext context) const
-    -> std::optional<ConclusionOf<ast::UnaryExpression>> {
+dynamatic::gen::TransferFnArray<dynamatic::ast::BinaryExpression>
+dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionTransferFns(
+    ast::BinaryExpression::Op op) {
+  switch (op) {
+  case ast::BinaryExpression::BitAnd:
+  case ast::BinaryExpression::BitOr:
+  case ast::BinaryExpression::BitXor:
+  case ast::BinaryExpression::ShiftLeft:
+  case ast::BinaryExpression::ShiftRight:
+    return {/*lhs=*/TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            /*rhs=*/
+            TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            /*output=*/
+            TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired})};
+  default:
+    return Super::getBinaryExpressionTransferFns(op);
+  }
+}
+
+dynamatic::gen::TransferFnArray<dynamatic::ast::UnaryExpression>
+dynamatic::gen::DynamaticTypeSystem::getUnaryExpressionTransferFns(
+    ast::UnaryExpression::Op op) {
   switch (op) {
   case ast::UnaryExpression::BitwiseNot:
-    // Requires an integer, produces an integer.
-    if (context.constraint != DynamaticTypingContext::IntegerRequired)
-      return std::nullopt;
-
-    return context;
+    return {
+        /*operand=*/TransferFn<ast::UnaryExpression>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*output=*/copyFromParent<ast::UnaryExpression>(),
+    };
   case ast::UnaryExpression::BoolNot:
-    // Can only be generated if an integer is required.
-    if (context.constraint != DynamaticTypingContext::IntegerRequired)
-      return std::nullopt;
-
-    // However, the operand itself may be of any type since boolean conversions
-    // are supported.
-    return DynamaticTypingContext{
-        random.fromEnum<DynamaticTypingContext::Constraint>()};
+    return {
+        /*operand=*/TransferFn<ast::UnaryExpression>(DynamaticTypingContext{
+            random.fromEnum<DynamaticTypingContext::Constraint>()}),
+        /*output=*/copyFromParent<ast::UnaryExpression>(),
+    };
   case ast::UnaryExpression::Minus:
-    return {context};
+    return {
+        /*operand=*/copyFromParent<ast::UnaryExpression>(),
+        /*output=*/copyFromParent<ast::UnaryExpression>(),
+    };
+  }
+  llvm_unreachable("all enum cases handled");
+}
+
+bool dynamatic::gen::DynamaticTypeSystem::discardUnaryExpression(
+    ast::UnaryExpression::Op op, DynamaticTypingContext context) {
+  switch (op) {
+  case ast::UnaryExpression::BitwiseNot:
+  case ast::UnaryExpression::BoolNot:
+    // Can't apply to float.
+    return context.constraint == DynamaticTypingContext::FloatRequired;
+  case ast::UnaryExpression::Minus:
+    return false;
   }
   llvm_unreachable("all enum values handled");
 }
