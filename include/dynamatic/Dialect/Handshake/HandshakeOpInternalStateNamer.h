@@ -13,7 +13,6 @@ struct EagerForkSentNamer;
 struct BufferSlotFullNamer;
 struct TokenCountNamer;
 struct PipelineSlotNamer;
-struct PipelineTokenCountNamer;
 struct ConstrainedNamer;
 struct ConstrainedEagerForkSentNamer;
 struct ConstrainedBufferSlotFullNamer;
@@ -23,8 +22,7 @@ struct TerminatingSinkNamer;
 
 std::vector<std::unique_ptr<InternalStateNamer>>
 getAllSlotsOfOperation(Operation *op);
-std::optional<std::unique_ptr<InternalStateNamer>>
-getTokenCountNamerOfOperation(Operation *op);
+std::optional<TokenCountNamer> getTokenCountNamerOfOperation(Operation *op);
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
@@ -40,7 +38,6 @@ struct InternalStateNamer {
     BufferSlotFull,
     TokenCount,
     PipelineSlot,
-    PipelineTokenCount,
     Constrained,
     MemoryControllerSlot,
     EntrySlot,
@@ -80,8 +77,6 @@ struct InternalStateNamer {
       "MemoryControllerSlot";
   static constexpr llvm::StringLiteral ENTRY_SLOT = "EntrySlot";
   static constexpr llvm::StringLiteral TOKEN_COUNT = "TokenCount";
-  static constexpr llvm::StringLiteral PIPELINE_TOKEN_COUNT =
-      "PipelineTokenCount";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -298,56 +293,33 @@ struct PipelineSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "pipeline_index";
 };
 
-struct PipelineTokenCountNamer : InternalStateNamer {
-  PipelineTokenCountNamer() = default;
-  PipelineTokenCountNamer(const std::string &opName)
-      : InternalStateNamer(TYPE::PipelineTokenCount), opName(opName) {}
-  ~PipelineTokenCountNamer() = default;
-
-  static inline bool classof(const InternalStateNamer *fp) {
-    return fp->type == TYPE::PipelineTokenCount;
-  }
-
-  inline std::string getSMVName() const override {
-    return llvm::formatv(
-        "{0}.inner_handshake_manager.inner_delay_buffer.pipeline_token_count",
-        opName);
-  }
-
-  inline llvm::json::Value toInnerJSON() const override {
-    return llvm::json::Object({{OPERATION_LIT, opName}});
-  }
-
-  friend bool fromJSON(const llvm::json::Value &value,
-                       PipelineTokenCountNamer &namer, llvm::json::Path path);
-  std::string opName;
-
-  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
-};
-
 struct TokenCountNamer : InternalStateNamer {
+  using VecType = std::vector<std::unique_ptr<InternalStateNamer>>;
   TokenCountNamer() = default;
-  TokenCountNamer(const std::string &opName)
-      : InternalStateNamer(TYPE::TokenCount), opName(opName) {}
+  TokenCountNamer(VecType slots)
+      : InternalStateNamer(TYPE::TokenCount),
+        slots(std::make_shared<VecType>(std::move(slots))) {}
   ~TokenCountNamer() = default;
 
   static inline bool classof(const InternalStateNamer *fp) {
     return fp->type == TYPE::TokenCount;
   }
 
-  inline std::string getSMVName() const override {
-    return llvm::formatv("{0}.slotted_token_count", opName);
-  }
-
+  std::string getSMVName() const override;
   inline llvm::json::Value toInnerJSON() const override {
-    return llvm::json::Object({{OPERATION_LIT, opName}});
+    return llvm::json::Array(*slots);
   }
 
-  friend bool fromJSON(const llvm::json::Value &value, TokenCountNamer &namer,
-                       llvm::json::Path path);
-  std::string opName;
+  inline friend bool fromJSON(const llvm::json::Value &value,
+                              TokenCountNamer &namer, llvm::json::Path path) {
+    auto vec = std::make_shared<VecType>();
+    bool ret = fromJSON(value, *vec, path);
+    namer.slots = vec;
+    return ret;
+  }
+  inline const VecType &getSlots() const { return *slots; }
 
-  static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
+  std::shared_ptr<const VecType> slots;
 };
 
 struct MemoryControllerSlotNamer : InternalStateNamer {
@@ -446,6 +418,9 @@ inline llvm::json::Value toJSON(const ConstrainedNamer &namer) {
   return namer.toInnerJSON();
 }
 inline llvm::json::Value toJSON(const EntrySlotNamer &namer) {
+  return namer.toInnerJSON();
+}
+inline llvm::json::Value toJSON(const TokenCountNamer &namer) {
   return namer.toInnerJSON();
 }
 

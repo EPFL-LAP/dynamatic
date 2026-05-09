@@ -21,8 +21,6 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::EntrySlot;
   if (s == TOKEN_COUNT)
     return TYPE::TokenCount;
-  if (s == PIPELINE_TOKEN_COUNT)
-    return TYPE::PipelineTokenCount;
   llvm::errs() << "unknown type\n";
   return std::nullopt;
 }
@@ -43,8 +41,6 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return ENTRY_SLOT.str();
   case TYPE::TokenCount:
     return TOKEN_COUNT.str();
-  case TYPE::PipelineTokenCount:
-    return PIPELINE_TOKEN_COUNT.str();
   }
 }
 
@@ -102,7 +98,6 @@ bool fromJSON(const llvm::json::Value &value,
   PipelineSlotNamer ps;
   MemoryControllerSlotNamer mc;
   TokenCountNamer tc;
-  PipelineTokenCountNamer ptc;
   EntrySlotNamer es;
   switch (type) {
   case InternalStateNamer::TYPE::EagerForkSent:
@@ -137,12 +132,6 @@ bool fromJSON(const llvm::json::Value &value,
     if (!mapper.map(InternalStateNamer::INNER_LIT, tc))
       return false;
     namer = std::make_unique<TokenCountNamer>(std::move(tc));
-    break;
-  case InternalStateNamer::TYPE::PipelineTokenCount:
-    ptc = PipelineTokenCountNamer();
-    if (!mapper.map(InternalStateNamer::INNER_LIT, ptc))
-      return false;
-    namer = std::make_unique<PipelineTokenCountNamer>(std::move(ptc));
     break;
   case InternalStateNamer::TYPE::EntrySlot:
     es = EntrySlotNamer();
@@ -209,17 +198,18 @@ bool fromJSON(const llvm::json::Value &value, PipelineSlotNamer &namer,
   return true;
 }
 
-bool fromJSON(const llvm::json::Value &value, PipelineTokenCountNamer &namer,
-              llvm::json::Path path) {
-  llvm::json::ObjectMapper mapper(value, path);
-  return mapper &&
-         mapper.map(PipelineTokenCountNamer::OPERATION_LIT, namer.opName);
-}
+std::string TokenCountNamer::getSMVName() const {
+  if (slots->empty()) {
+    return "0";
+  }
+  std::vector<std::string> names;
+  names.reserve(slots->size());
 
-bool fromJSON(const llvm::json::Value &value, TokenCountNamer &namer,
-              llvm::json::Path path) {
-  llvm::json::ObjectMapper mapper(value, path);
-  return mapper && mapper.map(TokenCountNamer::OPERATION_LIT, namer.opName);
+  for (const auto &x : *slots) {
+    names.push_back(x->getSMVName());
+  }
+
+  return llvm::formatv("count({0})", llvm::join(names, ", "));
 }
 
 bool fromJSON(const llvm::json::Value &value, ConstrainedNamer &namer,
@@ -299,21 +289,13 @@ getAllSlotsOfOperation(Operation *op) {
   return ret;
 }
 
-std::optional<std::unique_ptr<InternalStateNamer>>
+std::optional<TokenCountNamer>
 getTokenCountNamerOfOperation(Operation *op) {
-  if (isa<LatencyInterface>(op) && isa<BufferLikeOpInterface>(op)) {
-    assert(false &&
-           "cannot handle token count of operations with latency and slots");
+  auto tokens = getAllSlotsOfOperation(op);
+  if (tokens.empty()) {
     return std::nullopt;
   }
-
-  if (auto latencyOp = dyn_cast<LatencyInterface>(op)) {
-    return std::make_unique<PipelineTokenCountNamer>(getUniqueName(op).str());
-  }
-  if (auto bufferOp = dyn_cast<BufferLikeOpInterface>(op)) {
-    return std::make_unique<TokenCountNamer>(getUniqueName(op).str());
-  }
-  return std::nullopt;
+  return TokenCountNamer(std::move(tokens));
 }
 
 } // namespace handshake
