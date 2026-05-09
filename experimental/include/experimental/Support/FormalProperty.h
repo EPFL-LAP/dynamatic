@@ -318,9 +318,8 @@ public:
   fromJSON(const llvm::json::Value &value, llvm::json::Path path);
 
   IOGConsecutiveTokens() = default;
-  IOGConsecutiveTokens(unsigned long id, TAG tag,
-                       std::shared_ptr<InternalStateNamer> slot1,
-                       std::shared_ptr<InternalStateNamer> slot2,
+  IOGConsecutiveTokens(unsigned long id, TAG tag, const TokenCountNamer &slot1,
+                       const TokenCountNamer &slot2,
                        std::vector<EagerForkSentNamer> sents);
   ~IOGConsecutiveTokens() = default;
 
@@ -328,8 +327,8 @@ public:
     return fp->getType() == TYPE::IOGConsecutiveTokens;
   }
 
-  std::shared_ptr<InternalStateNamer> slot1;
-  std::shared_ptr<InternalStateNamer> slot2;
+  TokenCountNamer slot1;
+  TokenCountNamer slot2;
   std::vector<EagerForkSentNamer> sents;
 
 private:

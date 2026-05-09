@@ -415,12 +415,10 @@ IOGConsecutiveTokens::fromJSON(const llvm::json::Value &value,
 }
 
 IOGConsecutiveTokens::IOGConsecutiveTokens(
-    unsigned long id, TAG tag, std::shared_ptr<InternalStateNamer> slot1,
-    std::shared_ptr<InternalStateNamer> slot2,
-    std::vector<EagerForkSentNamer> sents)
-    : FormalProperty(id, tag, TYPE::IOGConsecutiveTokens),
-      slot1(std::move(slot1)), slot2(std::move(slot2)),
-      sents(std::move(sents)) {}
+    unsigned long id, TAG tag, const TokenCountNamer &slot1,
+    const TokenCountNamer &slot2, std::vector<EagerForkSentNamer> sents)
+    : FormalProperty(id, tag, TYPE::IOGConsecutiveTokens), slot1(slot1),
+      slot2(slot2), sents(std::move(sents)) {}
 
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database

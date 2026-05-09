@@ -371,12 +371,10 @@ HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(const IOG &iog) {
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
-  std::vector<std::pair<Operation *, std::shared_ptr<InternalStateNamer>>>
-      slotOps;
+  std::vector<std::pair<Operation *, TokenCountNamer>> slotOps;
   for (auto &op : iog.units) {
     auto slotCountNamer = getTokenCountNamerOfOperation(op);
     if (slotCountNamer.has_value()) {
-      assert(*slotCountNamer);
       slotOps.push_back({op, std::move(*slotCountNamer)});
     }
   }

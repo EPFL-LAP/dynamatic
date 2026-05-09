@@ -24,8 +24,6 @@ MODULE {name}(ins_valid, outs_ready)
   DEFINE
   ins_ready := !full;
   outs_valid := ins_valid | full;
-
-  slotted_token_count := count(full);
 """
 
 
@@ -46,7 +44,6 @@ MODULE {name}(ins, ins_valid, outs_ready)
   outs_valid := inner_one_slot_break_r.outs_valid;
   outs := inner_one_slot_break_r.full ? data : ins;
 
-  slotted_token_count := inner_one_slot_break_r.slotted_token_count;
   full := inner_one_slot_break_r.full;
 
 {_generate_one_slot_break_r_dataless(f"{name}__one_slot_break_r_dataless")}
