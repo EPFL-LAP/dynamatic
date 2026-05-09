@@ -289,8 +289,7 @@ getAllSlotsOfOperation(Operation *op) {
   return ret;
 }
 
-std::optional<TokenCountNamer>
-getTokenCountNamerOfOperation(Operation *op) {
+std::optional<TokenCountNamer> getTokenCountNamerOfOperation(Operation *op) {
   auto tokens = getAllSlotsOfOperation(op);
   if (tokens.empty()) {
     return std::nullopt;
