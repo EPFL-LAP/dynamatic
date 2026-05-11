@@ -160,7 +160,6 @@ class BloomFilterHash:
 
         # IOs
         addr_i = LogicVec(ctx, 'addr', 'i', self.configs.addrW)
-        addr_valid_i = Logic(ctx, 'addr_valid', 'i')
         filter_o = LogicVec(ctx, 'filter', 'o', self.configs.bloomFilterW)
 
         # Hashing
@@ -181,13 +180,8 @@ class BloomFilterHash:
         for i in range(self.configs.bloomFilterHashCount):
             arch += BitsToOH(ctx, hash_oh[i], hash[i])
 
-        # Reduce with OR to combine the one-hot encoded hashes into filter output
-        filter_combined = LogicVec(ctx, 'filter_combined', 'w', self.configs.bloomFilterW)
-        arch += Reduce(ctx, filter_combined, hash_oh, 'or')
-
-        # If the input address is not valid, output all ones. Otherwise, output the combined filter.
-        all_ones = 2 ** self.configs.bloomFilterW - 1
-        arch += Op(ctx, filter_o, filter_combined, "when", addr_valid_i, "else", all_ones)
+        # Reduce with OR to combine the one-hot encoded hashes into final filter output
+        arch += Reduce(ctx, filter_o, hash_oh, 'or')
 
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
@@ -207,8 +201,8 @@ class BloomFilterHash:
     def instantiate(
         self,
         ctx: VHDLContext,
+        instance_name: str,
         addr_i: LogicVec,
-        addr_valid_i: Logic,
         filter_o: LogicVec
     ) -> str:
         """
@@ -217,10 +211,10 @@ class BloomFilterHash:
         Creates the VHDL port mapping for the hash entity.
 
         Parameters:
-            ctx          : VHDLContext for code generation state.
-            addr_i       : Input address signal to be hashed.
-            addr_valid_i : Signal indicating whether the input address is valid.
-            filter_o     : Output signal for the Bloom filter result (one-hot encoded and OR-combined hash values).
+            ctx           : VHDLContext for code generation state.
+            instance_name : Identifier for this instance of the hash module (used in the label of the instantiation). Must be unique within the architecture.
+            addr_i        : Input address signal to be hashed.
+            filter_o      : Output signal for the Bloom filter result (one-hot encoded and OR-combined hash values).
 
         Returns:
             VHDL instantiation string for inclusion in the architecture body.
@@ -228,9 +222,8 @@ class BloomFilterHash:
         Example:
             arch += hash.instantiate(
                 ctx,
-                addr_i       = some_address_signal,
-                addr_valid_i = some_address_valid_signal,
-                filter_o     = some_filter_output_signal
+                addr_i    = some_address_signal,
+                filter_o  = some_filter_output_signal
             )
 
             This generates, inside 'config_0_core.vhd' and under the 'architecture config_0_core', the following instantiation
@@ -242,7 +235,6 @@ class BloomFilterHash:
                 config_0_core_bfh : entity work.config_0_core_bfh
                     port map(
                         addr_i       => some_address_signal,
-                        addr_valid_i => some_address_valid_signal,
                         filter_o     => some_filter_output_signal
                     );
                 ...
@@ -250,15 +242,13 @@ class BloomFilterHash:
         """
 
         arch = ctx.get_current_indent(
-        ) + f'{self.module_name} : entity work.{self.module_name}\n'
+        ) + f'{instance_name} : entity work.{self.module_name}\n'
         ctx.tabLevel += 1
         arch += ctx.get_current_indent() + f'port map(\n'
         ctx.tabLevel += 1
 
         arch += ctx.get_current_indent() + \
             f'addr_i => {addr_i.getNameRead()},\n'
-        arch += ctx.get_current_indent() + \
-            f'addr_valid_i => {addr_valid_i.getNameRead()},\n'
         arch += ctx.get_current_indent() + \
             f'filter_o => {filter_o.getNameWrite()}\n'
 
