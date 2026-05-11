@@ -49,8 +49,10 @@ struct SmvTestbenchConfig {
   // consumed by sinks
   bool syncOutput = false;
 
-  // Determines if the output is modelled as a dead buffer (i.e. accepts one
-  // token, then the output is no longer ready)
+  // Determines if the result of the join operation is modelled as a dead buffer
+  // (i.e. accepts one token, then the output is no longer ready) rather than
+  // always ready.
+  // Note: This only works if syncOutput is true
   bool deadBufferOutput = false;
 };
 

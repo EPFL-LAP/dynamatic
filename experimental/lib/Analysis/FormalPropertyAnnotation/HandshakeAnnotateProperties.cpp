@@ -293,9 +293,9 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 }
 
 namespace {
-// This function finds appropriate fork sent states for the consecutive tokens
-// invariant: Given the IOG and a set of paths from a start buffer to an end
-// buffer, it determines all forks for which:
+// This function finds appropriate fork sent state namers for the consecutive
+// tokens invariant: Given the IOG and a set of paths from a start buffer to an
+// end buffer, it determines all forks for which:
 // 1. The start buffer is the copied slot of the fork
 // 2. The fork is part of a path from start to end along the IOG
 std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
@@ -307,10 +307,14 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
   while (!stack.empty()) {
     Operation *cur = stack.back();
     stack.pop_back();
+    // Skip the check for slots for the first operation, as the first operation
+    // contains the starting slot but should not terminate the search
     if (!first) {
       auto slots = getAllSlotsOfOperation(cur);
       if (!slots.empty()) {
-        return sents;
+        // Stop following this path if it contains a buffer, as following forks
+        // will not have the start buffer as copied slot
+        continue;
       }
     }
     first = false;
@@ -318,7 +322,7 @@ std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
       if (!iog.contains(forward)) {
         continue;
       }
-      Operation *next = forward.getUses().begin()->getOwner();
+      Operation *next = *forward.getUsers().begin();
       assert(iog.contains(next));
       if (pathSet.units.find(next) == pathSet.units.end()) {
         continue;
@@ -344,8 +348,11 @@ HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(const IOG &iog) {
       op->getAttrOfType<ArrayAttr>("argNames")[iog.entry.getArgNumber()];
   std::string name = dyn_cast<StringAttr>(nameAttr).str();
 
+  // We model the entry node as a buffer that initially has one token.
   slots.push_back(std::make_unique<EntrySlotNamer>(name));
   std::vector<EagerForkSentNamer> forks(0);
+  // Collecting the slots and sents inside the IOG. The invariant relation of
+  // num(slots) = 1 + num(eager fork sents)
   for (auto &op : iog.units) {
     for (auto &slot : getAllSlotsOfOperation(op)) {
       slots.push_back(std::move(slot));
@@ -380,9 +387,12 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
   }
   for (auto slot1 = slotOps.begin(); slot1 != slotOps.end(); ++slot1) {
     for (auto slot2 = slot1 + 1; slot2 != slotOps.end(); ++slot2) {
-      if (slot1 == slot2) {
+      if (slot1->first == slot2->first) {
         // TODO: Handle loops, i.e. if the slot contains >=2 tokens, there
         // should be a copied fork within a loop
+        if (slot1->second.slots->size() >= 2) {
+          slot1->first->emitWarning("Should annotate self-loop");
+        }
         continue;
       }
 

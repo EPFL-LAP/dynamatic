@@ -33,8 +33,10 @@ static std::string instantiateModuleUnderTest(
     const SmallVector<std::pair<std::string, mlir::Type>> &arguments,
     const SmallVector<std::pair<std::string, mlir::Type>> &results,
     bool syncOutput = false) {
-  SmallVector<std::string> inputVariables;
-  inputVariables.push_back("self");
+  // NOTE: self is a keyword in nuXmv that refers to the module it is written
+  // in. This way, the context of the testbench is passed to the inner module
+  // without cluttering the arguments. See nuXmv user manual 2.3.12
+  SmallVector<std::string> inputVariables = {"self"};
   for (const auto &argument : arguments) {
     // The current handshake2smv conversion also creates a dataOut port when it
     // is of type control
