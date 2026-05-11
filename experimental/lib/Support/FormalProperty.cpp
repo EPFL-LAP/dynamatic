@@ -369,14 +369,8 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
 }
 
 llvm::json::Value EntryTokenOrder::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> jsonEqs{};
-  jsonEqs.reserve(slots.size());
-
-  for (auto &slot : slots) {
-    jsonEqs.push_back(slot.toInnerJSON());
-  }
   return llvm::json::Object(
-      {{SLOTS_LIT, llvm::json::Array(jsonEqs)}, {ENTRY_VALUE_LIT, entryValue}});
+      {{SLOTS_LIT, slots}, {ENTRY_VALUE_LIT, entryValue}});
 }
 
 std::unique_ptr<EntryTokenOrder>
@@ -385,13 +379,11 @@ EntryTokenOrder::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<EntryTokenOrder>();
 
   llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
-  auto *infoObj = info.getAsObject();
-  assert(infoObj);
   llvm::json::ObjectMapper mapper(info, path);
-  if (!mapper || !mapper.map(ENTRY_VALUE_LIT, prop->entryValue) ||
-      !mapper.map(SLOTS_LIT, prop->slots))
-    return nullptr;
 
+  if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
+      !mapper.map(ENTRY_VALUE_LIT, prop->entryValue))
+    return nullptr;
   return prop;
 }
 
