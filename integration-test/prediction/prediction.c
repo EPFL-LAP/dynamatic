@@ -5,27 +5,27 @@ void prediction(inout_float_t a[N], inout_float_t b[N], in_float_t c) {
   for (unsigned i = 0; i < N; ++i) {
     float x = a[i];
     float y;
-    switch ((int)((x + 1.0) * 10.0)) {
+    switch ((int)((x + 1.0f) * 10.0f)) {
     case 100:
-      y = 5.0;
+      y = 5.0f;
       break;
     default:
       y = x;
     }
-    /*
-    if (y == 5.0) {
-      b[i] = (5.0 + c) * 10.0;
+    /* 
+    if (y == 5.0f) {
+      b[i] = (5.0f + c) * 10.0f;
     } else {
-      b[i] = (y + c) * 10.0;
-    } */
-    b[i] = (y + c) * 10.0;
+      b[i] = (y + c) * 10.0f;
+    } */ 
+    b[i] = (y + c) * 10.0f;
   }
 }
 
 int main(void) {
-  in_int_t a[N];
-  in_int_t b[N];
-  float c = 7.0;
+  in_float_t a[N];
+  in_float_t b[N];
+  float c = 7.0f;
   for (unsigned j = 0; j < N; ++j) {
     a[j] = 10;
     b[j] = 0;

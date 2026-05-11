@@ -29,83 +29,88 @@ struct ShortcutPathPass
     MLIRContext *ctx = &getContext();
     OpBuilder builder(ctx);
 
-    auto funcOp = *modOp.getOps<mlir::func::FuncOp>().begin();
-    if (!funcOp)
-      return;
+    // find select0 operation
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    Operation *rawOp = namer.getOp("select0");
+    if (!rawOp) {
+      llvm::errs() << "No operation named \"addf0\" exists\n";
+      return signalPassFailure();
+    }
 
-    auto &blocks = funcOp.getBlocks();
-    auto it = blocks.begin();
-    mlir::Block *bb1 = &*(++it);
-    mlir::Block *bb2 = &*(++it);
-    mlir::Block *bb3 = &*(++it);
+    auto selectOp = dyn_cast<mlir::arith::SelectOp>(rawOp);
+    mlir::Block *bb1 = selectOp->getBlock();
+    mlir::func::FuncOp funcOp =
+        dyn_cast<mlir::func::FuncOp>(bb1->getParentOp());
+    Location loc = selectOp.getLoc();
 
-    Location loc = funcOp.getLoc();
-    mlir::Value currentI = bb1->getArgument(0);
+    // create branch condition
+    builder.setInsertionPointAfter(selectOp);
+    Value selectRes = selectOp.getResult();
+    Value cst5 = selectOp.getTrueValue();
+    Value branchCond = builder.create<mlir::arith::CmpFOp>(
+        loc, mlir::arith::CmpFPredicate::OEQ, selectRes, cst5);
+    mlir::Block *bb2 = funcOp.addBlock(); // true path
+    mlir::Block *bb3 = funcOp.addBlock(); // false path
 
-    // duplicate operations in bb1 for the prediction
-    builder.setInsertionPoint(bb1->getTerminator());
-    auto cMinus1 = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getI32IntegerAttr(-1));
-    auto newIdxI32 =
-        builder.create<mlir::arith::AddIOp>(loc, currentI, cMinus1);
-    auto newExtui = builder.create<mlir::arith::ExtUIOp>(
-        loc, builder.getI64Type(), newIdxI32);
-    auto newCast = builder.create<mlir::arith::IndexCastOp>(
-        loc, builder.getIndexType(), newExtui);
-    auto newLoad = builder.create<mlir::memref::LoadOp>(
-        loc, funcOp.getArgument(0), newCast.getResult());
-    mlir::Value sharedLoadVal = newLoad.getResult();
-    // TODO: put multiplication with 25 also in here!
+    // restructure the blocks
+    mlir::Block *bb4 = bb1->splitBlock(
+        Block::iterator(branchCond.getDefiningOp())->getNextNode());
+    Operation *c1 = namer.getOp("constant6");
+    c1->moveBefore(bb4, bb4->begin());
+    Value c100 = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getI32Type(), builder.getI32IntegerAttr(100));
+    Operation *cmpi1 = namer.getOp("cmpi1");
+    cmpi1->setOperand(1, c100);
+    builder.setInsertionPointToEnd(bb1);
+    builder.create<mlir::cf::CondBranchOp>(loc, branchCond, bb2, bb3);
 
-    // create the 'Exit' block for the loop logic (increment)
-    mlir::Block *bbExit = builder.createBlock(&funcOp.getBody());
-    mlir::Value exitArg = bbExit->addArgument(builder.getI32Type(), loc);
-    builder.setInsertionPointToStart(bbExit);
+    Operation *addfOp = namer.getOp("addf1");
+    Operation *mulfOp = namer.getOp("mulf1");
+    Operation *storeOp = namer.getOp("store1");
 
-    // define new constants in bbExit for the increment and comparison
-    // TODO: check whether these constants can be also just moved
-    auto exitConst1 = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getI32IntegerAttr(1));
-    auto exitConst100 = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getI32IntegerAttr(100));
+    if (!addfOp || !mulfOp || !storeOp) {
+      llvm::errs() << "Required operations for branching not found\n";
+      return signalPassFailure();
+    }
 
-    // identify the existing operations for increment in bb3
-    Operation *loopCondBr = bb3->getTerminator();
-    Operation *loopCmpi = loopCondBr->getPrevNode();
-    Operation *loopAddi = loopCmpi->getPrevNode();
+    // start of true branch (y = 5.0f)
+    builder.setInsertionPointToStart(bb2);
+    mlir::Value arg2 = funcOp.getArgument(2);
+    Value newCst5 = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(builder.getF32Type(), 5.0));
+    Value newCst10 = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(builder.getF32Type(), 10.0));
+    Value specAdd = builder.create<mlir::arith::AddFOp>(loc, arg2, newCst5);
+    Value specMul = builder.create<mlir::arith::MulFOp>(loc, specAdd, newCst10);
 
-    // Move the logic operations from bb3 to bbExit and rewire them
-    loopAddi->moveAfter(exitConst100);
-    loopCmpi->moveAfter(loopAddi);
-    loopCondBr->moveAfter(loopCmpi);
-    loopAddi->setOperand(0, exitArg); // Use index passed to bbExit
-    loopAddi->setOperand(1, exitConst1.getResult());   // Use new constant 1
-    loopCmpi->setOperand(1, exitConst100.getResult()); // Use new constant 100
+    // clone the address calculation for the store
+    Operation *extui1 = namer.getOp("extui1");
+    Operation *idxCast1 = namer.getOp("index_cast1");
+    Operation *newExt = builder.clone(*extui1);
+    newExt->setAttr("handshake.name", builder.getStringAttr("extui2"));
+    Operation *newIdx = builder.clone(*idxCast1);
+    newIdx->setAttr("handshake.name", builder.getStringAttr("index_cast2"));
+    newIdx->setOperand(0, newExt->getResult(0));
 
-    // create shortcut block
-    mlir::Block *bbShortcut = builder.createBlock(bbExit);
-    builder.setInsertionPointToStart(bbShortcut);
+    auto store2 = builder.create<mlir::memref::StoreOp>(
+        loc, specMul, storeOp->getOperand(1), newIdx->getResult(0));
+    store2->setAttr("handshake.name", builder.getStringAttr("store2"));
 
-    auto cnst25 = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getI32IntegerAttr(25));
-    auto shortcutVal =
-        builder.create<mlir::arith::MulIOp>(loc, sharedLoadVal, cnst25);
-    auto iStoreCast = builder.create<mlir::arith::IndexCastOp>(
-        loc, builder.getIndexType(), currentI);
-    builder.create<mlir::memref::StoreOp>(
-        loc, shortcutVal, funcOp.getArgument(1), iStoreCast.getResult());
+    builder.create<mlir::cf::BranchOp>(loc, bb4);
 
-    // branch to exit, providing the current loop index
-    builder.create<mlir::cf::BranchOp>(loc, bbExit, currentI);
+    // start of false branch (y = x)
+    builder.setInsertionPointToStart(bb3);
+    Value newCst10False = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(builder.getF32Type(), 10.0));
+    addfOp->moveBefore(bb3, bb3->end());
+    mulfOp->moveBefore(bb3, bb3->end());
+    mulfOp->setOperand(1, newCst10False);
+    extui1->moveBefore(bb3, bb3->end());
+    idxCast1->moveBefore(bb3, bb3->end());
+    storeOp->moveBefore(bb3, bb3->end());
+    storeOp->setAttr("handshake.name", builder.getStringAttr("store1"));
 
-    // update everything
-    auto condBr1 = mlir::cast<mlir::cf::CondBranchOp>(bb1->getTerminator());
-    condBr1.setSuccessor(bbShortcut, 0);
-    condBr1.getTrueDestOperandsMutable().clear();
-
-    // bb3 now also jumps to the increment / exit block
-    builder.setInsertionPointToEnd(bb3);
-    builder.create<mlir::cf::BranchOp>(loc, bbExit, currentI);
+    builder.create<mlir::cf::BranchOp>(loc, bb4);
   }
 };
 
