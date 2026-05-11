@@ -161,6 +161,17 @@ class Configs:
         if headLag is not None:
             self.headLag = bool(headLag)
 
+        ### BLOOM FILTER ###
+        bloomFilter = get_env("LSQ_BLOOM_FILTER")
+        if bloomFilter is not None:
+            self.bloomFilter = bool(bloomFilter)
+        bloomFilterHashCount = get_env("LSQ_BLOOM_FILTER_HASH_COUNT")
+        if bloomFilterHashCount is not None:
+            self.bloomFilterHashCount = bloomFilterHashCount
+        bloomFilterHashW = get_env("LSQ_BLOOM_FILTER_HASH_WIDTH")
+        if bloomFilterHashW is not None:
+            self.bloomFilterHashW = bloomFilterHashW
+
         ### ISSUE RESTRICTION ###
         self.issueOldestLoads = None
         issueOldestLoads = get_env("LSQ_ISSUE_OLDEST_LOADS")
@@ -225,6 +236,10 @@ class Configs:
             assert self.bloomFilterHashW > 0, "Bloom filter hash width must be positive."
             assert self.bloomFilterW == 2 ** self.bloomFilterHashW, "Bloom filter width must be equal to 2 ** bloomFilterHashW."
             assert self.issueOldestLoads is None, "Bloom filter is not compatible with oldest load issue restriction (which relies on exact address comparison)."
+            assert not self.fallbackIssueLoad and not self.fallbackIssueStore, "Bloom filter is not compatible with fallback issue."
+
+            # TODO: add support for proper pipelining
+            assert not self.pipeComp and not self.pipe0, "Bloom filter is not currently compatible with pipeComp and pipe0."
 
         # synthetic issue restrictions
         if self.issueOldestLoads is not None:
