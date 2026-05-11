@@ -731,13 +731,14 @@ def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
  ]> {
   let summary = "buffer operation without successor";
   let description = [{
-    The dead buffer operation stores an incoming token in its slot, and 
-    then stops accepting tokens.
+    The dead buffer operation stores a single incoming token
+    in its slot, and then stops accepting tokens. It is not
+    supposed to be used anywhere other than formal verification.
 
     Example:
 
     ```mlir
-    dead_buffer %data : !handshake.channel<i32>
+    formal.dead_buffer %data : !handshake.channel<i32>
     ```
   }];
 
