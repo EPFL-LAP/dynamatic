@@ -505,11 +505,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
       return failure();
     if (failed(annotateEntryTokenOrder(modOp)))
       return failure();
-<<<<<<< HEAD
-=======
     if (failed(annotateSingleEntryToken(modOp)))
       return failure();
->>>>>>> 13f33c9bf (annotate invariant 8)
   }
   return success();
 }
