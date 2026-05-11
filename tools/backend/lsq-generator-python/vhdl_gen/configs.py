@@ -84,6 +84,7 @@ class Configs:
     bloomFilterHashCount: int = 2              # Number of hash functions used in the Bloom filter (k)
     bloomFilterHashW: int = 8                  # Width of each hash function output
     bloomFilterW: int = 2 ** bloomFilterHashW  # Width of the Bloom filter (m)
+    bloomFilterSeed: int = 1                   # Seed for Bloom filter hash function generation
 
     # synthetic issue restrictions: restricts which loads can be issued
     # If not None, only allow the N oldest pending (allocated but not issued) loads to be issued
@@ -171,6 +172,9 @@ class Configs:
         bloomFilterHashW = get_env("LSQ_BLOOM_FILTER_HASH_WIDTH")
         if bloomFilterHashW is not None:
             self.bloomFilterHashW = bloomFilterHashW
+        bloomFilterSeed = get_env("LSQ_BLOOM_FILTER_SEED")
+        if bloomFilterSeed is not None:
+            self.bloomFilterSeed = bloomFilterSeed
 
         ### ISSUE RESTRICTION ###
         self.issueOldestLoads = None

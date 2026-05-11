@@ -107,7 +107,7 @@ class BloomFilterHash:
         self.module_name = name + suffix
 
         # generate hash matrices
-        rng = random.Random(1)  # fixed seed for reproducibility
+        rng = random.Random(self.configs.bloomFilterSeed)  # fixed seed for reproducibility
 
         self.hash_matrices = [
             _generate_random_h3_hash_matrix(self.configs.bloomFilterHashW, self.configs.addrW, rng)
