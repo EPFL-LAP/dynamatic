@@ -49,7 +49,7 @@ class LSQ:
         self.module_name = name + suffix
         self.configs = configs
 
-    def generate(self, lsq_submodules, path_rtl) -> None:
+    def generate(self, lsq_submodules: lsq_submodule_wrapper.LSQ_Submodules, path_rtl) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for an LSQ.
 
@@ -688,6 +688,41 @@ class LSQ:
                 # If the store queue entry is not valid (anymore), the store has completed.
                 arch += Op(ctx, store_completed[i], 'not', stq_alloc[i])
 
+        # Bloom filter generation
+        if self.configs.bloomFilter:
+            ldq_bloom_filter_raw = LogicVecArray(ctx, 'ldq_bloom_filter_raw', 'w', self.configs.numLdqEntries, self.configs.bloomFilterW)
+            stq_bloom_filter_raw = LogicVecArray(ctx, 'stq_bloom_filter_raw', 'w', self.configs.numStqEntries, self.configs.bloomFilterW)
+            for i in range(0, self.configs.numLdqEntries):
+                arch += lsq_submodules.bf_hash.instantiate(
+                    ctx,
+                    f"ldq_bf_hash_{i}",
+                    addr_i=ldq_addr[i],
+                    filter_o=ldq_bloom_filter_raw[i],
+                )
+            for i in range(0, self.configs.numStqEntries):
+                arch += lsq_submodules.bf_hash.instantiate(
+                    ctx,
+                    f"stq_bf_hash_{i}",
+                    addr_i=stq_addr[i],
+                    filter_o=stq_bloom_filter_raw[i],
+                )
+
+            ldq_bloom_filter_pcomp = LogicVecArray(ctx, 'ldq_bloom_filter_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.bloomFilterW)
+            stq_bloom_filter_pcomp = LogicVecArray(ctx, 'stq_bloom_filter_pcomp', pipe_comp_type, self.configs.numStqEntries, self.configs.bloomFilterW)
+            if self.configs.pipeComp:
+                ldq_bloom_filter_pcomp.regInit()
+                stq_bloom_filter_pcomp.regInit()
+
+            all_ones = 2 ** self.configs.bloomFilterW - 1
+            for i in range(0, self.configs.numLdqEntries):
+                arch += Op(ctx, ldq_bloom_filter_pcomp[i],
+                           0, 'when', '(', 'not', ldq_alloc[i], 'or', load_completed[i], ')', 'else',
+                           all_ones, 'when', 'not', ldq_addr_valid[i], 'else', ldq_bloom_filter_raw[i])
+            for i in range(0, self.configs.numStqEntries):
+                arch += Op(ctx, stq_bloom_filter_pcomp[i],
+                           0, 'when', '(', 'not', stq_alloc[i], 'or', store_completed[i], ')', 'else',
+                           all_ones, 'when', 'not', stq_addr_valid[i], 'else', stq_bloom_filter_raw[i])
+
         # A load conflicts with a store when:
         # 1. The store entry is valid, and
         # 2. The store entry hasn't completed (received write response from memory), and
@@ -753,6 +788,21 @@ class LSQ:
             ldq_alloc_p0.regInit(init=[0]*self.configs.numLdqEntries)
             ldq_addr_valid_p0.regInit(init=[0]*self.configs.numLdqEntries)
             can_load_p0.regInit(init=[0]*self.configs.numLdqEntries)
+
+        if self.configs.bloomFilter:
+            store_is_older_p0 = LogicVecArray(ctx, 'store_is_older_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+            ldq_bloom_filter_p0 = LogicVecArray(ctx, 'ldq_bloom_filter_p0', pipe0_type, self.configs.numLdqEntries, self.configs.bloomFilterW)
+            stq_bloom_filter_p0 = LogicVecArray(ctx, 'stq_bloom_filter_p0', pipe0_type, self.configs.numStqEntries, self.configs.bloomFilterW)
+            if self.configs.pipe0:
+                store_is_older_p0.regInit()
+                ldq_bloom_filter_p0.regInit()
+                stq_bloom_filter_p0.regInit()
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, store_is_older_p0[i], store_is_older_pcomp[i])
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, ldq_bloom_filter_p0[i], ldq_bloom_filter_pcomp[i])
+            for i in range(self.configs.numStqEntries):
+                arch += Op(ctx, stq_bloom_filter_p0[i], stq_bloom_filter_pcomp[i])
 
         # Pipeline
         for i in range(0, self.configs.numLdqEntries):
@@ -879,6 +929,58 @@ class LSQ:
                 arch += Reduce(ctx, load_allowed, load_allowed_per_port, 'or')
             for i in range(0, self.configs.numLdqEntries):
                 arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i], 'and', (load_allowed, i))
+        elif self.configs.bloomFilter and self.configs.numLdPorts > 0:
+            # Find the oldest issuable load: allocated, address valid, and not yet issued
+            load_pending = LogicVec(ctx, 'loads_pending', 'w', self.configs.numLdqEntries)
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, (load_pending, i), ldq_alloc_p0[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', ldq_issue[i])
+            load_candidate_oh = LogicVec(ctx, 'load_candidate_oh', 'w', self.configs.numLdqEntries)
+            arch += CyclicPriorityMasking(ctx, load_candidate_oh, load_pending, ldq_head_oh_p0)
+
+            # Get the bit mask of older stores for the oldest issuable load from the order matrix
+            stores_older_than_load_candidate = LogicVec(ctx, 'stores_older_than_load_candidate', 'w', self.configs.numStqEntries)
+            arch += Mux1H(ctx, stores_older_than_load_candidate, store_is_older_p0, load_candidate_oh)
+
+            # Create a Bloom filter which includes all stores which are valid, not completed, and older than the load.
+            store_bloom_filters_masked_for_load = LogicVecArray(ctx, 'store_bloom_filters_masked_for_load', 'w', self.configs.numStqEntries, self.configs.bloomFilterW)
+            for i in range(self.configs.numStqEntries):
+                arch += Op(ctx, store_bloom_filters_masked_for_load[i], stq_bloom_filter_p0[i], 'when', (stores_older_than_load_candidate, i), 'else', 0)
+            store_bloom_filter_for_load = LogicVec(ctx, 'store_bloom_filter_for_load', 'w', self.configs.bloomFilterW)
+            arch += Reduce(ctx, store_bloom_filter_for_load, store_bloom_filters_masked_for_load, 'or')
+
+            # Get Bloom filter for the load candidate itself (to check against store filter)
+            load_candidate_bloom_filter = LogicVec(ctx, 'load_candidate_bloom_filter', 'w', self.configs.bloomFilterW)
+            arch += Mux1H(ctx, load_candidate_bloom_filter, ldq_bloom_filter_p0, load_candidate_oh)
+
+            # Test whether load candidate is in the Bloom filter of conflicting stores. There is a conflict if the set
+            # membership test returns true (i.e., all bits in the load candidate's Bloom filter are also set in the
+            # store Bloom filter). The test returns true if (load_filter AND NOT store_filter) == 0. Conversely, if any
+            # bit in (load_filter AND NOT store_filter) is 1, then the load candidate is guaranteed not to conflict with
+            # any of the older stores. In that case, the load can be issued.
+            #
+            # NOTE the following:
+            # - If the store filter is empty, then the temp vector will be identical to the load candidate filter (and
+            #   thus non-zero if the load candidate is valid), and thus the load can be issued. In this case, there
+            #   cannot be any false positives, which guarantees forward progress for the candidate load once all older
+            #   stores have completed.
+            # - If the store filter is all ones, then any load will conflict and not be issued (used to handle stores
+            #   which don't have their address yet).
+            load_candidate_bloom_filter_test_temp = LogicVec(ctx, 'load_candidate_bloom_filter_test_temp', 'w', self.configs.bloomFilterW)
+            arch += Op(ctx, load_candidate_bloom_filter_test_temp, load_candidate_bloom_filter, 'and', 'not', store_bloom_filter_for_load)
+            load_candidate_not_in_store_filter = Logic(ctx, 'load_candidate_not_in_store_filter', 'w')
+            arch += Reduce(ctx, load_candidate_not_in_store_filter, load_candidate_bloom_filter_test_temp, 'or')
+
+            # Load candidate can be issued if it is not included in the Bloom filter of conflicting stores
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, can_load[i], (load_candidate_oh, i), 'and', load_candidate_not_in_store_filter)
+
+            # TODO: Expand this to support multiple Bloom filters such that we can issue also the second-oldest load if
+            # needed. Note that this will require cascaded CyclicPriorityMasking which has long critical paths.
+
+            # NOTE: If there is only one Bloom filter and one memory load port, we can just hook up:
+            #   load_idx_oh[0] = load_candidate_oh
+            #   load_en[0]     = OR-REDUCE(load_candidate_oh) AND load_candidate_not_in_store_filter
+            # This way, we can omit the CyclicPriorityMasking and most other logic from below.
         else:
             for i in range(0, self.configs.numLdqEntries):
                 arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i])
