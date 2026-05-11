@@ -300,7 +300,7 @@ struct EntryCMergePath {
   ControlMergeOp cmerge;
   int32_t entryValue;
 };
-std::vector<EntryCMergePath> findEntryCMergePaths(mlir::Value startChannel) {
+std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
     mlir::Value cur;
@@ -312,8 +312,13 @@ std::vector<EntryCMergePath> findEntryCMergePaths(mlir::Value startChannel) {
       .cur = startChannel,
   };
   // TODO: Make this an entry slot (which is in a different PR)
-  start.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(
-      "TMP_ENTRY_SLOT_REPLACEMENT", "s", 0));
+  Operation *op = startChannel.getOwner()->getParentOp();
+  auto nameAttr =
+      op->getAttrOfType<ArrayAttr>("argNames")[startChannel.getArgNumber()];
+  std::string name = dyn_cast<StringAttr>(nameAttr).str();
+  llvm::errs() << name << "\n";
+  start.slots.emplace_back(
+      std::make_unique<BufferSlotFullNamer>(name, "valid", "", 0));
   stack.push_back(start);
   while (!stack.empty()) {
     PartialPath path = std::move(stack.back());
@@ -417,6 +422,10 @@ findCMergeMuxPaths(ControlMergeOp cmerge) {
 LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     ControlMergeOp cmerge, int32_t entryValue) {
   for (const auto &path : findCMergeMuxPaths(cmerge)) {
+    if (path.size() < 2) {
+      // The regex of this invariant trivially holds for any path of length 1
+      continue;
+    }
     EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path, entryValue);
     propertyTable.push_back(p.toJSON());
   }

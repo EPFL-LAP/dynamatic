@@ -394,22 +394,7 @@ EntryTokenOrder::fromJSON(const llvm::json::Value &value,
 }
 
 llvm::json::Value SingleEntryToken::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> jsonCm{};
-  jsonCm.reserve(cm.size());
-
-  for (auto &slot : cm) {
-    jsonCm.push_back(slot.toInnerJSON());
-  }
-
-  std::vector<llvm::json::Value> jsonEc{};
-  jsonEc.reserve(ec.size());
-
-  for (auto &slot : ec) {
-    jsonEc.push_back(slot.toInnerJSON());
-  }
-
-  return llvm::json::Object({{PATH_CM_LIT, llvm::json::Array(jsonCm)},
-                             {PATH_EC_LIT, llvm::json::Array(jsonEc)}});
+  return llvm::json::Object({{PATH_CM_LIT, cm}, {PATH_EC_LIT, ec}});
 }
 
 std::unique_ptr<SingleEntryToken>
@@ -418,29 +403,11 @@ SingleEntryToken::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<SingleEntryToken>();
 
   llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
-  auto *infoObj = info.getAsObject();
-  assert(infoObj);
-  const llvm::json::Value *ecVal = infoObj->get(PATH_EC_LIT);
-  assert(ecVal);
-  const llvm::json::Array *ecArr = ecVal->getAsArray();
-  if (!ecArr)
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(PATH_CM_LIT, prop->cm) ||
+      !mapper.map(PATH_EC_LIT, prop->ec))
     return nullptr;
-
-  for (const llvm::json::Value &slot : *ecArr) {
-    auto namer = EffectiveSlotNamer::fromInnerJSON(slot, path);
-    prop->ec.push_back(std::move(*namer));
-  }
-
-  const llvm::json::Value *cmVal = infoObj->get(PATH_CM_LIT);
-  assert(cmVal);
-  const llvm::json::Array *cmArr = cmVal->getAsArray();
-  if (!cmArr)
-    return nullptr;
-
-  for (const llvm::json::Value &slot : *cmArr) {
-    auto namer = EffectiveSlotNamer::fromInnerJSON(slot, path);
-    prop->cm.push_back(std::move(*namer));
-  }
   return prop;
 }
 
