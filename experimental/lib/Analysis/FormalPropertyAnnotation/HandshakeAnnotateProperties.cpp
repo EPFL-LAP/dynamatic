@@ -293,6 +293,7 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   return success();
 }
 
+namespace {
 std::vector<std::pair<ControlMergeOp, int32_t>>
 findEntryCMerge(mlir::Value start) {
   std::vector<std::pair<ControlMergeOp, int32_t>> ret;
@@ -321,6 +322,7 @@ findEntryCMerge(mlir::Value start) {
   }
   return ret;
 }
+} // namespace
 
 LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     ControlMergeOp cmerge, int32_t entryValue) {
@@ -344,7 +346,10 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     Operation *next = path.cur.getUses().begin()->getOwner();
     if (auto mux = dyn_cast<MuxOp>(next)) {
       // Path is terminated by MuxOp, so this is the end of the path
-      llvm::errs() << "annotating new property\n";
+      if (path.slots.size() < 2) {
+        // This path does not contain enough slots to actually mean anything
+        continue;
+      }
       EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots,
                         entryValue);
       propertyTable.push_back(p.toJSON());
@@ -352,8 +357,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     }
     if (auto buffer = dyn_cast<BufferOp>(next)) {
       for (auto &slot : buffer.getInternalSlotStateNamers()) {
-        path.slots.push_back(
-            EffectiveSlotNamer(std::make_unique<BufferSlotFullNamer>(slot)));
+        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
       }
       path.cur = buffer.getResult();
       stack.push_back(std::move(path));
@@ -367,10 +371,6 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
             .cur = channel,
         };
         EffectiveSlotNamer &back = nextPath.slots.back();
-        llvm::errs() << path.slots.size() << " " << nextPath.slots.size()
-                     << "\n";
-        llvm::errs() << sents[i].getSMVName() << "\n";
-        llvm::errs() << back.getSMVName() << "\n";
         back.copiedSents.push_back(sents[i]);
         stack.push_back(nextPath);
       }
@@ -446,7 +446,6 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
       return failure();
     if (failed(annotateEntryTokenOrder(modOp)))
       return failure();
-    llvm::errs() << "invariants annotated\n";
   }
   return success();
 }

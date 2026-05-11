@@ -1305,19 +1305,27 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
     } else if (auto *p = llvm::dyn_cast<EntryTokenOrder>(property.get())) {
       std::vector<std::string> ends{};
       const auto &slots = p->getSlots();
+      assert(slots.size() >= 2);
 
       for (auto start = slots.begin(); start != slots.end(); ++start) {
         std::string entryToken = start->constrain(p->getValue())->getSMVName();
         std::vector<std::string> laterSlots{};
-        laterSlots.emplace_back("TRUE");
         for (auto later = start + 1; later != slots.end(); ++later) {
-          laterSlots.push_back("!" + later->getSMVName());
+          // Any later slot must not be full
+          laterSlots.emplace_back(llvm::formatv("!({0})", later->getSMVName()));
+        }
+        // if laterSlots is empty, there is nothing to annotate with this
+        // starting slot
+        if (laterSlots.empty()) {
+          continue;
         }
 
-        ends.push_back(llvm::formatv("({0} -> {1})", entryToken,
+        ends.push_back(llvm::formatv("(({0}) -> ({1}))", entryToken,
                                      llvm::join(laterSlots, " & ")));
       }
-
+      // This holds because every EntryTokenOrder slot path contains at least
+      // two slots
+      assert(!ends.empty());
       std::string propertyString = llvm::join(ends, " & ");
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
