@@ -1,12 +1,14 @@
+from vhdl_gen.configs import Configs
 from vhdl_gen.context import VHDLContext
 import vhdl_gen.generators.group_allocator as group_allocator
 import vhdl_gen.generators.dispatchers as dispatchers
+import vhdl_gen.generators.bloom_filter as bloom_filter
 import vhdl_gen.generators.lsq as lsq
 
 import vhdl_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
-def codeGen(path_rtl, configs):
+def codeGen(path_rtl, configs: Configs):
     ctx = VHDLContext()
 
     # Initialize a wrapper object to hold all submodule generator instances.
@@ -58,6 +60,11 @@ def codeGen(path_rtl, configs):
             name, '_stb', configs.numStPorts, configs.numStqEntries, 0, configs.stpAddrW)
         qtp_dispatcher_stb.generate(path_rtl)
         lsq_submodules.qtp_dispatcher_stb = qtp_dispatcher_stb
+
+    if configs.bloomFilter:
+        bf_hash = bloom_filter.BloomFilterHash(name, '_bfh', configs)
+        bf_hash.generate(path_rtl)
+        lsq_submodules.bf_hash = bf_hash
 
     # Change the name of the following module to lsq_core
     lsq_core = lsq.LSQ(name, '', configs)

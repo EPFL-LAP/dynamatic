@@ -77,6 +77,14 @@ class Configs:
     # implies fallbackIssueLoad=True, fallbackIssueStore=True, bypass=False)
     inOrder: bool = False
 
+    # approximate address comparison: whether to enable Bloom-filter-based approximate comparison of load and store
+    # addresses to reduce hardware usage and/or improve timing performance at the cost of potential false conflicts
+    # (false positives) between loads and stores, which can reduce performance
+    bloomFilter: bool = False
+    bloomFilterHashCount: int = 2              # Number of hash functions used in the Bloom filter (k)
+    bloomFilterHashW: int = 8                  # Width of each hash function output
+    bloomFilterW: int = 2 ** bloomFilterHashW  # Width of the Bloom filter (m)
+
     # synthetic issue restrictions: restricts which loads can be issued
     # If not None, only allow the N oldest pending (allocated but not issued) loads to be issued
     issueOldestLoads: int | None = None
@@ -182,6 +190,9 @@ class Configs:
         self.ldpAddrW = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
 
+        if self.bloomFilter:
+            self.bloomFilterW = 2 ** self.bloomFilterHashW
+
         pprint(self.__dict__)
 
         ### CHECKS ###
@@ -207,6 +218,12 @@ class Configs:
             # duplicated a load # issued by another load channel in the same cycle. Multiple load channels are not
             # currently used by Dynamatic, so this is left as future work.
             assert self.numLdMem == 1, "Fallback issue is only supported for single load port configuration."
+
+        # Bloom filter
+        if self.bloomFilter:
+            assert self.bloomFilterHashCount > 0, "Bloom filter hash count must be positive."
+            assert self.bloomFilterHashW > 0, "Bloom filter hash width must be positive."
+            assert self.bloomFilterW == 2 ** self.bloomFilterHashW, "Bloom filter width must be equal to 2 ** bloomFilterHashW."
 
         # synthetic issue restrictions
         if self.issueOldestLoads is not None:

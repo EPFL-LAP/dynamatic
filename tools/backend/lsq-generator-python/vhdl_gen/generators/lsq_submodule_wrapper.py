@@ -1,13 +1,14 @@
-import vhdl_gen.generators.group_allocator as group_allocator
 import vhdl_gen.generators.dispatchers as dispatchers
+import vhdl_gen.generators.group_allocator as group_allocator
+import vhdl_gen.generators.bloom_filter as bloom_filter
 
 
 class LSQ_Submodules:
     """
     Save LSQ (Load-Store Queue) submodule instances.
 
-    This class acts as a simple struct to group together all the generator objects 
-    required to build a complete LSQ. An instance of this class is created by the 
+    This class acts as a simple struct to group together all the generator objects
+    required to build a complete LSQ. An instance of this class is created by the
     codegen.py script, and then passed to the LSQ generator.
 
     Attributes:
@@ -25,6 +26,10 @@ class LSQ_Submodules:
             The optional Queue-to-Port dispatcher for the Store Backward/Response
             (STB) channel. This is only instantiated if store responses are
             enabled in the configuration.
+        bf_hash (bloom_filter.BloomFilterHash):
+            The optional Bloom filter hash instance, used for approximate
+            comparison of memory addresses. This is only instantiated if
+            approximate comparison is enabled in the configuration.
     """
 
     def __init__(self):
@@ -36,3 +41,6 @@ class LSQ_Submodules:
 
         # Optional (stResp = True)
         self.qtp_dispatcher_stb: dispatchers.QueueToPortDispatcher = None
+
+        # Optional (bloomFilter = True)
+        self.bf_hash: bloom_filter.BloomFilterHash = None
