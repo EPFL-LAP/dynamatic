@@ -1183,6 +1183,27 @@ class LSQ:
         # The store conflicts with any load
         arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
 
+        if self.configs.bloomFilter:
+            # Extract the Bloom filter for the current store candidate (the store at stq_issue).
+            store_bloom_filter_curr = LogicVec(ctx, 'store_bloom_filter_curr', 'w', self.configs.bloomFilterW)
+            arch += MuxLookUp(ctx, store_bloom_filter_curr, stq_bloom_filter_pcomp, stq_issue)
+
+            # Build the combined Bloom filter for all loads that are older than the current store.
+            # Masking by 'not store_is_older_arr_curr[i]' selects only loads older than the current store.
+            load_bloom_filters_masked_for_store = LogicVecArray(ctx, 'load_bloom_filters_masked_for_store', 'w', self.configs.numLdqEntries, self.configs.bloomFilterW)
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, load_bloom_filters_masked_for_store[i], ldq_bloom_filter_pcomp[i], 'when', 'not', store_is_older_arr_curr[i], 'else', 0)
+            load_bloom_filter_for_store = LogicVec(ctx, 'load_bloom_filter_for_store', 'w', self.configs.bloomFilterW)
+            arch += Reduce(ctx, load_bloom_filter_for_store, load_bloom_filters_masked_for_store, 'or')
+
+            # Test whether the current store is in the Bloom filter of older conflicting loads.
+            # (store_filter AND NOT load_filter) != 0 means the store address is guaranteed not to
+            # match any older load's address, so the store can be issued.
+            store_bloom_filter_test_temp = LogicVec(ctx, 'store_bloom_filter_test_temp', 'w', self.configs.bloomFilterW)
+            arch += Op(ctx, store_bloom_filter_test_temp, store_bloom_filter_curr, 'and', 'not', load_bloom_filter_for_store)
+            store_not_in_load_filter = Logic(ctx, 'store_not_in_load_filter', 'w')
+            arch += Reduce(ctx, store_not_in_load_filter, store_bloom_filter_test_temp, 'or')
+
         arch += Op(ctx, store_idx, stq_issue)
         # The store can be issued when it is valid AND store issue is not stalled AND (no conflict OR it is older than the fallback load).
         if self.configs.inOrder:
@@ -1192,6 +1213,9 @@ class LSQ:
         elif self.configs.fallbackIssueStore:
             arch += Op(ctx, store_en, store_req_valid_p0, 'and', 'not', store_issue_stall_p0, 'and',
                        '(', 'not', store_conflict, 'or', fallback_store_en_if_valid, ')')
+        elif self.configs.bloomFilter:
+            arch += Op(ctx, store_en, store_req_valid_p0, 'and', 'not', store_issue_stall_p0, 'and',
+                       store_not_in_load_filter)
         else:
             arch += Op(ctx, store_en, store_req_valid_p0, 'and', 'not', store_issue_stall_p0, 'and',
                        'not', store_conflict)
