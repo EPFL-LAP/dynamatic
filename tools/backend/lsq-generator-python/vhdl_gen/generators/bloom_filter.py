@@ -186,6 +186,9 @@ class BloomFilterHash:
         ######   Write To File  ######
         ctx.portInitString += '\n\t);'
 
+        # HACK: Make this compile for the moment.
+        ctx.portInitString = ctx.portInitString.replace('port(;', 'port(')
+
         # Write to the file
         with open(f'{path_rtl}/{self.name}.vhd', 'a') as file:
             file.write('\n\n')
