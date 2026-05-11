@@ -93,7 +93,7 @@
     "hdl": "smv"
   },
   {
-    "name": "handshake.dead_buffer",
+    "name": "handshake.formal.dead_buffer",
     "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t dead_buffer -p bitwidth=$BITWIDTH",
     "hdl": "smv"
   },

@@ -585,15 +585,12 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
-      .Case<handshake::SinkOp>([&](auto) {
-        // Bitwidth
-        addType("DATA_TYPE", op->getOperand(0));
-      })
+      .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp>(
+          [&](auto) {
+            // Bitwidth
+            addType("DATA_TYPE", op->getOperand(0));
+          })
       .Case<handshake::DeadBufferOp>([&](auto) {
-        // Bitwidth
-        addType("DATA_TYPE", op->getOperand(0));
-      })
-      .Case<handshake::BranchOp, handshake::NDWireOp>([&](auto) {
         // Bitwidth
         addType("DATA_TYPE", op->getOperand(0));
       })
