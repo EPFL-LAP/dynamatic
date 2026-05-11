@@ -235,6 +235,7 @@ class Configs:
             assert self.bloomFilterHashCount > 0, "Bloom filter hash count must be positive."
             assert self.bloomFilterHashW > 0, "Bloom filter hash width must be positive."
             assert self.bloomFilterW == 2 ** self.bloomFilterHashW, "Bloom filter width must be equal to 2 ** bloomFilterHashW."
+            assert not self.bypass, "Bloom filter is not compatible with bypass."
             assert self.issueOldestLoads is None, "Bloom filter is not compatible with oldest load issue restriction (which relies on exact address comparison)."
             assert not self.fallbackIssueLoad and not self.fallbackIssueStore, "Bloom filter is not compatible with fallback issue."
 
