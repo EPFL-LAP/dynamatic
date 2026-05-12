@@ -12,7 +12,9 @@ class PortToQueueDispatcher:
         numPorts: int,
         numEntries: int,
         bitsW: int,
-        portAddrW: int
+        portAddrW: int,
+        bloomFilter: bool = False,
+        bloomFilterW: int = 0,
     ):
         """
         Port-to-Queue (Port-to-Entry) Dispatcher
@@ -21,7 +23,7 @@ class PortToQueueDispatcher:
 
         This class encapsulates the logic for generating a VHDL module that takes
         arguments from a specific access port and passes them to a corresponding
-        queue entry. 
+        queue entry.
 
         This generates three main parts in the LSQ module:
             1. Load Address Port Dispatcher
@@ -45,10 +47,10 @@ class PortToQueueDispatcher:
         Example (Load Address Port Dispatcher):
             ptq_dispatcher_lda = PortToQueueDispatcher(
                                     "config_0_core",
-                                    "_lda", 
-                                    configs.numLdPorts, 
-                                    configs.numLdqEntries, 
-                                    configs.addrW, 
+                                    "_lda",
+                                    configs.numLdPorts,
+                                    configs.numLdqEntries,
+                                    configs.addrW,
                                     configs.ldpAddrW
                                 )
 
@@ -65,6 +67,11 @@ class PortToQueueDispatcher:
         self.numEntries = numEntries
         self.bitsW = bitsW
         self.portAddrW = portAddrW
+        # bloom filter
+        self.bloomFilter = bloomFilter
+        self.bloomFilterW = bloomFilterW
+        if self.bloomFilter:
+            assert bloomFilterW > 0, "Bloom filter parameters must be provided if bloomFilter is enabled."
 
     def generate(self, lsq_submodules: LSQ_Submodules, path_rtl) -> None:
         """
@@ -126,6 +133,9 @@ class PortToQueueDispatcher:
             ctx, 'entry_payload', 'o', self.numEntries, self.bitsW)
         entry_wen_o = LogicArray(ctx, 'entry_wen', 'o', self.numEntries)
         queue_head_oh_i = LogicVec(ctx, 'queue_head_oh', 'i', self.numEntries)
+        if self.bloomFilter:
+            entry_filter_o = LogicVecArray(
+                ctx, 'entry_filter', 'o', self.numEntries, self.bloomFilterW)
 
         # one-hot port index
         entry_port_idx_oh = LogicVecArray(
@@ -140,6 +150,21 @@ class PortToQueueDispatcher:
         for i in range(0, self.numEntries):
             arch += Mux1H(ctx, entry_payload_o[i],
                           port_payload_i, entry_port_idx_oh[i])
+
+        # Bloom filter
+        if self.bloomFilter:
+            port_filter = LogicVecArray(ctx, 'port_filter', 'w', self.numPorts, self.bloomFilterW)
+            for i in range(self.numPorts):
+                arch += lsq_submodules.bf_hash.instantiate(
+                    ctx,
+                    f"ldq_bf_hash_{i}",
+                    addr_i=port_payload_i[i],
+                    filter_o=port_filter[i],
+                )
+
+            # MUX for the filter output
+            for i in range(self.numEntries):
+                arch += Mux1H(ctx, entry_filter_o[i], port_filter, entry_port_idx_oh[i])
 
         # Entries that request data/address from a any port
         entry_ptq_ready = LogicArray(
@@ -206,7 +231,8 @@ class PortToQueueDispatcher:
         entry_port_idx_i:   LogicVecArray,
         entry_payload_o:       LogicVecArray,
         entry_wen_o:        LogicArray,
-        queue_head_oh_i:    LogicVec
+        queue_head_oh_i:    LogicVec,
+        entry_filter_o:     LogicVecArray | None = None
     ) -> str:
         """
         Port-to-Queue Dispatcher Instantiation
@@ -224,8 +250,9 @@ class PortToQueueDispatcher:
             entry_payload_valid_i: Valid bit for the data/address of a queue entry
             entry_port_idx_i     : Indicates to which port the entry is assigned
             entry_payload_o         : Output bits written to the entry
-            entry_wen_o          : Write enable for each entry 
+            entry_wen_o          : Write enable for each entry
             queue_head_oh_i      : One-hot vector indicating the current head index of the queue.
+            entry_filter_o       : (Optional) Output bits for the bloom filter, if enabled.
 
         Returns:
             VHDL instantiation string for inclusion in the architecture body.
@@ -311,7 +338,15 @@ class PortToQueueDispatcher:
             arch += ctx.get_current_indent() + \
                 f'entry_wen_{i}_o => {entry_wen_o.getNameWrite(i)},\n'
         arch += ctx.get_current_indent() + \
-            f'queue_head_oh_i => {queue_head_oh_i.getNameRead()}\n'
+            f'queue_head_oh_i => {queue_head_oh_i.getNameRead()},\n'
+        if self.bloomFilter:
+            assert entry_filter_o is not None, "entry_filter_o must be provided when bloomFilter is enabled."
+            for i in range(self.numEntries):
+                arch += ctx.get_current_indent() + \
+                    f'entry_filter_{i}_o => {entry_filter_o.getNameWrite(i)},\n'
+        else:
+            assert entry_filter_o is None, "entry_filter_o should not be provided when bloomFilter is disabled."
+        arch = arch.rstrip(',\n') + '\n'  # remove trailing comma
         ctx.tabLevel -= 1
         arch += ctx.get_current_indent() + f');\n'
         ctx.tabLevel -= 1
@@ -335,7 +370,7 @@ class QueueToPortDispatcher:
 
         This class encapsulates the logic for generating a VHDL module that takes
         data from queue entries and routes it to the correct outgoing port based on
-        priority. 
+        priority.
 
         This generates one main part in the LSQ module:
             1. Load Data Port Dispatcher
