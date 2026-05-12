@@ -939,13 +939,27 @@ class LSQ:
             # Find the oldest issuable load: allocated, address valid, and not yet issued
             load_pending = LogicVec(ctx, 'load_pending', 'w', self.configs.numLdqEntries)
             for i in range(self.configs.numLdqEntries):
-                arch += Op(ctx, (load_pending, i), ldq_alloc_p0[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', ldq_issue[i])
-            load_candidate_oh = LogicVec(ctx, 'load_candidate_oh', 'w', self.configs.numLdqEntries)
-            arch += CyclicPriorityMasking(ctx, load_candidate_oh, load_pending, ldq_head_oh_p0)
+                arch += Op(ctx, (load_pending, i), ldq_alloc_pcomp[i], 'and', ldq_addr_valid_pcomp[i], 'and', 'not', ldq_issue[i])
+
+            load_candidate_oh_curr = LogicVec(ctx, 'load_candidate_oh_curr', 'w', self.configs.numLdqEntries)
+            arch += CyclicPriorityMasking(ctx, load_candidate_oh_curr, load_pending, ldq_head_oh_pcomp)
+            load_candidate_oh_next = LogicVec(ctx, 'load_candidate_oh_next', 'w', self.configs.numLdqEntries)
+            for i in range(self.configs.numLdqEntries):
+                # For safety, we need to re-check the next load entry is actually still pending.
+                arch += Op(ctx, (load_candidate_oh_next, i), (load_pending, i), 'and', (load_candidate_oh_curr, (i - 1) % self.configs.numLdqEntries))
+
+            load_candidate_oh_p0 = LogicVec(ctx, 'load_candidate_oh_p0', pipe0_type, self.configs.numLdqEntries)
+            if self.configs.pipe0:
+                load_candidate_oh_p0.regInit(init=0)
+                # FIXME: This probably breaks when pipe1 is enabled, I haven't thought it through yet.
+                assert not self.configs.pipe1
+                arch += Op(ctx, load_candidate_oh_p0, load_candidate_oh_next, 'when', 'load_p1_ready', 'else', load_candidate_oh_curr)
+            else:
+                arch += Op(ctx, load_candidate_oh_p0, load_candidate_oh_curr)
 
             # Get the bit mask of older stores for the oldest issuable load from the order matrix
             stores_older_than_load_candidate = LogicVec(ctx, 'stores_older_than_load_candidate', 'w', self.configs.numStqEntries)
-            arch += Mux1H(ctx, stores_older_than_load_candidate, store_is_older_p0, load_candidate_oh)
+            arch += Mux1H(ctx, stores_older_than_load_candidate, store_is_older_p0, load_candidate_oh_p0)
 
             # Create a Bloom filter which includes all stores which are valid, not completed, and older than the load.
             store_bloom_filters_masked_for_load = LogicVecArray(ctx, 'store_bloom_filters_masked_for_load', 'w', self.configs.numStqEntries, self.configs.bloomFilterW)
@@ -956,7 +970,7 @@ class LSQ:
 
             # Get Bloom filter for the load candidate itself (to check against store filter)
             load_candidate_bloom_filter = LogicVec(ctx, 'load_candidate_bloom_filter', 'w', self.configs.bloomFilterW)
-            arch += Mux1H(ctx, load_candidate_bloom_filter, ldq_bloom_filter_p0, load_candidate_oh)
+            arch += Mux1H(ctx, load_candidate_bloom_filter, ldq_bloom_filter_p0, load_candidate_oh_p0)
 
             # Test whether load candidate is in the Bloom filter of conflicting stores. There is a conflict if the set
             # membership test returns true (i.e., all bits in the load candidate's Bloom filter are also set in the
@@ -978,7 +992,7 @@ class LSQ:
 
             # Load candidate can be issued if it is not included in the Bloom filter of conflicting stores
             for i in range(self.configs.numLdqEntries):
-                arch += Op(ctx, can_load[i], (load_candidate_oh, i), 'and', load_candidate_not_in_store_filter)
+                arch += Op(ctx, can_load[i], (load_candidate_oh_p0, i), 'and', load_candidate_not_in_store_filter)
 
             # TODO: Expand this to support multiple Bloom filters such that we can issue also the second-oldest load if
             # needed. Note that this will require cascaded CyclicPriorityMasking which has long critical paths.
@@ -999,7 +1013,7 @@ class LSQ:
             load_candidate_valid = Logic(ctx, 'load_candidate_valid', 'w')
             arch += Reduce(ctx, load_candidate_valid, load_pending, 'or')
 
-            arch += Op(ctx, load_idx_oh[0], load_candidate_oh)
+            arch += Op(ctx, load_idx_oh[0], load_candidate_oh_p0)
             arch += Op(ctx, load_en[0], load_candidate_valid, 'and', load_candidate_not_in_store_filter)
         else:
             can_load_list: list[LogicArray] = []
