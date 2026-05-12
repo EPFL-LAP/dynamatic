@@ -1,7 +1,6 @@
 import random
 
 from vhdl_gen.context import VHDLContext
-from vhdl_gen.generators.lsq_submodule_wrapper import LSQ_Submodules
 from vhdl_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from vhdl_gen.operators import BitsToOH, Op, Reduce
 from vhdl_gen.configs import Configs
@@ -173,7 +172,7 @@ class BloomFilterHash:
         self.hash_matrices = _generate_h3_hash_matrices(
             self.configs.bloomFilterHashCount, self.configs.bloomFilterHashW, self.configs.addrW, rng)
 
-    def generate(self, lsq_submodules: LSQ_Submodules, path_rtl) -> None:
+    def generate(self, lsq_submodules, path_rtl) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a Bloom filter hash module.
 
