@@ -1,4 +1,5 @@
 from vhdl_gen.context import VHDLContext
+from vhdl_gen.generators.lsq_submodule_wrapper import LSQ_Submodules
 from vhdl_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from vhdl_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
 from vhdl_gen.utils import MaskLess
@@ -46,7 +47,7 @@ class GroupAllocator:
         self.configs = configs
         self.module_name = name + suffix
 
-    def generate(self, path_rtl) -> None:
+    def generate(self, lsq_submodules: LSQ_Submodules, path_rtl) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
 

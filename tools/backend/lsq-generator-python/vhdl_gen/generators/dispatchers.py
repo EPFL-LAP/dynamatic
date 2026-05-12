@@ -1,4 +1,5 @@
 from vhdl_gen.context import VHDLContext
+from vhdl_gen.generators.lsq_submodule_wrapper import LSQ_Submodules
 from vhdl_gen.signals import *
 from vhdl_gen.operators import *
 
@@ -65,7 +66,7 @@ class PortToQueueDispatcher:
         self.bitsW = bitsW
         self.portAddrW = portAddrW
 
-    def generate(self, path_rtl) -> None:
+    def generate(self, lsq_submodules: LSQ_Submodules, path_rtl) -> None:
         """
         Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
         that passes arguments from a specific access port to a corresponding queue entry.
@@ -375,7 +376,7 @@ class QueueToPortDispatcher:
         self.bitsW = bitsW
         self.portAddrW = portAddrW
 
-    def generate(self, path_rtl) -> None:
+    def generate(self, lsq_submodules: LSQ_Submodules, path_rtl) -> None:
         """
         Queue-to-Port (Entry-to-Port) Dispatcher
 

@@ -21,8 +21,14 @@ def codeGen(path_rtl, configs: Configs):
     # Group Allocator
     ga = group_allocator.GroupAllocator(
         name=name, suffix='_ga', configs=configs)
-    ga.generate(path_rtl)
+    ga.generate(lsq_submodules, path_rtl)
     lsq_submodules.group_allocator = ga
+
+    # Bloom Filter Hash
+    if configs.bloomFilter:
+        bf_hash = bloom_filter.BloomFilterHash(name, '_bfh', configs)
+        bf_hash.generate(lsq_submodules, path_rtl)
+        lsq_submodules.bf_hash = bf_hash
 
     # When the condition "if configs.numLdPorts > 0:" is not true:
     # Do not generating dispatching modules when there are zero load ports.
@@ -33,38 +39,33 @@ def codeGen(path_rtl, configs: Configs):
         # Load Address Port Dispatcher
         ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
             name, '_lda', configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW)
-        ptq_dispatcher_lda.generate(path_rtl)
+        ptq_dispatcher_lda.generate(lsq_submodules, path_rtl)
         lsq_submodules.ptq_dispatcher_lda = ptq_dispatcher_lda
 
         # Load Data Port Dispatcher
         qtp_dispatcher_ldd = dispatchers.QueueToPortDispatcher(
             name, '_ldd', configs.numLdPorts, configs.numLdqEntries, configs.dataW, configs.ldpAddrW)
-        qtp_dispatcher_ldd.generate(path_rtl)
+        qtp_dispatcher_ldd.generate(lsq_submodules, path_rtl)
         lsq_submodules.qtp_dispatcher_ldd = qtp_dispatcher_ldd
 
     # Store Address Port Dispatcher
     ptq_dispatcher_sta = dispatchers.PortToQueueDispatcher(
         name, '_sta', configs.numStPorts, configs.numStqEntries, configs.addrW, configs.stpAddrW)
-    ptq_dispatcher_sta.generate(path_rtl)
+    ptq_dispatcher_sta.generate(lsq_submodules, path_rtl)
     lsq_submodules.ptq_dispatcher_sta = ptq_dispatcher_sta
 
     # Store Data Port Dispatcher
     ptq_dispatcher_std = dispatchers.PortToQueueDispatcher(
         name, '_std', configs.numStPorts, configs.numStqEntries, configs.dataW, configs.stpAddrW)
-    ptq_dispatcher_std.generate(path_rtl)
+    ptq_dispatcher_std.generate(lsq_submodules, path_rtl)
     lsq_submodules.ptq_dispatcher_std = ptq_dispatcher_std
 
     # Store Backward Port Dispatcher
     if configs.stResp:
         qtp_dispatcher_stb = dispatchers.QueueToPortDispatcher(
             name, '_stb', configs.numStPorts, configs.numStqEntries, 0, configs.stpAddrW)
-        qtp_dispatcher_stb.generate(path_rtl)
+        qtp_dispatcher_stb.generate(lsq_submodules, path_rtl)
         lsq_submodules.qtp_dispatcher_stb = qtp_dispatcher_stb
-
-    if configs.bloomFilter:
-        bf_hash = bloom_filter.BloomFilterHash(name, '_bfh', configs)
-        bf_hash.generate(path_rtl)
-        lsq_submodules.bf_hash = bf_hash
 
     # Change the name of the following module to lsq_core
     lsq_core = lsq.LSQ(name, '', configs)
