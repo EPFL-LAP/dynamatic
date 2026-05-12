@@ -294,12 +294,13 @@ HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
 
 namespace {
 // This function finds appropriate fork sent state namers for the consecutive
-// tokens invariant: Given the IOG and a set of paths from a start buffer to an
-// end buffer, it determines all forks for which:
+// tokens invariant: Given the IOG, a starting slot, and an ending slot, it
+// determines all forks for which:
 // 1. The start buffer is the copied slot of the fork
 // 2. The fork is part of a path from start to end along the IOG
-std::vector<EagerForkSentNamer> findCopiedSents(const IOG &iog,
-                                                const IOGPathSet &pathSet) {
+std::vector<EagerForkSentNamer>
+findCopiedSents(const IOG &iog, Operation *startSlot, Operation *endSlot) {
+  auto pathSet = iog.findAllPaths(startSlot, endSlot);
   std::vector<EagerForkSentNamer> sents;
   std::vector<Operation *> stack;
   stack.push_back(pathSet.start);
@@ -396,13 +397,12 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
         continue;
       }
 
-      IOGPathSet pathSet12(iog, slot1->first, slot2->first);
-
       std::vector<EagerForkSentNamer> copiedSents =
-          findCopiedSents(iog, pathSet12);
+          findCopiedSents(iog, slot1->first, slot2->first);
 
-      IOGPathSet pathSet21(iog, slot2->first, slot1->first);
-      std::vector<EagerForkSentNamer> extra = findCopiedSents(iog, pathSet21);
+      std::vector<EagerForkSentNamer> extra =
+          findCopiedSents(iog, slot2->first, slot1->first);
+
       copiedSents.insert(copiedSents.end(), extra.begin(), extra.end());
 
       // Note:

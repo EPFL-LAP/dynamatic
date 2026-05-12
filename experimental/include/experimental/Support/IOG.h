@@ -13,7 +13,7 @@ struct IOGPathSet;
 // operations: For any unit `u` within the IOG, it says whether there exists a
 // path going through `u` or not.
 struct IOGPathSet {
-  IOGPathSet(const IOG &iog, Operation *start, Operation *end);
+  IOGPathSet(Operation *start, Operation *end) : start(start), end(end) {}
 
   std::unordered_set<Operation *> units;
   Operation *start;
@@ -33,6 +33,8 @@ struct IOG {
   std::unordered_set<Operation *> units;
   llvm::DenseSet<mlir::Value> channels;
   BlockArgument entry;
+
+  IOGPathSet findAllPaths(Operation *startOp, Operation *endOp) const;
 
   inline bool contains(Operation *op) const {
     auto iter = units.find(op);

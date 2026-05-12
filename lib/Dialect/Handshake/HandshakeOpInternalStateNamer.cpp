@@ -259,12 +259,14 @@ getAllSlotsOfOperation(Operation *op) {
         std::make_unique<BufferSlotFullNamer>("testbench", "end_full", "", 0));
   }
   if (auto loadOp = dyn_cast<LoadOp>(op)) {
-    // TODO: Handle LoadOp for MC slot
     auto slots = loadOp.getInternalSlotStateNamers();
     auto *mcOp = loadOp.getAddressResult().getUses().begin()->getOwner();
-    assert(mcOp);
     auto mc = dyn_cast<MemoryControllerOp>(mcOp);
-    assert(mc);
+    if (!mc) {
+      op->emitError("Cannot get slot of LoadOp that is not connected to Memory "
+                    "Controller Op");
+      llvm::report_fatal_error("Unhandled LoadOp");
+    }
     size_t nLoads = mc.getNumLoadPorts();
     std::optional<MemoryControllerSlotNamer> mcSlot;
     for (size_t i = 0; i < nLoads; ++i) {

@@ -3,10 +3,10 @@
 #include "mlir/IR/BuiltinOps.h"
 
 namespace dynamatic {
-IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
-    : start(startA), end(endA) {
+IOGPathSet IOG::findAllPaths(Operation *startOp, Operation *endOp) const {
+  IOGPathSet paths = IOGPathSet(startOp, endOp);
   std::vector<Operation *> stack;
-  stack.push_back(start);
+  stack.push_back(paths.start);
   std::unordered_set<Operation *> forward;
   // Find all operations reachable by going forward from the start without going
   // through the end operation
@@ -20,21 +20,21 @@ IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
 
     forward.insert(op);
 
-    if (op == end) {
+    if (op == paths.end) {
       continue;
     }
 
     for (auto channel : op->getResults()) {
-      if (!iog.contains(channel)) {
+      if (!contains(channel)) {
         continue;
       }
       Operation *next = channel.getUses().begin()->getOwner();
-      assert(iog.contains(next));
+      assert(contains(next));
       stack.push_back(next);
     }
   }
 
-  stack.push_back(end);
+  stack.push_back(paths.end);
   std::unordered_set<Operation *> back;
 
   // Find all operations reachable by going backwards from the end without going
@@ -50,19 +50,19 @@ IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
 
     back.insert(op);
 
-    if (op == start) {
+    if (op == paths.start) {
       continue;
     }
 
     for (auto channel : op->getOperands()) {
-      if (!iog.contains(channel)) {
+      if (!contains(channel)) {
         continue;
       }
       Operation *next = channel.getDefiningOp();
       if (next == nullptr) {
         continue;
       }
-      assert(iog.contains(next));
+      assert(contains(next));
       stack.push_back(next);
     }
   }
@@ -71,9 +71,10 @@ IOGPathSet::IOGPathSet(const IOG &iog, Operation *startA, Operation *endA)
   // end, is part of a path from start to end
   for (Operation *op : forward) {
     if (back.find(op) != back.end()) {
-      units.insert(op);
+      paths.units.insert(op);
     }
   }
+  return paths;
 }
 
 namespace {
