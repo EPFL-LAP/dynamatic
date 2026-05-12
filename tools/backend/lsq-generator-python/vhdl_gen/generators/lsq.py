@@ -931,7 +931,7 @@ class LSQ:
                 arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i], 'and', (load_allowed, i))
         elif self.configs.bloomFilter and self.configs.numLdPorts > 0:
             # Find the oldest issuable load: allocated, address valid, and not yet issued
-            load_pending = LogicVec(ctx, 'loads_pending', 'w', self.configs.numLdqEntries)
+            load_pending = LogicVec(ctx, 'load_pending', 'w', self.configs.numLdqEntries)
             for i in range(self.configs.numLdqEntries):
                 arch += Op(ctx, (load_pending, i), ldq_alloc_p0[i], 'and', ldq_addr_valid_p0[i], 'and', 'not', ldq_issue[i])
             load_candidate_oh = LogicVec(ctx, 'load_candidate_oh', 'w', self.configs.numLdqEntries)
@@ -976,41 +976,52 @@ class LSQ:
 
             # TODO: Expand this to support multiple Bloom filters such that we can issue also the second-oldest load if
             # needed. Note that this will require cascaded CyclicPriorityMasking which has long critical paths.
-
-            # NOTE: If there is only one Bloom filter and one memory load port, we can just hook up:
-            #   load_idx_oh[0] = load_candidate_oh
-            #   load_en[0]     = OR-REDUCE(load_candidate_oh) AND load_candidate_not_in_store_filter
-            # This way, we can omit the CyclicPriorityMasking and most other logic from below.
         else:
             for i in range(0, self.configs.numLdqEntries):
                 arch += Op(ctx, can_load[i], 'not', ldq_issue[i], 'and', can_load_p0[i])
 
-        can_load_list: list[LogicArray] = []
-        can_load_list.append(can_load)
+        if self.configs.bloomFilter and self.configs.numLdPorts > 0 and self.configs.numLdMem == 1:
+            # With only one load port, we can directly use the load_candidate_oh and load_candidate_not_in_store_filter
+            # as the load_idx_oh and load_en signals, without needing the CyclicPriorityMasking and related logic below.
 
-        # temporary (pre-fallback) signals
-        load_idx_tmp_oh = LogicVecArray(ctx, 'load_idx_tmp_oh', 'w', self.configs.numLdMem, self.configs.numLdqEntries)
-        load_en_tmp = LogicArray(ctx, 'load_en_tmp', 'w', self.configs.numLdMem)
+            # sanity check for conflicting configurations
+            assert not self.configs.issueOldestLoads
+            assert not self.configs.fallbackIssueLoad
 
-        for w in range(self.configs.numLdMem):
-            arch += CyclicPriorityMasking(
-                ctx, load_idx_tmp_oh[w], can_load_list[w], ldq_head_oh_p0)
-            arch += Reduce(ctx, load_en_tmp[w], can_load_list[w], 'or')
-            if w != self.configs.numLdMem - 1:
-                can_load_list.append(LogicArray(ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
-                for i in range(0, self.configs.numLdqEntries):
-                    arch += Op(ctx, can_load_list[w+1][i], 'not', (load_idx_tmp_oh[w], i), 'and', can_load_list[w][i])
+            # load_candidate_oh is non-zero iff load_pending is non-zero (through CyclicPriorityMasking), so we can
+            # OR-reduce load_pending instead of load_candidate_oh to reduce timing pressure
+            load_candidate_valid = Logic(ctx, 'load_candidate_valid', 'w')
+            arch += Reduce(ctx, load_candidate_valid, load_pending, 'or')
 
-        for w in range(self.configs.numLdMem):
-            last_load_port = (w == self.configs.numLdMem - 1)
-            if self.configs.fallbackIssueLoad and last_load_port:
-                # last load port: use fallback load (if any) as the first priority, then service other loads (from _tmp)
-                arch += Op(ctx, load_idx_oh[w], fallback_load_idx_oh, 'when', fallback_load_en, 'else', load_idx_tmp_oh[w])
-                arch += Op(ctx, load_en[w], fallback_load_en, 'or', load_en_tmp[w])
-            else:
-                # non-last load port: use _tmp signals directly
-                arch += Op(ctx, load_idx_oh[w], load_idx_tmp_oh[w])
-                arch += Op(ctx, load_en[w], load_en_tmp[w])
+            arch += Op(ctx, load_idx_oh[0], load_candidate_oh)
+            arch += Op(ctx, load_en[0], load_candidate_valid, 'and', load_candidate_not_in_store_filter)
+        else:
+            can_load_list: list[LogicArray] = []
+            can_load_list.append(can_load)
+
+            # temporary (pre-fallback) signals
+            load_idx_tmp_oh = LogicVecArray(ctx, 'load_idx_tmp_oh', 'w', self.configs.numLdMem, self.configs.numLdqEntries)
+            load_en_tmp = LogicArray(ctx, 'load_en_tmp', 'w', self.configs.numLdMem)
+
+            for w in range(self.configs.numLdMem):
+                arch += CyclicPriorityMasking(
+                    ctx, load_idx_tmp_oh[w], can_load_list[w], ldq_head_oh_p0)
+                arch += Reduce(ctx, load_en_tmp[w], can_load_list[w], 'or')
+                if w != self.configs.numLdMem - 1:
+                    can_load_list.append(LogicArray(ctx, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries))
+                    for i in range(0, self.configs.numLdqEntries):
+                        arch += Op(ctx, can_load_list[w+1][i], 'not', (load_idx_tmp_oh[w], i), 'and', can_load_list[w][i])
+
+            for w in range(self.configs.numLdMem):
+                last_load_port = (w == self.configs.numLdMem - 1)
+                if self.configs.fallbackIssueLoad and last_load_port:
+                    # last load port: use fallback load (if any) as the first priority, then service other loads (from _tmp)
+                    arch += Op(ctx, load_idx_oh[w], fallback_load_idx_oh, 'when', fallback_load_en, 'else', load_idx_tmp_oh[w])
+                    arch += Op(ctx, load_en[w], fallback_load_en, 'or', load_en_tmp[w])
+                else:
+                    # non-last load port: use _tmp signals directly
+                    arch += Op(ctx, load_idx_oh[w], load_idx_tmp_oh[w])
+                    arch += Op(ctx, load_en[w], load_en_tmp[w])
 
         if self.configs.fallbackIssueLoad or self.configs.fallbackIssueStore:
             # Fallback Load / Store
@@ -1184,6 +1195,9 @@ class LSQ:
         arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
 
         if self.configs.bloomFilter:
+            # FIXME: I think these signals somehow skip the p0 pipeline stage. Not sure if this is a problem, but it
+            # needs to be looked at in more detail.
+
             # Extract the Bloom filter for the current store candidate (the store at stq_issue).
             store_bloom_filter_curr = LogicVec(ctx, 'store_bloom_filter_curr', 'w', self.configs.bloomFilterW)
             arch += MuxLookUp(ctx, store_bloom_filter_curr, stq_bloom_filter_pcomp, stq_issue)
