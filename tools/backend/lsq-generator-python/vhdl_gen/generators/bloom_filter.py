@@ -231,6 +231,10 @@ class BloomFilterHash:
                         rhs.append('xor')
                 if rhs:
                     rhs = rhs[:-1]  # remove trailing 'xor'
+                else:
+                    # If the row is all zeros, output zero.
+                    rhs = ["'0'"]
+                assert rhs, "RHS of hash bit cannot be empty"
                 arch += Op(ctx, (hash, i, j), *rhs)
 
         # One-Hot Encoding
