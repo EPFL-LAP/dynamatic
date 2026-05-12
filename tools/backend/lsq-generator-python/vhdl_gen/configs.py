@@ -206,6 +206,8 @@ class Configs:
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
 
         if self.bloomFilter:
+            # TODO: If bloomFilterHashW > addrW, we should just clamp it to addrW. Otherwise, there will be linearly
+            # dependent hash functions and we will not reach all the bits in the filter. This just wastes resources.
             self.bloomFilterW = 2 ** self.bloomFilterHashW
 
         pprint(self.__dict__)
