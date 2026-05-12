@@ -766,11 +766,17 @@ class LSQ:
 
         # Load
 
+        ldq_head_oh_pcomp = LogicVec(
+            ctx, 'ldq_head_oh_pcomp', pipe_comp_type, self.configs.numLdqEntries)
+        if self.configs.pipeComp:
+            ldq_head_oh_pcomp.regInit(init=0)
+        arch += Op(ctx, ldq_head_oh_pcomp, ldq_head_oh)
+
         ldq_head_oh_p0 = LogicVec(
             ctx, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries)
         if self.configs.pipe0:
             ldq_head_oh_p0.regInit(init=0)
-        arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
+        arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh_pcomp)
 
         ldq_alloc_p0 = LogicArray(
             ctx, 'ldq_alloc_p0', pipe0_type, self.configs.numLdqEntries)
