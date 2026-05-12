@@ -119,6 +119,15 @@ def ShortcutPath : DynamaticPass<"add-shortcut-path"> {
   let options = [];
 }
 
+def NDuplication : DynamaticPass<"n-duplication"> {
+  let summary = "Duplicate the computational path n times";
+  let description = [{
+    Adds an additional connection for the fork and duplicates a 
+    path N times with N-1 predicted values.
+  }];
+  let options = [];
+}
+
 
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

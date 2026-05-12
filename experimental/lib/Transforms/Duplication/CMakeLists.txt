@@ -1,6 +1,7 @@
 add_dynamatic_library(DynamaticDuplication
   PipelineDuplication.cpp
   ShortcutPath.cpp
+  NDuplication.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
