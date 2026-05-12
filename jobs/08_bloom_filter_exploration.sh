@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+RUN_EVALUATION_PY="${SCRIPT_DIR}/../tools/evaluation/run_evaluation.py"
+GIT_REVISION="$(git rev-parse --short HEAD)"
+
+LSQ_SIZE=20
+BLOOM_FILTER_HASH_COUNTS_WIDTHS=(
+	"1 3"
+	"2 4"
+	"3 5"
+	"4 5"
+	"4 6"
+	"5 6"
+	"5 7"
+	"6 7"
+)
+
+export SYNTHESIS_CLOCK_PERIOD_NS="2.5"
+export LSQ_NO_BYPASS=1
+export LSQ_NUM_LDQ_ENTRIES=$LSQ_SIZE
+export LSQ_NUM_STQ_ENTRIES=$LSQ_SIZE
+export LSQ_PIPE_COMP_EN=0
+export LSQ_PIPE0_EN=0
+export LSQ_PIPE1_EN=0
+export LSQ_HEAD_LAG_EN=1
+
+EXPERIMENT_NAME="$(basename "$0" .sh)"
+OUTPUT_DIR="${SCRIPT_DIR}/../eval_results/${EXPERIMENT_NAME}_${GIT_REVISION}"
+mkdir -p "${OUTPUT_DIR}"
+cat <<EOF >"${OUTPUT_DIR}/README.txt"
+Experiment 8: Bloom filter exploration
+- synthesis target clock period: ${SYNTHESIS_CLOCK_PERIOD_NS} ns
+- pipeline configurations: headlag only
+- LSQ size: ${LSQ_SIZE} entries
+- bloom filter hash counts and widths: ${BLOOM_FILTER_HASH_COUNTS_WIDTHS[*]}
+- git revision: ${GIT_REVISION}
+EOF
+
+OUTPUT_SUBDIR="${OUTPUT_DIR}/data"
+mkdir -p "${OUTPUT_SUBDIR}"
+
+for HASH_COUNT_WIDTH in "${BLOOM_FILTER_HASH_COUNTS_WIDTHS[@]}"; do
+	set -- $HASH_COUNT_WIDTH
+	HASH_COUNT=$1
+	HASH_WIDTH=$2
+	export LSQ_BLOOM_FILTER=1
+	export LSQ_BLOOM_FILTER_HASH_COUNT=$HASH_COUNT
+	export LSQ_BLOOM_FILTER_HASH_WIDTH=$HASH_WIDTH
+	export LSQ_BLOOM_FILTER_SEED=1
+
+	FILTER_WIDTH=$((2 ** HASH_WIDTH))
+
+	echo "Running evaluation with m=${FILTER_WIDTH}, k=${HASH_COUNT}..."
+	"$RUN_EVALUATION_PY" --no-synth -j 8 \
+		--json "${OUTPUT_SUBDIR}/bf_m${FILTER_WIDTH}_k${HASH_COUNT}.json"
+done
