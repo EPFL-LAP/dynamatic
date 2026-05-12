@@ -1176,6 +1176,52 @@ class LSQ:
                 for i in range(self.configs.numLdqEntries):
                     arch += Op(ctx, store_is_older_arr_p0[i], store_is_older_arr_curr[i])
 
+        # Store Conflict Checking with Bloom Filter
+        if self.configs.bloomFilter:
+            # Extract the Bloom filter for the current store candidate (the store at stq_issue).
+            store_bloom_filter_curr = LogicVec(ctx, 'store_bloom_filter_curr', 'w', self.configs.bloomFilterW)
+            arch += MuxLookUp(ctx, store_bloom_filter_curr, stq_bloom_filter_pcomp, stq_issue)
+
+            # Build the combined Bloom filter for all loads that are older than the current store.
+            # Masking by 'not store_is_older_arr_curr[i]' selects only loads older than the current store.
+            load_bloom_filters_masked_for_store_curr = LogicVecArray(ctx, 'load_bloom_filters_masked_for_store_curr', 'w',
+                                                                     self.configs.numLdqEntries, self.configs.bloomFilterW)
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, load_bloom_filters_masked_for_store_curr[i], ldq_bloom_filter_pcomp[i], 'when', 'not', store_is_older_arr_curr[i], 'else', 0)
+            load_bloom_filter_for_store_curr = LogicVec(ctx, 'load_bloom_filter_for_store_curr', 'w', self.configs.bloomFilterW)
+            arch += Reduce(ctx, load_bloom_filter_for_store_curr, load_bloom_filters_masked_for_store_curr, 'or')
+
+            if self.configs.pipe0:
+                # same again for *_next
+                store_bloom_filter_next = LogicVec(ctx, 'store_bloom_filter_next', 'w', self.configs.bloomFilterW)
+                arch += MuxLookUp(ctx, store_bloom_filter_next, stq_bloom_filter_pcomp, stq_issue_next)
+                load_bloom_filters_masked_for_store_next = LogicVecArray(ctx, 'load_bloom_filters_masked_for_store_next', 'w',
+                                                                         self.configs.numLdqEntries, self.configs.bloomFilterW)
+                for i in range(self.configs.numLdqEntries):
+                    arch += Op(ctx, load_bloom_filters_masked_for_store_next[i], ldq_bloom_filter_pcomp[i], 'when', 'not', store_is_older_arr_next[i], 'else', 0)
+                load_bloom_filter_for_store_next = LogicVec(ctx, 'load_bloom_filter_for_store_next', 'w', self.configs.bloomFilterW)
+                arch += Reduce(ctx, load_bloom_filter_for_store_next, load_bloom_filters_masked_for_store_next, 'or')
+
+            store_bloom_filter_p0 = LogicVec(ctx, 'store_bloom_filter_p0', pipe0_type, self.configs.bloomFilterW)
+            load_bloom_filter_for_store_p0 = LogicVec(ctx, 'load_bloom_filter_for_store_p0', pipe0_type, self.configs.bloomFilterW)
+
+            if self.configs.pipe0:
+                store_bloom_filter_p0.regInit()
+                load_bloom_filter_for_store_p0.regInit()
+                arch += Op(ctx, store_bloom_filter_p0, store_bloom_filter_next, 'when', stq_issue_en, 'else', store_bloom_filter_curr)
+                arch += Op(ctx, load_bloom_filter_for_store_p0, load_bloom_filter_for_store_next, 'when', stq_issue_en, 'else', load_bloom_filter_for_store_curr)
+            else:
+                arch += Op(ctx, store_bloom_filter_p0, store_bloom_filter_curr)
+                arch += Op(ctx, load_bloom_filter_for_store_p0, load_bloom_filter_for_store_curr)
+
+            # Test whether the current store is in the Bloom filter of older conflicting loads.
+            # (store_filter AND NOT load_filter) != 0 means the store address is guaranteed not to
+            # match any older load's address, so the store can be issued.
+            store_bloom_filter_test_temp = LogicVec(ctx, 'store_bloom_filter_test_temp', 'w', self.configs.bloomFilterW)
+            arch += Op(ctx, store_bloom_filter_test_temp, store_bloom_filter_p0, 'and', 'not', load_bloom_filter_for_store_p0)
+            store_not_in_load_filter = Logic(ctx, 'store_not_in_load_filter', 'w')
+            arch += Reduce(ctx, store_not_in_load_filter, store_bloom_filter_test_temp, 'or')
+
         # Stalling Store Issue
         # For small queues relative to the memory latency, it is possible that all store entries
         # have been allocated and are in-flight to the memory. In this case, the store issue
@@ -1193,30 +1239,6 @@ class LSQ:
 
         # The store conflicts with any load
         arch += Reduce(ctx, store_conflict, st_ld_conflict_p0, 'or')
-
-        if self.configs.bloomFilter:
-            # FIXME: I think these signals somehow skip the p0 pipeline stage. Not sure if this is a problem, but it
-            # needs to be looked at in more detail.
-
-            # Extract the Bloom filter for the current store candidate (the store at stq_issue).
-            store_bloom_filter_curr = LogicVec(ctx, 'store_bloom_filter_curr', 'w', self.configs.bloomFilterW)
-            arch += MuxLookUp(ctx, store_bloom_filter_curr, stq_bloom_filter_pcomp, stq_issue)
-
-            # Build the combined Bloom filter for all loads that are older than the current store.
-            # Masking by 'not store_is_older_arr_curr[i]' selects only loads older than the current store.
-            load_bloom_filters_masked_for_store = LogicVecArray(ctx, 'load_bloom_filters_masked_for_store', 'w', self.configs.numLdqEntries, self.configs.bloomFilterW)
-            for i in range(self.configs.numLdqEntries):
-                arch += Op(ctx, load_bloom_filters_masked_for_store[i], ldq_bloom_filter_pcomp[i], 'when', 'not', store_is_older_arr_curr[i], 'else', 0)
-            load_bloom_filter_for_store = LogicVec(ctx, 'load_bloom_filter_for_store', 'w', self.configs.bloomFilterW)
-            arch += Reduce(ctx, load_bloom_filter_for_store, load_bloom_filters_masked_for_store, 'or')
-
-            # Test whether the current store is in the Bloom filter of older conflicting loads.
-            # (store_filter AND NOT load_filter) != 0 means the store address is guaranteed not to
-            # match any older load's address, so the store can be issued.
-            store_bloom_filter_test_temp = LogicVec(ctx, 'store_bloom_filter_test_temp', 'w', self.configs.bloomFilterW)
-            arch += Op(ctx, store_bloom_filter_test_temp, store_bloom_filter_curr, 'and', 'not', load_bloom_filter_for_store)
-            store_not_in_load_filter = Logic(ctx, 'store_not_in_load_filter', 'w')
-            arch += Reduce(ctx, store_not_in_load_filter, store_bloom_filter_test_temp, 'or')
 
         arch += Op(ctx, store_idx, stq_issue)
         # The store can be issued when it is valid AND store issue is not stalled AND (no conflict OR it is older than the fallback load).

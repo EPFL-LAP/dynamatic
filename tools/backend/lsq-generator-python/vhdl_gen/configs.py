@@ -245,9 +245,6 @@ class Configs:
             assert self.issueOldestLoads is None, "Bloom filter is not compatible with oldest load issue restriction (which relies on exact address comparison)."
             assert not self.fallbackIssueLoad and not self.fallbackIssueStore, "Bloom filter is not compatible with fallback issue."
 
-            # TODO: add support for proper pipelining
-            assert not self.pipeComp and not self.pipe0, "Bloom filter is not currently compatible with pipeComp and pipe0."
-
         # synthetic issue restrictions
         if self.issueOldestLoads is not None:
             assert self.issueOldestLoads > 0, "issueOldestLoads must be positive."
