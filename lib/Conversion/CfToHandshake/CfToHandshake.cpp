@@ -721,12 +721,12 @@ void LowerFuncToHandshake::addBranchOps(
             //
             // To achieve this,
             //
-            // - We always first replace the first matched operand with the
-            // true input; this accociate the true output with the [0] index
-            // index of cmerge
-            // - We then replace the second matched operand with the false
-            // input; this accociate the false output with the one [1] index of
-            // cmerge.
+            // - We always first connect the first matched operand to the
+            // true branch output; this accociate the true output with the [0]
+            // index index of cmerge
+            // - We then connect the second matched operand with the false
+            // branch output; this accociate the false output with the one [1]
+            // index of cmerge.
             //
             // NOTE: the order here has to match the one in
             // `getRealBlockPredecessors`.
