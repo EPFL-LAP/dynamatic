@@ -491,6 +491,13 @@ int main(int argc, char **argv) {
     funcOp = op;
   }
 
+  if (funcOp == nullptr) {
+    modOp->emitError()
+        << "No handshake function found in the mlir module (maybe you "
+           "specified wrong function name to synthesize)! Aborting..\n";
+    return 1;
+  }
+
   // Name all operations in the IR
   NameAnalysis nameAnalysis = NameAnalysis(*modOp);
   if (!nameAnalysis.isAnalysisValid())
