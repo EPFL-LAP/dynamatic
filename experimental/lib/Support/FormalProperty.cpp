@@ -416,6 +416,22 @@ SingleEntryToken::fromJSON(const llvm::json::Value &value,
     return nullptr;
   return prop;
 }
+llvm::json::Value ExitTokenOrder::extraInfoToJSON() const {
+  return llvm::json::Object({{EXIT_VALUE_LIT, exitValue}, {SLOTS_LIT, slots}});
+}
+std::unique_ptr<ExitTokenOrder>
+ExitTokenOrder::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  auto prop = std::make_unique<ExitTokenOrder>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(EXIT_VALUE_LIT, prop->exitValue) ||
+      !mapper.map(SLOTS_LIT, prop->slots))
+    return nullptr;
+  return prop;
+}
 
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database

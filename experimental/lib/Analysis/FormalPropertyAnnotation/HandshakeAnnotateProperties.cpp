@@ -317,7 +317,6 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
   auto nameAttr =
       op->getAttrOfType<ArrayAttr>("argNames")[startChannel.getArgNumber()];
   std::string name = dyn_cast<StringAttr>(nameAttr).str();
-  llvm::errs() << name << "\n";
   start.slots.emplace_back(
       std::make_unique<BufferSlotFullNamer>(name, "valid", "", 0));
   stack.push_back(start);
@@ -462,6 +461,7 @@ HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
   }
   return success();
 }
+namespace {
 struct BranchOpDecision {
   // true -> this branch loops towards itself
   // false -> this branch exits
@@ -471,19 +471,22 @@ struct BranchOpDecision {
   inline bool isDecider() { return trueLoop != falseLoop; }
 };
 
-bool reachable(mlir::Value start, Operation *target) {
+bool reachable(mlir::Value start, mlir::Value target) {
   llvm::DenseSet<Operation *> visited;
   std::vector<mlir::Value> stack;
   stack.push_back(start);
   while (!stack.empty()) {
-    Operation *op = stack.back().getUses().begin()->getOwner();
+    mlir::Value next = stack.back();
     stack.pop_back();
+    if (next == target)
+      return true;
+
+    Operation *op = *next.getUsers().begin();
     if (visited.contains(op)) {
       continue;
     }
     visited.insert(op);
-    if (op == target)
-      return true;
+
     if (isa<ArithOpInterface, ConditionalBranchOp, ForkOp, BufferOp, LoadOp,
             MuxOp, MergeOp, ControlMergeOp>(op)) {
       for (auto res : op->getResults()) {
@@ -496,8 +499,10 @@ bool reachable(mlir::Value start, Operation *target) {
 
 BranchOpDecision findBranchLoops(ConditionalBranchOp branch) {
   BranchOpDecision ret;
-  ret.trueLoop = reachable(branch.getTrueResult(), branch);
-  ret.falseLoop = reachable(branch.getFalseResult(), branch);
+  ret.trueLoop =
+      reachable(branch.getTrueResult(), branch.getConditionOperand());
+  ret.falseLoop =
+      reachable(branch.getFalseResult(), branch.getConditionOperand());
   return ret;
 }
 
@@ -526,28 +531,36 @@ getConditionHolders(ConditionalBranchOp branch) {
       stack.push_back(forkOp.getOperand());
     }
     if (auto buffer = dyn_cast<BufferOp>(op)) {
+      /*
       std::vector<std::unique_ptr<InternalStateNamer>> slots =
           getAllSlotsOfOperation(buffer);
+          */
+      auto slots = buffer.getInternalSlotStateNamers();
+      auto lastSlot = std::make_unique<BufferSlotFullNamer>(slots.back());
       EffectiveSlotNamer last =
-          EffectiveSlotNamer(std::move(slots.back()), std::move(tailingSents));
+          EffectiveSlotNamer(std::move(lastSlot), std::move(tailingSents));
       tailingSents = std::vector<EagerForkSentNamer>();
       backPath.push_back(last);
       for (int i = slots.size() - 2; i >= 0; --i) {
-        backPath.emplace_back(std::move(slots[i]));
+        auto slot = std::make_unique<BufferSlotFullNamer>(slots[i]);
+        backPath.emplace_back(std::move(slot));
       }
       stack.push_back(buffer.getOperand());
     }
 
+    /*
     if (auto loadOp = dyn_cast<LoadOp>(op)) {
       auto slots = getAllSlotsOfOperation(loadOp);
       backPath.emplace_back(std::move(slots[slots.size() - 1]),
                             std::move(tailingSents));
     }
+    */
   }
   // Reverse path so the order corresponds to the circuit order
   std::reverse(backPath.begin(), backPath.end());
   return backPath;
 }
+} // namespace
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
@@ -561,10 +574,16 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
           // this invariant cannot say anything
           continue;
         }
+        llvm::errs() << getUniqueName(branch) << " is a decider\n";
         // If trueLoop: false output exits => exitValue = 0
         int32_t exitValue = dec.trueLoop ? 0 : 1;
         auto slots = getConditionHolders(branch);
-        ExitTokenOrder p(uid++, FormalProperty::TAG::INVAR, slots, exitValue);
+        if (slots.size() < 2) {
+          // Invariant is trivially true
+          continue;
+        }
+        ExitTokenOrder p(uid++, FormalProperty::TAG::OPT, slots, exitValue);
+        propertyTable.push_back(p.toJSON());
       }
     }
   }
@@ -589,6 +608,8 @@ HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
     return annotateEntryTokenOrder(modOp);
   case FormalProperty::TYPE::SingleEntryToken:
     return annotateSingleEntryToken(modOp);
+  case FormalProperty::TYPE::ExitTokenOrder:
+    return annotateExitTokenOrder(modOp);
   }
   return failure();
 }
@@ -624,6 +645,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties() {
     if (failed(annotateEntryTokenOrder(modOp)))
       return failure();
     if (failed(annotateSingleEntryToken(modOp)))
+      return failure();
+    if (failed(annotateExitTokenOrder(modOp)))
       return failure();
   }
   return success();
