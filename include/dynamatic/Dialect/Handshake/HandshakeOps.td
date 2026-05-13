@@ -726,6 +726,39 @@ def SinkOp : Handshake_Op<"sink"> {
   }];
 }
 
+def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
+ ]> {
+  let summary = "buffer operation without successor";
+  let description = [{
+    The dead buffer operation stores a single incoming token
+    in its slot, and then stops accepting tokens. It is not
+    supposed to be used anywhere other than formal verification.
+
+    Example:
+
+    ```mlir
+    formal.dead_buffer %data : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$operand);
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    DeadBufferOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
+  }];
+}
+
 def SourceOp : Handshake_Op<"source", [Pure]> {
   let summary = "source operation";
   let description = [{
