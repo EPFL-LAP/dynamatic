@@ -307,6 +307,7 @@ class LSQ:
             ctx, 'ldq_data_wen', 'w', self.configs.numLdqEntries)
         ldq_issue_set = LogicArray(
             ctx, 'ldq_issue_set', 'w', self.configs.numLdqEntries)
+        ldq_issue_set_any = Logic(ctx, 'ldq_issue_set_any', 'w')
         if self.configs.stResp:
             stq_exec_set = LogicArray(
                 ctx, 'stq_exec_set', 'w', self.configs.numStqEntries)
@@ -951,9 +952,7 @@ class LSQ:
             load_candidate_oh_p0 = LogicVec(ctx, 'load_candidate_oh_p0', pipe0_type, self.configs.numLdqEntries)
             if self.configs.pipe0:
                 load_candidate_oh_p0.regInit(init=0)
-                # FIXME: This probably breaks when pipe1 is enabled, I haven't thought it through yet.
-                assert not self.configs.pipe1
-                arch += Op(ctx, load_candidate_oh_p0, load_candidate_oh_next, 'when', 'load_p1_ready', 'else', load_candidate_oh_curr)
+                arch += Op(ctx, load_candidate_oh_p0, load_candidate_oh_next, 'when', ldq_issue_set_any, 'else', load_candidate_oh_curr)
             else:
                 arch += Op(ctx, load_candidate_oh_p0, load_candidate_oh_curr)
 
@@ -1383,6 +1382,16 @@ class LSQ:
                            (bypass_en, i)
                            )
             arch += Reduce(ctx, ldq_issue_set[i], ldq_issue_set_vec, 'or')
+        # Determine whether any load is being issued this cycle. This could just reduce ldq_issue_set, but we compute
+        # it differently to reduce the critical path.
+        load_p0_p1_hs = LogicArray(ctx, 'load_p0_p1_hs', 'w', self.configs.numLdMem)
+        for w in range(0, self.configs.numLdMem):
+            arch += Op(ctx, load_p0_p1_hs[w], load_en[w], 'and', load_p1_ready[w])
+        load_p0_p1_hs_any = Logic(ctx, 'load_p0_p1_hs_any', 'w')
+        arch += Reduce(ctx, load_p0_p1_hs_any, load_p0_p1_hs, 'or')
+        bypass_en_any = Logic(ctx, 'bypass_en_any', 'w')
+        arch += Reduce(ctx, bypass_en_any, bypass_en, 'or')
+        arch += Op(ctx, ldq_issue_set_any, load_p0_p1_hs_any, 'or', bypass_en_any)
 
         # Write Request
         arch += Op(ctx, wreq_valid_o[0], store_en_p1)
