@@ -654,7 +654,6 @@ void LowerFuncToHandshake::addBranchOps(
     // operation
     for (Value branchOprd : getBranchOperands(termOp)) {
       // Create a branch-like operation for the branch operand
-      // Operation *newOp;
       if (isConditional) {
         cf::CondBranchOp condBranchOp = cast<cf::CondBranchOp>(termOp);
 
