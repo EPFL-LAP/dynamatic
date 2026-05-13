@@ -674,32 +674,20 @@ void LowerFuncToHandshake::addBranchOps(
             falseUsers.insert(user);
         }
 
-#ifndef NDEBUG
-        // (Expensive) sanity check: every branch operand has one (the result is
-        // sinked later) or two users (regular case).
-        {
-          unsigned uses = 0;
-          for (auto &use : branchOprd.getUses()) {
-            if (trueUsers.contains(use.getOwner()) ||
-                falseUsers.contains(use.getOwner())) {
-              uses += 1;
-            }
-          }
-          assert(uses <= 2 &&
-                 "Expected that the branch result has up to 2 uses.");
-        }
-#endif
-
         Value trueRes = newCondBranchOp.getTrueResult();
 
         // NOTE: this flag is used to handle parallel edges. See the comment
         // below
-        bool alreadyReplaced = false;
+        //
+        // We use this look up to make sure that the true result of a branch is
+        // used exactly once.
+        DenseSet<Operation *> alreadyReplaced;
 
         // Use the results of the newly added conditional branch to feed the
         // original users (CF operations)
         rewriter.replaceUsesWithIf(branchOprd, trueRes, [&](OpOperand &oprd) {
-          if (alreadyReplaced) {
+          Operation *op = oprd.getOwner();
+          if (alreadyReplaced.count(op)) {
             // NOTE: here we need to be careful of handling parallel edges.
             //
             // Consider the following example:
@@ -730,13 +718,11 @@ void LowerFuncToHandshake::addBranchOps(
             //
             // NOTE: the order here has to match the one in
             // `getRealBlockPredecessors`.
-
-            // We use this flag to make sure that the true result of a branch is
-            // used exactly once.
             return false;
           }
           bool isMergeLikeHandshakeUser = trueUsers.contains(oprd.getOwner());
-          alreadyReplaced |= isMergeLikeHandshakeUser;
+          if (isMergeLikeHandshakeUser)
+            alreadyReplaced.insert(op);
           return isMergeLikeHandshakeUser;
         });
 
