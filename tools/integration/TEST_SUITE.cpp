@@ -279,6 +279,7 @@ INSTANTIATE_TEST_SUITE_P(
       "pivot",
       "polyn_mult",
       "prediction",
+      "predictionN",
       "simple_example_1",
       "sobel",
       "spmv",

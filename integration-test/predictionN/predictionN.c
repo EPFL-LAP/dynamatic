@@ -5,20 +5,16 @@ void predictionN(inout_float_t a[N], inout_float_t b[N], in_float_t c) {
   for (unsigned i = 0; i < N; ++i) {
     float x = a[i];
     float y;
-    switch ((int)((x + 1.0f) * 10.0f)) {
-    case 100:
+    float d = ((x + 1.0f) * 10.0f);
+    if (d == 100.0f) {
       y = 5.0f;
-      break;
-    case 200:
-      y = 6.0f;
-      break;
-    case 300:
-      y = 7.0f;
-      break;
-    default:
-      y = x;
+    } else {
+      if (d == 200.0f) {
+        y = 6.0f;
+      } else {
+        y = x;
+      }
     }
-
     if (y == 5.0f) {
       b[i] = (5.0f + c) * 10.0f;
     } else if (y == 6.0f) {
