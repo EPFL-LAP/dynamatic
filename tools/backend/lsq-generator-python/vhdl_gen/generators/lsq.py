@@ -945,9 +945,18 @@ class LSQ:
             load_candidate_oh_curr = LogicVec(ctx, 'load_candidate_oh_curr', 'w', self.configs.numLdqEntries)
             arch += CyclicPriorityMasking(ctx, load_candidate_oh_curr, load_pending, ldq_head_oh_pcomp)
             load_candidate_oh_next = LogicVec(ctx, 'load_candidate_oh_next', 'w', self.configs.numLdqEntries)
-            for i in range(self.configs.numLdqEntries):
-                # For safety, we need to re-check the next load entry is actually still pending.
-                arch += Op(ctx, (load_candidate_oh_next, i), (load_pending, i), 'and', (load_candidate_oh_curr, (i - 1) % self.configs.numLdqEntries))
+            if False:
+                # Find the next load candidate through a simple shift. This is more efficient, but can cause lower
+                # performance if the next load candidate is not pending (e.g., already issued, or not ready yet).
+                for i in range(self.configs.numLdqEntries):
+                    # For safety, we need to re-check the next load entry is actually still pending.
+                    arch += Op(ctx, (load_candidate_oh_next, i), (load_pending, i), 'and', (load_candidate_oh_curr, (i - 1) % self.configs.numLdqEntries))
+            else:
+                # Find the precise next load candidate by performing another round of cyclic priority masking. This is
+                # more expensive, but yields potentially higher performance.
+                load_pending_for_next = LogicVec(ctx, 'load_pending_for_next', 'w', self.configs.numLdqEntries)
+                arch += Op(ctx, load_pending_for_next, load_pending, 'and', 'not', load_candidate_oh_curr)
+                arch += CyclicPriorityMasking(ctx, load_candidate_oh_next, load_pending_for_next, ldq_head_oh_pcomp)
 
             load_candidate_oh_p0 = LogicVec(ctx, 'load_candidate_oh_p0', pipe0_type, self.configs.numLdqEntries)
             if self.configs.pipe0:
