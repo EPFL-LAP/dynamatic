@@ -1,8 +1,9 @@
-//===- NoShortCircuit.cpp -------------------------------------------------===//
+//===- SourceRewriter.cpp -------------------------------------------------===//
 //
 // Standalone clang transformer tool that rewrites the input C file.
 //
-// Turns logical operators (`&&`, `||`)
+// Currently only implements one rewrite: 
+// Turning logical operators (`&&`, `||`)
 // into bitwise operators (`&`, `|`)
 // with operands wrapped in a double-negation `!!(x)`.
 //
@@ -72,11 +73,11 @@ using ::clang::transformer::node;
 using ::clang::transformer::RewriteRule;
 
 // The source-file to source-file framework
-// we use in thie tool uses
+// we use in this tool uses
 // declarative rewrite rules
 // that can easily applied to entire codebases
 // using boilerplate utility objects/functions
-static RewriteRule buildRewriteRule() {
+static RewriteRule buildNoShortCircuitRewriteRule() {
   // make a rule to turn a && b into (!!a & !!b)
   // binaryOperator matches only operators with two inputs
   // hasOperatorName further filters down to only match &&
@@ -163,7 +164,7 @@ applySourceChanges(const AtomicChanges &AllChanges) {
 
     // applySourceChanges fails if we can't open a file
     if (!BufferErr) {
-      llvm::errs() << "NoShortCircuit Error: failed to open " << File
+      llvm::errs() << "SourceRewriter Error: failed to open " << File
                    << " for rewriting\n";
       return mlir::failure();
     }
@@ -210,53 +211,10 @@ applySourceChanges(const AtomicChanges &AllChanges) {
   return AppliedChanges;
 }
 
-// Add a boilerplate message to the help
-// of how libtooling CLI tools parse input commands
-static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
-
-// Tool category is used to hide generic libtooling help options
-// that are non-specific to this tool
-static cl::OptionCategory ToolCategory("no-short-circuit options");
-
-int main(int argc, const char **argv) {
-  // Handler for if the program crashes
-  // to give better errors than normal in c++
-  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
-
-  // parse the CLI args
-  // libtooling uses "registration objects",
-  // where the declaration of an option object
-  // automatically adds it to the parser
-  //
-  // We still need to pass the ToolCategory
-  // to hide the libtooling generic options in
-  // the help message
-  llvm::Expected<CommonOptionsParser> OptionsParser =
-      CommonOptionsParser::create(argc, argv, ToolCategory);
-
-  // if parsing the CLI args failed
-  if (!OptionsParser) {
-    // print why parsing failed
-    llvm::errs() << OptionsParser.takeError();
-    return -1;
-  }
-
-  // Extract the needed components of the OptionsParser
-  // since we need to pass them to multiple executors
-  CompilationDatabase &Compilations = OptionsParser->getCompilations();
-  const std::vector<std::string> &SourcePaths =
-      OptionsParser->getSourcePathList();
-
-  // The declarative rewrite rule is not stateful
-  // and so we can declare it outside of the loop
-  auto Rule = buildRewriteRule();
-
-  // If we changed a file,
-  // we need to re-run the whole flow
-  // to be able to change that file a second time
-  // which we need to do to handle nesting
-  bool AppliedChanges = true;
-  while (AppliedChanges) {
+static mlir::FailureOr<bool>
+applyRewriteRule(CompilationDatabase &Compilations,
+                 const std::vector<std::string> &SourcePaths,
+                 const RewriteRule &Rule) {
     // Constructs a standalone clang tool
     // based on the parser options
     //
@@ -326,13 +284,71 @@ int main(int argc, const char **argv) {
     auto Err = Executor.execute(newFrontendActionFactory(&MatchFinder));
     if (Err) {
       llvm::errs() << llvm::toString(std::move(Err)) << "\n";
-      return -1;
+      return mlir::failure();
     }
 
     // Actually apply AllChanges to the files
     // Returns FailureOr< applied changes >: if any change was applied
     // we need to re-run the whole flow to handle nesting
-    mlir::FailureOr<bool> Result = applySourceChanges(AllChanges);
+    return applySourceChanges(AllChanges);
+}
+
+
+// Add a boilerplate message to the help
+// of how libtooling CLI tools parse input commands
+static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
+
+// Tool category is used to hide generic libtooling help options
+// that are non-specific to this tool
+static cl::OptionCategory ToolCategory("source-rewriter options");
+
+int main(int argc, const char **argv) {
+  // Handler for if the program crashes
+  // to give better errors than normal in c++
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
+
+  // parse the CLI args
+  // libtooling uses "registration objects",
+  // where the declaration of an option object
+  // automatically adds it to the parser
+  //
+  // We still need to pass the ToolCategory
+  // to hide the libtooling generic options in
+  // the help message
+  llvm::Expected<CommonOptionsParser> OptionsParser =
+      CommonOptionsParser::create(argc, argv, ToolCategory);
+
+  // if parsing the CLI args failed
+  if (!OptionsParser) {
+    // print why parsing failed
+    llvm::errs() << OptionsParser.takeError();
+    return -1;
+  }
+
+  // Extract the needed components of the OptionsParser
+  // since we need to pass them to multiple executors
+  CompilationDatabase &Compilations = OptionsParser->getCompilations();
+  const std::vector<std::string> &SourcePaths =
+      OptionsParser->getSourcePathList();
+
+  // The declarative rewrite rule is not stateful
+  // and so we can declare it outside of the loop
+  auto NoShortCircuitRewriteRule = buildNoShortCircuitRewriteRule();
+
+  // If we changed a file,
+  // we need to re-run the whole flow
+  // to be able to change that file a second time
+  // which we need to do to handle nesting
+  bool AppliedChanges = true;
+
+  // boolean to track were any changes made 
+  // to the input kernel
+  // If so, we will print a warning
+  bool ChangesMade = false;
+  while (AppliedChanges) {
+ 
+    auto Result =
+        applyRewriteRule(Compilations, SourcePaths, NoShortCircuitRewriteRule);
 
     // return that the tool failed
     // if applying the changes failed
@@ -343,5 +359,18 @@ int main(int argc, const char **argv) {
     // update the local variable
     // to the boolean returned from applySourceChanges
     AppliedChanges = *Result;
+
+
+    // Update ChangesMade to be true
+    // if AppliedChanges is ever true
+    ChangesMade = ChangesMade || AppliedChanges;
+  }
+
+  if(ChangesMade){
+    llvm::errs() << "[WARNING] Dynamatic does not use short-circuiting "
+    << "on logical AND (&&) and logical OR (||) operators. "
+    << " Short-circuiting can be enabled by passing "
+    << "--enable-short-circuit to the compile command, "
+    << "but this may come at a performance cost.";
   }
 }

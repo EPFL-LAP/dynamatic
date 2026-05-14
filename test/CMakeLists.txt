@@ -11,7 +11,7 @@ set(DYNAMATIC_TEST_DEPENDS
   dynamatic-opt
   export-rtl
   hls-fuzzer-check-bitwidth
-  no-short-circuit
+  source-rewriter
   )
 
 add_lit_testsuite(check-dynamatic "Running the Dynamatic regression tests"
