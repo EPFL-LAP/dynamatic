@@ -828,7 +828,11 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
 
       auto ancestorPaths = findAncestorSlots(iog, dec, *iogBranch);
       for (auto ancestorPath : ancestorPaths) {
+        if (ancestorPath.empty())
+          continue;
         for (const auto &decPath : slotPaths) {
+          if (decPath.started.empty())
+            continue;
           for (const auto &startSent : decPath.startSents) {
             ancestorPath.back().addCopiedSent(startSent);
           }
