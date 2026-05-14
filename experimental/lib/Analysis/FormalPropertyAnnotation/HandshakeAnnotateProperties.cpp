@@ -26,6 +26,7 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
+#include "experimental/Support/IOG.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -468,7 +469,7 @@ struct BranchOpDecision {
   bool trueLoop;
   bool falseLoop;
 
-  inline bool isDecider() { return trueLoop != falseLoop; }
+  inline bool isExitBranch() { return trueLoop != falseLoop; }
 };
 
 bool reachable(mlir::Value start, mlir::Value target) {
@@ -497,12 +498,15 @@ bool reachable(mlir::Value start, mlir::Value target) {
   return false;
 }
 
-BranchOpDecision findBranchLoops(ConditionalBranchOp branch) {
+BranchOpDecision findBranchLoops(const IOG &iog, ConditionalBranchOp branch) {
   BranchOpDecision ret;
-  ret.trueLoop =
-      reachable(branch.getTrueResult(), branch.getConditionOperand());
-  ret.falseLoop =
-      reachable(branch.getFalseResult(), branch.getConditionOperand());
+  Operation *opTrue = *branch.getTrueResult().getUsers().begin();
+  auto paths = iog.findAllPaths(opTrue, branch);
+  ret.trueLoop = !(paths.units.find(branch) == paths.units.end());
+
+  Operation *opFalse = *branch.getFalseResult().getUsers().begin();
+  paths = iog.findAllPaths(opFalse, branch);
+  ret.falseLoop = !(paths.units.find(branch) == paths.units.end());
   return ret;
 }
 
@@ -560,31 +564,122 @@ getConditionHolders(ConditionalBranchOp branch) {
   std::reverse(backPath.begin(), backPath.end());
   return backPath;
 }
+Operation *getDecider(ConditionalBranchOp branch) {
+  std::vector<mlir::Value> stack;
+  stack.push_back(branch.getConditionOperand());
+  Operation *dec = branch;
+  while (!stack.empty()) {
+    mlir::Value cur = stack.back();
+    stack.pop_back();
+    Operation *op = cur.getDefiningOp();
+
+    if (!op) {
+      continue;
+    }
+    dec = op;
+
+    if (auto forkOp = dyn_cast<ForkOp>(op)) {
+      stack.push_back(forkOp.getOperand());
+    }
+    if (auto buffer = dyn_cast<BufferOp>(op)) {
+      stack.push_back(buffer.getOperand());
+    }
+  }
+  return dec;
+}
+std::vector<std::vector<EffectiveSlotNamer>>
+findDeciderBranchPaths(Operation *dec) {
+  struct PartialPath {
+    std::vector<EffectiveSlotNamer> slots;
+    mlir::Value cur;
+  };
+  std::vector<std::vector<EffectiveSlotNamer>> ret{};
+  std::vector<PartialPath> stack;
+  mlir::Value startChannel;
+  if (auto arith = dyn_cast<ArithOpInterface>(dec)) {
+    startChannel = arith->getResult(0);
+  } else if (auto load = dyn_cast<LoadOp>(dec)) {
+    load->emitError("TODO: Handle load decider");
+    llvm::report_fatal_error("");
+  } else {
+    load->emitError("Unexpected decider type");
+    llvm::report_fatal_error("");
+  }
+  PartialPath start = {
+      .slots = {},
+      .cur = startChannel,
+  };
+  stack.push_back(start);
+  while (!stack.empty()) {
+    PartialPath path = stack.back();
+    stack.pop_back();
+
+    Operation *next = *path.cur.getUsers().begin();
+    if (auto branch = dyn_cast<ConditionalBranchOp>(next)) {
+      // Path is terminated by ConditionalBranchOp, so this is the end of the
+      // path
+      ret.push_back(std::move(path.slots));
+      continue;
+    }
+    if (auto buffer = dyn_cast<BufferOp>(next)) {
+      for (auto &slot : buffer.getInternalSlotStateNamers()) {
+        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
+      }
+      path.cur = buffer.getResult();
+      stack.push_back(std::move(path));
+      continue;
+    }
+    if (auto fork = dyn_cast<ForkOp>(next)) {
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
+        PartialPath nextPath = {
+            .slots = path.slots,
+            .cur = channel,
+        };
+        if (!nextPath.slots.empty()) {
+          EffectiveSlotNamer &back = nextPath.slots.back();
+          back.copiedSents.push_back(sents[i]);
+        }
+        stack.push_back(nextPath);
+      }
+      continue;
+    }
+
+    llvm::report_fatal_error("unexpected op detected");
+  }
+  return ret;
+}
 } // namespace
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
-  for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
-    for (Operation &op : funcOp.getOps()) {
+  auto iogs = findAllIOGs(modOp);
+  llvm::DenseMap<ConditionalBranchOp, int32_t> deciderBranches;
+  for (const auto &iog : iogs) {
+    for (auto *op : iog.units) {
       if (auto branch = dyn_cast<ConditionalBranchOp>(op)) {
-        auto dec = findBranchLoops(branch);
-        if (!dec.isDecider()) {
-          // Either both branches exit and this invariant is handled by 6
-          // (assuming this branch is part of an IOG), or both branches loop and
-          // this invariant cannot say anything
-          continue;
+        auto dec = findBranchLoops(iog, branch);
+        if (dec.isExitBranch()) {
+          int32_t exitValue = dec.trueLoop ? 0 : 1;
+          deciderBranches.insert({branch, exitValue});
         }
-        llvm::errs() << getUniqueName(branch) << " is a decider\n";
-        // If trueLoop: false output exits => exitValue = 0
-        int32_t exitValue = dec.trueLoop ? 0 : 1;
-        auto slots = getConditionHolders(branch);
-        if (slots.size() < 2) {
-          // Invariant is trivially true
-          continue;
-        }
-        ExitTokenOrder p(uid++, FormalProperty::TAG::OPT, slots, exitValue);
-        propertyTable.push_back(p.toJSON());
       }
+    }
+  }
+  llvm::DenseMap<Operation *, int32_t> deciders;
+  for (auto [branch, exitValue] : deciderBranches) {
+    Operation *dec = getDecider(branch);
+    deciders.insert({dec, exitValue});
+  }
+  for (auto [dec, exitValue] : deciders) {
+    auto slotPaths = findDeciderBranchPaths(dec);
+    for (auto &slots : slotPaths) {
+      if (slots.size() < 2) {
+        // Invariant is trivially true
+        continue;
+      }
+      ExitTokenOrder p(uid++, FormalProperty::TAG::INVAR, slots, exitValue);
+      propertyTable.push_back(p.toJSON());
     }
   }
   return success();
