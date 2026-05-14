@@ -26,7 +26,7 @@
 // and there is no control-flow dependency between the two operands.
 //
 // Docs available at:
-//   docs/DeveloperGuide/DynamaticFeaturesAndOptimizations/DisablingShortCircuiting.md
+//   docs/DeveloperGuide/DynamaticFeaturesAndOptimizations/SourceRewriter.md
 //
 // Modeled on PointerToRef.cpp from feldsherov/pets-cattle-and-code-examples,
 // which is modelled on clang-tools-extra/tool-template.
@@ -359,7 +359,6 @@ int main(int argc, const char **argv) {
     // update the local variable
     // to the boolean returned from applySourceChanges
     AppliedChanges = *Result;
-
 
     // Update ChangesMade to be true
     // if AppliedChanges is ever true
