@@ -43,6 +43,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::SingleEntryToken;
   if (s == "ExitTokenOrder")
     return FormalProperty::TYPE::ExitTokenOrder;
+  if (s == "ExitTokenNoAncestors")
+    return FormalProperty::TYPE::ExitTokenNoAncestors;
 
   return std::nullopt;
 }
@@ -69,6 +71,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "SingleEntryToken";
   case TYPE::ExitTokenOrder:
     return "ExitTokenOrder";
+  case TYPE::ExitTokenNoAncestors:
+    return "ExitTokenNoAncestors";
   }
 }
 
@@ -138,6 +142,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return SingleEntryToken::fromJSON(value, path.field(INFO_LIT));
   case TYPE::ExitTokenOrder:
     return ExitTokenOrder::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::ExitTokenNoAncestors:
+    return ExitTokenNoAncestors::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -489,6 +495,26 @@ ExitTokenOrder::fromJSON(const llvm::json::Value &value,
 
   if (!mapper || !mapper.map(EXIT_VALUE_LIT, prop->exitValue) ||
       !mapper.map(SLOTS_LIT, prop->slots))
+    return nullptr;
+  return prop;
+}
+
+llvm::json::Value ExitTokenNoAncestors::extraInfoToJSON() const {
+  return llvm::json::Object({{EXIT_VALUE_LIT, exitValue},
+                             {EXIT_SLOTS_LIT, exitSlots},
+                             {ANCESTORS_LIT, ancestors}});
+}
+std::unique_ptr<ExitTokenNoAncestors>
+ExitTokenNoAncestors::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<ExitTokenNoAncestors>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(EXIT_VALUE_LIT, prop->exitValue) ||
+      !mapper.map(EXIT_SLOTS_LIT, prop->exitSlots) ||
+      !mapper.map(ANCESTORS_LIT, prop->ancestors))
     return nullptr;
   return prop;
 }

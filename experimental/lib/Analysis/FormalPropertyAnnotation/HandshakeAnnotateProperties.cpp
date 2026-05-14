@@ -92,6 +92,7 @@ private:
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
   LogicalResult annotateSingleEntryToken(ModuleOp modOp);
   LogicalResult annotateExitTokenOrder(const std::vector<IOG> &iog);
+  // LogicalResult annotateExitTokenNoAncestors(ModuleOp modOp);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -627,13 +628,19 @@ Operation *getDecider(ConditionalBranchOp branch) {
   return dec;
 }
 
-std::vector<std::vector<EffectiveSlotNamer>>
-findDeciderBranchPaths(Operation *dec) {
+struct UnstartedPath {
+  std::vector<EffectiveSlotNamer> started;
+  std::vector<EagerForkSentNamer> startSents;
+  ConditionalBranchOp end;
+};
+
+std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
+    std::vector<EagerForkSentNamer> startSents;
     mlir::Value cur;
   };
-  std::vector<std::vector<EffectiveSlotNamer>> ret{};
+  std::vector<UnstartedPath> ret{};
   std::vector<PartialPath> stack;
   mlir::Value startChannel;
   if (auto arith = dyn_cast<ArithOpInterface>(dec)) {
@@ -647,6 +654,7 @@ findDeciderBranchPaths(Operation *dec) {
   }
   PartialPath start = {
       .slots = {},
+      .startSents = {},
       .cur = startChannel,
   };
   stack.push_back(start);
@@ -658,7 +666,8 @@ findDeciderBranchPaths(Operation *dec) {
     if (auto branch = dyn_cast<ConditionalBranchOp>(next)) {
       // Path is terminated by ConditionalBranchOp, so this is the end of the
       // path
-      ret.push_back(std::move(path.slots));
+      ret.push_back(
+          {std::move(path.slots), std::move(path.startSents), branch});
       continue;
     }
     if (auto buffer = dyn_cast<BufferOp>(next)) {
@@ -674,11 +683,14 @@ findDeciderBranchPaths(Operation *dec) {
       for (auto [i, channel] : llvm::enumerate(next->getResults())) {
         PartialPath nextPath = {
             .slots = path.slots,
+            .startSents = path.startSents,
             .cur = channel,
         };
         if (!nextPath.slots.empty()) {
           EffectiveSlotNamer &back = nextPath.slots.back();
           back.copiedSents.push_back(sents[i]);
+        } else {
+          path.startSents.push_back(sents[i]);
         }
         stack.push_back(nextPath);
       }
@@ -689,6 +701,86 @@ findDeciderBranchPaths(Operation *dec) {
   }
   return ret;
 }
+
+std::vector<std::vector<EffectiveSlotNamer>>
+findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
+  struct PartialPath {
+    mlir::Value channel;
+    std::vector<EffectiveSlotNamer> backPath;
+    std::vector<EagerForkSentNamer> backSents;
+    llvm::DenseSet<Operation *> visited;
+  };
+  std::vector<PartialPath> stack;
+  std::vector<EffectiveSlotNamer> startSlots;
+  PartialPath start{
+      .channel = *dec->getOperands().begin(),
+      .backPath = {},
+      .backSents = {},
+      .visited = {},
+  };
+  std::vector<std::vector<EffectiveSlotNamer>> ret;
+  stack.push_back(std::move(start));
+  while (!stack.empty()) {
+    auto cur = std::move(stack.back());
+    stack.pop_back();
+
+    if (!iog.contains(cur.channel)) {
+      assert(false && "should not happen");
+      continue;
+    }
+
+    if (cur.channel == iog.entry) {
+      EffectiveSlotNamer es(std::make_unique<EntrySlotNamer>(iog.entry));
+      while (!cur.backSents.empty()) {
+        es.addCopiedSent(cur.backSents.back());
+        cur.backSents.pop_back();
+      }
+      cur.backPath.push_back(std::move(es));
+    }
+
+    Operation *op = cur.channel.getDefiningOp();
+    if (!op || !iog.contains(op) || op == exit ||
+        cur.visited.find(op) != cur.visited.end()) {
+      std::vector<EffectiveSlotNamer> forwardPath{};
+      while (!cur.backPath.empty()) {
+        forwardPath.push_back(std::move(cur.backPath.back()));
+        cur.backPath.pop_back();
+      }
+      ret.push_back(std::move(forwardPath));
+      continue;
+    }
+    cur.visited.insert(op);
+
+    if (auto fork = dyn_cast<EagerForkLikeOpInterface>(op)) {
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, chan] : llvm::enumerate(fork->getResults())) {
+        if (chan == cur.channel) {
+          cur.backSents.push_back(sents[i]);
+        }
+      }
+    }
+    auto curSlots = getAllSlotsOfOperation(op);
+    for (int i = curSlots.size() - 1; i >= 0; --i) {
+      auto &slot = curSlots[i];
+      EffectiveSlotNamer es(std::move(slot));
+      while (!cur.backSents.empty()) {
+        es.addCopiedSent(cur.backSents.back());
+        cur.backSents.pop_back();
+      }
+      cur.backPath.push_back(std::move(es));
+    }
+
+    for (auto back : op->getOperands()) {
+      if (!iog.contains(back)) {
+        continue;
+      }
+      cur.channel = back;
+      stack.push_back(cur);
+    }
+  }
+  return ret;
+}
+
 } // namespace
 
 LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
@@ -712,13 +804,44 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
   }
   for (auto [dec, exitValue] : deciders) {
     auto slotPaths = findDeciderBranchPaths(dec);
-    for (auto &slots : slotPaths) {
-      if (slots.size() < 2) {
+    for (const auto &slots : slotPaths) {
+      if (slots.started.size() < 2) {
         // Invariant is trivially true
         continue;
       }
-      ExitTokenOrder p(uid++, FormalProperty::TAG::INVAR, slots, exitValue);
+      ExitTokenOrder p(uid++, FormalProperty::TAG::INVAR, slots.started,
+                       exitValue);
       propertyTable.push_back(p.toJSON());
+    }
+    for (const auto &iog : iogs) {
+      if (!iog.contains(dec)) {
+        continue;
+      }
+      std::optional<ConditionalBranchOp> iogBranch;
+      for (const auto &slots : slotPaths) {
+        if (iog.contains(slots.end)) {
+          assert(!iogBranch);
+          iogBranch = slots.end;
+        }
+      }
+      assert(iogBranch);
+
+      auto ancestorPaths = findAncestorSlots(iog, dec, *iogBranch);
+      for (auto ancestorPath : ancestorPaths) {
+        for (const auto &decPath : slotPaths) {
+          for (const auto &startSent : decPath.startSents) {
+            ancestorPath.back().addCopiedSent(startSent);
+          }
+          std::vector<std::shared_ptr<InternalStateNamer>> exitSlots;
+          exitSlots.reserve(decPath.started.size());
+          for (const auto &es : decPath.started) {
+            exitSlots.push_back(es.slot);
+          }
+          ExitTokenNoAncestors p(uid++, FormalProperty::TAG::INVAR, exitSlots,
+                                 ancestorPath, exitValue);
+          propertyTable.push_back(p.toJSON());
+        }
+      }
     }
   }
   return success();

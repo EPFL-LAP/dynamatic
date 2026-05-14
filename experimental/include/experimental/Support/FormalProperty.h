@@ -38,6 +38,7 @@ public:
     EntryTokenOrder,
     SingleEntryToken,
     ExitTokenOrder,
+    ExitTokenNoAncestors,
   };
 
   TAG getTag() const { return tag; }
@@ -414,6 +415,42 @@ private:
   std::vector<EffectiveSlotNamer> slots;
   int32_t exitValue;
   inline static const StringLiteral SLOTS_LIT = "slots";
+  inline static const StringLiteral EXIT_VALUE_LIT = "exit_value";
+};
+
+class ExitTokenNoAncestors : public FormalProperty {
+public:
+  const std::vector<std::shared_ptr<InternalStateNamer>> &getExitSlots() const {
+    return exitSlots;
+  }
+  const std::vector<EffectiveSlotNamer> &getAncestors() const {
+    return ancestors;
+  }
+  int32_t getValue() const { return exitValue; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ExitTokenNoAncestors>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  ExitTokenNoAncestors() = default;
+  ExitTokenNoAncestors(
+      unsigned long id, TAG tag,
+      std::vector<std::shared_ptr<InternalStateNamer>> exitSlots,
+      std::vector<EffectiveSlotNamer> ancestors, int32_t value)
+      : FormalProperty(id, tag, TYPE::ExitTokenNoAncestors),
+        exitSlots(std::move(exitSlots)), ancestors(std::move(ancestors)),
+        exitValue(value) {}
+  ~ExitTokenNoAncestors() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::ExitTokenNoAncestors;
+  }
+
+private:
+  std::vector<std::shared_ptr<InternalStateNamer>> exitSlots;
+  std::vector<EffectiveSlotNamer> ancestors;
+  int32_t exitValue;
+  inline static const StringLiteral EXIT_SLOTS_LIT = "exit_slots";
+  inline static const StringLiteral ANCESTORS_LIT = "ancestors";
   inline static const StringLiteral EXIT_VALUE_LIT = "exit_value";
 };
 
