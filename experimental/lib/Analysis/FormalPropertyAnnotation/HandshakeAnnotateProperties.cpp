@@ -70,7 +70,8 @@ private:
   unsigned int uid;
   json::Array propertyTable;
 
-  LogicalResult annotateProperty(ModuleOp modOp, FormalProperty::TYPE t);
+  LogicalResult annotateProperty(ModuleOp modOp, const std::vector<IOG> &iogs,
+                                 FormalProperty::TYPE t);
   LogicalResult annotateQueriedProperties(const std::vector<IOG> &iogs);
   LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
@@ -90,7 +91,7 @@ private:
                                              int32_t entryValue);
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
   LogicalResult annotateSingleEntryToken(ModuleOp modOp);
-  LogicalResult annotateExitTokenOrder(ModuleOp modOp);
+  LogicalResult annotateExitTokenOrder(const std::vector<IOG> &iog);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -590,32 +591,6 @@ struct BranchOpDecision {
   inline bool isExitBranch() { return trueLoop != falseLoop; }
 };
 
-bool reachable(mlir::Value start, mlir::Value target) {
-  llvm::DenseSet<Operation *> visited;
-  std::vector<mlir::Value> stack;
-  stack.push_back(start);
-  while (!stack.empty()) {
-    mlir::Value next = stack.back();
-    stack.pop_back();
-    if (next == target)
-      return true;
-
-    Operation *op = *next.getUsers().begin();
-    if (visited.contains(op)) {
-      continue;
-    }
-    visited.insert(op);
-
-    if (isa<ArithOpInterface, ConditionalBranchOp, ForkOp, BufferOp, LoadOp,
-            MuxOp, MergeOp, ControlMergeOp>(op)) {
-      for (auto res : op->getResults()) {
-        stack.push_back(res);
-      }
-    }
-  }
-  return false;
-}
-
 BranchOpDecision findBranchLoops(const IOG &iog, ConditionalBranchOp branch) {
   BranchOpDecision ret;
   Operation *opTrue = *branch.getTrueResult().getUsers().begin();
@@ -628,60 +603,6 @@ BranchOpDecision findBranchLoops(const IOG &iog, ConditionalBranchOp branch) {
   return ret;
 }
 
-std::vector<EffectiveSlotNamer>
-getConditionHolders(ConditionalBranchOp branch) {
-  std::vector<mlir::Value> stack;
-  stack.push_back(branch.getConditionOperand());
-  std::vector<EagerForkSentNamer> tailingSents;
-  std::vector<EffectiveSlotNamer> backPath;
-  while (!stack.empty()) {
-    mlir::Value cur = stack.back();
-    stack.pop_back();
-    Operation *op = cur.getDefiningOp();
-
-    if (!op) {
-      continue;
-    }
-    if (auto forkOp = dyn_cast<ForkOp>(op)) {
-      auto sents = forkOp.getInternalSentStateNamers();
-      for (auto [i, chan] : llvm::enumerate(forkOp.getResults())) {
-        if (chan == cur) {
-          tailingSents.push_back(sents[i]);
-          break;
-        }
-      }
-      stack.push_back(forkOp.getOperand());
-    }
-    if (auto buffer = dyn_cast<BufferOp>(op)) {
-      /*
-      std::vector<std::unique_ptr<InternalStateNamer>> slots =
-          getAllSlotsOfOperation(buffer);
-          */
-      auto slots = buffer.getInternalSlotStateNamers();
-      auto lastSlot = std::make_unique<BufferSlotFullNamer>(slots.back());
-      EffectiveSlotNamer last =
-          EffectiveSlotNamer(std::move(lastSlot), std::move(tailingSents));
-      tailingSents = std::vector<EagerForkSentNamer>();
-      backPath.push_back(last);
-      for (int i = slots.size() - 2; i >= 0; --i) {
-        auto slot = std::make_unique<BufferSlotFullNamer>(slots[i]);
-        backPath.emplace_back(std::move(slot));
-      }
-      stack.push_back(buffer.getOperand());
-    }
-
-    /*
-    if (auto loadOp = dyn_cast<LoadOp>(op)) {
-      auto slots = getAllSlotsOfOperation(loadOp);
-      backPath.emplace_back(std::move(slots[slots.size() - 1]),
-                            std::move(tailingSents));
-    }
-    */
-  }
-  // Reverse path so the order corresponds to the circuit order
-  std::reverse(backPath.begin(), backPath.end());
-  return backPath;
-}
 Operation *getDecider(ConditionalBranchOp branch) {
   std::vector<mlir::Value> stack;
   stack.push_back(branch.getConditionOperand());
@@ -705,6 +626,7 @@ Operation *getDecider(ConditionalBranchOp branch) {
   }
   return dec;
 }
+
 std::vector<std::vector<EffectiveSlotNamer>>
 findDeciderBranchPaths(Operation *dec) {
   struct PartialPath {
@@ -769,9 +691,8 @@ findDeciderBranchPaths(Operation *dec) {
 }
 } // namespace
 
-LogicalResult
-HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
-  auto iogs = findAllIOGs(modOp);
+LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
+    const std::vector<IOG> &iogs) {
   llvm::DenseMap<ConditionalBranchOp, int32_t> deciderBranches;
   for (const auto &iog : iogs) {
     for (auto *op : iog.units) {
@@ -803,9 +724,8 @@ HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(ModuleOp modOp) {
   return success();
 }
 
-LogicalResult
-HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
-                                                  FormalProperty::TYPE t) {
+LogicalResult HandshakeAnnotatePropertiesPass::annotateProperty(
+    ModuleOp modOp, const std::vector<IOG> &iogs, FormalProperty::TYPE t) {
   switch (t) {
   case FormalProperty::TYPE::AbsenceOfBackpressure:
     return annotateAbsenceOfBackpressure(modOp);
@@ -818,16 +738,23 @@ HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
   case FormalProperty::TYPE::ReconvergentPathFlow:
     return annotateReconvergentPathFlow(modOp);
   case FormalProperty::TYPE::IOGSingleToken:
+    for (const auto &iog : iogs) {
+      if (failed(annotateIOGSingleToken(iog)))
+        return failure();
+    }
+    return success();
   case FormalProperty::TYPE::IOGConsecutiveTokens:
-    assert(false &&
-           "TODO: IOG as pass so that this function has access to IOGs");
-    return failure();
+    for (const auto &iog : iogs) {
+      if (failed(annotateIOGConsecutiveTokens(iog)))
+        return failure();
+    }
+    return success();
   case FormalProperty::TYPE::EntryTokenOrder:
     return annotateEntryTokenOrder(modOp);
   case FormalProperty::TYPE::SingleEntryToken:
     return annotateSingleEntryToken(modOp);
   case FormalProperty::TYPE::ExitTokenOrder:
-    return annotateExitTokenOrder(modOp);
+    return annotateExitTokenOrder(iogs);
   }
   return failure();
 }
@@ -840,7 +767,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
     for (auto &elem : llvm::split(annotateList, ',')) {
       std::string typeStr = elem.trim().str();
       if (auto t = FormalProperty::typeFromStr(typeStr)) {
-        if (failed(annotateProperty(modOp, *t)))
+        if (failed(annotateProperty(modOp, iogs, *t)))
           res = failure();
       } else {
         llvm::errs() << typeStr << " is not a property\n";
@@ -873,7 +800,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
       return failure();
     if (failed(annotateSingleEntryToken(modOp)))
       return failure();
-    if (failed(annotateExitTokenOrder(modOp)))
+    if (failed(annotateExitTokenOrder(iogs)))
       return failure();
   }
   return success();
