@@ -348,13 +348,9 @@ findCopiedSents(const IOG &iog, Operation *startSlot, Operation *endSlot) {
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(const IOG &iog) {
   std::vector<std::unique_ptr<InternalStateNamer>> slots(0);
-  Operation *op = iog.entry.getOwner()->getParentOp();
-  auto nameAttr =
-      op->getAttrOfType<ArrayAttr>("argNames")[iog.entry.getArgNumber()];
-  std::string name = dyn_cast<StringAttr>(nameAttr).str();
 
   // We model the entry node as a buffer that initially has one token.
-  slots.push_back(std::make_unique<EntrySlotNamer>(name));
+  slots.push_back(std::make_unique<EntrySlotNamer>(iog.entry));
   std::vector<EagerForkSentNamer> forks(0);
   // Collecting the slots and sents inside the IOG. The invariant relation of
   // num(slots) = 1 + num(eager fork sents)
@@ -440,11 +436,7 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
       .slots = {},
       .cur = startChannel,
   };
-  Operation *op = startChannel.getOwner()->getParentOp();
-  auto nameAttr =
-      op->getAttrOfType<ArrayAttr>("argNames")[startChannel.getArgNumber()];
-  std::string name = dyn_cast<StringAttr>(nameAttr).str();
-  start.slots.emplace_back(std::make_unique<EntrySlotNamer>(name));
+  start.slots.emplace_back(std::make_unique<EntrySlotNamer>(startChannel));
   stack.push_back(start);
   while (!stack.empty()) {
     PartialPath path = std::move(stack.back());

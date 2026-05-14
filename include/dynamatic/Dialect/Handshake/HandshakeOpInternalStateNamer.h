@@ -426,8 +426,7 @@ struct EntrySlotNamer : InternalStateNamer {
   // x_start_valid
   // start_valid
   EntrySlotNamer() = default;
-  EntrySlotNamer(const std::string &name)
-      : InternalStateNamer(TYPE::EntrySlot), argName(name) {}
+  EntrySlotNamer(BlockArgument arg);
   ~EntrySlotNamer() = default;
 
   static inline bool classof(const InternalStateNamer *fp) {
