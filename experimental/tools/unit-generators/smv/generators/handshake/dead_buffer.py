@@ -23,7 +23,6 @@ MODULE {name}(ins_valid)
   -- output
   DEFINE
   ins_ready  :=  !full;
-  full_full := full;
 """
 
 
@@ -40,5 +39,4 @@ MODULE {name}(ins, ins_valid)
   -- output
   DEFINE
   ins_ready  :=  !full;
-  full_full := full;
 """

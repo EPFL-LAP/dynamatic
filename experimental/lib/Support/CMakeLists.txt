@@ -10,6 +10,7 @@ add_dynamatic_library(DynamaticExperimentalSupport
   CFGAnnotation.cpp
   FormalProperty.cpp
   FlowExpression.cpp
+  IOG.cpp
 
   LINK_LIBS PUBLIC
   MLIRIR
