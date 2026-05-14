@@ -20,6 +20,7 @@ DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
+ENABLE_SHORT_CIRCUIT=${14}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -38,7 +39,8 @@ RIGIDIFICATION_SH="$DYNAMATIC_DIR/experimental/tools/rigidification/rigidificati
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
 
-F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c" 
+F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c"
+F_C_TRANSPILED="$COMP_DIR/$KERNEL_NAME.c"
 
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
@@ -106,6 +108,14 @@ export_cfg() {
 # Reset output directory
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
+cp "$F_C_SOURCE" "$F_C_TRANSPILED"
+exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"
+
+if [[ "$ENABLE_SHORT_CIRCUIT" != "1" ]]; then
+  "$DYNAMATIC_BINS/no-short-circuit" "$F_C_TRANSPILED" --
+  exit_on_fail "Failed to disable short-circuiting" "Disabled short-circuiting"
+fi
+
 # ------------------------------------------------------------------------------
 # NOTE:
 # - ffp-contract will prevent clang from adding "fused add mul" into the IR
@@ -113,8 +123,9 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 # optimizations, e.g., loop unrolling:
 # https://clang.llvm.org/docs/LanguageExtensions.html#loop-unrolling
 # ------------------------------------------------------------------------------
-$DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_SOURCE" \
+$DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_TRANSPILED" \
   -I "$DYNAMATIC_DIR/include"  \
+  -I "$SRC_DIR" \
   -Xclang \
   -ffp-contract=off \
   -o "$F_CLANG"

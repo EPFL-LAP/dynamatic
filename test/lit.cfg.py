@@ -44,6 +44,8 @@ llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
 tool_dirs = [config.dynamatic_tools_dir,
              config.mlir_tools_dir, config.llvm_tools_dir]
 tools = ["dynamatic-opt", "hls-fuzzer-check-bitwidth",
+         ToolSubst("%no-short-circuit",
+                   command=f"cp %s %t.c && {config.dynamatic_tools_dir}/no-short-circuit %t.c --"),
          ToolSubst("%export-vhdl",
                    command=f"rm -rf %t; mkdir %t; {config.dynamatic_tools_dir}/export-rtl %s %t {config.dynamatic_src_root}/data/rtl-config-vhdl.json --dynamatic-path {config.dynamatic_src_root} --hdl vhdl")]
 
