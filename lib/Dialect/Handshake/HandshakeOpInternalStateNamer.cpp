@@ -1,5 +1,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "llvm/ADT/StringExtras.h"
+#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "llvm/Support/Casting.h"
 
 namespace dynamatic {
@@ -18,6 +20,11 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::MemoryControllerSlot;
   if (s == EFFECTIVE_SLOT)
     return TYPE::EffectiveSlot;
+  if (s == ENTRY_SLOT)
+    return TYPE::EntrySlot;
+  if (s == TOKEN_COUNT)
+    return TYPE::TokenCount;
+  llvm::errs() << "unknown type\n";
   return std::nullopt;
 }
 
@@ -35,6 +42,10 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return MEMORY_CONTROLLER_SLOT.str();
   case TYPE::EffectiveSlot:
     return EFFECTIVE_SLOT.str();
+  case TYPE::EntrySlot:
+    return ENTRY_SLOT.str();
+  case TYPE::TokenCount:
+    return TOKEN_COUNT.str();
   }
 }
 
@@ -64,6 +75,17 @@ llvm::json::Value toJSON(const std::shared_ptr<InternalStateNamer> &namer) {
 }
 
 bool fromJSON(const llvm::json::Value &value,
+              std::shared_ptr<InternalStateNamer> &namer,
+              llvm::json::Path path) {
+  std::unique_ptr<InternalStateNamer> unique;
+
+  if (!fromJSON(value, unique, path))
+    return false;
+  namer = std::move(unique);
+  return true;
+}
+
+bool fromJSON(const llvm::json::Value &value,
               std::unique_ptr<InternalStateNamer> &namer,
               llvm::json::Path path) {
   std::string typeStr;
@@ -81,6 +103,8 @@ bool fromJSON(const llvm::json::Value &value,
   PipelineSlotNamer ps;
   MemoryControllerSlotNamer mc;
   EffectiveSlotNamer es;
+  TokenCountNamer tc;
+  EntrySlotNamer en;
   switch (type) {
   case InternalStateNamer::TYPE::EagerForkSent:
     ef = EagerForkSentNamer();
@@ -114,19 +138,20 @@ bool fromJSON(const llvm::json::Value &value,
       return false;
     namer = std::make_unique<EffectiveSlotNamer>(std::move(es));
     break;
+  case InternalStateNamer::TYPE::TokenCount:
+    tc = TokenCountNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, tc))
+      return false;
+    namer = std::make_unique<TokenCountNamer>(std::move(tc));
+    break;
+  case InternalStateNamer::TYPE::EntrySlot:
+    en = EntrySlotNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, en))
+      return false;
+    namer = std::make_unique<EntrySlotNamer>(std::move(en));
+    break;
   }
   namer->type = type;
-  return true;
-}
-
-bool fromJSON(const llvm::json::Value &value,
-              std::shared_ptr<InternalStateNamer> &namer,
-              llvm::json::Path path) {
-  std::unique_ptr<InternalStateNamer> unique;
-
-  if (!fromJSON(value, unique, path))
-    return false;
-  namer = std::move(unique);
   return true;
 }
 
@@ -189,6 +214,20 @@ bool fromJSON(const llvm::json::Value &value, PipelineSlotNamer &namer,
   return true;
 }
 
+std::string TokenCountNamer::getSMVName() const {
+  if (slots->empty()) {
+    return "0";
+  }
+  std::vector<std::string> names;
+  names.reserve(slots->size());
+
+  for (const auto &x : *slots) {
+    names.push_back(x->getSMVName());
+  }
+
+  return llvm::formatv("count({0})", llvm::join(names, ", "));
+}
+
 bool fromJSON(const llvm::json::Value &value, ConstrainedNamer &namer,
               llvm::json::Path path) {
   auto mapper = llvm::json::ObjectMapper(value, path);
@@ -244,5 +283,67 @@ std::unique_ptr<ConstrainedNamer>
 EffectiveSlotNamer::constrain(int32_t value) const {
   return std::make_unique<ConstrainedEffectiveSlotNamer>(*this, value);
 }
+
+bool fromJSON(const llvm::json::Value &value, EntrySlotNamer &namer,
+              llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  return mapper && mapper.map(EntrySlotNamer::ARG_NAME_LIT, namer.argName);
+}
+
+std::vector<std::unique_ptr<InternalStateNamer>>
+getAllSlotsOfOperation(Operation *op) {
+  std::vector<std::unique_ptr<InternalStateNamer>> ret;
+  if (auto latencyOp = dyn_cast<LatencyInterface>(op)) {
+    auto slots = latencyOp.getPipelineSlots();
+    for (auto &slot : slots) {
+      ret.push_back(std::make_unique<PipelineSlotNamer>(slot));
+    }
+  }
+
+  if (auto endOp = dyn_cast<EndOp>(op)) {
+    ret.push_back(
+        std::make_unique<BufferSlotFullNamer>("testbench", "end_full", "", 0));
+  }
+  if (auto loadOp = dyn_cast<LoadOp>(op)) {
+    auto slots = loadOp.getInternalSlotStateNamers();
+    auto *mcOp = loadOp.getAddressResult().getUses().begin()->getOwner();
+    auto mc = dyn_cast<MemoryControllerOp>(mcOp);
+    if (!mc) {
+      op->emitError("Cannot get slot of LoadOp that is not connected to Memory "
+                    "Controller Op");
+      llvm::report_fatal_error("Unhandled LoadOp");
+    }
+    size_t nLoads = mc.getNumLoadPorts();
+    std::optional<MemoryControllerSlotNamer> mcSlot;
+    for (size_t i = 0; i < nLoads; ++i) {
+      if (mc.getLoadPort(i)->getLoadOp() == loadOp) {
+        assert(!mcSlot.has_value());
+        mcSlot = mc.getLoadPortSlotNamer(i);
+      }
+    }
+    assert(mcSlot);
+    ret.push_back(std::make_unique<BufferSlotFullNamer>(slots[0]));
+    ret.push_back(std::make_unique<MemoryControllerSlotNamer>(*mcSlot));
+    ret.push_back(std::make_unique<BufferSlotFullNamer>(slots[1]));
+    return ret;
+  }
+
+  if (auto bufferOp = dyn_cast<BufferLikeOpInterface>(op)) {
+    auto slots = bufferOp.getInternalSlotStateNamers();
+    for (auto &slot : slots) {
+      ret.push_back(std::make_unique<BufferSlotFullNamer>(slot));
+    }
+  }
+  return ret;
+}
+
+std::optional<TokenCountNamer> getTokenCountNamerOfOperation(Operation *op) {
+  auto tokens = getAllSlotsOfOperation(op);
+  if (tokens.empty()) {
+    return std::nullopt;
+  }
+  return TokenCountNamer(std::move(tokens));
+}
+
 } // namespace handshake
 } // namespace dynamatic

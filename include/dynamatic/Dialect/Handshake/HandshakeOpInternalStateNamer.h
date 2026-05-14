@@ -11,6 +11,7 @@ namespace handshake {
 struct InternalStateNamer;
 struct EagerForkSentNamer;
 struct BufferSlotFullNamer;
+struct TokenCountNamer;
 struct PipelineSlotNamer;
 struct ConstrainedNamer;
 struct ConstrainedEagerForkSentNamer;
@@ -18,6 +19,12 @@ struct ConstrainedBufferSlotFullNamer;
 struct MemoryControllerSlotNamer;
 struct EffectiveSlotNamer;
 struct ConstrainedEffectiveSlotNamer;
+struct EntrySlotNamer;
+struct TerminatingSinkNamer;
+
+std::vector<std::unique_ptr<InternalStateNamer>>
+getAllSlotsOfOperation(Operation *op);
+std::optional<TokenCountNamer> getTokenCountNamerOfOperation(Operation *op);
 
 // A general structure for an operation is assumed:
 // in1, in2, ... -> Join/Merge/Mux
@@ -31,10 +38,12 @@ struct InternalStateNamer {
   enum class TYPE {
     EagerForkSent,
     BufferSlotFull,
+    TokenCount,
     PipelineSlot,
     Constrained,
     MemoryControllerSlot,
     EffectiveSlot,
+    EntrySlot,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
   static std::string typeToStr(TYPE t);
@@ -70,6 +79,8 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral MEMORY_CONTROLLER_SLOT =
       "MemoryControllerSlot";
   static constexpr llvm::StringLiteral EFFECTIVE_SLOT = "EffectiveSlot";
+  static constexpr llvm::StringLiteral ENTRY_SLOT = "EntrySlot";
+  static constexpr llvm::StringLiteral TOKEN_COUNT = "TokenCount";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
 };
 
@@ -286,6 +297,35 @@ struct PipelineSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral SLOT_INDEX_LIT = "pipeline_index";
 };
 
+struct TokenCountNamer : InternalStateNamer {
+  using VecType = std::vector<std::unique_ptr<InternalStateNamer>>;
+  TokenCountNamer() = default;
+  TokenCountNamer(VecType slots)
+      : InternalStateNamer(TYPE::TokenCount),
+        slots(std::make_shared<VecType>(std::move(slots))) {}
+  ~TokenCountNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::TokenCount;
+  }
+
+  std::string getSMVName() const override;
+  inline llvm::json::Value toInnerJSON() const override {
+    return llvm::json::Array(*slots);
+  }
+
+  inline friend bool fromJSON(const llvm::json::Value &value,
+                              TokenCountNamer &namer, llvm::json::Path path) {
+    auto vec = std::make_shared<VecType>();
+    bool ret = fromJSON(value, *vec, path);
+    namer.slots = vec;
+    return ret;
+  }
+  inline const VecType &getSlots() const { return *slots; }
+
+  std::shared_ptr<const VecType> slots;
+};
+
 struct MemoryControllerSlotNamer : InternalStateNamer {
   enum PortType {
     Load,
@@ -379,6 +419,35 @@ struct ConstrainedEffectiveSlotNamer : ConstrainedNamer {
   EffectiveSlotNamer inner;
 };
 
+struct EntrySlotNamer : InternalStateNamer {
+  // a_valid
+  // b_valid
+  // y_start_valid
+  // x_start_valid
+  // start_valid
+  EntrySlotNamer() = default;
+  EntrySlotNamer(const std::string &name)
+      : InternalStateNamer(TYPE::EntrySlot), argName(name) {}
+  ~EntrySlotNamer() = default;
+
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::EntrySlot;
+  }
+
+  inline std::string getSMVName() const override {
+    return llvm::formatv("{0}_valid", argName);
+  }
+
+  inline llvm::json::Value toInnerJSON() const override {
+    return llvm::json::Object({{ARG_NAME_LIT, argName}});
+  }
+
+  friend bool fromJSON(const llvm::json::Value &value, EntrySlotNamer &namer,
+                       llvm::json::Path path);
+
+  std::string argName;
+  static constexpr llvm::StringLiteral ARG_NAME_LIT = "arg_name";
+};
 // Specialize llvm::json toJSON template for each namer so that they can be
 // converted to json automatically by llvm where necessary
 inline llvm::json::Value toJSON(const EagerForkSentNamer &namer) {
@@ -397,6 +466,12 @@ inline llvm::json::Value toJSON(const ConstrainedNamer &namer) {
   return namer.toInnerJSON();
 }
 inline llvm::json::Value toJSON(const EffectiveSlotNamer &namer) {
+  return namer.toInnerJSON();
+}
+inline llvm::json::Value toJSON(const EntrySlotNamer &namer) {
+  return namer.toInnerJSON();
+}
+inline llvm::json::Value toJSON(const TokenCountNamer &namer) {
   return namer.toInnerJSON();
 }
 

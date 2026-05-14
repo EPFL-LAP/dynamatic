@@ -18,6 +18,7 @@ DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_EXPORT_RTL_BIN="$DYNAMATIC_DIR/bin/export-rtl"
 
 F_FORMAL_HW="$FORMAL_DIR/hw.mlir"
+F_FORMAL_INTERMEDIATE="$FORMAL_DIR/intermediate.mlir"
 F_FORMAL_PROP="$FORMAL_DIR/formal_properties.json"
 F_NUXMV_PROP="$FORMAL_DIR/property.rpt"
 F_NUXMV_CMD="$FORMAL_DIR/prove.cmd"
@@ -85,12 +86,12 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 # Annotate properties
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
   --handshake-annotate-properties="json-path=$F_FORMAL_PROP $ANNOTATE_FLAGS" \
-  > /dev/null
+  > "$F_FORMAL_INTERMEDIATE"
 exit_on_fail "Failed to generate property DB" \
   "Generated formal property DB"
 
 # handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+"$DYNAMATIC_OPT_BIN" "$F_FORMAL_INTERMEDIATE" --lower-handshake-to-hw \
   > "$F_FORMAL_HW"
 exit_on_fail "Failed to lower to HW" \
   "Lowered to HW"
