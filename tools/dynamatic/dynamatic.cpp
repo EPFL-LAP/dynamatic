@@ -770,12 +770,11 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string enableShortCircuit =
       args.flags.contains(ENABLE_SHORT_CIRCUIT) ? "1" : "0";
 
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, milpSolver, straightToQueue,
-                 enableShortCircuit);
+  return execCmd(
+      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
+      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
+      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery,
+      milpSolver, straightToQueue, enableShortCircuit);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

@@ -48,7 +48,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/LogicalResult.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
@@ -65,14 +65,14 @@ using namespace clang::ast_matchers;
 using namespace clang::tooling;
 using namespace llvm;
 using ::clang::tooling::Transformer;
-using ::clang::transformer::RewriteRule;
 using ::clang::transformer::applyFirst;
 using ::clang::transformer::cat;
 using ::clang::transformer::makeRule;
 using ::clang::transformer::node;
+using ::clang::transformer::RewriteRule;
 
 // The source-file to source-file framework
-// we use in thie tool uses 
+// we use in thie tool uses
 // declarative rewrite rules
 // that can easily applied to entire codebases
 // using boilerplate utility objects/functions
@@ -86,7 +86,7 @@ static RewriteRule buildRewriteRule() {
   // change to then defines the desired output
   auto RuleAnd = makeRule(
       binaryOperator(hasOperatorName("&&"), hasLHS(expr().bind("lhs")),
-                      hasRHS(expr().bind("rhs"))),
+                     hasRHS(expr().bind("rhs"))),
       changeTo(cat("(!!(", node("lhs"), ") & !!(", node("rhs"), "))")));
 
   // make a rule to turn a || b into (!!a | !!b)
@@ -98,7 +98,7 @@ static RewriteRule buildRewriteRule() {
   // change to then defines the desired output
   auto RuleOr = makeRule(
       binaryOperator(hasOperatorName("||"), hasLHS(expr().bind("lhs")),
-                      hasRHS(expr().bind("rhs"))),
+                     hasRHS(expr().bind("rhs"))),
       changeTo(cat("(!!(", node("lhs"), ") | !!(", node("rhs"), "))")));
 
   // Use a single Transformer to apply both rules
@@ -114,13 +114,14 @@ static RewriteRule buildRewriteRule() {
 // we can only allow one change to be applied per file
 //
 // If we change any file, we then re-run the whole flow
-// so that nested expressions are fully handled 
+// so that nested expressions are fully handled
 //
 // If the pass succeeds, it returns a boolean
 // indicating whether it made any changes
 // Since that means we need to re-run the tool
 // due to Transformers not being able to handle nesting
-static llvm::FailureOr<bool> applySourceChanges(const AtomicChanges &AllChanges) {
+static mlir::FailureOr<bool>
+applySourceChanges(const AtomicChanges &AllChanges) {
 
   // "spec" here means specification
   // and is the options struct for the applyAtomicChanges function
@@ -150,7 +151,7 @@ static llvm::FailureOr<bool> applySourceChanges(const AtomicChanges &AllChanges)
     }
   }
 
-  // Iterate over the changes we wish 
+  // Iterate over the changes we wish
   // to actually apply
   for (const auto &Change : ChangesToApply) {
     // get the file the change applies to
@@ -164,7 +165,7 @@ static llvm::FailureOr<bool> applySourceChanges(const AtomicChanges &AllChanges)
     if (!BufferErr) {
       llvm::errs() << "NoShortCircuit Error: failed to open " << File
                    << " for rewriting\n";
-      return failure();
+      return mlir::failure();
     }
 
     // Actually apply the change, and return the updated contents
@@ -179,7 +180,7 @@ static llvm::FailureOr<bool> applySourceChanges(const AtomicChanges &AllChanges)
     // applySourceChanges fails if we don't get a string back
     if (!Result) {
       llvm::errs() << toString(Result.takeError());
-      return failure();
+      return mlir::failure();
     }
 
     // Build an LLVM file stream object
@@ -190,7 +191,7 @@ static llvm::FailureOr<bool> applySourceChanges(const AtomicChanges &AllChanges)
     // applySourceChanges fails if building the stream fails
     if (EC) {
       llvm::errs() << EC.message() << "\n";
-      return failure();
+      return mlir::failure();
     }
 
     // Push the new file contents into the stream
@@ -246,19 +247,17 @@ int main(int argc, const char **argv) {
   const std::vector<std::string> &SourcePaths =
       OptionsParser->getSourcePathList();
 
-
   // The declarative rewrite rule is not stateful
   // and so we can declare it outside of the loop
   auto Rule = buildRewriteRule();
 
-
-  // If we changed a file, 
+  // If we changed a file,
   // we need to re-run the whole flow
   // to be able to change that file a second time
   // which we need to do to handle nesting
   bool AppliedChanges = true;
   while (AppliedChanges) {
-    // Constructs a standalone clang tool 
+    // Constructs a standalone clang tool
     // based on the parser options
     //
     // We need to re-construct this after each file edit
@@ -280,7 +279,7 @@ int main(int argc, const char **argv) {
     // a libtooling Transformer is the high-level object
     // used to implement source-to-source rewrites
     //
-    // Needs to be in the loop since the callback 
+    // Needs to be in the loop since the callback
     // needs the AllChanges variable
     Transformer TransformerInstance(
         // The rewrite rule itself
@@ -295,7 +294,8 @@ int main(int argc, const char **argv) {
         // The MatchFinder will call the lambda
         // with Changes, a mutable array ref of new changes
         // to apply
-        [&AllChanges](llvm::Expected<llvm::MutableArrayRef<AtomicChange>> Changes) {
+        [&AllChanges](
+            llvm::Expected<llvm::MutableArrayRef<AtomicChange>> Changes) {
           // if the rule didn't give an output
           // there is some kind of error
           if (!Changes) {
@@ -315,9 +315,9 @@ int main(int argc, const char **argv) {
     // so the MatchFinder can use the Transformer's
     // rewrite rule and callback
     // by comparing the rewrite rule to the AST
-    // 
-    // Needs to be in the loop due to the transformer 
-    // changing 
+    //
+    // Needs to be in the loop due to the transformer
+    // changing
     clang::ast_matchers::MatchFinder MatchFinder;
     TransformerInstance.registerMatchers(&MatchFinder);
 
@@ -332,11 +332,11 @@ int main(int argc, const char **argv) {
     // Actually apply AllChanges to the files
     // Returns FailureOr< applied changes >: if any change was applied
     // we need to re-run the whole flow to handle nesting
-    FailureOr<bool> Result = applySourceChanges(AllChanges);
+    mlir::FailureOr<bool> Result = applySourceChanges(AllChanges);
 
     // return that the tool failed
     // if applying the changes failed
-    if (llvm::failed(Result))
+    if (mlir::failed(Result))
       return -1;
 
     // otherwise
