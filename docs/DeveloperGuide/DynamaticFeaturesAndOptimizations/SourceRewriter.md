@@ -2,6 +2,8 @@
 
 ## High-Level Overview
 
+The source rewriter allows alterations to the source-code kernel before compilation begins.
+
 Most of the code in the source rewriter is the use of a boilerplate framework designed for migrating codebases when an API changes, or when moving from one version of C/C++ to another.
 
 The framework allows you to design custom source-code rewrites through the use of a declarative system. You first describe an abstract syntax tree structure to identify as the input, and then specify the new C/C++ code to use as its replacement.
