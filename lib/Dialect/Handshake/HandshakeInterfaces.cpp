@@ -488,6 +488,15 @@ std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
   }
   return ret;
 }
+std::vector<BufferSlotFullNamer> DeadBufferOp::getInternalSlotStateNamers() {
+  StringAttr nameAttr =
+      getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(nameAttr &&
+         "Cannot get names of slot states for operation without name");
+  std::vector<BufferSlotFullNamer> ret;
+  ret.emplace_back(nameAttr.str(), "full", "", 0);
+  return ret;
+}
 
 //===----------------------------------------------------------------------===//
 // ShiftLikeArithOpInterface

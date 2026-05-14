@@ -590,6 +590,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             // Bitwidth
             addType("DATA_TYPE", op->getOperand(0));
           })
+      .Case<handshake::DeadBufferOp>([&](auto) {
+        // Bitwidth
+        addType("DATA_TYPE", op->getOperand(0));
+      })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
         // Bitwidth
         addType("DATA_TYPE", bufferOp.getOperand());
@@ -2146,6 +2150,7 @@ public:
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,
         ConvertToHWInstance<handshake::SinkOp>,
+        ConvertToHWInstance<handshake::DeadBufferOp>,
         ConvertToHWInstance<handshake::ForkOp>,
         ConvertToHWInstance<handshake::LazyForkOp>,
         ConvertToHWInstance<handshake::LoadOp>,

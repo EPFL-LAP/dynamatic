@@ -4,8 +4,6 @@ from generators.support.utils import *
 def generate_sink(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
 
-    if "pyTest" in params:
-        return _generate_iog_terminating_sink_dataless(name)
     if data_type.bitwidth == 0:
         return _generate_sink_dataless(name)
     else:
