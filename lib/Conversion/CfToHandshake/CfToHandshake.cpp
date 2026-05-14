@@ -681,13 +681,20 @@ void LowerFuncToHandshake::addBranchOps(
         //
         // We use this look up to make sure that the true result of a branch is
         // used exactly once.
+        //
+        // For example (cf. `test/Conversion/CfToHandshake/control-flow.mlir`),
+        // say the CF cond branch argument has duplicated elements
+        //
+        // CondBr [%d] %arg1, %arg1, %arg2
+        // We don't want to make the rerouting for the first %arg1 also replaces
+        // the users of the second %arg1.
         DenseSet<Operation *> alreadyReplaced;
 
         // Use the results of the newly added conditional branch to feed the
         // original users (CF operations)
         rewriter.replaceUsesWithIf(branchOprd, trueRes, [&](OpOperand &oprd) {
-          Operation *op = oprd.getOwner();
-          if (alreadyReplaced.count(op)) {
+          Operation *user = oprd.getOwner();
+          if (alreadyReplaced.count(user)) {
             // NOTE: here we need to be careful of handling parallel edges.
             //
             // Consider the following example:
@@ -715,14 +722,11 @@ void LowerFuncToHandshake::addBranchOps(
             // - We then connect the second matched operand with the false
             // branch output; this accociate the false output with the one [1]
             // index of cmerge.
-            //
-            // NOTE: the order here has to match the one in
-            // `getRealBlockPredecessors`.
             return false;
           }
-          bool isMergeLikeHandshakeUser = trueUsers.contains(oprd.getOwner());
+          bool isMergeLikeHandshakeUser = trueUsers.contains(user);
           if (isMergeLikeHandshakeUser)
-            alreadyReplaced.insert(op);
+            alreadyReplaced.insert(user);
           return isMergeLikeHandshakeUser;
         });
 
