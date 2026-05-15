@@ -43,10 +43,12 @@ struct PipelineDuplicationPass
 
     // Find select0 operation
     // TODO: take from a .json file
+    float compVal = 5.0;
+    std::string opName = "select0";
     NameAnalysis &namer = getAnalysis<NameAnalysis>();
-    Operation *rawOp = namer.getOp("select0");
+    Operation *rawOp = namer.getOp(opName);
     if (!rawOp) {
-      llvm::errs() << "No operation named \"select0\" exists\n";
+      llvm::errs() << "No operation named "<< opName <<" exists\n";
       return signalPassFailure();
     }
     // TODO: make this mlir::arith::xxx changeable
@@ -58,14 +60,17 @@ struct PipelineDuplicationPass
 
     // create branch condition
     builder.setInsertionPointAfter(op);
-    // TODO: get this info from the json file
+    // TODO: get this info from the json file? or other
     Value selectRes = op.getResult();
-    Value cst5 = op.getTrueValue();
+
+    Value constantComp = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(builder.getF32Type(), compVal));
+
     Value branchCond = builder.create<mlir::arith::CmpFOp>(
-        loc, mlir::arith::CmpFPredicate::OEQ, selectRes, cst5);
+        loc, mlir::arith::CmpFPredicate::OEQ, selectRes, constantComp);
 
     // restructure the blocks
-    // splitblock maybe works differently for other operations
+    // TODO: splitblock maybe works differently for other operations
     mlir::Block *exitBlock = currentBlock->splitBlock(
         Block::iterator(branchCond.getDefiningOp())->getNextNode());
     mlir::Block *trueBlock = funcOp.addBlock();  // true path
@@ -75,32 +80,26 @@ struct PipelineDuplicationPass
     builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueBlock,
                                            falseBlock);
 
-    // somehow get all of the operations that I need to clone / duplicate
-    // this could also be done earlier or later than the splitting i think
-
-    // i will probably always have to add a result of some kind of calculation
-    // to my next block, TODO: make this not hardcoded
-    // could this all also be added at the end? or right before the end of the
-    // true path?
-    Operation *mulfOp = namer.getOp("mulf1");
-    Type resultType = mulfOp->getResult(0).getType();
-    Value mulfResultExit = exitBlock->addArgument(resultType, loc);
-    mulfOp->getResult(0).replaceAllUsesWith(mulfResultExit);
-
     // TRUE PATH
-    // clone the necessary operations to here as well as the (TODO:) constant
+    // clone the necessary operations to here as well as the constant
+    builder.setInsertionPointToStart(trueBlock);
+    Value newConstant = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(builder.getF32Type(), compVal));
+
     mlir::IRMapping mapper;
     // we only care about values derived from our starting operation which in
     // this hardcoded case is the selectop
     llvm::DenseSet<Value> trackedValues;
     for (Value res : op->getResults()) {
       trackedValues.insert(res);
+      mapper.map(res, newConstant);
     }
-
-    builder.setInsertionPointToStart(trueBlock);
-
+    
+    llvm::SmallVector<Operation*, 4> opsToMove;
+    Value lastClonedRes;
     for (Operation &blockOp : exitBlock->getOperations()) {
       // stop if we hit a store (or what else?)
+      // TODO: how does this end?
       if (isa<mlir::memref::StoreOp, mlir::BranchOpInterface>(blockOp)) {
         break;
       }
@@ -112,10 +111,18 @@ struct PipelineDuplicationPass
           });
 
       if (isDependent) {
+        opsToMove.push_back(&blockOp);
         Operation *cloned = builder.clone(blockOp, mapper);
         llvm::StringRef originalName = namer.getName(&blockOp);
         std::string newName = originalName.str() + "_dup";
-        cloned->setAttr("handshake.name", builder.getStringAttr(newName));
+        cloned->setAttr("handshake.name", builder.getStringAttr(
+          originalName.str() + "_dup"));
+
+        // track the result of the cloned operation if it produces one
+        if (cloned->getNumResults() > 0) {
+          lastClonedRes = cloned->getResult(0);
+        }
+
         // track the new results so we can find the next operations in the chain
         for (auto it : llvm::enumerate(cloned->getResults())) {
           size_t index = it.index();
@@ -156,21 +163,23 @@ struct PipelineDuplicationPass
 
     llvm::errs() << "-----------------------\n";
 
-    Value clonedMulfRes = mapper.lookup(mulfOp->getResult(0));
     builder.setInsertionPointToEnd(trueBlock);
-    builder.create<mlir::cf::BranchOp>(loc, exitBlock, clonedMulfRes);
+    Value exitBlockArg = exitBlock->addArgument(lastClonedRes.getType(), loc);
+    builder.create<mlir::cf::BranchOp>(loc, exitBlock, lastClonedRes);
 
     // FALSE PATH
     // move all of the stuff from above here
-    // TODO: make this not hardcoded
-    Operation *addfOp = namer.getOp("addf1");
     builder.setInsertionPointToStart(falseBlock);
-    Value newCst10False = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getFloatAttr(builder.getF32Type(), 10.0));
-    addfOp->moveBefore(falseBlock, falseBlock->end());
-    mulfOp->moveBefore(falseBlock, falseBlock->end());
-    mulfOp->setOperand(1, newCst10False);
-    builder.create<mlir::cf::BranchOp>(loc, exitBlock, mulfOp->getResult(0));
+    for (Operation *origOp : opsToMove) {
+      llvm::errs() << "Moving op: ";
+      origOp->print(llvm::errs());
+      llvm::errs() << "\n";
+      origOp->moveBefore(falseBlock, falseBlock->end());
+    }
+    Value lastOrigRes = opsToMove.back()->getResult(0);
+    // make sure in the new block it maps to the correct value
+    lastOrigRes.replaceAllUsesWith(exitBlockArg);
+    builder.create<mlir::cf::BranchOp>(loc, exitBlock, lastOrigRes);
   }
 };
 

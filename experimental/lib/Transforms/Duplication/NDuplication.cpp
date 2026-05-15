@@ -30,7 +30,7 @@ struct NDuplicationPass
     OpBuilder builder(ctx);
 
     // find operation which contains the selected value
-    // Names need to be checked!! might be different
+    // TODO: Names need to be checked!! might be different
     NameAnalysis &namer = getAnalysis<NameAnalysis>();
     Operation *rawOp = namer.getOp("select0"); // might be different
     if (!rawOp) {
@@ -43,7 +43,6 @@ struct NDuplicationPass
     mlir::func::FuncOp funcOp =
         dyn_cast<mlir::func::FuncOp>(currentBlock->getParentOp());
     Location loc = selectOp.getLoc();
-    builder.setInsertionPointAfter(selectOp);
     Value selectRes = selectOp.getResult();
 
     // move loop logic into the last block
