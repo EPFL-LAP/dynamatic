@@ -123,29 +123,6 @@ jobs:
         run: |
           cp perf_ci_branch.json $HOME/perf_ci_saved.json
 
-      - name: dump-symlink-state
-        if: success() || failure()
-        run: |
-          {
-            echo "=== ls -la bin/ ==="; ls -la bin/ || true
-            echo "=== ls -la build/include/ ==="; ls -la build/include/ || true
-            echo "=== readlink targets ==="
-            for f in bin/clang bin/clang++ bin/opt bin/source-rewriter build/include/clang_headers; do
-              echo "--- $f"
-              ls -la "$f" 2>&1
-              readlink -f "$f" 2>&1
-            done
-            echo "=== build/llvm-project/bin contents ==="; ls build/llvm-project/bin 2>&1 | head -30
-            echo "=== build/llvm-project/lib/clang ==="; ls -R build/llvm-project/lib/clang 2>&1 | head -50
-            echo "=== llvm-project/build contents (alt path) ==="; ls llvm-project/build 2>&1 | head -10
-          } > symlink-state.txt
-
-      - uses: actions/upload-artifact@v4
-        if: success() || failure()
-        with:
-          name: symlink-state
-          path: symlink-state.txt
-
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
