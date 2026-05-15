@@ -2,7 +2,7 @@
 //
 // Standalone clang transformer tool that rewrites the input C file.
 //
-// Currently only implements one rewrite: 
+// Currently only implements one rewrite:
 // Turning logical operators (`&&`, `||`)
 // into bitwise operators (`&`, `|`)
 // with operands wrapped in a `((x) != 0)` comparison.
@@ -85,10 +85,11 @@ static RewriteRule buildNoShortCircuitRewriteRule() {
   // 'lhs' and 'rhs' so we can reference them in the output
   //
   // change to then defines the desired output
-  auto RuleAnd = makeRule(
-      binaryOperator(hasOperatorName("&&"), hasLHS(expr().bind("lhs")),
-                     hasRHS(expr().bind("rhs"))),
-      changeTo(cat("(((", node("lhs"), ") != 0) & ((", node("rhs"), ") != 0))")));
+  auto RuleAnd =
+      makeRule(binaryOperator(hasOperatorName("&&"), hasLHS(expr().bind("lhs")),
+                              hasRHS(expr().bind("rhs"))),
+               changeTo(cat("(((", node("lhs"), ") != 0) & ((", node("rhs"),
+                            ") != 0))")));
 
   // make a rule to turn a || b into (((a) != 0) | ((b) != 0))
   // binaryOperator matches only operators with two inputs
@@ -97,10 +98,11 @@ static RewriteRule buildNoShortCircuitRewriteRule() {
   // 'lhs' and 'rhs' so we can reference them in the output
   //
   // change to then defines the desired output
-  auto RuleOr = makeRule(
-      binaryOperator(hasOperatorName("||"), hasLHS(expr().bind("lhs")),
-                     hasRHS(expr().bind("rhs"))),
-      changeTo(cat("(((", node("lhs"), ") != 0) | ((", node("rhs"), ") != 0))")));
+  auto RuleOr =
+      makeRule(binaryOperator(hasOperatorName("||"), hasLHS(expr().bind("lhs")),
+                              hasRHS(expr().bind("rhs"))),
+               changeTo(cat("(((", node("lhs"), ") != 0) | ((", node("rhs"),
+                            ") != 0))")));
 
   // Use a single Transformer to apply both rules
   return applyFirst({RuleAnd, RuleOr});
@@ -215,84 +217,83 @@ static mlir::FailureOr<bool>
 applyRewriteRule(CompilationDatabase &Compilations,
                  const std::vector<std::string> &SourcePaths,
                  const RewriteRule &Rule) {
-    // Constructs a standalone clang tool
-    // based on the parser options
-    //
-    // We need to re-construct this after each file edit
-    // otherwise there is stale data issues
-    //
-    // StandaloneToolExecutor contains boilerplate for running
-    // the tool you design across an entire code base
-    StandaloneToolExecutor Executor(Compilations, SourcePaths);
+  // Constructs a standalone clang tool
+  // based on the parser options
+  //
+  // We need to re-construct this after each file edit
+  // otherwise there is stale data issues
+  //
+  // StandaloneToolExecutor contains boilerplate for running
+  // the tool you design across an entire code base
+  StandaloneToolExecutor Executor(Compilations, SourcePaths);
 
-    // A set of changes to the source file
-    // we build the set first, and then apply
-    //
-    // Each individual change can be quite large,
-    // but is applied atomically:
-    // Each individual change will succeed or fail,
-    // but changes will never be partially applied
-    AtomicChanges AllChanges;
+  // A set of changes to the source file
+  // we build the set first, and then apply
+  //
+  // Each individual change can be quite large,
+  // but is applied atomically:
+  // Each individual change will succeed or fail,
+  // but changes will never be partially applied
+  AtomicChanges AllChanges;
 
-    // a LibTooling Transformer is the high-level object
-    // used to implement source-to-source rewrites
-    //
-    // Needs to be in the loop since the callback
-    // needs the AllChanges variable
-    Transformer TransformerInstance(
-        // The rewrite rule itself
-        Rule,
-        // Callback parameter: what to do once
-        // the MatchFinder tells us the rule can be applied
-        // and what the rule gave as output
-        //
-        // We pass AllChanges through the capture list
-        // so the lambda sees the local variable
-        //
-        // The MatchFinder will call the lambda
-        // with Changes, a mutable array ref of new changes
-        // to apply
-        [&AllChanges](
-            llvm::Expected<llvm::MutableArrayRef<AtomicChange>> Changes) {
-          // if the rule didn't give an output
-          // there is some kind of error
-          if (!Changes) {
-            llvm::errs() << Changes.takeError() << "\n";
-            return;
-          }
+  // a LibTooling Transformer is the high-level object
+  // used to implement source-to-source rewrites
+  //
+  // Needs to be in the loop since the callback
+  // needs the AllChanges variable
+  Transformer TransformerInstance(
+      // The rewrite rule itself
+      Rule,
+      // Callback parameter: what to do once
+      // the MatchFinder tells us the rule can be applied
+      // and what the rule gave as output
+      //
+      // We pass AllChanges through the capture list
+      // so the lambda sees the local variable
+      //
+      // The MatchFinder will call the lambda
+      // with Changes, a mutable array ref of new changes
+      // to apply
+      [&AllChanges](
+          llvm::Expected<llvm::MutableArrayRef<AtomicChange>> Changes) {
+        // if the rule didn't give an output
+        // there is some kind of error
+        if (!Changes) {
+          llvm::errs() << Changes.takeError() << "\n";
+          return;
+        }
 
-          // otherwise store the rewrite rule output
-          // in AllChanges
-          AllChanges.insert(AllChanges.end(),
-                            std::make_move_iterator(Changes->begin()),
-                            std::make_move_iterator(Changes->end()));
-        });
+        // otherwise store the rewrite rule output
+        // in AllChanges
+        AllChanges.insert(AllChanges.end(),
+                          std::make_move_iterator(Changes->begin()),
+                          std::make_move_iterator(Changes->end()));
+      });
 
-    // Create a MatchFinder,
-    // and register the Transformer to it
-    // so the MatchFinder can use the Transformer's
-    // rewrite rule and callback
-    // by comparing the rewrite rule to the AST
-    //
-    // Needs to be in the loop due to the transformer
-    // changing
-    clang::ast_matchers::MatchFinder MatchFinder;
-    TransformerInstance.registerMatchers(&MatchFinder);
+  // Create a MatchFinder,
+  // and register the Transformer to it
+  // so the MatchFinder can use the Transformer's
+  // rewrite rule and callback
+  // by comparing the rewrite rule to the AST
+  //
+  // Needs to be in the loop due to the transformer
+  // changing
+  clang::ast_matchers::MatchFinder MatchFinder;
+  TransformerInstance.registerMatchers(&MatchFinder);
 
-    // Run the MatchFinder on all files passed as input
-    // which will then populate AllChanges through the callback
-    auto Err = Executor.execute(newFrontendActionFactory(&MatchFinder));
-    if (Err) {
-      llvm::errs() << llvm::toString(std::move(Err)) << "\n";
-      return mlir::failure();
-    }
+  // Run the MatchFinder on all files passed as input
+  // which will then populate AllChanges through the callback
+  auto Err = Executor.execute(newFrontendActionFactory(&MatchFinder));
+  if (Err) {
+    llvm::errs() << llvm::toString(std::move(Err)) << "\n";
+    return mlir::failure();
+  }
 
-    // Actually apply AllChanges to the files
-    // Returns FailureOr< applied changes >: if any change was applied
-    // we need to re-run the whole flow to handle nesting
-    return applySourceChanges(AllChanges);
+  // Actually apply AllChanges to the files
+  // Returns FailureOr< applied changes >: if any change was applied
+  // we need to re-run the whole flow to handle nesting
+  return applySourceChanges(AllChanges);
 }
-
 
 // Add a boilerplate message to the help
 // of how libtooling CLI tools parse input commands
@@ -341,12 +342,12 @@ int main(int argc, const char **argv) {
   // which we need to do to handle nesting
   bool AppliedChanges = true;
 
-  // boolean to track were any changes made 
+  // boolean to track were any changes made
   // to the input kernel
   // If so, we will print a warning
   bool ChangesMade = false;
   while (AppliedChanges) {
- 
+
     auto Result =
         applyRewriteRule(Compilations, SourcePaths, NoShortCircuitRewriteRule);
 
@@ -365,11 +366,11 @@ int main(int argc, const char **argv) {
     ChangesMade = ChangesMade || AppliedChanges;
   }
 
-  if(ChangesMade){
+  if (ChangesMade) {
     llvm::errs() << "[WARNING] Dynamatic does not use short-circuiting "
-    << "on logical AND (&&) and logical OR (||) operators. "
-    << " Short-circuiting can be enabled by passing "
-    << "--enable-short-circuit to the compile command, "
-    << "but this may come at a performance cost.";
+                 << "on logical AND (&&) and logical OR (||) operators. "
+                 << " Short-circuiting can be enabled by passing "
+                 << "--enable-short-circuit to the compile command, "
+                 << "but this may come at a performance cost.";
   }
 }
