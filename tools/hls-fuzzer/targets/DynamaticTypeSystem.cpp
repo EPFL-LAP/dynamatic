@@ -66,7 +66,7 @@ dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionTransferFns(
   case ast::BinaryExpression::Equal:
   case ast::BinaryExpression::NotEqual:
     return {
-        copyFromParent<ast::BinaryExpression>(),
+        copyFromInput<ast::BinaryExpression>(),
         // Whatever type was used in the LHS expression must also be used on the
         // right to avoid casting.
         copyFrom<ast::BinaryExpression, ast::BinaryExpression::LHS>(),
@@ -104,7 +104,7 @@ dynamatic::gen::DynamaticTypeSystem::getUnaryExpressionTransferFns(
       return TransferFn<ast::UnaryExpression>(
           DynamaticTypingContext{DynamaticTypingContext::Unconstrained});
     case ast::UnaryExpression::Minus:
-      return copyFromParent<ast::UnaryExpression>();
+      return copyFromInput<ast::UnaryExpression>();
     }
     llvm_unreachable("all enum values handled");
   }();

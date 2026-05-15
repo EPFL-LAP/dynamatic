@@ -176,7 +176,7 @@ private:
 
                   if (iter.getInputDependencies().empty() ||
                       iter.getInputDependencies() ==
-                          llvm::ArrayRef{PARENT_DEPENDENCY}) {
+                          llvm::ArrayRef{INPUT_DEPENDENCY}) {
                     // No dependency (besides the parent context which is
                     // satisfied).
                     worklist[workListSize++] = index;
@@ -186,7 +186,7 @@ private:
                   // Build the outgoing edge list but do keep track of the
                   // number of incoming edges.
                   for (auto fromIndex : iter.getInputDependencies())
-                    if (fromIndex != PARENT_DEPENDENCY) {
+                    if (fromIndex != INPUT_DEPENDENCY) {
                       forwardEdgeList[fromIndex]
                                      [forwardEdgeCount[fromIndex]++] = index;
                       ++incomingEdgeCount[index];

@@ -44,8 +44,8 @@ private:
   std::any container;
 };
 
-/// Sentinel value representing a dependency on the parent context.
-constexpr std::size_t PARENT_DEPENDENCY = -1;
+/// Sentinel value representing a dependency on the input context.
+constexpr std::size_t INPUT_DEPENDENCY = -1;
 
 /// Class responsible for telling the generator how to calculate the input
 /// 'TypingContext' for a given subelement of 'ASTNode'.
@@ -57,7 +57,7 @@ constexpr std::size_t PARENT_DEPENDENCY = -1;
 /// + previously generated subelements using 'inputIndices'.
 /// The indices in 'inputIndices' refer to the index of the given subelement
 /// this instance depends on within 'ASTNode::SubElements'.
-/// The special value 'PARENT_DEPENDENCY' represents depending on the
+/// The special value 'INPUT_DEPENDENCY' represents depending on the
 /// input-context of 'ASTNode'.
 /// It is the user's responsibility to not create cyclic dependencies.
 template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
@@ -70,8 +70,8 @@ class TransferFn {
         decltype(std::tuple_cat(
             std::declval<Tuple>(),
             std::declval<std::conditional_t<
-                current == PARENT_DEPENDENCY,
-                // Parent case, only add the context.
+                current == INPUT_DEPENDENCY,
+                // Input case, only add the context.
                 std::tuple<const TypingContext &>,
                 // Add both the context and the ASTNode to the arguments.
                 std::tuple<
@@ -84,10 +84,10 @@ class TransferFn {
         remaining...>::type;
   };
 
-  // Special case required to still allow parent dependencies when 'ASTNode'
+  // Special case required to still allow input dependencies when 'ASTNode'
   // does not have any subelements.
   template <typename Tuple>
-  struct CalcCompFn<Tuple, PARENT_DEPENDENCY, 0> {
+  struct CalcCompFn<Tuple, INPUT_DEPENDENCY, 0> {
     // Recursive case.
     using type = typename CalcCompFn<
         decltype(std::tuple_cat(
@@ -110,14 +110,15 @@ public:
   /// The signature of the function is dependent on 'inputIndices'.
   /// Specifically, for every element of 'inputIndices' and in the order as
   /// given in 'inputIndices', the arguments are:
-  /// * The parent 'TypingContext' if the value is 'PARENT_DEPENDENCY'
+  /// * The input 'TypingContext' if the value is 'INPUT_DEPENDENCY'
   /// * The output 'TypingContext' of the 'i'th subelement of 'ASTNode' followed
   ///   by the subelement's AST node itself.
   ///
   /// Example:
-  /// Dependency<Context, ast::BinaryExpression, /*rhs*/ 1, PARENT_DEPENDENCY>(
+  /// Dependency<Context, ast::BinaryExpression,
+  ///   /*rhs=*/ast::BINARY_EXPRESSION::RHS, INPUT_DEPENDENCY>(
   ///   [](const Context& rhsContext, const ast::Expression& rhs,
-  ///      const Context& parentContext) -> Context {
+  ///      const Context& inputContext) -> Context {
   ///     ...
   ///   }
   /// )
@@ -141,9 +142,9 @@ public:
 private:
   static_assert(((inputIndices <
                       std::tuple_size_v<typename ASTNode::SubElements> ||
-                  inputIndices == PARENT_DEPENDENCY) &&
+                  inputIndices == INPUT_DEPENDENCY) &&
                  ...),
-                "input indices must refer to subelements or the parent");
+                "input indices must refer to subelements or the input");
 
   std::function<ContextComputationFn> computationFn;
 };
@@ -205,8 +206,8 @@ public:
           // required contexts and subelements have already been generated.
           auto argTuple = std::tuple_cat([&](auto &&integral) {
             constexpr std::size_t index = decltype(integral){};
-            if constexpr (index == PARENT_DEPENDENCY) {
-              // Parent context.
+            if constexpr (index == INPUT_DEPENDENCY) {
+              // Input context.
               return std::forward_as_tuple(
                   std::get<std::tuple_size_v<ContextTuple> - 1>(contexts)
                       ->template cast<TypingContext>());
@@ -229,7 +230,7 @@ public:
     this->inputIndices = storage;
   }
 
-  /// Returns the indices of the subelements (or parent) that this dependency
+  /// Returns the indices of the subelements (or input) that this dependency
   /// depends on.
   llvm::ArrayRef<std::size_t> getInputDependencies() const {
     return inputIndices;
@@ -380,10 +381,10 @@ using TransferFnArray =
 class AbstractTypeSystem {
 protected:
   /// Returns an instance of 'TransferFn' which simply forwards the context
-  /// from the parent to the subelement.
+  /// from the input to the subelement.
   template <typename ASTNode>
-  static auto copyFromParent() {
-    return copyFrom<ASTNode, PARENT_DEPENDENCY>();
+  static auto copyFromInput() {
+    return copyFrom<ASTNode, INPUT_DEPENDENCY>();
   }
 
   /// Returns an instance of 'TransferFn' which forwards the context
@@ -397,14 +398,14 @@ protected:
   /// Returns a noop 'OutputTransferFn' that keeps the output context
   /// equal to the input context.
   template <typename ASTNode>
-  static auto copyOutputFromParent() {
-    return copyOutputFrom<ASTNode, PARENT_DEPENDENCY>();
+  static auto copyInputToOutput() {
+    return copyToOutput<ASTNode, INPUT_DEPENDENCY>();
   }
 
   /// Returns a 'OutputTransferFn' whose output context will be equivalent to
   /// the output context of 'index' subelement.
   template <typename ASTNode, std::size_t index>
-  static auto copyOutputFrom() {
+  static auto copyToOutput() {
     return OutputTransferFn<ASTNode>(
         std::index_sequence<index>{},
         [](const ASTNode &, const OpaqueContext &context) { return context; });
@@ -415,18 +416,18 @@ public:
 
   virtual TransferFnArray<ast::Function> getFunctionTransferFns() {
     return {
-        /*return type=*/copyFromParent<ast::Function>(),
-        /*statement list=*/copyFromParent<ast::Function>(),
-        /*return statement=*/copyFromParent<ast::Function>(),
-        /*output=*/copyOutputFromParent<ast::Function>(),
+        /*return type=*/copyFromInput<ast::Function>(),
+        /*statement list=*/copyFromInput<ast::Function>(),
+        /*return statement=*/copyFromInput<ast::Function>(),
+        /*output=*/copyInputToOutput<ast::Function>(),
     };
   }
 
   virtual TransferFnArray<ast::ReturnStatement>
   getReturnStatementTransferFns() {
     return {
-        /*return value=*/copyFromParent<ast::ReturnStatement>(),
-        /*output=*/copyOutputFromParent<ast::ReturnStatement>(),
+        /*return value=*/copyFromInput<ast::ReturnStatement>(),
+        /*output=*/copyInputToOutput<ast::ReturnStatement>(),
     };
   }
 
@@ -434,14 +435,14 @@ public:
                                        const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() {
-    return /*output=*/copyOutputFromParent<ast::ScalarType>();
+    return /*output=*/copyInputToOutput<ast::ScalarType>();
   }
 
   virtual bool discardReturnTypeOpaque(const ast::ReturnType &,
                                        const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() {
-    return /*output=*/copyOutputFromParent<ast::ReturnType>();
+    return /*output=*/copyInputToOutput<ast::ReturnType>();
   }
 
   /// Returns true if the generator should discard this binary expression
@@ -452,9 +453,9 @@ public:
   virtual TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) {
     // Default implementation: Simply propagates the context to the subelements.
-    return {/*lhs=*/copyFromParent<ast::BinaryExpression>(),
-            /*rhs=*/copyFromParent<ast::BinaryExpression>(),
-            /*output=*/copyOutputFromParent<ast::BinaryExpression>()};
+    return {/*lhs=*/copyFromInput<ast::BinaryExpression>(),
+            /*rhs=*/copyFromInput<ast::BinaryExpression>(),
+            /*output=*/copyInputToOutput<ast::BinaryExpression>()};
   }
 
   virtual bool discardUnaryExpressionOpaque(ast::UnaryExpression::Op op,
@@ -463,8 +464,8 @@ public:
   virtual TransferFnArray<ast::UnaryExpression>
   getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) {
     return {
-        /*operand=*/copyFromParent<ast::UnaryExpression>(),
-        /*output=*/copyOutputFromParent<ast::UnaryExpression>(),
+        /*operand=*/copyFromInput<ast::UnaryExpression>(),
+        /*output=*/copyInputToOutput<ast::UnaryExpression>(),
     };
   }
 
@@ -472,8 +473,8 @@ public:
 
   virtual TransferFnArray<ast::Variable> getVariableTransferFns() {
     return {
-        /*parameter=*/copyFromParent<ast::Variable>(),
-        /*output=*/copyOutputFromParent<ast::Variable>(),
+        /*parameter=*/copyFromInput<ast::Variable>(),
+        /*output=*/copyInputToOutput<ast::Variable>(),
     };
   }
 
@@ -481,9 +482,9 @@ public:
 
   virtual TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() {
     return {
-        /*target type=*/copyFromParent<ast::CastExpression>(),
-        /*operand=*/copyFromParent<ast::CastExpression>(),
-        /*output=*/copyOutputFromParent<ast::CastExpression>(),
+        /*target type=*/copyFromInput<ast::CastExpression>(),
+        /*operand=*/copyFromInput<ast::CastExpression>(),
+        /*output=*/copyInputToOutput<ast::CastExpression>(),
     };
   }
 
@@ -495,10 +496,10 @@ public:
     // Default implementation: Simply propagates the context to the
     // subelements.
     return {
-        /*condition=*/copyFromParent<ast::ConditionalExpression>(),
-        /*true value=*/copyFromParent<ast::ConditionalExpression>(),
-        /*false value=*/copyFromParent<ast::ConditionalExpression>(),
-        /*output=*/copyOutputFromParent<ast::ConditionalExpression>(),
+        /*condition=*/copyFromInput<ast::ConditionalExpression>(),
+        /*true value=*/copyFromInput<ast::ConditionalExpression>(),
+        /*false value=*/copyFromInput<ast::ConditionalExpression>(),
+        /*output=*/copyInputToOutput<ast::ConditionalExpression>(),
     };
   }
 
@@ -507,7 +508,7 @@ public:
                         const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::Constant> getConstantTransferFns() {
-    return /*output=*/copyOutputFromParent<ast::Constant>();
+    return /*output=*/copyInputToOutput<ast::Constant>();
   }
 
   virtual bool
@@ -517,7 +518,7 @@ public:
   virtual TransferFnArray<ast::ExistingScalarParameter>
   getExistingScalarParameterTransferFns() {
     return {
-        /*output=*/copyOutputFromParent<ast::ExistingScalarParameter>(),
+        /*output=*/copyInputToOutput<ast::ExistingScalarParameter>(),
     };
   }
 
@@ -527,8 +528,8 @@ public:
   virtual TransferFnArray<ast::ScalarParameter>
   getFreshScalarParameterTransferFns() {
     return {
-        /*data type=*/copyFromParent<ast::ScalarParameter>(),
-        /*output=*/copyOutputFromParent<ast::ScalarParameter>(),
+        /*data type=*/copyFromInput<ast::ScalarParameter>(),
+        /*output=*/copyInputToOutput<ast::ScalarParameter>(),
     };
   }
 
@@ -537,9 +538,9 @@ public:
 
   virtual TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionTransferFns() {
-    return {/*array parameter=*/copyFromParent<ast::ArrayReadExpression>(),
-            /*index=*/copyFromParent<ast::ArrayReadExpression>(),
-            /*output=*/copyOutputFromParent<ast::ArrayReadExpression>()};
+    return {/*array parameter=*/copyFromInput<ast::ArrayReadExpression>(),
+            /*index=*/copyFromInput<ast::ArrayReadExpression>(),
+            /*output=*/copyInputToOutput<ast::ArrayReadExpression>()};
   }
 
   virtual bool
@@ -549,7 +550,7 @@ public:
   virtual TransferFnArray<ast::ExistingArrayParameter>
   getExistingArrayParameterTransferFns() {
     return {
-        /*output=*/copyOutputFromParent<ast::ExistingArrayParameter>(),
+        /*output=*/copyInputToOutput<ast::ExistingArrayParameter>(),
     };
   }
 
@@ -559,8 +560,8 @@ public:
   virtual TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() {
     return {
-        /*element type=*/copyFromParent<ast::ArrayParameter>(),
-        /*output=*/copyOutputFromParent<ast::ArrayParameter>(),
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*output=*/copyInputToOutput<ast::ArrayParameter>(),
     };
   }
 
@@ -570,10 +571,10 @@ public:
   virtual TransferFnArray<ast::ArrayAssignmentStatement>
   getArrayAssignmentStatementTransferFns() {
     return TransferFnArray<ast::ArrayAssignmentStatement>{
-        /*array parameter=*/copyFromParent<ast::ArrayAssignmentStatement>(),
-        /*index=*/copyFromParent<ast::ArrayAssignmentStatement>(),
-        /*value=*/copyFromParent<ast::ArrayAssignmentStatement>(),
-        /*output=*/copyOutputFromParent<ast::ArrayAssignmentStatement>(),
+        /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*output=*/copyInputToOutput<ast::ArrayAssignmentStatement>(),
     };
   }
 
@@ -581,9 +582,9 @@ public:
 
   virtual TransferFnArray<ast::StatementList> getStatementListTransferFns() {
     return TransferFnArray<ast::StatementList>{
-        /*statement list=*/copyFromParent<ast::StatementList>(),
-        /*statement=*/copyFromParent<ast::StatementList>(),
-        /*output=*/copyOutputFromParent<ast::StatementList>(),
+        /*statement list=*/copyFromInput<ast::StatementList>(),
+        /*statement=*/copyFromInput<ast::StatementList>(),
+        /*output=*/copyInputToOutput<ast::StatementList>(),
     };
   }
 };
@@ -608,7 +609,7 @@ public:
 /// elements should be calculated.
 /// Specifically, an instance of 'TransferFn' can specify that it depends on the
 /// context and AST node of a sibling subelement in addition to, or instead of
-/// the parent input context.
+/// the input context.
 /// Example:
 /// Given the C expression 'a[i]', an input context can be derived for
 /// generating 'i' using knowledge gained from the output context and AST node

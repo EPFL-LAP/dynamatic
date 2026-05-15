@@ -31,22 +31,22 @@ public:
 
   TransferFnArray<ast::Function> getFunctionTransferFns() override {
     return {
-        /*return type=*/copyFromParent<ast::Function>(),
-        /*statement list=*/copyFromParent<ast::Function>(),
+        /*return type=*/copyFromInput<ast::Function>(),
+        /*statement list=*/copyFromInput<ast::Function>(),
         // Return statement must match whatever type was calculated for the
         // return type.
         /*return statement=*/
         copyFrom<ast::Function, ast::Function::RETURN_TYPE>(),
-        copyOutputFrom<ast::Function, ast::Function::RETURN_STATEMENT>(),
+        copyToOutput<ast::Function, ast::Function::RETURN_STATEMENT>(),
     };
   }
 
   TransferFnArray<ast::ReturnStatement>
   getReturnStatementTransferFns() override {
     return {
-        /*return value=*/copyFromParent<ast::ReturnStatement>(),
+        /*return value=*/copyFromInput<ast::ReturnStatement>(),
         /*output=*/
-        copyOutputFrom<ast::ReturnStatement,
+        copyToOutput<ast::ReturnStatement,
                        ast::ReturnStatement::RETURN_VALUE>(),
     };
   }
@@ -92,15 +92,15 @@ public:
   getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override;
 
   TransferFnArray<ast::Variable> getVariableTransferFns() override {
-    return {copyFromParent<ast::Variable>(),
-            copyOutputFrom<ast::Variable, ast::Variable::PARAMETER>()};
+    return {copyFromInput<ast::Variable>(),
+            copyToOutput<ast::Variable, ast::Variable::PARAMETER>()};
   }
 
   TransferFnArray<ast::ScalarParameter>
   getFreshScalarParameterTransferFns() override {
     return {
-        copyFromParent<ast::ScalarParameter>(),
-        copyOutputFrom<ast::ScalarParameter, ast::ScalarParameter::DATATYPE>()};
+        copyFromInput<ast::ScalarParameter>(),
+        copyToOutput<ast::ScalarParameter, ast::ScalarParameter::DATATYPE>()};
   }
 
   TransferFnArray<ast::ExistingScalarParameter>
@@ -113,8 +113,8 @@ public:
 
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
-    return {copyFromParent<ast::ArrayParameter>(),
-            copyOutputFrom<ast::ArrayParameter,
+    return {copyFromInput<ast::ArrayParameter>(),
+            copyToOutput<ast::ArrayParameter,
                            ast::ArrayParameter::ELEMENT_TYPE>()};
   }
 
@@ -131,12 +131,12 @@ public:
     return {
         TransferFn<ast::ConditionalExpression>(
             DynamaticTypingContext{DynamaticTypingContext::Unconstrained}),
-        copyFromParent<ast::ConditionalExpression>(),
+        copyFromInput<ast::ConditionalExpression>(),
         // Forward choice of type made in the true expression into the false
         // expression.
         copyFrom<ast::ConditionalExpression,
                  ast::ConditionalExpression::TRUE_VAL>(),
-        copyOutputFrom<ast::ConditionalExpression,
+        copyToOutput<ast::ConditionalExpression,
                        ast::ConditionalExpression::TRUE_VAL>(),
     };
   }
@@ -151,20 +151,20 @@ public:
 
   TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
     return {
-        copyFromParent<ast::CastExpression>(),
+        copyFromInput<ast::CastExpression>(),
         // Whatever type was chosen for the target cast, its constraint must
         // be used for the expression.
         copyFrom<ast::CastExpression, ast::CastExpression::TARGET_TYPE>(),
-        copyOutputFrom<ast::CastExpression, ast::CastExpression::TARGET_TYPE>(),
+        copyToOutput<ast::CastExpression, ast::CastExpression::TARGET_TYPE>(),
     };
   }
 
   TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionTransferFns() override {
-    return {copyFromParent<ast::ArrayReadExpression>(),
+    return {copyFromInput<ast::ArrayReadExpression>(),
             TransferFn<ast::ArrayReadExpression>(DynamaticTypingContext{
                 DynamaticTypingContext::IntegerRequired}),
-            copyOutputFrom<ast::ArrayReadExpression,
+            copyToOutput<ast::ArrayReadExpression,
                            ast::ArrayReadExpression::ARRAY_PARAMETER>()};
   }
 
@@ -178,7 +178,7 @@ public:
         // Value constrained must match the array parameter!
         copyFrom<ast::ArrayAssignmentStatement,
                  ast::ArrayAssignmentStatement::ARRAY>(),
-        copyOutputFromParent<ast::ArrayAssignmentStatement>(),
+        copyInputToOutput<ast::ArrayAssignmentStatement>(),
     };
   }
 
