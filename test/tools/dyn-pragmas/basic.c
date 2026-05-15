@@ -1,0 +1,14 @@
+// RUN: %dyn-clang-pragmas %s | FileCheck %s
+
+// CHECK: declare i32 @__dyn_speculate(double, i32, ptr)
+// CHECK: call i32 @__dyn_speculate(double {{.+}}, i32 noundef 8, ptr noundef {{.+}})
+// CHECK: c"default\00"
+
+int compute(void);
+int use(int);
+
+int main(void) {
+  int x = compute();
+  #pragma DYN speculate variable=x max_predictions=8 style="default"
+  return use(x);
+}

@@ -12,6 +12,7 @@ set(DYNAMATIC_TEST_DEPENDS
   export-rtl
   hls-fuzzer-check-bitwidth
   source-rewriter
+  DynPragmasPlugin
   )
 
 add_lit_testsuite(check-dynamatic "Running the Dynamatic regression tests"
