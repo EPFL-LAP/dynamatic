@@ -47,7 +47,7 @@ public:
         /*return value=*/copyFromInput<ast::ReturnStatement>(),
         /*output=*/
         copyToOutput<ast::ReturnStatement,
-                       ast::ReturnStatement::RETURN_VALUE>(),
+                     ast::ReturnStatement::RETURN_VALUE>(),
     };
   }
 
@@ -113,9 +113,9 @@ public:
 
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
-    return {copyFromInput<ast::ArrayParameter>(),
-            copyToOutput<ast::ArrayParameter,
-                           ast::ArrayParameter::ELEMENT_TYPE>()};
+    return {
+        copyFromInput<ast::ArrayParameter>(),
+        copyToOutput<ast::ArrayParameter, ast::ArrayParameter::ELEMENT_TYPE>()};
   }
 
   TransferFnArray<ast::ExistingArrayParameter>
@@ -137,7 +137,7 @@ public:
         copyFrom<ast::ConditionalExpression,
                  ast::ConditionalExpression::TRUE_VAL>(),
         copyToOutput<ast::ConditionalExpression,
-                       ast::ConditionalExpression::TRUE_VAL>(),
+                     ast::ConditionalExpression::TRUE_VAL>(),
     };
   }
 
@@ -165,7 +165,7 @@ public:
             TransferFn<ast::ArrayReadExpression>(DynamaticTypingContext{
                 DynamaticTypingContext::IntegerRequired}),
             copyToOutput<ast::ArrayReadExpression,
-                           ast::ArrayReadExpression::ARRAY_PARAMETER>()};
+                         ast::ArrayReadExpression::ARRAY_PARAMETER>()};
   }
 
   TransferFnArray<ast::ArrayAssignmentStatement>
