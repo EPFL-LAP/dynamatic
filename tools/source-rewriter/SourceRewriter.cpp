@@ -5,7 +5,7 @@
 // Currently only implements one rewrite: 
 // Turning logical operators (`&&`, `||`)
 // into bitwise operators (`&`, `|`)
-// with operands wrapped in a double-negation `!!(x)`.
+// with operands wrapped in a `((x) != 0)` comparison.
 //
 // The C specification requires logical operations to use short-circuiting,
 // which means that the rhs of the operation only executes
@@ -13,7 +13,7 @@
 //
 // We disable this feature, since it blocks HLS developers from control
 // of their circuit:
-// a && b being logically equivalent to !!a & !!b
+// a && b being logically equivalent to (((a) != 0) & ((b) != 0))
 // is not a commonly-known optimization opportunity,
 // and so is less likely to be applied manually.
 //
@@ -78,7 +78,7 @@ using ::clang::transformer::RewriteRule;
 // that can easily applied to entire codebases
 // using boilerplate utility objects/functions
 static RewriteRule buildNoShortCircuitRewriteRule() {
-  // make a rule to turn a && b into (!!a & !!b)
+  // make a rule to turn a && b into (((a) != 0) & ((b) != 0))
   // binaryOperator matches only operators with two inputs
   // hasOperatorName further filters down to only match &&
   // we then bind the lhs and rhs inputs to the strings
@@ -88,9 +88,9 @@ static RewriteRule buildNoShortCircuitRewriteRule() {
   auto RuleAnd = makeRule(
       binaryOperator(hasOperatorName("&&"), hasLHS(expr().bind("lhs")),
                      hasRHS(expr().bind("rhs"))),
-      changeTo(cat("(!!(", node("lhs"), ") & !!(", node("rhs"), "))")));
+      changeTo(cat("(((", node("lhs"), ") != 0) & ((", node("rhs"), ") != 0))")));
 
-  // make a rule to turn a || b into (!!a | !!b)
+  // make a rule to turn a || b into (((a) != 0) | ((b) != 0))
   // binaryOperator matches only operators with two inputs
   // hasOperatorName further filters down to only match ||
   // we then bind the lhs and rhs inputs to the strings
@@ -100,7 +100,7 @@ static RewriteRule buildNoShortCircuitRewriteRule() {
   auto RuleOr = makeRule(
       binaryOperator(hasOperatorName("||"), hasLHS(expr().bind("lhs")),
                      hasRHS(expr().bind("rhs"))),
-      changeTo(cat("(!!(", node("lhs"), ") | !!(", node("rhs"), "))")));
+      changeTo(cat("(((", node("lhs"), ") != 0) | ((", node("rhs"), ") != 0))")));
 
   // Use a single Transformer to apply both rules
   return applyFirst({RuleAnd, RuleOr});
@@ -234,7 +234,7 @@ applyRewriteRule(CompilationDatabase &Compilations,
     // but changes will never be partially applied
     AtomicChanges AllChanges;
 
-    // a libtooling Transformer is the high-level object
+    // a LibTooling Transformer is the high-level object
     // used to implement source-to-source rewrites
     //
     // Needs to be in the loop since the callback
