@@ -127,6 +127,7 @@ fi
 $DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_REWRITTEN" \
   -I "$DYNAMATIC_DIR/include"  \
   -I "$SRC_DIR" \
+  -I "$DYNAMATIC_DIR/build/include/clang_headers" \
   -Xclang \
   -ffp-contract=off \
   -o "$F_CLANG"
