@@ -474,7 +474,7 @@ create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/import-blif
 create_symlink ../build/bin/log2csv
-create_symlink ../build/bin/no-short-circuit
+create_symlink ../build/bin/source-rewriter
 create_symlink "../build/bin/rigidification-testbench"
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
