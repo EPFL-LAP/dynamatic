@@ -33,6 +33,10 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull;
   if (s == "ReconvergentPathFlow")
     return FormalProperty::TYPE::ReconvergentPathFlow;
+  if (s == "IOGSingleToken")
+    return FormalProperty::TYPE::IOGSingleToken;
+  if (s == "IOGConsecutiveTokens")
+    return FormalProperty::TYPE::IOGConsecutiveTokens;
 
   return std::nullopt;
 }
@@ -49,6 +53,10 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "CopiedSlotsOfActiveForksAreFull";
   case TYPE::ReconvergentPathFlow:
     return "ReconvergentPathFlow";
+  case TYPE::IOGSingleToken:
+    return "IOGSingleToken";
+  case TYPE::IOGConsecutiveTokens:
+    return "IOGConsecutiveTokens";
   }
 }
 
@@ -108,6 +116,10 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
                                                     path.field(INFO_LIT));
   case TYPE::ReconvergentPathFlow:
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::IOGSingleToken:
+    return IOGSingleToken::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::IOGConsecutiveTokens:
+    return IOGConsecutiveTokens::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -361,6 +373,52 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
 
   return prop;
 }
+
+// IOGSingleToken
+
+llvm::json::Value IOGSingleToken::extraInfoToJSON() const {
+  return llvm::json::Object({{SLOTS_LIT, slots}, {FORKS_LIT, forks}});
+}
+
+std::unique_ptr<IOGSingleToken>
+IOGSingleToken::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  auto prop = std::make_unique<IOGSingleToken>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
+      !mapper.map(FORKS_LIT, prop->forks))
+    return nullptr;
+  return prop;
+}
+
+// IOGConsecutiveTokens
+
+llvm::json::Value IOGConsecutiveTokens::extraInfoToJSON() const {
+  return llvm::json::Object(
+      {{SLOT1_LIT, slot1}, {SLOT2_LIT, slot2}, {SENTS_LIT, sents}});
+}
+
+std::unique_ptr<IOGConsecutiveTokens>
+IOGConsecutiveTokens::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<IOGConsecutiveTokens>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOT1_LIT, prop->slot1) ||
+      !mapper.map(SLOT2_LIT, prop->slot2) ||
+      !mapper.map(SENTS_LIT, prop->sents))
+    return nullptr;
+  return prop;
+}
+
+IOGConsecutiveTokens::IOGConsecutiveTokens(
+    unsigned long id, TAG tag, const TokenCountNamer &slot1,
+    const TokenCountNamer &slot2, std::vector<EagerForkSentNamer> sents)
+    : FormalProperty(id, tag, TYPE::IOGConsecutiveTokens), slot1(slot1),
+      slot2(slot2), sents(std::move(sents)) {}
 
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database
