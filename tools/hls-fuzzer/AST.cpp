@@ -90,8 +90,8 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const Constant &constant) {
   llvm::TypeSwitch<Constant::Variant>(constant.value)
-      .Case([&](const int32_t *value) { os << *value; })
-      .Case([&](const uint32_t *value) { os << *value << 'u'; })
+      .Case([&](const int32_t *value) { os << '(' << *value << ')'; })
+      .Case([&](const uint32_t *value) { os << '(' << *value << 'u' << ')'; })
       .Case([&](const int8_t *value) {
         os << "(int8_t)(" << static_cast<int32_t>(*value) << ")";
       })
@@ -115,7 +115,7 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
           os << "NAN";
           return;
         }
-        os << *value;
+        os << '(' << *value << ')';
       });
   return os;
 }
@@ -304,6 +304,21 @@ ast::ScalarType ast::UnaryExpression::getType() const {
   llvm_unreachable("all enum cases handled");
 }
 
+bool ast::UnaryExpression::isLegalOperandType(Op op, const ScalarType &type) {
+  switch (op) {
+  case BitwiseNot: {
+    auto *prim = llvm::dyn_cast<PrimitiveType>(type);
+    if (!prim)
+      return false;
+    return prim->isInteger();
+  }
+  case BoolNot:
+  case Minus:
+    return true;
+  }
+  llvm_unreachable("all enum cases handled");
+}
+
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const UnaryExpression &unaryExpression) {
   os << '(';
@@ -365,6 +380,11 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
 }
 
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
+                                   const ReturnType &returnType) {
+  return os << returnType.variant;
+}
+
+llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const Function &function) {
   os << function.returnType << ' ' << function.name << '(';
   llvm::interleaveComma(function.scalarParameters, os);
@@ -376,10 +396,10 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
   mlir::raw_indented_ostream indentedOstream(os);
   indentedOstream.indent();
   for (auto &iter : function.statements)
-    indentedOstream << iter;
+    indentedOstream << iter << '\n';
   if (function.returnStatement)
-    indentedOstream << *function.returnStatement;
+    indentedOstream << *function.returnStatement << '\n';
 
-  os << "\n}\n";
+  os << "}\n";
   return os;
 }

@@ -590,11 +590,16 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             // Bitwidth
             addType("DATA_TYPE", op->getOperand(0));
           })
+      .Case<handshake::DeadBufferOp>([&](auto) {
+        // Bitwidth
+        addType("DATA_TYPE", op->getOperand(0));
+      })
       .Case<handshake::BufferOp>([&](handshake::BufferOp bufferOp) {
         // Bitwidth
         addType("DATA_TYPE", bufferOp.getOperand());
-
         addUnsigned("NUM_SLOTS", bufferOp.getNumSlots());
+        if (bufferOp.getBufferType() == handshake::BufferType::COUNTER_BUFFER)
+          addUnsigned("DV_LATENCY", bufferOp.getLatencyDV());
         addString("BUFFER_TYPE", stringifyEnum(bufferOp.getBufferType()));
       })
       .Case<handshake::ConditionalBranchOp>(
@@ -2145,6 +2150,7 @@ public:
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,
         ConvertToHWInstance<handshake::SinkOp>,
+        ConvertToHWInstance<handshake::DeadBufferOp>,
         ConvertToHWInstance<handshake::ForkOp>,
         ConvertToHWInstance<handshake::LazyForkOp>,
         ConvertToHWInstance<handshake::LoadOp>,

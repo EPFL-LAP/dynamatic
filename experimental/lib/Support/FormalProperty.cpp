@@ -33,6 +33,10 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull;
   if (s == "ReconvergentPathFlow")
     return FormalProperty::TYPE::ReconvergentPathFlow;
+  if (s == "IOGSingleToken")
+    return FormalProperty::TYPE::IOGSingleToken;
+  if (s == "IOGConsecutiveTokens")
+    return FormalProperty::TYPE::IOGConsecutiveTokens;
 
   return std::nullopt;
 }
@@ -49,6 +53,10 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "CopiedSlotsOfActiveForksAreFull";
   case TYPE::ReconvergentPathFlow:
     return "ReconvergentPathFlow";
+  case TYPE::IOGSingleToken:
+    return "IOGSingleToken";
+  case TYPE::IOGConsecutiveTokens:
+    return "IOGConsecutiveTokens";
   }
 }
 
@@ -108,6 +116,10 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
                                                     path.field(INFO_LIT));
   case TYPE::ReconvergentPathFlow:
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::IOGSingleToken:
+    return IOGSingleToken::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::IOGConsecutiveTokens:
+    return IOGConsecutiveTokens::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -252,11 +264,6 @@ EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> channels{};
-  // std::string opName = sentStateNamers[0].opName;
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    channels.push_back(state.toInnerJSON());
-  }
   // Example JSON:
   // [
   //   {
@@ -280,7 +287,7 @@ llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
   //     "operation": "fork0",
   //   }
   // ]
-  return llvm::json::Array(channels);
+  return llvm::json::Array(sentStateNamers);
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
@@ -289,14 +296,8 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::Array *array = info.getAsArray();
-  assert(array &&
-         "expected info of EFNAO to be an array of eager fork outputs");
-  for (auto &stateJSON : *array) {
-    auto sentStateNamer =
-        handshake::EagerForkSentNamer::fromInnerJSON(stateJSON, path);
-    prop->sentStateNamers.push_back(*sentStateNamer);
-  }
+  bool success = llvm::json::fromJSON(info, prop->sentStateNamers, path);
+  assert(success);
   return prop;
 }
 
@@ -323,12 +324,8 @@ CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
-  std::vector<llvm::json::Value> channels{};
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    channels.push_back(state.toInnerJSON());
-  }
   return llvm::json::Object(
-      {{FORK_CHANNELS_LIT, channels}, {COPIED_SLOT_LIT, copiedSlot->toJSON()}});
+      {{FORK_CHANNELS_LIT, sentStateNamers}, {COPIED_SLOT_LIT, copiedSlot}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -338,22 +335,10 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
 
-  const llvm::json::Object *obj = info.getAsObject();
-  assert(obj && "CSOAFAF json info not an object");
-
-  const llvm::json::Value *channelNameJSON = obj->get(FORK_CHANNELS_LIT);
-  assert(channelNameJSON && "missing FORK_CHANNELS_LIT in CSOAFAF info");
-  const llvm::json::Array *channelNameJSONs = channelNameJSON->getAsArray();
-  assert(channelNameJSONs && "FORK_CHANNELS_LIT in CSOAFAF is not an array");
-  for (auto &sentJSON : *channelNameJSONs) {
-    prop->sentStateNamers.push_back(
-        *handshake::EagerForkSentNamer::fromInnerJSON(sentJSON, path));
-  }
-
-  const llvm::json::Value *bufferSlotJSON = obj->get(COPIED_SLOT_LIT);
-  assert(bufferSlotJSON && "missing COPIED_SLOT_LIT in CSOAFAF json");
-  prop->copiedSlot = InternalStateNamer::fromJSON(*bufferSlotJSON, path);
-
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(FORK_CHANNELS_LIT, prop->sentStateNamers) ||
+      !mapper.map(COPIED_SLOT_LIT, prop->copiedSlot))
+    return nullptr;
   return prop;
 }
 
@@ -388,6 +373,52 @@ ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
 
   return prop;
 }
+
+// IOGSingleToken
+
+llvm::json::Value IOGSingleToken::extraInfoToJSON() const {
+  return llvm::json::Object({{SLOTS_LIT, slots}, {FORKS_LIT, forks}});
+}
+
+std::unique_ptr<IOGSingleToken>
+IOGSingleToken::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  auto prop = std::make_unique<IOGSingleToken>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
+      !mapper.map(FORKS_LIT, prop->forks))
+    return nullptr;
+  return prop;
+}
+
+// IOGConsecutiveTokens
+
+llvm::json::Value IOGConsecutiveTokens::extraInfoToJSON() const {
+  return llvm::json::Object(
+      {{SLOT1_LIT, slot1}, {SLOT2_LIT, slot2}, {SENTS_LIT, sents}});
+}
+
+std::unique_ptr<IOGConsecutiveTokens>
+IOGConsecutiveTokens::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<IOGConsecutiveTokens>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOT1_LIT, prop->slot1) ||
+      !mapper.map(SLOT2_LIT, prop->slot2) ||
+      !mapper.map(SENTS_LIT, prop->sents))
+    return nullptr;
+  return prop;
+}
+
+IOGConsecutiveTokens::IOGConsecutiveTokens(
+    unsigned long id, TAG tag, const TokenCountNamer &slot1,
+    const TokenCountNamer &slot2, std::vector<EagerForkSentNamer> sents)
+    : FormalProperty(id, tag, TYPE::IOGConsecutiveTokens), slot1(slot1),
+      slot2(slot2), sents(std::move(sents)) {}
 
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database

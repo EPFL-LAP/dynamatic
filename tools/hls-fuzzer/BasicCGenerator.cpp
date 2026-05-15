@@ -49,19 +49,23 @@ static ast::Expression safeCastAsNeeded(const ast::ScalarType &to,
       outputPrim->getMinValue());
 }
 
-auto gen::BasicCGenerator::generateFreshScalarParameter(
-    ast::ScalarType datatype, const OpaqueContext &context)
-    -> PendingParameter {
-  scalarParameters.push_back(
-      {{std::move(datatype), generateFreshVarName()}, context});
-  return PendingParameter(*this, scalarParameters.back().first);
-}
-
 ast::ReturnStatement
 gen::BasicCGenerator::generateReturnStatement(const OpaqueContext &context) {
-  ast::Expression expression = generateExpression(context, 0);
-  return ast::ReturnStatement{safeCastAsNeeded(
-      llvm::cast<ast::ScalarType>(returnType), std::move(expression))};
+  return *generateWithDependencies<ast::ReturnStatement>(
+      context, typeSystem.getReturnStatementTransferFns(),
+      /*return value=*/
+      [&](const OpaqueContext &context) {
+        ast::Expression expression = generateExpression(context, 0);
+        if (maybeReturnType && llvm::isa<ast::ScalarType>(*maybeReturnType))
+          expression =
+              safeCastAsNeeded(llvm::cast<ast::ScalarType>(*maybeReturnType),
+                               std::move(expression));
+        return expression;
+      },
+      /*constructor=*/
+      [&](ast::Expression &&expression) {
+        return ast::ReturnStatement{std::move(expression)};
+      });
 }
 
 constexpr std::size_t MAX_DEPTH = 4;
@@ -86,6 +90,13 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
                                    const OpaqueContext &context,
                                    std::size_t depth) {
         return self->generateBinaryExpression(op, context, depth);
+      });
+    }
+    for (auto op : enumRange<ast::UnaryExpression::Op>()) {
+      generators.emplace_back([op](BasicCGenerator *self,
+                                   const OpaqueContext &context,
+                                   std::size_t depth) {
+        return self->generateUnaryExpression(op, context, depth);
       });
     }
     generators.emplace_back(&BasicCGenerator::generateCastExpression);
@@ -116,114 +127,226 @@ std::optional<ast::Expression>
 gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
                                                const OpaqueContext &context,
                                                std::size_t depth) {
-  auto conclusion = typeSystem.checkBinaryExpressionOpaque(op, context);
-  if (!conclusion)
+  if (typeSystem.discardBinaryExpressionOpaque(op, context))
     return std::nullopt;
-  auto [lhsCons, rhsCons] = *conclusion;
 
-  ast::Expression lhs = generateExpression(lhsCons, depth + 1);
-  ast::Expression rhs = generateExpression(rhsCons, depth + 1);
+  return generateWithDependencies<ast::BinaryExpression>(
+      context, typeSystem.getBinaryExpressionTransferFns(op),
+      /*lhs=*/
+      [&](const OpaqueContext &context) -> ast::Expression {
+        return generateExpression(context, depth + 1);
+      },
+      /*rhs=*/
+      [&](const OpaqueContext &context) -> ast::Expression {
+        return generateExpression(context, depth + 1);
+      },
+      /*constructor=*/
+      [&](ast::Expression &&lhs,
+          ast::Expression &&rhs) -> std::optional<ast::BinaryExpression> {
+        // Perform explicit casts to a legal operand type if neither of the
+        // expressions are legal for the given operation.
+        // This would e.g. cast 'double's that are meant to be applied to '&' to
+        // a random type that can be legally used with '&'.
+        if (!ast::BinaryExpression::isLegalOperandType(op, lhs.getType()) ||
+            !ast::BinaryExpression::isLegalOperandType(op, rhs.getType())) {
 
-  // Perform explicit casts to a legal operand type if neither of the
-  // expressions are legal for the given operation.
-  // This would e.g. cast 'double's that are meant to be applied to '&' to a
-  // random type that can be legally used with '&'.
-  if (!ast::BinaryExpression::isLegalOperandType(op, lhs.getType()) ||
-      !ast::BinaryExpression::isLegalOperandType(op, rhs.getType())) {
+          std::optional<ast::ScalarType> scalarType = generateScalarType(
+              context, /*toExclude=*/[&](const ast::ScalarType &value) {
+                return !ast::BinaryExpression::isLegalOperandType(op, value);
+              });
+          if (!scalarType)
+            return std::nullopt;
 
-    std::optional<ast::ScalarType> scalarType = generateScalarType(
-        context, /*toExclude=*/[&](const ast::ScalarType &value) {
-          return !ast::BinaryExpression::isLegalOperandType(op, value);
-        });
-    if (!scalarType)
-      return std::nullopt;
+          lhs = safeCastAsNeeded(*scalarType, std::move(lhs));
+          rhs = safeCastAsNeeded(*scalarType, std::move(rhs));
+        }
 
-    lhs = safeCastAsNeeded(*scalarType, std::move(lhs));
-    rhs = safeCastAsNeeded(*scalarType, std::move(rhs));
-  }
+        switch (op) {
+        case ast::BinaryExpression::ShiftLeft:
+        case ast::BinaryExpression::ShiftRight: {
+          ast::ScalarType datatype = lhs.getType();
+          // Restrict the right expression to be in range of the bitwidth.
+          rhs = ast::BinaryExpression{
+              std::move(rhs), ast::BinaryExpression::BitAnd,
+              ast::Constant{static_cast<uint32_t>(datatype.getBitwidth() - 1)}};
 
-  switch (op) {
-  case ast::BinaryExpression::ShiftLeft:
-  case ast::BinaryExpression::ShiftRight: {
-    ast::ScalarType datatype = lhs.getType();
-    // Restrict the right expression to be in range of the bitwidth.
-    rhs = ast::BinaryExpression{
-        std::move(rhs), ast::BinaryExpression::BitAnd,
-        ast::Constant{static_cast<uint32_t>(datatype.getBitwidth() - 1)}};
+          // If the left-hand side is a signed integer, make sure the value is
+          // at least 0. Performing a left-shift on a negative value in C is
+          // undefined behavior.
+          if (op == ast::BinaryExpression::ShiftLeft && datatype.isSigned())
+            lhs = generateMinExpression(
+                std::move(lhs), ast::Constant{static_cast<uint32_t>(0)});
+          return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
+        }
+        case ast::BinaryExpression::Plus:
+        case ast::BinaryExpression::Minus: {
+          ast::ScalarType lhsType = lhs.getType();
+          ast::ScalarType rhsType = rhs.getType();
+          if (lhsType.isInteger() && rhsType.isInteger() &&
+              std::max(lhsType.getBitwidth(), rhsType.getBitwidth()) + 1 >=
+                  32) {
+            // Explicitly promote integers to 'uint32_t' if the operation may
+            // overflow to avoid undefined behavior.
+            // Otherwise, the operation is performed on 'int32_t' due to C's
+            // promotion rules, which has undefined behavior on overflow.
+            //
+            // Note that in LLVM IR signed and unsigned multiplications are
+            // identical operations except for the wraparound behaviour for
+            // unsigned. Signed overflow is defined to be poison via the 'nsw'
+            // flag.
+            lhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(lhs));
+            rhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(rhs));
+          }
+          return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
+        }
+        case ast::BinaryExpression::Mul: {
+          ast::ScalarType lhsType = lhs.getType();
+          ast::ScalarType rhsType = rhs.getType();
+          if (lhsType.isInteger() && rhsType.isInteger() &&
+              lhsType.getBitwidth() + rhsType.getBitwidth() >= 32) {
+            // Explicitly promote integers to 'uint32_t' if the operation may
+            // overflow to avoid undefined behavior.
+            // Otherwise, the operation is performed on 'int32_t' due to C's
+            // promotion rules, which has undefined behavior on overflow.
+            //
+            // Note that in LLVM IR signed and unsigned multiplications are
+            // identical operations except for the wraparound behaviour for
+            // unsigned. Signed overflow is defined to be poison via the 'nsw'
+            // flag.
+            lhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(lhs));
+            rhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(rhs));
+          }
+          return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
+        }
+        // case ast::BinaryExpression::Division:
+        break;
+        case ast::BinaryExpression::BitAnd:
+        case ast::BinaryExpression::BitOr:
+        case ast::BinaryExpression::BitXor:
+        case ast::BinaryExpression::Greater:
+        case ast::BinaryExpression::GreaterEqual:
+        case ast::BinaryExpression::Less:
+        case ast::BinaryExpression::LessEqual:
+        case ast::BinaryExpression::Equal:
+        case ast::BinaryExpression::NotEqual:
+          return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
+        }
+        llvm_unreachable("all enum cases handled");
+      });
+}
 
-    // If the left-hand side is a signed integer, make sure the value is at
-    // least 0.
-    // Performing a left-shift on a negative value in C is undefined behavior.
-    if (op == ast::BinaryExpression::ShiftLeft && datatype.isSigned())
-      lhs = generateMinExpression(std::move(lhs),
-                                  ast::Constant{static_cast<uint32_t>(0)});
-    return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
-  }
-  case ast::BinaryExpression::Plus:
-  case ast::BinaryExpression::Minus:
-  case ast::BinaryExpression::Mul: {
-    ast::ScalarType lhsType = lhs.getType();
-    ast::ScalarType rhsType = rhs.getType();
-    if ((lhsType == ast::PrimitiveType::Int32 &&
-         lhsType.getBitwidth() > rhsType.getBitwidth()) ||
-        (rhsType == ast::PrimitiveType::Int32 &&
-         rhsType.getBitwidth() > lhsType.getBitwidth())) {
-      // Promote integers where one operand is an 'int32_t' to 'uint32_t' to
-      // avoid undefined behavior on overflow.
-      lhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(lhs));
-      rhs = safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(rhs));
-    }
-    return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
-  }
-  // case ast::BinaryExpression::Division:
-  break;
-  case ast::BinaryExpression::BitAnd:
-  case ast::BinaryExpression::BitOr:
-  case ast::BinaryExpression::BitXor:
-  case ast::BinaryExpression::Greater:
-  case ast::BinaryExpression::GreaterEqual:
-  case ast::BinaryExpression::Less:
-  case ast::BinaryExpression::LessEqual:
-  case ast::BinaryExpression::Equal:
-  case ast::BinaryExpression::NotEqual:
-    return ast::BinaryExpression{std::move(lhs), op, std::move(rhs)};
-  }
-  llvm_unreachable("all enum cases handled");
+std::optional<ast::Expression>
+gen::BasicCGenerator::generateUnaryExpression(ast::UnaryExpression::Op op,
+                                              const OpaqueContext &context,
+                                              std::size_t depth) {
+  if (typeSystem.discardUnaryExpressionOpaque(op, context))
+    return std::nullopt;
+
+  return generateWithDependencies<ast::UnaryExpression>(
+      context, typeSystem.getUnaryExpressionTransferFns(op),
+      /*operand=*/
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, depth + 1);
+      },
+      /*constructor=*/
+      [&](ast::Expression &&operand) -> std::optional<ast::UnaryExpression> {
+        // Perform explicit casts to a legal operand type if the operand type is
+        // not legal for the given operation. This would e.g. cast 'double's
+        // that are meant to be applied to '~' to a random type that can be
+        // legally used with '~'.
+        if (!ast::UnaryExpression::isLegalOperandType(op, operand.getType())) {
+          std::optional<ast::ScalarType> scalarType = generateScalarType(
+              context, /*toExclude=*/[&](const ast::ScalarType &value) {
+                return !ast::UnaryExpression::isLegalOperandType(op, value);
+              });
+          if (!scalarType)
+            return std::nullopt;
+
+          operand = safeCastAsNeeded(*scalarType, std::move(operand));
+        }
+
+        return ast::UnaryExpression{op, std::move(operand)};
+      });
 }
 
 std::optional<ast::ConditionalExpression>
 gen::BasicCGenerator::generateConditionalExpression(
     const OpaqueContext &context, std::size_t depth) {
-  auto subcontext = typeSystem.checkConditionalExpressionOpaque(context);
-  if (!subcontext)
+  if (typeSystem.discardConditionalExpressionOpaque(context))
     return std::nullopt;
-  auto &&[cond, trueExpr, falseExpr] = *subcontext;
 
-  return ast::ConditionalExpression{generateExpression(cond, depth + 1),
-                                    generateExpression(trueExpr, depth + 1),
-                                    generateExpression(falseExpr, depth + 1)};
+  return generateWithDependencies<ast::ConditionalExpression>(
+      context, typeSystem.getConditionalExpressionTransferFns(),
+      /*condition=*/
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, depth + 1);
+      },
+      /*true value=*/
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, depth + 1);
+      },
+      /*false value=*/
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, depth + 1);
+      },
+      /*constructor=*/
+      [&](ast::Expression &&cond, ast::Expression &&trueExpr,
+          ast::Expression &&falseExpr) {
+        return ast::ConditionalExpression{std::move(cond), std::move(trueExpr),
+                                          std::move(falseExpr)};
+      });
 }
 
 std::optional<ast::CastExpression>
 gen::BasicCGenerator::generateCastExpression(const OpaqueContext &context,
                                              std::size_t depth) {
-  auto subcontext = typeSystem.checkCastExpressionOpaque(context);
-  if (!subcontext)
+  if (typeSystem.discardCastExpressionOpaque(context))
     return std::nullopt;
-  auto &&[typeCon, exprCon] = *subcontext;
 
-  ast::Expression expression = generateExpression(exprCon, depth + 1);
-  ast::ScalarType expressionType = expression.getType();
-
-  // Keep it interesting by not performing noop-casts!
-  std::optional<ast::ScalarType> datatype =
-      generateScalarType(typeCon, /*toExclude=*/[&](auto &&value) {
-        return value == expressionType;
+  return generateWithDependencies<ast::CastExpression>(
+      context, typeSystem.getCastExpressionTransferFns(),
+      /*data type=*/
+      [&](const OpaqueContext &context) { return generateScalarType(context); },
+      /*operand=*/
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, depth + 1);
+      },
+      /*constructor=*/
+      [](ast::ScalarType &&datatype, ast::Expression &&expression) {
+        return ast::CastExpression{std::move(datatype), std::move(expression)};
       });
-  if (!datatype)
-    return std::nullopt;
+}
 
-  return ast::CastExpression{std::move(*datatype), std::move(expression)};
+ast::Constant gen::BasicCGenerator::getConstantForType(
+    const ast::ScalarType &scalarType) const {
+  return llvm::TypeSwitch<ast::ScalarType, ast::Constant>(scalarType)
+      .Case([&](const ast::PrimitiveType *primitive) {
+        switch (primitive->getType()) {
+        case ast::PrimitiveType::Int8:
+          return ast::Constant{random.getInterestingInteger<std::int8_t>()};
+        case ast::PrimitiveType::UInt8:
+          return ast::Constant{random.getInterestingInteger<std::uint8_t>()};
+
+        case ast::PrimitiveType::Int16:
+          return ast::Constant{random.getInterestingInteger<std::int16_t>()};
+
+        case ast::PrimitiveType::UInt16:
+          return ast::Constant{random.getInterestingInteger<std::uint16_t>()};
+
+        case ast::PrimitiveType::Int32:
+          return ast::Constant{random.getInterestingInteger<std::int32_t>()};
+
+        case ast::PrimitiveType::UInt32:
+          return ast::Constant{random.getInterestingInteger<std::uint32_t>()};
+
+        case ast::PrimitiveType::Float:
+          return ast::Constant{random.getInterestingFloat()};
+
+        case ast::PrimitiveType::Double:
+          return ast::Constant{random.getInterestingDouble()};
+        }
+        llvm_unreachable("all enum cases handled");
+      });
 }
 
 std::optional<ast::Constant>
@@ -232,78 +355,54 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &context,
   auto candidates = ast::PrimitiveType::ALL_PRIMITIVES;
   random.shuffle(candidates);
 
-  for (ast::PrimitiveType::Type iter : candidates) {
-    std::optional constant = [&] {
-      switch (iter) {
-      case ast::PrimitiveType::Int8:
-        return ast::Constant{random.getInterestingInteger<std::int8_t>()};
-      case ast::PrimitiveType::UInt8:
-        return ast::Constant{random.getInterestingInteger<std::uint8_t>()};
-
-      case ast::PrimitiveType::Int16:
-        return ast::Constant{random.getInterestingInteger<std::int16_t>()};
-
-      case ast::PrimitiveType::UInt16:
-        return ast::Constant{random.getInterestingInteger<std::uint16_t>()};
-
-      case ast::PrimitiveType::Int32:
-        return ast::Constant{random.getInterestingInteger<std::int32_t>()};
-
-      case ast::PrimitiveType::UInt32:
-        return ast::Constant{random.getInterestingInteger<std::uint32_t>()};
-
-      case ast::PrimitiveType::Float:
-        return ast::Constant{random.getInterestingFloat()};
-
-      case ast::PrimitiveType::Double:
-        return ast::Constant{random.getInterestingDouble()};
-      }
-      llvm_unreachable("all enum cases handled");
-    }();
-    if (constant = typeSystem.checkConstantOpaque(*constant, context); constant)
+  for (ast::PrimitiveType::Type iter : candidates)
+    if (std::optional constant =
+            typeSystem.discardConstantOpaque(getConstantForType(iter), context))
       return constant;
-  }
+
   return std::nullopt;
 }
 
 std::optional<ast::ArrayReadExpression>
 gen::BasicCGenerator::generateArrayReadExpression(const OpaqueContext &context,
                                                   std::size_t depth) {
-  auto conclusion = typeSystem.checkArrayReadExpressionOpaque(context);
-  if (!conclusion)
+  if (typeSystem.discardArrayReadExpressionOpaque(context))
     return std::nullopt;
-  auto [paramConc, indexConc] = *conclusion;
 
-  // Construct a safe indexing expression from an array parameter.
-  auto genWrappedArrayReadFromParam = [&, &indexConc = indexConc](
-                                          const ast::ArrayParameter &param) {
-    ast::ScalarType elementType = param.getElementType();
-    std::size_t mask = param.getDimension() - 1;
-    std::string name = param.getName().str();
-    // Generate an indexing expression.
-    // Has to be an integer.
-    ast::Expression index = safeCastAsNeeded(
-        ast::PrimitiveType::UInt32, generateExpression(indexConc, depth + 1));
+  return generateWithDependencies<ast::ArrayReadExpression>(
+      context, typeSystem.getArrayReadExpressionTransferFns(),
+      /*array parameter=*/
+      [&](const OpaqueContext &context) -> std::optional<ast::ArrayParameter> {
+        return generateArrayParameter(context);
+      },
+      /*index=*/
+      [&](const OpaqueContext &context) -> std::optional<ast::Expression> {
+        return generateExpression(context, depth + 1);
+      },
+      /*constructor=*/
+      [&](ast::ArrayParameter &&param, ast::Expression &&expression) {
+        ast::ScalarType elementType = param.getElementType();
+        std::size_t mask = param.getDimension() - 1;
+        std::string name = param.getName().str();
+        // Generate an indexing expression.
+        // Has to be an integer.
+        ast::Expression index =
+            safeCastAsNeeded(ast::PrimitiveType::UInt32, std::move(expression));
 
-    // Bitmask the index to be in range of the array! We use this to avoid
-    // undefined behavior in our programs. In the future we could also add
-    // mechanisms (type systems, or whatever), that restrict expressions to
-    // safe in-range expressions.
-    //
-    // Note: We can use a bitmask here since array parameters that we generate
-    // are all powers-of-2. We do so since the modulo operator is currently
-    // unsupported in dynamatic.
-    return ast::ArrayReadExpression{
-        std::move(elementType), name,
-        ast::BinaryExpression{std::move(index), ast::BinaryExpression::BitAnd,
-                              ast::Constant{static_cast<std::uint32_t>(mask)}}};
-  };
-
-  std::optional<ast::ArrayParameter> arrayParameter =
-      generateArrayParameter(paramConc);
-  if (!arrayParameter)
-    return std::nullopt;
-  return genWrappedArrayReadFromParam(*arrayParameter);
+        // Bitmask the index to be in range of the array! We use this to avoid
+        // undefined behavior in our programs. In the future we could also add
+        // mechanisms (type systems, or whatever), that restrict expressions to
+        // safe in-range expressions.
+        //
+        // Note: We can use a bitmask here since array parameters that we
+        // generate are all powers-of-2. We do so since the modulo operator is
+        // currently unsupported in dynamatic.
+        return ast::ArrayReadExpression{
+            std::move(elementType), name,
+            ast::BinaryExpression{
+                std::move(index), ast::BinaryExpression::BitAnd,
+                ast::Constant{static_cast<std::uint32_t>(mask)}}};
+      });
 }
 
 std::optional<ast::ArrayParameter>
@@ -314,68 +413,88 @@ gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context,
   if (!random.getRatherLowProbabilityBool()) {
     // Randomly shuffle the parameter ordering and find the first parameter
     // that passes type checking.
-    std::vector<ast::ArrayParameter> copy(arrayParameters.size());
-    llvm::copy(llvm::make_first_range(arrayParameters), copy.begin());
+    std::vector<ast::ArrayParameter> copy = arrayParameters;
     random.shuffle(copy);
 
     for (const ast::ArrayParameter &candidateParam : copy)
-      if (typeSystem.checkArrayParameterOpaque(candidateParam, context))
+      if (!typeSystem.discardExistingArrayParameterOpaque(candidateParam,
+                                                          context))
         return candidateParam;
   }
 
-  std::optional<ast::ScalarType> elementType = generateScalarType(context);
-  if (!elementType)
+  if (typeSystem.discardFreshArrayParameterOpaque(context))
     return std::nullopt;
 
-  arrayParameters.push_back(
-      {{std::move(*elementType), generateFreshVarName(),
-        // Generate a power-of-2 dimension to make the modulo operator fast and
-        // easy to implement.
-        // We choose an arbitrary upper-bound of 32 for the dimension for now.
-        static_cast<std::size_t>(1 << random.getInteger(0, 5))},
-       context});
-  if (!typeSystem.checkArrayParameterOpaque(arrayParameters.back().first,
-                                            context)) {
-    arrayParameters.pop_back();
-    varCounter--;
-    return std::nullopt;
-  }
-  return arrayParameters.back().first;
+  return generateWithDependencies<ast::ArrayParameter>(
+      context, typeSystem.getArrayParameterTransferFns(),
+      /*element type=*/
+      [&](const OpaqueContext &context) { return generateScalarType(context); },
+      /*constructor=*/
+      [&](ast::ScalarType &&elementType) {
+        return arrayParameters.emplace_back(
+            std::move(elementType), generateFreshVarName(),
+            // Generate a power-of-2 dimension to make the modulo operator
+            // fast and easy to implement. We choose an arbitrary upper-bound
+            // of 32 for the dimension for now.
+            static_cast<std::size_t>(1 << random.getInteger(0, 5)));
+      });
 }
 
 std::optional<ast::Variable>
 gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
                                               std::size_t) {
-  auto conclusion = typeSystem.checkVariableOpaque(context);
-  if (!conclusion)
+  if (typeSystem.discardVariableOpaque(context))
     return std::nullopt;
 
-  // With a low chance, skip picking an existing parameter and try to generate
-  // a new one.
-  if (!random.getRatherLowProbabilityBool()) {
-    // Randomly shuffle the parameter ordering and find the first parameter
-    // that passes type checking.
-    std::vector<ast::ScalarParameter> copy(scalarParameters.size());
-    llvm::copy(llvm::make_first_range(scalarParameters), copy.begin());
-    random.shuffle(copy);
+  return generateWithDependencies<ast::Variable>(
+      context, typeSystem.getVariableTransferFns(),
+      /*parameter=*/
+      [&](const OpaqueContext &context) -> std::optional<ast::ScalarParameter> {
+        std::array<std::function<std::optional<ast::ScalarParameter>()>, 2>
+            generators;
+        generators[0] = [&]() -> std::optional<ast::ScalarParameter> {
+          // Randomly shuffle the parameter ordering and find the first
+          // parameter that passes type checking.
+          std::vector<ast::ScalarParameter> copy = scalarParameters;
+          random.shuffle(copy);
 
-    for (ast::ScalarParameter &iter : copy)
-      if (typeSystem.checkScalarParameterOpaque(iter, *conclusion))
-        return ast::Variable{iter.getDataType(), iter.getName().str()};
-  }
+          for (const ast::ScalarParameter &iter : copy)
+            if (!typeSystem.discardExistingScalarParameterOpaque(iter, context))
+              return iter;
 
-  std::optional<ast::ScalarType> datatype = generateScalarType(*conclusion);
-  if (!datatype)
-    return std::nullopt;
+          return std::nullopt;
+        };
+        generators[1] = [&]() -> std::optional<ast::ScalarParameter> {
+          if (typeSystem.discardFreshScalarParameterOpaque(context))
+            return std::nullopt;
 
-  PendingParameter pendingParam =
-      generateFreshScalarParameter(*datatype, context);
-  if (typeSystem.checkScalarParameterOpaque(pendingParam.getParameter(),
-                                            *conclusion)) {
-    ast::ScalarParameter parameter = pendingParam.commit();
-    return ast::Variable{parameter.getDataType(), parameter.getName().str()};
-  }
-  return std::nullopt;
+          return generateWithDependencies<ast::ScalarParameter>(
+              context, typeSystem.getScalarParameterTransferFns(),
+              /*datatype=*/
+              [&](const OpaqueContext &context) {
+                return generateScalarType(context);
+              },
+              /*constructor=*/
+              [&](ast::ScalarType &&datatype) {
+                return scalarParameters.emplace_back(std::move(datatype),
+                                                     generateFreshVarName());
+              });
+        };
+
+        if (random.getRatherLowProbabilityBool())
+          std::swap(generators[0], generators[1]);
+
+        for (auto &iter : generators)
+          if (std::optional<ast::ScalarParameter> result = iter())
+            return result;
+
+        return std::nullopt;
+      },
+      /*constructor=*/
+      [&](ast::ScalarParameter &&parameter) {
+        return ast::Variable{parameter.getDataType(),
+                             parameter.getName().str()};
+      });
 }
 
 std::optional<ast::ScalarType> gen::BasicCGenerator::generateScalarType(
@@ -388,7 +507,7 @@ std::optional<ast::ScalarType> gen::BasicCGenerator::generateScalarType(
     if (toExclude && toExclude(iter))
       continue;
 
-    if (typeSystem.checkScalarTypeOpaque(iter, context))
+    if (!typeSystem.discardScalarTypeOpaque(iter, context))
       return iter;
   }
 
@@ -405,7 +524,7 @@ gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
   candidates.back() = ast::VoidType{};
   random.shuffle(candidates);
   for (const ast::ReturnType &iter : candidates)
-    if (typeSystem.checkReturnTypeOpaque(iter, context))
+    if (!typeSystem.discardReturnTypeOpaque(iter, context))
       return iter;
 
   llvm::report_fatal_error(
@@ -414,23 +533,29 @@ gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
 
 constexpr std::size_t MAX_STATEMENTS = 10;
 
-std::vector<ast::Statement>
-gen::BasicCGenerator::generateStatementList(const OpaqueContext &context) {
-  std::vector<ast::Statement> result;
-  // TODO: Type systems should have better control over the number of
-  //       statements and in what order they are generated.
-  //       Right now they are always generated last statement to first.
-  std::size_t numStatements = random.getInteger<std::size_t>(0, MAX_STATEMENTS);
-  result.reserve(numStatements);
-  for (std::size_t i = 0; i < numStatements; i++) {
-    std::optional<ast::Statement> maybeStat = generateStatement(context);
-    if (!maybeStat)
-      break;
+ast::StatementList
+gen::BasicCGenerator::generateStatementList(const OpaqueContext &context,
+                                            size_t depth) {
+  if (depth > MAX_STATEMENTS)
+    return ast::StatementList();
 
-    result.push_back(std::move(*maybeStat));
-  }
-  std::reverse(result.begin(), result.end());
-  return result;
+  return generateWithDependencies<ast::StatementList>(
+             context, typeSystem.getStatementListTransferFns(),
+             /*statement list=*/
+             [&](const OpaqueContext &context) {
+               return generateStatementList(context, depth + 1);
+             },
+             /*statement=*/
+             [&](const OpaqueContext &context) {
+               return generateStatement(context);
+             },
+             /*constructor=*/
+             [&](ast::StatementList &&statements, ast::Statement &&statement) {
+               std::vector<ast::Statement> result = statements.takeVector();
+               result.push_back(std::move(statement));
+               return ast::StatementList(std::move(result));
+             })
+      .value_or(ast::StatementList());
 }
 
 std::optional<ast::Statement>
@@ -441,48 +566,68 @@ gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
 std::optional<ast::ArrayAssignmentStatement>
 gen::BasicCGenerator::generateArrayAssignmentStatement(
     const OpaqueContext &context) {
-  auto conclusion = typeSystem.checkArrayAssignmentStatementOpaque(context);
-  if (!conclusion)
+  if (typeSystem.discardArrayAssignmentStatementOpaque(context))
     return std::nullopt;
 
-  auto &&[param, index, value] = *conclusion;
-  std::optional<ast::ArrayParameter> parameter = generateArrayParameter(param);
-  if (!parameter)
-    return std::nullopt;
-
-  ast::Expression castAsNeeded = safeCastAsNeeded(
-      /*to=*/ast::PrimitiveType::UInt32,
-      generateExpression(/*context=*/index, /*depth=*/0));
-  castAsNeeded = ast::BinaryExpression{
-      std::move(castAsNeeded), ast::BinaryExpression::BitAnd,
-      ast::Constant{static_cast<std::uint32_t>(parameter->getDimension() - 1)}};
-  return ast::ArrayAssignmentStatement{
-      parameter->getName().str(),
-      castAsNeeded,
-      generateExpression(value, 0),
-  };
+  return generateWithDependencies<ast::ArrayAssignmentStatement>(
+      context, typeSystem.getArrayAssignmentStatementTransferFns(),
+      /*array parameter=*/
+      [&](const OpaqueContext &context) {
+        return generateArrayParameter(context);
+      },
+      /*index=*/
+      [&](const OpaqueContext &context) {
+        return safeCastAsNeeded(
+            /*to=*/ast::PrimitiveType::UInt32,
+            generateExpression(context, /*depth=*/0));
+      },
+      /*value=*/
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, 0);
+      },
+      /*constructor=*/
+      [&](ast::ArrayParameter &&param, ast::Expression &&index,
+          ast::Expression &&value) {
+        index = ast::BinaryExpression{std::move(index),
+                                      ast::BinaryExpression::BitAnd,
+                                      ast::Constant{static_cast<std::uint32_t>(
+                                          param.getDimension() - 1)}};
+        return ast::ArrayAssignmentStatement{
+            param.getName().str(),
+            std::move(index),
+            std::move(value),
+        };
+      });
 }
 
 ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
-  auto conclusion = typeSystem.checkFunctionOpaque(entryContext);
-  returnType = generateReturnType(conclusion.returnType);
-  std::optional<ast::ReturnStatement> returnStatement;
-  if (!std::holds_alternative<ast::VoidType>(returnType))
-    returnStatement = generateReturnStatement(conclusion.returnStatement);
+  return *generateWithDependencies<ast::Function>(
+      entryContext, typeSystem.getFunctionTransferFns(),
+      /*return type=*/
+      [&](const OpaqueContext &context) {
+        return maybeReturnType = generateReturnType(context);
+      },
+      /*statement list=*/
+      [&](const OpaqueContext &context) {
+        return generateStatementList(context, 0);
+      },
+      /*return statement=*/
+      [&](const OpaqueContext &context) {
+        return generateReturnStatement(context);
+      },
+      /*constructor=*/
+      [&](ast::ReturnType &&returnType, ast::StatementList &&statements,
+          ast::ReturnStatement &&returnStatement) {
+        std::optional maybeReturnStatement = std::move(returnStatement);
+        if (returnType == ast::VoidType{})
+          maybeReturnStatement.reset();
 
-  std::vector<ast::Statement> statementList =
-      generateStatementList(conclusion.returnStatement);
-
-  auto scalarRange = llvm::make_first_range(scalarParameters);
-  auto arrayRange = llvm::make_first_range(arrayParameters);
-  return ast::Function{
-      returnType,
-      std::string(functionName),
-      std::vector(scalarRange.begin(), scalarRange.end()),
-      std::vector(arrayRange.begin(), arrayRange.end()),
-      statementList,
-      std::move(returnStatement),
-  };
+        return ast::Function{
+            std::move(returnType),   std::string(functionName),
+            scalarParameters,        arrayParameters,
+            statements.takeVector(), std::move(maybeReturnStatement),
+        };
+      });
 }
 
 std::string
@@ -492,30 +637,19 @@ gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
   ss << "\nint main() {\n";
   mlir::raw_indented_ostream os(ss);
   os.indent();
-  for (const auto &[parameter, context] : scalarParameters) {
-    std::optional<ast::Constant> constant;
-    while (!constant) {
-      constant = generateConstant(context);
-    }
-
+  for (const ast::ScalarParameter &parameter : scalarParameters) {
     os << parameter.getDataType() << ' ' << parameter.getName() << " = "
-       << *constant << ";\n";
+       << getConstantForType(parameter.getDataType()) << ";\n";
   }
 
-  for (const auto &[parameter, context] : arrayParameters) {
+  for (const ast::ArrayParameter &parameter : arrayParameters) {
     os << parameter.getElementType() << ' ' << parameter.getName() << "["
        << parameter.getDimension() << "] = {";
-    llvm::interleaveComma(
-        llvm::seq<std::size_t>(0, parameter.getDimension()), os,
-        [&, &context = context, &parameter = parameter](auto &&) {
-          std::optional<ast::Constant> constant;
-          while (!constant) {
-            constant = generateConstant(context);
-          }
-          // C++ does not allow implicit casts in array constructors, so we
-          // must cast the constant explicitly.
-          os << safeCastAsNeeded(parameter.getElementType(), *constant);
-        });
+    llvm::interleaveComma(llvm::seq<std::size_t>(0, parameter.getDimension()),
+                          os, [&, &parameter = parameter](auto &&) {
+                            os << getConstantForType(
+                                parameter.getElementType());
+                          });
     os << "};\n";
   }
 

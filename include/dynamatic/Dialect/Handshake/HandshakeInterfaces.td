@@ -409,4 +409,25 @@ def BLIFImplInterface : OpInterface<"BLIFImplInterface"> {
   ];
 }
 
+def RTLAttrInterface : OpInterface<"RTLAttrInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Allow specification of generic values to be used in the RTL generation of a
+     Handshake operation. Implementations return the complete set of RTL
+     parameters (generic values) as a list of named attributes, where each entry
+     maps a parameter name to its value. These are passed to the component
+     generator specified in the rtl-config file.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the RTL parameters for this operation as a list of named
+      attributes. Each entry maps a parameter name to its corresponding
+      attribute value. Returns failure if parameters cannot be determined
+      (e.g., unsupported constant bitwidth).
+    }], "::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>",
+    "getRTLParameters", (ins)>
+  ];
+}
+
 #endif //DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES

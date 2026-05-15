@@ -6,6 +6,9 @@ KERNEL_NAME=$3
 F_HANDSHAKE_EXPORT=$4
 F_HANDSHAKE_RIGIDIFIED=$5
 
+# We need python (version>=3.12) for the RTL/SMV codegen (this environment is installed via CMake).
+source "$DYNAMATIC_DIR/build/python3-venv/bin/activate"
+
 source "$DYNAMATIC_DIR/tools/dynamatic/scripts/utils.sh"
 
 FORMAL_DIR="$OUTPUT_DIR/formal"
@@ -15,6 +18,7 @@ DYNAMATIC_OPT_BIN="$DYNAMATIC_DIR/bin/dynamatic-opt"
 DYNAMATIC_EXPORT_RTL_BIN="$DYNAMATIC_DIR/bin/export-rtl"
 
 F_FORMAL_HW="$FORMAL_DIR/hw.mlir"
+F_FORMAL_INTERMEDIATE="$FORMAL_DIR/intermediate.mlir"
 F_FORMAL_PROP="$FORMAL_DIR/formal_properties.json"
 F_NUXMV_PROP="$FORMAL_DIR/property.rpt"
 F_NUXMV_CMD="$FORMAL_DIR/prove.cmd"
@@ -55,7 +59,7 @@ show_property -o $F_NUXMV_PROP;
 time;
 quit"
 else
-  ANNOTATE_FLAGS="annotate-invariants"
+  ANNOTATE_FLAGS="annotate-properties"
   NUXMV_SCRIPT="set verbose_level 0;
 set pp_list cpp;
 set counter_examples 0;
@@ -67,10 +71,7 @@ set bdd_static_order_heuristics basic;
 set cone_of_influence;
 set use_coi_size_sorting 1;
 read_model -i $MODEL_DIR/main.smv;
-flatten_hierarchy;
-encode_variables;
-build_flat_model;
-build_model -f;
+go;
 check_invar -s forward;
 check_ctlspec;
 show_property -o $F_NUXMV_PROP;
@@ -85,11 +86,15 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
 # Annotate properties
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" \
   --handshake-annotate-properties="json-path=$F_FORMAL_PROP $ANNOTATE_FLAGS" \
-  > /dev/null
+  > "$F_FORMAL_INTERMEDIATE"
+exit_on_fail "Failed to generate property DB" \
+  "Generated formal property DB"
 
 # handshake level -> hw level
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+"$DYNAMATIC_OPT_BIN" "$F_FORMAL_INTERMEDIATE" --lower-handshake-to-hw \
   > "$F_FORMAL_HW"
+exit_on_fail "Failed to lower to HW" \
+  "Lowered to HW"
 
 # generate SMV
 "$DYNAMATIC_EXPORT_RTL_BIN" \
@@ -100,6 +105,8 @@ rm -rf "$FORMAL_DIR" && mkdir -p "$FORMAL_DIR"
   --property-database "$F_FORMAL_PROP" \
   $SMV_GENERATION_FLAGS \
   --dynamatic-path "$DYNAMATIC_DIR"
+exit_on_fail "Failed to generate SMV model" \
+  "Generated SMV model"
 
 # create the testbench
 "$FORMAL_TESTBENCH_GEN" \
