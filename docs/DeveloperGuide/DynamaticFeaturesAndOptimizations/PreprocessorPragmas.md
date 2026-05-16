@@ -10,7 +10,7 @@ Its syntax is as follows:
 #pragma DYN speculate variable=a max_predictions=b style=c
 ```
 
-Which will then place a speculator between the definition of `a` and uses of `a`, which can make a max of `b` in-flight predictions, and predcits according to style `c`. Currently the only style is `standard`, where the speculator predicts initially a value of `0`, but on receiving an input predicts future inputs to be the same as its most recent input. 
+Which will then place a speculator between the definition of `a` and uses of `a`, which can make a max of `b` in-flight predictions, and predicts according to style `c`. Currently the only style is `standard`, where the speculator predicts initially a value of `0`, but on receiving an input predicts future inputs to be the same as its most recent input. 
 
 
 ## High-Level Overview
