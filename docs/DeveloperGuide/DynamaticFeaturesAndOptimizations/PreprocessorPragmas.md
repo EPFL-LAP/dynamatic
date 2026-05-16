@@ -178,7 +178,7 @@ to
 ```
 input_variable = __dyn_speculate(input_variable, 5, "standard");
 ```
-Redefining any downstream uses of `input_variable` to be uses of the speculator's output. You may also notice the style gets wrapped in quote marks, as otherwise it will not valid be C syntax. The pragma style input should not contain quote marks.
+Redefining any downstream uses of `input_variable` to be uses of the speculator's output. You may also notice the style gets wrapped in quote marks, as otherwise it will not be valid C syntax. The pragma style input should not contain quote marks.
 
 This is done using a method inspired by how the preprocessor handles included header files. 
 
