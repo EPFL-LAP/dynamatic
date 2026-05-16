@@ -166,9 +166,33 @@ void emitInjectedTokens(Preprocessor &PP,
                           const SpeculatePragmaInfo &SpecPragmaInfo);
 ```
 
-which injects a `extern int __dyn_speculate(double, int, const char *)` function declaration: this is the function we use to represent the speculator in the C source kernel.
+which injects code to convert the pragma to a function call, which is how we represent the speculator in the C source kernel.
 
-It then also injects a call of this function, converting 
+To avoid having type conversions before or after the speculator, we first inject a declaration of this function for each possible type we could want to speculate on:
+```c++
+extern _Bool  __dyn_speculate_b(_Bool,  int, const char*) __attribute__((noinline, noduplicate));
+extern char   __dyn_speculate_c(char,   int, const char*) __attribute__((noinline, noduplicate));
+extern short  __dyn_speculate_s(short,  int, const char*) __attribute__((noinline, noduplicate));
+extern int    __dyn_speculate_i(int,    int, const char*) __attribute__((noinline, noduplicate));
+extern long   __dyn_speculate_l(long,   int, const char*) __attribute__((noinline, noduplicate));
+extern float  __dyn_speculate_f(float,  int, const char*) __attribute__((noinline, noduplicate));
+extern double __dyn_speculate_d(double, int, const char*) __attribute__((noinline, noduplicate));
+```
+
+We then inject a `_Generic` [macro](https://www.geeksforgeeks.org/c/_generic-keyword-c/) (which implements a type-based function select), to call the current function based on the type of the variable we are speculating on:
+
+```c++
+#define __dyn_speculate(x, n, s) _Generic((x), \
+  _Bool:  __dyn_speculate_b, \
+  char:   __dyn_speculate_c, \
+  short:  __dyn_speculate_s, \
+  int:    __dyn_speculate_i, \
+  long:   __dyn_speculate_l, \
+  float:  __dyn_speculate_f, \
+  double: __dyn_speculate_d)((x), (n), (s))
+```
+
+It then also injects a call of this macro, converting 
 ```
 #pragma DYN speculate variable=input_variable max_predictions=5 style=standard
 ```

@@ -188,10 +188,10 @@ private:
     // to an mlir attribute, before running
     // CFToHandshake
 
-    // Inject per-type extern declarations and a _Generic dispatch macro so the
-    // speculate call preserves the spec'd variable's type in LLVM IR (no
-    // implicit casts around the call, no double/int round-trip).
-    std::string Decl =
+    // Define a function
+    // for each type of variable we could speculate on
+    // so that no casts are added before or after the speculator
+    std::string FuncDecls =
         "extern _Bool  __dyn_speculate_b(_Bool,  int, const char*) "
         "__attribute__((noinline, noduplicate));\n"
         "extern char   __dyn_speculate_c(char,   int, const char*) "
@@ -205,7 +205,14 @@ private:
         "extern float  __dyn_speculate_f(float,  int, const char*) "
         "__attribute__((noinline, noduplicate));\n"
         "extern double __dyn_speculate_d(double, int, const char*) "
-        "__attribute__((noinline, noduplicate));\n"
+        "__attribute__((noinline, noduplicate));\n";
+
+    // use a generic macro
+    // so that which function to use
+    // and therefore what return type
+    // if chosen at compile time
+    // based on the input variable type
+    std::string GenericMacro =
         "#define __dyn_speculate(x, n, s) _Generic((x), \\\n"
         "  _Bool:  __dyn_speculate_b, \\\n"
         "  char:   __dyn_speculate_c, \\\n"
@@ -230,8 +237,8 @@ private:
     // so we place our fake file into one here
     // and give it the name "<dyn-speculate-injected>"
     // which is purely for error messages
-    auto MB = llvm::MemoryBuffer::getMemBufferCopy(Decl + Call,
-                                                   "<dyn-speculate-injected>");
+    auto MB = llvm::MemoryBuffer::getMemBufferCopy(
+        FuncDecls + GenericMacro + Call, "<dyn-speculate-injected>");
 
     // Here we prep the fake file to be a
     // fake header file
