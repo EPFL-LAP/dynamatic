@@ -33,7 +33,7 @@ static void error(Preprocessor &PP, const Token &Tok, const char *errorMsg) {
 // struct to store the information
 // we get from a speculate pragma
 struct SpeculatePragmaInfo {
-  IdentifierInfo *VariableId = nullptr;
+  std::string Variable;
   uint64_t MaxPredictions = 0;
   std::string Style;
   SourceLocation PragmaLoc;
@@ -77,7 +77,7 @@ private:
     // store output of lexer
     Token Tok;
 
-    // lex another token
+    // lex the initial token for the first iteration
     PP.Lex(Tok);
 
     // while the lexer has input from this line
@@ -111,10 +111,10 @@ private:
         }
 
         // store the variable name info
-        SpecPragmaInfo.VariableId = Tok.getIdentifierInfo();
+        SpecPragmaInfo.Variable = Tok.getIdentifierInfo()->getName().str();
         sawVariable = true;
 
-        // lex the next token for the next iteration
+        // lex the initial token for the next iteration
         PP.Lex(Tok);
 
       } else if (Name == "max_predictions") {
@@ -130,21 +130,34 @@ private:
           return failure();
         }
         sawMaxPred = true;
+
+        // no lex since parseSimpleIntegerLiteral updated Tok
+        // already
       } else if (Name == "style") {
         // if the named option is style
-        // try to store the value lexed from the pragma
-        // into SpecPragmaInfo.Style
-        if (!PP.LexStringLiteral(Tok, SpecPragmaInfo.Style,
-                                 "DYN speculate style",
-                                 /*AllowMacroExpansion=*/true))
+        // lex the style identifier
+        PP.Lex(Tok);
+
+        // enforce that style name
+        // lexes properly
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected identifier after style=");
           return failure();
-        // currently style has to be default,
+        }
+
+        // store the variable name info
+        SpecPragmaInfo.Style = Tok.getIdentifierInfo()->getName().str();
+
+        // currently style has to be standard,
         // will whitelist more options later
-        if (SpecPragmaInfo.Style != "default") {
-          error(PP, Tok, "style must be \"default\"");
+        if (SpecPragmaInfo.Style != "standard") {
+          error(PP, Tok, "style must be standard");
           return failure();
         }
         sawStyle = true;
+
+        // lex the initial token for the next iteration
+        PP.Lex(Tok);
       } else {
         // otherwise we have gotten an unknown named option
         error(PP, Tok, "unknown option in #pragma DYN speculate");
@@ -188,10 +201,9 @@ private:
     // which is required for the
     // manually specified prediction method of x
     // to be usable
-    std::string Call =
-        llvm::formatv("{0} = __dyn_speculate({0}, {1}, \"{2}\");\n",
-                      SpecPragmaInfo.VariableId->getName(),
-                      SpecPragmaInfo.MaxPredictions, SpecPragmaInfo.Style);
+    std::string Call = llvm::formatv(
+        "{0} = __dyn_speculate({0}, {1}, \"{2}\");\n", SpecPragmaInfo.Variable,
+        SpecPragmaInfo.MaxPredictions, SpecPragmaInfo.Style);
 
     // LLVM reads files into memory buffers
     // before processing them
