@@ -827,18 +827,13 @@ LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
 }
 
 void HandshakeSpeculationPass::runDynamaticPass() {
-  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
-
-  if (failed(SpeculationPlacements::readFromJSON(
-          this->jsonPath, this->placements, nameAnalysis)))
+  if (failed(SpeculationPlacements::readFromAttribute(getOperation(),
+                                                      this->placements)))
     return signalPassFailure();
 
-  // Run automatic finding of the unit placements
-  if (this->automatic) {
-    PlacementFinder finder(this->placements);
-    if (failed(finder.findPlacements()))
-      return signalPassFailure();
-  }
+  PlacementFinder finder(this->placements);
+  if (failed(finder.findPlacements()))
+    return signalPassFailure();
 
   if (failed(placeSpeculator()))
     return signalPassFailure();

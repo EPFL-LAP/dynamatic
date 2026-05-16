@@ -143,26 +143,94 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   fs::path compOutDir = outDir / "comp";
   fs::create_directories(compOutDir);
 
-  // Copy cf.mlir
-  fs::path cfFileBase = cFileDir / "cf.mlir";
-  fs::path cfFile = compOutDir / "cf.mlir";
-  fs::copy_file(cfFileBase, cfFile, fs::copy_options::overwrite_existing);
+  // Regenerate cf.mlir from the .c kernel via the new clang-plugin +
+  // translate-llvm-to-std + consume-edge-attr-marker flow. Mirrors the
+  // pre-handshake steps in tools/dynamatic/scripts/compile.sh so the
+  // baked-in cf.mlir fixture is no longer needed and the spec attribute
+  // injected by the DYN speculate pragma reaches HandshakeSpeculation.
+  const std::string CLANG_BIN = fs::path(DYNAMATIC_ROOT) / "bin" / "clang";
+  const std::string LLVM_OPT_BIN = fs::path(DYNAMATIC_ROOT) / "bin" / "opt";
+  const std::string TRANSLATE_BIN = fs::path(DYNAMATIC_ROOT) / "build" /
+                                    "bin" / "translate-llvm-to-std";
+  const std::string DYN_PRAGMAS_PLUGIN =
+      fs::path(DYNAMATIC_ROOT) / "build" / "lib" / "DynPragmasPlugin.so";
+  const std::string MEM_DEP_PLUGIN =
+      fs::path(DYNAMATIC_ROOT) / "build" / "lib" / "MemDepAnalysis.so";
+  const std::string CLANG_HEADERS =
+      fs::path(DYNAMATIC_ROOT) / "build" / "include" / "clang_headers";
+  const std::string DYN_INCLUDE = fs::path(DYNAMATIC_ROOT) / "include";
 
-  fs::path cfTransformed = compOutDir / "cfTransformed.mlir";
-  if (!runSubprocess({DYNAMATIC_OPT_BIN, cfFile.string(), "--canonicalize",
-                      "--cse", "--sccp", "--symbol-dce", "--control-flow-sink",
-                      "--loop-invariant-code-motion", "--canonicalize"},
-                     cfTransformed)) {
-    std::cerr << "Failed to apply standard transformations to cf\n";
+  fs::path fClang = compOutDir / "clang.ll";
+  fs::path fClangOpt = compOutDir / "clang.opt.ll";
+  fs::path fClangDep = compOutDir / "clang.opt.dep.ll";
+  fs::path cfFile = compOutDir / "cf.mlir";
+
+  // 1. clang -O0 -emit-llvm with the DynPragmasPlugin loaded so the
+  //    `#pragma DYN speculate` is rewritten to a `__dyn_speculate` call.
+  if (!runSubprocess({CLANG_BIN, "-O0", "-funroll-loops", "-S", "-emit-llvm",
+                      cFilePath.string(), "-I", DYN_INCLUDE, "-I",
+                      cFileDir.string(), "-I", CLANG_HEADERS,
+                      "-fplugin=" + DYN_PRAGMAS_PLUGIN, "-Xclang",
+                      "-ffp-contract=off", "-o", fClang.string()},
+                     compOutDir / "clang.stdout.txt")) {
+    std::cerr << "Failed to clang-compile " << name << "\n";
     return false;
   }
 
+  // 2. Strip attributes the LLVM optimizer / mlir-translate cannot consume.
+  std::system(("sed -i 's/optnone//g; s/noinline//g; "
+               "s/^target datalayout = .*$//g; s/^target triple = .*$//g' " +
+               fClang.string())
+                  .c_str());
+
+  // 3. opt with the standard dynamatic LLVM pass set.
+  if (!runSubprocess(
+          {LLVM_OPT_BIN, "-S",
+           "'-passes=inline,mem2reg,consthoist,instcombine<max-iterations=1000;"
+           "no-use-loop-info>,function(loop-mssa(licm<no-allowspeculation>)),"
+           "function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-"
+           "rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce'",
+           fClang.string()},
+          fClangOpt)) {
+    std::cerr << "Failed to apply LLVM optimization to " << name << "\n";
+    return false;
+  }
+
+  // 4. Memory dependency analysis (polly-backed) annotates loads/stores.
+  if (!runSubprocess({LLVM_OPT_BIN, "-S", "-load-pass-plugin", MEM_DEP_PLUGIN,
+                      "-passes=mem-dep-analysis",
+                      "-polly-process-unprofitable", fClangOpt.string()},
+                     fClangDep)) {
+    std::cerr << "Failed to apply mem-dep-analysis to " << name << "\n";
+    return false;
+  }
+
+  // 5. LLVM IR -> std MLIR. This is where the `__dyn_speculate` call gets
+  //    rewritten into a `dynamatic.edge_attr_marker` op carrying the
+  //    `dynamatic.speculate` attribute.
+  if (!runSubprocess({TRANSLATE_BIN, fClangDep.string(), "-function-name",
+                      name, "-csource", cFilePath.string(), "-dynamatic-path",
+                      DYNAMATIC_ROOT, "-o", cfFile.string()},
+                     compOutDir / "translate.stdout.txt")) {
+    std::cerr << "Failed to translate LLVM IR to std for " << name << "\n";
+    return false;
+  }
+
+  // 6. CF-level dynamatic transforms, including --consume-edge-attr-marker
+  //    which migrates the speculate attribute from the marker onto its
+  //    producer op. --allow-unregistered-dialect is required because the
+  //    marker op is the unregistered `dynamatic.edge_attr_marker`.
   fs::path cfDynTransformed = compOutDir / "cfDynTransformed.mlir";
-  if (!runSubprocess({DYNAMATIC_OPT_BIN, cfTransformed.string(),
-                      "--arith-reduce-strength=max-adder-depth-mul=1",
-                      "--push-constants", "--mark-memory-interfaces"},
+  if (!runSubprocess({DYNAMATIC_OPT_BIN, "--allow-unregistered-dialect",
+                      cfFile.string(),
+                      "--drop-unlisted-functions=function-names=" + name,
+                      "--func-set-arg-names=source=" + cFilePath.string(),
+                      "--flatten-memref-row-major", "--canonicalize",
+                      "--arith-reduce-strength=max-adder-depth-mul=3",
+                      "--push-constants", "--consume-edge-attr-marker",
+                      "--mark-memory-interfaces"},
                      cfDynTransformed)) {
-    std::cerr << "Failed to apply Dynamatic transformations to cf\n";
+    std::cerr << "Failed to apply Dynamatic CF transforms to " << name << "\n";
     return false;
   }
 
@@ -214,11 +282,10 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   fs::path handshakeExport;
   if (spec) {
     fs::path handshakeSpeculation = compOutDir / "handshakeSpeculation.mlir";
-    fs::path specJson = cFileDir / "spec.json";
     if (!runSubprocess(
             {DYNAMATIC_OPT_BIN, handshakeCanonicalized.string(),
-             "--handshake-speculation=json-path=" + specJson.string(),
-             "--handshake-materialize", "--handshake-canonicalize"},
+             "--handshake-speculation", "--handshake-materialize",
+             "--handshake-canonicalize"},
             handshakeSpeculation)) {
       std::cerr << "Failed to add speculative units\n";
       return false;

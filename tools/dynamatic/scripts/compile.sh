@@ -224,6 +224,7 @@ exit_on_fail "Failed to convert to std dialect" \
 # - "arith-reduce-strength": Convert muls to adds. "max-adder-depth-mul" limits
 # the maximum length of the adder chain created via this pass.
 $DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
   "$F_CF" \
   --drop-unlisted-functions="function-names=$KERNEL_NAME" \
   --func-set-arg-names="source=$F_C_SOURCE" \
@@ -231,6 +232,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
+  --consume-edge-attr-marker \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"

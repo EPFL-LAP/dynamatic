@@ -6,12 +6,15 @@
 int subdiag(in_float_t d[N], in_float_t e[N]) {
   int i = 0;
   bool cond_break = false;
+  bool loop_again = false;
   do {
     float dd = d[i] + d[i + 1];
     float x = 0.001;
     i++;
     cond_break = (e[i]) <= x * dd;
-  } while (i < N_DEC && !cond_break);
+    loop_again =  i < N_DEC && !cond_break;
+    #pragma DYN speculate variable = loop_again max_predictions = 9 style = standard
+  } while (loop_again);
   return i;
 }
 

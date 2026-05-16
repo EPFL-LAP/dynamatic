@@ -11,7 +11,8 @@ int subdiag_fast(in_float_t d1[N], in_float_t d2[N], in_float_t e[N]) {
     float x = 0.001;
     i++;
     cond_break = (e[i]) <= x * dd;
-  } while (i < N_DEC && !cond_break);
+    #pragma DYN speculate variable=cond_break max_predictions=16 style=standard
+  } while (!cond_break && i < N_DEC);
   return i;
 }
 
