@@ -461,9 +461,6 @@ void TranslateLLVMToStd::translateBinaryInst(llvm::BinaryOperator *inst) {
 }
 
 void TranslateLLVMToStd::translateCastInst(llvm::CastInst *inst) {
-  if (valueMap.find(inst) != valueMap.end())
-    return;
-
   mlir::Value arg = valueMap[inst->getOperand(0)];
   mlir::Type resType = getMLIRType(inst->getType(), ctx);
 
@@ -1030,6 +1027,12 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
 }
 
 void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
+  // With the per-type _Generic dispatch in the plugin, the called function
+  // (`__dyn_speculate_b/_c/_s/_i/_l/_f/_d`) takes and returns the spec'd
+  // variable's actual type. There are no implicit casts around the call, so
+  // the marker is a plain passthrough: arg0 is the producer's MLIR value
+  // directly, and marker output binds to the call's MLIR result.
+
   auto *maxPredConst = llvm::dyn_cast<llvm::ConstantInt>(
       callInst->getArgOperand(1));
   if (!maxPredConst)
@@ -1037,8 +1040,7 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
         "__dyn_speculate: max_predictions arg is not a ConstantInt");
   uint32_t maxPred = static_cast<uint32_t>(maxPredConst->getZExtValue());
 
-  llvm::Value *styleArg =
-      callInst->getArgOperand(2)->stripPointerCasts();
+  llvm::Value *styleArg = callInst->getArgOperand(2)->stripPointerCasts();
   auto *styleGV = llvm::dyn_cast<llvm::GlobalVariable>(styleArg);
   if (!styleGV || !styleGV->hasInitializer())
     llvm::report_fatal_error(
@@ -1046,33 +1048,12 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
   auto *styleArr =
       llvm::dyn_cast<llvm::ConstantDataArray>(styleGV->getInitializer());
   if (!styleArr || !styleArr->isCString())
-    llvm::report_fatal_error(
-        "__dyn_speculate: style arg is not a C string");
+    llvm::report_fatal_error("__dyn_speculate: style arg is not a C string");
   std::string style = styleArr->getAsCString().str();
 
-  llvm::Value *arg0 = callInst->getArgOperand(0);
-  llvm::Value *realProducer = arg0;
-  if (auto *castInst = llvm::dyn_cast<llvm::CastInst>(arg0)) {
-    switch (castInst->getOpcode()) {
-    case llvm::Instruction::SIToFP:
-    case llvm::Instruction::UIToFP:
-    case llvm::Instruction::FPExt:
-    case llvm::Instruction::FPTrunc:
-    case llvm::Instruction::SExt:
-    case llvm::Instruction::ZExt:
-    case llvm::Instruction::Trunc:
-    case llvm::Instruction::BitCast:
-      realProducer = castInst->getOperand(0);
-      break;
-    default:
-      break;
-    }
-  }
-
-  auto it = valueMap.find(realProducer);
+  auto it = valueMap.find(callInst->getArgOperand(0));
   if (it == valueMap.end())
-    llvm::report_fatal_error(
-        "__dyn_speculate: producer not found in valueMap");
+    llvm::report_fatal_error("__dyn_speculate: arg0 not found in valueMap");
   mlir::Value v = it->second;
 
   mlir::SmallVector<mlir::NamedAttribute, 2> entries;
@@ -1083,40 +1064,10 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
   mlir::DictionaryAttr specAttr = mlir::DictionaryAttr::get(ctx, entries);
 
   mlir::OperationState markerState(
-      v.getLoc(),
-      mlir::OperationName("dynamatic.edge_attr_marker", ctx));
+      v.getLoc(), mlir::OperationName("dynamatic.edge_attr_marker", ctx));
   markerState.addOperands(v);
   markerState.addTypes(v.getType());
   markerState.attributes.append("dynamatic.speculate", specAttr);
   mlir::Operation *markerOp = builder.create(markerState);
-  mlir::Value markerVal = markerOp->getResult(0);
-
-  mlir::Type producerType = v.getType();
-  mlir::Type callRetType = getMLIRType(callInst->getType(), ctx);
-
-  // First op (A) = the LLVM user of the call. A's input type at the call
-  // slot is the call's return type.
-  if (callRetType == producerType) {
-    valueMap[callInst] = markerVal;
-    return;
-  }
-
-  // First op did not match. If the call has exactly one user that is a cast
-  // op, try the second op (B) by skipping A: if A's output type matches the
-  // producer type, the chain is producer-typed at both ends, so binding
-  // valueMap[A] = markerVal and skipping A's emission preserves types.
-  if (callInst->hasOneUse()) {
-    if (auto *castA =
-            llvm::dyn_cast<llvm::CastInst>(*callInst->user_begin())) {
-      mlir::Type aOutType = getMLIRType(castA->getType(), ctx);
-      if (aOutType == producerType) {
-        valueMap[castA] = markerVal;
-        return;
-      }
-    }
-  }
-
-  llvm::report_fatal_error(
-      "edge attributes cannot be placed on edges that receive implicit "
-      "casting");
+  valueMap[callInst] = markerOp->getResult(0);
 }

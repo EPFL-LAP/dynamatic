@@ -154,6 +154,8 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
                                     "bin" / "translate-llvm-to-std";
   const std::string DYN_PRAGMAS_PLUGIN =
       fs::path(DYNAMATIC_ROOT) / "build" / "lib" / "DynPragmasPlugin.so";
+  const std::string SOURCE_REWRITER_BIN =
+      fs::path(DYNAMATIC_ROOT) / "build" / "bin" / "source-rewriter";
   const std::string MEM_DEP_PLUGIN =
       fs::path(DYNAMATIC_ROOT) / "build" / "lib" / "MemDepAnalysis.so";
   const std::string CLANG_HEADERS =
@@ -165,10 +167,26 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   fs::path fClangDep = compOutDir / "clang.opt.dep.ll";
   fs::path cfFile = compOutDir / "cf.mlir";
 
+  // 0. Rewrite `&&`/`||` into bitwise `&`/`|` (source-rewriter) so the
+  //    spec'd boolean isn't a phi merge across a short-circuit CFG diamond.
+  //    Without this, the producer of `loop_again = i < N && !cond` becomes a
+  //    block-arg after mem2reg, which ConsumeEdgeAttrMarker cannot attach
+  //    attributes to. source-rewriter edits the file in place, so we work
+  //    on a copy in compOutDir.
+  fs::path fCNoSc = compOutDir / (name + ".no_sc.c");
+  fs::copy_file(cFilePath, fCNoSc, fs::copy_options::overwrite_existing);
+  if (!runSubprocess({SOURCE_REWRITER_BIN, fCNoSc.string(), "--", "-I",
+                      DYN_INCLUDE, "-I", cFileDir.string(), "-I",
+                      CLANG_HEADERS},
+                     compOutDir / "no_sc.stdout.txt")) {
+    std::cerr << "Failed to rewrite short-circuit ops for " << name << "\n";
+    return false;
+  }
+
   // 1. clang -O0 -emit-llvm with the DynPragmasPlugin loaded so the
   //    `#pragma DYN speculate` is rewritten to a `__dyn_speculate` call.
   if (!runSubprocess({CLANG_BIN, "-O0", "-funroll-loops", "-S", "-emit-llvm",
-                      cFilePath.string(), "-I", DYN_INCLUDE, "-I",
+                      fCNoSc.string(), "-I", DYN_INCLUDE, "-I",
                       cFileDir.string(), "-I", CLANG_HEADERS,
                       "-fplugin=" + DYN_PRAGMAS_PLUGIN, "-Xclang",
                       "-ffp-contract=off", "-o", fClang.string()},
@@ -226,7 +244,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
                       "--drop-unlisted-functions=function-names=" + name,
                       "--func-set-arg-names=source=" + cFilePath.string(),
                       "--flatten-memref-row-major", "--canonicalize",
-                      "--arith-reduce-strength=max-adder-depth-mul=3",
+                      "--arith-reduce-strength=max-adder-depth-mul=1",
                       "--push-constants", "--consume-edge-attr-marker",
                       "--mark-memory-interfaces"},
                      cfDynTransformed)) {
