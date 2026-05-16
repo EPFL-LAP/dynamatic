@@ -151,11 +151,11 @@ while(token is not end of line){
   } else {
     throw_error("unrecognized named option);
   }
-
-  assert(every named option was found);
-
-  return optionsStruct;
 }
+
+assert(every named option was found);
+
+return optionsStruct;
 ```
 
 ### emitInjectedTokens
