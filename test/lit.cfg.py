@@ -49,8 +49,8 @@ tools = ["dynamatic-opt", "hls-fuzzer-check-bitwidth",
          ToolSubst("%export-vhdl",
                    command=f"rm -rf %t; mkdir %t; {config.dynamatic_tools_dir}/export-rtl %s %t {config.dynamatic_src_root}/data/rtl-config-vhdl.json --dynamatic-path {config.dynamatic_src_root} --hdl vhdl"),
          ToolSubst("%dyn-clang-pragmas",
-                   command=f"{config.dynamatic_tools_dir}/clang "
-                           f"-fplugin={config.dynamatic_shlib_dir}/DynPragmasPlugin{config.llvm_shlib_ext} "
-                           f"-O2 -emit-llvm -S -o - 2>&1")]
+                   command=f"{config.llvm_tools_dir}/clang "
+                   f"-fplugin={config.dynamatic_shlib_dir}/DynPragmasPlugin{config.llvm_shlib_ext} "
+                   f"-O2 -emit-llvm -S -o - 2>&1")]
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)

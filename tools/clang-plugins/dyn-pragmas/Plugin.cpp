@@ -63,7 +63,7 @@ public:
   }
 
 private:
-  // Using the preprocessor to lex in the pragma 
+  // Using the preprocessor to lex in the pragma
   // and convert it to the ParsedOptions struct
   LogicalResult parseOptions(Preprocessor &PP, const Token &FirstToken,
                              SpeculatePragmaInfo &SpecPragmaInfo) {
@@ -73,7 +73,6 @@ private:
 
     // booleans to track which info we have received
     bool sawVariable = false, sawMaxPred = false, sawStyle = false;
-
 
     // store output of lexer
     Token Tok;
@@ -88,7 +87,7 @@ private:
         error(PP, Tok, "expected named option in #pragma DYN speculate");
         return failure();
       }
-      
+
       // get the value of the named option
       llvm::StringRef Name = Tok.getIdentifierInfo()->getName();
 
@@ -99,8 +98,8 @@ private:
         return failure();
       }
 
-      // if the named option is variable
       if (Name == "variable") {
+        // if the named option is variable
         // lex the variable name
         PP.Lex(Tok);
 
@@ -111,15 +110,15 @@ private:
           return failure();
         }
 
-        //store the variable name info
+        // store the variable name info
         SpecPragmaInfo.VariableId = Tok.getIdentifierInfo();
         sawVariable = true;
 
         // lex the next token for the next iteration
         PP.Lex(Tok);
 
-      // if the named option is max predictions
       } else if (Name == "max_predictions") {
+        // if the named option is max predictions
         // lex the number of max predictions
         PP.Lex(Tok);
 
@@ -131,23 +130,23 @@ private:
           return failure();
         }
         sawMaxPred = true;
-      // if the named option is style
       } else if (Name == "style") {
+        // if the named option is style
         // try to store the value lexed from the pragma
         // into SpecPragmaInfo.Style
         if (!PP.LexStringLiteral(Tok, SpecPragmaInfo.Style,
                                  "DYN speculate style",
                                  /*AllowMacroExpansion=*/true))
           return failure();
-        // currently style has to be default, 
+        // currently style has to be default,
         // will whitelist more options later
         if (SpecPragmaInfo.Style != "default") {
           error(PP, Tok, "style must be \"default\"");
           return failure();
         }
         sawStyle = true;
-      // otherwise we have gotten an unknown named option 
       } else {
+        // otherwise we have gotten an unknown named option
         error(PP, Tok, "unknown option in #pragma DYN speculate");
         return failure();
       }
@@ -163,45 +162,46 @@ private:
     return success();
   }
 
-  void emitInjectedTokens(Preprocessor &PP, const SpeculatePragmaInfo &SpecPragmaInfo) {
+  void emitInjectedTokens(Preprocessor &PP,
+                          const SpeculatePragmaInfo &SpecPragmaInfo) {
     // Inspired by how the preprocessor injects
     // the content of header files
     // we create a fake header file with a function dec
     // and function call
-    // 
+    //
     // and replace the pragma with it
     //
-    // We will later convert this function call 
+    // We will later convert this function call
     // to an mlir attribute, before running
     // CFToHandshake
 
     // Inject declaration of a custom speculate function
-    // Take a double as the input variable, as any numeric value can be cast to double
-    // and produce a int as output, as any numeric value can be cast to from int
+    // Take a double as the input variable, as any numeric value can be cast to
+    // double and produce a int as output, as any numeric value can be cast to
+    // from int
     std::string Decl = "extern int __dyn_speculate(double, int, const char *) "
                        "__attribute__((noinline, noduplicate));\n";
 
     // produce a call of the spec function on the value being speculate on
     // so that x = spec(x, [other options for speculator])
     // this guarantees that x will exist in the final circuit
-    // which is required for the 
+    // which is required for the
     // manually specified prediction method of x
     // to be usable
-    std::string Call = llvm::formatv(
-        "{0} = __dyn_speculate({0}, {1}, \"{2}\");\n",
-        SpecPragmaInfo.VariableId->getName(),
-        SpecPragmaInfo.MaxPredictions,
-        SpecPragmaInfo.Style);
+    std::string Call =
+        llvm::formatv("{0} = __dyn_speculate({0}, {1}, \"{2}\");\n",
+                      SpecPragmaInfo.VariableId->getName(),
+                      SpecPragmaInfo.MaxPredictions, SpecPragmaInfo.Style);
 
     // LLVM reads files into memory buffers
     // before processing them
     // so we place our fake file into one here
     // and give it the name "<dyn-speculate-injected>"
-    // which is purely for error messages 
-    auto MB = llvm::MemoryBuffer::getMemBufferCopy(
-        Decl + Call, "<dyn-speculate-injected>");
+    // which is purely for error messages
+    auto MB = llvm::MemoryBuffer::getMemBufferCopy(Decl + Call,
+                                                   "<dyn-speculate-injected>");
 
-    // Here we prep the fake file to be a 
+    // Here we prep the fake file to be a
     // fake header file
     // (owned by the user and treated as unloaded)
     // and say the pragma triggered its include

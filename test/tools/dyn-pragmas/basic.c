@@ -1,8 +1,8 @@
 // RUN: %dyn-clang-pragmas %s | FileCheck %s
 
-// CHECK: declare i32 @__dyn_speculate(double, i32, ptr)
-// CHECK: call i32 @__dyn_speculate(double {{.+}}, i32 noundef 8, ptr noundef {{.+}})
 // CHECK: c"default\00"
+// CHECK: call i32 @__dyn_speculate(double {{.+}}, i32 noundef 8, ptr noundef {{.+}})
+// CHECK: declare i32 @__dyn_speculate(double noundef, i32 noundef, ptr noundef)
 
 int compute(void);
 int use(int);
