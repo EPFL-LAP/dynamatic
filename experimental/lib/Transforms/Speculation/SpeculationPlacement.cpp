@@ -103,8 +103,8 @@ void SpeculationPlacements::setSaveCommitsFifoDepth(unsigned int depth) {
 LogicalResult
 SpeculationPlacements::readFromAttribute(mlir::ModuleOp modOp,
                                          SpeculationPlacements &placements) {
-  // small vector to store 
-  // the ops with a speculation attribute 
+  // small vector to store
+  // the ops with a speculation attribute
   llvm::SmallVector<mlir::Operation *, 2> speculateOnOps;
 
   // walk over op in the ir and store it
@@ -119,7 +119,7 @@ SpeculationPlacements::readFromAttribute(mlir::ModuleOp modOp,
     modOp.emitError() << "no op carries the `dynamatic.speculate` attribute";
     return failure();
   }
-  
+
   // if more than one op found, speculation pass fails
   if (speculateOnOps.size() > 1) {
     modOp.emitError() << "more than one op carries the `dynamatic.speculate` "
@@ -127,10 +127,10 @@ SpeculationPlacements::readFromAttribute(mlir::ModuleOp modOp,
     return failure();
   }
 
-  // get the op to speculate on 
+  // get the op to speculate on
   mlir::Operation *producer = speculateOnOps.front();
 
-  // get the dictionary attribute 
+  // get the dictionary attribute
   // with the options of how to speculate
   auto dictAttr =
       producer->getAttrOfType<mlir::DictionaryAttr>("dynamatic.speculate");
@@ -148,13 +148,13 @@ SpeculationPlacements::readFromAttribute(mlir::ModuleOp modOp,
         << "`dynamatic.speculate` is missing `max_predictions`";
     return failure();
   }
-  // convert from IntegerAttr to an APInt to a ui64_t to an unsigned 
+  // convert from IntegerAttr to an APInt to a ui64_t to an unsigned
   unsigned maxPred =
       static_cast<unsigned>(maxPredAttr.getValue().getLimitedValue());
 
   // Get which result the speculate attibute applies to
-  auto idxAttr =
-      producer->getAttrOfType<mlir::IntegerAttr>("dynamatic.speculate.result_idx");
+  auto idxAttr = producer->getAttrOfType<mlir::IntegerAttr>(
+      "dynamatic.speculate.result_idx");
   if (!idxAttr) {
     producer->emitError() << "Op containing `dynamatic.speculate` attribute "
                              "did not contain a "
@@ -162,21 +162,22 @@ SpeculationPlacements::readFromAttribute(mlir::ModuleOp modOp,
     return failure();
   }
 
-  // convert from IntegerAttr to an APInt to a ui64_t to an unsigned 
-  unsigned resultIdx = static_cast<unsigned>(idxAttr.getValue().getLimitedValue());
+  // convert from IntegerAttr to an APInt to a ui64_t to an unsigned
+  unsigned resultIdx =
+      static_cast<unsigned>(idxAttr.getValue().getLimitedValue());
 
   // if there is no result corresponding to the index
   // placement fails
   if (resultIdx >= producer->getNumResults()) {
-    producer->emitError() << "`dynamatic.speculate.result_idx` "
-                          << resultIdx << " is out of range for producer with "
+    producer->emitError() << "`dynamatic.speculate.result_idx` " << resultIdx
+                          << " is out of range for producer with "
                           << producer->getNumResults() << " result(s)";
     return failure();
   }
   // get the actual result
   mlir::Value res = producer->getResult(resultIdx);
 
-  // IR must be setup to use forks 
+  // IR must be setup to use forks
   // before placing running speculation pass
   if (!res.hasOneUse()) {
     producer->emitError() << "`dynamatic.speculate` producer's result must "
