@@ -159,17 +159,17 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   }];
 }
 
-def ConsumeEdgeAttrMarker : Pass<"consume-edge-attr-marker", "mlir::ModuleOp"> {
-  let summary = "Consume `dynamatic.edge_attr_marker` ops by moving their "
-                "`dynamatic.*` attributes onto the marked value's defining op.";
+def ConsumeProducerOutputAttrMarker
+    : Pass<"consume-producer-output-attr-marker", "mlir::ModuleOp"> {
+  let summary = "Consume `dynamatic.producer_output_attr_marker` ops by "
+                "moving their `dynamatic.*` attributes onto the producer.";
   let description = [{
-    Walks every `dynamatic.edge_attr_marker` op (an unregistered op emitted
-    by `translate-llvm-to-std` to pin attributes onto a specific SSA edge),
-    copies attributes whose name starts with `dynamatic.` onto the defining
-    op of the marker's operand, and erases the marker. Other attributes
-    on the marker (notably ones added by upstream MLIR machinery such as
-    `handshake.name`) are dropped along with the marker so they do not
-    pollute the producer.
+    Transfer the contents of any producer-attribute marker ops to the actual
+    producer, and then erase the producer-attribute marker ops.
+    We use the ops in the std files to avoid the producer's output from 
+    being folded away during the front-end's lowering passes,
+    but once the IR has reached Dynamatic's internal IRs, 
+    we can just store the attribute directly on the producer.
   }];
 }
 

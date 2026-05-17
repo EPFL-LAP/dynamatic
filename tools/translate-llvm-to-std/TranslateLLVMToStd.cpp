@@ -1068,7 +1068,8 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
     llvm::errs() << "Warning: __dyn_speculate input has "
                  << specVal->getNumUses()
                  << " users; consumers other than the spec call will bypass "
-                    "the edge_attr_marker and not be marked for speculation\n";
+                    "the producer_output_attr_marker and not be marked for "
+                    "speculation\n";
 
   // find the producer of the variable
   // inside our internal valueMap structure
@@ -1097,9 +1098,10 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
   // as long as the serialized form gives enough info,
   // which is enough for our purposes here.
   // So this op is never actually defined anywhere
-  // and the op type is "dynamatic.edge_attr_marker"
+  // and the op type is "dynamatic.producer_output_attr_marker"
   mlir::OperationState markerState(
-      v.getLoc(), mlir::OperationName("dynamatic.edge_attr_marker", ctx));
+      v.getLoc(),
+      mlir::OperationName("dynamatic.producer_output_attr_marker", ctx));
   // single input
   markerState.addOperands(v);
   // return type is the same as the input type
@@ -1110,8 +1112,8 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
 
   // Actually build the operation
   mlir::Operation *markerOp = builder.create(markerState);
-  // And have any op which consumes the 
-  // speculator function's output use 
+  // And have any op which consumes the
+  // speculator function's output use
   // the output of our edge attr op
   valueMap[callInst] = markerOp->getResult(0);
 }
