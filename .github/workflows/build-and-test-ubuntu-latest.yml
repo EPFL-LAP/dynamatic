@@ -86,6 +86,39 @@ jobs:
         run: |
           bash ./build.sh --use-prebuilt-llvm --enable-cbc
 
+  build-release-abc:
+    runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update apt and install prerequisites
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install software-properties-common
+          sudo add-apt-repository ppa:deadsnakes/ppa
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install -y \
+            --option APT::Immediate-Configure=false \
+            sudo vim clang lld ccache cmake wget \
+            ninja-build python3 graphviz git curl \
+            gzip libreadline-dev \
+            libboost-all-dev pkg-config python3.12 \
+            python3.12-venv python3.12-dev \
+            ghdl verilator
+
+      - name: Verify Python 3.12
+        run: python3.12 --version
+
+      - name: Build Dynamatic (release, prebuilt LLVM, abc)
+        run: |
+          bash ./build.sh --release --use-prebuilt-llvm --enable-cbc --enable-abc
+
   build-release-docker-image:
     runs-on: ubuntu-latest
 
