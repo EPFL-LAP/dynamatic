@@ -57,7 +57,7 @@ jobs:
         run: python3.12 --version
 
       - name: build
-        run: ./build.sh --release --use-prebuilt-llvm --enable-cbc --force
+        run: ./build.sh --release --use-prebuilt-llvm --enable-cbc --enable-leq-binaries --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
