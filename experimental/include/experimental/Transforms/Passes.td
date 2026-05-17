@@ -107,7 +107,10 @@ def PipelineDuplication : DynamaticPass<"pipeline-duplication"> {
     Adds an additional connection for the fork and duplicates the addition, multiplication,
     and more of the pipeline, with a hardcoded value that we know should come up often.
   }];
-  let options = [];
+  let options = [
+    Option<"jsonPath", "json-path", "std::string", "",
+           "Path to JSON-formatted file containing the positions for speculative "
+           "operations.">];
 }
 
 def ShortcutPath : DynamaticPass<"add-shortcut-path"> {
