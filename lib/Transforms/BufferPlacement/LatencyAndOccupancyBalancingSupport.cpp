@@ -181,8 +181,8 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
       auto it = nodeMap.find({user, step});
       if (it == nodeMap.end())
         continue;
-      seen.insert({it->second, reinterpret_cast<uintptr_t>(
-                                   arg.getAsOpaquePointer())});
+      seen.insert(
+          {it->second, reinterpret_cast<uintptr_t>(arg.getAsOpaquePointer())});
     }
   }
 
@@ -192,8 +192,8 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
     if (isa<mlir::MemRefType>(arg.getType()))
       continue;
     llvm::errs() << "  arg #" << arg.getArgNumber() << " \""
-                 << namer.getInputName(arg.getArgNumber()) << "\": "
-                 << arg.getType() << "\n";
+                 << namer.getInputName(arg.getArgNumber())
+                 << "\": " << arg.getType() << "\n";
   }
 
   if (seen.size() < 2)
@@ -203,10 +203,10 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
   nodeIdToStep[forkId] = 0;
 
   for (const auto &pr : seen)
-    addEdge(forkId, pr.first,
-            Value::getFromOpaquePointer(
-                reinterpret_cast<const void *>(pr.second)),
-            DataflowGraphEdgeType::INTRA_BB);
+    addEdge(
+        forkId, pr.first,
+        Value::getFromOpaquePointer(reinterpret_cast<const void *>(pr.second)),
+        DataflowGraphEdgeType::INTRA_BB);
 }
 
 std::vector<ReconvergentPath>
@@ -721,8 +721,8 @@ void SynchronizingCyclesFinderGraph::addSyntheticStartForkForBalancing() {
     auto it = opToNodeId.find(user);
     if (it == opToNodeId.end())
       continue;
-    seen.insert({it->second, reinterpret_cast<uintptr_t>(
-                                 arg.getAsOpaquePointer())});
+    seen.insert(
+        {it->second, reinterpret_cast<uintptr_t>(arg.getAsOpaquePointer())});
   }
 
   if (seen.size() < 2)
@@ -730,9 +730,9 @@ void SynchronizingCyclesFinderGraph::addSyntheticStartForkForBalancing() {
 
   NodeIdType forkId = addNode(nullptr, true);
   for (const auto &pr : seen)
-    addEdge(forkId, pr.first,
-            Value::getFromOpaquePointer(
-                reinterpret_cast<const void *>(pr.second)));
+    addEdge(
+        forkId, pr.first,
+        Value::getFromOpaquePointer(reinterpret_cast<const void *>(pr.second)));
 }
 
 std::string
