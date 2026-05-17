@@ -27,9 +27,9 @@ As then the producer output we wished to annotate would no longer exist.
 
 ## Inside of Standard MLIR
 
-In the conversion from LLVM to MLIR, we replace the function call with an unregistered `dynamatic.producer_output_attr_marker` operation: a completely opaque operation with no defined structure or verifiation. This operation belongs to a non-existant `dynamatic` dialect which marks it as part of the Dynamatic project without requiring any new dialect or operation definitions. 
+In the conversion from LLVM to MLIR, we replace the function call with an unregistered `dynamatic.producer_output_attr_marker` operation: a completely opaque operation with no defined structure or verification. This operation belongs to a non-existant `dynamatic` dialect which marks it as part of the Dynamatic project without requiring any new dialect or operation definitions. 
 
-We then place the information from the LLVM function call on this operation as an unregistered attribute specific to the type of annotation, which can have any desired structure as it is again undefined.
+We then place the information from the LLVM function call on this operation as an unregistered attribute specific to the type of annotation, which can have any desired structure as it is again not strictly define.
 
 An example of the serialized form of this unregistered operation with an unregistered attribute is
 ```
