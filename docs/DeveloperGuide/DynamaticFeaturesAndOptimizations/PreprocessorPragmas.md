@@ -21,7 +21,7 @@ Dynamatic uses a single plugin with the "DYN" namespace to register its custom p
 
 The pragma plugin therefore has similiar capabilities of the Source Rewriter based on the Transformer system, but the Transformer system does not work on pragmas: the two approaches therefore do very similiar work but on two different input types.
 
-## PragmaHandlerRegistry::Add, PragmaNamespace, PragmaHandler, and HandlePragma()
+## PragmaHandlerRegistry::Add, PragmaNamespace, PragmaHandler, and HandlePragma
 
 The four constructs we use in our plugin to interface with clang's preprocessor are `PragmaHandlerRegistery::Add`, `PragmaNamespace`, `PragmaHandler` and `HandlePragma`.
 
@@ -207,6 +207,6 @@ Redefining any downstream uses of `input_variable` to be uses of the speculator'
 This is done using a method inspired by how the preprocessor handles included header files. 
 
 The steps are roughly as follows:
-1. Build a fake generic file containing the function declaration and call.
+1. Build a fake generic file containing the function declarations, macro, and call.
 2. Convert the generic file to a fake "include", which knows the pragma is the line of code that caused it to be included.
 3. Tell the preprocessor to actually include our fake "include".

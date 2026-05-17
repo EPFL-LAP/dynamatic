@@ -1,3 +1,4 @@
+// clang-format off
 #include "nested_loop.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"

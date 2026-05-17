@@ -1,3 +1,4 @@
+// clang-format off
 #include "if_convert.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"

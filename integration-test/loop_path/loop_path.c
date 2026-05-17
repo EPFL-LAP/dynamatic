@@ -1,3 +1,4 @@
+// clang-format off
 #include "loop_path.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"

@@ -1,3 +1,4 @@
+// clang-format off
 #include "fixed.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"

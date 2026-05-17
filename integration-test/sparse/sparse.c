@@ -1,3 +1,4 @@
+// clang-format off
 #include "sparse.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"
