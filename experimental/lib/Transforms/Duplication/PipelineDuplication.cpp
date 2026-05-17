@@ -15,6 +15,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
+#include <fstream>
 
 using namespace llvm;
 using namespace dynamatic;
@@ -96,7 +97,6 @@ void PipelineDuplicationPass::runDynamaticPass() {
   OpBuilder builder(ctx);
 
   // Find select0 operation
-  // TODO: take from a .json file
   float compVal;
   std::string opName;
   if (failed(PipelineDuplicationPass::readFromJSON(this->jsonPath, compVal,

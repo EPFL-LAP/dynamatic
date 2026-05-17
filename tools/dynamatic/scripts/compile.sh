@@ -231,7 +231,7 @@ if [[ $DISABLE_LSQ -ne 0 ]]; then
     "Forced usage of MC interface in cf"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
-    --pipeline-duplication \
+    --pipeline-duplication="json-path=$DYNAMATIC_DIR/integration-test/prediction/pred.json" \
     --push-constants \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
