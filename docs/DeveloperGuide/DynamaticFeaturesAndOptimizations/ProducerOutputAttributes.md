@@ -9,7 +9,7 @@ These attributes are represented in 3 different forms across the 3 different lev
 The static nature of the LLVM IR means we cannot easily introduce new concepts. We therefore represent the "producer output attibute" as a function call directly underneath the production of the variable. We can inject this directly into the source code as 
 
 ```c++
-variable_to_annotate = edge_attribute_function_call(variable_to_annotate, [other attribute parameters]);
+variable_to_annotate = producer_output_attribute_func(variable_to_annotate, [other attribute parameters]);
 ```
 
 and causing a use-define chain that looks roughly like this:
