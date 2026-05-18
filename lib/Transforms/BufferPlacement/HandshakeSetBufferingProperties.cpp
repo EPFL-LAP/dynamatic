@@ -225,11 +225,11 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     Channel issueChannel(issueCtrl, true);
     issueChannel.props->minTrans = std::max(issueChannel.props->minTrans, minTrans);
 
-    // resolveCtrl is on a path from a lazy fork
+    // historyCtrl is on a path from a lazy fork
     // to a join
     // and so needs a buffer to prevent deadlock
-    Value resolveCtrl = specOp.getResolveCtrl();
-    Channel resolveChannel(resolveCtrl, true);
+    Value historyCtrl = specOp.getHistoryCtrl();
+    Channel resolveChannel(historyCtrl, true);
     resolveChannel.props->minTrans = std::max(resolveChannel.props->minTrans, minTrans);
   }
 

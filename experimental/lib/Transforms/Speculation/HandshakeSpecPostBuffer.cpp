@@ -152,7 +152,7 @@ FailureOr<SpeculatorOp> coalesceSpecOps(FuncOp funcOp,
   specOp2.getCommitCtrl().replaceAllUsesWith(speculator.getCommitCtrl());
 
   specOp1.getIssueCtrl().replaceAllUsesWith(speculator.getIssueCtrl());
-  specOp1.getResolveCtrl().replaceAllUsesWith(speculator.getResolveCtrl());
+  specOp1.getHistoryCtrl().replaceAllUsesWith(speculator.getHistoryCtrl());
 
   specOp1->erase();
   specOp2->erase();

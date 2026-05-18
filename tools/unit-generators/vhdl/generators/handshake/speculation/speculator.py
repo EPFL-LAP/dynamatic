@@ -935,9 +935,9 @@ entity {name} is
     ctrl_issue: out std_logic_vector(1 downto 0);
     ctrl_issue_valid: out std_logic;
     ctrl_issue_ready: in std_logic;
-    ctrl_resolve: out std_logic_vector(1 downto 0);
-    ctrl_resolve_valid: out std_logic;
-    ctrl_resolve_ready: in std_logic;
+    ctrl_history: out std_logic_vector(1 downto 0);
+    ctrl_history_valid: out std_logic;
+    ctrl_history_ready: in std_logic;
     ctrl_commit: out std_logic_vector(0 downto 0);
     ctrl_commit_valid: out std_logic;
     ctrl_commit_ready: in std_logic
@@ -1126,9 +1126,9 @@ begin
       resend_in_ready => resend_fork_outs_ready(2),
       no_cmp_in_valid => no_cmp_fork_outs_valid(2),
       no_cmp_in_ready => no_cmp_fork_outs_ready(2),
-      outs => ctrl_resolve,
-      outs_valid => ctrl_resolve_valid,
-      outs_ready => ctrl_resolve_ready
+      outs => ctrl_history,
+      outs_valid => ctrl_history_valid,
+      outs_ready => ctrl_history_ready
     );
 
   commit_dec0: entity work.{commit_dec_name}(arch)
@@ -1172,7 +1172,7 @@ def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signal
             "bitwidth": 2,
             "extra_signals": {}
         }, {
-            "name": "ctrl_resolve",
+            "name": "ctrl_history",
             "bitwidth": 2,
             "extra_signals": {}
         }, {
@@ -1181,5 +1181,5 @@ def _generate_speculator_signal_manager(name, bitwidth, fifo_depth, extra_signal
             "extra_signals": {}
         }],
         extra_signals_without_spec,
-        ["ctrl_issue", "ctrl_resolve", "ctrl_commit"],
+        ["ctrl_issue", "ctrl_history", "ctrl_commit"],
         lambda name: _generate_speculator(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))

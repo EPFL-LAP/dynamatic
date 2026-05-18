@@ -1365,8 +1365,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   AllTypesMatch<["dataIn", "dataOut"]>,
   IsSimpleHandshake<"issueCtrl">,
   IsIntSizedChannel<2, "issueCtrl">,
-  IsSimpleHandshake<"resolveCtrl">,
-  IsIntSizedChannel<2, "resolveCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
@@ -1378,14 +1378,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     the correctness of its speculation.
 
     It exposes three control outputs: $issueCtrl (begin vs resend,
-    broadcast to save_commits), $resolveCtrl (resolve, broadcast to
+    broadcast to save_commits), $historyCtrl (resolve, broadcast to
     save_commits), and $commitCtrl (PASS vs KILL, routed through the
     speculative region's branches to reach the correct commits).
 
     Example:
 
     ```mlir
-    %dataOut, %issueCtrl, %resolveCtrl, %commitCtrl
+    %dataOut, %issueCtrl, %historyCtrl, %commitCtrl
       = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
         <i1>, <i1>, <i1>
     ```
@@ -1396,12 +1396,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                        UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
                       ChannelType:$issueCtrl,
-                      ChannelType:$resolveCtrl,
+                      ChannelType:$historyCtrl,
                       ChannelType:$commitCtrl);
 
   let assemblyFormat = [{
     `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
-    type($dataOut) `,` type($issueCtrl) `,` type($resolveCtrl) `,`
+    type($dataOut) `,` type($issueCtrl) `,` type($historyCtrl) `,`
     type($commitCtrl)
   }];
 
@@ -1430,7 +1430,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
       case 1:
         return "ctrl_issue";
       case 2:
-        return "ctrl_resolve";
+        return "ctrl_history";
       default:
         return "ctrl_commit";
       }
@@ -1453,8 +1453,8 @@ def SpecPreBufferOp1 : Handshake_Op<"spec_prebuffer1", [
   HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"issueCtrl">,
   IsIntSizedChannel<2, "issueCtrl">,
-  IsSimpleHandshake<"resolveCtrl">,
-  IsIntSizedChannel<2, "resolveCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
 ]> {
   let summary = "";
   let description = [{
@@ -1464,11 +1464,11 @@ def SpecPreBufferOp1 : Handshake_Op<"spec_prebuffer1", [
                        UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
                       ChannelType:$issueCtrl,
-                      ChannelType:$resolveCtrl);
+                      ChannelType:$historyCtrl);
 
   let assemblyFormat = [{
     `[` $trigger `]` attr-dict `:` type($trigger) `,`
-    type($dataOut) `,` type($issueCtrl) `,` type($resolveCtrl)
+    type($dataOut) `,` type($issueCtrl) `,` type($historyCtrl)
   }];
 
   // Infer the type of the control signals
@@ -1640,10 +1640,10 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"issueIn">,
-  IsIntSizedChannel<2, "issueIn">,
-  IsSimpleHandshake<"resolveIn">,
-  IsIntSizedChannel<2, "resolveIn">,
+  IsSimpleHandshake<"issueCtrl">,
+  IsIntSizedChannel<2, "issueCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
   DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
@@ -1654,22 +1654,22 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     a copy of them.
 
     Two control inputs broadcast from the speculator:
-    $issueIn (begin vs resend, 1-bit payload) triggers issuing on outs;
-    $resolveIn (resolve) advances Head independently of outs_ready.
+    $issueCtrl (begin vs resend, 1-bit payload) triggers issuing on outs;
+    $historyCtrl (resolve) advances Head independently of outs_ready.
 
     Example:
 
     ```mlir
-    %dataOut = spec_save_commit[%issueIn, %resolveIn] %dataIn : i11
+    %dataOut = spec_save_commit[%issueCtrl, %historyCtrl] %dataIn : i11
     ```
   }];
   let arguments = (ins HandshakeType:$dataIn,
-                       ChannelType:$issueIn,
-                       ChannelType:$resolveIn,
+                       ChannelType:$issueCtrl,
+                       ChannelType:$historyCtrl,
                        UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
-    `[` $issueIn `,` $resolveIn `]` $dataIn attr-dict `:` type($dataIn) `,` type($issueIn) `,` type($resolveIn)
+    `[` $issueCtrl `,` $historyCtrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($issueCtrl) `,` type($historyCtrl)
   }];
 
   let extraClassDefinition = [{
@@ -1678,7 +1678,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
       switch (idx) {
       case 0: return "ins";
       case 1: return "ctrl_issue";
-      default: return "ctrl_resolve";
+      default: return "ctrl_history";
       }
     }
 

@@ -74,7 +74,7 @@ private:
   /// signal.
   LogicalResult placeCommits();
 
-  /// Generate the save-commit control path and place save-commit units.
+  /// Place save-commit units and connect directly to speculator
   LogicalResult placeSaveCommits();
 
   /// Adds a spec tag to the operand/result types in the speculative region.
@@ -367,11 +367,17 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
   OpBuilder builder(&getContext());
 
   // Save-Commits receive two control inputs from the Speculator:
-  // issueCtrl (begin vs resend) and resolveCtrl (resolve). Both are broadcast
-  // from the speculator to all save-commits via the standard fan-out pattern.
-  // Save-commits no longer carry a commitCtrl input — KILLs reach commits only.
+  // issueCtrl and historyCtrl 
+  // Both connect directly from the speculator to the save-commit
+  // with no routing.
+  // The first controls issuing tokens from the save-commit
+  // The second controls updating the save-commits internal memory
+  // If the speculator wishes to take an action which affects both
+  // both are sent simultaneously from the speculator
+  // and consumed simultaneously from the save-commit
+  // to ensure each atomic action is processed correctly
   Value issueCtrl = specOp1.getIssueCtrl();
-  Value resolveCtrl = specOp1.getResolveCtrl();
+  Value historyCtrl = specOp1.getHistoryCtrl();
 
   // Get the specified FIFO depth
   unsigned fifoDepth = placements.getSaveCommitsFifoDepth();
@@ -387,12 +393,14 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
     // Create and connect the new Operation
     builder.setInsertionPoint(dstOp);
     
-    // resultType is tentative and will be updated in the addSpecTag algorithm
-    // later.
+    // resultType is tentative 
+    // since we place the save-commit before we mark 
+    // where the spec tag is needed
+    // and so will be updated later
     SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
         dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-        /*dataIn=*/srcOpResult, /*issueIn=*/issueCtrl,
-        /*resolveIn=*/resolveCtrl,
+        /*dataIn=*/srcOpResult, /*issueCtrl=*/issueCtrl,
+        /*historyCtrl=*/historyCtrl,
         /*fifoDepth=*/fifoDepth);
     inheritBB(dstOp, newOp);
 

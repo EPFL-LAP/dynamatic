@@ -30,9 +30,9 @@ entity {name} is
     ctrl_issue : in std_logic_vector(1 downto 0);
     ctrl_issue_valid : in std_logic;
     ctrl_issue_ready : out std_logic;
-    ctrl_resolve : in std_logic_vector(1 downto 0);
-    ctrl_resolve_valid : in std_logic;
-    ctrl_resolve_ready : out std_logic;
+    ctrl_history : in std_logic_vector(1 downto 0);
+    ctrl_history_valid : in std_logic;
+    ctrl_history_ready : out std_logic;
     outs_ready : in std_logic;
     {data(f"outs : out std_logic_vector({bitwidth} - 1 downto 0);", bitwidth)}
     outs_valid : out std_logic;
@@ -89,9 +89,9 @@ begin
   issue_is_resend  <= ctrl_issue_valid when ctrl_issue = "01" else '0';
   issue_is_no_cmp  <= ctrl_issue_valid when ctrl_issue = "10" else '0';
 
-  resolve_is_resolve <= ctrl_resolve_valid when ctrl_resolve = "00" else '0';
-  resolve_is_resend  <= ctrl_resolve_valid when ctrl_resolve = "01" else '0';
-  resolve_is_no_cmp  <= ctrl_resolve_valid when ctrl_resolve = "10" else '0';
+  resolve_is_resolve <= ctrl_history_valid when ctrl_history = "00" else '0';
+  resolve_is_resend  <= ctrl_history_valid when ctrl_history = "01" else '0';
+  resolve_is_no_cmp  <= ctrl_history_valid when ctrl_history = "10" else '0';
 
   -----------------------------
 
@@ -139,7 +139,7 @@ begin
     {data("outs <= Memory(Head);", bitwidth)}
     outs_spec <= "0";
     ctrl_issue_ready <= '0';
-    ctrl_resolve_ready <= '0';
+    ctrl_history_ready <= '0';
 
     -- if we want to speculate
     if do_spec = '1' then
@@ -187,7 +187,7 @@ begin
     -- now for simplicity
     if do_cmp_correct = '1' then
         -- accept control if head is behind curr
-        ctrl_resolve_ready <= head_behind_curr;
+        ctrl_history_ready <= head_behind_curr;
 
         HeadEn <= head_behind_curr;
     end if;
@@ -197,7 +197,7 @@ begin
     if do_resend = '1' then
       -- accept control if consumer is ready
       ctrl_issue_ready <= outs_ready;
-      ctrl_resolve_ready <= outs_ready;
+      ctrl_history_ready <= outs_ready;
 
       -- data is valid to issue
       outs_valid <= '1';
@@ -215,7 +215,7 @@ begin
           -- can accept the control
           -- if the consumer is ready
           ctrl_issue_ready <= outs_ready;
-          ctrl_resolve_ready <= outs_ready;
+          ctrl_history_ready <= outs_ready;
 
           -- record the transfer if the consumer is ready
           CurrEn <= outs_ready;
@@ -231,7 +231,7 @@ begin
         -- can accept the control
         -- if the consumer is ready
         ctrl_issue_ready <= outs_ready;
-        ctrl_resolve_ready <= outs_ready;
+        ctrl_history_ready <= outs_ready;
 
         -- record the transfer if the consumer is ready
         CurrEn <= outs_ready;
@@ -385,7 +385,7 @@ def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_
             "name": "ctrl_issue",
             "bitwidth": 2
         }, {
-            "name": "ctrl_resolve",
+            "name": "ctrl_history",
             "bitwidth": 2
         }],
         [{
@@ -394,5 +394,5 @@ def _generate_spec_save_commit_signal_manager(name, bitwidth, fifo_depth, extra_
             "extra_signals": extra_signals
         }],
         extra_signals_without_spec,
-        ["ctrl_issue", "ctrl_resolve"],
+        ["ctrl_issue", "ctrl_history"],
         lambda name: _generate_spec_save_commit(name, bitwidth + extra_signals_bitwidth - 1, fifo_depth))
