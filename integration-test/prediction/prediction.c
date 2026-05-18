@@ -12,13 +12,14 @@ void prediction(inout_float_t a[N], inout_float_t b[N], in_float_t c) {
     default:
       y = x;
     }
-    /* 
+    /*
     if (y == 5.0f) {
       b[i] = (5.0f + c) * 10.0f;
     } else {
       b[i] = (y + c) * 10.0f;
-    } */ 
+    } */
     b[i] = (y + c) * 10.0f;
+    a[i] = (y - c) * 10.0f;
   }
 }
 

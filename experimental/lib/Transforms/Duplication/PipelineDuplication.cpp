@@ -43,6 +43,9 @@ struct PipelineDuplicationPass
 private:
   LogicalResult readFromJSON(const std::string &jsonPath, float &compVal,
                              std::string &opName);
+
+  void collectOpsDFS(mlir::Value currentVal,
+                     llvm::DenseSet<mlir::Operation *> &sliceOps);
 };
 
 } // namespace
@@ -92,6 +95,29 @@ LogicalResult PipelineDuplicationPass::readFromJSON(const std::string &jsonPath,
   return success();
 }
 
+void PipelineDuplicationPass::collectOpsDFS(
+    mlir::Value currentVal, llvm::DenseSet<mlir::Operation *> &sliceOps) {
+  for (mlir::OpOperand &use : currentVal.getUses()) {
+    mlir::Operation *user = use.getOwner();
+
+    // stop traversing if we hit memory operations or branches
+    // TODO: what else??
+    if (mlir::isa<mlir::memref::StoreOp, mlir::memref::LoadOp,
+                  mlir::BranchOpInterface>(user)) {
+      continue;
+    }
+
+    // attempt to insert into the DenseSet
+    // if (!visited)
+    if (sliceOps.insert(user).second) {
+      // Recursively traverse all outputs produced by this operation
+      for (mlir::Value result : user->getResults()) {
+        collectOpsDFS(result, sliceOps);
+      }
+    }
+  }
+}
+
 void PipelineDuplicationPass::runDynamaticPass() {
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
@@ -117,6 +143,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
   // create branch condition
   builder.setInsertionPointAfter(op);
+  // assume only the first result is relevant
   Value selectRes = op->getResult(0);
   Value constantComp = builder.create<mlir::arith::ConstantOp>(
       loc, builder.getFloatAttr(builder.getF32Type(), compVal));
@@ -126,6 +153,20 @@ void PipelineDuplicationPass::runDynamaticPass() {
   // restructure the blocks
   mlir::Block *exitBlock = currentBlock->splitBlock(
       Block::iterator(branchCond.getDefiningOp())->getNextNode());
+
+  // is there a better way than DFS + sorting?
+  // DFS starting from selectRes
+  llvm::DenseSet<mlir::Operation *> unorganizedOps;
+  collectOpsDFS(selectRes, unorganizedOps);
+
+  // iterate through the exitBlock to sort
+  llvm::SmallVector<mlir::Operation *> opsToMove;
+  for (mlir::Operation &blockOp : exitBlock->getOperations()) {
+    if (unorganizedOps.count(&blockOp)) {
+      opsToMove.push_back(&blockOp);
+    }
+  }
+
   mlir::Block *trueBlock = funcOp.addBlock();  // true path
   mlir::Block *falseBlock = funcOp.addBlock(); // false path
   // move the new blocks to right after currentBlock
@@ -140,53 +181,42 @@ void PipelineDuplicationPass::runDynamaticPass() {
                                          falseBlock);
 
   // TRUE PATH
-  // clone the necessary operations to here as well as the constant
+  // clone the necessary operations to here
   builder.setInsertionPointToStart(trueBlock);
-
-  // we only care about values derived from our starting operation
   mlir::IRMapping mapper;
   mapper.map(op->getResult(0), constantComp);
 
-  llvm::SmallVector<Operation *, 4> opsToMove;
-  Value lastClonedRes;
-  for (Operation &blockOp : exitBlock->getOperations()) {
-    // stop if we hit a store (or what else?)
-    // TODO: how does this end?
-    if (isa<mlir::memref::StoreOp, mlir::BranchOpInterface, mlir::arith::CmpFOp,
-            mlir::arith::CmpIOp>(blockOp)) {
-      break;
+  // do the actual cloning
+  for (mlir::Operation *origOp : opsToMove) {
+    mlir::Operation *cloned = builder.clone(*origOp, mapper);
+    std::string newName = namer.getName(origOp).str() + "_dup";
+    cloned->setAttr("handshake.name", builder.getStringAttr(newName));
+
+    for (unsigned i = 0; i < cloned->getNumResults(); ++i) {
+      mapper.map(origOp->getResult(i), cloned->getResult(i));
     }
+  }
 
-    // check if the op uses a value we are tracking
-    bool isDependent = llvm::any_of(blockOp.getOperands(), [&](Value operand) {
-      return mapper.contains(operand);
-    });
+  // track the connecting to output wires
+  llvm::SmallVector<mlir::Value> originalOutputs;
 
-    if (isDependent) {
-      opsToMove.push_back(&blockOp);
-      Operation *cloned = builder.clone(blockOp, mapper);
-      std::string newName = namer.getName(&blockOp).str() + "_dup";
-      cloned->setAttr("handshake.name", builder.getStringAttr(newName));
+  for (mlir::Operation *origOp : opsToMove) {
+    for (mlir::Value origRes : origOp->getResults()) {
+      // Determine if a value breaches the edge of our duplicated region
+      bool usedOutside =
+          llvm::any_of(origRes.getUsers(), [&](mlir::Operation *user) {
+            return std::find(opsToMove.begin(), opsToMove.end(), user) ==
+                   opsToMove.end();
+          });
 
-      // track the result of the cloned operation if it produces one
-      // what if it does not produce one?
-      if (cloned->getNumResults() > 0) {
-        lastClonedRes = cloned->getResult(0);
-      }
-
-      // track the new results so we can find the next operations in the chain
-      for (unsigned i = 0; i < cloned->getNumResults(); ++i) {
-        Value originalRes = blockOp.getResult(i);
-        Value clonedRes = cloned->getResult(i);
-
-        mapper.map(originalRes, clonedRes);
+      if (usedOutside || origRes.use_empty()) {
+        originalOutputs.push_back(origRes);
       }
     }
   }
 
-  llvm::errs() << "--- Mapper Contents ---\n";
-
   // Print Value mappings (Original Value -> Cloned Value)
+  llvm::errs() << "--- Mapper Contents ---\n";
   for (auto &pair : mapper.getValueMap()) {
     mlir::Value original = pair.first;
     mlir::Value cloned = pair.second;
@@ -195,24 +225,16 @@ void PipelineDuplicationPass::runDynamaticPass() {
     llvm::errs() << "  From: " << original << "\n";
     llvm::errs() << "  To:   " << cloned << "\n";
   }
-
-  // print mappings
-  for (auto &pair : mapper.getBlockMap()) {
-    mlir::Block *original = pair.first;
-    mlir::Block *cloned = pair.second;
-
-    llvm::errs() << "Block Mapping:\n";
-    original->printAsOperand(llvm::errs());
-    llvm::errs() << " -> ";
-    cloned->printAsOperand(llvm::errs());
-    llvm::errs() << "\n";
-  }
-
   llvm::errs() << "-----------------------\n";
 
+  llvm::SmallVector<Value> exitBlockArgs;
+  llvm::SmallVector<Value> trueBranchOperands;
+  for (Value origOut : originalOutputs) {
+    exitBlockArgs.push_back(exitBlock->addArgument(origOut.getType(), loc));
+    trueBranchOperands.push_back(mapper.lookup(origOut));
+  }
   builder.setInsertionPointToEnd(trueBlock);
-  Value exitBlockArg = exitBlock->addArgument(lastClonedRes.getType(), loc);
-  builder.create<mlir::cf::BranchOp>(loc, exitBlock, lastClonedRes);
+  builder.create<mlir::cf::BranchOp>(loc, exitBlock, trueBranchOperands);
 
   // FALSE PATH
   // move all of the stuff from above here
@@ -220,10 +242,16 @@ void PipelineDuplicationPass::runDynamaticPass() {
   for (Operation *origOp : opsToMove) {
     origOp->moveBefore(falseBlock, falseBlock->end());
   }
-  Value lastOrigRes = opsToMove.back()->getResult(0);
-  // make sure in the new block it maps to the correct value
-  lastOrigRes.replaceAllUsesWith(exitBlockArg);
-  builder.create<mlir::cf::BranchOp>(loc, exitBlock, lastOrigRes);
+  builder.setInsertionPointToEnd(falseBlock);
+  builder.create<mlir::cf::BranchOp>(loc, exitBlock, originalOutputs);
+
+  for (size_t i = 0; i < originalOutputs.size(); ++i) {
+    originalOutputs[i].replaceUsesWithIf(
+        exitBlockArgs[i], [&](OpOperand &operand) {
+          mlir::Block *userBlock = operand.getOwner()->getBlock();
+          return userBlock != trueBlock && userBlock != falseBlock;
+        });
+  }
 
   // Automatically run push-constants pass after duplication
   mlir::PassManager pm(ctx);
