@@ -217,13 +217,21 @@ TEST_P(SharingFixture, sharing_NoCI) {
 }
 
 TEST_P(SpecFixture, spec) {
-  const std::string &name = GetParam();
-  int simTime = -1;
-
-  EXPECT_EQ(runSpecIntegrationTest(name, simTime), true);
-
-  RecordProperty("cycles", std::to_string(simTime));
-  logPerformance(simTime);
+  IntegrationTestData config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useSpeculation = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(runIntegrationTest(config), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
 }
 
 // clang-format off

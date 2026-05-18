@@ -235,7 +235,7 @@ routeCommitControlRecursive(MLIRContext *ctx, SpecPreBufferOp2 &specOp,
             /*trueResultType=*/conditionOperand.getType(),
             /*falseResultType=*/conditionOperand.getType(),
             /*specTag=*/valueForSpecTag, conditionOperand);
-        inheritBB(valueForSpecTag.getDefiningOp(), *branchDiscardNonSpec);
+        inheritBB(branchOp, *branchDiscardNonSpec);
       }
 
       std::optional<ConditionalBranchOp> branchReplicated =
