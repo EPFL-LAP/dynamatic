@@ -77,33 +77,6 @@ FailureOr<SpecOps> getSpecOps(ModuleOp modOp) {
   return SpecOps{funcOp, *op1Range.begin(), *op2Range.begin()};
 }
 
-Operation *getUserSkippingBuffers(Value val) {
-  Operation *uniqueUser = *val.getUsers().begin();
-  if (auto bufOp = dyn_cast<BufferOp>(uniqueUser)) {
-    return getUserSkippingBuffers(bufOp.getResult());
-  }
-  return uniqueUser;
-}
-
-FailureOr<handshake::ConditionalBranchOp>
-findControlBranch(FuncOp funcOp, unsigned bb) {
-  for (auto condBrOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
-    if (auto brBB = getLogicBB(condBrOp); !brBB || brBB != bb)
-      continue;
-
-    for (Value result : condBrOp->getResults()) {
-      for (Operation *user : result.getUsers()) {
-        if (isBackedge(result, user))
-          return condBrOp;
-      }
-    }
-  }
-
-  return failure();
-}
-
-
-
 /// Stores in a do-while loop have commit units before them,
 /// but the values in iteration 0 are non-speculative,
 /// and so pass through the commit without any control signal.
@@ -187,15 +160,6 @@ FailureOr<SpeculatorOp> coalesceSpecOps(FuncOp funcOp,
   return speculator;
 }
 
-LogicalResult placeAdditionalBuffers(FuncOp funcOp,
-                                            SpeculatorOp speculator) {
-  // solve underbuffering of cross iteration joining
-  // at commits on stores in do-while loops
-  bufferCommitCtrl(funcOp, speculator);
-
-  return success();
-}
-
 void HandshakeSpecPostBufferPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
@@ -218,8 +182,9 @@ void HandshakeSpecPostBufferPass::runDynamaticPass() {
   if (failed(speculator))
     return signalPassFailure();
 
-  if (failed(placeAdditionalBuffers(funcOp, *speculator)))
-    return signalPassFailure();
+  // solve underbuffering of cross iteration joining
+  // at commits on stores in do-while loops
+  bufferCommitCtrl(funcOp, *speculator);
 }
 
 } // namespace
