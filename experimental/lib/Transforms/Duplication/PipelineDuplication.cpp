@@ -117,21 +117,23 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
   // create branch condition
   builder.setInsertionPointAfter(op);
-  // TODO: get this info from the json file? or other
   Value selectRes = op->getResult(0);
-
   Value constantComp = builder.create<mlir::arith::ConstantOp>(
       loc, builder.getFloatAttr(builder.getF32Type(), compVal));
-
   Value branchCond = builder.create<mlir::arith::CmpFOp>(
       loc, mlir::arith::CmpFPredicate::OEQ, selectRes, constantComp);
 
   // restructure the blocks
-  // TODO: splitblock maybe works differently for other operations
   mlir::Block *exitBlock = currentBlock->splitBlock(
       Block::iterator(branchCond.getDefiningOp())->getNextNode());
   mlir::Block *trueBlock = funcOp.addBlock();  // true path
   mlir::Block *falseBlock = funcOp.addBlock(); // false path
+  // move the new blocks to right after currentBlock
+  auto &blockList = funcOp.getBody().getBlocks();
+  blockList.splice(std::next(currentBlock->getIterator()), blockList,
+                   trueBlock->getIterator());
+  blockList.splice(std::next(trueBlock->getIterator()), blockList,
+                   falseBlock->getIterator());
 
   builder.setInsertionPointToEnd(currentBlock);
   builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueBlock,
@@ -150,7 +152,8 @@ void PipelineDuplicationPass::runDynamaticPass() {
   for (Operation &blockOp : exitBlock->getOperations()) {
     // stop if we hit a store (or what else?)
     // TODO: how does this end?
-    if (isa<mlir::memref::StoreOp, mlir::BranchOpInterface>(blockOp)) {
+    if (isa<mlir::memref::StoreOp, mlir::BranchOpInterface, mlir::arith::CmpFOp,
+            mlir::arith::CmpIOp>(blockOp)) {
       break;
     }
 
@@ -166,7 +169,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
       cloned->setAttr("handshake.name", builder.getStringAttr(newName));
 
       // track the result of the cloned operation if it produces one
-      // TODO: what if it does not produce one?
+      // what if it does not produce one?
       if (cloned->getNumResults() > 0) {
         lastClonedRes = cloned->getResult(0);
       }
