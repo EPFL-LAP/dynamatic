@@ -1,7 +1,6 @@
 {
   "splitoperation": {
-    "operation-name": "select0",
-    "operand-type": "SelectOp"
+    "operation-name": "select0"
   },
   "compVal": 7
 }

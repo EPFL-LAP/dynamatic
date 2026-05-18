@@ -45,7 +45,6 @@ F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
-F_CF_TRANSFORMED_CUSTOM = "$COMP_DIR/cf_transformed_custom.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
@@ -231,7 +230,7 @@ if [[ $DISABLE_LSQ -ne 0 ]]; then
     "Forced usage of MC interface in cf"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
-    --pipeline-duplication="json-path=$DYNAMATIC_DIR/integration-test/prediction/pred.json" \
+    --pipeline-duplication="json-path=$DYNAMATIC_DIR/integration-test/sparse/pred.json" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
