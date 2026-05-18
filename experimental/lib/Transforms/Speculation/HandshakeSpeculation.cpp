@@ -787,25 +787,6 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
-
-  // Quick fix: branchDiscardCondNonspec's operands must be the loop condition
-  // The real loop condition only turns out after the placement of speculative
-  // units (Speculator or save-commit unit may produce this)
-  handshake::FuncOp funcOp = specOp1->getParentOfType<handshake::FuncOp>();
-  for (auto branch : funcOp.getOps<handshake::SpeculatingBranchOp>()) {
-    if (branch->getAttr("specv1_branchDiscardCondNonSpec")) {
-      unsigned bb = getLogicBB(specOp1).value();
-      ConditionalBranchOp controlBranch = findControlBranch(funcOp, bb);
-      if (controlBranch == nullptr) {
-        specOp1->emitError()
-            << "Could not find backedge within speculation bb.\n";
-        return signalPassFailure();
-      }
-      auto conditionOperand = controlBranch.getConditionOperand();
-      branch->setOperand(0, conditionOperand);
-      branch->setOperand(1, conditionOperand);
-    }
-  }
 }
 
 } // namespace
