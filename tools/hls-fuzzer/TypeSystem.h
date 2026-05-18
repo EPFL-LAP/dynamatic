@@ -256,6 +256,9 @@ private:
 /// It primarily differs from 'TransferFn' in that it receives a fully
 /// constructed instance of 'ASTNode' rather than subelements and is always
 /// executed last.
+///
+/// There is no way for a 'TransferFn' to receive the final fully constructed
+/// 'ASTNode' necessitating this being a separate class.
 template <typename ASTNode>
 class OutputTransferFn {
 public:
