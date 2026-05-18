@@ -20,7 +20,8 @@ DISABLE_LSQ=${10}
 FAST_TOKEN_DELIVERY=${11}
 MILP_SOLVER=${12}
 STRAIGHT_TO_QUEUE=${13}
-ENABLE_SHORT_CIRCUIT=${14}
+SPECULATION=${14}
+ENABLE_SHORT_CIRCUIT=${15}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -301,6 +302,25 @@ else
     "Applied transformations to handshake"
 fi
 
+# Speculation (pre-buffer): canonicalize, then place speculative units.
+if [[ "$SPECULATION" == "1" ]]; then
+  F_HANDSHAKE_CANONICALIZED="$COMP_DIR/handshake_canonicalized.mlir"
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-canonicalize \
+    > "$F_HANDSHAKE_CANONICALIZED"
+  exit_on_fail "Failed to canonicalize for speculation" \
+    "Canonicalized for speculation"
+
+  F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CANONICALIZED" \
+    --handshake-speculation \
+    --handshake-materialize \
+    --handshake-canonicalize \
+    > "$F_HANDSHAKE_SPECULATION"
+  exit_on_fail "Failed to add speculative units" "Added speculative units"
+  F_HANDSHAKE_TRANSFORMED="$F_HANDSHAKE_SPECULATION"
+fi
+
 # Credit-based sharing
 if [[ $USE_SHARING -ne 0 ]]; then
   # NOTE: to use this in dynamatic-opt, do ${SHARING_PASS:+"$SHARING_PASS"} to
@@ -353,6 +373,17 @@ else
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
+fi
+
+# Speculation (post-buffer): coalesce speculative units, rewire commit ctrl.
+if [[ "$SPECULATION" == "1" ]]; then
+  F_HANDSHAKE_SPEC_POST_BUFFER="$COMP_DIR/handshake_spec_post_buffer.mlir"
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+    --handshake-spec-post-buffer \
+    --handshake-materialize \
+    > "$F_HANDSHAKE_SPEC_POST_BUFFER"
+  exit_on_fail "Failed spec post-buffering" "Spec post-buffering done"
+  F_HANDSHAKE_BUFFERED="$F_HANDSHAKE_SPEC_POST_BUFFER"
 fi
 
 # handshake canonicalization
