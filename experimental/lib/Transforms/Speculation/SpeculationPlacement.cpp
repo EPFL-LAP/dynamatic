@@ -89,8 +89,24 @@ SpeculationPlacements::getPlacements<handshake::SpecSaveCommitOp>() {
 
 
 LogicalResult
-SpeculationPlacements::readFromAttribute(mlir::Operation *producer,
+SpeculationPlacements::readFromAttribute(mlir::ModuleOp modOp,
                                          SpeculationPlacements &placements) {
+  llvm::SmallVector<mlir::Operation *, 2> markedOps;
+  modOp.walk([&](mlir::Operation *op) {
+    if (op->hasAttr("dynamatic.speculate"))
+      markedOps.push_back(op);
+  });
+  if (markedOps.empty()) {
+    modOp.emitError() << "no op carries the `dynamatic.speculate` attribute";
+    return failure();
+  }
+  if (markedOps.size() > 1) {
+    modOp.emitError() << "more than one op carries the `dynamatic.speculate` "
+                         "attribute; only one speculator is supported";
+    return failure();
+  }
+  mlir::Operation *producer = markedOps.front();
+
   auto dictAttr = producer->getAttrOfType<mlir::DictionaryAttr>(
       "dynamatic.speculate");
   if (!dictAttr) {

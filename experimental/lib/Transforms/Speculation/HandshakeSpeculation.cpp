@@ -372,13 +372,21 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
   // Save-commits no longer carry a commitCtrl input — KILLs reach commits only.
   Value issueCtrl = specOp1.getIssueCtrl();
   Value resolveCtrl = specOp1.getResolveCtrl();
+
+  // Get the specified FIFO depth
   unsigned fifoDepth = placements.getSaveCommitsFifoDepth();
+  if (fifoDepth == 0) {
+    llvm::errs() << "Save Commit FIFO depth cannot be 0\n";
+    return failure();
+  }
 
   for (OpOperand *operand : placements.getPlacements<SpecSaveCommitOp>()) {
     Operation *dstOp = operand->getOwner();
     Value srcOpResult = operand->get();
 
+    // Create and connect the new Operation
     builder.setInsertionPoint(dstOp);
+    
     // resultType is tentative and will be updated in the addSpecTag algorithm
     // later.
     SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
@@ -461,7 +469,10 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   Value srcOpResult = operand.get();
 
   handshake::FuncOp funcOp = dstOp->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "op should have parent function");
+  if (!funcOp) {
+    dstOp->emitError("Op should have parent function.");
+    return failure();
+  }
 
   // Get the BB number of the operation safely
   std::optional<unsigned> targetBB = getLogicBB(dstOp);
@@ -483,7 +494,8 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   // Get the specified FIFO depth
   unsigned fifoDepth = placements.getSpeculatorFifoDepth();
   if (fifoDepth == 0) {
-    llvm_unreachable("Speculator FIFO depth cannot be 0");
+    llvm::errs() << "Speculator FIFO depth cannot be 0\n";
+    return failure();
   }
 
   // resultType is tentative and will be updated in the addSpecTag algorithm
@@ -736,21 +748,7 @@ LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
 void HandshakeSpeculationPass::runDynamaticPass() {
   mlir::ModuleOp modOp = getOperation();
 
-  llvm::SmallVector<mlir::Operation *, 2> markedOps;
-  modOp.walk([&](mlir::Operation *op) {
-    if (op->hasAttr("dynamatic.speculate"))
-      markedOps.push_back(op);
-  });
-  if (markedOps.empty())
-    return;
-  if (markedOps.size() > 1) {
-    modOp.emitError() << "more than one op carries the `dynamatic.speculate` "
-                         "attribute; only one speculator is supported";
-    return signalPassFailure();
-  }
-
-  if (failed(SpeculationPlacements::readFromAttribute(markedOps.front(),
-                                                      this->placements)))
+  if (failed(SpeculationPlacements::readFromAttribute(modOp, this->placements)))
     return signalPassFailure();
 
   PlacementFinder finder(this->placements);
@@ -808,7 +806,6 @@ void HandshakeSpeculationPass::runDynamaticPass() {
       branch->setOperand(1, conditionOperand);
     }
   }
-
 }
 
 } // namespace

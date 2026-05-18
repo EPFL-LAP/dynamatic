@@ -57,7 +57,7 @@ public:
   /// Set the speculator position from a `dynamatic.speculate` dict attribute
   /// on the given producer op. Sets both speculatorFifoDepth and
   /// saveCommitsFifoDepth from the attribute's `max_predictions` entry.
-  static LogicalResult readFromAttribute(mlir::Operation *producerOp,
+  static LogicalResult readFromAttribute(mlir::ModuleOp modOp,
                                          SpeculationPlacements &place);
 
   /// Explicitly set the speculator position
