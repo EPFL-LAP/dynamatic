@@ -232,7 +232,6 @@ if [[ $DISABLE_LSQ -ne 0 ]]; then
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
     --pipeline-duplication="json-path=$DYNAMATIC_DIR/integration-test/prediction/pred.json" \
-    --push-constants \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \

@@ -1,6 +1,7 @@
 // Include some other useful headers.
 #include "dynamatic/Analysis/NameAnalysis.h" // needed
 #include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -104,22 +105,20 @@ void PipelineDuplicationPass::runDynamaticPass() {
     return signalPassFailure();
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
-  Operation *rawOp = namer.getOp(opName);
-  if (!rawOp) {
+  Operation *op = namer.getOp(opName);
+  if (!op) {
     llvm::errs() << "No operation named " << opName << " exists\n";
     return signalPassFailure();
   }
-  // TODO: make this mlir::arith::xxx changeable
-  auto op = dyn_cast<mlir::arith::SelectOp>(rawOp);
   mlir::Block *currentBlock = op->getBlock();
   mlir::func::FuncOp funcOp =
       dyn_cast<mlir::func::FuncOp>(currentBlock->getParentOp());
-  Location loc = op.getLoc();
+  Location loc = op->getLoc();
 
   // create branch condition
   builder.setInsertionPointAfter(op);
   // TODO: get this info from the json file? or other
-  Value selectRes = op.getResult();
+  Value selectRes = op->getResult(0);
 
   Value constantComp = builder.create<mlir::arith::ConstantOp>(
       loc, builder.getFloatAttr(builder.getF32Type(), compVal));
@@ -141,17 +140,10 @@ void PipelineDuplicationPass::runDynamaticPass() {
   // TRUE PATH
   // clone the necessary operations to here as well as the constant
   builder.setInsertionPointToStart(trueBlock);
-  Value newConstant = builder.create<mlir::arith::ConstantOp>(
-      loc, builder.getFloatAttr(builder.getF32Type(), compVal));
 
+  // we only care about values derived from our starting operation
   mlir::IRMapping mapper;
-  // we only care about values derived from our starting operation which in
-  // this hardcoded case is the selectop
-  llvm::DenseSet<Value> trackedValues;
-  for (Value res : op->getResults()) {
-    trackedValues.insert(res);
-    mapper.map(res, newConstant);
-  }
+  mapper.map(op->getResult(0), constantComp);
 
   llvm::SmallVector<Operation *, 4> opsToMove;
   Value lastClonedRes;
@@ -164,31 +156,26 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
     // check if the op uses a value we are tracking
     bool isDependent = llvm::any_of(blockOp.getOperands(), [&](Value operand) {
-      return trackedValues.count(operand);
+      return mapper.contains(operand);
     });
 
     if (isDependent) {
       opsToMove.push_back(&blockOp);
       Operation *cloned = builder.clone(blockOp, mapper);
-      llvm::StringRef originalName = namer.getName(&blockOp);
-      std::string newName = originalName.str() + "_dup";
-      cloned->setAttr("handshake.name",
-                      builder.getStringAttr(originalName.str() + "_dup"));
+      std::string newName = namer.getName(&blockOp).str() + "_dup";
+      cloned->setAttr("handshake.name", builder.getStringAttr(newName));
 
       // track the result of the cloned operation if it produces one
+      // TODO: what if it does not produce one?
       if (cloned->getNumResults() > 0) {
         lastClonedRes = cloned->getResult(0);
       }
 
       // track the new results so we can find the next operations in the chain
-      for (auto it : llvm::enumerate(cloned->getResults())) {
-        size_t index = it.index();
-        Value clonedRes = it.value();
-        Value originalRes = blockOp.getResult(index);
+      for (unsigned i = 0; i < cloned->getNumResults(); ++i) {
+        Value originalRes = blockOp.getResult(i);
+        Value clonedRes = cloned->getResult(i);
 
-        // track the original result so we can find its users later in the
-        // block
-        trackedValues.insert(originalRes);
         mapper.map(originalRes, clonedRes);
       }
     }
@@ -228,13 +215,16 @@ void PipelineDuplicationPass::runDynamaticPass() {
   // move all of the stuff from above here
   builder.setInsertionPointToStart(falseBlock);
   for (Operation *origOp : opsToMove) {
-    llvm::errs() << "Moving op: ";
-    origOp->print(llvm::errs());
-    llvm::errs() << "\n";
     origOp->moveBefore(falseBlock, falseBlock->end());
   }
   Value lastOrigRes = opsToMove.back()->getResult(0);
   // make sure in the new block it maps to the correct value
   lastOrigRes.replaceAllUsesWith(exitBlockArg);
   builder.create<mlir::cf::BranchOp>(loc, exitBlock, lastOrigRes);
+
+  // Automatically run push-constants pass after duplication
+  mlir::PassManager pm(ctx);
+  pm.addPass(dynamatic::createPushConstants());
+  if (failed(pm.run(modOp)))
+    return signalPassFailure();
 }
