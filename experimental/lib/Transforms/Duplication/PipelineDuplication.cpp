@@ -42,6 +42,7 @@ struct PipelineDuplicationPass
 
 private:
   LogicalResult readFromJSON(const std::string &jsonPath, float &compVal,
+                             std::vector<float> &compValList,
                              std::string &opName);
 
   void collectOpsDFS(mlir::Value currentVal,
@@ -50,10 +51,9 @@ private:
 
 } // namespace
 
-// TODO: change compVal into list / integers?
-LogicalResult PipelineDuplicationPass::readFromJSON(const std::string &jsonPath,
-                                                    float &compVal,
-                                                    std::string &opName) {
+LogicalResult PipelineDuplicationPass::readFromJSON(
+    const std::string &jsonPath, float &compVal,
+    std::vector<float> &compValList, std::string &opName) {
 
   // Open the .json file
   std::ifstream inputFile(jsonPath);
@@ -92,6 +92,14 @@ LogicalResult PipelineDuplicationPass::readFromJSON(const std::string &jsonPath,
     }
   }
 
+  if (const llvm::json::Array *parsedArray = rootObj->getArray("compValList")) {
+    for (const llvm::json::Value &element : *parsedArray) {
+      if (auto num = element.getAsNumber()) {
+        compValList.push_back(static_cast<float>(*num));
+      }
+    }
+  }
+
   return success();
 }
 
@@ -103,7 +111,7 @@ void PipelineDuplicationPass::collectOpsDFS(
     // stop traversing if we hit memory operations or branches
     // TODO: what else??
     if (mlir::isa<mlir::memref::StoreOp, mlir::memref::LoadOp,
-                  mlir::BranchOpInterface>(user)) {
+                  mlir::BranchOpInterface, mlir::func::ReturnOp>(user)) {
       continue;
     }
 
@@ -125,11 +133,13 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
   // Find select0 operation
   float compVal;
+  std::vector<float> compValList;
   std::string opName;
   if (failed(PipelineDuplicationPass::readFromJSON(this->jsonPath, compVal,
-                                                   opName)))
+                                                   compValList, opName)))
     return signalPassFailure();
 
+  llvm::errs() << "COMPVALLIST: " << compValList[0] << '\n';
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   Operation *op = namer.getOp(opName);
   if (!op) {
