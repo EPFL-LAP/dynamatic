@@ -36,6 +36,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace dynamatic {
+struct SimpleCycle;
 struct SynchronizingCyclePair;
 class SynchronizingCyclesFinderGraph;
 
