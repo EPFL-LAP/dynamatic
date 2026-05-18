@@ -16,11 +16,9 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DynamaticPass.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Visitors.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "handshake-inactivate-deps"
 
@@ -87,9 +85,8 @@ static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
         if (!dep.getIsActive())
           continue;
         auto storeOp = storesByName.at(dep.getDstAccess());
-        opDeps[loadOp].push_back(isStoreGIIDOnLoad(loadOp, storeOp, cfg)
-                                     ? dep.asInactive()
-                                     : dep);
+        opDeps[loadOp].push_back(
+            isStoreGIIDOnLoad(loadOp, storeOp, cfg) ? dep.asInactive() : dep);
       }
     }
   }
@@ -102,11 +99,10 @@ static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps,
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
       StringRef storeName = getUniqueName(storeOp);
       for (MemDependenceAttr dep : deps.getDependencies()) {
-        if (!dep.getIsActive())
+        if (dep.getIsActive())
           continue;
-        opDeps[storeOp].push_back(storeName == dep.getDstAccess()
-                                      ? dep.asInactive()
-                                      : dep);
+        opDeps[storeOp].push_back(
+            storeName == dep.getDstAccess() ? dep.asInactive() : dep);
       }
     }
   }

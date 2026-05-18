@@ -98,8 +98,9 @@ void HandshakeAnalyzeLSQUsagePass::analyzeFunction(handshake::FuncOp funcOp) {
   }
 }
 
-/// Given a set of operations, returns a mapping from each operation to a boolean indicating whether it is
-/// involved in at least one active dependency with another operation 
+/// Given a set of operations, returns a mapping from each operation to a
+/// boolean indicating whether it is involved in at least one active dependency
+/// with another operation
 static DenseMap<Operation *, bool>
 markOpsWithActiveDependencies(DenseSet<Operation *> &accessOps) {
   DenseMap<Operation *, bool> hasActiveDep;
@@ -173,7 +174,8 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
     }
   }
 
-  DenseMap<Operation *, bool> isLSQPort = markOpsWithActiveDependencies(lsqAccessOps);
+  DenseMap<Operation *, bool> isLSQPort =
+      markOpsWithActiveDependencies(lsqAccessOps);
 
   for (Operation *accessOp : lsqAccessOps) {
     if (isLSQPort.at(accessOp))
@@ -181,5 +183,4 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
     else
       setDialectAttr<MemInterfaceAttr>(accessOp, ctx);
   }
-
 }
