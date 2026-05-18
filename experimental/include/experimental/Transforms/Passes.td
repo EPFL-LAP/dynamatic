@@ -50,10 +50,12 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
       Speculator placement is driven by a `dynamatic.speculate` dictionary
       attribute on a single producer op (typically the loop-continuation
       predicate), carrying `max_predictions : i32` and `style : str`.
-      The attribute is emitted by the SpeculatePlugin clang plugin from
-      `#pragma DYN speculate variable=...`. Save / Commit / SaveCommit
-      placements are auto-found from the speculator position. If no op
-      carries the attribute, the pass is a no-op.
+      The attribute is created based on a speculate pragma in the 
+      C source code.
+      The pass requires the attribute to be present, and so should only 
+      be called on kernels which contain a speculate pragma.
+      Save / Commit / SaveCommit placements are auto-found 
+      from the speculator position. 
   }];
   let options = [];
 }
