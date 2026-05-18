@@ -126,6 +126,13 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
   ];
 }
 
+def HandshakeInactivateDeps : DynamaticPass<"handshake-inactivate-deps"> {
+  let summary = "Inactivates memory dependences that do not need to be enforced";
+  let description = [{
+    # TODO: write description
+  }];
+}
+
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{
