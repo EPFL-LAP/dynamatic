@@ -38,16 +38,25 @@ enum DataflowGraphEdgeType {
 };
 
 struct DataflowGraphNode {
-  mlir::Operation *op; // <-- The underlying Operation (null if it's the
-                       // synthetic start fork).
+  enum NodeType {
+    REGULAR,
+    /// Analysis-only fork node (not present in IR) that fans out control starts
+    /// for latency/occupancy balancing.
+    SYNTHETIC_FORK,
+    SYNTHETIC_JOIN
+  };
+
+  mlir::Operation *op; // <-- The underlying Operation (null for synthetic
+                       // nodes).
   NodeIdType id; // <-- Unique id in the nodes vector to help with traversal.
-  /// Analysis-only fork node (not present in IR) that fans out control starts
-  /// for latency/occupancy balancing.
-  bool isSyntheticStartFork = false;
+  NodeType type;
 
   DataflowGraphNode(mlir::Operation *op, NodeIdType id,
-                    bool syntheticStartFork = false)
-      : op(op), id(id), isSyntheticStartFork(syntheticStartFork) {}
+                    NodeType type = NodeType::REGULAR)
+      : op(op), id(id), type(type) {
+    if (type == NodeType::REGULAR)
+      assert(op != nullptr && "REGULAR nodes must have a non-null operation");
+  }
 };
 
 struct DataflowGraphEdge {
@@ -95,9 +104,11 @@ struct DataflowSubgraphBase {
   std::vector<llvm::SmallVector<EdgeIdType, 4>> adjList;
   std::vector<llvm::SmallVector<EdgeIdType, 4>> revAdjList;
 
-  NodeIdType addNode(mlir::Operation *op, bool syntheticStartFork = false) {
+  NodeIdType addNode(mlir::Operation *op,
+                     DataflowGraphNode::NodeType type =
+                         DataflowGraphNode::NodeType::REGULAR) {
     NodeIdType id = nodes.size();
-    nodes.emplace_back(op, id, syntheticStartFork);
+    nodes.emplace_back(op, id, type);
     adjList.emplace_back();
     revAdjList.emplace_back();
     return nodes.size() - 1;
@@ -198,7 +209,7 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
 class CFGTransitionSequenceSubgraph : public DataflowSubgraphBase {
 public:
   bool isForkNode(NodeIdType nodeId) const override {
-    if (nodes[nodeId].isSyntheticStartFork)
+    if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
       return true;
     return mlir::isa_and_nonnull<handshake::ForkOp, handshake::LazyForkOp,
                                  handshake::EagerForkLikeOpInterface>(
@@ -210,7 +221,7 @@ public:
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
     mlir::Operation *op = nodes[nodeId].op;
-    if (!op || nodes[nodeId].isSyntheticStartFork)
+    if (!op || nodes[nodeId].type != DataflowGraphNode::REGULAR)
       return false;
     if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
       auto memOp = findMemInterface(storeOp.getAddressResult());
@@ -350,7 +361,7 @@ public:
   std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs();
 
   bool isForkNode(NodeIdType nodeId) const override {
-    if (nodes[nodeId].isSyntheticStartFork)
+    if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
       return true;
     return mlir::isa_and_nonnull<handshake::ForkOp, handshake::LazyForkOp,
                                  handshake::EagerForkLikeOpInterface>(
@@ -360,7 +371,7 @@ public:
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
     mlir::Operation *op = nodes[nodeId].op;
-    if (!op || nodes[nodeId].isSyntheticStartFork)
+    if (!op || nodes[nodeId].type != DataflowGraphNode::REGULAR)
       return false;
 
     if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {

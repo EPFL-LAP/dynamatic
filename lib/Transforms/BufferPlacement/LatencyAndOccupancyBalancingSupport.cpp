@@ -52,7 +52,7 @@ using namespace dynamatic::handshake;
 
 std::string
 CFGTransitionSequenceSubgraph::getNodeLabel(NodeIdType nodeId) const {
-  if (nodes[nodeId].isSyntheticStartFork)
+  if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
     return "synthetic_start_fork\\nStep: " +
            std::to_string(getNodeStep(nodeId));
   auto opName = nodes[nodeId].op->getAttrOfType<mlir::StringAttr>(
@@ -199,7 +199,7 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
   if (seen.size() < 2)
     return;
 
-  NodeIdType forkId = addNode(nullptr, true);
+  NodeIdType forkId = addNode(nullptr, DataflowGraphNode::SYNTHETIC_FORK);
   nodeIdToStep[forkId] = 0;
 
   for (const auto &pr : seen)
@@ -728,7 +728,7 @@ void SynchronizingCyclesFinderGraph::addSyntheticStartForkForBalancing() {
   if (seen.size() < 2)
     return;
 
-  NodeIdType forkId = addNode(nullptr, true);
+  NodeIdType forkId = addNode(nullptr, DataflowGraphNode::SYNTHETIC_FORK);
   for (const auto &pr : seen)
     addEdge(
         forkId, pr.first,
@@ -737,7 +737,7 @@ void SynchronizingCyclesFinderGraph::addSyntheticStartForkForBalancing() {
 
 std::string
 SynchronizingCyclesFinderGraph::getNodeLabel(NodeIdType nodeId) const {
-  if (nodes[nodeId].isSyntheticStartFork)
+  if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
     return "synthetic_start_fork";
   return nodes[nodeId].op->getName().getStringRef().str();
 }

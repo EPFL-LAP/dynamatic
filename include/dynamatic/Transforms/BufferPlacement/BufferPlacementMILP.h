@@ -453,6 +453,12 @@ protected:
       ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
       const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
 
+  /// [FPGA24] Computes the lower bound on latency forced by channel properties
+  /// for a given cycle. Used to determine the minimum II.
+  double computeCycleForcedLatencyLowerBound(
+      const ::dynamatic::SimpleCycle &cycle,
+      const ::dynamatic::SynchronizingCyclesFinderGraph &graph) const;
+
   /// [FPGA24] Adds cycle-time constraints and computes required II values.
   void addCycleTimeConstraints(ArrayRef<CFDFC *> cfdfcs, double &computedII,
                                llvm::MapVector<CFDFC *, double> &iiMap);

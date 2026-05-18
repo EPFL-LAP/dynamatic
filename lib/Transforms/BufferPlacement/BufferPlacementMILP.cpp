@@ -155,11 +155,9 @@ static double computeCycleBaseLatency(
   return latency;
 }
 
-static double computeCycleForcedLatencyLowerBound(
+double BufferPlacementMILP::computeCycleForcedLatencyLowerBound(
     const SimpleCycle &cycle,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
-    const llvm::MapVector<Value, ChannelBufProps> &channelProps,
-    const TimingDatabase &timingDB, double targetPeriod) {
+    const ::dynamatic::SynchronizingCyclesFinderGraph &graph) const {
   double latency =
       computeCycleBaseLatency(cycle, graph, timingDB, targetPeriod);
 
@@ -1421,13 +1419,11 @@ void BufferPlacementMILP::addCycleTimeConstraints(
     auto maxCycleIt = std::max_element(
         cycles.begin(), cycles.end(),
         [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
-          return computeCycleForcedLatencyLowerBound(
-                     lhs, cfdfcGraph, channelProps, timingDB, targetPeriod) <
-                 computeCycleForcedLatencyLowerBound(
-                     rhs, cfdfcGraph, channelProps, timingDB, targetPeriod);
+          return computeCycleForcedLatencyLowerBound(lhs, cfdfcGraph) <
+                 computeCycleForcedLatencyLowerBound(rhs, cfdfcGraph);
         });
-    double maxRequiredLatency = computeCycleForcedLatencyLowerBound(
-        *maxCycleIt, cfdfcGraph, channelProps, timingDB, targetPeriod);
+    double maxRequiredLatency =
+        computeCycleForcedLatencyLowerBound(*maxCycleIt, cfdfcGraph);
 
     double iiCFC = std::max(1.0, std::ceil(maxRequiredLatency));
     computedII = std::max(computedII, iiCFC);
