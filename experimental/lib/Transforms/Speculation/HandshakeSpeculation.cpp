@@ -403,24 +403,6 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
   return success();
 }
 
-static handshake::ConditionalBranchOp findControlBranch(FuncOp funcOp,
-                                                        unsigned bb) {
-  for (auto condBrOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
-    if (auto brBB = getLogicBB(condBrOp); !brBB || brBB != bb)
-      continue;
-
-    for (Value result : condBrOp->getResults()) {
-      for (Operation *user : result.getUsers()) {
-
-        if (isBackedge(result, user))
-          return condBrOp;
-      }
-    }
-  }
-
-  return nullptr;
-}
-
 std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
                                           unsigned targetBB) {
   // Here we fork control token to use as trigger signal to speculator.
