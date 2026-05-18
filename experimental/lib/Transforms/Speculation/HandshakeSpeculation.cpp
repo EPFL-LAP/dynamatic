@@ -497,7 +497,7 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
                                              /*dataIn=*/srcOpResult, fifoDepth);
 
   // Replace uses of the original source operation's result with the
-  // speculator's result, except in the speculator's operands (otherwise this
+  // specOp1's result, except in the specOp2's operands (otherwise this
   // would create a self-loop from the speculator to the speculator)
   srcOpResult.replaceAllUsesExcept(specOp1.getDataOut(), specOp2);
 
