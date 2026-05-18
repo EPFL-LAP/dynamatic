@@ -1,0 +1,3 @@
+set-src integration-test/sparse/sparse.c
+compile --buffer-algorithm fpl22
+exit
