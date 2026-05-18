@@ -104,9 +104,9 @@ struct DataflowSubgraphBase {
   std::vector<llvm::SmallVector<EdgeIdType, 4>> adjList;
   std::vector<llvm::SmallVector<EdgeIdType, 4>> revAdjList;
 
-  NodeIdType addNode(mlir::Operation *op,
-                     DataflowGraphNode::NodeType type =
-                         DataflowGraphNode::NodeType::REGULAR) {
+  NodeIdType addNode(
+      mlir::Operation *op,
+      DataflowGraphNode::NodeType type = DataflowGraphNode::NodeType::REGULAR) {
     NodeIdType id = nodes.size();
     nodes.emplace_back(op, id, type);
     adjList.emplace_back();
