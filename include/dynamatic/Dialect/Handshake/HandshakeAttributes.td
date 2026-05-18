@@ -200,10 +200,26 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   let parameters = (ins 
     "::mlir::StringAttr":$dstAccess,
     "unsigned":$loopDepth,
-    "unsigned":$distance
+    "unsigned":$distance,
+    "bool":$isActive
   );
 
-  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `,` $distance `]`";
+  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `,` $distance `,` $isActive `]`";
+
+  let builders = [
+    AttrBuilder<(ins "::mlir::StringAttr":$dstAccess,
+                     "unsigned":$loopDepth,
+                     "unsigned":$distance), [{
+      return $_get(context, dstAccess, loopDepth, distance, /*isActive=*/true);
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    MemDependenceAttr asInactive() const {
+      return get(getContext(), getDstAccess(), getLoopDepth(), getDistance(),
+                 /*isActive=*/false);
+    }
+  }];
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
