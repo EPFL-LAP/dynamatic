@@ -585,7 +585,24 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
       });
 }
 
-ast::Function gen::BasicCGenerator::generate(std::string_view functionName) {
+void gen::BasicCGenerator::generate(llvm::raw_ostream &os,
+                                    std::string_view functionName) {
+  ast::Function function = generateFunction(functionName);
+  os << R"(
+#include <stdint.h>
+#include <math.h>
+#include "dynamatic/Integration.h"
+
+#ifdef HLS_FUZZER_VERIFY
+constexpr
+#endif
+)";
+  os << function << '\n';
+  os << generateTestBench(function);
+}
+
+ast::Function
+gen::BasicCGenerator::generateFunction(llvm::StringRef functionName) {
   return std::move(
       generateWithDependencies<ast::Function>(
           entryContext, typeSystem.getFunctionTransferFns(),
@@ -623,7 +640,12 @@ std::string
 gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
   std::string s;
   llvm::raw_string_ostream ss(s);
-  ss << "\nint main() {\n";
+  ss << R"(
+#ifdef HLS_FUZZER_VERIFY
+constexpr
+#endif
+)";
+  ss << "void test_bench() {\n";
   mlir::raw_indented_ostream os(ss);
   os.indent();
   for (const ast::ScalarParameter &parameter : scalarParameters) {
@@ -651,5 +673,10 @@ gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
   }
   os << ");";
   ss << "\n}\n";
+  ss << R"(
+int main() {
+  test_bench();
+}
+)";
   return s;
 }

@@ -16,6 +16,7 @@ dynamatic::performDifferentialTesting(const std::filesystem::path &sourceFile,
   llvm::cantFail(llvm::writeToOutput(
       executeFile, [&](llvm::raw_ostream &os) -> llvm::Error {
         outputDynamaticInvocation(os, sourceFile, dynamaticPath, R"(
+hls-fuzzer-verify
 compile
 write-hdl
 simulate --timeout 20000
@@ -73,8 +74,14 @@ void dynamatic::outputDynamaticInvocation(
   os << "\n" << script.trim() << "\nexit\nEOF\n";
   os << R"()
 RET=$?
-# Ignore known issue. See https://github.com/EPFL-LAP/dynamatic/issues/886
+# Ignore known issues.
 if echo "$OUTPUT" | grep -q "Pointer values are unsupported"; then
+  # See https://github.com/EPFL-LAP/dynamatic/issues/886
+  exit 0
+fi
+# 'constexpr' evaluation does not define semantics for floating point edge
+# cases that match implementation defined behaviour in clang, GCC and dynamatic.
+if echo "$OUTPUT" | grep -q "floating point arithmetic produces a NaN"; then
   exit 0
 fi
 if [ "$RET" -ne "0" ]; then

@@ -34,16 +34,7 @@ void RandomCWorker::generate(llvm::raw_ostream &os,
   gen::BasicCGenerator generator(random, dynamaticTypeSystem,
                                  /*entryContext=*/
                                  {gen::DynamaticTypingContext::Unconstrained});
-
-  ast::Function function = generator.generate(functionName);
-  os << R"(
-#include <stdint.h>
-#include <math.h>
-#include "dynamatic/Integration.h"
-
-)";
-  os << function << '\n';
-  os << generator.generateTestBench(function);
+  generator.generate(os, functionName);
 }
 
 AbstractWorker::VerificationResult

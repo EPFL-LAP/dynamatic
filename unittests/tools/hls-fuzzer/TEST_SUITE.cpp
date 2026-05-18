@@ -17,7 +17,7 @@ TYPED_TEST_P(TypeSystemTest, OutputCheck) {
                                  /*entryContext=*/typeSystem.entryContext);
   std::string s;
   llvm::raw_string_ostream os(s);
-  os << generator.generate("test");
+  os << generator.generateFunction("test");
 
   ASSERT_EQ(s, typeSystem.result);
 }
