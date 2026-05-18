@@ -1377,10 +1377,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
-    It exposes three control outputs: $issueCtrl (begin vs resend,
-    broadcast to save_commits), $historyCtrl (resolve, broadcast to
-    save_commits), and $commitCtrl (PASS vs KILL, routed through the
-    speculative region's branches to reach the correct commits).
+    It exposes three control outputs.
+    Two unconditionally go to the save-commits 
+    $issueCtrl (which affects when tokens are issued by the save-commit)
+    and $historyCtrl (which affects what the save-commit does with its
+    internal token history)
+    One to the commit units: $commitCtrl
+    which conditionally connects to the commit units, routing through 
+    the speculative region's branches to reach the correct commits).
 
     Example:
 

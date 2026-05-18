@@ -96,7 +96,6 @@ int runIntegrationTest(IntegrationTestData &config) {
   return status;
 }
 
-
 int getSimulationTime(const fs::path &logFile) {
   std::ifstream file(logFile);
   if (!file.is_open()) {

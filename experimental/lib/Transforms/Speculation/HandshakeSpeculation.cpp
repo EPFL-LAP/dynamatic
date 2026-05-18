@@ -367,7 +367,7 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
   OpBuilder builder(&getContext());
 
   // Save-Commits receive two control inputs from the Speculator:
-  // issueCtrl and historyCtrl 
+  // issueCtrl and historyCtrl
   // Both connect directly from the speculator to the save-commit
   // with no routing.
   // The first controls issuing tokens from the save-commit
@@ -392,9 +392,9 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
 
     // Create and connect the new Operation
     builder.setInsertionPoint(dstOp);
-    
-    // resultType is tentative 
-    // since we place the save-commit before we mark 
+
+    // resultType is tentative
+    // since we place the save-commit before we mark
     // where the spec tag is needed
     // and so will be updated later
     SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(

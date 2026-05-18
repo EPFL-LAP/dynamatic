@@ -304,18 +304,10 @@ fi
 
 # Speculation (pre-buffer): canonicalize, then place speculative units.
 if [[ "$SPECULATION" == "1" ]]; then
-  F_HANDSHAKE_CANONICALIZED="$COMP_DIR/handshake_canonicalized.mlir"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-canonicalize \
-    > "$F_HANDSHAKE_CANONICALIZED"
-  exit_on_fail "Failed to canonicalize for speculation" \
-    "Canonicalized for speculation"
-
   F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_CANONICALIZED" \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-speculation \
     --handshake-materialize \
-    --handshake-canonicalize \
     > "$F_HANDSHAKE_SPECULATION"
   exit_on_fail "Failed to add speculative units" "Added speculative units"
   F_HANDSHAKE_TRANSFORMED="$F_HANDSHAKE_SPECULATION"

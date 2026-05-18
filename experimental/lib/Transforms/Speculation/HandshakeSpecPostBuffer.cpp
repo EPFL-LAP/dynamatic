@@ -129,12 +129,9 @@ void bufferCommitCtrl(FuncOp funcOp, SpeculatorOp speculator) {
   }
 }
 
-
-FailureOr<SpeculatorOp> coalesceSpecOps(FuncOp funcOp,
-                                        SpecPreBufferOp1 specOp1,
+FailureOr<SpeculatorOp> coalesceSpecOps(FuncOp funcOp, SpecPreBufferOp1 specOp1,
                                         SpecPreBufferOp2 specOp2,
-                                        unsigned specBB,
-                                        OpBuilder &builder) {
+                                        unsigned specBB, OpBuilder &builder) {
   // Build the SpeculatorOp
   // (specify inputs at construction)
   SpeculatorOp speculator = builder.create<SpeculatorOp>(

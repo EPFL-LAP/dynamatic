@@ -196,7 +196,7 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
   for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>())
     setLSQControlConstraints(lsqOp);
 
-  // The speculator has outputs which require buffers 
+  // The speculator has outputs which require buffers
   // for correctness
   auto specOps = funcOp.getOps<handshake::SpecPreBufferOp1>();
   auto specCount = std::distance(specOps.begin(), specOps.end());
@@ -208,29 +208,34 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     auto specOp = *specOps.begin();
     unsigned minTrans = 1;
 
-    // dataOut is volatile 
-    // (value can change without being accepted)
-    // and so if not safe to connect to an eager fork
-    // so we place a buffer here for safety
+    // dataOut is volatile
+    // (value can change without being accepted,
+    // from a predicted value
+    // to re-sending an mis-predicted value)
+    // and so is not safe to connect to an eager fork.
+    // We place a buffer here for safety
     Value dataOut = specOp.getDataOut();
     Channel dataChannel(dataOut, true);
-    dataChannel.props->minTrans = std::max(dataChannel.props->minTrans, minTrans);
+    dataChannel.props->minTrans =
+        std::max(dataChannel.props->minTrans, minTrans);
 
-    // issueCtrl is volatile 
+    // issueCtrl is volatile
     // (value can change without being accepted,
     // from spec to resend)
     // and so if not safe to connect to an eager fork
-    // so we place a buffer here for safety
+    // We place a buffer here for safety.
     Value issueCtrl = specOp.getIssueCtrl();
     Channel issueChannel(issueCtrl, true);
-    issueChannel.props->minTrans = std::max(issueChannel.props->minTrans, minTrans);
+    issueChannel.props->minTrans =
+        std::max(issueChannel.props->minTrans, minTrans);
 
     // historyCtrl is on a path from a lazy fork
     // to a join
     // and so needs a buffer to prevent deadlock
     Value historyCtrl = specOp.getHistoryCtrl();
     Channel resolveChannel(historyCtrl, true);
-    resolveChannel.props->minTrans = std::max(resolveChannel.props->minTrans, minTrans);
+    resolveChannel.props->minTrans =
+        std::max(resolveChannel.props->minTrans, minTrans);
   }
 
   // The speculator's KILL_ONLY_DATA state stalls the data input for
