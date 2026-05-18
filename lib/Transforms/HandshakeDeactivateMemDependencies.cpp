@@ -1,4 +1,5 @@
-//===- HandshakeInactivateDeps.cpp - Inactivate memory deps -----*- C++ -*-===//
+//===- HandshakeDeactivateMemDependencies.cpp - Deactivate mem deps
+//-*-C++-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the --handshake-inactivate-deps pass, using the logic introduced
+// Implements the --handshake-deactivate-mem-dependencies pass, using the logic
 // in https://ieeexplore.ieee.org/document/8977873.
 //
 //===----------------------------------------------------------------------===//
@@ -20,12 +21,12 @@
 #include "mlir/IR/Visitors.h"
 #include "llvm/ADT/STLExtras.h"
 
-#define DEBUG_TYPE "handshake-inactivate-deps"
+#define DEBUG_TYPE "handshake-deactivate-mem-dependencies"
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
-#define GEN_PASS_DEF_HANDSHAKEINACTIVATEDEPS
+#define GEN_PASS_DEF_HANDSHAKEDEACTIVATEMEMDEPENDENCIES
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
@@ -38,11 +39,12 @@ using DependencyMap = DenseMap<Operation *, SmallVector<MemDependenceAttr>>;
 
 namespace {
 
-struct HandshakeInactivateDepsPass
-    : public dynamatic::impl::HandshakeInactivateDepsBase<
-          HandshakeInactivateDepsPass> {
+struct HandshakeDeactivateMemDependenciesPass
+    : public dynamatic::impl::HandshakeDeactivateMemDependenciesBase<
+          HandshakeDeactivateMemDependenciesPass> {
 
-  using HandshakeInactivateDepsBase::HandshakeInactivateDepsBase;
+  using HandshakeDeactivateMemDependenciesBase::
+      HandshakeDeactivateMemDependenciesBase;
 
   void runDynamaticPass() override;
 
@@ -115,7 +117,8 @@ static void changeOpDeps(DependencyMap &opDeps, MLIRContext *ctx) {
     setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
 }
 
-void HandshakeInactivateDepsPass::analyzeFunction(handshake::FuncOp funcOp) {
+void HandshakeDeactivateMemDependenciesPass::analyzeFunction(
+    handshake::FuncOp funcOp) {
   HandshakeCFG cfg(funcOp);
   DenseSet<handshake::LoadOp> loadOps;
   DenseSet<handshake::StoreOp> storeOps;
@@ -132,7 +135,7 @@ void HandshakeInactivateDepsPass::analyzeFunction(handshake::FuncOp funcOp) {
   changeOpDeps(opDeps, &getContext());
 }
 
-void HandshakeInactivateDepsPass::runDynamaticPass() {
+void HandshakeDeactivateMemDependenciesPass::runDynamaticPass() {
   mlir::ModuleOp modOp = getOperation();
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();

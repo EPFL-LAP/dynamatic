@@ -39,8 +39,8 @@ namespace {
 
 /// Simple pass driver for the LSQ usage analysis pass. Does not modify the IR
 /// beyond setting `handshake::MemInterfaceAttr` attributes on memory ports.
-/// Requires that `HandshakeInactivateDeps` has already run to mark enforced
-/// dependencies as inactive.
+/// Requires that `HandshakeDeactivateMemDependencies` has already run to mark
+/// enforced dependencies as inactive.
 struct HandshakeAnalyzeLSQUsagePass
     : public dynamatic::impl::HandshakeAnalyzeLSQUsageBase<
           HandshakeAnalyzeLSQUsagePass> {

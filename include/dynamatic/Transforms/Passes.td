@@ -116,7 +116,7 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
     `handshake::MemInterfaceAttr` attributes on memory ports to encode the 
     analysis' results.
 
-    This pass must be preceded by `HandshakeInactivateDeps`, which marks
+    This pass must be preceded by `HandshakeDeactivateMemDependencies`, which marks
     enforced dependencies as inactive. It requires that all memory access
     operations are uniquely named.
   }];
@@ -127,8 +127,8 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
   ];
 }
 
-def HandshakeInactivateDeps : DynamaticPass<"handshake-inactivate-deps"> {
-  let summary = "Inactivates memory dependences that do not need to be enforced";
+def HandshakeDeactivateMemDependencies : DynamaticPass<"handshake-deactivate-mem-dependencies"> {
+  let summary = "Deactivates memory dependences that do not need to be enforced";
   let description = [{
     Performs flow analysis to identify memory dependencies between memory
     accesses that are ensured by the circuit's semantics and which therefore do

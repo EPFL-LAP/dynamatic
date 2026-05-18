@@ -7,7 +7,7 @@ add_dynamatic_library(DynamaticTransforms
   FuncSetArgNames.cpp
   HandshakeAnalyzeLSQUsage.cpp
   HandshakeCanonicalize.cpp
-  HandshakeInactivateDeps.cpp
+  HandshakeDeactivateMemDependencies.cpp
   HandshakeHoistExtInstances.cpp
   HandshakeMaterialize.cpp
   HandshakeMinimizeCstWidth.cpp

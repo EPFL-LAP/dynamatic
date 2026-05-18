@@ -177,7 +177,7 @@ bool runSpecIntegrationTest(const std::string &name, int &outSimTime) {
   fs::path handshakeTransformed = compOutDir / "handshakeTransformed.mlir";
   if (!runSubprocess(
           {DYNAMATIC_OPT_BIN, handshake.string(),
-           "--handshake-inactivate-deps", "--handshake-analyze-lsq-usage",
+           "--handshake-deactivate-mem-dependencies", "--handshake-analyze-lsq-usage",
            "--handshake-replace-memory-interfaces",
            "--handshake-minimize-cst-width", "--handshake-optimize-bitwidths",
            "--handshake-materialize", "--handshake-infer-basic-blocks"},
