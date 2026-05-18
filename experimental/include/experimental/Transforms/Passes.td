@@ -65,7 +65,10 @@ def HandshakeSpecPostBuffer : DynamaticPass<"handshake-spec-post-buffer"> {
   let description = [{
     Speculation integration requires some steps to be performed after the
     buffer placement pass:
-    - Finalize speculative units
+    - Merge the two speculator units into a single speculator unit
+    - Add an additional buffer on commit control inputs, 
+      which is needed due to the conditionally-present join in the commit unit
+      being unrepresentable to the buffering algorithm.
   }];
   let options = [
   ];
