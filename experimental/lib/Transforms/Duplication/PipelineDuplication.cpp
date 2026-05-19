@@ -41,19 +41,21 @@ struct PipelineDuplicationPass
   void runDynamaticPass() override;
 
 private:
-  LogicalResult readFromJSON(const std::string &jsonPath, float &compVal,
+  LogicalResult readFromJSON(const std::string &jsonPath,
                              std::vector<float> &compValList,
                              std::string &opName);
 
   void collectOpsDFS(mlir::Value currentVal,
-                     llvm::DenseSet<mlir::Operation *> &sliceOps);
+                     llvm::DenseSet<mlir::Operation *> &sliceOps,
+                     llvm::SmallVector<mlir::Value> &originalOutputs);
 };
 
 } // namespace
 
-LogicalResult PipelineDuplicationPass::readFromJSON(
-    const std::string &jsonPath, float &compVal,
-    std::vector<float> &compValList, std::string &opName) {
+LogicalResult
+PipelineDuplicationPass::readFromJSON(const std::string &jsonPath,
+                                      std::vector<float> &compValList,
+                                      std::string &opName) {
 
   // Open the .json file
   std::ifstream inputFile(jsonPath);
@@ -77,13 +79,6 @@ LogicalResult PipelineDuplicationPass::readFromJSON(
   if (!rootObj)
     return failure();
 
-  // extract compVal, you can write 7 or 7.0
-  if (auto parsedCompVal = rootObj->getInteger("compVal")) {
-    compVal = static_cast<float>(*parsedCompVal);
-  } else if (auto parsedCompValNum = rootObj->getNumber("compVal")) {
-    compVal = static_cast<float>(*parsedCompValNum);
-  }
-
   // Extract splitoperation -> operation-name
   if (const llvm::json::Object *splitOpObj =
           rootObj->getObject("splitoperation")) {
@@ -104,14 +99,25 @@ LogicalResult PipelineDuplicationPass::readFromJSON(
 }
 
 void PipelineDuplicationPass::collectOpsDFS(
-    mlir::Value currentVal, llvm::DenseSet<mlir::Operation *> &sliceOps) {
+    mlir::Value currentVal, llvm::DenseSet<mlir::Operation *> &sliceOps,
+    llvm::SmallVector<mlir::Value> &originalOutputs) {
+
+  // if the current value has no users, it must be a leaf
+  if (currentVal.use_empty()) {
+    originalOutputs.push_back(currentVal);
+  }
+
   for (mlir::OpOperand &use : currentVal.getUses()) {
     mlir::Operation *user = use.getOwner();
 
     // stop traversing if we hit memory operations or branches
-    // TODO: what else??
+    // TODO: replace with bb selection
     if (mlir::isa<mlir::memref::StoreOp, mlir::memref::LoadOp,
                   mlir::BranchOpInterface, mlir::func::ReturnOp>(user)) {
+
+      if (originalOutputs.empty() || originalOutputs.back() != currentVal) {
+        originalOutputs.push_back(currentVal);
+      }
       continue;
     }
 
@@ -120,7 +126,7 @@ void PipelineDuplicationPass::collectOpsDFS(
     if (sliceOps.insert(user).second) {
       // Recursively traverse all outputs produced by this operation
       for (mlir::Value result : user->getResults()) {
-        collectOpsDFS(result, sliceOps);
+        collectOpsDFS(result, sliceOps, originalOutputs);
       }
     }
   }
@@ -131,12 +137,11 @@ void PipelineDuplicationPass::runDynamaticPass() {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
-  // Find select0 operation
-  float compVal;
+  // find operation
   std::vector<float> compValList;
   std::string opName;
-  if (failed(PipelineDuplicationPass::readFromJSON(this->jsonPath, compVal,
-                                                   compValList, opName)))
+  if (failed(PipelineDuplicationPass::readFromJSON(this->jsonPath, compValList,
+                                                   opName)))
     return signalPassFailure();
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -147,7 +152,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
   }
   mlir::Block *currentBlock = op->getBlock();
   mlir::func::FuncOp funcOp =
-      dyn_cast<mlir::func::FuncOp>(currentBlock->getParentOp());
+      cast<mlir::func::FuncOp>(currentBlock->getParentOp());
   Location loc = op->getLoc();
   Value selectRes = op->getResult(0);
 
@@ -157,33 +162,16 @@ void PipelineDuplicationPass::runDynamaticPass() {
       currentBlock->splitBlock(builder.getInsertionPoint());
   // Block::iterator(branchCond.getDefiningOp())->getNextNode());
 
-  // is there a better way than DFS + sorting?
   // DFS starting from selectRes
   llvm::DenseSet<mlir::Operation *> unorganizedOps;
-  collectOpsDFS(selectRes, unorganizedOps);
+  llvm::SmallVector<mlir::Value> originalOutputs;
+  collectOpsDFS(selectRes, unorganizedOps, originalOutputs);
 
   // iterate through the exitBlock to sort
   llvm::SmallVector<mlir::Operation *> opsToMove;
   for (mlir::Operation &blockOp : exitBlock->getOperations()) {
     if (unorganizedOps.count(&blockOp)) {
       opsToMove.push_back(&blockOp);
-    }
-  }
-
-  // track the connecting to output wires
-  llvm::SmallVector<mlir::Value> originalOutputs;
-  for (mlir::Operation *origOp : opsToMove) {
-    for (mlir::Value origRes : origOp->getResults()) {
-      // Determine if a value breaches the edge of our duplicated region
-      bool usedOutside =
-          llvm::any_of(origRes.getUsers(), [&](mlir::Operation *user) {
-            return std::find(opsToMove.begin(), opsToMove.end(), user) ==
-                   opsToMove.end();
-          });
-
-      if (usedOutside || origRes.use_empty()) {
-        originalOutputs.push_back(origRes);
-      }
     }
   }
 
@@ -226,6 +214,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
       cloned->setAttr("handshake.name", builder.getStringAttr(newName));
 
       for (unsigned i = 0; i < cloned->getNumResults(); ++i) {
+        // make sure cloned operations go to cloned operations
         mapper.map(origOp->getResult(i), cloned->getResult(i));
       }
     }
@@ -263,6 +252,8 @@ void PipelineDuplicationPass::runDynamaticPass() {
   builder.setInsertionPointToEnd(currentBlock);
   builder.create<mlir::cf::BranchOp>(loc, exitBlock, originalOutputs);
 
+  // make sure exitBlock reads its stuff from block arguments instead of old
+  // operations that do not exist anymore in that sense
   for (size_t i = 0; i < originalOutputs.size(); ++i) {
     originalOutputs[i].replaceUsesWithIf(
         exitBlockArgs[i], [&](OpOperand &operand) {
