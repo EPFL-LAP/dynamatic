@@ -481,9 +481,11 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
   }
 
   /// Buffer the paths to EndOp (<out0> or <end>) that represent the function
-  /// end. (The ones not directly produced by memory controllers.) 
-  /// This fixes a commonly occuring stall by ensuring that the function has at least one buffer, 
-  // thus preventing the final synchronization point from exerting backpressure on the internal logic.
+  /// end. (The ones not directly produced by memory controllers.)
+  /// This fixes a commonly occuring stall by ensuring that the function has at
+  /// least one buffer,
+  // thus preventing the final synchronization point from exerting backpressure
+  // on the internal logic.
   auto *terminator = funcInfo.funcOp.getBodyBlock()->getTerminator();
   if (auto endOp = dyn_cast<handshake::EndOp>(terminator)) {
     for (Value operand : endOp->getOperands()) {
