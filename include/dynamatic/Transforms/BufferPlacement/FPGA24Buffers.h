@@ -176,11 +176,11 @@ private:
       SynchronizingCyclesFinderGraph &syncGraph);
 
   /// Solves LP1 (Latency Balancing) and returns the result.
-  FailureOr<LatencyBalancingResult> solveLatencyBalancing(
-      ArrayRef<CFDFC *> cfdfcs,
-      ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<SynchronizingCyclePair> syncCyclePairs,
-      const SynchronizingCyclesFinderGraph &syncGraph);
+  FailureOr<LatencyBalancingResult>
+  solveLatencyBalancing(ArrayRef<CFDFC *> cfdfcs,
+                        ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+                        ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+                        const SynchronizingCyclesFinderGraph &syncGraph);
 
   /// Solves LP2 (Occupancy Balancing) and writes into placement.
   LogicalResult

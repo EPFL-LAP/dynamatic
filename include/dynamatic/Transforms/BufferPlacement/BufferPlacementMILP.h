@@ -414,8 +414,7 @@ protected:
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
 
   /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
-  void addSyncCycleVars(
-      ArrayRef<SynchronizingCyclePair> syncCyclePairs);
+  void addSyncCycleVars(ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
   /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
   void addOccupancyVars(ValueRange channels,
@@ -442,9 +441,8 @@ protected:
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
 
   /// [FPGA24] Adds imbalance constraints for synchronizing cycle pairs in LP1.
-  void addSyncCycleConstraints(
-      ArrayRef<SynchronizingCyclePair> syncCyclePairs,
-      const SynchronizingCyclesFinderGraph &syncGraph);
+  void addSyncCycleConstraints(ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+                               const SynchronizingCyclesFinderGraph &syncGraph);
 
   /// [FPGA24] For each channel involved in a reconvergent path or
   /// synchronizing cycle pair, constrains stalled_c >= imbalanced_p so that

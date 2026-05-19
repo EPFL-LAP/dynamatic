@@ -106,11 +106,11 @@ static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
 }
 
 /// [FPGA24] Computes cycle latency expression.
-static LinExpr
-computeCycleLatency(const SimpleCycle &cycle,
-                    const SynchronizingCyclesFinderGraph &graph,
-                    const MILPVars &vars, const TimingDatabase &timingDB,
-                    double targetPeriod) {
+static LinExpr computeCycleLatency(const SimpleCycle &cycle,
+                                   const SynchronizingCyclesFinderGraph &graph,
+                                   const MILPVars &vars,
+                                   const TimingDatabase &timingDB,
+                                   double targetPeriod) {
   LinExpr latency;
 
   for (NodeIdType nodeId : cycle.nodes) {
@@ -145,10 +145,10 @@ computeCycleLatency(const SimpleCycle &cycle,
 }
 
 /// [FPGA24] Computes cycle base latency.
-static double computeCycleBaseLatency(
-    const SimpleCycle &cycle,
-    const SynchronizingCyclesFinderGraph &graph,
-    const TimingDatabase &timingDB, double targetPeriod) {
+static double
+computeCycleBaseLatency(const SimpleCycle &cycle,
+                        const SynchronizingCyclesFinderGraph &graph,
+                        const TimingDatabase &timingDB, double targetPeriod) {
   double latency = 0.0;
   for (NodeIdType nodeId : cycle.nodes) {
     Operation *op = graph.nodes[nodeId].op;
@@ -1417,8 +1417,7 @@ void BufferPlacementMILP::addCycleTimeConstraints(
   }
 
   for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
-    SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp,
-                                                           *cfdfc);
+    SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp, *cfdfc);
     std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
     if (cycles.empty()) {
       continue;

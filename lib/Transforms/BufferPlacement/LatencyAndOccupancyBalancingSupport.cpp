@@ -186,9 +186,8 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
     }
   }
 
-  LLVM_DEBUG({
-    llvm::errs() << "=== Synthetic start fork block arguments ===\n";
-  });
+  LLVM_DEBUG(
+      { llvm::errs() << "=== Synthetic start fork block arguments ===\n"; });
 
   handshake::PortNamer namer(funcOp);
   for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
