@@ -447,7 +447,6 @@ EntryTokenOrder::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
-
 LogicalResult FormalPropertyTable::addPropertiesFromJSON(StringRef filepath) {
   // Open the properties' database
   std::ifstream inputFile(filepath.str());
