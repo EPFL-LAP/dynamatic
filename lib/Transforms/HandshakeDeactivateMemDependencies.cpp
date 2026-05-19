@@ -48,21 +48,24 @@ struct HandshakeDeactivateMemDependenciesPass
 
   void runDynamaticPass() override;
 
-  void analyzeFunction(handshake::FuncOp funcOp);
+  LogicalResult analyzeFunction(handshake::FuncOp funcOp);
 };
 
 } // namespace
 
-/// Determines whether the store is globally in-order dependent (GIID) on the
-/// load along all non-cyclic CFG paths between them.
-static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
-                              handshake::StoreOp storeOp, HandshakeCFG &cfg) {
-  handshake::FuncOp funcOp = loadOp->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "parent of load access must be handshake function");
-  SmallVector<CFGPath> allPaths;
+/// Determines whether a WAR (write-after-read) dependency between a load and a
+/// store can be deactivated because it is naturally enforced by the circuit.
+static FailureOr<bool> isStoreGIIDOnLoad(handshake::LoadOp loadOp,
+                                         handshake::StoreOp storeOp,
+                                         HandshakeCFG &cfg) {
   std::optional<unsigned> loadBB = getLogicBB(loadOp);
   std::optional<unsigned> storeBB = getLogicBB(storeOp);
-  assert(loadBB && storeBB && "memory accesses must belong to blocks");
+  if (!loadBB)
+    return loadOp->emitError() << "load op must have basic block attribute";
+  if (!storeBB)
+    return storeOp->emitError() << "store op must have basic block attribute";
+
+  SmallVector<CFGPath> allPaths;
   cfg.getNonCyclicPaths(*loadBB, *storeBB, allPaths);
 
   Value loadData = loadOp.getDataResult();
@@ -74,9 +77,10 @@ static bool isStoreGIIDOnLoad(handshake::LoadOp loadOp,
 
 /// Inactivates WAR dependencies that are enforced by the circuit's data
 /// ordering semantics.
-static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
-                                   DenseSet<handshake::StoreOp> &storeOps,
-                                   DependencyMap &opDeps, HandshakeCFG &cfg) {
+static LogicalResult
+inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
+                       DenseSet<handshake::StoreOp> &storeOps,
+                       DependencyMap &opDeps, HandshakeCFG &cfg) {
   DenseMap<StringRef, handshake::StoreOp> storesByName;
   for (handshake::StoreOp storeOp : storeOps)
     storesByName.insert({getUniqueName(storeOp), storeOp});
@@ -87,11 +91,14 @@ static void inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
         if (!dep.getIsActive())
           continue;
         auto storeOp = storesByName.at(dep.getDstAccess());
-        opDeps[loadOp].push_back(
-            isStoreGIIDOnLoad(loadOp, storeOp, cfg) ? dep.asInactive() : dep);
+        FailureOr<bool> giid = isStoreGIIDOnLoad(loadOp, storeOp, cfg);
+        if (failed(giid))
+          return failure();
+        opDeps[loadOp].push_back(*giid ? dep.asInactive() : dep);
       }
     }
   }
+  return success();
 }
 
 /// Inactivates WAW dependencies between a store and itself.
@@ -101,8 +108,9 @@ static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps,
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
       StringRef storeName = getUniqueName(storeOp);
       for (MemDependenceAttr dep : deps.getDependencies()) {
-        if (dep.getIsActive())
+        if (!dep.getIsActive())
           continue;
+        // set the dependency as inactive if the store is GIID on the load
         opDeps[storeOp].push_back(
             storeName == dep.getDstAccess() ? dep.asInactive() : dep);
       }
@@ -110,14 +118,14 @@ static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps,
   }
 }
 
-/// Replaces each op's dependency array attribute with the updated entries in
-/// `opDeps`.
+/// Replaces each op's dependency array attribute with the updated entries
+/// in `opDeps`.
 static void changeOpDeps(DependencyMap &opDeps, MLIRContext *ctx) {
   for (auto &[op, deps] : opDeps)
     setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
 }
 
-void HandshakeDeactivateMemDependenciesPass::analyzeFunction(
+LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
     handshake::FuncOp funcOp) {
   HandshakeCFG cfg(funcOp);
   DenseSet<handshake::LoadOp> loadOps;
@@ -130,36 +138,36 @@ void HandshakeDeactivateMemDependenciesPass::analyzeFunction(
   });
 
   DependencyMap opDeps;
-  inactivateEnforcedWARs(loadOps, storeOps, opDeps, cfg);
+  if (failed(inactivateEnforcedWARs(loadOps, storeOps, opDeps, cfg)))
+    return failure();
   inactivateEnforcedWAWs(storeOps, opDeps);
   changeOpDeps(opDeps, &getContext());
+  return success();
 }
 
 void HandshakeDeactivateMemDependenciesPass::runDynamaticPass() {
-  mlir::ModuleOp modOp = getOperation();
-
+  ModuleOp modOp = getOperation();
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
-  WalkResult res = modOp.walk([&](Operation *op) {
-    if (!isa<handshake::LoadOp, handshake::StoreOp>(op))
-      return WalkResult::advance();
-    if (!namer.hasName(op)) {
-      op->emitError() << "Memory access port must be named.";
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (res.wasInterrupted())
-    return signalPassFailure();
-
+  bool failure = false;
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
+      if (isa<handshake::LoadOp, handshake::StoreOp>(&op) &&
+          !namer.hasName(&op)) {
+        op.emitError() << "Memory access port must be named.";
+        failure = true;
+      }
       if (!cannotBelongToCFG(&op) && !getLogicBB(&op)) {
         op.emitError() << "Operation should have basic block attribute.";
-        return signalPassFailure();
+        failure = true;
       }
     }
   }
 
-  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
-    analyzeFunction(funcOp);
+  if (failure)
+    return signalPassFailure();
+
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    if (failed(analyzeFunction(funcOp)))
+      return signalPassFailure();
+  }
 }
