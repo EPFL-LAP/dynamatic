@@ -1211,7 +1211,7 @@ void BufferPlacementMILP::addSyncCycleVars(
 }
 
 void BufferPlacementMILP::addOccupancyVars(
-    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy,
+    ValueRange channels, llvm::MapVector<Value, CPVar> &channelOccupancy,
     double maxOccupancy) {
   for (Value channel : channels) {
     std::string name = getUniqueName(*channel.getUses().begin());
@@ -1221,22 +1221,20 @@ void BufferPlacementMILP::addOccupancyVars(
 }
 
 void BufferPlacementMILP::setOccupancyBalancingObjective(
-    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy) {
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c)
   LinExpr objective;
-  for (Value channel : channels) {
-    assert(channelOccupancy.count(channel) &&
-           "missing occupancy variable for channel");
+  for (auto &[channel, occupancy] : channelOccupancy) {
     unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
     // Control channels may have bitwidth 0, weight them with 1.
-    objective += (bitwidth == 0 ? 1 : bitwidth) * channelOccupancy[channel];
+    objective += (bitwidth == 0 ? 1 : bitwidth) * occupancy;
   }
   model->setMaximizeObjective(-objective);
 }
 
 void BufferPlacementMILP::addMinOccupancyConstraints(
-    const DenseMap<Value, double> &requiredOccupancy,
-    DenseMap<Value, CPVar> &channelOccupancy) {
+    const llvm::MapVector<Value, double> &requiredOccupancy,
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
   for (auto const &[channel, minOccupancy] : requiredOccupancy) {
     model->addConstr(channelOccupancy[channel] >= minOccupancy,
                      "n_c>=(L_c/II)" +
@@ -1245,7 +1243,7 @@ void BufferPlacementMILP::addMinOccupancyConstraints(
 }
 
 void BufferPlacementMILP::addBackedgeConstraints(
-    ArrayRef<CFDFC *> cfdfcs, DenseMap<Value, CPVar> &channelOccupancy) {
+    ArrayRef<CFDFC *> cfdfcs, llvm::MapVector<Value, CPVar> &channelOccupancy) {
   size_t cycleConstraints = 0;
   for (size_t i = 0; i < cfdfcs.size(); ++i) {
     CFDFC *cfdfc = cfdfcs[i];

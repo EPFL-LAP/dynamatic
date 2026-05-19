@@ -140,14 +140,14 @@ private:
   std::vector<ReconvergentPathWithGraph> reconvergentPaths;
   std::vector<CFDFC *> cfdfcs;
 
-  DenseMap<Value, CPVar> channelOccupancy;
+  llvm::MapVector<Value, CPVar> channelOccupancy;
 
   void setup();
 
   /// Translates channel slot-count properties into LP2 occupancy constraints,
   /// using the LP1 latency result as the opaque-presence decision.
   void addChannelPropertyOccupancyConstraints(
-      ArrayRef<Value> channels, DenseMap<Value, CPVar> &channelOccupancy);
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 };
 
 class FPGA24Buffers {

@@ -419,23 +419,23 @@ protected:
 
   /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
   void addOccupancyVars(ValueRange channels,
-                        DenseMap<Value, CPVar> &channelOccupancy,
+                        llvm::MapVector<Value, CPVar> &channelOccupancy,
                         double maxOccupancy);
 
   /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum.
-  void setOccupancyBalancingObjective(ValueRange channels,
-                                      DenseMap<Value, CPVar> &channelOccupancy);
+  void setOccupancyBalancingObjective(
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds minimum occupancy constraints: N_c >= L_c / II.
   /// (Paper: Section 5, Equation 8 and 15)
-  void
-  addMinOccupancyConstraints(const DenseMap<Value, double> &requiredOccupancy,
-                             DenseMap<Value, CPVar> &channelOccupancy);
+  void addMinOccupancyConstraints(
+      const llvm::MapVector<Value, double> &requiredOccupancy,
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
   /// least one token. (Paper: Section 5, Equation 12)
   void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
-                              DenseMap<Value, CPVar> &channelOccupancy);
+                              llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
   void addReconvergentPathConstraints(

@@ -166,7 +166,7 @@ void OccupancyBalancingLP::setup() {
   /// (Paper: Section 5, Equation 15): Making the required occupancy the
   /// maximum of all CFDFCs' II.
 
-  DenseMap<Value, double> requiredOccupancy;
+  llvm::MapVector<Value, double> requiredOccupancy;
 
   // Initialize with global II constraint
   for (Value channel : allChannels) {
@@ -193,21 +193,18 @@ void OccupancyBalancingLP::setup() {
 
   addMinOccupancyConstraints(requiredOccupancy, channelOccupancy);
   addBackedgeConstraints(cfdfcs, channelOccupancy);
-  addChannelPropertyOccupancyConstraints(allChannels, channelOccupancy);
+  addChannelPropertyOccupancyConstraints(channelOccupancy);
 
-  this->setOccupancyBalancingObjective(allChannels, channelOccupancy);
+  this->setOccupancyBalancingObjective(channelOccupancy);
 
   markReadyToOptimize();
 }
 
 void OccupancyBalancingLP::addChannelPropertyOccupancyConstraints(
-    ArrayRef<Value> channels, DenseMap<Value, CPVar> &channelOccupancy) {
-  for (Value channel : channels) {
-    if (!channelOccupancy.count(channel))
-      continue;
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
+  for (auto &[channel, n] : channelOccupancy) {
     handshake::ChannelBufProps &props = channelProps[channel];
     std::string name = getUniqueName(*channel.getUses().begin());
-    CPVar &n = channelOccupancy[channel];
 
     bool hasOpaqueLatency =
         latencyResult.channelExtraLatency.lookup(channel) > 0;
