@@ -309,7 +309,7 @@ public:
                 return std::forward_as_tuple(
                     std::forward<decltype(args)>(args)...);
               },
-              [&](auto indexT, auto inputDependencyT) {
+              [&](auto indexT, auto inputDependencyT) -> decltype(auto) {
                 constexpr std::size_t index = decltype(indexT){};
                 constexpr std::size_t inputDependency =
                     decltype(inputDependencyT){};

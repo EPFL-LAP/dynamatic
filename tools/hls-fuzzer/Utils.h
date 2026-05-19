@@ -32,11 +32,12 @@ decltype(auto) mapTuplesInto(Constructor &&constructor, F &&f, First &&first,
                              Others &&...others) {
   return std::apply(
       [&](auto &&...indices) {
-        return std::forward<Constructor>(constructor)([&](auto index) {
-          return f(
-              std::get<decltype(index){}>(std::forward<First>(first)),
-              std::get<decltype(index){}>(std::forward<Others>(others))...);
-        }(indices)...);
+        return std::forward<Constructor>(constructor)(
+            [&](auto index) -> decltype(auto) {
+              return f(
+                  std::get<decltype(index){}>(std::forward<First>(first)),
+                  std::get<decltype(index){}>(std::forward<Others>(others))...);
+            }(indices)...);
       },
       getTupleOfIndices(
           std::make_index_sequence<std::tuple_size_v<std::decay_t<First>>>{}));
