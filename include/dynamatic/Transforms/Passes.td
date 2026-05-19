@@ -108,7 +108,7 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
   let summary = "Reroutes memory ports with no active dependencies from LSQ to MC";
   let description = [{
     Inspects the `handshake::MemDependenceAttr` attributes on LSQ memory ports
-    to determine which ports have no inactive dependencies and which therefore 
+    to determine which ports have only inactive dependencies and which therefore 
     do not need to be enforced by an LSQ. This allows to reduce the number of 
     memory ports that go to LSQs, thereby improving the circuit's performance 
     and area thanks to LSQ size reduction (or elimination, in some instances). 
@@ -132,10 +132,10 @@ def HandshakeDeactivateMemDependencies : DynamaticPass<"handshake-deactivate-mem
   let description = [{
     Performs flow analysis to identify memory dependencies between memory
     accesses that are ensured by the circuit's semantics and which therefore do
-    not need to be enforced by an LSQ. Specifically, WAR dependencies where the
-    load is globally in-order dependent (GIID) on the store along all non-cyclic
-    CFG paths are inactivated, as are WAW dependencies between a store and
-    itself. 
+    not need to be enforced by an LSQ. Specifically, write-after-read 
+    dependencies where the store is globally in-order dependent (GIID) on the 
+    load along all non-cyclic CFG paths are deactivated, as are 
+    write-after-write dependencies between a store and itself. 
 
     The pass requires that all eligible operations within Handshake functions
     are tagged with the basic block they belong to, and that all memory access
