@@ -104,28 +104,6 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
-  let summary = "Reroutes memory ports with no active dependencies from LSQ to MC";
-  let description = [{
-    Inspects the `handshake::MemDependenceAttr` attributes on LSQ memory ports
-    to determine which ports have only inactive dependencies and which therefore 
-    do not need to be enforced by an LSQ. This allows to reduce the number of 
-    memory ports that go to LSQs, thereby improving the circuit's performance 
-    and area thanks to LSQ size reduction (or elimination, in some instances). 
-    The pass does not modify the IR's structure, it only sets 
-    `handshake::MemInterfaceAttr` attributes on memory ports to encode the 
-    analysis' results.
-
-    This pass must be preceded by `HandshakeDeactivateMemDependencies`, which marks
-    enforced dependencies as inactive. It requires that all memory access
-    operations are uniquely named.
-  }];
-
-  let statistics = [
-    Statistic<"loadsRerouted", "Loads rerouted", "Number of load operations that have been rerouted">,
-    Statistic<"storesRerouted", "Stores rerouted", "Number of store operations that have been rerouted">,
-  ];
-}
 
 def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependencies", "mlir::ModuleOp"> {
   let summary = "Deactivates memory dependences that do not need to be enforced";
@@ -225,7 +203,12 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
 > {
   let summary = "Place memory interfaces according to memoty port annotations.";
   let description = [{
-    Replaces existing memory interfaces and memory ports in Handshake functions
+    Inspects the `handshake::MemDependenceAttr` attributes on LSQ memory ports
+    to determine which ports have only inactive dependencies and which therefore 
+    do not need to be enforced by an LSQ and updates the 
+    `handshake::MemInterfaceAttr` attributes of these ports accordingly. 
+
+    Then replaces existing memory interfaces and memory ports in Handshake functions
     following the `handshake::MemInterfaceAttr` attribute on each memory port.
 
     In general the pass needs to identify new control signals to appropriately
