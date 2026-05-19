@@ -410,24 +410,30 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
       for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
         unsigned totalLatency = 0;
         llvm::errs() << "  Cycle " << cycleIdx << ": ";
+        auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+          for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
+            if (cfdfcGraph.edges[edgeId].dstId != dst)
+              continue;
+            return cfdfcGraph.edges[edgeId].channel;
+          }
+          llvm_unreachable("Edge not found");
+          return Value();
+        };
+
         for (size_t i = 0; i < cycle.nodes.size(); ++i) {
           NodeIdType src = cycle.nodes[i];
           NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
-          for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
-            if (cfdfcGraph.edges[edgeId].dstId == dst) {
-              Value channel = cfdfcGraph.edges[edgeId].channel;
-              unsigned extraLat = 0;
-              if (result.channelExtraLatency.count(channel)) {
-                extraLat = result.channelExtraLatency.lookup(channel);
-              }
-              if (extraLat > 0) {
-                llvm::errs() << getUniqueName(*channel.getUses().begin())
-                             << "(L=" << extraLat << ") ";
-              }
-              totalLatency += extraLat;
-              break;
-            }
+          Value channel = findChannel(src, dst);
+
+          unsigned extraLat = 0;
+          if (result.channelExtraLatency.count(channel)) {
+            extraLat = result.channelExtraLatency.lookup(channel);
           }
+          if (extraLat > 0) {
+            llvm::errs() << getUniqueName(*channel.getUses().begin())
+                         << "(L=" << extraLat << ") ";
+          }
+          totalLatency += extraLat;
         }
         llvm::errs() << "-> Total cycle latency = " << totalLatency << "\n";
         if (totalLatency > 1) {

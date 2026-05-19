@@ -108,7 +108,7 @@ static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
 /// [FPGA24] Computes cycle latency expression.
 static LinExpr
 computeCycleLatency(const SimpleCycle &cycle,
-                    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
+                    const SynchronizingCyclesFinderGraph &graph,
                     const MILPVars &vars, const TimingDatabase &timingDB,
                     double targetPeriod) {
   LinExpr latency;
@@ -122,17 +122,23 @@ computeCycleLatency(const SimpleCycle &cycle,
     latency += unitLatency;
   }
 
+  auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId != dst)
+        continue;
+      return graph.edges[edgeId].channel;
+    }
+    llvm_unreachable("Edge not found");
+    return Value();
+  };
+
   for (size_t i = 0; i < cycle.nodes.size(); ++i) {
     NodeIdType src = cycle.nodes[i];
     NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
-    for (EdgeIdType edgeId : graph.adjList[src]) {
-      if (graph.edges[edgeId].dstId == dst) {
-        Value channel = graph.edges[edgeId].channel;
-        if (vars.channelVars.count(channel))
-          latency += vars.channelVars.lookup(channel).dataLatency;
-        break;
-      }
-    }
+    Value channel = findChannel(src, dst);
+
+    if (vars.channelVars.count(channel))
+      latency += vars.channelVars.lookup(channel).dataLatency;
   }
 
   return latency;
@@ -141,7 +147,7 @@ computeCycleLatency(const SimpleCycle &cycle,
 /// [FPGA24] Computes cycle base latency.
 static double computeCycleBaseLatency(
     const SimpleCycle &cycle,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
+    const SynchronizingCyclesFinderGraph &graph,
     const TimingDatabase &timingDB, double targetPeriod) {
   double latency = 0.0;
   for (NodeIdType nodeId : cycle.nodes) {
@@ -157,23 +163,28 @@ static double computeCycleBaseLatency(
 
 double BufferPlacementMILP::computeCycleForcedLatencyLowerBound(
     const SimpleCycle &cycle,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &graph) const {
+    const SynchronizingCyclesFinderGraph &graph) const {
   double latency =
       computeCycleBaseLatency(cycle, graph, timingDB, targetPeriod);
+
+  auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId != dst)
+        continue;
+      return graph.edges[edgeId].channel;
+    }
+    llvm_unreachable("Edge not found");
+    return Value();
+  };
 
   for (size_t i = 0; i < cycle.nodes.size(); ++i) {
     NodeIdType src = cycle.nodes[i];
     NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
-    for (EdgeIdType edgeId : graph.adjList[src]) {
-      if (graph.edges[edgeId].dstId != dst)
-        continue;
+    Value channel = findChannel(src, dst);
 
-      Value channel = graph.edges[edgeId].channel;
-      const auto *propsIt = channelProps.find(channel);
-      if (propsIt != channelProps.end() && propsIt->second.minOpaque > 0)
-        latency += 1.0;
-      break;
-    }
+    const auto *propsIt = channelProps.find(channel);
+    if (propsIt != channelProps.end() && propsIt->second.minOpaque > 0)
+      latency += 1.0;
   }
 
   return latency;
@@ -1148,7 +1159,7 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
 
 void BufferPlacementMILP::addLatencyBalancingVars(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs) {
   for (auto &[channel, _] : channelProps) {
     if (isa<MemRefType>(channel.getType()))
       continue;
@@ -1191,7 +1202,7 @@ void BufferPlacementMILP::addReconvergentPathVars(
 }
 
 void BufferPlacementMILP::addSyncCycleVars(
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs) {
   vars.syncCycleVars.resize(syncCyclePairs.size());
   for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
     vars.syncCycleVars[pairIdx].imbalanced =
@@ -1315,10 +1326,10 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
 }
 
 void BufferPlacementMILP::addSyncCycleConstraints(
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+    const SynchronizingCyclesFinderGraph &syncGraph) {
   for (size_t pairIdx = 0; pairIdx < syncCyclePairs.size(); ++pairIdx) {
-    const ::dynamatic::SynchronizingCyclePair &pair = syncCyclePairs[pairIdx];
+    const SynchronizingCyclePair &pair = syncCyclePairs[pairIdx];
     CPVar &patternImbalanced = vars.syncCycleVars[pairIdx].imbalanced;
 
     bool hasVarLatency =
@@ -1351,8 +1362,8 @@ void BufferPlacementMILP::addSyncCycleConstraints(
 /// so channels are marked stalled if any associated pattern is imbalanced.
 void BufferPlacementMILP::addStallPropagationConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+    const SynchronizingCyclesFinderGraph &syncGraph) {
   DenseMap<Value, SmallVector<CPVar *>> channelToPatterns;
   auto addPatternToChannelStallProp = [&](Value channel, CPVar *imbalanced) {
     channelToPatterns[channel].push_back(imbalanced);
@@ -1408,7 +1419,7 @@ void BufferPlacementMILP::addCycleTimeConstraints(
   }
 
   for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
-    ::dynamatic::SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp,
+    SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp,
                                                            *cfdfc);
     std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
     if (cycles.empty()) {

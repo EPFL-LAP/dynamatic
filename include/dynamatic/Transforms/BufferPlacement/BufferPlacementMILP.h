@@ -403,7 +403,7 @@ protected:
   /// pattern imbalance variables, and links R_c to L_c.
   void addLatencyBalancingVars(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
   /// [FPGA24] Links the binary buffer-presence variable R_c to the integer
   /// latency variable L_c for every channel. (Paper: Section 4, Equation 6)
@@ -415,7 +415,7 @@ protected:
 
   /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
   void addSyncCycleVars(
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
   /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
   void addOccupancyVars(ValueRange channels,
@@ -443,22 +443,22 @@ protected:
 
   /// [FPGA24] Adds imbalance constraints for synchronizing cycle pairs in LP1.
   void addSyncCycleConstraints(
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+      const SynchronizingCyclesFinderGraph &syncGraph);
 
   /// [FPGA24] For each channel involved in a reconvergent path or
   /// synchronizing cycle pair, constrains stalled_c >= imbalanced_p so that
   /// pattern imbalance surfaces in the per-channel stall term of the objective.
   void addStallPropagationConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+      const SynchronizingCyclesFinderGraph &syncGraph);
 
   /// [FPGA24] Computes the lower bound on latency forced by channel properties
   /// for a given cycle. Used to determine the minimum II.
   double computeCycleForcedLatencyLowerBound(
-      const ::dynamatic::SimpleCycle &cycle,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &graph) const;
+      const SimpleCycle &cycle,
+      const SynchronizingCyclesFinderGraph &graph) const;
 
   /// [FPGA24] Adds cycle-time constraints and computes required II values.
   void addCycleTimeConstraints(ArrayRef<CFDFC *> cfdfcs, double &computedII,
