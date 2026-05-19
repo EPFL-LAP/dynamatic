@@ -127,7 +127,7 @@ def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
   ];
 }
 
-def HandshakeDeactivateMemDependencies : DynamaticPass<"handshake-deactivate-mem-dependencies"> {
+def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependencies", "mlir::ModuleOp"> {
   let summary = "Deactivates memory dependences that do not need to be enforced";
   let description = [{
     Performs flow analysis to identify memory dependencies between memory

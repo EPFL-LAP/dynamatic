@@ -43,10 +43,7 @@ struct HandshakeDeactivateMemDependenciesPass
     : public dynamatic::impl::HandshakeDeactivateMemDependenciesBase<
           HandshakeDeactivateMemDependenciesPass> {
 
-  using HandshakeDeactivateMemDependenciesBase::
-      HandshakeDeactivateMemDependenciesBase;
-
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
   LogicalResult analyzeFunction(handshake::FuncOp funcOp);
 };
@@ -145,7 +142,7 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
   return success();
 }
 
-void HandshakeDeactivateMemDependenciesPass::runDynamaticPass() {
+void HandshakeDeactivateMemDependenciesPass::runOnOperation() {
   ModuleOp modOp = getOperation();
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   bool failure = false;
