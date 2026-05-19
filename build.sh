@@ -502,6 +502,5 @@ chmod +x tools/dynamatic/scripts/write-hdl.sh
 chmod +x tools/dynamatic/scripts/simulate.sh
 chmod +x tools/dynamatic/scripts/synthesize.sh
 chmod +x tools/dynamatic/scripts/visualize.sh
-chmod +x tools/dynamatic/scripts/hls-fuzzer-verify.sh
 
 echo_subsection "Build successful!"

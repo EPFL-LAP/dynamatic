@@ -406,24 +406,6 @@ public:
   CommandResult execute(CommandArguments &args) override;
 };
 
-class HlsFuzzerVerify : public Command {
-public:
-  constexpr static StringLiteral TEST_BENCH_FN = "test-bench-function";
-
-  explicit HlsFuzzerVerify(FrontendState &state)
-      : Command("hls-fuzzer-verify",
-                "Verifies that a fuzzer generated test bench is free of "
-                "undefined behaviour by "
-                "executing the test bench using C++ constant evaluation",
-                state) {
-    addOption({TEST_BENCH_FN, "The name of the test bench function (default: "
-                              "test_bench). Should not take any arguments and "
-                              "be marked constexpr."});
-  }
-
-  CommandResult execute(CommandArguments &args) override;
-};
-
 class FrontendCommands {
 public:
   StringMap<std::unique_ptr<Command>> cmds;
@@ -917,22 +899,6 @@ CommandResult EstimatePower::execute(CommandArguments &args) {
   // clang-format on
 }
 
-CommandResult HlsFuzzerVerify::execute(CommandArguments &args) {
-  // We need the source path to be set
-  if (!state.sourcePathIsSet(keyword))
-    return CommandResult::FAIL;
-
-  std::string testBench = "test_bench";
-  std::string script =
-      state.getScriptsPath() + getSeparator() + "hls-fuzzer-verify.sh";
-
-  if (auto it = args.options.find(TEST_BENCH_FN); it != args.options.end())
-    testBench = it->second;
-
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getKernelName(), testBench);
-}
-
 static StringRef removeComment(StringRef input) {
   if (size_t cutAt = input.find('#'); cutAt != std::string::npos)
     return input.take_front(cutAt);
@@ -1004,7 +970,6 @@ int main(int argc, char **argv) {
   commands.add<Compile>(state);
   commands.add<WriteHDL>(state);
   commands.add<Simulate>(state);
-  commands.add<HlsFuzzerVerify>(state);
   commands.add<Visualize>(state);
   commands.add<Synthesize>(state);
   commands.add<EstimatePower>(state);
