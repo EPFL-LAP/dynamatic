@@ -33,6 +33,8 @@ public:
     EagerForkNotAllOutputSent,
     CopiedSlotsOfActiveForksAreFull,
     ReconvergentPathFlow,
+    IOGSingleToken,
+    IOGConsecutiveTokens,
   };
 
   TAG getTag() const { return tag; }
@@ -269,6 +271,70 @@ public:
 private:
   std::vector<FlowExpression> equations;
   inline static const StringLiteral EQUATIONS_LIT = "equations";
+};
+
+// An IOG contains a single token at the start (at the entry), and no other
+// tokens will ever enter or leave. Tokens can be duplicated by eager forks, but
+// they keep track of this within their `sent` state. Because of this, the
+// number of occupied slots within an IOG is equal to one plus the number of
+// duplicated tokens by fork.
+class IOGSingleToken : public FormalProperty {
+public:
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<IOGSingleToken>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  IOGSingleToken() = default;
+  IOGSingleToken(unsigned long id, TAG tag,
+                 std::vector<std::unique_ptr<InternalStateNamer>> slots,
+                 std::vector<EagerForkSentNamer> forks)
+      : FormalProperty(id, tag, TYPE::IOGSingleToken), slots(std::move(slots)),
+        forks(std::move(forks)) {};
+  ~IOGSingleToken() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::IOGSingleToken;
+  }
+
+  std::vector<std::unique_ptr<InternalStateNamer>> slots;
+  std::vector<EagerForkSentNamer> forks;
+
+private:
+  inline static const StringLiteral SLOTS_LIT = "slots";
+  inline static const StringLiteral FORKS_LIT = "forks";
+};
+
+// Within an IOG, multiple slots can be occupied when forks duplicate tokens.
+// Whereas the previous invariant only states that there needs to be an active
+// fork somewhere, this invariant determines where the active fork could be: If
+// any two slots are occupied, there must be at least one path connecting them,
+// and for some path p, there must be an active fork along p with the start of p
+// as the copied slot (i.e. no other slots between the fork and the starting
+// slot)
+class IOGConsecutiveTokens : public FormalProperty {
+public:
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<IOGConsecutiveTokens>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  IOGConsecutiveTokens() = default;
+  IOGConsecutiveTokens(unsigned long id, TAG tag, const TokenCountNamer &slot1,
+                       const TokenCountNamer &slot2,
+                       std::vector<EagerForkSentNamer> sents);
+  ~IOGConsecutiveTokens() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::IOGConsecutiveTokens;
+  }
+
+  TokenCountNamer slot1;
+  TokenCountNamer slot2;
+  std::vector<EagerForkSentNamer> sents;
+
+private:
+  inline static const StringLiteral SLOT1_LIT = "slot1";
+  inline static const StringLiteral SLOT2_LIT = "slot2";
+  inline static const StringLiteral SENTS_LIT = "sents";
 };
 
 class FormalPropertyTable {

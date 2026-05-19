@@ -122,6 +122,7 @@ private:
 
   void translateFunnelShiftIntrinsic(llvm::CallInst *callInst);
   void translateMemsetIntrinsic(llvm::CallInst *callInst);
+  void handleSpeculateMarker(llvm::CallInst *callInst);
 
   SmallVector<mlir::Value> getBranchOperandsForCFGEdge(BasicBlock *currBB,
                                                        BasicBlock *nextBB);

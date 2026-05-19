@@ -300,6 +300,8 @@ public:
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
+  static constexpr llvm::StringLiteral ENABLE_SHORT_CIRCUIT =
+      "enable-short-circuit";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -328,6 +330,9 @@ public:
                           "accesses, use with caution!"});
     addFlag({STRAIGHT_TO_QUEUE,
              "Use straight to queue to connect the circuit to the LSQ"});
+    addFlag({ENABLE_SHORT_CIRCUIT,
+             "Enable short-circuit evaluation of && and ||, "
+             "to match C specification"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -352,6 +357,7 @@ public:
 class Simulate : public Command {
 public:
   static constexpr llvm::StringLiteral SIMULATOR = "simulator";
+  static constexpr llvm::StringLiteral TIMEOUT = "timeout";
 
   Simulate(FrontendState &state)
       : Command("simulate",
@@ -362,6 +368,8 @@ public:
     addOption({SIMULATOR, "The simulator to use for verification, options are "
                           "'ghdl' (GHDL), 'vsim' (default option: ModelSim), "
                           "'xsim' (Vivado), 'verilator' (Verilator)"});
+    addOption({TIMEOUT, "The timeout for the simulation in cycles. Use 0 "
+                        "(default) for no timeout"});
   }
   CommandResult execute(CommandArguments &args) override;
 };
@@ -759,12 +767,14 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
+  std::string enableShortCircuit =
+      args.flags.contains(ENABLE_SHORT_CIRCUIT) ? "1" : "0";
 
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), sharing,
-                 state.fpUnitsGenerator, rigidification, disableLSQ,
-                 fastTokenDelivery, milpSolver, straightToQueue);
+  return execCmd(
+      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
+      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
+      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery,
+      milpSolver, straightToQueue, enableShortCircuit);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -800,6 +810,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   if (!state.sourcePathIsSet(keyword))
     return CommandResult::FAIL;
 
+  std::size_t timeout = 0;
   std::string simulator = "vsim";
   std::string script = state.getScriptsPath() + getSeparator() + "simulate.sh";
 
@@ -811,6 +822,13 @@ CommandResult Simulate::execute(CommandArguments &args) {
       llvm::errs() << "Unknow Simulator '" << it->second
                    << "', possible options are 'ghdl', "
                       "'xsim', 'vsim' and 'verilator'.\n";
+      return CommandResult::FAIL;
+    }
+  }
+
+  if (auto it = args.options.find(TIMEOUT); it != args.options.end()) {
+    if (it->second.getAsInteger(10, timeout)) {
+      llvm::errs() << "Invalid timeout '" << it->second << "'.\n";
       return CommandResult::FAIL;
     }
   }
@@ -831,7 +849,7 @@ CommandResult Simulate::execute(CommandArguments &args) {
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), state.vivadoPath,
                  state.fpUnitsGenerator == "vivado" ? "true" : "false",
-                 simulator, state.hdl);
+                 simulator, state.hdl, std::to_string(timeout));
 }
 
 CommandResult Visualize::execute(CommandArguments &args) {

@@ -622,21 +622,6 @@ void LowerFuncToHandshake::addMergeOps(handshake::FuncOp funcOp,
   }
 }
 
-/// Returns the branch result of the new handshake-level branch operation that
-/// goes to the successor block of the old cf-level branch result.
-static Value getSuccResult(Operation *brOp, Operation *newBrOp,
-                           Block *succBlock) {
-  // For conditional block, check if result goes to true or to false successor
-  if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(brOp)) {
-    if (condBranchOp.getTrueDest() == succBlock)
-      return dyn_cast<handshake::ConditionalBranchOp>(newBrOp).getTrueResult();
-    assert(condBranchOp.getFalseDest() == succBlock);
-    return dyn_cast<handshake::ConditionalBranchOp>(newBrOp).getFalseResult();
-  }
-  // If the block is unconditional, newOp has only one result
-  return newBrOp->getResult(0);
-}
-
 /// Returns the unique data operands of a cf-level branch-like operation.
 static SetVector<Value> getBranchOperands(Operation *termOp) {
   if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(termOp)) {
@@ -655,11 +640,11 @@ void LowerFuncToHandshake::addBranchOps(
     Location loc = termOp->getLoc();
     rewriter.setInsertionPoint(termOp);
 
-    Value cond = nullptr;
+    Value isConditional = nullptr;
     if (cf::CondBranchOp condBranchOp = dyn_cast<cf::CondBranchOp>(termOp)) {
-      cond = condBranchOp.getCondition();
-      cond = rewriter.getRemappedValue(cond);
-      assert(cond && "Failed to remap branch operand");
+      isConditional = condBranchOp.getCondition();
+      isConditional = rewriter.getRemappedValue(isConditional);
+      assert(isConditional && "Failed to remap branch operand");
     } else if (isa<func::ReturnOp>(termOp)) {
       continue;
     }
@@ -669,35 +654,108 @@ void LowerFuncToHandshake::addBranchOps(
     // operation
     for (Value branchOprd : getBranchOperands(termOp)) {
       // Create a branch-like operation for the branch operand
-      Operation *newOp;
-      if (cond) {
-        newOp = rewriter.create<handshake::ConditionalBranchOp>(loc, cond,
-                                                                branchOprd);
+      if (isConditional) {
+        cf::CondBranchOp condBranchOp = cast<cf::CondBranchOp>(termOp);
+
+        auto newCondBranchOp = rewriter.create<handshake::ConditionalBranchOp>(
+            loc, isConditional, branchOprd);
+        Block *trueSucc = condBranchOp.getTrueDest();
+        Block *falseSucc = condBranchOp.getFalseDest();
+
+        SmallPtrSet<Operation *, 4> trueUsers;
+        SmallPtrSet<Operation *, 4> falseUsers;
+
+        for (Operation *user : branchOprd.getUsers()) {
+          if (isa<handshake::MergeLikeOpInterface>(user) &&
+              user->getBlock() == trueSucc)
+            trueUsers.insert(user);
+          if (isa<handshake::MergeLikeOpInterface>(user) &&
+              user->getBlock() == falseSucc)
+            falseUsers.insert(user);
+        }
+
+        Value trueRes = newCondBranchOp.getTrueResult();
+
+        // NOTE: this flag is used to handle parallel edges. See the comment
+        // below
+        //
+        // We use this look up to make sure that the true result of a branch is
+        // used exactly once.
+        //
+        // For example (cf. `test/Conversion/CfToHandshake/control-flow.mlir`),
+        // say the CF cond branch argument has duplicated elements
+        //
+        // CondBr [%d] %arg1, %arg1, %arg2
+        // We don't want to make the rerouting for the first %arg1 also replaces
+        // the users of the second %arg1.
+        DenseSet<Operation *> alreadyReplaced;
+
+        // Use the results of the newly added conditional branch to feed the
+        // original users (CF operations)
+        rewriter.replaceUsesWithIf(branchOprd, trueRes, [&](OpOperand &oprd) {
+          Operation *user = oprd.getOwner();
+          if (alreadyReplaced.count(user)) {
+            // NOTE: here we need to be careful of handling parallel edges.
+            //
+            // Consider the following example:
+            // =========================================================
+            // ^bb1:  // pred: ^bb0
+            //   %1 = arith.cmpf une, %arg0, %cst : f64
+            //   cf.cond_br %1, ^bb3(%c0_i32 : i32), ^bb3(%c9_i32 : i32)
+            // ^bb2:  // pred: ^bb0
+            //   %2 = memref.load %arg9[%c0] : memref<2xf32>
+            //   %3 = arith.cmpf une, %2, %cst_0  : f32
+            //   cf.cond_br %3, ^bb3(%c0_i32 : i32), ^bb3(%c9_i32 : i32)
+            // ^bb3(%4: i32):  // 4 preds: ^bb1, ^bb1, ^bb2, ^bb2
+            // =========================================================
+            // Here, there are two parallel edges from bb1 to bb3 (bb2 to bb3 as
+            // well).
+            //
+            // In the end, we need to make sure that the cmerge in bb3 must
+            // takes both outputs of the cbranch of bb1.
+            //
+            // To achieve this,
+            //
+            // - We always first connect the first matched operand to the
+            // true branch output; this accociate the true output with the [0]
+            // index index of cmerge
+            // - We then connect the second matched operand with the false
+            // branch output; this accociate the false output with the one [1]
+            // index of cmerge.
+            return false;
+          }
+          bool isMergeLikeHandshakeUser = trueUsers.contains(user);
+          if (isMergeLikeHandshakeUser)
+            alreadyReplaced.insert(user);
+          return isMergeLikeHandshakeUser;
+        });
+
+        Value falseRes = newCondBranchOp.getFalseResult();
+        // Use the results of the newly added conditional branch to feed the
+        // original users (CF operations)
+        rewriter.replaceUsesWithIf(branchOprd, falseRes, [&](OpOperand &oprd) {
+          return falseUsers.contains(oprd.getOwner());
+        });
+
       } else {
-        newOp = rewriter.create<handshake::BranchOp>(loc, branchOprd);
-      }
+        auto newBranchOp =
+            rewriter.create<handshake::BranchOp>(loc, branchOprd);
 
-      // Group users by the block which they belong to, which inform the result
-      // of the branch that they will then connect to
-      DenseMap<Block *, SmallPtrSet<Operation *, 4>> branchUsers;
-      auto succ = block.getSuccessors();
-      SmallPtrSet<Block *, 2> successors(succ.begin(), succ.end());
-      for (Operation *user : branchOprd.getUsers()) {
-        // Only merges in successor blocks must connect to the branch output
-        if (!isa<handshake::MergeLikeOpInterface>(user) ||
-            !successors.contains(user->getBlock()))
-          continue;
-        branchUsers[user->getBlock()].insert(user);
-      }
-      assert(branchUsers.size() <= 2 && "too many branch successors");
+        Block *succ = block.getSuccessors()[0];
 
-      // Connect users of the branch to the appropriate branch result
-      for (const auto &userGroup : branchUsers) {
+        SmallPtrSet<Operation *, 4> users;
+
+        for (Operation *user : branchOprd.getUsers()) {
+          if (isa<handshake::MergeLikeOpInterface>(user) &&
+              user->getBlock() == succ)
+            users.insert(user);
+        }
+
+        // Use the results of the newly added branch to feed the
+        // original users (CF operations)
         rewriter.replaceUsesWithIf(
-            branchOprd, getSuccResult(termOp, newOp, userGroup.first),
-            [&](OpOperand &oprd) {
-              return userGroup.second.contains(oprd.getOwner());
-            });
+            branchOprd, newBranchOp.getResult(),
+            [&](OpOperand &oprd) { return users.contains(oprd.getOwner()); });
       }
     }
   }
