@@ -139,7 +139,6 @@ void PipelineDuplicationPass::runDynamaticPass() {
                                                    compValList, opName)))
     return signalPassFailure();
 
-  llvm::errs() << "COMPVALLIST: " << compValList[0] << '\n';
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   Operation *op = namer.getOp(opName);
   if (!op) {
@@ -150,19 +149,13 @@ void PipelineDuplicationPass::runDynamaticPass() {
   mlir::func::FuncOp funcOp =
       dyn_cast<mlir::func::FuncOp>(currentBlock->getParentOp());
   Location loc = op->getLoc();
-
-  // create branch condition
-  builder.setInsertionPointAfter(op);
-  // assume only the first result is relevant
   Value selectRes = op->getResult(0);
-  Value constantComp = builder.create<mlir::arith::ConstantOp>(
-      loc, builder.getFloatAttr(builder.getF32Type(), compVal));
-  Value branchCond = builder.create<mlir::arith::CmpFOp>(
-      loc, mlir::arith::CmpFPredicate::OEQ, selectRes, constantComp);
 
   // restructure the blocks
-  mlir::Block *exitBlock = currentBlock->splitBlock(
-      Block::iterator(branchCond.getDefiningOp())->getNextNode());
+  builder.setInsertionPointAfter(op);
+  mlir::Block *exitBlock =
+      currentBlock->splitBlock(builder.getInsertionPoint());
+  // Block::iterator(branchCond.getDefiningOp())->getNextNode());
 
   // is there a better way than DFS + sorting?
   // DFS starting from selectRes
@@ -177,39 +170,8 @@ void PipelineDuplicationPass::runDynamaticPass() {
     }
   }
 
-  mlir::Block *trueBlock = funcOp.addBlock();  // true path
-  mlir::Block *falseBlock = funcOp.addBlock(); // false path
-  // move the new blocks to right after currentBlock
-  auto &blockList = funcOp.getBody().getBlocks();
-  blockList.splice(std::next(currentBlock->getIterator()), blockList,
-                   trueBlock->getIterator());
-  blockList.splice(std::next(trueBlock->getIterator()), blockList,
-                   falseBlock->getIterator());
-
-  builder.setInsertionPointToEnd(currentBlock);
-  builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueBlock,
-                                         falseBlock);
-
-  // TRUE PATH
-  // clone the necessary operations to here
-  builder.setInsertionPointToStart(trueBlock);
-  mlir::IRMapping mapper;
-  mapper.map(op->getResult(0), constantComp);
-
-  // do the actual cloning
-  for (mlir::Operation *origOp : opsToMove) {
-    mlir::Operation *cloned = builder.clone(*origOp, mapper);
-    std::string newName = namer.getName(origOp).str() + "_dup";
-    cloned->setAttr("handshake.name", builder.getStringAttr(newName));
-
-    for (unsigned i = 0; i < cloned->getNumResults(); ++i) {
-      mapper.map(origOp->getResult(i), cloned->getResult(i));
-    }
-  }
-
   // track the connecting to output wires
   llvm::SmallVector<mlir::Value> originalOutputs;
-
   for (mlir::Operation *origOp : opsToMove) {
     for (mlir::Value origRes : origOp->getResults()) {
       // Determine if a value breaches the edge of our duplicated region
@@ -225,41 +187,100 @@ void PipelineDuplicationPass::runDynamaticPass() {
     }
   }
 
-  // Print Value mappings (Original Value -> Cloned Value)
-  llvm::errs() << "--- Mapper Contents ---\n";
-  for (auto &pair : mapper.getValueMap()) {
-    mlir::Value original = pair.first;
-    mlir::Value cloned = pair.second;
-
-    llvm::errs() << "Value Mapping:\n";
-    llvm::errs() << "  From: " << original << "\n";
-    llvm::errs() << "  To:   " << cloned << "\n";
-  }
-  llvm::errs() << "-----------------------\n";
-
   llvm::SmallVector<Value> exitBlockArgs;
-  llvm::SmallVector<Value> trueBranchOperands;
   for (Value origOut : originalOutputs) {
     exitBlockArgs.push_back(exitBlock->addArgument(origOut.getType(), loc));
-    trueBranchOperands.push_back(mapper.lookup(origOut));
   }
-  builder.setInsertionPointToEnd(trueBlock);
-  builder.create<mlir::cf::BranchOp>(loc, exitBlock, trueBranchOperands);
+
+  int counter = 2;
+  for (float comp : compValList) {
+    // create branch condition
+    builder.setInsertionPointToEnd(currentBlock);
+    // assume only the first result is relevant
+    Value constantComp = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(builder.getF32Type(), comp));
+    Value branchCond = builder.create<mlir::arith::CmpFOp>(
+        loc, mlir::arith::CmpFPredicate::OEQ, selectRes, constantComp);
+    mlir::Block *trueBlock = funcOp.addBlock();     // true path
+    mlir::Block *nextElseBlock = funcOp.addBlock(); // false path
+    builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueBlock,
+                                           nextElseBlock);
+
+    // move the new blocks to right after currentBlock
+    auto &blockList = funcOp.getBody().getBlocks();
+    blockList.splice(std::next(currentBlock->getIterator()), blockList,
+                     trueBlock->getIterator());
+    blockList.splice(std::next(trueBlock->getIterator()), blockList,
+                     nextElseBlock->getIterator());
+
+    // clone the necessary operations to here
+    builder.setInsertionPointToStart(trueBlock);
+    mlir::IRMapping mapper;
+    mapper.map(selectRes, constantComp);
+
+    // do the actual cloning
+    for (mlir::Operation *origOp : opsToMove) {
+      mlir::Operation *cloned = builder.clone(*origOp, mapper);
+      std::string newName =
+          namer.getName(origOp).str() + "_dup" + std::to_string(counter);
+      cloned->setAttr("handshake.name", builder.getStringAttr(newName));
+
+      for (unsigned i = 0; i < cloned->getNumResults(); ++i) {
+        mapper.map(origOp->getResult(i), cloned->getResult(i));
+      }
+    }
+
+    // Print Value mappings (Original Value -> Cloned Value)
+    llvm::errs() << "--- Mapper Contents ---\n";
+    for (auto &pair : mapper.getValueMap()) {
+      mlir::Value original = pair.first;
+      mlir::Value cloned = pair.second;
+
+      llvm::errs() << "Value Mapping:\n";
+      llvm::errs() << "  From: " << original << "\n";
+      llvm::errs() << "  To:   " << cloned << "\n";
+    }
+    llvm::errs() << "-----------------------\n";
+
+    llvm::SmallVector<Value> trueBranchOperands;
+    for (Value origOut : originalOutputs) {
+      trueBranchOperands.push_back(mapper.lookup(origOut));
+    }
+    builder.setInsertionPointToEnd(trueBlock);
+    builder.create<mlir::cf::BranchOp>(loc, exitBlock, trueBranchOperands);
+
+    // update
+    currentBlock = nextElseBlock;
+    counter++;
+  }
 
   // FALSE PATH
   // move all of the stuff from above here
-  builder.setInsertionPointToStart(falseBlock);
+  builder.setInsertionPointToStart(currentBlock);
   for (Operation *origOp : opsToMove) {
-    origOp->moveBefore(falseBlock, falseBlock->end());
+    origOp->moveBefore(currentBlock, currentBlock->end());
   }
-  builder.setInsertionPointToEnd(falseBlock);
+  builder.setInsertionPointToEnd(currentBlock);
   builder.create<mlir::cf::BranchOp>(loc, exitBlock, originalOutputs);
 
   for (size_t i = 0; i < originalOutputs.size(); ++i) {
     originalOutputs[i].replaceUsesWithIf(
         exitBlockArgs[i], [&](OpOperand &operand) {
           mlir::Block *userBlock = operand.getOwner()->getBlock();
-          return userBlock != trueBlock && userBlock != falseBlock;
+          if (userBlock == exitBlock) {
+            return true;
+          }
+
+          // Otherwise, only replace it if it's completely outside the
+          // true/false cascade structures we generated.
+          return userBlock != currentBlock &&
+                 userBlock->getParentOp() == funcOp &&
+                 !llvm::any_of(compValList, [&](float) {
+                   // Keeps replacements from corrupting the internal lanes
+                   return userBlock->getTerminator() &&
+                          isa<mlir::cf::CondBranchOp>(
+                              userBlock->getTerminator());
+                 });
         });
   }
 
