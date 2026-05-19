@@ -422,17 +422,19 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
   return success();
 }
 namespace {
-std::vector<std::pair<ControlMergeOp, int32_t>>
-findEntryCMerge(mlir::Value start) {
-  std::vector<std::pair<ControlMergeOp, int32_t>> ret;
+struct EntryCMerge {
+  ControlMergeOp op;
+  int32_t entryValue;
+};
+std::vector<EntryCMerge> findEntryCMerge(mlir::Value start) {
+  std::vector<EntryCMerge> ret;
   std::vector<mlir::Value> stack;
   stack.push_back(start);
   while (!stack.empty()) {
     mlir::Value cur = stack.back();
     stack.pop_back();
 
-    OpOperand &operand = *cur.getUses().begin();
-    Operation *next = operand.getOwner();
+    Operation *next = *cur.getUsers().begin();
     if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
       int32_t entry;
       for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
@@ -440,7 +442,7 @@ findEntryCMerge(mlir::Value start) {
           entry = i;
         }
       }
-      ret.emplace_back(cmerge, entry);
+      ret.push_back({cmerge, entry});
     }
     if (isa<BufferOp, ForkOp>(next)) {
       for (mlir::Value channel : next->getResults()) {
@@ -454,6 +456,9 @@ findEntryCMerge(mlir::Value start) {
 
 LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     ControlMergeOp cmerge, int32_t entryValue) {
+  // Usually, the index of the cmerge is used for as the select input for a mux
+  // operator for each argument of the function. Each of these paths can be
+  // annotated.
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
     mlir::Value cur;
@@ -481,17 +486,19 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
       EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots,
                         entryValue);
       propertyTable.push_back(p.toJSON());
-      continue;
-    }
-    if (auto buffer = dyn_cast<BufferOp>(next)) {
+    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
+      // Add the slots of this buffer to the list of effective slot (copied
+      // sents will be added later)
       for (auto &slot : buffer.getInternalSlotStateNamers()) {
         path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
       }
       path.cur = buffer.getResult();
       stack.push_back(std::move(path));
-      continue;
-    }
-    if (auto fork = dyn_cast<ForkOp>(next)) {
+    } else if (auto fork = dyn_cast<ForkOp>(next)) {
+      // Branch into multiple paths, and add the sent state of the selected
+      // channel as a copied sent for the last slot
+      // Note: This last slot always exists, as the control merge contains a
+      // slot
       auto sents = fork.getInternalSentStateNamers();
       for (auto [i, channel] : llvm::enumerate(next->getResults())) {
         PartialPath nextPath = {
@@ -502,11 +509,10 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
         back.copiedSents.push_back(sents[i]);
         stack.push_back(nextPath);
       }
-      continue;
+    } else {
+      assert(false && "unexpected op detected!");
+      return failure();
     }
-
-    assert(false && "unexpected op detected!");
-    return failure();
   }
   return success();
 }

@@ -338,6 +338,15 @@ private:
   inline static const StringLiteral SENTS_LIT = "sents";
 };
 
+// EntryTokenOrder describes the invariant that, for a path between an entry
+// control merge and a following mux operation, only the last effective token
+// along that path can be an entry. Intuitively, this is because the entry token
+// will only appear a single time when the loop starts, and after that all
+// tokens along the path will be looping tokens.
+// This invariant is defined by the effective slots along the path from control
+// merge to mux `slots`, and by the value of the entry token `entryValue` (which
+// corresponds to the index of the control merge's input connected to the
+// entry path).
 class EntryTokenOrder : public FormalProperty {
 public:
   const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }

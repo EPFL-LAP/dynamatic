@@ -375,8 +375,8 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
 };
 
-// EffectiveSlotNamer generates the SMV that is TRUE if and only if the
-// targetted slot 1. contains data and 2. is not duplicated by an eager fork.
+// EffectiveSlotNamer generates the name of the signal that indicates whether
+// the targeted slot 1. contains data and 2. is not duplicated by an eager fork.
 struct EffectiveSlotNamer : InternalStateNamer {
   EffectiveSlotNamer() = default;
   EffectiveSlotNamer(std::unique_ptr<InternalStateNamer> slot)
