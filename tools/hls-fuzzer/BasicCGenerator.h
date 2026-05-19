@@ -4,6 +4,7 @@
 #include "AST.h"
 #include "Randomly.h"
 #include "TypeSystem.h"
+#include "Utils.h"
 
 #include <optional>
 
@@ -42,75 +43,41 @@ private:
     return "var" + std::to_string(varCounter++);
   }
 
-  friend class PendingParameter;
-
-  /// Convenience class that automatically undoes the creation of a parameter
-  /// unless it was committed.
-  class PendingParameter {
-  public:
-    PendingParameter(BasicCGenerator &generator,
-                     const ast::ScalarParameter &parameter)
-        : generator(generator), parameter(parameter) {}
-
-    ~PendingParameter() {
-      if (!parameter)
-        return;
-
-      generator.scalarParameters.pop_back();
-      generator.varCounter--;
-    }
-
-    const ast::ScalarParameter &getParameter() const {
-      assert(parameter && "must not yet be committed");
-      return *parameter;
-    }
-
-    ast::ScalarParameter commit() {
-      assert(parameter && "must not yet be committed");
-      ast::ScalarParameter value = std::move(*parameter);
-      parameter.reset();
-      return value;
-    }
-
-  private:
-    BasicCGenerator &generator;
-    std::optional<ast::ScalarParameter> parameter;
-  };
-
-  ast::ReturnStatement
+  std::pair<ast::ReturnStatement, OpaqueContext>
   generateReturnStatement(const OpaqueContext &constraints);
 
-  ast::Expression generateExpression(const OpaqueContext &context,
-                                     std::size_t depth);
+  std::pair<ast::Expression, OpaqueContext>
+  generateExpression(const OpaqueContext &context, std::size_t depth);
 
-  std::optional<ast::Expression>
+  std::optional<std::pair<ast::Expression, OpaqueContext>>
   generateBinaryExpression(ast::BinaryExpression::Op op,
                            const OpaqueContext &constraints, std::size_t depth);
 
-  std::optional<ast::Expression>
+  std::optional<std::pair<ast::Expression, OpaqueContext>>
   generateUnaryExpression(ast::UnaryExpression::Op op,
                           const OpaqueContext &context, std::size_t depth);
 
-  std::optional<ast::ConditionalExpression>
+  std::optional<std::pair<ast::ConditionalExpression, OpaqueContext>>
   generateConditionalExpression(const OpaqueContext &constraint,
                                 std::size_t depth);
 
-  std::optional<ast::CastExpression>
+  std::optional<std::pair<ast::CastExpression, OpaqueContext>>
   generateCastExpression(const OpaqueContext &constraint, std::size_t depth);
 
   ast::Constant getConstantForType(const ast::ScalarType &scalarType) const;
 
-  std::optional<ast::Constant> generateConstant(const OpaqueContext &constraint,
-                                                std::size_t depth = 0) const;
+  std::optional<std::pair<ast::Constant, OpaqueContext>>
+  generateConstant(const OpaqueContext &constraint,
+                   std::size_t depth = 0) const;
 
-  std::optional<ast::ArrayReadExpression>
+  std::optional<std::pair<ast::ArrayReadExpression, OpaqueContext>>
   generateArrayReadExpression(const OpaqueContext &context,
                               std::size_t depth = 0);
 
-  std::optional<ast::ArrayParameter>
+  std::optional<std::pair<ast::ArrayParameter, OpaqueContext>>
   generateArrayParameter(const OpaqueContext &context, std::size_t depth = 0);
 
-  std::optional<ast::Variable>
+  std::optional<std::pair<ast::Variable, OpaqueContext>>
   generateScalarParameter(const OpaqueContext &constraints,
                           std::size_t depth = 0);
 
@@ -118,19 +85,21 @@ private:
   /// type in the given context.
   /// 'toExclude' may be supplied by the caller to further exclude some scalar
   /// types based on the given context.
-  std::optional<ast::ScalarType> generateScalarType(
+  std::optional<std::pair<ast::ScalarType, OpaqueContext>> generateScalarType(
       const OpaqueContext &context,
       llvm::function_ref<bool(const ast::ScalarType &)> toExclude =
           nullptr) const;
 
-  ast::ReturnType generateReturnType(const OpaqueContext &context) const;
+  std::pair<ast::ReturnType, OpaqueContext>
+  generateReturnType(const OpaqueContext &context) const;
 
-  ast::StatementList generateStatementList(const OpaqueContext &context,
-                                           size_t depth);
+  std::pair<ast::StatementList, OpaqueContext>
+  generateStatementList(const OpaqueContext &context, size_t depth);
 
-  std::optional<ast::Statement> generateStatement(const OpaqueContext &context);
+  std::optional<std::pair<ast::Statement, OpaqueContext>>
+  generateStatement(const OpaqueContext &context);
 
-  std::optional<ast::ArrayAssignmentStatement>
+  std::optional<std::pair<ast::ArrayAssignmentStatement, OpaqueContext>>
   generateArrayAssignmentStatement(const OpaqueContext &context);
 
   Randomly &random;
@@ -152,17 +121,28 @@ private:
 
   template <typename ASTNode, typename... SubElements>
   struct GenerateWithDependencies<ASTNode, std::tuple<SubElements...>> {
-    std::optional<ASTNode>
-    operator()(const OpaqueContext &parentContext,
+
+    /// Convenience overload for terminal ASTNodes. Calculates the output
+    /// context and returns the node 'node' as is.
+    template <std::size_t size = sizeof...(SubElements),
+              std::enable_if_t<size == 0> * = nullptr>
+    std::pair<ASTNode, OpaqueContext>
+    operator()(const OpaqueContext &inputContext,
                const TransferFnArray<ASTNode> &transferFunctions,
-               llvm::function_ref<
-                   std::optional<SubElements>(OpaqueContext)>... generators,
-               llvm::function_ref<std::optional<ASTNode>(SubElements &&...)>
-                   constructor) const {
+               ASTNode node) const {
+      return std::move(*(*this)(inputContext, transferFunctions,
+                                [&] { return std::move(node); }));
+    }
+
+    std::optional<std::pair<ASTNode, OpaqueContext>> operator()(
+        const OpaqueContext &parentContext,
+        const TransferFnArray<ASTNode> &transferFunctions,
+        llvm::function_ref<std::optional<std::pair<SubElements, OpaqueContext>>(
+            OpaqueContext)>... generators,
+        llvm::function_ref<std::optional<ASTNode>(SubElements &&...)>
+            constructor) const {
       typename OpaqueTransferFn<ASTNode>::SubElementsTuple subElements;
 
-      // TODO: For now subelement generators cannot yet return an output
-      //       context. We assume output context == input context.
       typename OpaqueTransferFn<ASTNode>::ContextTuple contexts;
       std::get<sizeof...(SubElements)>(contexts) = parentContext;
 
@@ -187,25 +167,35 @@ private:
       std::array<NodeList, sizeof...(SubElements)> forwardEdgeList{};
       // For a given node 'i', contains the number of incoming edges into 'i'.
       NodeList incomingEdgeCount{};
-      for (auto &&[index, iter] :
-           llvm::enumerate(llvm::ArrayRef(transferFunctions).drop_back())) {
-        if (iter.getInputDependencies().empty() ||
-            iter.getInputDependencies() == llvm::ArrayRef{PARENT_DEPENDENCY}) {
-          // No dependency (besides the parent context which is satisfied).
-          worklist[workListSize++] = index;
-          continue;
-        }
 
-        // Build the outgoing edge list but do keep track of the number of
-        // incoming edges.
-        for (auto fromIndex : iter.getInputDependencies()) {
-          if (fromIndex == PARENT_DEPENDENCY)
-            continue;
+      std::apply(
+          [&](auto &&...elementIndices) {
+            (
+                [&](auto elementIndex) {
+                  constexpr std::size_t index = decltype(elementIndex){};
+                  auto &iter = std::get<index>(transferFunctions);
 
-          forwardEdgeList[fromIndex][forwardEdgeCount[fromIndex]++] = index;
-          ++incomingEdgeCount[index];
-        }
-      }
+                  if (iter.getInputDependencies().empty() ||
+                      iter.getInputDependencies() ==
+                          llvm::ArrayRef{INPUT_DEPENDENCY}) {
+                    // No dependency (besides the parent context which is
+                    // satisfied).
+                    worklist[workListSize++] = index;
+                    return;
+                  }
+
+                  // Build the outgoing edge list but do keep track of the
+                  // number of incoming edges.
+                  for (auto fromIndex : iter.getInputDependencies())
+                    if (fromIndex != INPUT_DEPENDENCY) {
+                      forwardEdgeList[fromIndex]
+                                     [forwardEdgeCount[fromIndex]++] = index;
+                      ++incomingEdgeCount[index];
+                    }
+                }(elementIndices),
+                ...);
+          },
+          getIndicesTuple(std::index_sequence_for<SubElements...>{}));
 
       std::size_t topoOrderSize = 0;
       NodeList topoOrder{};
@@ -239,32 +229,42 @@ private:
                 constexpr std::size_t index = decltype(indexT){};
 
                 auto &context = std::get<index>(contexts);
-                // First generate the context for the subelement.
-                context = transferFunctions[iter](subElements, contexts);
-                // Now generate the subelement.
-                std::get<index>(subElements) =
+                // First calculate the context for the subelement.
+                context.emplace(
+                    std::get<indexT>(transferFunctions)(subElements, contexts));
+
+                std::optional result =
                     std::get<index>(std::make_tuple(generators...))(*context);
-                // Check whether we were successful.
-                return std::get<index>(subElements).has_value();
+                if (!result)
+                  return false;
+
+                // Update with the output context plus generated subelement.
+                std::tie(std::get<index>(subElements), context) =
+                    std::move(*result);
+                return true;
               }(indices) &&
                       ...);
             },
-            getIndicesTuple(std::index_sequence_for<SubElements...>{}));
+            getTupleOfIndices(std::index_sequence_for<SubElements...>{}));
 
         // Discard this AST node if we failed to generate a subelement.
         if (!success)
           return std::nullopt;
       }
-      // Lastly, generate the output context.
-      std::get<sizeof...(SubElements)>(contexts) =
-          transferFunctions[sizeof...(SubElements)](subElements, contexts);
 
-      // And call the constructor with all subelements.
+      // Call the constructor with all subelements.
       // It should be safe to dereference all optionals since they have been
       // guaranteed to have been generated.
-      return std::apply(
+      std::optional<ASTNode> astNode = std::apply(
           [&](auto &&...values) { return constructor(std::move(*values)...); },
           std::move(subElements));
+      if (!astNode)
+        return std::nullopt;
+
+      // Calculate the output context.
+      OpaqueContext outputContext = std::get<OutputTransferFn<ASTNode>>(
+          transferFunctions)(*astNode, contexts);
+      return std::pair{std::move(*astNode), std::move(outputContext)};
     }
   };
 

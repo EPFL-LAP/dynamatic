@@ -125,7 +125,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
-        with: 
+        with:
           name: integration-report
           path: |
             integration-test/*/out*/comp
