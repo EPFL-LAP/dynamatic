@@ -44,7 +44,7 @@ struct LLVMMemDependency {
 
       auto dstNameAttr = mlir::StringAttr::get(&ctx, dstName);
       auto attr = dynamatic::handshake::MemDependenceAttr::get(
-          &ctx, dstNameAttr, depth, dist);
+          &ctx, dstNameAttr, depth, dist, true);
       attrs.push_back(attr);
     }
 

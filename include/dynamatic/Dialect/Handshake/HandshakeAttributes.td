@@ -206,14 +206,6 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
 
   let assemblyFormat = "`{``dstAccess` `:` $dstAccess `,` `loopDepth` `:` $loopDepth `,` `distance` `:` $distance `,` `isActive` `:` $isActive`}`";
 
-  let builders = [
-    AttrBuilder<(ins "::mlir::StringAttr":$dstAccess,
-                     "unsigned":$loopDepth,
-                     "unsigned":$distance), [{
-      return $_get(context, dstAccess, loopDepth, distance, /*isActive=*/true);
-    }]>
-  ];
-
   let extraClassDeclaration = [{
     MemDependenceAttr asInactive() const {
       return get(getContext(), getDstAccess(), getLoopDepth(), getDistance(),
