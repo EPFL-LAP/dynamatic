@@ -640,6 +640,16 @@ std::string
 gen::BasicCGenerator::generateTestBench(const ast::Function &kernel) const {
   std::string s;
   llvm::raw_string_ostream ss(s);
+  // Mark the test bench as 'constexpr' to be able to use constant evaluation to
+  // verify that the kernel is free of undefined-behaviour.
+  // The 'execute.sh' file in 'TargetUtils.cpp' later appends a 'static_assert'
+  // that forces constant evaluation of the 'test_bench'.
+
+  // Note that we gate this behind the 'HLS_FUZZER_VERIFY' macro since compiling
+  // the kernel for profiling and I/O generation would otherwise error out as
+  // things like I/O functions are not 'constexpr' and not allowed to be called
+  // from 'constexpr' functions in some C++ versions. Furthermore, 'constexpr'
+  // does not exist in C.
   ss << R"(
 #ifdef HLS_FUZZER_VERIFY
 constexpr
