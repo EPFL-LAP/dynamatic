@@ -953,6 +953,14 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.valid_merger",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t valid_merger -p left_bitwidth=$LEFT_BITWIDTH right_bitwidth=$RIGHT_BITWIDTH"
+  },
+  {
+    "name": "handshake.ready_remover",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t ready_remover -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "generic": "$DYNAMATIC/data/verilog/support/delay_buffer.v",
     "hdl": "verilog"
   },

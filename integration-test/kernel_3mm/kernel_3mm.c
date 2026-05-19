@@ -21,25 +21,28 @@ void kernel_3mm(int A[NI][NK], int B[NK][NJ], int C[NJ][NM], int D[NM][NL],
                 int E[NI][NJ], int F[NJ][NL], int G[NI][NL]) {
   for (unsigned i = 0; i < NI; i++) {
     for (unsigned j = 0; j < NJ; j++) {
-      E[i][j] = 0;
+      int tmp = 0;
       for (unsigned k = 0; k < NK; ++k)
-        E[i][j] += A[i][k] * B[k][j];
+        tmp += A[i][k] * B[k][j];
+      E[i][j] = tmp;
     }
   }
 
   for (unsigned j = 0; j < NJ; j++) {
     for (unsigned l = 0; l < NL; l++) {
-      F[j][l] = 0;
+      int tmp = 0;
       for (unsigned m = 0; m < NM; ++m)
-        F[j][l] += C[j][m] * D[m][l];
+        tmp += C[j][m] * D[m][l];
+      F[j][l] = tmp;
     }
   }
 
   for (unsigned i = 0; i < NI; i++) {
     for (unsigned l = 0; l < NL; l++) {
-      G[i][l] = 0;
+      int tmp = 0;
       for (unsigned j = 0; j < NJ; ++j)
-        G[i][l] += E[i][j] * F[j][l];
+        tmp += E[i][j] * F[j][l];
+      G[i][l] = tmp;
     }
   }
 }

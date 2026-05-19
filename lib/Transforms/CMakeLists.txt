@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticTransforms
   ForceMemoryInterface.cpp
   FuncMaximizeSSA.cpp
   FuncSetArgNames.cpp
+  ConsumeProducerOutputAttrMarker.cpp
   HandshakeCanonicalize.cpp
   HandshakeDeactivateMemDependencies.cpp
   HandshakeHoistExtInstances.cpp

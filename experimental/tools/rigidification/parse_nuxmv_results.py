@@ -27,7 +27,7 @@ def parse_nuxmv(json_file, nuxmv_file, abort_on_unproven):
         #   [Invar          False          N/A    fir.p75]
         #
         # We therefore extract the id with the following pattern
-        id_pattern = fr"p{obj_id}\]"
+        id_pattern = fr"(p|invariant){obj_id}\]"
         for line in nuXmv_lines:
             if re.search(id_pattern, line):
                 status_match = re.search(result_pattern, line)
