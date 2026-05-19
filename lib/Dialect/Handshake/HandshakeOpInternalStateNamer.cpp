@@ -1,7 +1,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
-#include "llvm/ADT/StringExtras.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Casting.h"
 
 namespace dynamatic {
