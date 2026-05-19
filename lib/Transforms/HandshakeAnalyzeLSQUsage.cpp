@@ -105,6 +105,8 @@ static DenseMap<Operation *, bool>
 markOpsWithActiveDependencies(DenseSet<Operation *> &accessOps) {
   DenseMap<Operation *, bool> hasActiveDep;
 
+  // needed as we need to be able to find the operations corresponding to the
+  // names in the dependencies
   DenseMap<StringRef, Operation *> nameToOpMapping;
   for (Operation *op : accessOps) {
     StringRef name = getUniqueName(op);
@@ -174,13 +176,19 @@ void HandshakeAnalyzeLSQUsagePass::analyzeMemRef(
     }
   }
 
+  // process all dependencies and mark all the ports involved in a dependency as
+  // LSQ ports
   DenseMap<Operation *, bool> isLSQPort =
       markOpsWithActiveDependencies(lsqAccessOps);
 
   for (Operation *accessOp : lsqAccessOps) {
     if (isLSQPort.at(accessOp))
+      // mark the access op as an LSQ port by setting the attribute with the
+      // group ID
       setDialectAttr<MemInterfaceAttr>(accessOp, ctx, groupMap.at(accessOp));
     else
+      // mark the access op as a non-LSQ port by setting the attribute without a
+      // group ID
       setDialectAttr<MemInterfaceAttr>(accessOp, ctx);
   }
 }
