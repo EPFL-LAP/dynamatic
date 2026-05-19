@@ -4,6 +4,7 @@
 #include "AST.h"
 #include "Randomly.h"
 #include "TypeSystem.h"
+#include "Utils.h"
 
 #include <optional>
 
@@ -244,7 +245,7 @@ private:
               }(indices) &&
                       ...);
             },
-            getIndicesTuple(std::index_sequence_for<SubElements...>{}));
+            getTupleOfIndices(std::index_sequence_for<SubElements...>{}));
 
         // Discard this AST node if we failed to generate a subelement.
         if (!success)

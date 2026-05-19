@@ -3,6 +3,7 @@
 
 #include "AST.h"
 #include "Randomly.h"
+#include "Utils.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FunctionExtras.h"
@@ -256,9 +257,29 @@ private:
 /// It primarily differs from 'TransferFn' in that it receives a fully
 /// constructed instance of 'ASTNode' rather than subelements and is always
 /// executed last.
-///
 /// There is no way for a 'TransferFn' to receive the final fully constructed
 /// 'ASTNode' necessitating this being a separate class.
+///
+/// For example, given a 'TransferFn<ArrayAssignmentStatement, ...>' for an
+/// array assignment of the form:
+///   ARRAY[INDEX] = VALUE
+///
+/// If it its input dependencies are 'ArrayAssignmentStatement::ARRAY',
+/// 'ArrayAssignmentStatement::NAME' and 'INPUT_CONTEXT' (i.e.
+/// TransferFn<ArrayAssignmentStatement, ARRAY, NAME, INPUT_CONTEXT> in C++)
+/// then its function object has the signature:
+///
+/// (const TypingContext& arrayContext, const ArrayParameter& arrayParameter,
+///  const TypingContext& indexContext, const Expression& index,
+///  const TypingContext& inputContext) -> TypingContext
+///
+/// An 'OutputTransferFn' with the same input context, in contrast, no longer
+/// receives the AST subelements but the final generated 'ASTNode' as first
+/// parameter. The function object for the above must have the signature:
+///
+/// (const ArrayAssignmentStatement& node,
+///  const TypingContext& arrayContext, const TypingContext& indexContext,
+///  const TypingContext& inputContext) -> TypingContext
 template <typename ASTNode>
 class OutputTransferFn {
 public:
@@ -276,32 +297,55 @@ public:
   /// Note that unlike 'TransferFn', no subelement AST nodes are passed.
   /// Instead the fully constructed 'ASTNode' is passed as the first parameter.
   template <std::size_t... inputDependencies, class F>
-  explicit OutputTransferFn(std::index_sequence<inputDependencies...>, F &&f) {
-    computationFn =
-        [f = std::forward<F>(f)](
-            const ASTNode &astNode,
-            const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts) {
-          return OpaqueContext(std::apply(
-              [&](auto &&...integrals) {
-                constexpr auto numSubElements =
-                    std::tuple_size_v<typename ASTNode::SubElements>;
+  explicit OutputTransferFn(std::index_sequence<inputDependencies...>, F &&f)
+      : computationFn([f = std::forward<F>(f)](
+                          const ASTNode &astNode,
+                          const typename OpaqueTransferFn<ASTNode>::ContextTuple
+                              &contexts) {
+          // Using the values in 'inputDependencies', construct a tuple of all
+          // the requested contexts and unbox them out of the 'OpaqueContext'.
+          auto castedContexts = enumerateTuplesInto(
+              [](auto &&...args) {
+                return std::forward_as_tuple(
+                    std::forward<decltype(args)>(args)...);
+              },
+              [&](auto indexT, auto inputDependencyT) {
+                constexpr std::size_t index = decltype(indexT){};
+                constexpr std::size_t inputDependency =
+                    decltype(inputDependencyT){};
+
+                // Input dependencies map to the last element within
+                // 'contexts'.
+                constexpr std::size_t indexInContext =
+                    inputDependency == INPUT_DEPENDENCY
+                        ? std::tuple_size_v<std::decay_t<decltype(contexts)>> -
+                              1
+                        : inputDependency;
+
+                // Cast the 'OpaqueContext' to whatever parameter type
+                // the function object accepts.
+                constexpr std::size_t astNodeParamOffset = 1;
+
                 using FunctionTrait =
                     llvm::function_traits<std::decay_t<decltype(f)>>;
+                using TypingContext =
+                    std::decay_t<typename FunctionTrait::template arg_t<
+                        astNodeParamOffset + index>>;
 
-                return f(
-                    astNode,
-                    std::get<std::min<std::size_t>(inputDependencies,
-                                                   numSubElements)>(contexts)
-                        // Cast the 'OpaqueContext' to whatever parameter type
-                        // the function object accepts.
-                        ->template cast<
-                            std::decay_t<typename FunctionTrait::template arg_t<
-                                1 + decltype(integrals){}>>>()...);
+                return std::get<indexInContext>(contexts)
+                    ->template cast<TypingContext>();
               },
-              getIndicesTuple(
-                  std::make_index_sequence<sizeof...(inputDependencies)>{})));
-        };
-  }
+              getTupleOfIndices(std::index_sequence<inputDependencies...>{}));
+
+          // Now call the given function object using the 'ASTNode' and the
+          // contexts.
+          return std::apply(
+              [&](auto &&...args) {
+                return OpaqueContext(
+                    f(astNode, std::forward<decltype(args)>(args)...));
+              },
+              std::move(castedContexts));
+        }) {}
 
   /// Convenience overload for 'OutputTransferFn' that do not have any input
   /// dependencies.
@@ -327,11 +371,6 @@ public:
   }
 
 private:
-  template <std::size_t... is>
-  constexpr static auto getIndicesTuple(std::index_sequence<is...>) {
-    return std::tuple{std::integral_constant<std::size_t, is>{}...};
-  }
-
   std::function<OpaqueContext(
       const ASTNode &astNode,
       const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts)>
