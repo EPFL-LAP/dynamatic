@@ -69,8 +69,8 @@ private:
                                   OpBuilder &builder) const;
 
   /// Given a set of operations, returns a mapping from each operation to a
-  /// boolean indicating whether it is involved in at least one active dependency
-  /// with another operation.
+  /// boolean indicating whether it is involved in at least one active
+  /// dependency with another operation.
   static DenseMap<Operation *, bool>
   markOpsWithActiveDependencies(DenseSet<Operation *> &accessOps);
 
