@@ -204,7 +204,7 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     "bool":$isActive
   );
 
-  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `,` $distance `,` $isActive `]`";
+  let assemblyFormat = "`{``dstAccess` `:` $dstAccess `,` `loopDepth` `:` $loopDepth `,` `distance` `:` $distance `,` `isActive` `:` $isActive`}`";
 
   let builders = [
     AttrBuilder<(ins "::mlir::StringAttr":$dstAccess,
