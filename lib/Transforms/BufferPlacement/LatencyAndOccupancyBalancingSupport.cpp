@@ -186,14 +186,19 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
     }
   }
 
-  llvm::errs() << "=== Synthetic start fork block arguments ===\n";
+  LLVM_DEBUG({
+    llvm::errs() << "=== Synthetic start fork block arguments ===\n";
+  });
+
   handshake::PortNamer namer(funcOp);
   for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
     if (isa<mlir::MemRefType>(arg.getType()))
       continue;
-    llvm::errs() << "  arg #" << arg.getArgNumber() << " \""
-                 << namer.getInputName(arg.getArgNumber())
-                 << "\": " << arg.getType() << "\n";
+    LLVM_DEBUG({
+      llvm::errs() << "  arg #" << arg.getArgNumber() << " \""
+                   << namer.getInputName(arg.getArgNumber())
+                   << "\": " << arg.getType() << "\n";
+    });
   }
 
   if (seen.size() < 2)
