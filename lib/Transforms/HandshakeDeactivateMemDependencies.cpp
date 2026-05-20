@@ -154,23 +154,19 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
 void HandshakeDeactivateMemDependenciesPass::runOnOperation() {
   ModuleOp modOp = getOperation();
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
-  bool failure = false;
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       if (isa<handshake::LoadOp, handshake::StoreOp>(&op) &&
           !namer.hasName(&op)) {
         op.emitError() << "Memory access port must be named.";
-        failure = true;
+        return signalPassFailure();
       }
       if (!cannotBelongToCFG(&op) && !getLogicBB(&op)) {
         op.emitError() << "Operation should have basic block attribute.";
-        failure = true;
+        return signalPassFailure();
       }
     }
   }
-
-  if (failure)
-    return signalPassFailure();
 
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     if (failed(analyzeFunction(funcOp)))
