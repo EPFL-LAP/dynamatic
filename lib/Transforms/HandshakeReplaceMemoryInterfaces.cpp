@@ -98,7 +98,7 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
   if (res.wasInterrupted())
     return signalPassFailure();
 
-  // Check that all eligible operations within Handshake function belon to a
+  // Check that all eligible operations within Handshake function belong to a
   // basic block
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
@@ -120,6 +120,8 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
     }
   }
 
+  // Use the updated memory access type information to replace the memory
+  // interfaces in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     if (failed(replaceInFunction(funcOp)))
       return signalPassFailure();
