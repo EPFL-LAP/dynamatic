@@ -91,7 +91,12 @@ inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
         FailureOr<bool> giid = isStoreGIIDOnLoad(loadOp, storeOp, cfg);
         if (failed(giid))
           return failure();
-        opDeps[loadOp].push_back(*giid ? dep.asInactive() : dep);
+        opDeps[loadOp].push_back(
+            *giid
+                ? MemDependenceAttr::get(dep.getContext(), dep.getDstAccess(),
+                                         dep.getLoopDepth(), dep.getDistance(),
+                                         /*isActive=*/false)
+                : dep);
       }
     }
   }
@@ -109,7 +114,11 @@ static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps,
           continue;
         // set the dependency as inactive if the store is GIID on the load
         opDeps[storeOp].push_back(
-            storeName == dep.getDstAccess() ? dep.asInactive() : dep);
+            storeName == dep.getDstAccess()
+                ? MemDependenceAttr::get(dep.getContext(), dep.getDstAccess(),
+                                         dep.getLoopDepth(), dep.getDistance(),
+                                         /*isActive=*/false)
+                : dep);
       }
     }
   }
