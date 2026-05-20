@@ -77,58 +77,59 @@ static FailureOr<bool> isStoreGIIDOnLoad(handshake::LoadOp loadOp,
 static LogicalResult
 inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
                        DenseSet<handshake::StoreOp> &storeOps,
-                       DependencyMap &opDeps, HandshakeCFG &cfg) {
+                       HandshakeCFG &cfg) {
   DenseMap<StringRef, handshake::StoreOp> storesByName;
   for (handshake::StoreOp storeOp : storeOps)
     storesByName.insert({getUniqueName(storeOp), storeOp});
 
   for (handshake::LoadOp loadOp : loadOps) {
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(loadOp)) {
+      SmallVector<MemDependenceAttr> newDeps;
+      newDeps.reserve(deps.getDependencies().size());
+
       for (MemDependenceAttr dep : deps.getDependencies()) {
-        if (!dep.getIsActive())
-          continue;
         auto storeOp = storesByName.at(dep.getDstAccess());
         FailureOr<bool> giid = isStoreGIIDOnLoad(loadOp, storeOp, cfg);
         if (failed(giid))
           return failure();
-        opDeps[loadOp].push_back(
-            *giid
-                ? MemDependenceAttr::get(dep.getContext(), dep.getDstAccess(),
-                                         dep.getLoopDepth(), dep.getDistance(),
-                                         /*isActive=*/false)
-                : dep);
+
+        newDeps.push_back(*giid ? MemDependenceAttr::get(
+                                      dep.getContext(), dep.getDstAccess(),
+                                      dep.getLoopDepth(), dep.getDistance(),
+                                      /*isActive=*/false)
+                                : dep);
       }
+
+      setDialectAttr<MemDependenceArrayAttr>(
+          loadOp, MemDependenceArrayAttr::get(loadOp.getContext(), newDeps));
     }
   }
   return success();
 }
 
 /// Inactivates WAW dependencies between a store and itself.
-static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps,
-                                   DependencyMap &opDeps) {
+static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps) {
   for (handshake::StoreOp storeOp : storeOps) {
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
+      SmallVector<MemDependenceAttr> newDeps;
+      newDeps.reserve(deps.getDependencies().size());
       StringRef storeName = getUniqueName(storeOp);
+
       for (MemDependenceAttr dep : deps.getDependencies()) {
         if (!dep.getIsActive())
           continue;
         // set the dependency as inactive if the store is GIID on the load
-        opDeps[storeOp].push_back(
+        newDeps.push_back(
             storeName == dep.getDstAccess()
                 ? MemDependenceAttr::get(dep.getContext(), dep.getDstAccess(),
                                          dep.getLoopDepth(), dep.getDistance(),
                                          /*isActive=*/false)
                 : dep);
       }
+      setDialectAttr<MemDependenceArrayAttr>(
+          storeOp, MemDependenceArrayAttr::get(storeOp.getContext(), newDeps));
     }
   }
-}
-
-/// Replaces each op's dependency array attribute with the updated entries
-/// in `opDeps`.
-static void changeOpDeps(DependencyMap &opDeps, MLIRContext *ctx) {
-  for (auto &[op, deps] : opDeps)
-    setDialectAttr<MemDependenceArrayAttr>(op, ctx, deps);
 }
 
 LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
@@ -143,11 +144,9 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
       storeOps.insert(storeOp);
   });
 
-  DependencyMap opDeps;
-  if (failed(inactivateEnforcedWARs(loadOps, storeOps, opDeps, cfg)))
+  if (failed(inactivateEnforcedWARs(loadOps, storeOps, cfg)))
     return failure();
-  inactivateEnforcedWAWs(storeOps, opDeps);
-  changeOpDeps(opDeps, &getContext());
+  inactivateEnforcedWAWs(storeOps);
   return success();
 }
 
