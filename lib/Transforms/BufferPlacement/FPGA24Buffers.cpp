@@ -414,7 +414,6 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
             return cfdfcGraph.edges[edgeId].channel;
           }
           llvm_unreachable("Edge not found");
-          return Value();
         };
 
         for (size_t i = 0; i < cycle.nodes.size(); ++i) {
