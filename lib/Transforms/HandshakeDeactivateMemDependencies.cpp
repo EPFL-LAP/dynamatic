@@ -21,8 +21,6 @@
 #include "mlir/IR/Visitors.h"
 #include "llvm/ADT/STLExtras.h"
 
-#define DEBUG_TYPE "handshake-deactivate-mem-dependencies"
-
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {

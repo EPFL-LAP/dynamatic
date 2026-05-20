@@ -26,6 +26,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 
+// Define the debug type for the LLVM_DEBUG macro
+// Allows for selective enabling of debug output related to this pass
 #define DEBUG_TYPE "handshake-replace-memory-interfaces"
 
 using namespace mlir;
