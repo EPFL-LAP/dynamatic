@@ -157,10 +157,6 @@ void HandshakeDeactivateMemDependenciesPass::runOnOperation() {
         op.emitError() << "Memory access port must be named.";
         return signalPassFailure();
       }
-      if (!cannotBelongToCFG(&op) && !getLogicBB(&op)) {
-        op.emitError() << "Operation should have basic block attribute.";
-        return signalPassFailure();
-      }
     }
   }
 
