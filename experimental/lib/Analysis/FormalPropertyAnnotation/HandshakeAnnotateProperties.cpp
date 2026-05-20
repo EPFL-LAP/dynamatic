@@ -426,7 +426,10 @@ struct EntryCMerge {
   ControlMergeOp op;
   int32_t entryValue;
 };
-std::vector<EntryCMerge> findEntryCMerge(mlir::Value start) {
+// This function is used to find entry control merges (i.e. control merges with
+// one input coming from an entry node), and is used in the annotation of the
+// entry token order invariant
+std::vector<EntryCMerge> findEntryCMerge(BlockArgument start) {
   std::vector<EntryCMerge> ret;
   std::vector<mlir::Value> stack;
   stack.push_back(start);
