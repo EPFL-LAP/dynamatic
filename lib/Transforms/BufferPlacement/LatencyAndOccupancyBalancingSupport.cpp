@@ -170,7 +170,7 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
     if (isa<mlir::MemRefType>(arg.getType()) || arg.getUsers().empty())
       continue;
     Operation *user = *arg.getUsers().begin();
-    
+
     // Only add the edges in the very first step (entry BB)
     auto it = nodeMap.find({user, 0});
     if (it != nodeMap.end()) {
