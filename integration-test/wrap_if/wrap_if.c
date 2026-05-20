@@ -6,7 +6,11 @@ void wrap_if(inout_int_t a[N], inout_int_t b[N], in_int_t c) {
     int x = a[i];
     int y = x * 3;
     if (x > 0) {
-      b[i] = (y + c) * 10;
+      if (y == 3) {
+        b[i] = (3 + c) * 10;
+      } else {
+        b[i] = (y + c) * 10;
+      }
     }
     a[i] = (y - c) * 11;
   }

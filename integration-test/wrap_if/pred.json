@@ -4,7 +4,7 @@
   },
   "dataType": "int",
   "compValList": [3, 9, 27],
-  "basicBlock": "bb2"
+  "basicBlock": 2
 }
 
 

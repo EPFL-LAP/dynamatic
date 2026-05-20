@@ -43,7 +43,7 @@ struct PipelineDuplicationPass
 
 private:
   LogicalResult readFromJSON(const std::string &jsonPath, std::string &opName,
-                             std::string &basicBlock, std::string &dataType,
+                             int &basicBlock, std::string &dataType,
                              std::vector<float> *floatList,
                              std::vector<int> *intList,
                              std::vector<double> *doubleList);
@@ -61,7 +61,7 @@ private:
 } // namespace
 
 LogicalResult PipelineDuplicationPass::readFromJSON(
-    const std::string &jsonPath, std::string &opName, std::string &basicBlock,
+    const std::string &jsonPath, std::string &opName, int &basicBlock,
     std::string &dataType, std::vector<float> *floatList,
     std::vector<int> *intList, std::vector<double> *doubleList) {
 
@@ -100,8 +100,8 @@ LogicalResult PipelineDuplicationPass::readFromJSON(
   } else
     return failure();
 
-  if (auto parsedDataType = rootObj->getString("basicBlock")) {
-    basicBlock = parsedDataType->str();
+  if (auto parsedBlock = rootObj->getInteger("basicBlock")) {
+    basicBlock = *parsedBlock;
   } else
     return failure();
 
@@ -218,7 +218,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
   std::vector<double> doubleValList;
   std::string opName;
   std::string dataType;
-  std::string basicBlock;
+  int basicBlock;
   if (failed(PipelineDuplicationPass::readFromJSON(
           this->jsonPath, opName, basicBlock, dataType, &floatValList,
           &intValList, &doubleValList)))
@@ -232,20 +232,33 @@ void PipelineDuplicationPass::runDynamaticPass() {
     llvm::errs() << "No operation named " << opName << " exists\n";
     return signalPassFailure();
   }
-  mlir::Block *currentBlock = op->getBlock();
+
+  mlir::Region *parentRegion = op->getParentRegion();
+  mlir::Block *currentBlock;
+  if (basicBlock >= 0 &&
+      basicBlock < static_cast<int>(parentRegion->getBlocks().size())) {
+    auto blockIt = std::next(parentRegion->begin(), basicBlock);
+    currentBlock = &*blockIt;
+  } else {
+    llvm::errs() << "Warning: JSON block index " << basicBlock
+                 << " is out of bounds!";
+    return signalPassFailure();
+  }
+
   mlir::func::FuncOp funcOp =
       cast<mlir::func::FuncOp>(currentBlock->getParentOp());
-  Location loc = op->getLoc();
+  Location loc = funcOp.getLoc();
   Value selectRes = op->getResult(0);
 
   // restructure the blocks
   builder.setInsertionPointAfter(op);
-  mlir::Block *exitBlock =
-      currentBlock->splitBlock(builder.getInsertionPoint());
+  mlir::Block *falseBlock = currentBlock->splitBlock(currentBlock->begin());
+  // mlir::Block *exitBlock =
+  //     currentBlock->splitBlock(builder.getInsertionPoint());
   // Block::iterator(branchCond.getDefiningOp())->getNextNode());
 
   // DFS starting from selectRes
-  llvm::DenseSet<mlir::Operation *> unorganizedOps;
+  /* llvm::DenseSet<mlir::Operation *> unorganizedOps;
   llvm::SmallVector<mlir::Value> originalOutputs;
   collectOpsDFS(selectRes, unorganizedOps, originalOutputs);
 
@@ -260,7 +273,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
   llvm::SmallVector<Value> exitBlockArgs;
   for (Value origOut : originalOutputs) {
     exitBlockArgs.push_back(exitBlock->addArgument(origOut.getType(), loc));
-  }
+  } */
 
   // PREDICTED PATHS
   int size =
@@ -281,8 +294,14 @@ void PipelineDuplicationPass::runDynamaticPass() {
                    << "\n";
       return signalPassFailure();
     }
-    mlir::Block *trueBlock = funcOp.addBlock();     // true path
-    mlir::Block *nextElseBlock = funcOp.addBlock(); // false path
+    mlir::Block *trueBlock = funcOp.addBlock(); // true path
+    mlir::Block *nextElseBlock;                 // false path
+    if (i + 1 < size) {
+      nextElseBlock = funcOp.addBlock();
+    } else {
+      nextElseBlock = falseBlock;
+    }
+
     builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueBlock,
                                            nextElseBlock);
 
@@ -297,6 +316,11 @@ void PipelineDuplicationPass::runDynamaticPass() {
     builder.setInsertionPointToStart(trueBlock);
     mlir::IRMapping mapper;
     mapper.map(selectRes, constantComp);
+
+    llvm::SmallVector<mlir::Operation *> opsToMove;
+    for (mlir::Operation &blockOp : falseBlock->getOperations()) {
+      opsToMove.push_back(&blockOp);
+    }
 
     // do the actual cloning
     for (mlir::Operation *origOp : opsToMove) {
@@ -323,12 +347,12 @@ void PipelineDuplicationPass::runDynamaticPass() {
     }
     llvm::errs() << "-----------------------\n";
 
-    llvm::SmallVector<Value> trueBranchOperands;
+    /* llvm::SmallVector<Value> trueBranchOperands;
     for (Value origOut : originalOutputs) {
       trueBranchOperands.push_back(mapper.lookup(origOut));
     }
     builder.setInsertionPointToEnd(trueBlock);
-    builder.create<mlir::cf::BranchOp>(loc, exitBlock, trueBranchOperands);
+    builder.create<mlir::cf::BranchOp>(loc, exitBlock, trueBranchOperands); */
 
     // update
     currentBlock = nextElseBlock;
@@ -336,7 +360,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
   // FALSE PATH
   // move all of the stuff from above here
-  builder.setInsertionPointToStart(currentBlock);
+  /* builder.setInsertionPointToStart(currentBlock);
   for (Operation *origOp : opsToMove) {
     origOp->moveBefore(currentBlock, currentBlock->end());
   }
@@ -363,7 +387,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
                  userBlock->getParentOp() == funcOp && isCondBranch;
         });
   }
-
+ */
   // Automatically run push-constants pass after duplication
   mlir::PassManager pm(ctx);
   pm.addPass(dynamatic::createPushConstants());
