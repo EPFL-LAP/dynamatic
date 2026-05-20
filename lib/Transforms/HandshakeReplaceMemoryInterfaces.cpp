@@ -77,7 +77,7 @@ private:
   /// Sets `handshake::MemInterfaceAttr` on each memory access port connected to
   /// the given memref, routing ports with active dependencies to the LSQ and
   /// the rest to the MC.
-  void updateMemoryAccessMarks(TypedValue<mlir::MemRefType> memref);
+  LogicalResult updateMemoryAccessMarks(TypedValue<mlir::MemRefType> memref);
 };
 } // namespace
 
@@ -115,7 +115,8 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (BlockArgument arg : funcOp.getArguments()) {
       if (auto memref = dyn_cast<TypedValue<mlir::MemRefType>>(arg))
-        updateMemoryAccessMarks(memref);
+        if (failed(updateMemoryAccessMarks(memref)))
+          return signalPassFailure();
     }
   }
 
@@ -288,21 +289,23 @@ HandshakeReplaceMemoryInterfacesPass::markOpsWithActiveDependencies(
   return hasActiveDep;
 }
 
-void HandshakeReplaceMemoryInterfacesPass::updateMemoryAccessMarks(
+LogicalResult HandshakeReplaceMemoryInterfacesPass::updateMemoryAccessMarks(
     TypedValue<mlir::MemRefType> memref) {
   MLIRContext *ctx = &getContext();
   auto memrefUsers = memref.getUsers();
   assert(std::distance(memrefUsers.begin(), memrefUsers.end()) <= 1 &&
          "expected at most one memref user");
   if (memrefUsers.empty())
-    return;
+    return success();
 
   // Identify all memory interfaces (master and potential slaves) for the region
   Operation *memOp = *memrefUsers.begin();
   handshake::LSQOp lsqOp;
   if (lsqOp = dyn_cast<handshake::LSQOp>(memOp); !lsqOp) {
     // The master memory interface must be an MC
-    auto mcOp = cast<handshake::MemoryControllerOp>(memOp);
+    auto mcOp = dyn_cast<handshake::MemoryControllerOp>(memOp);
+    if (!mcOp)
+      return memOp->emitError() << "expected memory controller or LSQ";
     // Ports to memory controllers will always remain connected to a memory
     // controller, mark them as such with the memory interface attribute
     MCPorts mcPorts = mcOp.getPorts();
@@ -313,7 +316,7 @@ void HandshakeReplaceMemoryInterfacesPass::updateMemoryAccessMarks(
     // Nothing else to do if the region has no LSQ
     if (!mcPorts.connectsToLSQ()) {
       LLVM_DEBUG(llvm::dbgs() << "\tNo LSQ interface for the region\n");
-      return;
+      return success();
     }
     lsqOp = mcPorts.getLSQPort().getLSQOp();
   }
@@ -343,4 +346,5 @@ void HandshakeReplaceMemoryInterfacesPass::updateMemoryAccessMarks(
       // group ID
       setDialectAttr<MemInterfaceAttr>(accessOp, ctx);
   }
+  return success();
 }
