@@ -12,6 +12,7 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -982,6 +983,12 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
 
   Function *calledFunc = callInst->getCalledFunction();
   assert(calledFunc);
+
+  if (calledFunc->getName().starts_with("__dyn_speculate")) {
+    handleSpeculateMarker(callInst);
+    return;
+  }
+
   assert(calledFunc->isIntrinsic() &&
          "Function calls are not currently supported");
 
@@ -1018,4 +1025,95 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     llvm::report_fatal_error(
         "Not implemented llvm intrinsic function handling!");
   }
+}
+
+void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
+
+  // try cast arg1 (max_predictions) to a llvm::ConstantInt
+  auto *maxPredConst =
+      llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(1));
+
+  // if cast failed, it means we don't have
+  // a constant int value for max predictions
+  // and so conversion fails
+  if (!maxPredConst)
+    llvm::report_fatal_error(
+        "__dyn_speculate: max_predictions arg is not a ConstantInt");
+
+  // pulling a uint64_t from a llvm::ConstantInt is annoying
+  // since they store the value as an APInt (arbitrary precision)
+  // getLimitedValue returns a uint64_t clamped to UINT64_MAX
+  // so that the conversion doesn't fail if the value is larger
+  // than that
+  uint64_t maxPred = maxPredConst->getValue().getLimitedValue();
+
+  llvm::StringRef style;
+  // using existing llvm utility function
+  // to try turn the style arg into a string
+  // (handles lots of edge cases of pointers etc.)
+  // if it fails, we don't have a constant string
+  // for the speculation style
+  // and so conversion fails
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(2), style))
+    llvm::report_fatal_error(
+        "__dyn_speculate: style arg is not a constant C string");
+
+  // get the value we want to speculate on
+  llvm::Value *specVal = callInst->getArgOperand(0);
+
+  // Warn if the value has other users besides this call.
+  // LLVM does some weird duplication stuff sometimes
+  // to do more aggressive folding
+  if (specVal->getNumUses() > 1)
+    llvm::errs() << "Warning: __dyn_speculate input has "
+                 << specVal->getNumUses()
+                 << " users; consumers other than the spec call will bypass "
+                    "the producer_output_attr_marker and not be marked for "
+                    "speculation\n";
+
+  // find the producer of the variable
+  // inside our internal valueMap structure
+  auto it = valueMap.find(specVal);
+
+  // if we don't find the value to speculate on
+  // conversion fails
+  if (it == valueMap.end())
+    llvm::report_fatal_error("__dyn_speculate: arg0 not found in valueMap");
+  // actually get the cf value
+  mlir::Value v = it->second;
+
+  // Build the speculation edge attribute
+  // which is a dictionary attr with
+  // {"max_predictions" : max_predictions, "style" : style}
+  // based on the real extracted values
+  mlir::DictionaryAttr specAttr = mlir::DictionaryAttr::get(
+      ctx, {builder.getNamedAttr("max_predictions",
+                                 builder.getI64IntegerAttr(maxPred)),
+            builder.getNamedAttr("style", builder.getStringAttr(style))});
+
+  // Build the OperationState that we use to build
+  // an unregistered op with the dictionary attr on it.
+  // MLIR allows you to create operations of an unknown type
+  // (i.e. op types it knows nothing about)
+  // as long as the serialized form gives enough info,
+  // which is enough for our purposes here.
+  // So this op is never actually defined anywhere
+  // and the op type is "dynamatic.producer_output_attr_marker"
+  mlir::OperationState markerState(
+      v.getLoc(),
+      mlir::OperationName("dynamatic.producer_output_attr_marker", ctx));
+  // single input
+  markerState.addOperands(v);
+  // return type is the same as the input type
+  markerState.addTypes(v.getType());
+  // has the dictionary attribute in the attribute dict
+  // under the name "dynamatic.speculate"
+  markerState.attributes.append("dynamatic.speculate", specAttr);
+
+  // Actually build the operation
+  mlir::Operation *markerOp = builder.create(markerState);
+  // And have any op which consumes the
+  // speculator function's output use
+  // the output of our edge attr op
+  valueMap[callInst] = markerOp->getResult(0);
 }

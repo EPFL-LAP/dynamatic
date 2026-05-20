@@ -7,7 +7,7 @@
     "comment": "To avoid deadlock"
   },
   {
-    "pred": "cmpi1",
+    "pred": "cmpi0",
     "outid": 0,
     "slots": 8,
     "type": "fifo_break_none",

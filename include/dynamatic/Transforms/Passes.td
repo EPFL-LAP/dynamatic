@@ -159,6 +159,20 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   }];
 }
 
+def ConsumeProducerOutputAttrMarker
+    : Pass<"consume-producer-output-attr-marker", "mlir::ModuleOp"> {
+  let summary = "Consume `dynamatic.producer_output_attr_marker` ops by "
+                "moving their `dynamatic.*` attributes onto the producer.";
+  let description = [{
+    Transfer the contents of any producer-attribute marker ops to the actual
+    producer, and then erase the producer-attribute marker ops.
+    We use the ops in the std files to avoid the producer's output from 
+    being folded away during the front-end's lowering passes,
+    but once the IR has reached Dynamatic's internal IRs, 
+    we can just store the attribute directly on the producer.
+  }];
+}
+
 def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
   let summary = "Materializes forks and sinks into the IR.";
   let description = [{

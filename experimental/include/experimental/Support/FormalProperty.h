@@ -291,7 +291,7 @@ public:
                  std::vector<std::unique_ptr<InternalStateNamer>> slots,
                  std::vector<EagerForkSentNamer> forks)
       : FormalProperty(id, tag, TYPE::IOGSingleToken), slots(std::move(slots)),
-        forks(std::move(forks)){};
+        forks(std::move(forks)) {};
   ~IOGSingleToken() = default;
 
   static bool classof(const FormalProperty *fp) {
@@ -339,6 +339,36 @@ private:
   inline static const StringLiteral SENTS_LIT = "sents";
 };
 
+// EntryTokenOrder describes the invariant that, for a path between an entry
+// control merge and a following mux operation, only the last effective token
+// along that path can be an entry. Intuitively, this is because the entry token
+// will only appear a single time when the loop starts, and after that all
+// tokens along the path will be looping tokens.
+// This invariant is defined by the effective slots along the path from control
+// merge to mux `slots`, and by the value of the entry token `entryValue` (which
+// corresponds to the index of the control merge's input connected to the
+// entry path).
+//
+// clang-format off
+//
+// Example: fir (using fpl22)
+//
+// %result, %index = control_merge [%0#2, %trueResult_6]  {...} : [<>, <>] to <>, <i1>
+// %16:2 = fork [2] %index {...} : <i1>
+// %10 = buffer %16#1
+// %11 = buffer %10
+// %12 = buffer %11
+// %15 = mux %12 [%3#1, %14] {...} : <i1>, [<i32>, <i32>] to <i32>
+//
+// Annotates the path consisting of effective slots:
+// slot (copied sent)
+//
+// control_merge0.slot_full (fork3.outs_1_sent)
+// buffer4.outs_valid_i
+// buffer5.full
+// buffer6.full
+//
+// clang-format on
 class EntryTokenOrder : public FormalProperty {
 public:
   const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }

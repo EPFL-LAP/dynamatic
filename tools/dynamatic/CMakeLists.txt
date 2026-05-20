@@ -7,7 +7,7 @@ add_llvm_tool(dynamatic
   DEPENDS
   # Required by compile.sh
   dynamatic-opt opt clang MemDepAnalysis ArrayPartition translate-llvm-to-std
-  export-dot export-cfg exp-frequency-profiler
+  export-dot export-cfg exp-frequency-profiler source-rewriter DynPragmasPlugin
   # Required by simulate.sh
   hls-verifier
   # Required by write-hdl.sh

@@ -145,7 +145,8 @@ BUILD_CHIESEL_LSQ=0
 ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
 CMAKE_DYNAMATIC_ENABLE_ABC=""
-LLVM_DIR="$PWD/llvm-project/build"
+LLVM_DIR="$PWD/build/llvm-project"
+
 
 # Loop over command line arguments and update script variables
 PARSE_ARG=""
@@ -192,7 +193,6 @@ do
               ;;
           "--use-prebuilt-llvm")
               PREBUILT_LLVM=1
-              LLVM_DIR="$PWD/build/llvm-project"
               ;;
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
@@ -366,8 +366,6 @@ if should_run_cmake ; then
             $CMAKE_DYNAMATIC_ENABLE_CBC \
             $CMAKE_DYNAMATIC_ENABLE_ABC \
             $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
-
-    LLVM_DIR="../build/llvm-project"
   else
     cmake -G Ninja .. \
         -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
@@ -474,6 +472,7 @@ create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/import-blif
 create_symlink ../build/bin/log2csv
+create_symlink ../build/bin/source-rewriter
 create_symlink "../build/bin/rigidification-testbench"
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator
