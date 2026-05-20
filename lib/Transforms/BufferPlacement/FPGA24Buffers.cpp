@@ -406,9 +406,7 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
 
       for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
         unsigned totalLatency = 0;
-        LLVM_DEBUG({
-          llvm::errs() << "  Cycle " << cycleIdx << ": ";
-        });
+        LLVM_DEBUG({ llvm::errs() << "  Cycle " << cycleIdx << ": "; });
         auto findChannel = [&](NodeIdType src, NodeIdType dst) {
           for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
             if (cfdfcGraph.edges[edgeId].dstId != dst)
@@ -482,9 +480,11 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
   }
 
   /// It is hard to accurately model when memory controllers emit a "done"
-  /// signal, which synchronizes with other function outputs. To prevent the 
-  /// backpressure to the function outputs from propagating into the internal logic, 
-  ///  we buffer the paths to EndOp (<out0> or <end>) that represent the function end. 
+  /// signal, which synchronizes with other function outputs. To prevent the
+  /// backpressure to the function outputs from propagating into the internal
+  /// logic,
+  ///  we buffer the paths to EndOp (<out0> or <end>) that represent the
+  ///  function end.
   /// (The ones not directly produced by memory controllers.)
   auto *terminator = funcInfo.funcOp.getBodyBlock()->getTerminator();
   if (auto endOp = dyn_cast<handshake::EndOp>(terminator)) {
