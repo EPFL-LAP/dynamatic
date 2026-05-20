@@ -394,6 +394,15 @@ private:
   inline static const StringLiteral ENTRY_VALUE_LIT = "entry_value";
 };
 
+// SingleEntryToken describes the invariant that only a single token is emitted
+// from the entry unit. This means that, if any path between an entry cmerge and
+// a subsequent mux operation contains a token (regardless of whether it is an
+// entry token or a loop token), the path between the entry and cmerge must be
+// empty. This is because both entry tokens and loop tokens only exist after a
+// token has propagated from entry to cmerge.
+// This invariant is represented by the path from entry to cmerge `ec`, and the
+// path from cmerge to mux `cm`. Effective slots are used to ensure that
+// duplicated tokens are not counted double
 class SingleEntryToken : public FormalProperty {
 public:
   const std::vector<EffectiveSlotNamer> &getEcPath() const { return ec; }
