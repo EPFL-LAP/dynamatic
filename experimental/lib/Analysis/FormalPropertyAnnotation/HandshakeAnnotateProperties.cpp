@@ -450,16 +450,26 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
     Operation *next = *path.cur.getUsers().begin();
     if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
       // Path is terminated by ControlMergeOp, so this is the end of the path
-      int32_t entry;
-      for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
-        if (input == path.cur) {
-          entry = i;
+
+      // CMerge uses the following logic to generate index token:
+      // - When a CMerge receives a token from the i-th data input channel, it
+      // sends a token with value i to the index channel Here, if the path to
+      // CMerge ends at the 0-th channel, then an entry token will cause the
+      // CMerge to emit a token carrying a value = 0 to the index channel. This
+      // function determines the actual entry value of the index channel.
+      auto getEntryValue = [&](ControlMergeOp cmerge, Value entryChannel) {
+        for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
+          if (input == entryChannel) {
+            return (int32_t)i;
+          }
         }
-      }
+        llvm::report_fatal_error(
+            "entryChannel is not a data operand of cmerge");
+      };
       EntryCMergePath retPath = {
           .slots = path.slots,
           .cmerge = cmerge,
-          .entryValue = entry,
+          .entryValue = getEntryValue(cmerge, path.cur),
       };
       ret.push_back(retPath);
     } else if (auto buffer = dyn_cast<BufferOp>(next)) {

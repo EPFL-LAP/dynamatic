@@ -348,6 +348,8 @@ private:
 // merge to mux `slots`, and by the value of the entry token `entryValue` (which
 // corresponds to the index of the control merge's input connected to the
 // entry path).
+// e.g. if the path from start -> cmerge arrives at the 0th input of cmerge,
+// `entryValue` will be 0
 //
 // clang-format off
 //
