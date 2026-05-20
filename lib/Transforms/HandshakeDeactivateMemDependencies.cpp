@@ -75,7 +75,7 @@ static FailureOr<bool> isStoreGIIDOnLoad(handshake::LoadOp loadOp,
 /// Inactivates WAR dependencies that are enforced by the circuit's data
 /// ordering semantics.
 static LogicalResult
-inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
+deactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
                        DenseSet<handshake::StoreOp> &storeOps,
                        HandshakeCFG &cfg) {
   DenseMap<StringRef, handshake::StoreOp> storesByName;
@@ -108,7 +108,7 @@ inactivateEnforcedWARs(DenseSet<handshake::LoadOp> &loadOps,
 }
 
 /// Inactivates WAW dependencies between a store and itself.
-static void inactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps) {
+static void deactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps) {
   for (handshake::StoreOp storeOp : storeOps) {
     if (auto deps = getDialectAttr<MemDependenceArrayAttr>(storeOp)) {
       SmallVector<MemDependenceAttr> newDeps;
@@ -144,9 +144,9 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
       storeOps.insert(storeOp);
   });
 
-  if (failed(inactivateEnforcedWARs(loadOps, storeOps, cfg)))
+  if (failed(deactivateEnforcedWARs(loadOps, storeOps, cfg)))
     return failure();
-  inactivateEnforcedWAWs(storeOps);
+  deactivateEnforcedWAWs(storeOps);
   return success();
 }
 
