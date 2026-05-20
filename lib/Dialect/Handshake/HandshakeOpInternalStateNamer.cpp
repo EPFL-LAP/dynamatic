@@ -1,6 +1,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Casting.h"
 
 namespace dynamatic {
@@ -17,6 +18,8 @@ InternalStateNamer::typeFromStr(const std::string &s) {
     return TYPE::Constrained;
   if (s == MEMORY_CONTROLLER_SLOT)
     return TYPE::MemoryControllerSlot;
+  if (s == EFFECTIVE_SLOT)
+    return TYPE::EffectiveSlot;
   if (s == ENTRY_SLOT)
     return TYPE::EntrySlot;
   if (s == TOKEN_COUNT)
@@ -37,6 +40,8 @@ std::string InternalStateNamer::typeToStr(TYPE t) {
     return CONSTRAINED.str();
   case TYPE::MemoryControllerSlot:
     return MEMORY_CONTROLLER_SLOT.str();
+  case TYPE::EffectiveSlot:
+    return EFFECTIVE_SLOT.str();
   case TYPE::EntrySlot:
     return ENTRY_SLOT.str();
   case TYPE::TokenCount:
@@ -97,8 +102,9 @@ bool fromJSON(const llvm::json::Value &value,
   BufferSlotFullNamer bs;
   PipelineSlotNamer ps;
   MemoryControllerSlotNamer mc;
+  EffectiveSlotNamer es;
   TokenCountNamer tc;
-  EntrySlotNamer es;
+  EntrySlotNamer en;
   switch (type) {
   case InternalStateNamer::TYPE::EagerForkSent:
     ef = EagerForkSentNamer();
@@ -127,6 +133,11 @@ bool fromJSON(const llvm::json::Value &value,
       return false;
     namer = std::make_unique<MemoryControllerSlotNamer>(std::move(mc));
     break;
+  case InternalStateNamer::TYPE::EffectiveSlot:
+    if (!mapper.map(InternalStateNamer::INNER_LIT, es))
+      return false;
+    namer = std::make_unique<EffectiveSlotNamer>(std::move(es));
+    break;
   case InternalStateNamer::TYPE::TokenCount:
     tc = TokenCountNamer();
     if (!mapper.map(InternalStateNamer::INNER_LIT, tc))
@@ -134,10 +145,10 @@ bool fromJSON(const llvm::json::Value &value,
     namer = std::make_unique<TokenCountNamer>(std::move(tc));
     break;
   case InternalStateNamer::TYPE::EntrySlot:
-    es = EntrySlotNamer();
-    if (!mapper.map(InternalStateNamer::INNER_LIT, es))
+    en = EntrySlotNamer();
+    if (!mapper.map(InternalStateNamer::INNER_LIT, en))
       return false;
-    namer = std::make_unique<EntrySlotNamer>(std::move(es));
+    namer = std::make_unique<EntrySlotNamer>(std::move(en));
     break;
   }
   namer->type = type;
@@ -145,7 +156,7 @@ bool fromJSON(const llvm::json::Value &value,
 }
 
 std::unique_ptr<ConstrainedNamer>
-InternalStateNamer::tryConstrain(int32_t value) {
+InternalStateNamer::tryConstrain(int32_t value) const {
   if (auto *namer = dyn_cast<EagerForkSentNamer>(this)) {
     return std::make_unique<ConstrainedEagerForkSentNamer>(
         namer->constrain(value));
@@ -153,6 +164,9 @@ InternalStateNamer::tryConstrain(int32_t value) {
   if (auto *namer = dyn_cast<BufferSlotFullNamer>(this)) {
     return std::make_unique<ConstrainedBufferSlotFullNamer>(
         namer->constrain(value));
+  }
+  if (auto *namer = dyn_cast<EffectiveSlotNamer>(this)) {
+    return namer->constrain(value);
   }
 
   return nullptr;
@@ -167,7 +181,8 @@ bool fromJSON(const llvm::json::Value &value, EagerForkSentNamer &namer,
          mapper.map(EagerForkSentNamer::CHANNEL_SIZE_LIT, namer.channelSize);
 }
 
-ConstrainedEagerForkSentNamer EagerForkSentNamer::constrain(int32_t value) {
+ConstrainedEagerForkSentNamer
+EagerForkSentNamer::constrain(int32_t value) const {
   ConstrainedEagerForkSentNamer p(*this, value);
   return p;
 }
@@ -182,7 +197,8 @@ bool fromJSON(const llvm::json::Value &value, BufferSlotFullNamer &namer,
          mapper.map(BufferSlotFullNamer::SLOT_SIZE_LIT, namer.slotSize);
 }
 
-ConstrainedBufferSlotFullNamer BufferSlotFullNamer::constrain(int32_t value) {
+ConstrainedBufferSlotFullNamer
+BufferSlotFullNamer::constrain(int32_t value) const {
   ConstrainedBufferSlotFullNamer p(*this, value);
   return p;
 }
@@ -236,6 +252,36 @@ bool fromJSON(const llvm::json::Value &value, MemoryControllerSlotNamer &namer,
     return false;
   namer.portType = (MemoryControllerSlotNamer::PortType)t;
   return true;
+}
+
+std::string EffectiveSlotNamer::getSMVName() const {
+  if (copiedSents.empty()) {
+    return slot->getSMVName();
+  }
+
+  std::vector<std::string> sentNames;
+  sentNames.reserve(copiedSents.size());
+  for (auto &sent : copiedSents) {
+    sentNames.push_back(llvm::formatv("!{0}", sent.getSMVName()));
+  }
+  return llvm::formatv("({0} & {1})", slot->getSMVName(),
+                       llvm::join(sentNames, " & "));
+}
+llvm::json::Value EffectiveSlotNamer::toInnerJSON() const {
+  return llvm::json::Object(
+      {{SLOT_LIT, slot}, {COPIED_SENTS_LIT, copiedSents}});
+}
+
+bool fromJSON(const llvm::json::Value &value, EffectiveSlotNamer &namer,
+              llvm::json::Path path) {
+  llvm::json::ObjectMapper mapper(value, path);
+  return mapper && mapper.map(EffectiveSlotNamer::SLOT_LIT, namer.slot) &&
+         mapper.map(EffectiveSlotNamer::COPIED_SENTS_LIT, namer.copiedSents);
+}
+
+std::unique_ptr<ConstrainedNamer>
+EffectiveSlotNamer::constrain(int32_t value) const {
+  return std::make_unique<ConstrainedEffectiveSlotNamer>(*this, value);
 }
 
 bool fromJSON(const llvm::json::Value &value, EntrySlotNamer &namer,

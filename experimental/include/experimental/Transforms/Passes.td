@@ -47,17 +47,10 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
       that take several cycles to calculate, or loops with 
       loop-carried dependencies. 
       
-      The pass needs to specify the position of the Speculation Units by 
-      means of an input JSON file.
+      The speculator's position is read from a `dynamatic.speculate`
+      dictionary attribute on a single producer op in the module; the
+      remaining unit positions are inferred by PlacementFinder.
   }];
-  let options = [
-    Option<"jsonPath", "json-path", "std::string", "",
-           "Path to JSON-formatted file containing the positions for speculative "
-           "operations.">,
-    Option<"automatic", "automatic", "bool", "true",
-           "When the automatic mode is enabled, the speculative unit positions are "
-           "automatically detected. The speculator position still needs to be "
-           "specified in the JSON-formatted file.">];
 }
 
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {

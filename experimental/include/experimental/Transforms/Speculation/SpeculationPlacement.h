@@ -55,10 +55,12 @@ public:
   SpeculationPlacements(OpOperand &speculatorPosition)
       : speculator(&speculatorPosition) {};
 
-  /// Set the speculator operations positions according to a JSON file
-  static LogicalResult readFromJSON(const std::string &jsonPath,
-                                    SpeculationPlacements &place,
-                                    NameAnalysis &nameAnalysis);
+  /// Walk `modOp` for the single op carrying a `dynamatic.speculate` dict
+  /// attribute, then set the speculator position from it. Sets both
+  /// speculatorFifoDepth and saveCommitsFifoDepth from the attribute's
+  /// `max_predictions` entry. Fails if zero or more than one op is marked.
+  static LogicalResult readFromAttribute(mlir::ModuleOp modOp,
+                                         SpeculationPlacements &place);
 
   /// Explicitly set the speculator position
   void setSpeculator(OpOperand &dstOpOperand);
