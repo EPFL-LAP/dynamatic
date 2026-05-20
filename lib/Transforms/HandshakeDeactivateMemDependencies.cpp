@@ -118,7 +118,8 @@ static void deactivateEnforcedWAWs(DenseSet<handshake::StoreOp> &storeOps) {
       for (MemDependenceAttr dep : deps.getDependencies()) {
         if (!dep.getIsActive())
           continue;
-        // set the dependency as inactive if the store is GIID on the load
+        // set the dependency as inactive if the source and destination of the
+        // dependency are the same store operation
         newDeps.push_back(
             storeName == dep.getDstAccess()
                 ? MemDependenceAttr::get(dep.getContext(), dep.getDstAccess(),
