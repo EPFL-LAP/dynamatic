@@ -3,7 +3,8 @@
     "operation-name": "select0"
   },
   "dataType": "float",
-  "compValList": [1.0, 5.1, 7.0] 
+  "compValList": [1.0, 5.1, 7.0],
+  "basicBlock": "bb2"
 }
 
 

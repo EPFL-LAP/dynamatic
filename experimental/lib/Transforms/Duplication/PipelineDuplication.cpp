@@ -43,7 +43,7 @@ struct PipelineDuplicationPass
 
 private:
   LogicalResult readFromJSON(const std::string &jsonPath, std::string &opName,
-                             std::string &dataType,
+                             std::string &basicBlock, std::string &dataType,
                              std::vector<float> *floatList,
                              std::vector<int> *intList,
                              std::vector<double> *doubleList);
@@ -61,9 +61,9 @@ private:
 } // namespace
 
 LogicalResult PipelineDuplicationPass::readFromJSON(
-    const std::string &jsonPath, std::string &opName, std::string &dataType,
-    std::vector<float> *floatList, std::vector<int> *intList,
-    std::vector<double> *doubleList) {
+    const std::string &jsonPath, std::string &opName, std::string &basicBlock,
+    std::string &dataType, std::vector<float> *floatList,
+    std::vector<int> *intList, std::vector<double> *doubleList) {
 
   // Open the .json file
   std::ifstream inputFile(jsonPath);
@@ -97,7 +97,13 @@ LogicalResult PipelineDuplicationPass::readFromJSON(
 
   if (auto parsedDataType = rootObj->getString("dataType")) {
     dataType = parsedDataType->str();
-  }
+  } else
+    return failure();
+
+  if (auto parsedDataType = rootObj->getString("basicBlock")) {
+    basicBlock = parsedDataType->str();
+  } else
+    return failure();
 
   const llvm::json::Array *parsedArray = rootObj->getArray("compValList");
   if (!parsedArray) {
@@ -212,10 +218,13 @@ void PipelineDuplicationPass::runDynamaticPass() {
   std::vector<double> doubleValList;
   std::string opName;
   std::string dataType;
+  std::string basicBlock;
   if (failed(PipelineDuplicationPass::readFromJSON(
-          this->jsonPath, opName, dataType, &floatValList, &intValList,
-          &doubleValList)))
+          this->jsonPath, opName, basicBlock, dataType, &floatValList,
+          &intValList, &doubleValList)))
     return signalPassFailure();
+
+  llvm::errs() << "basic block: " << basicBlock << '\n';
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
   Operation *op = namer.getOp(opName);

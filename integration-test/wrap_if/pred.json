@@ -1,0 +1,10 @@
+{
+  "splitoperation": {
+    "operation-name": "addi2"
+  },
+  "dataType": "int",
+  "compValList": [3, 9, 27],
+  "basicBlock": "bb2"
+}
+
+
