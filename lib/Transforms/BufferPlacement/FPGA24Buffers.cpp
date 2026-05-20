@@ -406,7 +406,9 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
 
       for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
         unsigned totalLatency = 0;
-        llvm::errs() << "  Cycle " << cycleIdx << ": ";
+        LLVM_DEBUG({
+          llvm::errs() << "  Cycle " << cycleIdx << ": ";
+        });
         auto findChannel = [&](NodeIdType src, NodeIdType dst) {
           for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
             if (cfdfcGraph.edges[edgeId].dstId != dst)
