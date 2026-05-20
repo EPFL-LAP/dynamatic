@@ -119,8 +119,8 @@ void CFGTransitionSequenceSubgraph::buildGraphFromSequence(
       for (Operation *user : result.getUsers()) {
         // Check if user exists at the same step
         if (nodeMap.count({user, step})) {
-          addEdge(node.id, nodeMap[{user, step}], result,
-                  DataflowGraphEdgeType::INTRA_BB);
+          addEdge(/*pred=*/node.id, /*succ=*/nodeMap[{user, step}], /*mlirValue=*/result,
+                  /*type=*/DataflowGraphEdgeType::INTRA_BB);
         }
       }
     }
@@ -150,8 +150,8 @@ void CFGTransitionSequenceSubgraph::buildGraphFromSequence(
         for (Operation *user : result.getUsers()) {
           // Check if user exists at the destination step of this arch
           if (nodeMap.count({user, dstStep})) {
-            addEdge(node.id, nodeMap[{user, dstStep}], result,
-                    DataflowGraphEdgeType::INTER_BB);
+            addEdge(/*pred=*/node.id, /*succ=*/nodeMap[{user, dstStep}], /*mlirValue=*/result,
+                    /*type=*/DataflowGraphEdgeType::INTER_BB);
           }
         }
       }
@@ -199,7 +199,7 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
   nodeIdToStep[forkId] = 0;
 
   for (const auto &edge : edgesToAdd)
-    addEdge(forkId, edge.first, edge.second, DataflowGraphEdgeType::INTRA_BB);
+    addEdge(/*pred=*/forkId, /*succ=*/edge.first, /*mlirValue=*/edge.second, /*type=*/DataflowGraphEdgeType::INTRA_BB);
 }
 
 std::vector<ReconvergentPath>
@@ -695,7 +695,7 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
              "CFDFC channel consumer must be in CFDFC units");
       NodeIdType srcId = opToNodeId[producer];
       NodeIdType dstId = opToNodeId[consumer];
-      addEdge(srcId, dstId, channel);
+      addEdge(/*pred=*/srcId, /*succ=*/dstId, /*mlirValue=*/channel);
     }
   }
 }
