@@ -2,8 +2,8 @@
   "splitoperation": {
     "operation-name": "select0"
   },
-  "compVal": 7,
-  "compValList": [4.0, 5.0, 7.0] 
+  "dataType": "float",
+  "compValList": [1.0, 5.1, 7.0] 
 }
 
 

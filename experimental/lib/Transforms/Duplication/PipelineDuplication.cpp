@@ -16,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/JSON.h"
+#include <algorithm>
 #include <fstream>
 
 using namespace llvm;
@@ -41,21 +42,28 @@ struct PipelineDuplicationPass
   void runDynamaticPass() override;
 
 private:
-  LogicalResult readFromJSON(const std::string &jsonPath,
-                             std::vector<float> &compValList,
-                             std::string &opName);
+  LogicalResult readFromJSON(const std::string &jsonPath, std::string &opName,
+                             std::string &dataType,
+                             std::vector<float> *floatList,
+                             std::vector<int> *intList,
+                             std::vector<double> *doubleList);
 
   void collectOpsDFS(mlir::Value currentVal,
                      llvm::DenseSet<mlir::Operation *> &sliceOps,
                      llvm::SmallVector<mlir::Value> &originalOutputs);
+
+  template <typename T>
+  std::pair<mlir::Value, mlir::Value>
+  createBranchCond(mlir::OpBuilder &builder, mlir::Location loc,
+                   mlir::Value selectRes, T comparisonValue);
 };
 
 } // namespace
 
-LogicalResult
-PipelineDuplicationPass::readFromJSON(const std::string &jsonPath,
-                                      std::vector<float> &compValList,
-                                      std::string &opName) {
+LogicalResult PipelineDuplicationPass::readFromJSON(
+    const std::string &jsonPath, std::string &opName, std::string &dataType,
+    std::vector<float> *floatList, std::vector<int> *intList,
+    std::vector<double> *doubleList) {
 
   // Open the .json file
   std::ifstream inputFile(jsonPath);
@@ -87,12 +95,42 @@ PipelineDuplicationPass::readFromJSON(const std::string &jsonPath,
     }
   }
 
-  if (const llvm::json::Array *parsedArray = rootObj->getArray("compValList")) {
+  if (auto parsedDataType = rootObj->getString("dataType")) {
+    dataType = parsedDataType->str();
+  }
+
+  const llvm::json::Array *parsedArray = rootObj->getArray("compValList");
+  if (!parsedArray) {
+    llvm::errs() << "Empty compValList not allowed.\n";
+    return failure();
+  }
+
+  if (dataType == "float") {
     for (const llvm::json::Value &element : *parsedArray) {
       if (auto num = element.getAsNumber()) {
-        compValList.push_back(static_cast<float>(*num));
+        floatList->push_back(static_cast<float>(*num));
       }
     }
+  } else if (dataType == "double") {
+    for (const llvm::json::Value &element : *parsedArray) {
+      if (auto num = element.getAsNumber()) {
+        floatList->push_back(*num);
+      }
+    }
+  } else if (dataType == "integer" || dataType == "bool" ||
+             dataType == "boolean" || dataType == "int") {
+    for (const llvm::json::Value &element : *parsedArray) {
+      if (auto num = element.getAsInteger()) {
+        intList->push_back(static_cast<int>(*num));
+      } else if (auto boolean = element.getAsBoolean()) {
+        intList->push_back(*boolean ? 1 : 0);
+      }
+    }
+    dataType = "int";
+  } else {
+    llvm::errs()
+        << "Mismatch between JSON dataType and provided C++ vectors.\n";
+    return failure();
   }
 
   return success();
@@ -132,16 +170,51 @@ void PipelineDuplicationPass::collectOpsDFS(
   }
 }
 
+template <typename T>
+std::pair<mlir::Value, mlir::Value> PipelineDuplicationPass::createBranchCond(
+    mlir::OpBuilder &builder, mlir::Location loc, mlir::Value selectRes,
+    T comparisonValue) {
+
+  Value constantComp;
+  Value branchCond;
+  if constexpr (std::is_floating_point_v<T>) {
+    // float or double
+    mlir::Type floatTy =
+        std::is_same_v<T, double> ? builder.getF64Type() : builder.getF32Type();
+
+    constantComp = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getFloatAttr(floatTy, comparisonValue));
+
+    branchCond = builder.create<mlir::arith::CmpFOp>(
+        loc, mlir::arith::CmpFPredicate::OEQ, selectRes, constantComp);
+
+  } else if constexpr (std::is_integral_v<T>) {
+    // int or bool
+    constantComp = builder.create<mlir::arith::ConstantOp>(
+        loc, builder.getIntegerAttr(builder.getI32Type(), comparisonValue));
+
+    branchCond = builder.create<mlir::arith::CmpIOp>(
+        loc, mlir::arith::CmpIPredicate::eq, selectRes, constantComp);
+  }
+
+  return {branchCond, constantComp};
+}
+
 void PipelineDuplicationPass::runDynamaticPass() {
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
 
   // find operation
-  std::vector<float> compValList;
+  // TODO: what is still missing?
+  std::vector<float> floatValList;
+  std::vector<int> intValList;
+  std::vector<double> doubleValList;
   std::string opName;
-  if (failed(PipelineDuplicationPass::readFromJSON(this->jsonPath, compValList,
-                                                   opName)))
+  std::string dataType;
+  if (failed(PipelineDuplicationPass::readFromJSON(
+          this->jsonPath, opName, dataType, &floatValList, &intValList,
+          &doubleValList)))
     return signalPassFailure();
 
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -180,15 +253,25 @@ void PipelineDuplicationPass::runDynamaticPass() {
     exitBlockArgs.push_back(exitBlock->addArgument(origOut.getType(), loc));
   }
 
-  int counter = 2;
-  for (float comp : compValList) {
+  // PREDICTED PATHS
+  int size =
+      std::max({floatValList.size(), intValList.size(), doubleValList.size()});
+  for (int i = 0; i < size; i++) {
     // create branch condition
     builder.setInsertionPointToEnd(currentBlock);
     // assume only the first result is relevant
-    Value constantComp = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getFloatAttr(builder.getF32Type(), comp));
-    Value branchCond = builder.create<mlir::arith::CmpFOp>(
-        loc, mlir::arith::CmpFPredicate::OEQ, selectRes, constantComp);
+    Value branchCond, constantComp;
+    if (dataType == "float" || dataType == "double") {
+      std::tie(branchCond, constantComp) =
+          createBranchCond(builder, loc, selectRes, floatValList[i]);
+    } else if (dataType == "int") {
+      std::tie(branchCond, constantComp) =
+          createBranchCond(builder, loc, selectRes, intValList[i]);
+    } else {
+      llvm::errs() << "Error: Unknown or unsupported data type: " << dataType
+                   << "\n";
+      return signalPassFailure();
+    }
     mlir::Block *trueBlock = funcOp.addBlock();     // true path
     mlir::Block *nextElseBlock = funcOp.addBlock(); // false path
     builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueBlock,
@@ -210,7 +293,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
     for (mlir::Operation *origOp : opsToMove) {
       mlir::Operation *cloned = builder.clone(*origOp, mapper);
       std::string newName =
-          namer.getName(origOp).str() + "_dup" + std::to_string(counter);
+          namer.getName(origOp).str() + "_dup" + std::to_string(i);
       cloned->setAttr("handshake.name", builder.getStringAttr(newName));
 
       for (unsigned i = 0; i < cloned->getNumResults(); ++i) {
@@ -240,7 +323,6 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
     // update
     currentBlock = nextElseBlock;
-    counter++;
   }
 
   // FALSE PATH
@@ -264,14 +346,12 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
           // Otherwise, only replace it if it's completely outside the
           // true/false cascade structures we generated.
+          bool isCondBranch =
+              userBlock->getTerminator() &&
+              isa<mlir::cf::CondBranchOp>(userBlock->getTerminator());
+
           return userBlock != currentBlock &&
-                 userBlock->getParentOp() == funcOp &&
-                 !llvm::any_of(compValList, [&](float) {
-                   // Keeps replacements from corrupting the internal lanes
-                   return userBlock->getTerminator() &&
-                          isa<mlir::cf::CondBranchOp>(
-                              userBlock->getTerminator());
-                 });
+                 userBlock->getParentOp() == funcOp && isCondBranch;
         });
   }
 
