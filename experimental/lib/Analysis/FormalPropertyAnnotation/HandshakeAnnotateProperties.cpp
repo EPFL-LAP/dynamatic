@@ -86,6 +86,9 @@ private:
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
   LogicalResult annotateIOGSingleToken(const IOG &iog);
   LogicalResult annotateIOGConsecutiveTokens(const IOG &iog);
+  LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge,
+                                             int32_t entryValue);
+  LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -418,6 +421,118 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
   }
   return success();
 }
+namespace {
+struct EntryCMerge {
+  ControlMergeOp op;
+  int32_t entryValue;
+};
+// This function is used to find entry control merges (i.e. control merges with
+// one input coming from an entry node), and is used in the annotation of the
+// entry token order invariant
+std::vector<EntryCMerge> findEntryCMerge(BlockArgument start) {
+  std::vector<EntryCMerge> ret;
+  std::vector<mlir::Value> stack;
+  stack.push_back(start);
+  while (!stack.empty()) {
+    mlir::Value cur = stack.back();
+    stack.pop_back();
+
+    Operation *next = *cur.getUsers().begin();
+    if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
+      int32_t entry;
+      for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
+        if (input == cur) {
+          entry = i;
+        }
+      }
+      ret.push_back({cmerge, entry});
+    }
+    if (isa<BufferOp, ForkOp>(next)) {
+      for (mlir::Value channel : next->getResults()) {
+        stack.push_back(channel);
+      }
+    }
+  }
+  return ret;
+}
+} // namespace
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
+    ControlMergeOp cmerge, int32_t entryValue) {
+  // Usually, the index of the cmerge is used for as the select input for a mux
+  // operator for each argument of the function. Each of these paths can be
+  // annotated.
+  struct PartialPath {
+    std::vector<EffectiveSlotNamer> slots;
+    mlir::Value cur;
+  };
+  std::vector<PartialPath> stack;
+  EffectiveSlotNamer mergeSlot(std::make_unique<BufferSlotFullNamer>(
+      cmerge.getInternalSlotStateNamers()[0]));
+  PartialPath start = {
+      .slots = {},
+      .cur = cmerge.getIndex(),
+  };
+  start.slots.push_back(mergeSlot);
+  stack.push_back(start);
+  while (!stack.empty()) {
+    PartialPath path = stack.back();
+    stack.pop_back();
+
+    Operation *next = path.cur.getUses().begin()->getOwner();
+    if (auto mux = dyn_cast<MuxOp>(next)) {
+      // Path is terminated by MuxOp, so this is the end of the path
+      if (path.slots.size() < 2) {
+        // This path does not contain enough slots to actually mean anything
+        continue;
+      }
+      EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots,
+                        entryValue);
+      propertyTable.push_back(p.toJSON());
+    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
+      // Add the slots of this buffer to the list of effective slot (copied
+      // sents will be added later)
+      for (auto &slot : buffer.getInternalSlotStateNamers()) {
+        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
+      }
+      path.cur = buffer.getResult();
+      stack.push_back(std::move(path));
+    } else if (auto fork = dyn_cast<ForkOp>(next)) {
+      // Branch into multiple paths, and add the sent state of the selected
+      // channel as a copied sent for the last slot
+      // Note: This last slot always exists, as the control merge contains a
+      // slot
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
+        PartialPath nextPath = {
+            .slots = path.slots,
+            .cur = channel,
+        };
+        EffectiveSlotNamer &back = nextPath.slots.back();
+        back.copiedSents.push_back(sents[i]);
+        stack.push_back(nextPath);
+      }
+    } else {
+      assert(false && "unexpected op detected!");
+      return failure();
+    }
+  }
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder(ModuleOp modOp) {
+  for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (BlockArgument arg : funcOp.getRegion().getArguments()) {
+      for (auto [cmerge, entryValue] : findEntryCMerge(arg)) {
+        if (failed(annotateEntryTokenOrderPaths(cmerge, entryValue))) {
+          return failure();
+        }
+      }
+    }
+  }
+  return success();
+}
 
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
@@ -438,6 +553,8 @@ HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
     assert(false &&
            "TODO: IOG as pass so that this function has access to IOGs");
     return failure();
+  case FormalProperty::TYPE::EntryTokenOrder:
+    return annotateEntryTokenOrder(modOp);
   }
   return failure();
 }
@@ -479,6 +596,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
       if (failed(annotateIOGConsecutiveTokens(iog)))
         return failure();
     }
+    if (failed(annotateEntryTokenOrder(modOp)))
+      return failure();
   }
   return success();
 }

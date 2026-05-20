@@ -17,6 +17,8 @@ struct ConstrainedNamer;
 struct ConstrainedEagerForkSentNamer;
 struct ConstrainedBufferSlotFullNamer;
 struct MemoryControllerSlotNamer;
+struct EffectiveSlotNamer;
+struct ConstrainedEffectiveSlotNamer;
 struct EntrySlotNamer;
 struct TerminatingSinkNamer;
 
@@ -40,6 +42,7 @@ struct InternalStateNamer {
     PipelineSlot,
     Constrained,
     MemoryControllerSlot,
+    EffectiveSlot,
     EntrySlot,
   };
   static std::optional<TYPE> typeFromStr(const std::string &s);
@@ -65,7 +68,7 @@ struct InternalStateNamer {
 
   static inline bool classof(const InternalStateNamer *fp) { return true; }
 
-  std::unique_ptr<ConstrainedNamer> tryConstrain(int32_t value);
+  std::unique_ptr<ConstrainedNamer> tryConstrain(int32_t value) const;
 
   TYPE type;
   static constexpr llvm::StringLiteral TYPE_LIT = "type";
@@ -75,6 +78,7 @@ struct InternalStateNamer {
   static constexpr llvm::StringLiteral CONSTRAINED = "Constrained";
   static constexpr llvm::StringLiteral MEMORY_CONTROLLER_SLOT =
       "MemoryControllerSlot";
+  static constexpr llvm::StringLiteral EFFECTIVE_SLOT = "EffectiveSlot";
   static constexpr llvm::StringLiteral ENTRY_SLOT = "EntrySlot";
   static constexpr llvm::StringLiteral TOKEN_COUNT = "TokenCount";
   static constexpr llvm::StringLiteral INNER_LIT = "inner";
@@ -152,7 +156,7 @@ struct EagerForkSentNamer : InternalStateNamer {
   std::string channelName;
   size_t channelSize;
 
-  ConstrainedEagerForkSentNamer constrain(int32_t value);
+  ConstrainedEagerForkSentNamer constrain(int32_t value) const;
 
   static constexpr llvm::StringLiteral OPERATION_LIT = "operation";
   static constexpr llvm::StringLiteral CHANNEL_NAME_LIT = "channel_name";
@@ -209,7 +213,7 @@ struct BufferSlotFullNamer : InternalStateNamer {
     return fp->type == TYPE::BufferSlotFull;
   }
 
-  ConstrainedBufferSlotFullNamer constrain(int32_t value);
+  ConstrainedBufferSlotFullNamer constrain(int32_t value) const;
 
   inline std::string getSMVName() const override {
     return llvm::formatv("{0}.{1}", opName, slotName).str();
@@ -371,6 +375,50 @@ struct MemoryControllerSlotNamer : InternalStateNamer {
   static constexpr llvm::StringLiteral LOADLESS_LIT = "loadless";
 };
 
+// EffectiveSlotNamer generates the name of the signal that indicates whether
+// the targeted slot 1. contains data and 2. is not duplicated by an eager fork.
+struct EffectiveSlotNamer : InternalStateNamer {
+  EffectiveSlotNamer() = default;
+  EffectiveSlotNamer(std::unique_ptr<InternalStateNamer> slot)
+      : InternalStateNamer(TYPE::EffectiveSlot), slot(std::move(slot)),
+        copiedSents(std::vector<EagerForkSentNamer>()) {}
+  ~EffectiveSlotNamer() = default;
+  static inline bool classof(const InternalStateNamer *fp) {
+    return fp->type == TYPE::EffectiveSlot;
+  }
+
+  inline void addCopiedSent(EagerForkSentNamer sent) {
+    copiedSents.push_back(std::move(sent));
+  }
+
+  std::unique_ptr<ConstrainedNamer> constrain(int32_t value) const;
+
+  std::string getSMVName() const override;
+  llvm::json::Value toInnerJSON() const override;
+  friend bool fromJSON(const llvm::json::Value &value,
+                       EffectiveSlotNamer &namer, llvm::json::Path path);
+
+  std::shared_ptr<InternalStateNamer> slot;
+  std::vector<EagerForkSentNamer> copiedSents;
+  static constexpr llvm::StringLiteral SLOT_LIT = "slot";
+  static constexpr llvm::StringLiteral COPIED_SENTS_LIT = "copied_sents";
+};
+
+struct ConstrainedEffectiveSlotNamer : ConstrainedNamer {
+  ConstrainedEffectiveSlotNamer() = default;
+  ConstrainedEffectiveSlotNamer(EffectiveSlotNamer namer, int32_t value)
+      : ConstrainedNamer(TYPE::EffectiveSlot, value) {
+    namer.slot = namer.slot->tryConstrain(value);
+    inner = namer;
+  }
+  ~ConstrainedEffectiveSlotNamer() = default;
+  inline std::unique_ptr<InternalStateNamer> getUnconstrained() const override {
+    return std::make_unique<EffectiveSlotNamer>(inner);
+  }
+  inline std::string getSMVName() const override { return inner.getSMVName(); }
+  EffectiveSlotNamer inner;
+};
+
 struct EntrySlotNamer : InternalStateNamer {
   // a_valid
   // b_valid
@@ -415,6 +463,9 @@ inline llvm::json::Value toJSON(const MemoryControllerSlotNamer &namer) {
   return namer.toInnerJSON();
 }
 inline llvm::json::Value toJSON(const ConstrainedNamer &namer) {
+  return namer.toInnerJSON();
+}
+inline llvm::json::Value toJSON(const EffectiveSlotNamer &namer) {
   return namer.toInnerJSON();
 }
 inline llvm::json::Value toJSON(const EntrySlotNamer &namer) {

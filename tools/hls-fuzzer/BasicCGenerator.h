@@ -30,8 +30,11 @@ public:
                            const TypingContext &entryContext = {})
       : random(random), typeSystem(typeSystem), entryContext(entryContext) {}
 
+  /// Generates an entire C program that can compile and run.
+  void generate(llvm::raw_ostream &os, std::string_view functionName);
+
   /// Returns a new function with the given function name.
-  ast::Function generate(std::string_view functionName);
+  ast::Function generateFunction(llvm::StringRef functionName);
 
   /// Generates a dynamatic test bench for the given function.
   // TODO: Could return a function once our AST is powerful enough to represent

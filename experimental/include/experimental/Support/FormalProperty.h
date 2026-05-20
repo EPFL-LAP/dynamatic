@@ -35,6 +35,7 @@ public:
     ReconvergentPathFlow,
     IOGSingleToken,
     IOGConsecutiveTokens,
+    EntryTokenOrder,
   };
 
   TAG getTag() const { return tag; }
@@ -335,6 +336,61 @@ private:
   inline static const StringLiteral SLOT1_LIT = "slot1";
   inline static const StringLiteral SLOT2_LIT = "slot2";
   inline static const StringLiteral SENTS_LIT = "sents";
+};
+
+// EntryTokenOrder describes the invariant that, for a path between an entry
+// control merge and a following mux operation, only the last effective token
+// along that path can be an entry. Intuitively, this is because the entry token
+// will only appear a single time when the loop starts, and after that all
+// tokens along the path will be looping tokens.
+// This invariant is defined by the effective slots along the path from control
+// merge to mux `slots`, and by the value of the entry token `entryValue` (which
+// corresponds to the index of the control merge's input connected to the
+// entry path).
+//
+// clang-format off
+//
+// Example: fir (using fpl22)
+//
+// %result, %index = control_merge [%0#2, %trueResult_6]  {...} : [<>, <>] to <>, <i1>
+// %16:2 = fork [2] %index {...} : <i1>
+// %10 = buffer %16#1
+// %11 = buffer %10
+// %12 = buffer %11
+// %15 = mux %12 [%3#1, %14] {...} : <i1>, [<i32>, <i32>] to <i32>
+//
+// Annotates the path consisting of effective slots:
+// slot (copied sent)
+//
+// control_merge0.slot_full (fork3.outs_1_sent)
+// buffer4.outs_valid_i
+// buffer5.full
+// buffer6.full
+//
+// clang-format on
+class EntryTokenOrder : public FormalProperty {
+public:
+  const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }
+  int32_t getValue() const { return entryValue; }
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<EntryTokenOrder>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  EntryTokenOrder() = default;
+  EntryTokenOrder(unsigned long id, TAG tag,
+                  std::vector<EffectiveSlotNamer> slots, int32_t value)
+      : FormalProperty(id, tag, TYPE::EntryTokenOrder), slots(std::move(slots)),
+        entryValue(value) {}
+  ~EntryTokenOrder() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::EntryTokenOrder;
+  }
+
+private:
+  std::vector<EffectiveSlotNamer> slots;
+  int32_t entryValue;
+  inline static const StringLiteral SLOTS_LIT = "slots";
+  inline static const StringLiteral ENTRY_VALUE_LIT = "entry_value";
 };
 
 class FormalPropertyTable {
