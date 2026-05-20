@@ -397,8 +397,6 @@ public:
                                  llvm::StringRef filename) const;
 
 private:
-  void addSyntheticStartForkForBalancing();
-
   std::map<mlir::Operation *, NodeIdType> opToNodeId;
 
   /// Adjacency list for the non-cyclic subgraph (stores edge indices).

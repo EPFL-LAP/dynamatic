@@ -165,24 +165,16 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
   if (nodes.empty())
     return;
 
-  // mlir::Value is not LessThanComparable
-  // Order pairs by (node id, opaque pointer).
-  std::set<std::pair<NodeIdType, uintptr_t>> seen;
+  std::vector<std::pair<NodeIdType, mlir::Value>> edgesToAdd;
   for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
     if (isa<mlir::MemRefType>(arg.getType()) || arg.getUsers().empty())
       continue;
     Operation *user = *arg.getUsers().begin();
-    std::optional<unsigned> optBB = getLogicBB(user);
-    if (!optBB)
-      continue;
-    for (const auto &[step, bb] : stepToBB) {
-      if (bb != *optBB)
-        continue;
-      auto it = nodeMap.find({user, step});
-      if (it == nodeMap.end())
-        continue;
-      seen.insert(
-          {it->second, reinterpret_cast<uintptr_t>(arg.getAsOpaquePointer())});
+    
+    // Only add the edges in the very first step (entry BB)
+    auto it = nodeMap.find({user, 0});
+    if (it != nodeMap.end()) {
+      edgesToAdd.push_back({it->second, arg});
     }
   }
 
@@ -200,17 +192,14 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
     });
   }
 
-  if (seen.size() < 2)
+  if (edgesToAdd.size() < 2)
     return;
 
   NodeIdType forkId = addNode(nullptr, DataflowGraphNode::SYNTHETIC_FORK);
   nodeIdToStep[forkId] = 0;
 
-  for (const auto &pr : seen)
-    addEdge(
-        forkId, pr.first,
-        Value::getFromOpaquePointer(reinterpret_cast<const void *>(pr.second)),
-        DataflowGraphEdgeType::INTRA_BB);
+  for (const auto &edge : edgesToAdd)
+    addEdge(forkId, edge.first, edge.second, DataflowGraphEdgeType::INTRA_BB);
 }
 
 std::vector<ReconvergentPath>
@@ -709,34 +698,6 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
       addEdge(srcId, dstId, channel);
     }
   }
-
-  addSyntheticStartForkForBalancing();
-}
-
-void SynchronizingCyclesFinderGraph::addSyntheticStartForkForBalancing() {
-  if (nodes.empty())
-    return;
-
-  std::set<std::pair<NodeIdType, uintptr_t>> seen;
-  for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
-    if (isa<mlir::MemRefType>(arg.getType()) || arg.getUsers().empty())
-      continue;
-    Operation *user = *arg.getUsers().begin();
-    auto it = opToNodeId.find(user);
-    if (it == opToNodeId.end())
-      continue;
-    seen.insert(
-        {it->second, reinterpret_cast<uintptr_t>(arg.getAsOpaquePointer())});
-  }
-
-  if (seen.size() < 2)
-    return;
-
-  NodeIdType forkId = addNode(nullptr, DataflowGraphNode::SYNTHETIC_FORK);
-  for (const auto &pr : seen)
-    addEdge(
-        forkId, pr.first,
-        Value::getFromOpaquePointer(reinterpret_cast<const void *>(pr.second)));
 }
 
 std::string
