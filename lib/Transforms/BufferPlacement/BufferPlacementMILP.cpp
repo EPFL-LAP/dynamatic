@@ -79,9 +79,10 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
 }
 
 /// [FPGA24] Returns whether the unit has variable latency.
-static bool hasVariableLatencyUnit(Operation *unit) {
-  if (!unit)
+static bool hasVariableLatencyUnit(const DataflowGraphNode &node) {
+  if (node.type != DataflowGraphNode::REGULAR)
     return false;
+  Operation *unit = node.op;
   if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
     auto memOp = findMemInterface(loadOp.getAddress());
     if (isa_and_present<handshake::LSQOp>(memOp))
@@ -101,7 +102,7 @@ static bool hasVariableLatencyUnit(Operation *unit) {
 static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
                                    const DataflowSubgraphBase &graph) {
   return std::any_of(nodeIds.begin(), nodeIds.end(), [&](NodeIdType nodeId) {
-    return hasVariableLatencyUnit(graph.nodes[nodeId].op);
+    return hasVariableLatencyUnit(graph.nodes[nodeId]);
   });
 }
 
@@ -114,9 +115,10 @@ static LinExpr computeCycleLatency(const SimpleCycle &cycle,
   LinExpr latency;
 
   for (NodeIdType nodeId : cycle.nodes) {
-    Operation *op = graph.nodes[nodeId].op;
-    if (!op)
+    const DataflowGraphNode &node = graph.nodes[nodeId];
+    if (node.type != DataflowGraphNode::REGULAR)
       continue;
+    Operation *op = node.op;
     double unitLatency = 0.0;
     (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
     latency += unitLatency;
@@ -151,9 +153,10 @@ computeCycleBaseLatency(const SimpleCycle &cycle,
                         const TimingDatabase &timingDB, double targetPeriod) {
   double latency = 0.0;
   for (NodeIdType nodeId : cycle.nodes) {
-    Operation *op = graph.nodes[nodeId].op;
-    if (!op)
+    const DataflowGraphNode &node = graph.nodes[nodeId];
+    if (node.type != DataflowGraphNode::REGULAR)
       continue;
+    Operation *op = node.op;
     double unitLatency = 0.0;
     (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
     latency += unitLatency;
@@ -1268,7 +1271,7 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
 
     bool hasVarLatency = std::any_of(
         path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
-          return hasVariableLatencyUnit(graph->nodes[id].op);
+          return hasVariableLatencyUnit(graph->nodes[id]);
         });
 
     if (hasVarLatency) {
@@ -1287,9 +1290,10 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
       LinExpr pathLatency;
 
       for (NodeIdType nodeId : simplePath.nodes) {
-        Operation *unitOp = graph->nodes[nodeId].op;
-        if (!unitOp)
+        const DataflowGraphNode &node = graph->nodes[nodeId];
+        if (node.type != DataflowGraphNode::REGULAR)
           continue;
+        Operation *unitOp = node.op;
         double unitLat = 0.0;
         (void)timingDB.getLatency(unitOp, SignalType::DATA, unitLat,
                                   targetPeriod);
