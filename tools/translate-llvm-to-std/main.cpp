@@ -94,6 +94,8 @@ int main(int argc, char **argv) {
   context.getOrLoadDialect<cf::ControlFlowDialect>();
   context.getOrLoadDialect<dynamatic::handshake::HandshakeDialect>();
 
+  context.allowUnregisteredDialects();
+
   OpBuilder builder(&context);
 
   auto module = builder.create<ModuleOp>(builder.getUnknownLoc());
