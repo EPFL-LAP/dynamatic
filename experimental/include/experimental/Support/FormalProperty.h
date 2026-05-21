@@ -466,6 +466,15 @@ private:
   inline static const StringLiteral PATH_CM_LIT = "cmerge_mux_path";
 };
 
+// In a path between a decider unit and a branch, only the first token along the
+// path can have the value that exits the loop. This is because, after the exit
+// token is generated, control flow will never come back to the decider unit
+// again, so no new token will be propagated into the path.
+// A unit is a decider unit if:
+// 1. It generates a token with a new value used as the condition by one or more
+// branches
+// 2. At least one of the branches is part of an IOG, and only one of the output
+// paths of this branch loops back to the branch
 class ExitTokenOrder : public FormalProperty {
 public:
   const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }
@@ -491,6 +500,10 @@ private:
   inline static const StringLiteral EXIT_VALUE_LIT = "exit_value";
 };
 
+// The ExitTokenNoAncestors invariant states that, for any decider-branch path,
+// if an exit token exists anywhere, ancestors of the decider cannot contain any
+// effective tokens. Any unit that can reach the decider is called an ancestor
+// of the decider
 class ExitTokenNoAncestors : public FormalProperty {
 public:
   const std::vector<std::shared_ptr<InternalStateNamer>> &getExitSlots() const {
