@@ -92,7 +92,6 @@ private:
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
   LogicalResult annotateSingleEntryToken(ModuleOp modOp);
   LogicalResult annotateExitTokenOrder(const std::vector<IOG> &iog);
-  // LogicalResult annotateExitTokenNoAncestors(ModuleOp modOp);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -421,13 +420,18 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
   }
   return success();
 }
-
 namespace {
+
 struct EntryCMergePath {
   std::vector<EffectiveSlotNamer> slots;
   ControlMergeOp cmerge;
   int32_t entryValue;
 };
+
+// This function is used to find entry control merges (i.e. control merges with
+// one input coming from an entry node), and returns the effective slots along
+// the path. It is used in the annotation of the entry token order invariant and
+// single entry token invariant
 std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
@@ -445,30 +449,44 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
     PartialPath path = std::move(stack.back());
     stack.pop_back();
 
-    Operation *next = path.cur.getUses().begin()->getOwner();
+    Operation *next = *path.cur.getUsers().begin();
     if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
-      int32_t entry;
-      for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
-        if (input == path.cur) {
-          entry = i;
+      // Path is terminated by ControlMergeOp, so this is the end of the path
+
+      // CMerge uses the following logic to generate index token:
+      // - When a CMerge receives a token from the i-th data input channel, it
+      // sends a token with value i to the index channel Here, if the path to
+      // CMerge ends at the 0-th channel, then an entry token will cause the
+      // CMerge to emit a token carrying a value = 0 to the index channel. This
+      // function determines the actual entry value of the index channel.
+      auto getEntryValue = [&](ControlMergeOp cmerge, Value entryChannel) {
+        for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
+          if (input == entryChannel) {
+            return (int32_t)i;
+          }
         }
-      }
+        llvm::report_fatal_error(
+            "entryChannel is not a data operand of cmerge");
+      };
       EntryCMergePath retPath = {
           .slots = path.slots,
           .cmerge = cmerge,
-          .entryValue = entry,
+          .entryValue = getEntryValue(cmerge, path.cur),
       };
       ret.push_back(retPath);
-    }
-    if (auto buffer = dyn_cast<BufferOp>(next)) {
+    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
+      // Add the slots of this buffer to the list of effective slot (copied
+      // sents will be added later)
       for (auto &slot : buffer.getInternalSlotStateNamers()) {
         path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
       }
       path.cur = buffer.getResult();
       stack.push_back(std::move(path));
-      continue;
-    }
-    if (auto fork = dyn_cast<ForkOp>(next)) {
+    } else if (auto fork = dyn_cast<ForkOp>(next)) {
+      // Branch into multiple paths, and add the sent state of the selected
+      // channel as a copied sent for the last slot
+      // Note: This last slot always exists, as the entry contains a
+      // slot
       auto sents = fork.getInternalSentStateNamers();
       for (auto [i, channel] : llvm::enumerate(next->getResults())) {
         PartialPath nextPath = {
@@ -480,12 +498,14 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
         back.copiedSents.push_back(sents[i]);
         stack.push_back(nextPath);
       }
-      continue;
     }
   }
   return ret;
 }
 
+// This function finds any path from a control merge to a mux operation. Note
+// that there can be multiple paths due to forks that replicate the index token
+// of the CMerge to multiple muxes.
 std::vector<std::vector<EffectiveSlotNamer>>
 findCMergeMuxPaths(ControlMergeOp cmerge) {
   struct PartialPath {
@@ -506,21 +526,23 @@ findCMergeMuxPaths(ControlMergeOp cmerge) {
     PartialPath path = stack.back();
     stack.pop_back();
 
-    Operation *next = path.cur.getUses().begin()->getOwner();
+    Operation *next = *path.cur.getUsers().begin();
     if (auto mux = dyn_cast<MuxOp>(next)) {
       // Path is terminated by MuxOp, so this is the end of the path
       ret.push_back(std::move(path.slots));
-      continue;
-    }
-    if (auto buffer = dyn_cast<BufferOp>(next)) {
+    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
+      // Add the slots of this buffer to the list of effective slot (copied
+      // sents will be added later)
       for (auto &slot : buffer.getInternalSlotStateNamers()) {
         path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
       }
       path.cur = buffer.getResult();
       stack.push_back(std::move(path));
-      continue;
-    }
-    if (auto fork = dyn_cast<ForkOp>(next)) {
+    } else if (auto fork = dyn_cast<ForkOp>(next)) {
+      // Branch into multiple paths, and add the sent state of the selected
+      // channel as a copied sent for the last slot
+      // Note: This last slot always exists, as the initial control merge
+      // contains a slot
       auto sents = fork.getInternalSentStateNamers();
       for (auto [i, channel] : llvm::enumerate(next->getResults())) {
         PartialPath nextPath = {
@@ -531,10 +553,9 @@ findCMergeMuxPaths(ControlMergeOp cmerge) {
         back.copiedSents.push_back(sents[i]);
         stack.push_back(nextPath);
       }
-      continue;
+    } else {
+      llvm::report_fatal_error("unexpected op detected");
     }
-
-    llvm::report_fatal_error("unexpected op detected");
   }
   return ret;
 }
@@ -582,6 +603,7 @@ HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
   }
   return success();
 }
+
 namespace {
 struct BranchOpDecision {
   // true -> this branch loops towards itself
@@ -882,6 +904,9 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateProperty(
     return annotateSingleEntryToken(modOp);
   case FormalProperty::TYPE::ExitTokenOrder:
     return annotateExitTokenOrder(iogs);
+  case FormalProperty::TYPE::ExitTokenNoAncestors:
+    llvm::errs() << "ExitTokenNoAncestors is annotated with ExitTokenOrder\n";
+    return failure();
   }
   return failure();
 }

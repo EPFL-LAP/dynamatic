@@ -31,20 +31,10 @@ RandomCTarget::createWorker(const Options &options, Randomly randomly) const {
 void RandomCWorker::generate(llvm::raw_ostream &os,
                              llvm::StringRef functionName) {
   gen::DynamaticTypeSystem dynamaticTypeSystem(random);
-  gen::BasicCGenerator generator(
-      random, dynamaticTypeSystem,
-      /*entryContext=*/
-      {random.fromEnum<gen::DynamaticTypingContext::Constraint>()});
-
-  ast::Function function = generator.generate(functionName);
-  os << R"(
-#include <stdint.h>
-#include <math.h>
-#include "dynamatic/Integration.h"
-
-)";
-  os << function << '\n';
-  os << generator.generateTestBench(function);
+  gen::BasicCGenerator generator(random, dynamaticTypeSystem,
+                                 /*entryContext=*/
+                                 {gen::DynamaticTypingContext::Unconstrained});
+  generator.generate(os, functionName);
 }
 
 AbstractWorker::VerificationResult

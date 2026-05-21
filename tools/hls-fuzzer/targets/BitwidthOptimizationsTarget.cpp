@@ -49,15 +49,7 @@ void BitwidthOptimizationsGenerator::generate(llvm::raw_ostream &os,
                                  /*entryContext=*/
                                  gen::BitwidthTypingContext{maxBitwidth});
 
-  ast::Function function = generator.generate(functionName);
-  os << R"(
-#include <stdint.h>
-#include <math.h>
-#include "dynamatic/Integration.h"
-
-)";
-  os << function << '\n';
-  os << generator.generateTestBench(function);
+  generator.generate(os, functionName);
 }
 
 constexpr std::string_view ORACLE_EXECUTABLE = "hls-fuzzer-check-bitwidth";

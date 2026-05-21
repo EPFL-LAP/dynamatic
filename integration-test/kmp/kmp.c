@@ -15,7 +15,9 @@ c1:
   for (q = 1; q < PATTERN_SIZE; q++) {
     char tmp = pattern[q];
   c2:
-    while (k > 0 && pattern[k] != tmp) {
+    while (k > 0) {
+      if (pattern[k] == tmp)
+        break;
       k = kmpNext[q];
     }
     if (pattern[k] == tmp) {
@@ -29,7 +31,9 @@ k1:
   for (i = 0; i < STRING_SIZE; i++) {
     char tmp = input[i];
   k2:
-    while (q > 0 && pattern[q] != tmp) {
+    while (q > 0) {
+      if (pattern[q] == tmp)
+        break;
       q = kmpNext[q];
     }
     if (pattern[q] == tmp) {

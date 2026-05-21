@@ -104,26 +104,21 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
-  let summary = "Analyzes memory accesses to LSQs to find unnecessary ones";
+
+def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependencies", "mlir::ModuleOp"> {
+  let summary = "Deactivates memory dependences that do not need to be enforced";
   let description = [{
-    Performs flow analysis to identify WAR dependencies between memory accesses
-    that are ensured by the circuit's semantics and which therefore do not need
-    to be enforced by an LSQ. This allows to reduce the number of memory ports
-    that go to LSQs, thereby improving the circuit's performance and area thanks
-    to LSQ size reduction (or elimination, in some instances). The pass does not
-    modify the IR's structure, it only sets `handshake::MemInterfaceAttr`
-    attributes on memory ports to encode the analysis' results.
+    Performs flow analysis to identify memory dependencies between memory
+    accesses that are ensured by the circuit's semantics and which therefore do
+    not need to be enforced by an LSQ. Specifically, write-after-read 
+    dependencies where the store is globally in-order dependent (GIID) on the 
+    load along all non-cyclic CFG paths are deactivated, as are 
+    write-after-write dependencies between a store and itself. 
 
     The pass requires that all eligible operations within Handshake functions
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
-
-  let statistics = [
-    Statistic<"loadsRerouted", "Loads rerouted", "Number of load operations that have been rerouted">,
-    Statistic<"storesRerouted", "Stores rerouted", "Number of store operations that have been rerouted">,
-  ];
 }
 
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
@@ -156,6 +151,20 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
     heuristics manage to infer an operation's block, the pass sets the
     `dynamatic::BB_ATTR_NAME` on the operation. This pass does not fail, even
     when it does not manage to infer the basic block of all operations.
+  }];
+}
+
+def ConsumeProducerOutputAttrMarker
+    : Pass<"consume-producer-output-attr-marker", "mlir::ModuleOp"> {
+  let summary = "Consume `dynamatic.producer_output_attr_marker` ops by "
+                "moving their `dynamatic.*` attributes onto the producer.";
+  let description = [{
+    Transfer the contents of any producer-attribute marker ops to the actual
+    producer, and then erase the producer-attribute marker ops.
+    We use the ops in the std files to avoid the producer's output from 
+    being folded away during the front-end's lowering passes,
+    but once the IR has reached Dynamatic's internal IRs, 
+    we can just store the attribute directly on the producer.
   }];
 }
 
@@ -208,7 +217,12 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
 > {
   let summary = "Place memory interfaces according to memoty port annotations.";
   let description = [{
-    Replaces existing memory interfaces and memory ports in Handshake functions
+    Inspects the `handshake::MemDependenceAttr` attributes on LSQ memory ports
+    to determine which ports have only inactive dependencies and which therefore 
+    do not need to be enforced by an LSQ and updates the 
+    `handshake::MemInterfaceAttr` attributes of these ports accordingly. 
+
+    Then replaces existing memory interfaces and memory ports in Handshake functions
     following the `handshake::MemInterfaceAttr` attribute on each memory port.
 
     In general the pass needs to identify new control signals to appropriately

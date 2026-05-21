@@ -341,6 +341,41 @@ private:
   inline static const StringLiteral SENTS_LIT = "sents";
 };
 
+// EntryTokenOrder describes the invariant that, for a path between an entry
+// control merge and a following mux operation, only the last effective token
+// along that path can be an entry. Intuitively, this is because the entry token
+// will only appear a single time when the loop starts, and after that all
+// tokens along the path will be looping tokens.
+// This invariant is defined by the effective slots along the path from control
+// merge to mux `slots`, and by the value of the entry token `entryValue` (which
+// corresponds to the index of the control merge's input connected to the
+// entry path).
+// e.g. if the path from start -> cmerge arrives at the 0th input of cmerge,
+// `entryValue` will be 0
+//
+// clang-format off
+//
+// Example: fir (using fpl22)
+//
+// %0:3 = fork [3] %arg4 {...} : <>
+// %result, %index = control_merge [%0#2, %trueResult_6]  {...} : [<>, <>] to <>, <i1>
+// %16:2 = fork [2] %index {...} : <i1>
+// %10 = buffer %16#1
+// %11 = buffer %10
+// %12 = buffer %11
+// %15 = mux %12 [%3#1, %14] {...} : <i1>, [<i32>, <i32>] to <i32>
+//
+// Annotates the path consisting of effective slots:
+// slot (copied sent)
+//
+// control_merge0.slot_full (fork3.outs_1_sent)
+// buffer4.outs_valid_i
+// buffer5.full
+// buffer6.full
+//
+// The entry value is 0, as %0#2 comes from the entry.
+//
+// clang-format on
 class EntryTokenOrder : public FormalProperty {
 public:
   const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }
@@ -366,6 +401,44 @@ private:
   inline static const StringLiteral ENTRY_VALUE_LIT = "entry_value";
 };
 
+// SingleEntryToken describes the invariant that only a single token is emitted
+// from the entry unit. This means that, if any path between an entry cmerge and
+// a subsequent mux operation contains a token (regardless of whether it is an
+// entry token or a loop token), the path between the entry and cmerge must be
+// empty. This is because both entry tokens and loop tokens only exist after a
+// token has propagated from entry to cmerge.
+// This invariant is represented by the path from entry to cmerge `ec`, and the
+// path from cmerge to mux `cm`. Effective slots are used to ensure that
+// duplicated tokens are not counted double
+//
+// clang-format off
+//
+// Example: fir (using fpl22)
+//
+// %0:3 = fork [3] %arg4 {...} : <>
+// %result, %index = control_merge [%0#2, %trueResult_6]  {...} : [<>, <>] to <>, <i1>
+// %16:2 = fork [2] %index {...} : <i1>
+// %10 = buffer %16#1
+// %11 = buffer %10
+// %12 = buffer %11
+// %15 = mux %12 [%3#1, %14] {...} : <i1>, [<i32>, <i32>] to <i32>
+//
+// Annotates the following paths consisting of effective slots
+// slot (copied sent)
+//
+// cmerge -> mux path:
+//
+// control_merge0.slot_full (fork3.outs_1_sent)
+// buffer4.outs_valid_i
+// buffer5.full
+// buffer6.full
+//
+//
+// entry -> cmerge path:
+//
+// start_valid (fork0.outs_2_sent)
+//
+// clang-format on
 class SingleEntryToken : public FormalProperty {
 public:
   const std::vector<EffectiveSlotNamer> &getEcPath() const { return ec; }

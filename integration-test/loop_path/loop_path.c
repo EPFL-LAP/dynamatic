@@ -1,3 +1,4 @@
+// clang-format off
 #include "loop_path.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"
@@ -6,14 +7,16 @@
 void loop_path(in_int_t a[N], in_int_t b[N], inout_int_t c[N]) {
   int i = 0;
   bool break_flag = false;
-
+  bool loopAgain = false;
   do {
     int temp = a[i] + b[i];
     int x = 5;
     c[i] = temp;
     i++;
     break_flag = (1000 - temp) <= x * temp;
-  } while (i < N && !break_flag);
+    loopAgain = !break_flag && i < N;
+    #pragma DYN speculate variable=loopAgain max_predictions=3 style=standard
+  } while (loopAgain);
 }
 
 int main(void) {

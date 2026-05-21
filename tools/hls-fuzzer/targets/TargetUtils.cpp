@@ -66,15 +66,38 @@ void dynamatic::outputDynamaticInvocation(
 
   os << "set -o pipefail\n";
   os << "exec 5>&1\n";
-  os << "OUTPUT=$(" << dynamaticPath
-     << " --exit-on-failure <<EOF 2>&1 | tee >(cat - >&5)\n";
+  os << "OUTPUT=$(\n";
+
+  // Perform constant evaluation with clang to find any instances of UB.
+  os << R"(set -e
+# Create a temporary file which has the 'static_assert' appended to it.
+# Since we always append the 'static_assert' rather than making it part of the
+# original source code, reduction tools such as 'cvise' cannot circumvent it.
+file=$(mktemp --suffix .c)
+trap 'rm "$file"' EXIT
+)";
+  os << "cat " << sourceFile.filename().string() << " >> $file\n";
+  os << "echo \"static_assert((test_bench(), true));\"  >> $file\n";
+  os << (dynamaticSourceRoot / "bin" / "clang++").string()
+     << " $file -std=c++20 -DHLS_FUZZER_VERIFY ";
+  os << "-I" << (dynamaticSourceRoot / "include").string()
+     << " -Wno-deprecated -o /dev/null\n";
+
+  // Invoke dynamatic.
+  os << dynamaticPath << " --exit-on-failure <<EOF 2>&1 | tee >(cat - >&5)\n";
   os << "set-dynamatic-path " << dynamaticSourceRoot.string() << '\n';
   os << "set-src " << sourceFile.filename().string();
   os << "\n" << script.trim() << "\nexit\nEOF\n";
   os << R"()
 RET=$?
-# Ignore known issue. See https://github.com/EPFL-LAP/dynamatic/issues/886
+# Ignore known issues.
 if echo "$OUTPUT" | grep -q "Pointer values are unsupported"; then
+  # See https://github.com/EPFL-LAP/dynamatic/issues/886
+  exit 0
+fi
+# 'constexpr' evaluation does not define semantics for floating point edge
+# cases that match implementation defined behaviour in clang, GCC and dynamatic.
+if echo "$OUTPUT" | grep -q "floating point arithmetic produces a NaN"; then
   exit 0
 fi
 if [ "$RET" -ne "0" ]; then
