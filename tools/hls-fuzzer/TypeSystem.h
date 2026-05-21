@@ -629,6 +629,20 @@ public:
         /*output=*/copyInputToOutput<ast::StatementList>(),
     };
   }
+
+  using ExpressionKey =
+      std::variant<ast::Constant::Tag, ast::CastExpression::Tag,
+                   ast::Variable::Tag, ast::ArrayReadExpression::Tag,
+                   ast::ConditionalExpression::Tag, ast::BinaryExpression::Tag,
+                   ast::UnaryExpression::Tag>;
+
+  /// Returns the probability table for a given expression, represented by their
+  /// tag, to be selected.
+  ///
+  /// The method may return different probabilities for different contexts but
+  /// should be a pure function otherwise.
+  virtual ProbabilityTable<ExpressionKey>
+  getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -773,6 +787,26 @@ public:
 
   static bool discardStatementList(const TypingContext &) { return false; }
 
+  static ProbabilityTable<ExpressionKey>
+  getExpressionProbabilityTable(const TypingContext &) {
+    // Default probabilities for expressions.
+    // Most expressions are 100 times more likely to be generated than a
+    // constant.
+    // Variables are only 10 times more likely, conditional expressions too.
+    std::vector<std::pair<ExpressionKey, std::size_t>> probs{
+        {ast::Variable::Tag{}, 10},
+        {ast::ConditionalExpression::Tag{}, 10},
+        {ast::CastExpression::Tag{}, 100},
+        {ast::ArrayReadExpression::Tag{}, 100}};
+    for (auto op : enumRange<ast::BinaryExpression::Op>())
+      probs.emplace_back(op, 100);
+
+    for (auto op : enumRange<ast::UnaryExpression::Op>())
+      probs.emplace_back(op, 100);
+
+    return ProbabilityTable<ExpressionKey>(std::move(probs));
+  }
+
   // Implementations of the virtual methods in 'AbstractTypeSystem'.
   // These are automatically implemented to unbox the 'TypingContext's out of
   // the opaque contexts, calling the corresponding non-opaque 'check*' method
@@ -849,6 +883,11 @@ public:
 
   bool discardStatementListOpaque(const OpaqueContext &context) final {
     return self().discardStatementList(context.cast<TypingContext>());
+  }
+
+  ProbabilityTable<ExpressionKey>
+  getExpressionProbabilityTableOpaque(const OpaqueContext &context) final {
+    return self().getExpressionProbabilityTable(context.cast<TypingContext>());
   }
 
 private:

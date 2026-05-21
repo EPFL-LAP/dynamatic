@@ -212,6 +212,10 @@ struct Constant {
                    std::int32_t, std::uint32_t, float, double>;
   Variant value;
 
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
   /// Returns the type of this expression.
   PrimitiveType getType() const {
     return llvm::TypeSwitch<Variant, PrimitiveType>(value)
@@ -255,6 +259,10 @@ struct Variable {
 
   using SubElements = std::tuple<ScalarParameter>;
   constexpr static std::size_t PARAMETER = 0;
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Variable &variable);
@@ -316,6 +324,7 @@ public:
     NotEqual,
     MAX_VALUE = NotEqual,
   };
+  using Tag = Op;
 
   BinaryExpression(Expression lhs, Op op, Expression rhs)
       : lhs(std::move(lhs)), op(op), rhs(std::move(rhs)) {}
@@ -363,6 +372,10 @@ public:
   constexpr static std::size_t TARGET_TYPE = 0;
   constexpr static std::size_t OPERAND = 1;
 
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
 private:
   ScalarType targetType;
   Expression expression;
@@ -381,6 +394,7 @@ public:
     Minus,
     MAX_VALUE = Minus,
   };
+  using Tag = Op;
 
   UnaryExpression(Op op, Expression expression)
       : op(op), expression(std::move(expression)) {}
@@ -424,6 +438,10 @@ public:
   constexpr static std::size_t TRUE_VAL = 1;
   constexpr static std::size_t FALSE_VAL = 2;
 
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
 private:
   Expression condition;
   Expression trueVal;
@@ -460,6 +478,10 @@ public:
 
   constexpr static std::size_t ARRAY_PARAMETER = 0;
   constexpr static std::size_t INDEX = 1;
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
 
 private:
   ScalarType dataType;
