@@ -44,13 +44,19 @@ Whenever a `non-spec` value arrives at a point where speculation is resolved, we
 
 If a value is `spec`, a prediction was involved in its generation. When it arrives at a point where speculation is resolved, we must wait to see if it resolved correctly or incorrectly before taking any action. 
 
+We identify `non-spec` vs `spec` data via an additional bit attached to values. 
+
 ### High-Level Overview: The Speculator
 
 The core dataflow unit of token-prediction speculative flow is the speculator. Currently, it is placed manually, based on a user-written `#pragma dyn speculate` in the input kernel source code. The speculator can be used to break data dependencies, producing a data output before receiving a data input, by generating predicted values. These values can then be used to begin computations earlier, often resulting in improved circuit performance. The speculator has an internal history of predictions made: for a maximum of N in-flight predictions, this internal history must be at least of size N. 
 
 ### High-Level Overview: The Commit Units
 
-The second unit used in our token-prediction speculative flow is the commit unit. Outputs of the computation done with predicted inputs will eventually reach commit units, which provide a hard boundary of how far a `spec` value can travel from the speculator. When the true data input arrives at the speculator, the speculator communicates to these commit units if the prediction was correct or incorrect. If correct, the commit units allows the value to `pass`. If incorrect, the commit unit `kills` the value, preventing the misprediction from impacting the correctness of the circuit's execution. We use `kill` to refer to "dropping" values which are incorrect. 
+The second unit used in our token-prediction speculative flow is the commit unit. Outputs of the computation done with predicted inputs will eventually reach commit units, which provide a hard boundary of how far a `spec` value can travel from the speculator. 
+
+When the true data input arrives at the speculator, the speculator communicates to these commit units if the prediction was correct or incorrect. If correct, the commit units allows the value to `pass`. If incorrect, the commit unit `kills` the value, preventing the misprediction from impacting the correctness of the circuit's execution. We use `kill` to refer to "dropping" values which are incorrect. 
+
+From the reasoning discussed in [Non-Spec Vs. Spec](#high-level-overview-non-spec-vs-spec), a `non-spec` value is automatically `pass`-ed by the commit unit without receiving any communication from the speculator.
 
 ### High-Level Overview: The Save-Commit Units
 
@@ -58,7 +64,7 @@ The third unit of the approach is the save-commit units.
 
 The primary purpose of the save-commit units is to save values, to allow recovery from mis-prediction. When a computation begins with a predicted input, a set of save-commits save all other inputs to that computation (one save-commit per input). When mis-prediction is discovered, the computation must be re-executed. The speculator issues the real data input for the first time, and each save-commit re-issues their saved value. In order to have up to N in-flight predictions, the save-commits must be able to store N saved values.
 
-The secondary purpose of the save-commit units is the "commit" purpose. This refers to how the save-commit updates its history of stored inputs after mis-prediction is detected.
+The secondary purpose of the save-commit units is the "commit" purpose. This refers to how the save-commit updates its history of stored inputs after mis-prediction is detected. 
 
 ### High-Level Overview: How to Place Commits
 
@@ -75,9 +81,11 @@ In the "snapshot approach", we use the save-commits units to store a "snapshot" 
 
 If mis-prediction is detected, we `kill` all computational outputs that are generated after the snapshot was created, and roll the entire circuit state back to this point, even if computation occured below the snapshot which was not affected by the mis-prediction. For multiple in-flight predictions, the snapshot approach means that any predictions made after a mis-prediction are also considered mis-predicted. 
 
-The input values to the save-commits are often `non-spec`. However, computational outputs generated from `non-spec` inputs are `non-spec`, and `non-spec` outputs cannot be killed. The save-commits therefore issue the snapshot as `spec` when prediction happens, to guarantee that all outputs will be `spec`, and therefore all outputs will be `kill`-able if mis-prediction is detected.
+The input values to the save-commits are often `non-spec`. However, computational outputs generated from `non-spec` inputs are `non-spec`, and `non-spec` outputs automatically pass through commit units: they cannot be `kill`-ed. The save-commits therefore issue the snapshot as `spec` when prediction happens, to guarantee that all outputs will be `spec`, and therefore all outputs will be `kill`-able if mis-prediction is detected.
 
 In mis-prediction recovery, the speculator issues the correct value as `non-spec`, and all save-commits re-issue their values also as `non-spec`, as no prediction was involved in the issuing of these inputs. 
+
+This guarantees that exactly one value will be generated for each output, even is a snapshot is executed twice.
 
 If any computation receives input only from the save-commit units, and no input from the speculator, this computation will be redundantly re-executed when mis-prediction recovery happens. The placement of the save-commit must therefore trade-off the degree of redundant execution with how many save-commits must be placed to create a full snapshot.
 
@@ -86,6 +94,8 @@ An example below shows a single save-commit above a computation which will never
 <img alt="Post-speculation circuit" src="./Figures/loop_with_spec_cut.png" width="600" />
 
 The snapshot approach means the value issued by the save-commit is `spec`, so that the outputs are correctly `kill`-ed when mis-prediction is detected. `f1(ai)` then re-executes with the same inputs (but now `non-spec`) during mis-speculation recovery. 
+
+You can see that the output of the save-commit must be marked as `spec` here. Otherwise, a `non-spec` `ai+1'` would pass through `Commit 1` twice if mis-prediction occurs when `ci+1'` is `false`. This means the circuit would produce two output values along this edge when there should only be one.
 
 Another valid save-commit placement would be two save-commits on the two outputs of `f1(ai)`. This would reduce redundant re-computation, but would require another save-commit. 
 
@@ -119,7 +129,7 @@ A simplified version of how the save-commit works is shown below, with stateful 
 
 When the save-commit is not recovering from mis-prediction:
 1. `data in` is stored in the history.
-2. `issue control` is a value from the speculator telling the save-commit to speculatively issue, since the entire snapshot is now ready.
+2. `issue control` is a value from the speculator telling the save-commit to issue a `spec` output, since the rest of the snapshot is valid.
 3. `history control` is a value from the speculator telling the save-commit to `discard` its oldest saved value, as it is no longer necessary.
 
 When mis-prediction is discovered, the speculator informs the save-commit using both `history control` and `issue control`:
@@ -130,9 +140,12 @@ When mis-prediction is discovered, the speculator informs the save-commit using 
 
 This omits some details about the order in which things happen, synchronization between the two control channels, and what happens when the speculator decides not to speculate, which we will discuss in more detail later.
 
+We will also discuss later how we treat the arrival of `non-spec` data as a flag event, which indicates no mis-speculated values remain in the circuit.
+
 ### Individual Unit Behaviour: The Speculator
 
 
+# Cut Content
 
 The placement of the `Save-Commit` units to form the "snapshot point" must-trade off the extent of redundant computation with the number of `Save-Commit` units required to cut every path through the circuit. 
 
