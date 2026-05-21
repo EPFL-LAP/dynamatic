@@ -373,14 +373,51 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
 
 /// Transfer function for sub operations or alike.
 static ExtWidth subWidth(ExtWidth lhs, ExtWidth rhs) {
-  // Subtraction logic can be broken down using other operations as follows:
-  // sub(a, b) = add(a, ~b + 1) = add(a, xor(b, sext(-1)) + 1)
-  // Applying the forward function from 'xor' we can conclude that rhs is
-  // always sign-extended if reduced in bitwidth.
+  // When the extension types match we have the following property:
+  // All bits beyond 'std::max(lhs.bitWidth, rhs.bitWidth) + 1' are duplicates
+  // of 'std::max(lhs.bitWidth, rhs.bitWidth) + 1' and can therefore be computed
+  // using just sign-extension.
+  //
+  // Proof for both operands being ZEXT:
+  // Note that subtraction is defined as 'add(a, ~b + 1)'
+  // There are two cases:
+  // 1) 'rhs' is 0, in which case negating it keeps the value as 0. Bits
+  //    std::max(lhs.bitWidth, rhs.bitWidth) + 1 and above are guaranteed to be
+  //    zero from the zero-extension of lhs. We can therefore perform the
+  //    computation using just 'std::max(lhs.bitWidth, rhs.bitWidth) + 1' and
+  //    zero-extend. (Note: For this subcase, we can even perform the
+  //    computation in 'lhs.bitWidth' many bits and zero-extend).
+  // 2) 'rhs' is any other value. In that case there must exist at least one
+  //    bit that is set and that when negated catches any carry-over from the
+  //    negation (~operand + 1) operation. Bits
+  //    'max(lhs.bitWidth, rhs.bitWidth) + 1' onwards of the right operand
+  //    are guaranteed to be all 1. The corresponding bits of the left operand
+  //    are guaranteed to be all 0 from the zero-extension.
+  //    Due to the carry logic of addition, all bits beyond
+  //    'max(lhs.bitWidth, rhs.bitWidth) + 1' are therefore guaranteed to be
+  //    equal to bit 'max(lhs.bitWidth, rhs.bitWidth) + 1'.
+  //
+  // Proof when both operands are SEXT:
+  // After negation, all bits beyond 'max(lhs.bitWidth, rhs.bitWidth)' are
+  // guaranteed to be either all 0s or all 1s, in each operand respectively.
+  // For the case of all bits being all 0 in one operand and all 1s in the
+  // other see the ZEXT case above (case 2).
+  // In the case of all 0s of both operands, bit
+  // 'max(lhs.bitWidth, rhs.bitWidth) + 1' of the result is guaranteed to be 0
+  // and so are all bits beyond. The reason is that bits
+  // 'max(lhs.bitWidth, rhs.bitWidth)' of both operands must have been 0,
+  // otherwise the sign-extension wouldn't have made all subsequent bits 0.
+  // The final case of all bits beyond 'max(lhs.bitWidth, rhs.bitWidth)' being
+  // 1 in both operands follows similar logic as the 0 case. The only way they
+  // could have been all ones is if 'max(lhs.bitWidth, rhs.bitWidth)' is also
+  // one. Their addition leads to a carry to the next bit which propagates
+  // through the entire adder. All bits in the result from bits
+  // 'max(lhs.bitWidth, rhs.bitWidth) + 1' onwards are guaranteed to be 1.
+  if (lhs.extType == rhs.extType)
+    return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 
-  // We apply the logic from 'add' here, but with the assumption that 'rhs' is
-  // SEXT.
-  return addWidth({lhs.extType, lhs.bitWidth}, {ExtType::SEXT, rhs.bitWidth});
+  // Otherwise, conservative add logic applies.
+  return addWidth(lhs, rhs);
 }
 
 /// Transfer function for mul operations or alike.

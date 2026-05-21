@@ -96,6 +96,62 @@ handshake.func @subiFW(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<
 
 // -----
 
+// CHECK-LABEL:   handshake.func @subiFW_ui_si(
+// CHECK-SAME:                           %[[VAL_0:.*]]: !handshake.channel<i8>, %[[VAL_1:.*]]: !handshake.channel<i8>,
+// CHECK-SAME:                           %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = extui %[[VAL_1]] {handshake.bb = 0 : ui32} : <i8> to <i10>
+// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : <i8> to <i10>
+// CHECK:           %[[VAL_5:.*]] = subi %[[VAL_4]], %[[VAL_3]] : <i10>
+// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i10> to <i32>
+// CHECK:           end %[[VAL_6]] : <i32>
+// CHECK:         }
+handshake.func @subiFW_ui_si(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i8>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %ext0 = extsi %arg0 : <i8> to <i32>
+  %ext1 = extui %arg1 : <i8> to <i32>
+  %res = subi %ext0, %ext1 : <i32>
+  end %res : <i32>
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @subiFW_si_ui(
+// CHECK-SAME:                                 %[[VAL_0:.*]]: !handshake.channel<i8>,
+// CHECK-SAME:                                 %[[VAL_1:.*]]: !handshake.channel<i16>,
+// CHECK-SAME:                                 %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = extui %[[VAL_1]] {handshake.bb = 0 : ui32} : <i16> to <i18>
+// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : <i8> to <i18>
+// CHECK:           %[[VAL_5:.*]] = subi %[[VAL_4]], %[[VAL_3]] : <i18>
+// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i18> to <i32>
+// CHECK:           end %[[VAL_6]] : <i32>
+// CHECK:         }
+handshake.func @subiFW_si_ui(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %ext0 = extsi %arg0 : <i8> to <i32>
+  %ext1 = extui %arg1 : <i16> to <i32>
+  %res = subi %ext0, %ext1 : <i32>
+  end %res : <i32>
+}
+
+// -----
+
+// CHECK-LABEL:   handshake.func @subiFW_ui_ui(
+// CHECK-SAME:                                 %[[VAL_0:.*]]: !handshake.channel<i8>,
+// CHECK-SAME:                                 %[[VAL_1:.*]]: !handshake.channel<i16>,
+// CHECK-SAME:                                 %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
+// CHECK:           %[[VAL_3:.*]] = extui %[[VAL_1]] {handshake.bb = 0 : ui32} : <i16> to <i17>
+// CHECK:           %[[VAL_4:.*]] = extui %[[VAL_0]] {handshake.bb = 0 : ui32} : <i8> to <i17>
+// CHECK:           %[[VAL_5:.*]] = subi %[[VAL_4]], %[[VAL_3]] : <i17>
+// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i17> to <i32>
+// CHECK:           end %[[VAL_6]] : <i32>
+// CHECK:         }
+handshake.func @subiFW_ui_ui(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
+  %ext0 = extui %arg0 : <i8> to <i32>
+  %ext1 = extui %arg1 : <i16> to <i32>
+  %res = subi %ext0, %ext1 : <i32>
+  end %res : <i32>
+}
+
+// -----
+
 // CHECK-LABEL:   handshake.func @muliFW(
 // CHECK-SAME:                           %[[VAL_0:.*]]: !handshake.channel<i8>,
 // CHECK-SAME:                           %[[VAL_1:.*]]: !handshake.channel<i16>,
@@ -501,25 +557,6 @@ handshake.func @cmpi_ui_si2(%arg0: !handshake.channel<i8>, %arg1: !handshake.cha
   %ext1 = extsi %arg1 : <i8> to <i32>
   %res = cmpi eq, %ext1, %ext0 : <i32>
   end %res : <i1>
-}
-
-// -----
-
-// CHECK-LABEL:   handshake.func @subiFW_extui(
-// CHECK-SAME:                                 %[[VAL_0:.*]]: !handshake.channel<i8>,
-// CHECK-SAME:                                 %[[VAL_1:.*]]: !handshake.channel<i16>,
-// CHECK-SAME:                                 %[[VAL_2:.*]]: !handshake.control<>, ...) -> !handshake.channel<i32> attributes {argNames = ["arg0", "arg1", "start"], resNames = ["out0"]} {
-// CHECK:           %[[VAL_3:.*]] = extui %[[VAL_1]] {handshake.bb = 0 : ui32} : <i16> to <i17>
-// CHECK:           %[[VAL_4:.*]] = extsi %[[VAL_0]] {handshake.bb = 0 : ui32} : <i8> to <i17>
-// CHECK:           %[[VAL_5:.*]] = subi %[[VAL_4]], %[[VAL_3]] : <i17>
-// CHECK:           %[[VAL_6:.*]] = extsi %[[VAL_5]] : <i17> to <i32>
-// CHECK:           end %[[VAL_6]] : <i32>
-// CHECK:         }
-handshake.func @subiFW_extui(%arg0: !handshake.channel<i8>, %arg1: !handshake.channel<i16>, %start: !handshake.control<>) -> !handshake.channel<i32> {
-  %ext0 = extsi %arg0 : <i8> to <i32>
-  %ext1 = extui %arg1 : <i16> to <i32>
-  %res = subi %ext0, %ext1 : <i32>
-  end %res : <i32>
 }
 
 // -----
