@@ -502,7 +502,8 @@ std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
 }
 
 // This function finds any path from a control merge to a mux operation. Note
-// that there can be multiple due to forks.
+// that there can be multiple paths due to forks that replicate the index token
+// of the CMerge to multiple muxes.
 std::vector<std::vector<EffectiveSlotNamer>>
 findCMergeMuxPaths(ControlMergeOp cmerge) {
   struct PartialPath {
