@@ -11,9 +11,13 @@
     {
       "name": "BUFFER_TYPE",
       "type": "string"
+    },
+    {
+      "name": "DV_LATENCY",
+      "type": "unsigned"
     }
   ],
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p num_slots=$NUM_SLOTS bitwidth=$BITWIDTH  buffer_type='\"$BUFFER_TYPE\"'",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t buffer -p num_slots=$NUM_SLOTS dv_latency=$DV_LATENCY bitwidth=$BITWIDTH  buffer_type='\"$BUFFER_TYPE\"'",
     "hdl": "smv"
   },
   {
