@@ -167,6 +167,26 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
   if (nodes.empty())
     return;
 
+  // `edgesToAdd` collects the set of edges (target node ID and mlir::Value)
+  // that will be added from the newly created synthetic start fork to the first
+  // operations consuming the function's input arguments.
+  //
+  // For example, take this snippet from the IIR benchmark (details omitted)
+  // ```
+  // handshake.func @iir(%arg0: memref<1000xi32>, %arg1: memref<1000xi32>,
+  // %arg2: !handshake.channel<i32>, %arg3: !handshake.channel<i32>, %arg4:
+  // !handshake.control<>, %arg5: !handshake.control<>, %arg6:
+  // !handshake.control<>, ...) -> (!handshake.channel<i32>,
+  // !handshake.control<>, !handshake.control<>, !handshake.control<>)
+  // attributes
+  // {} {
+  //   ... // (other operations)
+  //   %7 = br %arg3 {handshake.bb = 0 : ui32, handshake.name = "br4"} : <i32>
+  //   ... // (other operations)
+  // }
+  // ```
+  //
+  // One of the pairs in edgesToAdd is ("br4", %arg3)
   std::vector<std::pair<NodeIdType, mlir::Value>> edgesToAdd;
   for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
     if (isa<mlir::MemRefType>(arg.getType()) || arg.getUsers().empty())
