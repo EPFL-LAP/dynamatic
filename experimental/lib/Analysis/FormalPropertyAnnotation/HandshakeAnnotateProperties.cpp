@@ -605,51 +605,35 @@ HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
 }
 
 namespace {
-struct BranchOpDecision {
-  // true -> this branch loops towards itself
-  // false -> this branch exits
-  bool trueLoop;
-  bool falseLoop;
+// This function returns the `decider` operation of a branch, meaning the
+// operation that emits the final condition token used by the branch.
+std::optional<Operation *> getDecider(ConditionalBranchOp branch) {
+  mlir::Value next = branch.getConditionOperand();
+  while (true) {
+    Operation *op = next.getDefiningOp();
 
-  inline bool isExitBranch() { return trueLoop != falseLoop; }
-};
+    if (!op)
+      return std::nullopt;
 
-BranchOpDecision findBranchLoops(const IOG &iog, ConditionalBranchOp branch) {
-  BranchOpDecision ret;
-  Operation *opTrue = *branch.getTrueResult().getUsers().begin();
-  auto paths = iog.findAllPaths(opTrue, branch);
-  ret.trueLoop = !(paths.units.find(branch) == paths.units.end());
-
-  Operation *opFalse = *branch.getFalseResult().getUsers().begin();
-  paths = iog.findAllPaths(opFalse, branch);
-  ret.falseLoop = !(paths.units.find(branch) == paths.units.end());
-  return ret;
-}
-
-Operation *getDecider(ConditionalBranchOp branch) {
-  std::vector<mlir::Value> stack;
-  stack.push_back(branch.getConditionOperand());
-  Operation *dec = branch;
-  while (!stack.empty()) {
-    mlir::Value cur = stack.back();
-    stack.pop_back();
-    Operation *op = cur.getDefiningOp();
-
-    if (!op) {
-      continue;
-    }
-    dec = op;
-
+    // Forks and buffers only propagate the condition token without modifying it
     if (auto forkOp = dyn_cast<ForkOp>(op)) {
-      stack.push_back(forkOp.getOperand());
-    }
-    if (auto buffer = dyn_cast<BufferOp>(op)) {
-      stack.push_back(buffer.getOperand());
+      next = forkOp.getOperand();
+    } else if (auto buffer = dyn_cast<BufferOp>(op)) {
+      next = buffer.getOperand();
+    } else {
+      return op;
     }
   }
-  return dec;
 }
 
+// Paths from decider to the branch might contain a fork before they contain a
+// slot. If this is the case, these forks cannot be added as copied sents of any
+// effective slot. However, in the path annotation from ancestor to branch,
+// these copied sents are necessary for the path of effective slots. The
+// UnstartedPath struct represents this partial path for this usage. It stores
+// the initial sents along the path `startSents`, then the effective slots of
+// the decider->branch path from the first slot onwards `started`, and finally
+// the branch operation that terminates the path.
 struct UnstartedPath {
   std::vector<EffectiveSlotNamer> started;
   std::vector<EagerForkSentNamer> startSents;
@@ -811,17 +795,15 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
   for (const auto &iog : iogs) {
     for (auto *op : iog.units) {
       if (auto branch = dyn_cast<ConditionalBranchOp>(op)) {
-        auto dec = findBranchLoops(iog, branch);
-        if (dec.isExitBranch()) {
-          int32_t exitValue = dec.trueLoop ? 0 : 1;
-          deciderBranches.insert({branch, exitValue});
+        if (auto optExitValue = iog.isExitBranch(branch)) {
+          deciderBranches.insert({branch, *optExitValue});
         }
       }
     }
   }
   llvm::DenseMap<Operation *, int32_t> deciders;
   for (auto [branch, exitValue] : deciderBranches) {
-    Operation *dec = getDecider(branch);
+    Operation *dec = *getDecider(branch);
     deciders.insert({dec, exitValue});
   }
   for (auto [dec, exitValue] : deciders) {

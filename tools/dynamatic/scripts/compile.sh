@@ -111,6 +111,11 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 cp "$F_C_SOURCE" "$F_C_REWRITTEN"
 exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"
 
+if [[ "$ENABLE_SHORT_CIRCUIT" != "1" ]]; then
+  "$DYNAMATIC_BINS/source-rewriter" "$F_C_REWRITTEN" -- \
+    -I "$DYNAMATIC_DIR/include" -I "$SRC_DIR" -I "$DYNAMATIC_DIR/build/include/clang_headers"
+  exit_on_fail "Failed to disable short-circuiting" "Disabled short-circuiting"
+fi
 
 # ------------------------------------------------------------------------------
 # NOTE:

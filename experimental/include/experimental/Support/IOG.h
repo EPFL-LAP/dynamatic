@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/Value.h"
 #include <unordered_set>
@@ -34,6 +35,22 @@ struct IOG {
   llvm::DenseSet<mlir::Value> channels;
   BlockArgument entry;
 
+  // isExitBranch() determines if a branch part of the IOG decides between
+  // exiting a loop or continuing the loop. This is the case when one of the
+  // branch outputs loops back to the branch, whereas the other has no path back
+  // to the branch. If the argument is an exit branch, isExitBranch returns the
+  // token value that leads to exiting the loop. Otherwise, std::nullopt is
+  // returned, so if the exit value is not relevant, the condition
+  // ```
+  // if (iog.isExitBranch(branch)) {
+  //   // branch is an exit branch
+  // } else {
+  //   // branch is not an exit branch
+  // }
+  // ```
+  // behaves as expected.
+  std::optional<int32_t>
+  isExitBranch(handshake::ConditionalBranchOp branch) const;
   IOGPathSet findAllPaths(Operation *startOp, Operation *endOp) const;
 
   inline bool contains(Operation *op) const {

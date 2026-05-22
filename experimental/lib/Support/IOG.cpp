@@ -1,5 +1,4 @@
 #include "experimental/Support/IOG.h"
-#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace dynamatic {
@@ -75,6 +74,25 @@ IOGPathSet IOG::findAllPaths(Operation *startOp, Operation *endOp) const {
     }
   }
   return paths;
+}
+
+std::optional<int32_t>
+IOG::isExitBranch(handshake::ConditionalBranchOp branch) const {
+  assert(contains(branch));
+  Operation *opTrue = *branch.getTrueResult().getUsers().begin();
+  auto paths = findAllPaths(opTrue, branch);
+  bool trueLoop = !(paths.units.find(branch) == paths.units.end());
+
+  Operation *opFalse = *branch.getFalseResult().getUsers().begin();
+  paths = findAllPaths(opFalse, branch);
+  bool falseLoop = !(paths.units.find(branch) == paths.units.end());
+
+  if (trueLoop == falseLoop) {
+    return std::nullopt;
+  }
+
+  int32_t exitValue = trueLoop ? 0 : 1;
+  return exitValue;
 }
 
 namespace {
