@@ -39,6 +39,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::IOGConsecutiveTokens;
   if (s == "EntryTokenOrder")
     return FormalProperty::TYPE::EntryTokenOrder;
+  if (s == "SingleEntryToken")
+    return FormalProperty::TYPE::SingleEntryToken;
 
   return std::nullopt;
 }
@@ -61,6 +63,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "IOGConsecutiveTokens";
   case TYPE::EntryTokenOrder:
     return "EntryTokenOrder";
+  case TYPE::SingleEntryToken:
+    return "SingleEntryToken";
   }
 }
 
@@ -126,6 +130,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return IOGConsecutiveTokens::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EntryTokenOrder:
     return EntryTokenOrder::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::SingleEntryToken:
+    return SingleEntryToken::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -443,6 +449,24 @@ EntryTokenOrder::fromJSON(const llvm::json::Value &value,
 
   if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
       !mapper.map(ENTRY_VALUE_LIT, prop->entryValue))
+    return nullptr;
+  return prop;
+}
+
+llvm::json::Value SingleEntryToken::extraInfoToJSON() const {
+  return llvm::json::Object({{PATH_CM_LIT, cm}, {PATH_EC_LIT, ec}});
+}
+
+std::unique_ptr<SingleEntryToken>
+SingleEntryToken::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<SingleEntryToken>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(PATH_CM_LIT, prop->cm) ||
+      !mapper.map(PATH_EC_LIT, prop->ec))
     return nullptr;
   return prop;
 }

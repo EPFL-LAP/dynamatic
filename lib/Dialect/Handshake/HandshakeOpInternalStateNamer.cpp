@@ -284,6 +284,14 @@ EffectiveSlotNamer::constrain(int32_t value) const {
   return std::make_unique<ConstrainedEffectiveSlotNamer>(*this, value);
 }
 
+EntrySlotNamer::EntrySlotNamer(BlockArgument arg)
+    : InternalStateNamer(TYPE::EntrySlot) {
+  Operation *op = arg.getOwner()->getParentOp();
+  auto nameAttr = op->getAttrOfType<ArrayAttr>("argNames")[arg.getArgNumber()];
+  std::string name = dyn_cast<StringAttr>(nameAttr).str();
+  argName = name;
+}
+
 bool fromJSON(const llvm::json::Value &value, EntrySlotNamer &namer,
               llvm::json::Path path) {
   llvm::json::ObjectMapper mapper(value, path);

@@ -271,8 +271,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   # FPT19 should run before straight to the queue, so that no useless components are instantiated.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage \
-    --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_SQ"
@@ -293,7 +292,7 @@ else
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-minimize-cst-width --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \

@@ -36,6 +36,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace dynamatic {
+struct SimpleCycle;
 struct SynchronizingCyclePair;
 class SynchronizingCyclesFinderGraph;
 
@@ -402,7 +403,7 @@ protected:
   /// pattern imbalance variables, and links R_c to L_c.
   void addLatencyBalancingVars(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
   /// [FPGA24] Links the binary buffer-presence variable R_c to the integer
   /// latency variable L_c for every channel. (Paper: Section 4, Equation 6)
@@ -413,45 +414,49 @@ protected:
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
 
   /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
-  void addSyncCycleVars(
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+  void addSyncCycleVars(ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
   /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
   void addOccupancyVars(ValueRange channels,
-                        DenseMap<Value, CPVar> &channelOccupancy,
+                        llvm::MapVector<Value, CPVar> &channelOccupancy,
                         double maxOccupancy);
 
   /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum.
-  void setOccupancyBalancingObjective(ValueRange channels,
-                                      DenseMap<Value, CPVar> &channelOccupancy);
+  void setOccupancyBalancingObjective(
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds minimum occupancy constraints: N_c >= L_c / II.
   /// (Paper: Section 5, Equation 8 and 15)
-  void
-  addMinOccupancyConstraints(const DenseMap<Value, double> &requiredOccupancy,
-                             DenseMap<Value, CPVar> &channelOccupancy);
+  void addMinOccupancyConstraints(
+      const llvm::MapVector<Value, double> &requiredOccupancy,
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
   /// least one token. (Paper: Section 5, Equation 12)
   void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
-                              DenseMap<Value, CPVar> &channelOccupancy);
+                              llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
   void addReconvergentPathConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
 
   /// [FPGA24] Adds imbalance constraints for synchronizing cycle pairs in LP1.
-  void addSyncCycleConstraints(
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+  void addSyncCycleConstraints(ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+                               const SynchronizingCyclesFinderGraph &syncGraph);
 
   /// [FPGA24] For each channel involved in a reconvergent path or
   /// synchronizing cycle pair, constrains stalled_c >= imbalanced_p so that
   /// pattern imbalance surfaces in the per-channel stall term of the objective.
   void addStallPropagationConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+      const SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// [FPGA24] Computes the lower bound on latency forced by channel properties
+  /// for a given cycle. Used to determine the minimum II.
+  double computeCycleForcedLatencyLowerBound(
+      const SimpleCycle &cycle,
+      const SynchronizingCyclesFinderGraph &graph) const;
 
   /// [FPGA24] Adds cycle-time constraints and computes required II values.
   void addCycleTimeConstraints(ArrayRef<CFDFC *> cfdfcs, double &computedII,

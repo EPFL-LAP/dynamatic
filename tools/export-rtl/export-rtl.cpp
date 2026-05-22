@@ -1370,6 +1370,19 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       assert(!ends.empty());
       std::string propertyString = llvm::join(ends, " & ");
       data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<SingleEntryToken>(property.get())) {
+      std::vector<std::string> cmStrs;
+      for (const auto &x : p->getCmPath()) {
+        cmStrs.push_back(x.getSMVName());
+      }
+      std::vector<std::string> ecStrs;
+      for (const auto &x : p->getEcPath()) {
+        ecStrs.push_back(x.getSMVName());
+      }
+      std::string propertyString =
+          llvm::formatv("count({0}) > 0 -> count({1}) = 0",
+                        llvm::join(cmStrs, ", "), llvm::join(ecStrs, ", "));
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();

@@ -115,6 +115,10 @@ private:
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
   void setup();
+
+  /// Translates binary opaque/transparent channel properties into LP1 latency
+  /// constraints. Slot-count properties are handled by the occupancy LP.
+  void addChannelPropertyLatencyConstraints();
 };
 
 class OccupancyBalancingLP : public BufferPlacementMILP {
@@ -136,9 +140,14 @@ private:
   std::vector<ReconvergentPathWithGraph> reconvergentPaths;
   std::vector<CFDFC *> cfdfcs;
 
-  DenseMap<Value, CPVar> channelOccupancy;
+  llvm::MapVector<Value, CPVar> channelOccupancy;
 
   void setup();
+
+  /// Translates channel slot-count properties into LP2 occupancy constraints,
+  /// using the LP1 latency result as the opaque-presence decision.
+  void addChannelPropertyOccupancyConstraints(
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 };
 
 class FPGA24Buffers {
@@ -163,15 +172,15 @@ private:
       ArrayRef<CFDFC *> cfdfcs,
       std::list<CFGTransitionSequenceSubgraph> &reconvergentGraphs,
       std::vector<ReconvergentPathWithGraph> &allReconvergentPaths,
-      std::vector<::dynamatic::SynchronizingCyclePair> &allSyncCyclePairs,
-      ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+      std::vector<SynchronizingCyclePair> &allSyncCyclePairs,
+      SynchronizingCyclesFinderGraph &syncGraph);
 
   /// Solves LP1 (Latency Balancing) and returns the result.
-  FailureOr<LatencyBalancingResult> solveLatencyBalancing(
-      ArrayRef<CFDFC *> cfdfcs,
-      ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+  FailureOr<LatencyBalancingResult>
+  solveLatencyBalancing(ArrayRef<CFDFC *> cfdfcs,
+                        ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
+                        ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+                        const SynchronizingCyclesFinderGraph &syncGraph);
 
   /// Solves LP2 (Occupancy Balancing) and writes into placement.
   LogicalResult
