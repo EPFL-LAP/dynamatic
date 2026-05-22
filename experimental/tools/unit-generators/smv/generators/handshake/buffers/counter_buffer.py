@@ -47,7 +47,7 @@ MODULE {name} (ins_valid, outs_ready)
   init(occupied) := FALSE;
   next(occupied) := case
     !occupied : (ins_valid ? TRUE : occupied);
-    outs_valid & outs_ready : (ins_valid ? TRUE : occupied);
+    outs_valid & outs_ready : ins_valid;
     TRUE : occupied;
   esac;
 
@@ -74,7 +74,7 @@ MODULE {name} (ins, ins_valid, outs_ready)
   init(occupied) := FALSE;
   next(occupied) := case
     !occupied : (ins_valid ? TRUE : occupied);
-    outs_valid & outs_ready : (ins_valid ? TRUE : occupied);
+    outs_valid & outs_ready : ins_valid;
     TRUE : occupied;
   esac;
 
