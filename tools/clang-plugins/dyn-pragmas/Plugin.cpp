@@ -255,6 +255,183 @@ private:
   }
 };
 
+struct PredictPragmaInfo {
+  std::string Variable;
+  uint64_t Values;      // TODO: change to a list
+  std::string Location; // start or end
+  SourceLocation PragmaLoc;
+};
+
+// PragmaHandler to handle the predict pragma
+class PredictPragmaHandler : public PragmaHandler {
+public:
+  PredictPragmaHandler() : PragmaHandler("predict") {}
+
+  // what to do when the pragma is encountered
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override {
+    // initialize the struct we use to store
+    // the pragma information
+    PredictPragmaInfo PredPragmaInfo;
+
+    // populate the fields of PredPragmaInfo
+    // by parsing the pragma text
+    if (failed(parseOptions(PP, FirstToken, PredPragmaInfo)))
+      return;
+
+    emitInjectedTokens(PP, PredPragmaInfo);
+  }
+
+private:
+  LogicalResult parseOptions(Preprocessor &PP, const Token &FirstToken,
+                             PredictPragmaInfo &PredPragmaInfo) {
+
+    // store the location of the pragma
+    PredPragmaInfo.PragmaLoc = FirstToken.getLocation();
+
+    // booleans to track which info we have received
+    bool sawVariable = false, sawValues = false, sawLocation = false;
+
+    // store output of lexer
+    Token Tok;
+
+    // lex the initial token for the first iteration
+    PP.Lex(Tok);
+
+    // while the lexer has input from this line
+    while (Tok.isNot(tok::eod)) {
+      // we expect a named option
+      if (Tok.isNot(tok::identifier)) {
+        error(PP, Tok, "expected named option in #pragma DYN predict");
+        return failure();
+      }
+
+      // get the value of the named option
+      llvm::StringRef Name = Tok.getIdentifierInfo()->getName();
+
+      // lex the = sign
+      PP.Lex(Tok);
+      if (Tok.isNot(tok::equal)) {
+        error(PP, Tok, "expected '=' after option name");
+        return failure();
+      }
+
+      if (Name == "variable") {
+        // if the named option is variable
+        // lex the variable name
+        PP.Lex(Tok);
+
+        // enforce that variable name
+        // lexes properly
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected variable name after variable=");
+          return failure();
+        }
+
+        // store the variable name info
+        PredPragmaInfo.Variable = Tok.getIdentifierInfo()->getName().str();
+        sawVariable = true;
+
+        // lex the initial token for the next iteration
+        PP.Lex(Tok);
+
+      } else if (Name == "values") {
+        PP.Lex(Tok);
+
+        // try to store the value lexed from the pragma
+        // into PredPragmaInfo.MaxPredictions
+        if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, PredPragmaInfo.Values)) {
+          error(PP, Tok, "expected integer literal after values=");
+          return failure();
+        }
+        sawValues = true;
+      } else if (Name == "location") {
+        PP.Lex(Tok);
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected identifier after style=");
+          return failure();
+        }
+
+        // store the variable name info
+        PredPragmaInfo.Location = Tok.getIdentifierInfo()->getName().str();
+
+        // location has to be "start" or "end"
+        if (PredPragmaInfo.Location != "start" &&
+            PredPragmaInfo.Location != "end") {
+          error(PP, Tok, "location must be start or end");
+          return failure();
+        }
+        sawLocation = true;
+
+        // lex the initial token for the next iteration
+        PP.Lex(Tok);
+      }
+    }
+
+    // Enforce that we got every option needed
+    // TODO: values is not needed when location is end
+    if (!sawVariable || !sawValues || !sawLocation) {
+      error(PP, FirstToken,
+            "#pragma DYN predict requires variable=, "
+            "values=, location=");
+      return failure();
+    }
+    return success();
+  }
+
+  void emitInjectedTokens(Preprocessor &PP,
+                          const PredictPragmaInfo &PredPragmaInfo) {
+    // Inspired by emitInjectedTokens from Speculate Pragma
+
+    // Define a function
+    // for each type of variable we could predict on
+    // so that no casts are added before or after the speculator
+    std::string FuncDecls =
+        "extern _Bool  __dyn_predict_b(_Bool,  int, const char*) "
+        "__attribute__((noinline, noduplicate));\n"
+        "extern char   __dyn_predict_c(char,   int, const char*) "
+        "__attribute__((noinline, noduplicate));\n"
+        "extern short  __dyn_predict_s(short,  int, const char*) "
+        "__attribute__((noinline, noduplicate));\n"
+        "extern int    __dyn_predict_i(int,    int, const char*) "
+        "__attribute__((noinline, noduplicate));\n"
+        "extern long   __dyn_predict_l(long,   int, const char*) "
+        "__attribute__((noinline, noduplicate));\n"
+        "extern float  __dyn_predict_f(float,  int, const char*) "
+        "__attribute__((noinline, noduplicate));\n"
+        "extern double __dyn_predict_d(double, int, const char*) "
+        "__attribute__((noinline, noduplicate));\n";
+
+    // use a generic macro
+    std::string GenericMacro =
+        "#define __dyn_predict(x, n, s) _Generic((x), \\\n"
+        "  _Bool:  __dyn_predict_b, \\\n"
+        "  char:   __dyn_predict_c, \\\n"
+        "  short:  __dyn_predict_s, \\\n"
+        "  int:    __dyn_predict_i, \\\n"
+        "  long:   __dyn_predict_l, \\\n"
+        "  float:  __dyn_predict_f, \\\n"
+        "  double: __dyn_predict_d)((x), (n), (s))\n";
+
+    std::string Call = llvm::formatv(
+        "{0} = __dyn_predict({0}, {1}, \"{2}\");\n", PredPragmaInfo.Variable,
+        PredPragmaInfo.Values, PredPragmaInfo.Location);
+
+    // LLVM reads files into memory buffers before processing them
+    auto MB = llvm::MemoryBuffer::getMemBufferCopy(
+        FuncDecls + GenericMacro + Call, "<dyn-predict-injected>");
+
+    FileID FID = PP.getSourceManager().createFileID(
+        std::move(MB), SrcMgr::C_User, /*LoadedID=*/0,
+        /*LoadedOffset=*/0, PredPragmaInfo.PragmaLoc);
+
+    // process the fake header file next
+    // in the same way #include directives work
+    PP.EnterSourceFile(FID, /*DirLookup=*/nullptr, PredPragmaInfo.PragmaLoc);
+  }
+};
+
 // Declare the DynPragmaNamespace object
 // which stores all of our Dyn pragmas
 class DynPragmaNamespace : public PragmaNamespace {
@@ -263,6 +440,7 @@ public:
   DynPragmaNamespace() : PragmaNamespace("DYN") {
     // put the speculate pragma in the DYN namespace
     AddPragma(new SpeculatePragmaHandler());
+    AddPragma(new PredictPragmaHandler());
   }
 };
 
