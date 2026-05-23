@@ -633,7 +633,8 @@ std::optional<Operation *> getDecider(ConditionalBranchOp branch) {
 // UnstartedPath struct represents this partial path for this usage. It stores
 // the initial sents along the path `startSents`, then the effective slots of
 // the decider->branch path from the first slot onwards `started`, and finally
-// the branch operation that terminates the path.
+// the branch operation that terminates the path. See the comment before the
+// declaration of ExitTokenNoAncestors for a visual explanation
 struct UnstartedPath {
   std::vector<EffectiveSlotNamer> started;
   std::vector<EagerForkSentNamer> startSents;
@@ -669,21 +670,6 @@ std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
     stack.pop_back();
 
     Operation *next = *path.cur.getUsers().begin();
-    if (auto branch = dyn_cast<ConditionalBranchOp>(next)) {
-      // Path is terminated by ConditionalBranchOp, so this is the end of the
-      // path
-      ret.push_back(
-          {std::move(path.slots), std::move(path.startSents), branch});
-      continue;
-    }
-    if (auto buffer = dyn_cast<BufferOp>(next)) {
-      for (auto &slot : buffer.getInternalSlotStateNamers()) {
-        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
-      }
-      path.cur = buffer.getResult();
-      stack.push_back(std::move(path));
-      continue;
-    }
     if (auto fork = dyn_cast<ForkOp>(next)) {
       auto sents = fork.getInternalSentStateNamers();
       for (auto [i, channel] : llvm::enumerate(next->getResults())) {
@@ -700,19 +686,38 @@ std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
         }
         stack.push_back(nextPath);
       }
-      continue;
+    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
+      for (auto &slot : buffer.getInternalSlotStateNamers()) {
+        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
+      }
+      path.cur = buffer.getResult();
+      stack.push_back(std::move(path));
+    } else if (auto branch = dyn_cast<ConditionalBranchOp>(next)) {
+      // Path is terminated by ConditionalBranchOp, so this is the end of the
+      // path
+      ret.push_back(
+          {std::move(path.slots), std::move(path.startSents), branch});
+    } else {
+      llvm::report_fatal_error("unexpected op detected");
     }
-
-    llvm::report_fatal_error("unexpected op detected");
   }
   return ret;
 }
 
+// This function finds the ancestor slots of the decider as shown in the diagram
+// before the ExitTokenNoAncestors declaration. The reason the exit branch is
+// required for this search is so that the search does not go back past this
+// branch and overlap with the decider-branch path
 std::vector<std::vector<EffectiveSlotNamer>>
 findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
   struct PartialPath {
     mlir::Value channel;
+    // `back` means the paths are annotated backwards, meaning the paths flow in
+    // the direction of operands (rather than results)
     std::vector<EffectiveSlotNamer> backPath;
+    // `backSents` stores eager fork sent states that should be added to the
+    // next fork found along this path, in backwards order in comparison to the
+    // direction tokens flow
     std::vector<EagerForkSentNamer> backSents;
     llvm::DenseSet<Operation *> visited;
   };
@@ -745,6 +750,12 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
     }
 
     Operation *op = cur.channel.getDefiningOp();
+    // The search for ancestor slots is terminated by any of the following:
+    // 1. No defining op
+    // 2. op is not part of the IOG (ancestors must be part of the IOG)
+    // 3. The operation is the exit branch (Any operation before this is part of
+    // the decider-branch path, and is therefore not an ancestor of those slots)
+    // 4. op has already been visited (to avoid loops)
     if (!op || !iog.contains(op) || op == exit ||
         cur.visited.find(op) != cur.visited.end()) {
       std::vector<EffectiveSlotNamer> forwardPath{};
@@ -758,6 +769,8 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
     cur.visited.insert(op);
 
     if (auto fork = dyn_cast<EagerForkLikeOpInterface>(op)) {
+      // Store the appropriate sent state as a copied sent for the next slot
+      // found
       auto sents = fork.getInternalSentStateNamers();
       for (auto [i, chan] : llvm::enumerate(fork->getResults())) {
         if (chan == cur.channel) {
@@ -766,6 +779,8 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
       }
     }
     auto curSlots = getAllSlotsOfOperation(op);
+    // Annotate the slots backwards, using the stored copied sents to build
+    // effective slots.
     for (int i = curSlots.size() - 1; i >= 0; --i) {
       auto &slot = curSlots[i];
       EffectiveSlotNamer es(std::move(slot));
@@ -776,6 +791,7 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
       cur.backPath.push_back(std::move(es));
     }
 
+    // Follow the inputs of the operand
     for (auto back : op->getOperands()) {
       if (!iog.contains(back)) {
         continue;
@@ -791,23 +807,24 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
 
 LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
     const std::vector<IOG> &iogs) {
-  llvm::DenseMap<ConditionalBranchOp, int32_t> deciderBranches;
+  llvm::DenseMap<ConditionalBranchOp, int32_t> exitBranches;
   for (const auto &iog : iogs) {
     for (auto *op : iog.units) {
       if (auto branch = dyn_cast<ConditionalBranchOp>(op)) {
         if (auto optExitValue = iog.isExitBranch(branch)) {
-          deciderBranches.insert({branch, *optExitValue});
+          exitBranches.insert({branch, *optExitValue});
         }
       }
     }
   }
   llvm::DenseMap<Operation *, int32_t> deciders;
-  for (auto [branch, exitValue] : deciderBranches) {
+  for (auto [branch, exitValue] : exitBranches) {
     Operation *dec = *getDecider(branch);
     deciders.insert({dec, exitValue});
   }
   for (auto [dec, exitValue] : deciders) {
     auto slotPaths = findDeciderBranchPaths(dec);
+    // [START Enumerating ExitTokenOrder invariants]
     for (const auto &slots : slotPaths) {
       if (slots.started.size() < 2) {
         // Invariant is trivially true
@@ -817,10 +834,15 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
                        exitValue);
       propertyTable.push_back(p.toJSON());
     }
+    // [END Enumerating ExitTokenOrder invariants]
+
+    // [START Enumerating ExitTokenNoAncestors invariants]
     for (const auto &iog : iogs) {
       if (!iog.contains(dec)) {
         continue;
       }
+
+      // Find the branch that is part of the IOG of the decider
       std::optional<ConditionalBranchOp> iogBranch;
       for (const auto &slots : slotPaths) {
         if (iog.contains(slots.end)) {
@@ -828,7 +850,9 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
           iogBranch = slots.end;
         }
       }
-      assert(iogBranch);
+      if (!iogBranch) {
+        return failure();
+      }
 
       auto ancestorPaths = findAncestorSlots(iog, dec, *iogBranch);
       for (auto ancestorPath : ancestorPaths) {
@@ -837,6 +861,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
         for (const auto &decPath : slotPaths) {
           if (decPath.started.empty())
             continue;
+          // Extend the ancestor path using the startSents
           for (const auto &startSent : decPath.startSents) {
             ancestorPath.back().addCopiedSent(startSent);
           }
@@ -851,6 +876,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
         }
       }
     }
+    // [END Enumerating ExitTokenNoAncestors invariants]
   }
   return success();
 }

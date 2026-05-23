@@ -503,7 +503,41 @@ private:
 // The ExitTokenNoAncestors invariant states that, for any decider-branch path,
 // if an exit token exists anywhere, ancestors of the decider cannot contain any
 // effective tokens. Any unit that can reach the decider is called an ancestor
-// of the decider
+// of the decider.
+//
+// The following graphic should assist in understanding what ancestor slots are,
+// and visualize the terminology used in the search algorithm.
+// ```
+// EffectiveSlot            --|--|
+// ...                        |  |
+// EffectiveSlot              |  | Ancestor slots
+//                            |  |
+// Slot                       |--|
+// EagerFork                  |
+// ...                        | Effective Ancestors
+// EagerFork                  |
+//                            |
+//                            |
+// Decider (e.g. <)           |  --|
+//                            |    | Unstarted path
+//                            |    |
+// EagerFork   --|            |    |
+// ...           | startSents |    |
+// EagerFork   --|          --|    |
+//                                 |
+// EffectiveSlot    --|            |--|
+// ...                | DecBrPath  |  |
+// EffectiveSlot      |            |  | Started path
+//                    |            |  |
+// ExitBranch       --|          --|--|
+// ```
+//
+// The reason for the complicated search algorithm is due to the edge cases of
+// eager forks, and due to the presence of multiple possible paths: There might
+// be multiple paths of ancestors before the decider, and there are multiple
+// paths to exit branches after the decider. However, to get the effective path
+// of ancestors, the forks labelled `startSents` are still required, as they are
+// copied sents of the last ancestor.
 class ExitTokenNoAncestors : public FormalProperty {
 public:
   const std::vector<std::shared_ptr<InternalStateNamer>> &getExitSlots() const {
