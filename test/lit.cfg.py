@@ -16,7 +16,7 @@ config.name = "Dynamatic"
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
 # suffixes: A list of file extensions to treat as test files.
-config.suffixes = [".mlir"]
+config.suffixes = [".mlir", ".ll"]
 
 # test_source_root: The root path where tests are located.
 config.test_source_root = os.path.dirname(__file__)
@@ -48,6 +48,8 @@ tools = ["dynamatic-opt", "hls-fuzzer-check-bitwidth",
                    command=f"cp %s %t.c && {config.dynamatic_tools_dir}/source-rewriter %t.c --"),
          ToolSubst("%export-vhdl",
                    command=f"rm -rf %t; mkdir %t; {config.dynamatic_tools_dir}/export-rtl %s %t {config.dynamatic_src_root}/data/rtl-config-vhdl.json --dynamatic-path {config.dynamatic_src_root} --hdl vhdl"),
+         ToolSubst("%translate-llvm-to-std",
+                   command=f"{config.llvm_tools_dir}/split-file %s %t; {config.dynamatic_tools_dir}/translate-llvm-to-std %t/test.ll -csource %t/test.c -function-name=test --dynamatic-path {config.dynamatic_src_root}"),
          ToolSubst("%dyn-clang-pragmas",
                    command=f"{config.llvm_tools_dir}/clang "
                    f"-fplugin={config.dynamatic_shlib_dir}/DynPragmasPlugin{config.llvm_shlib_ext} "

@@ -6,6 +6,7 @@ from generators.handshake.buffers.fifo_break_none import generate_fifo_break_non
 from generators.handshake.buffers.one_slot_break_dv import generate_one_slot_break_dv
 from generators.handshake.buffers.one_slot_break_r import generate_one_slot_break_r
 from generators.handshake.buffers.ofifo import generate_ofifo
+from generators.handshake.buffers.counter_buffer import generate_counter_buffer
 
 from generators.support.utils import try_enum_cast
 
@@ -17,11 +18,13 @@ class BufferType(Enum):
     FIFO_BREAK_DV = "FIFO_BREAK_DV"
     ONE_SLOT_BREAK_DVR = "ONE_SLOT_BREAK_DVR"
     SHIFT_REG_BREAK_DV = "SHIFT_REG_BREAK_DV"
+    COUNTER_BUFFER = "COUNTER_BUFFER"
 
 
 def generate_buffer(name, params):
     slots = params[ATTR_SLOTS]
     bitwidth = params[ATTR_BITWIDTH]
+    dv_latency = int(params["dv_latency"])
 
     buffer_type = try_enum_cast(params[ATTR_BUFFER_TYPE], BufferType)
 
@@ -42,5 +45,7 @@ def generate_buffer(name, params):
             # this is wrong
             # but it is what was being generated based on the previous code
             return generate_ofifo(name, {ATTR_SLOTS: slots, ATTR_BITWIDTH: bitwidth})
+        case BufferType.COUNTER_BUFFER:
+            return generate_counter_buffer(name, params)
         case _:
             raise ValueError(f"Unhandled buffer type: {buffer_type}")

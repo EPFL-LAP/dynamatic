@@ -76,48 +76,58 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context,
   using Constructor =
       std::function<std::optional<std::pair<ast::Expression, OpaqueContext>>(
           BasicCGenerator *, const OpaqueContext &, std::size_t)>;
-  llvm::SmallVector<Constructor> generators;
+  using ConstructorKeyPair =
+      std::pair<Constructor, AbstractTypeSystem::ExpressionKey>;
+  llvm::SmallVector<ConstructorKeyPair> generators;
 
   // Keep expressions interesting by making terminators less likely.
-  if (depth > MAX_DEPTH || random.getSmallProbabilityBool())
-    generators.emplace_back(&BasicCGenerator::generateConstant);
-  if (depth > 2 || random.getRatherLowProbabilityBool())
-    generators.emplace_back(&BasicCGenerator::generateScalarParameter);
+  if (depth > MAX_DEPTH)
+    generators.emplace_back(&BasicCGenerator::generateConstant,
+                            ast::Constant::Tag{});
+  if (depth > 2)
+    generators.emplace_back(&BasicCGenerator::generateScalarParameter,
+                            ast::Variable::Tag{});
 
   // Avoid stack overflows by restricting to a maximum expression depth.
   if (depth <= MAX_DEPTH) {
     for (auto op : enumRange<ast::BinaryExpression::Op>()) {
-      generators.emplace_back([op](BasicCGenerator *self,
-                                   const OpaqueContext &context,
-                                   std::size_t depth) {
-        return self->generateBinaryExpression(op, context, depth);
-      });
+      generators.emplace_back(
+          [op](BasicCGenerator *self, const OpaqueContext &context,
+               std::size_t depth) {
+            return self->generateBinaryExpression(op, context, depth);
+          },
+          op);
     }
     for (auto op : enumRange<ast::UnaryExpression::Op>()) {
-      generators.emplace_back([op](BasicCGenerator *self,
-                                   const OpaqueContext &context,
-                                   std::size_t depth) {
-        return self->generateUnaryExpression(op, context, depth);
-      });
+      generators.emplace_back(
+          [op](BasicCGenerator *self, const OpaqueContext &context,
+               std::size_t depth) {
+            return self->generateUnaryExpression(op, context, depth);
+          },
+          op);
     }
-    generators.emplace_back(&BasicCGenerator::generateCastExpression);
-    generators.emplace_back(&BasicCGenerator::generateArrayReadExpression);
-    if (random.getRatherLowProbabilityBool())
-      generators.emplace_back(&BasicCGenerator::generateConditionalExpression);
+    generators.emplace_back(&BasicCGenerator::generateCastExpression,
+                            ast::CastExpression::Tag{});
+    generators.emplace_back(&BasicCGenerator::generateArrayReadExpression,
+                            ast::ArrayReadExpression::Tag{});
+    generators.emplace_back(&BasicCGenerator::generateConditionalExpression,
+                            ast::ConditionalExpression::Tag{});
   }
-  random.shuffle(generators);
+
+  llvm::SmallVector<Constructor> constructors = random.shuffle(
+      generators, typeSystem.getExpressionProbabilityTableOpaque(context),
+      /*keyF=*/&ConstructorKeyPair::second,
+      /*mapF=*/&ConstructorKeyPair::first);
 
   // If no other expression is allowed, then attempt to generate constants or
   // parameters rather than fail.
-  // TODO: The entire logic here is a bit ad-hoc. We probably want probability
-  //       tables that can be influenced by type systems somehow.
-  generators.emplace_back(&BasicCGenerator::generateConstant);
-  generators.emplace_back(&BasicCGenerator::generateScalarParameter);
+  constructors.emplace_back(&BasicCGenerator::generateConstant);
+  constructors.emplace_back(&BasicCGenerator::generateScalarParameter);
   if (random.getBool())
     std::swap(generators.back(), generators[generators.size() - 2]);
 
   // Continuously generate an expression until one passes the type checker.
-  for (Constructor &con : generators)
+  for (Constructor &con : constructors)
     if (std::optional<std::pair<ast::Expression, OpaqueContext>> result =
             con(this, context, depth))
       return std::move(*result);

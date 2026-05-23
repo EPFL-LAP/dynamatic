@@ -85,7 +85,7 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
 
       - name: build
-        run: ./build.sh --release --enable-cbc --enable-leq-binaries --force 
+        run: ./build.sh --release --enable-llvm-assertions --enable-cbc --enable-leq-binaries --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0

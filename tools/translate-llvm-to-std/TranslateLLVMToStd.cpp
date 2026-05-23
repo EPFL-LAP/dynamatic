@@ -1021,6 +1021,9 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
   } else if (calledFunc->getIntrinsicID() == Intrinsic::fshl ||
              calledFunc->getIntrinsicID() == Intrinsic::fshr) {
     this->translateFunnelShiftIntrinsic(callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::assume) {
+    // An assume op can be simply dropped. It does not have any semantics
+    // besides causing undefined behavior.
   } else {
     llvm::report_fatal_error(
         "Not implemented llvm intrinsic function handling!");
