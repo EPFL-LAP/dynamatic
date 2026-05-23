@@ -257,7 +257,7 @@ private:
 
 struct PredictPragmaInfo {
   std::string Variable;
-  uint64_t Values;      // TODO: change to a list
+  llvm::SmallVector<uint64_t> Values;      // TODO: change to a list
   std::string Location; // start or end
   SourceLocation PragmaLoc;
 };
@@ -338,18 +338,40 @@ private:
       } else if (Name == "values") {
         PP.Lex(Tok);
 
-        // try to store the value lexed from the pragma
-        // into PredPragmaInfo.MaxPredictions
-        if (Tok.isNot(tok::numeric_constant) ||
-            !PP.parseSimpleIntegerLiteral(Tok, PredPragmaInfo.Values)) {
-          error(PP, Tok, "expected integer literal after values=");
+        // Expect opening parenthesis for the array format: values=(1, 2, 3)
+        if (Tok.isNot(tok::l_paren)) {
+          error(PP, Tok, "expected '(' after values=");
           return failure();
         }
-        sawValues = true;
+
+        while (true) {
+          PP.Lex(Tok);
+          uint64_t Value = 0;
+
+          if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, Value)) {
+            error(PP, Tok, "expected integer literal inside values list");
+            return failure();
+          }
+          PredPragmaInfo.Values.push_back(Value);
+
+          if (Tok.is(tok::r_paren)) {
+            PP.Lex(Tok); // Consume the ')'
+            break;
+          }
+
+          if (Tok.isNot(tok::comma)) {
+            error(PP, Tok, "expected ',' or ')' in values list");
+            return failure();
+          }
+        }
+        
+        sawValues = !PredPragmaInfo.Values.empty();
+
       } else if (Name == "location") {
         PP.Lex(Tok);
         if (Tok.isNot(tok::identifier)) {
-          error(PP, Tok, "expected identifier after style=");
+          error(PP, Tok, "expected identifier after location=");
           return failure();
         }
 
@@ -366,15 +388,19 @@ private:
 
         // lex the initial token for the next iteration
         PP.Lex(Tok);
+      } else {
+        // otherwise we have gotten an unknown named option
+        error(PP, Tok, "unknown option in #pragma DYN predict");
+        return failure();
       }
     }
 
     // Enforce that we got every option needed
-    // TODO: values is not needed when location is end
-    if (!sawVariable || !sawValues || !sawLocation) {
+    bool valuesRequired = (PredPragmaInfo.Location != "end");
+    if (!sawVariable || (valuesRequired && !sawValues) || !sawLocation) {
       error(PP, FirstToken,
             "#pragma DYN predict requires variable=, "
-            "values=, location=");
+            "values= (unless location=end), location=");
       return failure();
     }
     return success();
@@ -388,19 +414,19 @@ private:
     // for each type of variable we could predict on
     // so that no casts are added before or after the speculator
     std::string FuncDecls =
-        "extern _Bool  __dyn_predict_b(_Bool,  int, const char*) "
+        "extern _Bool  __dyn_predict_b(_Bool,  const char*, const char*) "
         "__attribute__((noinline, noduplicate));\n"
-        "extern char   __dyn_predict_c(char,   int, const char*) "
+        "extern char   __dyn_predict_c(char,   const char*, const char*) "
         "__attribute__((noinline, noduplicate));\n"
-        "extern short  __dyn_predict_s(short,  int, const char*) "
+        "extern short  __dyn_predict_s(short,  const char*, const char*) "
         "__attribute__((noinline, noduplicate));\n"
-        "extern int    __dyn_predict_i(int,    int, const char*) "
+        "extern int    __dyn_predict_i(int,    const char*, const char*) "
         "__attribute__((noinline, noduplicate));\n"
-        "extern long   __dyn_predict_l(long,   int, const char*) "
+        "extern long   __dyn_predict_l(long,   const char*, const char*) "
         "__attribute__((noinline, noduplicate));\n"
-        "extern float  __dyn_predict_f(float,  int, const char*) "
+        "extern float  __dyn_predict_f(float,  const char*, const char*) "
         "__attribute__((noinline, noduplicate));\n"
-        "extern double __dyn_predict_d(double, int, const char*) "
+        "extern double __dyn_predict_d(double, const char*, const char*) "
         "__attribute__((noinline, noduplicate));\n";
 
     // use a generic macro
@@ -413,10 +439,17 @@ private:
         "  long:   __dyn_predict_l, \\\n"
         "  float:  __dyn_predict_f, \\\n"
         "  double: __dyn_predict_d)((x), (n), (s))\n";
+      
+    std::string ValuesStr;
+    for (size_t i = 0; i < PredPragmaInfo.Values.size(); ++i) {
+      ValuesStr += std::to_string(PredPragmaInfo.Values[i]);
+      if (i + 1 < PredPragmaInfo.Values.size())
+        ValuesStr += ",";
+    }
 
     std::string Call = llvm::formatv(
-        "{0} = __dyn_predict({0}, {1}, \"{2}\");\n", PredPragmaInfo.Variable,
-        PredPragmaInfo.Values, PredPragmaInfo.Location);
+        "{0} = __dyn_predict({0}, \"{1}\", \"{2}\");\n", PredPragmaInfo.Variable, 
+        ValuesStr, PredPragmaInfo.Location);
 
     // LLVM reads files into memory buffers before processing them
     auto MB = llvm::MemoryBuffer::getMemBufferCopy(

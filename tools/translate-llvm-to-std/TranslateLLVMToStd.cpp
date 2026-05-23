@@ -1125,13 +1125,27 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
 
 void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
 
-  // try to cast the value to a constant
-  auto *ValueConst =
-      llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(1));
-  if (!ValueConst)
-    llvm::report_fatal_error("__dyn_predict: value arg is not a ConstantInt");
-
-  uint64_t value = ValueConst->getValue().getLimitedValue();
+  // try to get the string info
+  llvm::StringRef valuesStr;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(1), valuesStr))
+    llvm::report_fatal_error(
+        "__dyn_predict: values arg is not a constant C string");
+  
+  // parse the comma-separated string back into a vector of integers
+  llvm::SmallVector<int64_t> values;
+  if (!valuesStr.empty()) {
+    llvm::SmallVector<llvm::StringRef> splitValues;
+    valuesStr.split(splitValues, ',');
+    for (llvm::StringRef valRef : splitValues) {
+      int64_t parsedVal;
+      // Convert string fragment to integer safely
+      if (valRef.getAsInteger(10, parsedVal)) {
+        llvm::report_fatal_error(
+            "__dyn_predict: failed to parse integer token from values string");
+      }
+      values.push_back(parsedVal);
+    }
+  }
 
   // try to get the string start or end for location
   llvm::StringRef location;
@@ -1140,27 +1154,28 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
         "__dyn_predict: location arg is not a constant C string");
 
   // get the value we want to predict
-  llvm::Value *predVal = callInst->getArgOperand(0);
+  llvm::Value *predVar = callInst->getArgOperand(0);
 
   // Warn if the value has other users besides this call.
   // LLVM does some weird duplication stuff sometimes
   // to do more aggressive folding
   // TODO: but this should be okay for prediction?
-  if (predVal->getNumUses() > 1)
-    llvm::errs() << "Warning: __dyn_predict input has " << predVal->getNumUses()
+  if (predVar->getNumUses() > 1)
+    llvm::errs() << "Warning: __dyn_predict input has " << predVar->getNumUses()
                  << " users; consumers other than the pred call will bypass "
                     "the producer_output_attr_marker and not be marked for "
                     "prediction\n";
 
-  auto it = valueMap.find(predVal);
+  auto it = valueMap.find(predVar);
   if (it == valueMap.end())
     llvm::report_fatal_error("__dyn_predict: variable not found in valueMap");
   // actually get the cf value
   mlir::Value v = it->second;
 
+  mlir::DenseI64ArrayAttr valuesAttr = builder.getDenseI64ArrayAttr(values);
   // Build the actual attribute
   mlir::DictionaryAttr predAttr = mlir::DictionaryAttr::get(
-      ctx, {builder.getNamedAttr("values", builder.getI64IntegerAttr(value)),
+      ctx, {builder.getNamedAttr("values", valuesAttr),
             builder.getNamedAttr("location", builder.getStringAttr(location))});
 
   // build the operationstate that is used for the unregistered op
