@@ -732,6 +732,17 @@ findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
   std::vector<std::vector<EffectiveSlotNamer>> ret;
   stack.push_back(std::move(start));
   while (!stack.empty()) {
+    // In this function, the operations are not handled case-by-case, but
+    // instead using their interfaces as any operation is allowed here. The
+    // order cannot be changed without breaking the behaviour:
+    // First, terminate in bad cases (otherwise potentially too many things are
+    // annotated).
+    // Second, if applicable, an eager fork output is added as a
+    // copied sent to the next slot.
+    // Third, slots are annotated.
+    // Lastly, all inputs are followed backwards (regardless of the number of
+    // inputs, can be 1 for buffer or fork, or 2 for arithmetic operations or
+    // loads)
     auto cur = std::move(stack.back());
     stack.pop_back();
 
