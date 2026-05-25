@@ -374,17 +374,17 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
 /// Transfer function for sub operations or alike.
 static ExtWidth subWidth(ExtWidth lhs, ExtWidth rhs) {
   // When the extension types match we have the following property:
-  // All bits beyond 'std::max(lhs.bitWidth, rhs.bitWidth) + 1' are duplicates
-  // of 'std::max(lhs.bitWidth, rhs.bitWidth) + 1' and can therefore be computed
+  // All bits beyond 'max(lhs.bitWidth, rhs.bitWidth) + 1' are duplicates
+  // of 'max(lhs.bitWidth, rhs.bitWidth) + 1' and can therefore be computed
   // using just sign-extension.
   //
   // Proof for both operands being ZEXT:
   // Note that subtraction is defined as 'add(a, ~b + 1)'
   // There are two cases:
   // 1) 'rhs' is 0, in which case negating it keeps the value as 0. Bits
-  //    std::max(lhs.bitWidth, rhs.bitWidth) + 1 and above are guaranteed to be
+  //    max(lhs.bitWidth, rhs.bitWidth) + 1 and above are guaranteed to be
   //    zero from the zero-extension of lhs. We can therefore perform the
-  //    computation using just 'std::max(lhs.bitWidth, rhs.bitWidth) + 1' and
+  //    computation using just 'max(lhs.bitWidth, rhs.bitWidth) + 1' and
   //    zero-extend. (Note: For this subcase, we can even perform the
   //    computation in 'lhs.bitWidth' many bits and zero-extend).
   // 2) 'rhs' is any other value. In that case there must exist at least one
