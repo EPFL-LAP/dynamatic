@@ -31,6 +31,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::EagerForkNotAllOutputSent;
   if (s == "CopiedSlotsOfActiveForksAreFull")
     return FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull;
+  if (s == "EagerForkPath")
+    return FormalProperty::TYPE::EagerForkPath;
   if (s == "ReconvergentPathFlow")
     return FormalProperty::TYPE::ReconvergentPathFlow;
   if (s == "IOGSingleToken")
@@ -59,6 +61,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "EagerForkNotAllOutputSent";
   case TYPE::CopiedSlotsOfActiveForksAreFull:
     return "CopiedSlotsOfActiveForksAreFull";
+  case TYPE::EagerForkPath:
+    return "EagerForkPath";
   case TYPE::ReconvergentPathFlow:
     return "ReconvergentPathFlow";
   case TYPE::IOGSingleToken:
@@ -130,6 +134,8 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::CopiedSlotsOfActiveForksAreFull:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::EagerForkPath:
+    return EagerForkPath::fromJSON(value, path.field(INFO_LIT));
   case TYPE::ReconvergentPathFlow:
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
   case TYPE::IOGSingleToken:
@@ -362,6 +368,37 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   llvm::json::ObjectMapper mapper(info, path);
   if (!mapper || !mapper.map(FORK_CHANNELS_LIT, prop->sentStateNamers) ||
       !mapper.map(COPIED_SLOT_LIT, prop->copiedSlot))
+    return nullptr;
+  return prop;
+}
+
+// Eager Fork Path
+
+EagerForkPath::EagerForkPath(uint64_t id, TAG tag, ForkOp &op)
+    : FormalProperty(id, tag, TYPE::EagerForkPath) {
+  PortNamer namer(op);
+  // ForkOp has only 1 input
+  validOp = getUniqueName(op);
+  validChannel = namer.getInputName(0).str();
+  sentStateNamers = op.getInternalSentStateNamers();
+}
+
+llvm::json::Value EagerForkPath::extraInfoToJSON() const {
+  return llvm::json::Object({{VALID_OP_LIT, validOp},
+                             {VALID_CHANNEL_LIT, validChannel},
+                             {SENTS_LIT, sentStateNamers}});
+}
+
+std::unique_ptr<EagerForkPath>
+EagerForkPath::fromJSON(const llvm::json::Value &value, llvm::json::Path path) {
+  auto prop = std::make_unique<EagerForkPath>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(VALID_OP_LIT, prop->validOp) ||
+      !mapper.map(VALID_CHANNEL_LIT, prop->validChannel) ||
+      !mapper.map(SENTS_LIT, prop->sentStateNamers))
     return nullptr;
   return prop;
 }

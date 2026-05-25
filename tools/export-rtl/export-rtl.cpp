@@ -1284,6 +1284,17 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                         bufferFull)
               .str();
       data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<EagerForkPath>(property.get())) {
+      std::string channelName =
+          llvm::formatv("{0}.{1}_valid", p->getValidOp(), p->getValidChannel());
+      auto sentStates = p->getSentStateNamers();
+      std::vector<std::string> forkOutNames{sentStates.size()};
+      for (unsigned i = 0; i < sentStates.size(); ++i) {
+        forkOutNames[i] = sentStates[i].getSMVName();
+      }
+      std::string propertyString = llvm::formatv(
+          "({0}) -> {1}", llvm::join(forkOutNames, " | "), channelName);
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<ReconvergentPathFlow>(property.get())) {
       std::vector<std::string> eqs{};
       for (auto &eq : p->getEquations()) {

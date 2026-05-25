@@ -39,7 +39,7 @@ for i in $@; do
 done
 
 if [ ! -z $VERIFY_INVARIANTS ]; then
-  ANNOTATE_FLAGS="annotate-list=EagerForkNotAllOutputSent,CopiedSlotsOfActiveForksAreFull"
+  ANNOTATE_FLAGS="annotate-list=EagerForkNotAllOutputSent,CopiedSlotsOfActiveForksAreFull,EagerForkPath"
   SMV_GENERATION_FLAGS="--verify-invariants"
   RESULT_PARSE_FLAGS="--abort-on-unproven"
   NUXMV_SCRIPT="set verbose_level 0;

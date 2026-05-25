@@ -84,6 +84,7 @@ private:
                          Operation &curOp);
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
+  LogicalResult annotateEagerForkPath(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
   LogicalResult annotateIOGSingleToken(const IOG &iog);
   LogicalResult annotateIOGConsecutiveTokens(const IOG &iog);
@@ -244,6 +245,21 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
     for (Operation &op : funcOp.getOps()) {
       if (failed(annotateCopiedSlots(op)))
         return failure();
+    }
+  }
+  return success();
+}
+
+LogicalResult
+HandshakeAnnotatePropertiesPass::annotateEagerForkPath(ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<ForkOp>(op)) {
+        EagerForkPath p(uid, FormalProperty::TAG::INVAR, forkOp);
+
+        propertyTable.push_back(p.toJSON());
+        uid++;
+      }
     }
   }
   return success();
@@ -903,6 +919,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateProperty(
     return annotateEagerForkNotAllOutputSent(modOp);
   case FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull:
     return annotateCopiedSlotsOfAllForks(modOp);
+  case FormalProperty::TYPE::EagerForkPath:
+    return annotateEagerForkPath(modOp);
   case FormalProperty::TYPE::ReconvergentPathFlow:
     return annotateReconvergentPathFlow(modOp);
   case FormalProperty::TYPE::IOGSingleToken:
@@ -957,6 +975,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
     if (failed(annotateEagerForkNotAllOutputSent(modOp)))
       return failure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
+      return failure();
+    if (failed(annotateEagerForkPath(modOp)))
       return failure();
     if (failed(annotateReconvergentPathFlow(modOp)))
       return failure();
