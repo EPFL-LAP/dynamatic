@@ -14,6 +14,7 @@ set(DYNAMATIC_TEST_DEPENDS
   translate-llvm-to-std
   source-rewriter
   DynPragmasPlugin
+  clang
   )
 
 add_lit_testsuite(check-dynamatic "Running the Dynamatic regression tests"
