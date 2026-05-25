@@ -600,6 +600,9 @@ public:
   // statement after the list.
   using SubElements = std::tuple<StatementList, Statement>;
 
+  constexpr static std::size_t STATEMENT_LIST = 0;
+  constexpr static std::size_t STATEMENT = 1;
+
 private:
   std::vector<Statement> statements;
 };

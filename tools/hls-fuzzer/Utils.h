@@ -43,6 +43,28 @@ decltype(auto) mapTuplesInto(Constructor &&constructor, F &&f, First &&first,
           std::make_index_sequence<std::tuple_size_v<std::decay_t<First>>>{}));
 }
 
+/// Like 'mapTuplesInto' but the constructor is hardcoded to produce an array.
+template <typename First, typename... Others, typename F>
+decltype(auto) mapTuplesIntoArray(F &&f, First &&first, Others &&...others) {
+  return mapTuplesInto(
+      [](auto &&...args) {
+        return std::array{std::forward<decltype(args)>(args)...};
+      },
+      std::forward<F>(f), std::forward<First>(first),
+      std::forward<Others>(others)...);
+}
+
+/// Like 'mapTuplesInto' but the constructor is hardcoded to produce a tuple.
+template <typename First, typename... Others, typename F>
+decltype(auto) mapTuples(F &&f, First &&first, Others &&...others) {
+  return mapTuplesInto(
+      [](auto &&...args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      },
+      std::forward<F>(f), std::forward<First>(first),
+      std::forward<Others>(others)...);
+}
+
 /// Like 'mapTuplesInto' the function 'f' additionally receives an index
 /// parameter ranging from 0 to the length of the tuples as the first parameter.
 /// The index parameter is of type 'std::integral_constant' and can therefore be
@@ -65,6 +87,33 @@ decltype(auto) enumerateTuplesInto(Constructor &&constructor, F &&f,
       getTupleOfIndices(
           std::make_index_sequence<std::tuple_size_v<std::decay_t<First>>>{}),
       std::forward<First>(first), std::forward<Others>(others)...);
+}
+
+/// Like 'enumerateTuplesInto' but the constructor is hardcoded to produce a
+/// tuple.
+template <typename First, typename... Others, typename F>
+decltype(auto) enumerateTuples(F &&f, First &&first, Others &&...others) {
+  return enumerateTuplesInto(
+      [](auto &&...args) {
+        return std::make_tuple(std::forward<decltype(args)>(args)...);
+      },
+      std::forward<F>(f), std::forward<First>(first),
+      std::forward<Others>(others)...);
+}
+
+/// Applies the function 'f' to all elements in the tuples 'first' and 'others'
+/// at the same time.
+/// 'first' and 'others' are required to be of the same length.
+/// 'f' is not expected to return any value.
+template <typename First, typename... Others, typename F>
+void foreachInTuples(F &&f, First &&first, Others &&...others) {
+  // Discard any results of 'f' and make the constructor a noop.
+  mapTuplesInto([](auto &&...) { return 0; },
+                [&](auto &&...args) {
+                  f(std::forward<decltype(args)>(args)...);
+                  return 0;
+                },
+                std::forward<First>(first), std::forward<Others>(others)...);
 }
 
 } // namespace dynamatic

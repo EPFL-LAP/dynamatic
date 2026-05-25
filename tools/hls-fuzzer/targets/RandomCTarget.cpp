@@ -3,6 +3,8 @@
 #include "DynamaticTypeSystem.h"
 #include "TargetUtils.h"
 #include "hls-fuzzer/BasicCGenerator.h"
+#include "hls-fuzzer/ConjunctionTypeSystem.h"
+#include "hls-fuzzer/LimitTypeSystem.h"
 #include "hls-fuzzer/TargetRegistry.h"
 
 REGISTER_TARGET("random-c", dynamatic::RandomCTarget);
@@ -30,10 +32,16 @@ RandomCTarget::createWorker(const Options &options, Randomly randomly) const {
 
 void RandomCWorker::generate(llvm::raw_ostream &os,
                              llvm::StringRef functionName) {
-  gen::DynamaticTypeSystem dynamaticTypeSystem(random);
-  gen::BasicCGenerator generator(random, dynamaticTypeSystem,
-                                 /*entryContext=*/
-                                 {gen::DynamaticTypingContext::Unconstrained});
+  gen::ConjunctionTypeSystem<gen::DynamaticTypeSystem, gen::LimitTypeSystem>
+      dynamaticTypeSystem{gen::DynamaticTypeSystem(random),
+                          gen::LimitTypeSystem()};
+  gen::BasicCGenerator generator(
+      random, dynamaticTypeSystem,
+      /*entryContext=*/
+      {
+          {gen::DynamaticTypingContext::Unconstrained},
+          {},
+      });
   generator.generate(os, functionName);
 }
 
