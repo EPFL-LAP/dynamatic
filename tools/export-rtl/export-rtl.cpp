@@ -1284,7 +1284,8 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                         bufferFull)
               .str();
       data.properties[p->getId()] = {propertyString, propertyTag};
-    } else if (auto *p = llvm::dyn_cast<EagerForkPath>(property.get())) {
+    } else if (auto *p = llvm::dyn_cast<EagerForkPathTokenCopiedMaximumOnce>(
+                   property.get())) {
       std::string channelName =
           llvm::formatv("{0}.{1}_valid", p->getValidOp(), p->getValidChannel());
       auto sentStates = p->getSentStateNamers();

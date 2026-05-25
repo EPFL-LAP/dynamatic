@@ -255,7 +255,8 @@ HandshakeAnnotatePropertiesPass::annotateEagerForkPath(ModuleOp modOp) {
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
       if (auto forkOp = dyn_cast<ForkOp>(op)) {
-        EagerForkPath p(uid, FormalProperty::TAG::INVAR, forkOp);
+        EagerForkPathTokenCopiedMaximumOnce p(uid, FormalProperty::TAG::INVAR,
+                                              forkOp);
 
         propertyTable.push_back(p.toJSON());
         uid++;
@@ -919,7 +920,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateProperty(
     return annotateEagerForkNotAllOutputSent(modOp);
   case FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull:
     return annotateCopiedSlotsOfAllForks(modOp);
-  case FormalProperty::TYPE::EagerForkPath:
+  case FormalProperty::TYPE::EagerForkPathTokenCopiedMaximumOnce:
     return annotateEagerForkPath(modOp);
   case FormalProperty::TYPE::ReconvergentPathFlow:
     return annotateReconvergentPathFlow(modOp);
