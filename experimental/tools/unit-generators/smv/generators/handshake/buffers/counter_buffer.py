@@ -1,5 +1,6 @@
 from generators.support.utils import *
 
+
 def generate_counter_buffer(name, params):
     bitwidth = params["bitwidth"]
     dv_latency = int(params["dv_latency"])
@@ -13,8 +14,10 @@ def generate_counter_buffer(name, params):
     else:
         return _generate_counter_buffer(name, dv_latency, data_type)
 
+
 def _counter_width(dv_latency):
     return 1 if dv_latency <= 1 else (dv_latency - 1).bit_length()
+
 
 def _delay_counter_assignment(dv_latency):
 
@@ -96,5 +99,3 @@ MODULE {name} (ins, ins_valid, outs_ready)
   esac;
 
 """
-
-
