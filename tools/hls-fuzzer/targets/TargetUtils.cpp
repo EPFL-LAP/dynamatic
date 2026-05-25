@@ -80,8 +80,10 @@ trap 'rm "$file"' EXIT
   os << "echo \"static_assert((test_bench(), true));\"  >> $file\n";
   os << (dynamaticSourceRoot / "bin" / "clang++").string()
      << " $file -std=c++20 -DHLS_FUZZER_VERIFY ";
+  // Add an error limit to circumvent clang bugs where it gets stuck and speed
+  // up reduction.
   os << "-I" << (dynamaticSourceRoot / "include").string()
-     << " -Wno-deprecated -o /dev/null\n";
+     << " -Wno-deprecated -o /dev/null -ferror-limit=1\n";
 
   // Invoke dynamatic.
   os << dynamaticPath << " --exit-on-failure <<EOF 2>&1 | tee >(cat - >&5)\n";
