@@ -373,46 +373,28 @@ static ExtWidth addWidth(ExtWidth lhs, ExtWidth rhs) {
 
 /// Transfer function for sub operations or alike.
 static ExtWidth subWidth(ExtWidth lhs, ExtWidth rhs) {
-  // When the extension types match we have the following property:
-  // All bits beyond 'max(lhs.bitWidth, rhs.bitWidth) + 1' are duplicates
-  // of 'max(lhs.bitWidth, rhs.bitWidth) + 1' and can therefore be computed
-  // using just sign-extension.
+  // Proof for correctness of bitwidth and sign-extension:
+  // Case 1: Both operands are ZEXT:
+  // When both operands are zext their range is limited to be 0 to
+  // 2^b - 1 where b is their respective bitwidths.
+  // This means the maximum value possible is achieved using '2^|lhs| - 1'
+  // subtracted by 0.
+  // The minimum value is achieved when 'lhs' is 0 and 'rhs' is '2^|rhs| - 1'
+  // yielding a result of -'2^|rhs| - 1'.
+  // The latter case necessitates a sign-extension. The sign-extension requires
+  // us to encode the output values in twos-complement, requiring one extra bit
+  // ontop of max(|lhs|, |rhs|).
   //
-  // Proof for both operands being ZEXT:
-  // Note that subtraction is defined as 'add(a, ~b + 1)'
-  // There are two cases:
-  // 1) 'rhs' is 0, in which case negating it keeps the value as 0. Bits
-  //    max(lhs.bitWidth, rhs.bitWidth) + 1 and above are guaranteed to be
-  //    zero from the zero-extension of lhs. We can therefore perform the
-  //    computation using just 'max(lhs.bitWidth, rhs.bitWidth) + 1' and
-  //    zero-extend. (Note: For this subcase, we can even perform the
-  //    computation in 'lhs.bitWidth' many bits and zero-extend).
-  // 2) 'rhs' is any other value. In that case there must exist at least one
-  //    bit that is set and that when negated catches any carry-over from the
-  //    negation (~operand + 1) operation. Bits
-  //    'max(lhs.bitWidth, rhs.bitWidth) + 1' onwards of the right operand
-  //    are guaranteed to be all 1. The corresponding bits of the left operand
-  //    are guaranteed to be all 0 from the zero-extension.
-  //    Due to the carry logic of addition, all bits beyond
-  //    'max(lhs.bitWidth, rhs.bitWidth) + 1' are therefore guaranteed to be
-  //    equal to bit 'max(lhs.bitWidth, rhs.bitWidth) + 1'.
-  //
-  // Proof when both operands are SEXT:
-  // After negation, all bits beyond 'max(lhs.bitWidth, rhs.bitWidth)' are
-  // guaranteed to be either all 0s or all 1s, in each operand respectively.
-  // For the case of all bits being all 0 in one operand and all 1s in the
-  // other see the ZEXT case above (case 2).
-  // In the case of all 0s of both operands, bit
-  // 'max(lhs.bitWidth, rhs.bitWidth) + 1' of the result is guaranteed to be 0
-  // and so are all bits beyond. The reason is that bits
-  // 'max(lhs.bitWidth, rhs.bitWidth)' of both operands must have been 0,
-  // otherwise the sign-extension wouldn't have made all subsequent bits 0.
-  // The final case of all bits beyond 'max(lhs.bitWidth, rhs.bitWidth)' being
-  // 1 in both operands follows similar logic as the 0 case. The only way they
-  // could have been all ones is if 'max(lhs.bitWidth, rhs.bitWidth)' is also
-  // one. Their addition leads to a carry to the next bit which propagates
-  // through the entire adder. All bits in the result from bits
-  // 'max(lhs.bitWidth, rhs.bitWidth) + 1' onwards are guaranteed to be 1.
+  // Case 2: Both operands are SEXT:
+  // When both operands are sext their range is limited to be '-2^{b-1}' to
+  // '2^{b-1}-1' where b is their respective bitwidths.
+  // The maximum value is achieved when lhs is '2^{|lhs|-1}-1' and rhs is
+  // -2^{|rhs|-1} yielding a value in the magnitude of '2^{max(|lhs|, |rhs|)}'.
+  // The minimum value is achieved when lhs is '-2^{|lhs|-1}' and rhs is
+  // '2^{|rhs|-1}-1' yielding a value in the magnitude of
+  // '-2^{max(|lhs|, |rhs|)}'.
+  // Like the ZEXT case, the latter necessitates sign-extension and an extra bit
+  // to encode both ranges in twos-complement.
   if (lhs.extType == rhs.extType)
     return {ExtType::SEXT, std::max(lhs.bitWidth, rhs.bitWidth) + 1};
 
