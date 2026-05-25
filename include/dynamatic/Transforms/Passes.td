@@ -292,7 +292,10 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     Option<"dumpLogs", "dump-logs", "bool", "false",
     "If true, dump debugging information (identified CFDFCs, MILP "
     "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">];
+    "'buffer-placement' at the binary's location.">,
+    Option<"seed", "seed", "unsigned", "0",
+    "Seed for the Gurobi MILP solver (controls random tie-breaking; "
+    "use the same value across runs for reproducibility).">];
 }
 
 //===----------------------------------------------------------------------===//

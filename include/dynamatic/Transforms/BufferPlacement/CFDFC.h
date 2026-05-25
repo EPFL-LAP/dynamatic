@@ -99,7 +99,7 @@ void getDisjointBlockUnions(ArrayRef<CFDFC *> cfdfcs,
 LogicalResult extractCFDFC(handshake::FuncOp funcOp, ArchSet &archs, BBSet &bbs,
                            ArchSet &selectedArchs, unsigned &numExec,
                            const std::string &logPath = "",
-                           int *milpStat = nullptr);
+                           int *milpStat = nullptr, unsigned seed = 0);
 
 } // namespace buffer
 } // namespace dynamatic

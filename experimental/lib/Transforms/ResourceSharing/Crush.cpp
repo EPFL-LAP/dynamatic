@@ -285,9 +285,10 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
                                    StringRef algorithm, StringRef frequencies,
                                    StringRef timingModels, bool firstCFDFC,
                                    double targetCP, unsigned timeout,
-                                   bool dumpLogs)
+                                   bool dumpLogs, unsigned seed = 0)
       : HandshakePlaceBuffersPass(algorithm, frequencies, timingModels,
-                                  firstCFDFC, targetCP, timeout, dumpLogs),
+                                  firstCFDFC, targetCP, timeout, dumpLogs,
+                                  seed),
         sharingInfo(sharingInfo) {};
   SharingInfo &sharingInfo;
 
@@ -299,6 +300,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
     // Create Gurobi environment
     GRBEnv env = GRBEnv(true);
     env.set(GRB_IntParam_OutputFlag, 0);
+    env.set(GRB_IntParam_Seed, seed);
     if (timeout > 0)
       env.set(GRB_DoubleParam_TimeLimit, timeout);
     env.start();

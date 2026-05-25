@@ -357,7 +357,7 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
                                               ArchSet &selectedArchs,
                                               unsigned &numExecs,
                                               const std::string &logPath,
-                                              int *milpStat) {
+                                              int *milpStat, unsigned seed) {
 #ifdef DYNAMATIC_GUROBI_NOT_INSTALLED
   return funcOp->emitError() << "Project was built without Gurobi, can't run "
                                 "CFDFC extraction";
@@ -365,6 +365,7 @@ LogicalResult dynamatic::buffer::extractCFDFC(handshake::FuncOp funcOp,
   // Create Gurobi MILP model for CFDFC extraction, suppressing stdout
   GRBEnv env = GRBEnv(true);
   env.set(GRB_IntParam_OutputFlag, 0);
+  env.set(GRB_IntParam_Seed, seed);
   env.start();
   GRBModel model = GRBModel(env);
 

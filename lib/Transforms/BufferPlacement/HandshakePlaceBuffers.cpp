@@ -95,7 +95,8 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
 
 HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
+    unsigned seed) {
   this->algorithm = algorithm.str();
   this->frequencies = frequencies.str();
   this->timingModels = timingModels.str();
@@ -103,6 +104,7 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->targetCP = targetCP;
   this->timeout = timeout;
   this->dumpLogs = dumpLogs;
+  this->seed = seed;
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
@@ -356,7 +358,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     // Try to extract the next CFDFC
     int milpStat;
     if (failed(extractCFDFC(info.funcOp, archs, bbs, selectedArchs, numExecs,
-                            logPath, &milpStat)))
+                            logPath, &milpStat, seed)))
       return info.funcOp->emitError()
              << "CFDFC extraction MILP failed with status " << milpStat << ". "
              << getGurobiOptStatusDesc(milpStat);
@@ -434,6 +436,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   // Create Gurobi environment
   GRBEnv env = GRBEnv(true);
   env.set(GRB_IntParam_OutputFlag, 0);
+  env.set(GRB_IntParam_Seed, seed);
   if (timeout > 0)
     env.set(GRB_DoubleParam_TimeLimit, timeout);
   env.start();
@@ -566,8 +569,9 @@ void HandshakePlaceBuffersPass::instantiateBuffers(BufferPlacement &placement) {
 std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::buffer::createHandshakePlaceBuffers(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
-    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs) {
+    bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
+    unsigned seed) {
   return std::make_unique<HandshakePlaceBuffersPass>(
       algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs);
+      dumpLogs, seed);
 }

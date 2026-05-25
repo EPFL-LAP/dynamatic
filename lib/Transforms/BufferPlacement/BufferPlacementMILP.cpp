@@ -496,13 +496,13 @@ void BufferPlacementMILP::addObjective(ValueRange channels,
 
   // For each channel, add a "penalty" in case a buffer is added to the channel,
   // and another penalty that depends on the number of slots
-  double bufPenaltyMul = 1e-4;
-  double slotPenaltyMul = 1e-5;
-  for (Value channel : channels) {
-    ChannelVars &channelVars = vars.channelVars[channel];
-    objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
-    objective -= maxCoefCFDFC * slotPenaltyMul * channelVars.bufNumSlots;
-  }
+  // double bufPenaltyMul = 1e-4;
+  // double slotPenaltyMul = 1e-5;
+  // for (Value channel : channels) {
+  //   ChannelVars &channelVars = vars.channelVars[channel];
+  //   objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
+  //   objective -= maxCoefCFDFC * slotPenaltyMul * channelVars.bufNumSlots;
+  // }
 
   // Finally, set the MILP objective
   model.setObjective(objective, GRB_MAXIMIZE);
