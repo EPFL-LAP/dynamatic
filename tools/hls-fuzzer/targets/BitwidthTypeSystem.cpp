@@ -24,7 +24,7 @@ auto dynamatic::gen::BitwidthTypeSystem::discardConstant(
     -> std::optional<ast::Constant> {
   // Allow all integer constants as we manually truncate them
   // (regardless of their C++ type).
-  if (!discardScalarType(constant.getType(), ResultIsTruncated{}))
+  if (discardScalarType(constant.getType(), ResultIsTruncated{}))
     return std::nullopt;
 
   // Any integer constant is okay.
@@ -65,7 +65,7 @@ bool dynamatic::gen::BitwidthTypeSystem::discardBinaryExpression(
   case ast::BinaryExpression::Mul:
   case ast::BinaryExpression::Minus:
     // Only allowed if truncated.
-    return context.resultIsTruncated();
+    return !context.resultIsTruncated();
 
   case ast::BinaryExpression::Greater:
   case ast::BinaryExpression::GreaterEqual:
@@ -196,10 +196,48 @@ auto dynamatic::gen::BitwidthTypeSystem::getArrayReadExpressionTransferFns()
   };
 }
 
+dynamatic::gen::TransferFnArray<dynamatic::ast::ArrayAssignmentStatement>
+dynamatic::gen::BitwidthTypeSystem::getArrayAssignmentStatementTransferFns() {
+  return {
+      /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+      /*index=*/
+      TransferFn<ast::ArrayAssignmentStatement,
+                 ast::ArrayAssignmentStatement::ARRAY>(
+          [&](const BitwidthTypingContext &,
+              const ast::ArrayParameter &parameter) {
+            assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
+                   "implementation depends on dimensions being powers of 2");
+            return BitwidthTypingContext{std::min<std::uint8_t>(
+                llvm::Log2_64(parameter.getDimension()), globalMaxBitwidth)};
+          }),
+      copyFromInput<ast::ArrayAssignmentStatement>(),
+      /*output=*/copyInputToOutput<ast::ArrayAssignmentStatement>(),
+  };
+}
+
+dynamatic::gen::TransferFnArray<dynamatic::ast::StructuredForStatement>
+dynamatic::gen::BitwidthTypeSystem::getStructuredForStatementTransferFns() {
+  auto subBitwidth = random.getInteger<std::uint8_t>(
+      1, std::min<std::uint8_t>(4, globalMaxBitwidth));
+  // Restricting all expressions to have a specific bitwidth also inherently
+  // forces a specific range in loop iterations.
+  return {
+      TransferFn<ast::StructuredForStatement>(
+          BitwidthTypingContext{subBitwidth}),
+      TransferFn<ast::StructuredForStatement>(
+          BitwidthTypingContext{subBitwidth}),
+      // NOTE: Still allows 0!
+      TransferFn<ast::StructuredForStatement>(
+          BitwidthTypingContext{subBitwidth}),
+      copyFromInput<ast::StructuredForStatement>(),
+      copyInputToOutput<ast::StructuredForStatement>(),
+  };
+}
+
 dynamatic::gen::BitwidthTypingContext
 dynamatic::gen::BitwidthTypeSystem::getInterestingBitWidthInRange(
     uint8_t bitWidth) const {
-  if (random.getRatherLowProbabilityBool())
+  if (bitWidth > 0 && random.getRatherLowProbabilityBool())
     return BitwidthTypingContext(random.getInteger<std::uint32_t>(1, bitWidth));
 
   return BitwidthTypingContext(bitWidth);

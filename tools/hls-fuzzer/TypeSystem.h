@@ -630,6 +630,20 @@ public:
     };
   }
 
+  virtual bool
+  discardStructuredForStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() {
+    return {
+        /*start=*/copyFromInput<ast::StructuredForStatement>(),
+        /*end=*/copyFromInput<ast::StructuredForStatement>(),
+        /*step=*/copyFromInput<ast::StructuredForStatement>(),
+        /*statements=*/copyFromInput<ast::StructuredForStatement>(),
+        /*output=*/copyInputToOutput<ast::StructuredForStatement>(),
+    };
+  }
+
   using ExpressionKey =
       std::variant<ast::Constant::Tag, ast::CastExpression::Tag,
                    ast::Variable::Tag, ast::ArrayReadExpression::Tag,
@@ -643,6 +657,17 @@ public:
   /// should be a pure function otherwise.
   virtual ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
+
+  using StatementKey = std::variant<ast::StructuredForStatement::Tag,
+                                    ast::ArrayAssignmentStatement::Tag>;
+
+  /// Returns the probability table for a given statement, represented by their
+  /// tag, to be selected.
+  ///
+  /// The method may return different probabilities for different contexts but
+  /// should be a pure function otherwise.
+  virtual ProbabilityTable<StatementKey>
+  getStatementProbabilityTableOpaque(const OpaqueContext &context) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -787,6 +812,10 @@ public:
 
   static bool discardStatementList(const TypingContext &) { return false; }
 
+  static bool discardStructuredForStatement(const TypingContext &) {
+    return false;
+  }
+
   static ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTable(const TypingContext &) {
     // Default probabilities for expressions.
@@ -805,6 +834,11 @@ public:
       probs.emplace_back(op, 100);
 
     return ProbabilityTable<ExpressionKey>(std::move(probs));
+  }
+
+  static ProbabilityTable<StatementKey>
+  getStatementProbabilityTable(const TypingContext &) {
+    return {};
   }
 
   // Implementations of the virtual methods in 'AbstractTypeSystem'.
@@ -885,9 +919,18 @@ public:
     return self().discardStatementList(context.cast<TypingContext>());
   }
 
+  bool discardStructuredForStatementOpaque(const OpaqueContext &context) final {
+    return self().discardStructuredForStatement(context.cast<TypingContext>());
+  }
+
   ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) final {
     return self().getExpressionProbabilityTable(context.cast<TypingContext>());
+  }
+
+  ProbabilityTable<StatementKey>
+  getStatementProbabilityTableOpaque(const OpaqueContext &context) final {
+    return self().getStatementProbabilityTable(context.cast<TypingContext>());
   }
 
 private:
@@ -965,6 +1008,10 @@ public:
   }
 
   static bool discardStatementList(const TypingContext &) { return true; }
+
+  static bool discardStructuredForStatement(const TypingContext &) {
+    return true;
+  }
 };
 
 } // namespace dynamatic::gen

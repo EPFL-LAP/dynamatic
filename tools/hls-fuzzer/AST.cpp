@@ -82,6 +82,23 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
 }
 
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
+                                   const StructuredForStatement &forStatement) {
+  os << "for (uint32_t " << forStatement.getIterVariable() << " = "
+     << forStatement.getStart() << "; " << forStatement.getIterVariable()
+     << " < (" << forStatement.getEnd() << "); "
+     << forStatement.getIterVariable() << " += " << forStatement.getStep()
+     << ") {\n";
+  {
+    mlir::raw_indented_ostream ss(os);
+    ss.indent();
+    for (auto &iter : forStatement.getStatements())
+      ss << iter << '\n';
+  }
+  os << '}';
+  return os;
+}
+
+llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const ScalarParameter &parameter) {
 
   return os << parameter.getDataType() << " " << parameter.getName();

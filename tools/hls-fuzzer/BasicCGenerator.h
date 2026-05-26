@@ -6,6 +6,8 @@
 #include "TypeSystem.h"
 #include "Utils.h"
 
+#include "llvm/ADT/ScopeExit.h"
+
 #include <optional>
 
 namespace dynamatic::gen {
@@ -100,18 +102,31 @@ private:
   generateStatementList(const OpaqueContext &context, size_t depth);
 
   std::optional<std::pair<ast::Statement, OpaqueContext>>
-  generateStatement(const OpaqueContext &context);
+  generateStatement(const OpaqueContext &context, size_t depth);
 
   std::optional<std::pair<ast::ArrayAssignmentStatement, OpaqueContext>>
   generateArrayAssignmentStatement(const OpaqueContext &context);
 
+  std::optional<std::pair<ast::StructuredForStatement, OpaqueContext>>
+  generateStructuredForStatement(const OpaqueContext &context, size_t depth);
+
   Randomly &random;
   std::optional<ast::ReturnType> maybeReturnType;
   std::vector<ast::ScalarParameter> scalarParameters;
+  std::vector<std::vector<ast::ScalarParameter>> localVariableStack;
   std::vector<ast::ArrayParameter> arrayParameters;
   std::size_t varCounter = 0;
   AbstractTypeSystem &typeSystem;
   OpaqueContext entryContext;
+
+  [[nodiscard]] auto pushNewScope() {
+    localVariableStack.emplace_back();
+    return llvm::make_scope_exit([&] { localVariableStack.pop_back(); });
+  }
+
+  void addVariable(ast::ScalarType type, std::string name) {
+    localVariableStack.back().emplace_back(std::move(type), std::move(name));
+  }
 
   /// Returns a tuple of 'std::integral_constant's for every element in 'is'.
   template <std::size_t... is>

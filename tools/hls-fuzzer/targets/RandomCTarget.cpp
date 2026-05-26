@@ -39,6 +39,6 @@ void RandomCWorker::generate(llvm::raw_ostream &os,
 
 AbstractWorker::VerificationResult
 RandomCWorker::verify(const std::filesystem::path &sourceFile) const {
-  return performDifferentialTesting(sourceFile,
-                                    options.dynamaticExecutablePath);
+  return performDifferentialTesting(sourceFile, options.dynamaticExecutablePath,
+                                    20000);
 }

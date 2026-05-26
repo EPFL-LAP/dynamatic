@@ -2,6 +2,8 @@
 
 #include "mlir/Support/IndentedOstream.h"
 
+#include "llvm/ADT/ScopeExit.h"
+
 #include <functional>
 #include <sstream>
 
@@ -442,6 +444,8 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context,
           // Randomly shuffle the parameter ordering and find the first
           // parameter that passes type checking.
           std::vector<ast::ScalarParameter> copy = scalarParameters;
+          for (auto &iter : localVariableStack)
+            llvm::append_range(copy, iter);
           random.shuffle(copy);
 
           for (const ast::ScalarParameter &iter : copy)
@@ -524,12 +528,12 @@ gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
       "It must always be possible to generate a return type");
 }
 
-constexpr std::size_t MAX_STATEMENTS = 10;
+constexpr std::size_t MAX_STATEMENTS = 5;
 
 std::pair<ast::StatementList, gen::OpaqueContext>
 gen::BasicCGenerator::generateStatementList(const OpaqueContext &context,
                                             size_t depth) {
-  if (depth > MAX_STATEMENTS)
+  if (depth > MAX_STATEMENTS || typeSystem.discardStatementListOpaque(context))
     return std::pair{ast::StatementList(), context};
 
   return generateWithDependencies<ast::StatementList>(
@@ -540,7 +544,7 @@ gen::BasicCGenerator::generateStatementList(const OpaqueContext &context,
              },
              /*statement=*/
              [&](const OpaqueContext &context) {
-               return generateStatement(context);
+               return generateStatement(context, depth);
              },
              /*constructor=*/
              [&](ast::StatementList &&statements, ast::Statement &&statement) {
@@ -552,8 +556,34 @@ gen::BasicCGenerator::generateStatementList(const OpaqueContext &context,
 }
 
 std::optional<std::pair<ast::Statement, gen::OpaqueContext>>
-gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
-  return generateArrayAssignmentStatement(context);
+gen::BasicCGenerator::generateStatement(const OpaqueContext &context,
+                                        size_t depth) {
+  using Constructor =
+      std::function<std::optional<std::pair<ast::Statement, OpaqueContext>>(
+          const OpaqueContext &)>;
+  using ConstructorKeyPair =
+      std::pair<Constructor, AbstractTypeSystem::StatementKey>;
+
+  llvm::SmallVector<ConstructorKeyPair> generators;
+  generators.emplace_back(
+      [this](const OpaqueContext &context) {
+        return generateArrayAssignmentStatement(context);
+      },
+      ast::ArrayAssignmentStatement::Tag{});
+  generators.emplace_back(
+      [&](const OpaqueContext &context) {
+        return generateStructuredForStatement(context, depth);
+      },
+      ast::StructuredForStatement::Tag{});
+
+  llvm::SmallVector<Constructor> constructors = random.shuffle(
+      generators, typeSystem.getStatementProbabilityTableOpaque(context),
+      &ConstructorKeyPair::second, &ConstructorKeyPair::first);
+  for (auto &iter : constructors)
+    if (auto result = iter(context))
+      return result;
+
+  return std::nullopt;
 }
 
 std::optional<std::pair<ast::ArrayAssignmentStatement, gen::OpaqueContext>>
@@ -592,6 +622,40 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
             std::move(index),
             std::move(value),
         };
+      });
+}
+
+std::optional<std::pair<ast::StructuredForStatement, gen::OpaqueContext>>
+gen::BasicCGenerator::generateStructuredForStatement(
+    const OpaqueContext &context, size_t depth) {
+  if (typeSystem.discardStructuredForStatementOpaque(context))
+    return std::nullopt;
+
+  std::string varName = generateFreshVarName();
+  return generateWithDependencies<ast::StructuredForStatement>(
+      context, typeSystem.getStructuredForStatementTransferFns(),
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, 0);
+      },
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, 0);
+      },
+      [&](const OpaqueContext &context) {
+        return generateExpression(context, 0);
+      },
+      [&](const OpaqueContext &context) {
+        auto scopeExit = pushNewScope();
+        addVariable(ast::PrimitiveType::UInt32, varName);
+        return generateStatementList(context, depth + 1);
+      },
+      [&](ast::Expression &&start, ast::Expression &&end,
+          ast::Expression &&step, ast::StatementList &&statements) {
+        // Note: Requiring the step to be at least one to ensure termination!
+        // TODO: Negative steps are currently unsupported.
+        step = generateMaxExpression(step, ast::Constant{1});
+        return ast::StructuredForStatement(std::move(varName), std::move(start),
+                                           std::move(end), std::move(step),
+                                           std::move(statements));
       });
 }
 
