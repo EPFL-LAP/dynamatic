@@ -1024,6 +1024,12 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
   } else if (calledFunc->getIntrinsicID() == Intrinsic::assume) {
     // An assume op can be simply dropped. It does not have any semantics
     // besides causing undefined behavior.
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::bitreverse) {
+    if (!callInst->getType()->isIntegerTy(1))
+      llvm::report_fatal_error("Non i1 '@llvm.bitreverse' unimplemented");
+
+    mlir::Value operand = valueMap[callInst->getArgOperand(0)];
+    valueMap[callInst] = operand;
   } else {
     llvm::report_fatal_error(
         "Not implemented llvm intrinsic function handling!");
