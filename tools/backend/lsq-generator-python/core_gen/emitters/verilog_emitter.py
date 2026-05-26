@@ -32,7 +32,8 @@ class VerilogEmitter(Emitter):
         self.regInitString += self.get_current_indent() + code + "\n"
 
     def add_comment(self, comment: str):
-        self.statementString += self.get_current_indent() + f"// {comment}\n"
+        for line in comment.split("\n"):
+            self.statementString += self.get_current_indent() + f"// {line}\n"
 
     def add_assignment(self, out, statement: Statement, in_process=False):
         out_str, size = self.assigned_var_to_str(out)
