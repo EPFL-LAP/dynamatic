@@ -1700,18 +1700,18 @@ struct ArithCmpFW : public OpRewritePattern<handshake::CmpIOp> {
     // are zero-extended. This is to make sure the sign-bit is guaranteed to be
     // zero.
     if (cmpOp.isSignedComparison()) {
-      if ((extLhs == ExtType::ZEXT && minLhs.getType().getDataBitWidth() >=
-                                          minRhs.getType().getDataBitWidth()) ||
-          (extRhs == ExtType::ZEXT && minRhs.getType().getDataBitWidth() >=
-                                          minLhs.getType().getDataBitWidth()))
+      if ((lhsExtValue.getExtType() == ExtType::ZEXT &&
+           lhsExtValue.getDataBitWidth() >= rhsExtValue.getDataBitWidth()) ||
+          (rhsExtValue.getExtType() == ExtType::ZEXT &&
+           rhsExtValue.getDataBitWidth() >= lhsExtValue.getDataBitWidth()))
         optWidth++;
     } else {
       if (cmpOp.isSignedComparison() ||
-        (lhsExtValue.getExtType() == ExtType::ZEXT &&
-         rhsExtValue.getExtType() == ExtType::SEXT &&
+          (lhsExtValue.getExtType() == ExtType::ZEXT &&
+           rhsExtValue.getExtType() == ExtType::SEXT &&
            lhsExtValue.getDataBitWidth() >= rhsExtValue.getDataBitWidth()) ||
           (rhsExtValue.getExtType() == ExtType::ZEXT &&
-         lhsExtValue.getExtType() == ExtType::SEXT &&
+           lhsExtValue.getExtType() == ExtType::SEXT &&
            rhsExtValue.getDataBitWidth() >= lhsExtValue.getDataBitWidth()))
         optWidth += 1;
     }
