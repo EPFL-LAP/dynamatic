@@ -383,14 +383,6 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
 
 void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
                                      SmallVector<CFGPath> &paths) {
-  if (this->successors.empty()) {
-    assert(
-        from == 0 && to == 0 &&
-        "If the CFG has no edges, then we must have a single BB with ID == 0");
-    paths = {{0}};
-    return;
-  }
-
   // Both blocks must exist in the CFG
   assert(bbs.contains(from) && "source block must exist in the CFG");
   assert(bbs.contains(to) && "source block must exist in the CFG");
@@ -473,17 +465,21 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
 void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
                                unsigned to, SmallVector<CFGPath> &paths) {
   assert(!pathSoFar.empty() && "path cannot be empty");
+  if (pathSoFar.back() == to) {
+    // End reached, terminate the recursion.
+    CFGPath newPath(pathSoFar.begin(), pathSoFar.end());
+    newPath.push_back(to);
+    paths.push_back(std::move(newPath));
+    return;
+  }
+
   for (unsigned nextBB : successors[pathSoFar.back()]) {
-    if (nextBB == to) {
-      CFGPath newPath;
-      llvm::copy(pathSoFar, std::back_inserter(newPath));
-      newPath.push_back(to);
-      paths.push_back(newPath);
-    } else if (!pathSoFar.contains(nextBB)) {
-      mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
-      nextPathSoFar.insert(nextBB);
-      findPathsTo(nextPathSoFar, to, paths);
-    }
+    if (pathSoFar.contains(nextBB))
+      continue;
+
+    mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
+    nextPathSoFar.insert(nextBB);
+    findPathsTo(nextPathSoFar, to, paths);
   }
 }
 
