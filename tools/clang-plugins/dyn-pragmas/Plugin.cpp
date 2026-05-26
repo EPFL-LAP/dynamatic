@@ -257,7 +257,7 @@ private:
 
 struct PredictPragmaInfo {
   std::string Variable;
-  llvm::SmallVector<uint64_t> Values;      // TODO: change to a list
+  std::string Values;   // "[7, 3, 1]"
   std::string Location; // start or end
   SourceLocation PragmaLoc;
 };
@@ -338,34 +338,35 @@ private:
       } else if (Name == "values") {
         PP.Lex(Tok);
 
-        // Expect opening parenthesis for the array format: values=(1, 2, 3)
-        if (Tok.isNot(tok::l_paren)) {
-          error(PP, Tok, "expected '(' after values=");
+        if (Tok.isNot(tok::l_square)) {
+          error(PP, Tok, "expected '[' after values=");
           return failure();
         }
 
+        PredPragmaInfo.Values = "[";
+
         while (true) {
           PP.Lex(Tok);
-          uint64_t Value = 0;
 
-          if (Tok.isNot(tok::numeric_constant) ||
-            !PP.parseSimpleIntegerLiteral(Tok, Value)) {
-            error(PP, Tok, "expected integer literal inside values list");
+          if (Tok.isNot(tok::numeric_constant)) {
+            error(PP, Tok, "expected numeric literal inside values list");
             return failure();
           }
-          PredPragmaInfo.Values.push_back(Value);
+          PredPragmaInfo.Values += PP.getSpelling(Tok);
+          PP.Lex(Tok);
 
-          if (Tok.is(tok::r_paren)) {
-            PP.Lex(Tok); // Consume the ')'
+          if (Tok.is(tok::r_square)) {
+            PredPragmaInfo.Values += "]";
+            PP.Lex(Tok);
             break;
           }
 
           if (Tok.isNot(tok::comma)) {
-            error(PP, Tok, "expected ',' or ')' in values list");
+            error(PP, Tok, "expected ',' or ']' in values list");
             return failure();
           }
         }
-        
+
         sawValues = !PredPragmaInfo.Values.empty();
 
       } else if (Name == "location") {
@@ -439,17 +440,11 @@ private:
         "  long:   __dyn_predict_l, \\\n"
         "  float:  __dyn_predict_f, \\\n"
         "  double: __dyn_predict_d)((x), (n), (s))\n";
-      
-    std::string ValuesStr;
-    for (size_t i = 0; i < PredPragmaInfo.Values.size(); ++i) {
-      ValuesStr += std::to_string(PredPragmaInfo.Values[i]);
-      if (i + 1 < PredPragmaInfo.Values.size())
-        ValuesStr += ",";
-    }
 
-    std::string Call = llvm::formatv(
-        "{0} = __dyn_predict({0}, \"{1}\", \"{2}\");\n", PredPragmaInfo.Variable, 
-        ValuesStr, PredPragmaInfo.Location);
+    std::string Call =
+        llvm::formatv("{0} = __dyn_predict({0}, \"{1}\", \"{2}\");\n",
+                      PredPragmaInfo.Variable, PredPragmaInfo.Values,
+                      PredPragmaInfo.Location);
 
     // LLVM reads files into memory buffers before processing them
     auto MB = llvm::MemoryBuffer::getMemBufferCopy(

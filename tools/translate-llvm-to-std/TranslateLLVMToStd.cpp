@@ -1130,22 +1130,6 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
   if (!llvm::getConstantStringInfo(callInst->getArgOperand(1), valuesStr))
     llvm::report_fatal_error(
         "__dyn_predict: values arg is not a constant C string");
-  
-  // parse the comma-separated string back into a vector of integers
-  llvm::SmallVector<int64_t> values;
-  if (!valuesStr.empty()) {
-    llvm::SmallVector<llvm::StringRef> splitValues;
-    valuesStr.split(splitValues, ',');
-    for (llvm::StringRef valRef : splitValues) {
-      int64_t parsedVal;
-      // Convert string fragment to integer safely
-      if (valRef.getAsInteger(10, parsedVal)) {
-        llvm::report_fatal_error(
-            "__dyn_predict: failed to parse integer token from values string");
-      }
-      values.push_back(parsedVal);
-    }
-  }
 
   // try to get the string start or end for location
   llvm::StringRef location;
@@ -1159,7 +1143,6 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
   // Warn if the value has other users besides this call.
   // LLVM does some weird duplication stuff sometimes
   // to do more aggressive folding
-  // TODO: but this should be okay for prediction?
   if (predVar->getNumUses() > 1)
     llvm::errs() << "Warning: __dyn_predict input has " << predVar->getNumUses()
                  << " users; consumers other than the pred call will bypass "
@@ -1172,10 +1155,9 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
   // actually get the cf value
   mlir::Value v = it->second;
 
-  mlir::DenseI64ArrayAttr valuesAttr = builder.getDenseI64ArrayAttr(values);
   // Build the actual attribute
   mlir::DictionaryAttr predAttr = mlir::DictionaryAttr::get(
-      ctx, {builder.getNamedAttr("values", valuesAttr),
+      ctx, {builder.getNamedAttr("values", builder.getStringAttr(valuesStr)),
             builder.getNamedAttr("location", builder.getStringAttr(location))});
 
   // build the operationstate that is used for the unregistered op
