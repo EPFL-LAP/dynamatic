@@ -6,11 +6,10 @@ void wrap_if(inout_int_t a[N], inout_int_t b[N], in_int_t c) {
     int x = a[i];
     int y = x * 3;
     if (x > 0) {
-      if (y == 3) {
-        b[i] = (3 + c) * 10;
-      } else {
-        b[i] = (y + c) * 10;
-      }
+#pragma DYN predict variable = y values = (3)location = start
+      int z = (y + c) * 10;
+#pragma DYN predict variable = z values = (3)location = end
+      b[i] = z;
     }
     a[i] = (y - c) * 11;
   }

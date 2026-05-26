@@ -231,27 +231,34 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
-  --consume-producer-output-attr-marker \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
+F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --pipeline-duplication \
+  --consume-producer-output-attr-marker \
+  > "$F_CF_DUPLICATED"
+exit_on_fail "Failed to apply CF duplication" \
+  "Applied CF duplication"
 
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
-    --pipeline-duplication \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DUPLICATED" \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
-    --pipeline-duplication="json-path=$DYNAMATIC_DIR/integration-test/sparse/pred.json" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DUPLICATED" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
     "Marked memory accesses with the corresponding interfaces in cf"
 fi
+
 
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
