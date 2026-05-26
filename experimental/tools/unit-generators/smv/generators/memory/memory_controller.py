@@ -176,10 +176,10 @@ def _generate_mem_controller(
     ]
     mc_in_ports = ", ".join(
         ["loadData", "memStart_valid"]
-        + load_address_ports
         + control_ports
         + store_address_ports
         + store_data_ports
+        + load_address_ports
         + ["ctrlEnd_valid"]
         + load_data_ports
         + ["memEnd_ready"]
