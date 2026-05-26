@@ -60,6 +60,7 @@ class VHDLEmitter(Emitter):
             + self.get_port_end_str()
             + "\nend entity;\n\n"
             + f"architecture arch of {module_name} is\n"
+            + self._BOOL_TO_LOGIC_FUNC
             + self.signalInitString
             + "begin\n"
             + self.statementString
@@ -117,6 +118,13 @@ class VHDLEmitter(Emitter):
         self.decrease_indent()
         self.statementString += self.inst_str
         self.inst_str = ""
+
+    _BOOL_TO_LOGIC_FUNC = (
+        "\tfunction to_sl(b : boolean) return std_logic is\n"
+        "\tbegin\n"
+        "\t\tif b then return '1'; else return '0'; end if;\n"
+        "\tend function;\n"
+    )
 
     BINOP_STRINGS = {
         BinOp.ADD: "+",
@@ -185,6 +193,8 @@ class VHDLEmitter(Emitter):
                 if self.is_surrounded_by_parentheses(child_str)
                 else f"std_logic_vector({child_str})"
             )
+        elif super_type == Type.LOGIC and child_type == Type.BOOL:
+            return f"to_sl({child_str})"
         else:
             return child_str
 
