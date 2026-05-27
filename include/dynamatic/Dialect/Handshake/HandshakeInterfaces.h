@@ -81,6 +81,21 @@ private:
 class ControlType;
 
 } // end namespace handshake
+
+namespace buffer {
+
+/// One independent retiming flow declared by an op implementing
+/// handshake::RetimingFlowsOpInterface. The flow groups a set of operand
+/// indices and a set of result indices that share a single
+/// fluid-retiming token-conservation accounting in the buffer placement
+/// MILP, plus the cycle latency for that flow.
+struct RetimingFlow {
+  SmallVector<unsigned> operands;
+  SmallVector<unsigned> results;
+  double latency;
+};
+
+} // end namespace buffer
 } // end namespace dynamatic
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"

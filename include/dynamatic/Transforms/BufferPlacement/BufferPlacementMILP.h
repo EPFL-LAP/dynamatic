@@ -56,14 +56,39 @@ struct TimeVars {
 
 /// Holds MILP variables associated to every CFDFC unit. Note that a unit may
 /// appear in multiple CFDFCs and so may have multiple sets of these variables.
+/// MILP variables for one retiming flow of a unit that implements
+/// handshake::RetimingFlowsOpInterface. Channels touching any operand in
+/// the flow's operand set tie to `retIn`; channels touching any result in
+/// the flow's result set tie to `retOut`. The unit throughput constraint
+/// `throughput * latency == retOut - retIn` is added once per flow.
+struct UnitFlowVars {
+  CPVar retIn;
+  CPVar retOut;
+  double latency;
+};
+
 struct UnitVars {
-  /// Fluid retiming of tokens at unit's input (real).
+  /// Fluid retiming of tokens at unit's input (real). Used when the op does
+  /// not implement the RetimingFlowsOpInterface; otherwise see `flows`.
   CPVar retIn;
   /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
-  /// input if the latter is combinational (real).
+  /// input if the latter is combinational (real). Used when the op does not
+  /// implement the RetimingFlowsOpInterface; otherwise see `flows`.
   CPVar retOut;
   /// [FPGA24] Occupancy contribution of this unit (real).
   CPVar occupancy;
+
+  /// Independent retiming flows for ops that implement the
+  /// RetimingFlowsOpInterface. Empty for default ops.
+  llvm::SmallVector<UnitFlowVars> flows;
+  /// Maps an operand index to the index of its flow in `flows`. Every
+  /// operand of an interface-implementing op appears here exactly once.
+  llvm::DenseMap<unsigned, unsigned> operandToFlow;
+  /// Maps a result index to the index of its flow in `flows`. Every result
+  /// of an interface-implementing op appears here exactly once.
+  llvm::DenseMap<unsigned, unsigned> resultToFlow;
+  /// Whether per-flow retiming variables are used for this unit.
+  bool usePerFlow = false;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -222,6 +247,15 @@ protected:
   /// a pair of retiming variables for each CFDFC unit, a throughput variable
   /// for each CFDFC channel, and an overall CFDFC's throughput variable.
   void addCFDFCVars(CFDFC &cfdfc);
+
+  /// Looks up the fluid retiming variable at the given operand of `op` in the
+  /// provided CFDFC variables. Returns the per-flow variable if the op
+  /// implements RetimingFlowsOpInterface, else the unit's singular retIn.
+  CPVar &getRetIn(CFDFCVars &cfVars, Operation *op, unsigned operandIdx);
+  /// Looks up the fluid retiming variable at the given result of `op` in the
+  /// provided CFDFC variables. Returns the per-flow variable if the op
+  /// implements RetimingFlowsOpInterface, else the unit's singular retOut.
+  CPVar &getRetOut(CFDFCVars &cfVars, Operation *op, unsigned resultIdx);
 
   /// Adds path constraints for a signal of the channel. The `bufModel` should
   /// characterize a buffer that cuts the signal i.e., the path constraints

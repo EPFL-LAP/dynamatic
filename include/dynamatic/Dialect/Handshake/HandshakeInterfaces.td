@@ -117,6 +117,39 @@ def ShiftLikeArithOpInterface : OpInterface<"ShiftLikeArithOpInterface"> {
   ];
 }
 
+def RetimingFlowsOpInterface : OpInterface<"RetimingFlowsOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    For ops with independent flows through them. The default buffer
+    placement MILP gives every unit a single fluid retiming variable
+    `r_u`, which forces every input channel of the unit to share a
+    single token-conservation equation with every output channel. Ops
+    that implement this interface partition their operands and results
+    into independent flows. Each flow gets its own pair of fluid
+    retiming variables in the MILP, with one throughput constraint per
+    flow. The constraint shape is unchanged from the default model — only
+    which retiming variables a given channel ties to changes.
+
+    Every operand and every result of the op must belong to exactly
+    one flow. The MILP will assert at variable-creation time if an
+    operand or result is left uncovered or claimed by more than one
+    flow.
+  }];
+  let methods = [
+    InterfaceMethod<[{
+      Returns the list of independent retiming flows of this op. Each
+      ::dynamatic::buffer::RetimingFlow declares a set of operand
+      indices, a set of result indices, and a cycle latency. The union
+      of operand sets must equal the op's operand range, and the union
+      of result sets must equal the op's result range — each index
+      appearing in exactly one flow.
+    }],
+    "llvm::SmallVector<::dynamatic::buffer::RetimingFlow>",
+    "getRetimingFlows", (ins)
+    >,
+  ];
+}
+
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
