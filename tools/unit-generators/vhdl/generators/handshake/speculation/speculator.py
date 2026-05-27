@@ -64,6 +64,7 @@ begin
     new_pred_valid = '1' and new_pred_spec = "0";
 
   -- We can speculate again once the history is empty
+  -- and we have a non-spec trigger
   ready_to_re_speculate <=
     no_pred_history and nonspec_trigger_arrived;
 
@@ -223,19 +224,23 @@ architecture arch of {specFSMOutputs_name} is
 
 begin
 
+  -- we have incoming data 
+  -- but have not yet predicted
   data_before_prediction <=
     trigger_valid = '1' and data_in_valid = '1' and pred_hist_in_valid = '0';
 
+  -- we have a trigger to speculate with
+  -- and space in the history
   do_spec <=
     trigger_valid = '1' and pred_hist_out_ready = '1';
 
 
   -- Tracks whether data and RESEND control tokens
   -- have been sent out during the KILL state
-  -- Set to true everytime 
+  -- Set to true if 
   -- the lazy fork to the decoders is ready
   -- even if was true already since it simplifies logic
-  -- Reset to false and set to false on misspec detected
+  -- Reset to false, and set to false on misspec detected
   resend_done_proc : process (clk)
   begin
     if rising_edge(clk) then

@@ -4,6 +4,10 @@
 
 Our token-prediction speculative flow allows the breaking of arbitrary data dependencies, and therefore reduction of performance bottlenecks. 
 
+### Examples
+
+#### Example 1
+
 Take a snippet of python code as a simple example:
 
 ```python
@@ -33,7 +37,40 @@ Which in turn implements the following schedule instead:
 
 <img alt="Pre-speculation circuit" src="./Figures/schedule_post_spec.png" width="600" />
 
-`f2(c', b')` can begin in cycle 0, and perform either `f3(e')` or `f4(e')` in cycle 1. We discover if prediction was correct at the end of cycle 3. The speculator informs either `Commit 1` or `Commit 2` of this, by consuming `d'` a second time along the new red edges. The green `Save-Commit` unit acts saves `b` in its internal history. In the case that the prediction of `c` was incorrect, the `Speculator` informs the `Save-Commit` along the green edge, and the `Save-Commit` re-issues b, allowing the original schedule to run in order to recover from the mis-prediction.
+In cycle 0, the speculator issues a predicted value `c'`, and the save-commit saves `b` in its internal memory and issues `b'`, allowing `f2(c', b')` to begin immediately, and perform either `f3(e')` or `f4(e')` in cycle 1. We discover if prediction was correct at the end of cycle 3. The speculator informs either `Commit 1` or `Commit 2` of this, by consuming `d'` a second time along the new red edges. In the case that the prediction of `c` was incorrect, the `Speculator` issues the correct `c`, and informs the `Save-Commit` along the green edge, so the `Save-Commit` re-issues `b`, allowing the original schedule to run in order to recover from the mis-prediction.
+
+#### Example 2
+
+Take the following loop circuit:
+
+<img alt="Pre-speculation circuit" src="./Figures/loop.png" width="500" />
+
+which has the following schedule:
+
+<img alt="Pre-speculation circuit" src="./Figures/loop_sched.png" width="800" />
+
+A speculator can be placed on the output of `f2` to improve loop pipelining. The output circuit is as follows:
+
+<img alt="Pre-speculation circuit" src="./Figures/loop_spec.png" width="500" />
+
+and produces the following schedule:
+
+<img alt="Pre-speculation circuit" src="./Figures/loop_sched_spec.png" width="800" />
+
+In cycle 0, the save-commit receives `i1` as the output of `f3(i0)`, and the speculator predicts the value of `f2(i0)` as `true`. This causes `i1` to speculatively re-enter the loop. 
+
+Therefore in cycle 1, all functions execute speculatively with `i1` as their input. At the end of cycle 1, the save-commit receives a speculative `i2'` from the speculative execution of `f3(i1)`. The speculator again predicts that the output of `f2` will be `true`, causing `i2'` to re-enter the loop. Even though `i2'` is speculative, and therefore will eventually need to be resolved, the save-commit does not resolve it yet: the save-commits continue to issue values until mis-prediction is detected. This is required to allow multiple predictions to be in-flight simultaneously. 
+
+In cycle 2, all functions execute speculatively with `i2` as their input. The real `f2(i0)` arrives at the input to the speculator, and the speculator discovers its prediction was correct. The speculator then informs the save-commits and commits of the correct prediction. Only `Commit 1` will receive this info, as only `Commit 1` will receive a value from that prediction. The speculator and save-commit allow `i3'` to speculatively re-enter the loop.
+
+Cycle 3 is the same as cycle 2, although with the real `f2(i1)` arriving and `i4` entering the loop.
+
+In cycle 4, the speculator discovers mis-prediction. The real value of `f2(i2)` is `false`. It informs the save-commit of the mis-prediction. The speculator issues a `false` value, and the save-commit re-issues the saved `i3`. `i3` then exits the loop. 
+
+The speculator and save-commit both know they will receive mis-speculated input values as input: `f3(i4)` is currently arriving to the save-commit, and the speculator will still receive `f2(i3)` and `f2(i4)` in later cycles. Both units use a stateful mechanism to `kill` these values, which we describe in more detail later.
+
+In cycles 5 and 6, the speculator sends out a `kill` communication to the commit units for the predicted `f2(i3)` and `f2(i4)`. These will both arrive at only `Commit 1`, as `Commit 2` did not receive any mis-speculated outputs for this executiont trace.
+
 
 ### High-Level Overview: Non-Spec vs. Spec
 In our token-prediction speculative approach, there are two types of values: `non-spec` and `spec`.
@@ -50,6 +87,14 @@ We identify `non-spec` vs `spec` data via an additional bit attached to values.
 
 The core dataflow unit of token-prediction speculative flow is the speculator. Currently, it is placed manually, based on a user-written `#pragma dyn speculate` in the input kernel source code. The speculator can be used to break data dependencies, producing a data output before receiving a data input, by generating predicted values. These values can then be used to begin computations earlier, often resulting in improved circuit performance. The speculator has an internal history of predictions made: for a maximum of N in-flight predictions, this internal history must be at least of size N. 
 
+When the speculator makes a prediction, it informs all the save-commit units so that the speculator and the save-commits all issue their outputs in the same cycle. The speculator may make multiple predictions before the first resolves. 
+
+When a value arrives at the speculator to resolve speculation, the speculator informs the save-commits of the result: correct prediction or incorrect prediction. If prediction was incorrect, the speculator and save-commits re-issue their correct outputs, again all in the same cycle. 
+
+When a prediction is discovered to have been incorrect, all in-flight predictions must also be considered mis-predicted. The speculator therefore switches mode, and sends a `kill` communication to the commit units for each in-flight prediction. The speculator does not communicate with the save-commits during this time. 
+
+An output value of an in-flight prediction may arrive at the speculator. The speculator must therefore `kill` any incoming values which came from in-flight predictions. We describe the exact details of this later. 
+
 ### High-Level Overview: The Commit Units
 
 The second unit used in our token-prediction speculative flow is the commit unit. Outputs of the computation done with predicted inputs will eventually reach commit units, which provide a hard boundary of how far a `spec` value can travel from the speculator. 
@@ -60,17 +105,26 @@ From the reasoning discussed in [Non-Spec Vs. Spec](#high-level-overview-non-spe
 
 ### High-Level Overview: The Save-Commit Units
 
-The third unit of the approach is the save-commit units. 
+The third unit of the approach is the save-commit units. Save-commits are involved in speculation beginning but are not involved in speculation resolving.
+
+The speculator may make multiple predictions before the first resolves. If so, the second value that the save-commit receives is the result of the first prediction, and so on. The save-commit 
 
 The primary purpose of the save-commit units is to save values, to allow recovery from mis-prediction. When a computation begins with a predicted input, a set of save-commits save all other inputs to that computation (one save-commit per input). When mis-prediction is discovered, the computation must be re-executed. The speculator issues the real data input for the first time, and each save-commit re-issues their saved value. In order to have up to N in-flight predictions, the save-commits must be able to store N saved values.
 
 The secondary purpose of the save-commit units is the "commit" purpose. This refers to how the save-commit updates its history of stored inputs after mis-prediction is detected. 
 
+When a prediction is discovered to be correct, it means that computation will not be re-executed. The save-commit can therefore `discard` the value it was saving for that re-execution. We use `discard` to refer to 'dropping' values which were correct but are no longer needed. 
+
+When a prediction is discovered to have been incorrect, all in-flight predictions must also be considered mis-predicted. 
+
+An output value of an in-flight prediction may arrive at the save-commit. The save-commit must therefore `kill` any incoming values which came from in-flight predictions. The save-commit and speculator implement this in the same way, and we describe the exact details of this later. 
+
+
 ### High-Level Overview: How to Place Commits
 
 Commit units are placed to limit where unresolved `spec` values can reach. In general, we place commit units to prevent `spec` values from exiting the circuit along any external connection, including being stored to memory. 
 
-Commit units can also be placed to prevent any arbitrary computation from being performed speculatively, for any arbitrary reason. 
+Commit units can also be placed to prevent any arbitrary computation from being performed speculatively, for any arbitrary reason.
 
 Additional commit units are also needed for ordering correctness, but we will discuss this later.
 
@@ -89,7 +143,7 @@ This guarantees that exactly one value will be generated for each output, even i
 
 If any computation receives input only from the save-commit units, and no input from the speculator, this computation will be redundantly re-executed when mis-prediction recovery happens. The placement of the save-commit must therefore trade-off the degree of redundant execution with how many save-commits must be placed to create a full snapshot.
 
-An example below shows a single save-commit above a computation which will never be affected by prediction:
+An example below shows a single save-commit above a computation which will never be affected by prediction, with the shapshot point shown as a dashed purple line:
 
 <img alt="Post-speculation circuit" src="./Figures/loop_with_spec_cut.png" width="600" />
 
@@ -123,6 +177,8 @@ A `spec` value must join with a `control` signal to either be `pass`-ed to the o
 
 The save-commit unit has three inputs: `data in`, `issue control`, and `history control`, and one output: `data out`.
 
+This diagram is the first introduction of how the speculator and save-commit statefully kill values which come from mis-speculation. If the speculator informs the save-commit of mis-prediction, the save-commit wipes its entire history and kills any incoming `spec` values until it sees a `non-spec` value. We will discuss the `non-spec` value as a flag event indicating all mis-speculated values have been killed in more detail later. 
+
 A simplified version of how the save-commit works is shown below, with stateful aspects in purple, mis-prediction recovery aspects in red, and "normal operation" aspects in green:
 
 <img alt="Save Commit Unit" src="./Figures/save_commit_internals.png" width="500" />
@@ -140,10 +196,210 @@ When mis-prediction is discovered, the speculator informs the save-commit using 
 
 This omits some details about the order in which things happen, synchronization between the two control channels, and what happens when the speculator decides not to speculate, which we will discuss in more detail later.
 
-We will also discuss later how we treat the arrival of `non-spec` data as a flag event, which indicates no mis-speculated values remain in the circuit.
-
 ### Individual Unit Behaviour: The Speculator
 
+The logic of the speculator is divided into two halves: a "brain", and a "communicator"
+
+<img alt="Save Commit Unit" src="./Figures/speculator.png" width="800" />
+
+
+The speculator "brain" unit has 5 elastic output channels: `no cmp`, `do spec`,  `resend`, `kill`, and `resolve`m as well as 3 data outputs: `in data`, `predicted data`, and `resend data`, which do not have a valid and ready signal. 
+
+The 5 elastic output channels encode the decisions that the speculator "brain" has made. Each decision corresponds to a different set of output values that must be issued from the speculator's 4 outputs. 
+
+The meaning of each of the five events is as follows:
+
+- `do spec`
+Perform prediction to begin speculate. Issue the predicted value and inform the save-commits so they can issue their save values.
+- `no cmp`
+`data in` arrived immediately and there is no need to predict. Pass through all the values as `non-spec`.
+- `resolve` 
+A new `data in` has arrived and matches our prediction. Tell the commit units to `pass` the outputs, and the save-commits to `discard` their oldest saved values.
+- `kill`
+In a previous cycle, the speculator discovered a mis-prediction. Now it sends one `kill` event per unresolved in-flight prediction.
+- `resend` 
+In a previous cycle, the speculator discovered a mis-prediction. `resend` is issued once to the save-commits for them to re-issue their oldest save data and wipe their history, and the speculator also issues the corrected value.
+
+This table shows which of the decision channels can be valid simultaneously:
+| `no cmp` | `do spec` | `resolve` | `kill` | `resend` |
+|:-:|:-:|:---:|:---:|:---:|
+| X |   |   |   |   |
+|   | X |   |   |   |
+|   | X | X |   |   |
+|   |   | X |   |   |
+|   |   |   | X |   |
+|   |   |   | X | X |
+|   |   |   |   | X |
+
+`no cmp` cannot overlap with any other decision: there are no predictions to resolve. The elastic channel means the "communicator" is able to backpressure this decision. 
+
+`do spec` and `resolve` can overlap: the speculator can make a new prediction, resolve an old prediction as correct, or both in a single cycle. The "communicator" can backpressure both decisions along the elastic channel, only one, or neither. 
+
+`kill` and `resend` can overlap: the speculator can `kill` an in-flight mis-prediction, `resend` the correct values, or both in a single cycle. The "communicator" can backpressure both decisions along the elastic channel, only one, or neither. 
+
+####  Individual Unit Behaviour: The Speculator's "Communicator"
+
+The internals of the speculator's communicators look like this:
+
+<img alt="Save Commit Unit" src="./Figures/spec_communicator.png" width="800" />
+
+4 decoder units take different actions based on which decision the brain has taken. Each decoder is guaranteed by the mutual exclusivity of the decisions to have only a single valid input in any cycle. 
+
+The lazy forks guarantee that if any decoder backpressures a decision, that decision is not applied. This is because the decision value from the speculator "brain" is volatile: the value can change without the handshake protocol accepting it for transfer. 
+
+The data decoder additionally receives the 3 data values of `in data`, `predicted data` and `resend data`, and chooses which to output based on the incoming decision from the speculator `brain`. 
+
+The Issue Control Decoder communicates with the save-commits, and sends a "issue oldest un-issued value as `spec`" for `do spec`, a "issue oldest un-issued value as `non-spec`" for `no cmp`, and "issue oldest value as `non-spec`" for `resend`.
+
+The History Control Decoder communicates with the save-commits, and sends a "drop oldest saved value" for `no cmp`, a "drop oldest saved value" for `resolve`, and "wipe history" for `resend`.
+
+The Commit Control Decoder communicates with the commit units, and sends a `pass` for `resolve` and a `kill` for `kill`.
+
+####  Individual Unit Behaviour: The Speculator's "Brain"
+
+
+#####  Individual Unit Behaviour: The Speculator's FSM
+
+
+The core of the speculator's "brain" is a simple finite state machine.
+
+<img alt="Save Commit Unit" src="./Figures/spec_fsm_interface.png" width="400" />
+
+It has 3 inputs: `mis-spec detected`, `ready to re-speculate` and `non-spec data`, and 1 output: `state`.
+
+<img alt="Save Commit Unit" src="./Figures/spec_fsm.png" width="800" />
+
+The FSM has three states `IDLE`, `KILL` and `KILL ONLY DATA`. The speculator makes predictions in both `IDLE` and `KILL ONLY DATA`. The speculator only resolves predictions in `IDLE`. In `KILL`, the speculator sends out one `kill` value for each in-flight mis-predictions, and independently attempts to perform `resend`. In both `KILL` and `KILL ONLY DATA`, the speculator `kill`-s any incoming `spec` values, as they are the results of mis-prediction. 
+
+The speculator transitions from `IDLE` to `KILL` when mis-prediction is detected.
+
+An important sub signal is `ready to re-speculate`, which occurs once all `kill`-s have been sent by the "communicator", and the speculator is receiving a `non-spec` `trigger` value. This `non-spec` `trigger` value is a request from the circuit to begin a fresh round of speculation. The arrival of the `non-spec` `trigger` can only happen as a consquence of a successful `resend`, and so the `resend` event is not explicitly in the transition conditions. 
+
+Another signal used in the other three transition is `non-spec` `data`. This `non-spec` `data in` is treated as a flag event meaning that all data values from the in-flight mis-predictions have been been killed.
+
+The speculator transitions from `KILL` to `IDLE` when `ready to re-speculate` occurs and there is `non-spec` data: all `kill`-ing is complete.
+
+The speculator transitions from `KILL` to `KILL ONLY DATA` when `ready to re-speculate` occurs but there is not yet `non-spec` data: some in-flight mis-predictions may not yet have been killed. As mentioned above, the speculator can start making fresh predictions in `KILL ONLY DATA`, which is helpful for performance reasons.
+
+The speculator transitions from `KILL ONLY DATA` to `IDLE` when there is `non-spec` data: all `kill`-ing is complete.
+
+#####  Individual Unit Behaviour: From FSM to Decision
+
+A rough block diagram of the brain as a whole is then:
+
+<img alt="Save Commit Unit" src="./Figures/spec_brain.png" width="600" />
+
+The history stores unresolved in-flight predictions. 
+
+`Ready to Respeculate` takes as input the history and the trigger. If a `kill` has been sent for each mis-prediction, the history will be empty. When the history is empty and the trigger is `non-spec`, `Ready to Respeculate` sends a value. This is used for the FSM transitions.
+
+`Prediction Check` evaluates an incoming true value against the oldest value in the history. If mis-prediction is detected, it informs the FSM and `Resend Done`, as well as the `Output Unit`. If a the prediction was correct, only the `Output Unit` is informed.
+
+The FSM as described before takes in three inputs and outputs the `state`. 
+
+The `Predictor` produces a predicted value for each trigger, based on the specified prediction mechanism. 
+
+`Resend Data Reg` stores the incoming data when mis-prediction is detected, so it can be resent properly. 
+
+The `Output Unit` itself then encodes which decision is made based on the `state`, `trigger`, `data in`, `resend done` and the output of Prediction Check. 
+
+A simple pseudocode is the easiest way to describe the behaviour of the Output Unit:
+
+```
+IDLE:
+    if mis-prediction detected:
+        store data in to resend reg
+        accept trigger              # any trigger now is spec, so kill it
+        set resend not done
+        # FSM will move to KILL
+
+    else:
+        # if statement 1: confirm a correct speculation?
+        if data matches prediction:
+            emit resolve
+
+            # backpressure from communicator?
+            if resolve accepted:
+                accept data in
+                pop oldest prediction from history
+
+        # if statement 2: did real data arrive before any prediction
+        if data arrived before prediction:
+            emit no_cmp
+
+            # backpressure from communicator?
+            if no_cmp accepted:
+                accept data in
+                accept trigger
+
+        # otherwise, speculate on the new trigger
+        else if trigger present and history has room:
+            emit do_spec
+
+            # backpressure from communicator?
+            if do_spec accepted:
+                accept trigger
+                push prediction into history
+
+KILL:
+    if data in is spec:
+        accept data in            # to kill it
+    if trigger is spec:
+        accept trigger            # to kill it
+
+    if history not empty:
+        emit kill
+
+        # backpressure from communicator?
+        if kill accepted:
+            pop oldest prediction from history
+
+    if not resend done:
+        emit resend
+
+        # backpressure from communicator?
+        if resend accepted:
+          set resend done
+
+KILL_ONLY_DATA:
+    if data in is spec:
+        accept data in            # to kill it
+
+    # speculate on the new trigger
+    if trigger present and history has room:
+        emit do_spec
+        if do_spec accepted:
+            accept trigger
+            push prediction into history
+
+```
+
+
+## Speculator to Save-Commit Communication
+
+The communication between the speculator and save-commit is rife with deadlock risks. 
+
+Take for example a speculator and save-commit in a do-while loop:
+
+<img alt="Save Commit Unit" src="./Figures/save_commit_control.png" width="600" />
+
+Whenever backpressure is present on the data out channel of the save-commit, it cannot accept instructions from the speculator relating to issuing. However, to remove this backpressure, the save-commit may need to `discard` a value from its internal history, so it can accept a new value on the data in channel. Therefore, to avoid deadlocking, the save-commit must be able to accept a history-based instruction from the speculator even when 1) it has backpressure at its input and 2) the speculator also wants it to issue. 
+
+In order to be able to have independent transfer of the two types of instructions, we need two handshaking channels. We call these two channels the `issue control` and the `history control`.
+
+<img alt="Save Commit Unit" src="./Figures/issue_and_hist.png" width="600" />
+
+When backpressure propagates to the `issue control` channel, a value can still transfer on the `history control` channel, freeing up space in the save-commit and preventing deadlock.
+
+Two handshaking channels between two units poses a issue: there is no guaranteed relative arrival order between the two channels. However, the speculator expects its instructions to be applied in the order they are issued. Additionally, some instructions affect the internal history and also require a value to be issued. How should these instructions be communicated and applied to ensure correctness?
+
+The solution is synchronized acceptance of problematic instructions. Any instruction which affects both the internal history and the issuing of values must be applied after all previous instructions have been succesffuly applied. To avoid the instruction overtaking a value on the other channel, we send the instruction along both channels, and only accept it once it has arrived on both channels.
+
+Take for example this situation:
+
+<img alt="Save Commit Unit" src="./Figures/issue_hist_order.png" width="600" />
+
+The speculator has sent `do spec` twice along `issue control` and then `resend` on both `issue control` and `history control`. `resend` wipes the internal history and `do spec` reads from the internal history: if we apply these in the wrong order, the `do spec` instruction will have nothing to send. Synchronized acceptance means the save-commit sees the `resend` along `history control`, but does not accept it until `resend` also arrives along `issue control`.
 
 # Cut Content
 
