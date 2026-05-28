@@ -6,9 +6,9 @@ void wrap_if(inout_int_t a[N], inout_int_t b[N], in_int_t c) {
     int x = a[i];
     int y = x * 3;
     if (x > 0) {
-#pragma DYN predict variable = y values = (3)location = start
+#pragma DYN predict variable = y values = [3] location = start marker = 0
       int z = (y + c) * 10;
-#pragma DYN predict variable = z values = (3)location = end
+#pragma DYN predict variable = z values = [3] location = end marker = 0
       b[i] = z;
     }
     a[i] = (y - c) * 11;

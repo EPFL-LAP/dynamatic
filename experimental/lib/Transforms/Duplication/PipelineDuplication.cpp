@@ -42,109 +42,30 @@ struct PipelineDuplicationPass
   void runDynamaticPass() override;
 
 private:
-  LogicalResult readFromJSON(const std::string &jsonPath, std::string &opName,
-                             int &basicBlock, std::string &dataType,
-                             std::vector<float> *floatList,
-                             std::vector<int> *intList,
-                             std::vector<double> *doubleList);
-
   LogicalResult readFromAttribute(mlir::ModuleOp modOp, mlir::Operation *&op,
                                   std::vector<int> &intValList,
                                   std::vector<mlir::Operation *> &endOps);
 
-  LogicalResult collectOpsDFS(mlir::Value currentVal, mlir::Operation *endOp,
-                              llvm::DenseSet<mlir::Operation *> &visitedOps,
-                              llvm::DenseSet<mlir::Operation *> &sliceOps);
+  LogicalResult collectOpsDFS(mlir::Value currentVal,
+                              std::vector<mlir::Operation *> endOps,
+                              llvm::DenseSet<mlir::Operation *> &visitedOps);
 
   template <typename T>
   std::pair<mlir::Value, mlir::Value>
   createBranchCond(mlir::OpBuilder &builder, mlir::Location loc,
                    mlir::Value selectRes, T comparisonValue);
+
+  struct PredictionData;
+  LogicalResult parseValuesList(llvm::StringRef valuesStr,
+                                std::vector<int> &intVals,
+                                std::vector<float> &floatVals,
+                                std::string &dataType);
+
+  LogicalResult readPredictMarker(mlir::ModuleOp modOp,
+                                  std::vector<PredictionData> &pragmaData);
 };
 
 } // namespace
-
-LogicalResult PipelineDuplicationPass::readFromJSON(
-    const std::string &jsonPath, std::string &opName, int &basicBlock,
-    std::string &dataType, std::vector<float> *floatList,
-    std::vector<int> *intList, std::vector<double> *doubleList) {
-
-  // Open the .json file
-  std::ifstream inputFile(jsonPath);
-  if (!inputFile.is_open()) {
-    llvm::errs() << "Failed to open unit positions file\n";
-    return failure();
-  }
-  // Read the JSON content from the file and into a string
-  std::string jsonString, line;
-  while (std::getline(inputFile, line))
-    jsonString += line;
-
-  // Try to parse the string as a JSON
-  llvm::Expected<llvm::json::Value> value = llvm::json::parse(jsonString);
-  if (!value) {
-    llvm::errs() << "Failed to parse unit positions in " << jsonPath << '\n';
-    return failure();
-  }
-
-  const llvm::json::Object *rootObj = value->getAsObject();
-  if (!rootObj)
-    return failure();
-
-  // Extract splitoperation -> operation-name
-  if (const llvm::json::Object *splitOpObj =
-          rootObj->getObject("splitoperation")) {
-    if (auto parsedOpName = splitOpObj->getString("operation-name")) {
-      opName = parsedOpName->str();
-    }
-  }
-
-  if (auto parsedDataType = rootObj->getString("dataType")) {
-    dataType = parsedDataType->str();
-  } else
-    return failure();
-
-  if (auto parsedBlock = rootObj->getInteger("basicBlock")) {
-    basicBlock = *parsedBlock;
-  } else
-    return failure();
-
-  const llvm::json::Array *parsedArray = rootObj->getArray("compValList");
-  if (!parsedArray) {
-    llvm::errs() << "Empty compValList not allowed.\n";
-    return failure();
-  }
-
-  if (dataType == "float") {
-    for (const llvm::json::Value &element : *parsedArray) {
-      if (auto num = element.getAsNumber()) {
-        floatList->push_back(static_cast<float>(*num));
-      }
-    }
-  } else if (dataType == "double") {
-    for (const llvm::json::Value &element : *parsedArray) {
-      if (auto num = element.getAsNumber()) {
-        floatList->push_back(*num);
-      }
-    }
-  } else if (dataType == "integer" || dataType == "bool" ||
-             dataType == "boolean" || dataType == "int") {
-    for (const llvm::json::Value &element : *parsedArray) {
-      if (auto num = element.getAsInteger()) {
-        intList->push_back(static_cast<int>(*num));
-      } else if (auto boolean = element.getAsBoolean()) {
-        intList->push_back(*boolean ? 1 : 0);
-      }
-    }
-    dataType = "int";
-  } else {
-    llvm::errs()
-        << "Mismatch between JSON dataType and provided C++ vectors.\n";
-    return failure();
-  }
-
-  return success();
-}
 
 LogicalResult PipelineDuplicationPass::readFromAttribute(
     mlir::ModuleOp modOp, mlir::Operation *&op, std::vector<int> &intValList,
@@ -192,55 +113,43 @@ LogicalResult PipelineDuplicationPass::readFromAttribute(
   return success();
 }
 
-// TODO: add error if operations across different blocks are needed
 LogicalResult PipelineDuplicationPass::collectOpsDFS(
-    mlir::Value currentVal, mlir::Operation *endOp,
-    llvm::DenseSet<mlir::Operation *> &visitedOps,
-    llvm::DenseSet<mlir::Operation *> &sliceOps) {
+    mlir::Value currentVal, std::vector<mlir::Operation *> endOps,
+    llvm::DenseSet<mlir::Operation *> &visitedOps) {
 
-  llvm::errs() << "Visiting Value: " << currentVal << "\n";
-  if (mlir::Operation *definingOp = currentVal.getDefiningOp()) {
-    llvm::errs() << "  Defined by Op: " << *definingOp << "\n";
+  // if a value has no uses, it's a dead end branch and neither a store nor an
+  // endop
+  if (currentVal.use_empty()) {
+    return failure();
   }
-  llvm::errs() << "  Looking for EndOp: " << *endOp << "\n";
-
-  bool foundPath = false;
 
   for (mlir::OpOperand &use : currentVal.getUses()) {
     mlir::Operation *user = use.getOwner();
 
-    // endOp is found
-    if (user == endOp) {
-      sliceOps.insert(user);
-      foundPath = true;
-      continue; // Check other uses of currentVal just in case TODO: really
-                // necessary?
-    }
-
-    // check if already visited
+    // check if already visited and mark
     if (visitedOps.count(user)) {
-      if (sliceOps.count(user)) {
-        foundPath = true;
-      }
+      continue;
+    }
+    visitedOps.insert(user);
+
+    // endOp is found
+    if (llvm::is_contained(endOps, user) || isa<mlir::memref::StoreOp>(user)) {
       continue;
     }
 
-    // mark as visited
-    visitedOps.insert(user);
+    // if the operation has no results (but this is handled above already?)
+    if (user->getNumResults() == 0) {
+      return failure();
+    }
 
     // recursive step
-    bool userLeadsToTarget = false;
     for (mlir::Value result : user->getResults()) {
-      if (succeeded(collectOpsDFS(result, endOp, visitedOps, sliceOps))) {
-        userLeadsToTarget = true;
+      if (failed(collectOpsDFS(result, endOps, visitedOps))) {
+        return failure();
       }
     }
-    if (userLeadsToTarget) {
-      sliceOps.insert(user);
-      foundPath = true;
-    }
   }
-  return foundPath ? success() : failure();
+  return success();
 }
 
 template <typename T>
@@ -265,12 +174,156 @@ std::pair<mlir::Value, mlir::Value> PipelineDuplicationPass::createBranchCond(
     // int or bool
     constantComp = builder.create<mlir::arith::ConstantOp>(
         loc, builder.getIntegerAttr(builder.getI32Type(), comparisonValue));
+    llvm::errs() << "building of constantComp succeeded: " << constantComp
+                 << '\n';
 
     branchCond = builder.create<mlir::arith::CmpIOp>(
         loc, mlir::arith::CmpIPredicate::eq, selectRes, constantComp);
+    llvm::errs() << "building of branchCond succeeded: " << branchCond << '\n';
+  } else {
+    llvm::errs() << "this should not happen!\n";
   }
 
   return {branchCond, constantComp};
+}
+
+struct PipelineDuplicationPass::PredictionData {
+  mlir::Operation *startOp;
+  mlir::Value predInput;
+  std::vector<mlir::Operation *> endOps;
+  std::vector<float> floatValList;
+  std::vector<int> intValList;
+  std::string dataType;
+};
+
+// TODO: add strings and maybe more types
+LogicalResult PipelineDuplicationPass::parseValuesList(
+    llvm::StringRef valuesStr, std::vector<int> &intVals,
+    std::vector<float> &floatVals, std::string &dataType) {
+
+  std::string s = valuesStr.str();
+
+  if (!s.empty() && s.front() == '[')
+    s.erase(0, 1);
+  if (!s.empty() && s.back() == ']')
+    s.pop_back();
+  if (s.empty())
+    return failure();
+
+  if (s.find('.') != std::string::npos) {
+    dataType = "float";
+    double doubleVal;
+    if (llvm::StringRef(s).getAsDouble(doubleVal)) {
+      return failure();
+    }
+    floatVals.push_back(static_cast<float>(doubleVal));
+    return success();
+
+  } else {
+    dataType = "int";
+    int intVal;
+    if (llvm::StringRef(s).getAsInteger(10, intVal)) {
+      return failure();
+    }
+    intVals.push_back(intVal);
+    return success();
+  }
+}
+
+LogicalResult PipelineDuplicationPass::readPredictMarker(
+    mlir::ModuleOp modOp, std::vector<PredictionData> &pragmaData) {
+
+  std::map<int, PredictionData> markerMap;
+  std::vector<mlir::Operation *> markersToErase;
+
+  auto funcOps = modOp.getOps<mlir::func::FuncOp>();
+  mlir::func::FuncOp funcOp = *funcOps.begin();
+
+  for (mlir::Operation &opRef : funcOp.getOps()) {
+    mlir::Operation *op = &opRef;
+    if (op->getName().getStringRef() != "dynamatic.prediction_marker")
+      continue;
+    llvm::errs() << "found a prediction marker\n";
+    // extract the dictionary attribute 'dynamatic.predict'
+    auto predictAttr =
+        op->getAttrOfType<mlir::DictionaryAttr>("dynamatic.predict");
+    if (!predictAttr) {
+      llvm::errs() << "no dynamatic.predict attribute!\n";
+      return failure();
+    }
+
+    auto locationAttr = predictAttr.getAs<mlir::StringAttr>("location");
+    auto markerAttr = predictAttr.getAs<mlir::IntegerAttr>("marker");
+    auto valuesAttr = predictAttr.getAs<mlir::StringAttr>("values");
+
+    int markerId = markerAttr.getInt();
+    llvm::StringRef location = locationAttr.getValue();
+
+    // initialize the struct for this marker ID if it doesn't yet exist
+    if (markerMap.find(markerId) == markerMap.end()) {
+      PredictionData newData;
+      newData.startOp = nullptr;
+      if (valuesAttr) {
+        if (failed(parseValuesList(valuesAttr.getValue(), newData.intValList,
+                                   newData.floatValList, newData.dataType))) {
+          llvm::errs() << "Failed to parse value attributes for marker ID "
+                       << markerId << '\n';
+          return failure();
+        }
+      } else
+        return failure();
+      markerMap[markerId] = newData;
+    }
+    mlir::Value markerInput = op->getOperand(0);
+    mlir::Value markerResult = op->getResult(0);
+    if (location == "start") {
+      mlir::Operation *nextNode = op->getNextNode();
+      bool isUser = false;
+      for (mlir::Value operand : nextNode->getOperands()) {
+        if (operand == markerResult) {
+          isUser = true;
+          break;
+        }
+      }
+      if (isUser) {
+        markerMap[markerId].startOp = nextNode;
+      } else {
+        llvm::errs() << "Warning: Next node does not use the marker\n";
+        markerMap[markerId].startOp = *op->getResult(0).user_begin();
+      }
+      markerMap[markerId].predInput = markerInput;
+
+    } else if (location == "end") {
+      // The endOp is the operation defining the marker's operand (arith.addi ->
+      // %11)
+      mlir::Operation *definingOp = markerInput.getDefiningOp();
+      markerMap[markerId].endOps.push_back(definingOp);
+    }
+
+    markersToErase.push_back(op);
+  }
+
+  for (auto op : markersToErase) {
+    op->getResult(0).replaceAllUsesWith(op->getOperand(0));
+    op->erase();
+  }
+
+  for (auto &pair : markerMap) {
+    PredictionData &data = pair.second;
+    if (data.endOps.empty()) {
+      llvm::errs() << "Marker ID " << pair.first
+                   << "does not have any endoperations\n";
+      return failure();
+    }
+
+    if (!data.startOp) {
+      llvm::errs() << "Marker ID " << pair.first
+                   << "does not have a valid start operation\n";
+      return failure();
+    }
+    pragmaData.push_back(std::move(pair.second));
+  }
+  return success();
 }
 
 void PipelineDuplicationPass::runDynamaticPass() {
@@ -279,67 +332,95 @@ void PipelineDuplicationPass::runDynamaticPass() {
   OpBuilder builder(ctx);
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
-  // find operation
-  // TODO: what is still missing?
-  std::vector<float> floatValList;
-  std::vector<int> intValList;
-  std::vector<double> doubleValList;
-  mlir::Operation *op = nullptr;
-  std::vector<mlir::Operation *> endOps;
-  std::string opName;
-  std::string dataType = "int";
-  if (failed(PipelineDuplicationPass::readFromAttribute(modOp, op, intValList,
-                                                        endOps)))
+  // read input data given in the form of pragmas
+  std::vector<PredictionData> pragmaData;
+  llvm::errs() << "start reading predict marker data \n";
+  if (failed(readPredictMarker(modOp, pragmaData)))
     return signalPassFailure();
+  llvm::errs() << "done reading predict marker data \n";
 
-  mlir::Block *currentBlock = op->getBlock();
-  mlir::func::FuncOp funcOp =
-      cast<mlir::func::FuncOp>(currentBlock->getParentOp());
-  Location loc = funcOp.getLoc();
-  Value selectRes = op->getResult(0);
+  // print pragmadata
+  for (auto &data : pragmaData) {
+    llvm::errs() << "Data Type : " << data.dataType << "\n";
 
-  // Find the first user of selectRes inside the target execution block
-  mlir::Operation *firstUserInBlock = nullptr;
-  for (mlir::OpOperand &use : selectRes.getUses()) {
-    mlir::Operation *user = use.getOwner();
-    // We want the user inside the block containing our endOp
-    if (user->getBlock() == endOps[0]->getBlock()) {
-      firstUserInBlock = user;
-      break;
+    // Print values list based on data type
+    llvm::errs() << "Values    : [";
+    if (data.dataType == "float") {
+      for (size_t i = 0; i < data.floatValList.size(); ++i) {
+        llvm::errs() << data.floatValList[i]
+                     << (i + 1 < data.floatValList.size() ? ", " : "");
+      }
+    } else {
+      for (size_t i = 0; i < data.intValList.size(); ++i) {
+        llvm::errs() << data.intValList[i]
+                     << (i + 1 < data.intValList.size() ? ", " : "");
+      }
     }
+    llvm::errs() << "]\n";
+
+    // Print the start operation
+    llvm::errs() << "Start Op  : ";
+    if (data.startOp) {
+      data.startOp->print(llvm::errs());
+    }
+    llvm::errs() << "\n";
+
+    llvm::errs() << "predInput : ";
+    if (data.predInput) {
+      data.predInput.print(llvm::errs());
+    }
+    llvm::errs() << '\n';
+
+    // Print the end operations
+    llvm::errs() << "End Ops   : ";
+    if (data.endOps.empty()) {
+      llvm::errs() << "None\n";
+    } else {
+      llvm::errs() << "\n";
+      for (mlir::Operation *op : data.endOps) {
+        llvm::errs() << "  -> ";
+        if (op)
+          op->print(llvm::errs());
+        else
+          llvm::errs() << "nullptr";
+        llvm::errs() << "\n";
+      }
+    }
+    llvm::errs() << "------------------------------------\n";
   }
 
-  if (!firstUserInBlock) {
-    llvm::errs() << "Error: Could not find a user of selectRes inside the "
-                    "target block.\n";
-    return signalPassFailure();
-  }
+  mlir::Operation *startOp = pragmaData[0].startOp;
+  mlir::Value predictInput = pragmaData[0].predInput;
+  mlir::Block *targetBlock = startOp->getBlock();
 
-  // Target the block where computation actually happens
-  mlir::Block *targetBlock = firstUserInBlock->getBlock();
+  mlir::func::FuncOp funcOp =
+      cast<mlir::func::FuncOp>(targetBlock->getParentOp());
+  Location loc = funcOp.getLoc();
+
   // restructure the blocks
-  builder.setInsertionPointAfter(firstUserInBlock);
-  mlir::Block *exitBlock = targetBlock->splitBlock(builder.getInsertionPoint());
+  // builder.setInsertionPointAfter(startOp);
+  mlir::Block *exitBlock = targetBlock->splitBlock(startOp);
   mlir::Block *falseBlock = funcOp.addBlock();
 
-  // DFS starting from selectRes to find all ops that have to be duplicated
+  // DFS starting from predictInput to find all ops that have to be duplicated
   llvm::DenseSet<mlir::Operation *> visitedOps;
-  llvm::DenseSet<mlir::Operation *> unorganizedOps;
-  if (failed(collectOpsDFS(selectRes, endOps[0], visitedOps, unorganizedOps))) {
-    llvm::errs() << "Could not find a path from start to end operation.\n";
+  visitedOps.insert(startOp);
+  if (startOp->getResult(0) == 0 ||
+      failed(collectOpsDFS(startOp->getResult(0), pragmaData[0].endOps,
+                           visitedOps))) {
+    llvm::errs() << "Could not find a valid graph to duplicate. Are all the "
+                    "endops placed correctly?\n";
     return signalPassFailure();
   }
 
-  for (auto operation : unorganizedOps) {
-    llvm::errs() << operation << " unorganizedops\n";
-  }
+  llvm::errs() << "dfs succeeded\n";
 
   // iterate through the exitBlock to sort
   llvm::SmallVector<mlir::Operation *> opsToMove;
-  for (mlir::Operation &blockOp : exitBlock->getOperations()) {
-    if (unorganizedOps.count(&blockOp)) {
+  for (mlir::Operation &blockOp : funcOp.getOps()) {
+    if (visitedOps.count(&blockOp)) {
       opsToMove.push_back(&blockOp);
-      llvm::errs() << "PUSHED BACK!!!!\n";
+      blockOp.dump();
     }
   }
 
@@ -367,25 +448,28 @@ void PipelineDuplicationPass::runDynamaticPass() {
   }
 
   // PREDICTED PATHS
-  int size =
-      std::max({floatValList.size(), intValList.size(), doubleValList.size()});
+  int size = std::max(pragmaData[0].floatValList.size(),
+                      pragmaData[0].intValList.size());
   for (int i = 0; i < size; i++) {
     // create branch condition
     builder.setInsertionPointToEnd(targetBlock);
+    llvm::errs() << "start for loop \n";
     // assume only the first result is relevant
     Value branchCond, constantComp;
-    if (dataType == "float" || dataType == "double") {
-      std::tie(branchCond, constantComp) =
-          createBranchCond(builder, loc, selectRes, floatValList[i]);
-    } else if (dataType == "int") {
-      llvm::errs() << intValList[i] << ", " << selectRes << '\n';
-      std::tie(branchCond, constantComp) =
-          createBranchCond(builder, loc, selectRes, intValList[i]);
+    if (pragmaData[0].dataType == "float" ||
+        pragmaData[0].dataType == "double") {
+      std::tie(branchCond, constantComp) = createBranchCond(
+          builder, loc, predictInput, pragmaData[0].floatValList[i]);
+    } else if (pragmaData[0].dataType == "int") {
+      llvm::errs() << pragmaData[0].intValList[i] << ", " << predictInput
+                   << '\n';
+      std::tie(branchCond, constantComp) = createBranchCond(
+          builder, loc, predictInput, pragmaData[0].intValList[i]);
       llvm::errs() << "branchCond: " << branchCond
                    << "\nconstantComp: " << constantComp << '\n';
     } else {
-      llvm::errs() << "Error: Unknown or unsupported data type: " << dataType
-                   << "\n";
+      llvm::errs() << "Error: Unknown or unsupported data type: "
+                   << pragmaData[0].dataType << "\n";
       return signalPassFailure();
     }
     mlir::Block *trueBlock = funcOp.addBlock(); // true path
@@ -408,7 +492,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
     // clone the necessary operations to here
     builder.setInsertionPointToStart(trueBlock);
     mlir::IRMapping mapper;
-    mapper.map(selectRes, constantComp);
+    mapper.map(predictInput, constantComp);
 
     // do the actual cloning
     for (mlir::Operation *origOp : opsToMove) {
