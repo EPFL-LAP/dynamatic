@@ -256,6 +256,7 @@ private:
 };
 
 struct PredictPragmaInfo {
+  uint64_t Marker;
   std::string Variable;
   std::string Values;   // "[7, 3, 1]"
   std::string Location; // start or end
@@ -290,7 +291,8 @@ private:
     PredPragmaInfo.PragmaLoc = FirstToken.getLocation();
 
     // booleans to track which info we have received
-    bool sawVariable = false, sawValues = false, sawLocation = false;
+    bool sawVariable = false, sawValues = false, sawLocation = false,
+         sawMarker = false;
 
     // store output of lexer
     Token Tok;
@@ -389,6 +391,15 @@ private:
 
         // lex the initial token for the next iteration
         PP.Lex(Tok);
+      } else if (Name == "marker") {
+        PP.Lex(Tok);
+        if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, PredPragmaInfo.Marker)) {
+          error(PP, Tok, "expected integer literal after marker=");
+          return failure();
+        }
+        sawMarker = true;
+
       } else {
         // otherwise we have gotten an unknown named option
         error(PP, Tok, "unknown option in #pragma DYN predict");
@@ -398,10 +409,11 @@ private:
 
     // Enforce that we got every option needed
     bool valuesRequired = (PredPragmaInfo.Location != "end");
-    if (!sawVariable || (valuesRequired && !sawValues) || !sawLocation) {
+    if (!sawVariable || (valuesRequired && !sawValues) || !sawLocation ||
+        !sawMarker) {
       error(PP, FirstToken,
             "#pragma DYN predict requires variable=, "
-            "values= (unless location=end), location=");
+            "values= (unless location=end), location=, marker=");
       return failure();
     }
     return success();
@@ -414,37 +426,43 @@ private:
     // Define a function
     // for each type of variable we could predict on
     // so that no casts are added before or after the speculator
-    std::string FuncDecls =
-        "extern _Bool  __dyn_predict_b(_Bool,  const char*, const char*) "
-        "__attribute__((noinline, noduplicate));\n"
-        "extern char   __dyn_predict_c(char,   const char*, const char*) "
-        "__attribute__((noinline, noduplicate));\n"
-        "extern short  __dyn_predict_s(short,  const char*, const char*) "
-        "__attribute__((noinline, noduplicate));\n"
-        "extern int    __dyn_predict_i(int,    const char*, const char*) "
-        "__attribute__((noinline, noduplicate));\n"
-        "extern long   __dyn_predict_l(long,   const char*, const char*) "
-        "__attribute__((noinline, noduplicate));\n"
-        "extern float  __dyn_predict_f(float,  const char*, const char*) "
-        "__attribute__((noinline, noduplicate));\n"
-        "extern double __dyn_predict_d(double, const char*, const char*) "
-        "__attribute__((noinline, noduplicate));\n";
+    std::string FuncDecls = "extern _Bool  __dyn_predict_b(_Bool,  const "
+                            "char*, const char*, unsigned int) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern char   __dyn_predict_c(char,   const "
+                            "char*, const char*, unsigned int) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern short  __dyn_predict_s(short,  const "
+                            "char*, const char*, unsigned int) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern int    __dyn_predict_i(int,    const "
+                            "char*, const char*, unsigned int) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern long   __dyn_predict_l(long,   const "
+                            "char*, const char*, unsigned int) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern float  __dyn_predict_f(float,  const "
+                            "char*, const char*, unsigned int) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern double __dyn_predict_d(double, const "
+                            "char*, const char*, unsigned int) "
+                            "__attribute__((noinline, noduplicate));\n";
 
     // use a generic macro
     std::string GenericMacro =
-        "#define __dyn_predict(x, n, s) _Generic((x), \\\n"
+        "#define __dyn_predict(x, n, s, m) _Generic((x), \\\n"
         "  _Bool:  __dyn_predict_b, \\\n"
         "  char:   __dyn_predict_c, \\\n"
         "  short:  __dyn_predict_s, \\\n"
         "  int:    __dyn_predict_i, \\\n"
         "  long:   __dyn_predict_l, \\\n"
         "  float:  __dyn_predict_f, \\\n"
-        "  double: __dyn_predict_d)((x), (n), (s))\n";
+        "  double: __dyn_predict_d)((x), (n), (s), (m))\n";
 
     std::string Call =
-        llvm::formatv("{0} = __dyn_predict({0}, \"{1}\", \"{2}\");\n",
+        llvm::formatv("{0} = __dyn_predict({0}, \"{1}\", \"{2}\", {3});\n",
                       PredPragmaInfo.Variable, PredPragmaInfo.Values,
-                      PredPragmaInfo.Location);
+                      PredPragmaInfo.Location, PredPragmaInfo.Marker);
 
     // LLVM reads files into memory buffers before processing them
     auto MB = llvm::MemoryBuffer::getMemBufferCopy(

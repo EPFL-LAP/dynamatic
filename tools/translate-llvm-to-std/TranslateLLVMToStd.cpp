@@ -1137,12 +1137,20 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
     llvm::report_fatal_error(
         "__dyn_predict: location arg is not a constant C string");
 
+  // try to get the marker value
+  auto markerValueConst =
+      llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(3));
+  if (!markerValueConst)
+    llvm::report_fatal_error("__dyn_predict: marker arg is not a ConstantInt");
+  uint64_t markerValue = markerValueConst->getValue().getLimitedValue();
+
   // get the value we want to predict
   llvm::Value *predVar = callInst->getArgOperand(0);
 
   // Warn if the value has other users besides this call.
   // LLVM does some weird duplication stuff sometimes
   // to do more aggressive folding
+  // TODO: now it might really be unnecessary
   if (predVar->getNumUses() > 1)
     llvm::errs() << "Warning: __dyn_predict input has " << predVar->getNumUses()
                  << " users; consumers other than the pred call will bypass "
@@ -1157,13 +1165,14 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
 
   // Build the actual attribute
   mlir::DictionaryAttr predAttr = mlir::DictionaryAttr::get(
-      ctx, {builder.getNamedAttr("values", builder.getStringAttr(valuesStr)),
-            builder.getNamedAttr("location", builder.getStringAttr(location))});
+      ctx,
+      {builder.getNamedAttr("values", builder.getStringAttr(valuesStr)),
+       builder.getNamedAttr("location", builder.getStringAttr(location)),
+       builder.getNamedAttr("marker", builder.getI32IntegerAttr(markerValue))});
 
   // build the operationstate that is used for the unregistered op
   mlir::OperationState markerState(
-      v.getLoc(),
-      mlir::OperationName("dynamatic.producer_output_attr_marker", ctx));
+      v.getLoc(), mlir::OperationName("dynamatic.prediction_marker", ctx));
 
   markerState.addOperands(v);
   markerState.addTypes(v.getType());
