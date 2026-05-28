@@ -224,7 +224,9 @@ static bool isOperandInCycle(Value val, Value res,
     return true;
 
   // Backtrack through operations that end up "forwarding" one of their
-  // inputs to the output
+  // inputs to the output.
+  // Notably, extension operations are not data-forwarding as they modify the
+  // data.
   if (isa<handshake::BufferOp, handshake::ForkOp, handshake::LazyForkOp,
           handshake::BranchOp>(defOp))
     return isOperandInCycle(defOp->getOperand(0), res, mergedValues,
