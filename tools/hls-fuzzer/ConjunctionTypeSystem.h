@@ -270,11 +270,36 @@ public:
     });
   }
 
+  bool discardStructuredForStatement(const Context &context) {
+    return combineDiscard(
+        [&](auto &&typeSystem, auto &&context) {
+          return typeSystem.discardStructuredForStatement(context);
+        },
+        context);
+  }
+
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override {
+    return combineGetTransferFns<ast::StructuredForStatement>(
+        [&](auto &&typeSystem) {
+          return typeSystem.getStructuredForStatementTransferFns();
+        });
+  }
+
   ProbabilityTable<AbstractTypeSystem::ExpressionKey>
   getExpressionProbabilityTable(const Context &context) {
     return combineExpressionProbabilityTable(
         [](auto &&typeSystem, auto &&context) {
           return typeSystem.getExpressionProbabilityTable(context);
+        },
+        context);
+  }
+
+  ProbabilityTable<AbstractTypeSystem::StatementKey>
+  getStatementProbabilityTable(const Context &context) {
+    return combineExpressionProbabilityTable(
+        [](auto &&typeSystem, auto &&context) {
+          return typeSystem.getStatementProbabilityTable(context);
         },
         context);
   }

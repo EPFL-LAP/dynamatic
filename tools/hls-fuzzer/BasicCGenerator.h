@@ -100,13 +100,13 @@ private:
   generateStatementList(const OpaqueContext &context);
 
   std::optional<std::pair<ast::Statement, OpaqueContext>>
-  generateStatement(const OpaqueContext &context, size_t depth);
+  generateStatement(const OpaqueContext &context);
 
   std::optional<std::pair<ast::ArrayAssignmentStatement, OpaqueContext>>
   generateArrayAssignmentStatement(const OpaqueContext &context);
 
   std::optional<std::pair<ast::StructuredForStatement, OpaqueContext>>
-  generateStructuredForStatement(const OpaqueContext &context, size_t depth);
+  generateStructuredForStatement(const OpaqueContext &context);
 
   Randomly &random;
   std::optional<ast::ReturnType> maybeReturnType;
@@ -137,6 +137,9 @@ private:
   std::vector<
       ConstructorKeyPair<ast::Expression, AbstractTypeSystem::ExpressionKey>>
       expressionGenerators;
+  std::vector<
+      ConstructorKeyPair<ast::Statement, AbstractTypeSystem::StatementKey>>
+      statementGenerators;
 
   void initGenerators();
 

@@ -473,7 +473,7 @@ gen::BasicCGenerator::generateStatementList(const OpaqueContext &context) {
              },
              /*statement=*/
              [&](const OpaqueContext &context) {
-               return generateStatement(context, depth);
+               return generateStatement(context);
              },
              /*constructor=*/
              [&](ast::StatementList &&statements, ast::Statement &&statement) {
@@ -485,31 +485,16 @@ gen::BasicCGenerator::generateStatementList(const OpaqueContext &context) {
 }
 
 std::optional<std::pair<ast::Statement, gen::OpaqueContext>>
-gen::BasicCGenerator::generateStatement(const OpaqueContext &context,
-                                        size_t depth) {
-  using Constructor =
-      std::function<std::optional<std::pair<ast::Statement, OpaqueContext>>(
-          const OpaqueContext &)>;
-  using ConstructorKeyPair =
-      std::pair<Constructor, AbstractTypeSystem::StatementKey>;
-
-  llvm::SmallVector<ConstructorKeyPair> generators;
-  generators.emplace_back(
-      [this](const OpaqueContext &context) {
-        return generateArrayAssignmentStatement(context);
-      },
-      ast::ArrayAssignmentStatement::Tag{});
-  generators.emplace_back(
-      [&](const OpaqueContext &context) {
-        return generateStructuredForStatement(context, depth);
-      },
-      ast::StructuredForStatement::Tag{});
-
-  llvm::SmallVector<Constructor> constructors = random.shuffle(
-      generators, typeSystem.getStatementProbabilityTableOpaque(context),
-      &ConstructorKeyPair::second, &ConstructorKeyPair::first);
+gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
+  llvm::SmallVector<Constructor<ast::Statement>> constructors = random.shuffle(
+      statementGenerators,
+      typeSystem.getStatementProbabilityTableOpaque(context),
+      &ConstructorKeyPair<ast::Statement,
+                          AbstractTypeSystem::StatementKey>::second,
+      &ConstructorKeyPair<ast::Statement,
+                          AbstractTypeSystem::StatementKey>::first);
   for (auto &iter : constructors)
-    if (auto result = iter(context))
+    if (auto result = iter(this, context))
       return result;
 
   return std::nullopt;
@@ -553,26 +538,20 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
 
 std::optional<std::pair<ast::StructuredForStatement, gen::OpaqueContext>>
 gen::BasicCGenerator::generateStructuredForStatement(
-    const OpaqueContext &context, size_t depth) {
+    const OpaqueContext &context) {
   if (typeSystem.discardStructuredForStatementOpaque(context))
     return std::nullopt;
 
   std::string varName = generateFreshVarName();
   return generateWithDependencies<ast::StructuredForStatement>(
       context, typeSystem.getStructuredForStatementTransferFns(),
-      [&](const OpaqueContext &context) {
-        return generateExpression(context, 0);
-      },
-      [&](const OpaqueContext &context) {
-        return generateExpression(context, 0);
-      },
-      [&](const OpaqueContext &context) {
-        return generateExpression(context, 0);
-      },
+      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](const OpaqueContext &context) { return generateExpression(context); },
       [&](const OpaqueContext &context) {
         auto scopeExit = pushNewScope();
         addVariable(ast::PrimitiveType::UInt32, varName);
-        return generateStatementList(context, depth + 1);
+        return generateStatementList(context);
       },
       [&](ast::Expression &&start, ast::Expression &&end,
           ast::Expression &&step, ast::StatementList &&statements) {
@@ -612,6 +591,13 @@ void gen::BasicCGenerator::initGenerators() {
   expressionGenerators.emplace_back(
       &BasicCGenerator::generateConditionalExpression,
       ast::ConditionalExpression::Tag{});
+
+  statementGenerators.emplace_back(
+      &BasicCGenerator::generateArrayAssignmentStatement,
+      ast::ArrayAssignmentStatement::Tag{});
+  statementGenerators.emplace_back(
+      &BasicCGenerator::generateStructuredForStatement,
+      ast::StructuredForStatement::Tag{});
 }
 
 void gen::BasicCGenerator::generate(llvm::raw_ostream &os,

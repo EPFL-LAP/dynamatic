@@ -105,10 +105,28 @@ public:
   TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionTransferFns() override {
     return {
-        copyFromInput<ast::ArrayReadExpression>(),
+        /*array parameter=*/copyFromInput<ast::ArrayReadExpression>(),
+        /*index=*/
         incrementDepth<ast::ArrayReadExpression,
                        &LimitTypingContext::expressionDepth>(),
-        copyInputToOutput<ast::ArrayReadExpression>(),
+        /*output=*/copyInputToOutput<ast::ArrayReadExpression>(),
+    };
+  }
+
+  TransferFnArray<ast::ArrayAssignmentStatement>
+  getArrayAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ArrayAssignmentStatement>{
+        /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*output=*/
+        OutputTransferFn<ast::ArrayAssignmentStatement>(
+            std::index_sequence<INPUT_DEPENDENCY>{},
+            [](const ast::ArrayAssignmentStatement &,
+               LimitTypingContext context) {
+              context.totalNumberOfStatements++;
+              return context;
+            }),
     };
   }
 
@@ -124,11 +142,25 @@ public:
     //       their respective statement number is propagated to the other.
     //       This is a missing feature!
     return {
-        incrementDepth<ast::StatementList,
-                       &LimitTypingContext::totalNumberOfStatements,
-                       ast::StatementList::STATEMENT>(),
+        copyFrom<ast::StatementList, ast::StatementList::STATEMENT>(),
         copyFromInput<ast::StatementList>(),
-        copyInputToOutput<ast::StatementList>(),
+        /*output=*/
+        copyToOutput<ast::StatementList, ast::StatementList::STATEMENT_LIST>(),
+    };
+  }
+
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override {
+    return {
+        /*start=*/copyFromInput<ast::StructuredForStatement>(),
+        /*end=*/copyFromInput<ast::StructuredForStatement>(),
+        /*step=*/copyFromInput<ast::StructuredForStatement>(),
+        /*statements=*/
+        incrementDepth<ast::StructuredForStatement,
+                       &LimitTypingContext::totalNumberOfStatements>(),
+        /*output=*/
+        copyToOutput<ast::StructuredForStatement,
+                     ast::StructuredForStatement::BODY>(),
     };
   }
 
