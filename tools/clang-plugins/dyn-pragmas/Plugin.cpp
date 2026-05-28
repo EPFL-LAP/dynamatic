@@ -350,6 +350,11 @@ private:
         while (true) {
           PP.Lex(Tok);
 
+          if (Tok.is(tok::minus)) {
+            PredPragmaInfo.Values += "-";
+            PP.Lex(Tok);
+          }
+
           if (Tok.isNot(tok::numeric_constant)) {
             error(PP, Tok, "expected numeric literal inside values list");
             return failure();
@@ -367,6 +372,7 @@ private:
             error(PP, Tok, "expected ',' or ']' in values list");
             return failure();
           }
+          PredPragmaInfo.Values += ",";
         }
 
         sawValues = !PredPragmaInfo.Values.empty();

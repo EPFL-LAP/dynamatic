@@ -42,10 +42,6 @@ struct PipelineDuplicationPass
   void runDynamaticPass() override;
 
 private:
-  LogicalResult readFromAttribute(mlir::ModuleOp modOp, mlir::Operation *&op,
-                                  std::vector<int> &intValList,
-                                  std::vector<mlir::Operation *> &endOps);
-
   LogicalResult collectOpsDFS(mlir::Value currentVal,
                               std::vector<mlir::Operation *> endOps,
                               llvm::DenseSet<mlir::Operation *> &visitedOps);
@@ -67,52 +63,6 @@ private:
 
 } // namespace
 
-LogicalResult PipelineDuplicationPass::readFromAttribute(
-    mlir::ModuleOp modOp, mlir::Operation *&op, std::vector<int> &intValList,
-    std::vector<mlir::Operation *> &endOps) {
-  int startCount = 0;
-
-  // walk through all operations inside the module
-  // iterate over the operations inside the function TODO:
-  modOp.walk([&](mlir::Operation *currOp) {
-    if (auto predictAttr =
-            currOp->getAttrOfType<mlir::DictionaryAttr>("dynamatic.predict")) {
-      auto locationAttr =
-          predictAttr.get("location").dyn_cast_or_null<mlir::StringAttr>();
-      if (!locationAttr)
-        return;
-
-      llvm::StringRef location = locationAttr.getValue();
-      if (location == "start") {
-        startCount++;
-        op = currOp;
-
-        // Extract the array of integers
-        if (auto valuesAttr =
-                predictAttr.get("values")
-                    .dyn_cast_or_null<mlir::DenseI64ArrayAttr>()) {
-          for (int64_t val : valuesAttr.asArrayRef()) {
-            intValList.push_back(static_cast<int>(val));
-          }
-        }
-      } else if (location == "end") {
-        endOps.push_back(currOp);
-      }
-    }
-  });
-
-  // verification
-  if (startCount != 1) {
-    llvm::errs() << "Expected only one predict pragma with \"start\"\n";
-    return failure();
-  }
-  if (endOps.empty()) {
-    llvm::errs() << "An \"end\" predict pragma is necessary \n";
-    return failure();
-  }
-  return success();
-}
-
 LogicalResult PipelineDuplicationPass::collectOpsDFS(
     mlir::Value currentVal, std::vector<mlir::Operation *> endOps,
     llvm::DenseSet<mlir::Operation *> &visitedOps) {
@@ -130,10 +80,15 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
     if (visitedOps.count(user)) {
       continue;
     }
+
+    // when a store op is hit do not add it to visitedops
+    if (isa<mlir::memref::StoreOp>(user))
+      continue;
+
     visitedOps.insert(user);
 
     // endOp is found
-    if (llvm::is_contained(endOps, user) || isa<mlir::memref::StoreOp>(user)) {
+    if (llvm::is_contained(endOps, user)) {
       continue;
     }
 
@@ -202,30 +157,48 @@ LogicalResult PipelineDuplicationPass::parseValuesList(
     std::vector<float> &floatVals, std::string &dataType) {
 
   std::string s = valuesStr.str();
+  llvm::errs() << "string containing values list: " << s << '\n';
 
-  if (!s.empty() && s.front() == '[')
-    s.erase(0, 1);
-  if (!s.empty() && s.back() == ']')
-    s.pop_back();
-  if (s.empty())
+  llvm::StringRef ref(s);
+  if (ref.startswith("["))
+    ref = ref.drop_front(1);
+  if (ref.endswith("]"))
+    ref = ref.drop_back(1);
+
+  if (ref.empty())
     return failure();
 
-  if (s.find('.') != std::string::npos) {
+  // split the string by commas to parse each individual number
+  llvm::SmallVector<llvm::StringRef> tokens;
+  ref.split(tokens, ',', -1, false);
+
+  if (ref.contains('.')) {
     dataType = "float";
-    double doubleVal;
-    if (llvm::StringRef(s).getAsDouble(doubleVal)) {
-      return failure();
+    llvm::errs() << "datatype float recognized\n";
+
+    for (auto token : tokens) {
+      token = token.trim();
+      double doubleVal;
+      if (token.getAsDouble(doubleVal)) {
+        return failure();
+      }
+      floatVals.push_back(static_cast<float>(doubleVal));
     }
-    floatVals.push_back(static_cast<float>(doubleVal));
     return success();
 
   } else {
     dataType = "int";
-    int intVal;
-    if (llvm::StringRef(s).getAsInteger(10, intVal)) {
-      return failure();
+    llvm::errs() << "datatype int recognized\n";
+
+    for (auto token : tokens) {
+      int intVal;
+      if (token.getAsInteger(10, intVal)) {
+        // TODO: bools
+        return failure();
+      }
+      intVals.push_back(intVal);
     }
-    intVals.push_back(intVal);
+
     return success();
   }
 }
@@ -234,7 +207,7 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
     mlir::ModuleOp modOp, std::vector<PredictionData> &pragmaData) {
 
   std::map<int, PredictionData> markerMap;
-  std::vector<mlir::Operation *> markersToErase;
+  std::vector<mlir::Operation *> markers;
 
   auto funcOps = modOp.getOps<mlir::func::FuncOp>();
   mlir::func::FuncOp funcOp = *funcOps.begin();
@@ -243,7 +216,22 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
     mlir::Operation *op = &opRef;
     if (op->getName().getStringRef() != "dynamatic.prediction_marker")
       continue;
-    llvm::errs() << "found a prediction marker\n";
+
+    if (op->getNumOperands() != 1) {
+      llvm::errs() << "prediction marker must have exactly one operand";
+      return failure();
+    }
+    if (op->getNumResults() != 1) {
+      llvm::errs() << "prediction marker must have exactly one result";
+      return failure();
+    }
+
+    op->getResult(0).replaceAllUsesWith(op->getOperand(0));
+    markers.push_back(op);
+  }
+
+  for (auto op : markers) {
+
     // extract the dictionary attribute 'dynamatic.predict'
     auto predictAttr =
         op->getAttrOfType<mlir::DictionaryAttr>("dynamatic.predict");
@@ -274,53 +262,40 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
         return failure();
       markerMap[markerId] = newData;
     }
+
+    // because of replaceAllUsesWith this is equal to the result
     mlir::Value markerInput = op->getOperand(0);
-    mlir::Value markerResult = op->getResult(0);
     if (location == "start") {
       mlir::Operation *nextNode = op->getNextNode();
-      bool isUser = false;
-      for (mlir::Value operand : nextNode->getOperands()) {
-        if (operand == markerResult) {
-          isUser = true;
-          break;
-        }
-      }
+      bool isUser = llvm::is_contained(nextNode->getOperands(), markerInput);
       if (isUser) {
         markerMap[markerId].startOp = nextNode;
       } else {
-        llvm::errs() << "Warning: Next node does not use the marker\n";
-        markerMap[markerId].startOp = *op->getResult(0).user_begin();
+        llvm::errs() << "Warning: Next node does not use the marker. Falling "
+                        "back on the next operation that uses it.\n";
+        markerMap[markerId].startOp = *markerInput.user_begin();
       }
       markerMap[markerId].predInput = markerInput;
 
     } else if (location == "end") {
-      // The endOp is the operation defining the marker's operand (arith.addi ->
-      // %11)
+      // the endop is the definingop of the markerinput
       mlir::Operation *definingOp = markerInput.getDefiningOp();
       markerMap[markerId].endOps.push_back(definingOp);
     }
-
-    markersToErase.push_back(op);
   }
 
-  for (auto op : markersToErase) {
-    op->getResult(0).replaceAllUsesWith(op->getOperand(0));
+  for (auto op : markers) {
     op->erase();
   }
 
   for (auto &pair : markerMap) {
     PredictionData &data = pair.second;
-    if (data.endOps.empty()) {
-      llvm::errs() << "Marker ID " << pair.first
-                   << "does not have any endoperations\n";
-      return failure();
-    }
-
     if (!data.startOp) {
       llvm::errs() << "Marker ID " << pair.first
                    << "does not have a valid start operation\n";
       return failure();
     }
+
     pragmaData.push_back(std::move(pair.second));
   }
   return success();
