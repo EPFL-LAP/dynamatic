@@ -49,8 +49,9 @@ struct CFDFC {
 
   /// (Available after placement) The achieved throughput after the placement
   double throughput;
-  /// (Available after placement) The number of tokens per unit.
-  mlir::DenseMap<Operation *, double> unitOccupancy;
+  /// (Available after placement) The number of tokens held by each placed
+  /// buffer.
+  mlir::DenseMap<Operation *, double> bufferOccupancy;
   /// (Available after placement) The number of tokens per channel. After
   /// instantiating the buffers, this value is cleared and transferred to the
   /// buffer(s).

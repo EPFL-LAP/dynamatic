@@ -672,7 +672,7 @@ static void insertBufferOpAndOccupancyInCFDFC(
     tokensInBufOp =
         (bufOp.getLatencyDV() / totalChannelLatency) * totalChannelOccupancy;
     tokensInBufOp = fmin(tokensInBufOp, static_cast<double>(effectiveCapacity));
-    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
+    cfdfc.bufferOccupancy[bufOp] = tokensInBufOp;
   } else {
     // Case "#tokens in the channel" => "Total latency of the channel":
     // Assign one token to each bufer slot with latency, the rest is assigned
@@ -699,7 +699,7 @@ static void insertBufferOpAndOccupancyInCFDFC(
         fmin(nonLatencyCapacity, remainingTknsToDistribute);
     tokensInBufOp = fmin(tokensInBufOp, static_cast<double>(effectiveCapacity));
 
-    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
+    cfdfc.bufferOccupancy[bufOp] = tokensInBufOp;
   }
 
   // Sanity check: we should never assign more tokens to the buffer than its

@@ -34,6 +34,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include <functional>
 
 namespace dynamatic {
 struct SimpleCycle;
@@ -68,6 +69,31 @@ struct UnitFlowVars {
 };
 
 struct UnitVars {
+  /// Creates this unit's retiming variables. For ops implementing
+  /// handshake::RetimingFlowsOpInterface, creates one retIn/retOut pair per
+  /// declared flow; otherwise creates a single retIn/retOut pair (with retOut
+  /// aliased to retIn when `latency` is 0). `suffix` is appended to variable
+  /// names; `createVar` builds a real MILP variable from a name.
+  UnitVars(Operation *unit, const std::string &suffix,
+           const std::function<CPVar(const llvm::Twine &)> &createVar,
+           double latency);
+
+  /// Returns the fluid retiming variable at the given operand. For ops with
+  /// per-flow retiming, returns the variable of the flow that owns the
+  /// operand; otherwise returns the singular retIn.
+  CPVar &getRetIn(unsigned operandIdx);
+  /// Returns the fluid retiming variable at the given result. For ops with
+  /// per-flow retiming, returns the variable of the flow that owns the
+  /// result; otherwise returns the singular retOut.
+  CPVar &getRetOut(unsigned resultIdx);
+
+  /// Returns all input-side fluid retiming variables: one per flow for
+  /// per-flow ops, otherwise the singular retIn.
+  llvm::SmallVector<CPVar> getInputRetimingVars();
+  /// Returns all output-side fluid retiming variables: one per flow for
+  /// per-flow ops, otherwise the singular retOut.
+  llvm::SmallVector<CPVar> getOutputRetimingVars();
+
   /// Fluid retiming of tokens at unit's input (real). Used when the op does
   /// not implement the RetimingFlowsOpInterface; otherwise see `flows`.
   CPVar retIn;
@@ -89,6 +115,32 @@ struct UnitVars {
   llvm::DenseMap<unsigned, unsigned> resultToFlow;
   /// Whether per-flow retiming variables are used for this unit.
   bool usePerFlow = false;
+};
+
+/// Maps each CFDFC unit to its retiming variables. Wraps a DenseMap so that
+/// looking up an absent unit fails an assertion rather than silently
+/// default-constructing an entry.
+class UnitVarsMap {
+private:
+  llvm::DenseMap<Operation *, UnitVars> map;
+
+public:
+  /// Creates and inserts the variables for a unit. See UnitVars' constructor
+  /// for the argument meanings. Returns the (iterator, inserted) pair.
+  auto insert(Operation *op, const std::string &suffix,
+              const std::function<CPVar(const llvm::Twine &)> &createVar,
+              double latency) {
+    return map.insert({op, UnitVars(op, suffix, createVar, latency)});
+  }
+
+  /// Returns the variables for a unit, which must already be present. Unlike a
+  /// standard map's operator[], this asserts on a missing key rather than
+  /// inserting a default entry.
+  UnitVars &operator[](Operation *op) {
+    auto it = map.find(op);
+    assert(it != map.end() && "expected unit present");
+    return it->second;
+  }
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -132,7 +184,7 @@ struct SynchronizationPatternVars {
 /// the CFDFC, and a CFDFC throughput variable.
 struct CFDFCVars {
   /// Maps each CFDFC unit to its retiming variables.
-  llvm::MapVector<Operation *, UnitVars> unitVars;
+  UnitVarsMap unitVars;
   /// Channel throughput variables (real).
   llvm::MapVector<Value, CPVar> channelThroughputs;
   /// CFDFC throughput (real).
@@ -152,7 +204,7 @@ struct MILPVars {
   /// [FPGA24] Balancing variables for synchronizing cycles.
   SmallVector<SynchronizationPatternVars> syncCycleVars;
   /// List of units in the function.
-  llvm::MapVector<Operation *, UnitVars> unitVars;
+  UnitVarsMap unitVars;
 };
 
 /// Abstract class holding the basic logic for the smart buffer placement pass,
@@ -247,15 +299,6 @@ protected:
   /// a pair of retiming variables for each CFDFC unit, a throughput variable
   /// for each CFDFC channel, and an overall CFDFC's throughput variable.
   void addCFDFCVars(CFDFC &cfdfc);
-
-  /// Looks up the fluid retiming variable at the given operand of `op` in the
-  /// provided CFDFC variables. Returns the per-flow variable if the op
-  /// implements RetimingFlowsOpInterface, else the unit's singular retIn.
-  CPVar &getRetIn(CFDFCVars &cfVars, Operation *op, unsigned operandIdx);
-  /// Looks up the fluid retiming variable at the given result of `op` in the
-  /// provided CFDFC variables. Returns the per-flow variable if the op
-  /// implements RetimingFlowsOpInterface, else the unit's singular retOut.
-  CPVar &getRetOut(CFDFCVars &cfVars, Operation *op, unsigned resultIdx);
 
   /// Adds path constraints for a signal of the channel. The `bufModel` should
   /// characterize a buffer that cuts the signal i.e., the path constraints
@@ -516,37 +559,7 @@ protected:
   /// Store the buffer placement MILP solution. This makes it possible for a
   /// later pass in the pass pipeline to retrieve the throughput and occupancy
   /// of each CFDFC of the current function.
-  void populateCFDFCThroughputAndOccupancy() {
-    for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-      auto [cf, cfVars] = cfdfcWithVars;
-
-      cf->throughput = model->getValue(cfVars.throughput);
-      // Store the unit occupancy into the CFDFC data structure.
-      for (auto &[op, var] : cfVars.unitVars) {
-        double occupancy =
-            model->getValue(var.retOut) - model->getValue(var.retIn);
-        // Approximate occupancy to 0 if it is negative but bigger than
-        // -MILP_EPSILON.
-        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
-          occupancy = 0.0;
-        }
-        assert(occupancy >= 0.0 && "Unit occupancy must not be non-negative!");
-        cf->unitOccupancy[op] = occupancy;
-      }
-
-      // Store the channel occupancy into the CFDFC data structure.
-      for (auto &[val, var] : cfVars.channelThroughputs) {
-        double occupancy = model->getValue(var);
-        // Approximate occupancy to 0 if it is negative but bigger than
-        // -MILP_EPSILON.
-        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
-          occupancy = 0.0;
-        }
-        assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
-        cf->channelOccupancy[val] = occupancy;
-      }
-    }
-  }
+  void populateCFDFCThroughputAndOccupancy();
 
 private:
   /// Common logic for all constructors. Fills the channel to buffering

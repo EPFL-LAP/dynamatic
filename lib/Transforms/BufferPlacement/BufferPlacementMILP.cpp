@@ -269,6 +269,56 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   chVars.shiftReg = createVar("shiftReg", BOOLEAN);
 }
 
+UnitVars::UnitVars(Operation *unit, const std::string &suffix,
+                   const std::function<CPVar(const llvm::Twine &)> &createVar,
+                   double latency) {
+  // Ops that implement RetimingFlowsOpInterface partition their operands
+  // and results into independent flows. Each flow gets one retIn and one
+  // retOut variable; channels touching any operand or result of the flow
+  // tie to those variables. Every operand and every result of the op must
+  // be claimed by exactly one flow.
+  if (auto flowsOp = dyn_cast<handshake::RetimingFlowsOpInterface>(unit)) {
+    usePerFlow = true;
+    llvm::SmallVector<buffer::RetimingFlow> declaredFlows =
+        flowsOp.getRetimingFlows();
+    for (auto [flowIdx, flow] : llvm::enumerate(declaredFlows)) {
+      UnitFlowVars flowVars;
+      flowVars.latency = flow.latency;
+      flowVars.retIn =
+          createVar("retIn" + suffix + "_flow" + std::to_string(flowIdx));
+      if (flow.latency == 0.0)
+        flowVars.retOut = flowVars.retIn;
+      else
+        flowVars.retOut =
+            createVar("retOut" + suffix + "_flow" + std::to_string(flowIdx));
+      flows.push_back(flowVars);
+
+      for (unsigned operandIdx : flow.operands) {
+        auto [it, inserted] = operandToFlow.try_emplace(operandIdx, flowIdx);
+        assert(inserted && "operand claimed by more than one flow");
+      }
+      for (unsigned resultIdx : flow.results) {
+        auto [it, inserted] = resultToFlow.try_emplace(resultIdx, flowIdx);
+        assert(inserted && "result claimed by more than one flow");
+      }
+    }
+    assert(operandToFlow.size() == unit->getNumOperands() &&
+           "every operand must be claimed by exactly one flow");
+    assert(resultToFlow.size() == unit->getNumResults() &&
+           "every result must be claimed by exactly one flow");
+    return;
+  }
+
+  retIn = createVar("retIn" + suffix);
+
+  // If the component is combinational (i.e., 0 latency) its output fluid
+  // retiming equals its input fluid retiming, otherwise it is different
+  if (latency == 0.0)
+    retOut = retIn;
+  else
+    retOut = createVar("retOut" + suffix);
+}
+
 void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   // Create a set of variables for each CFDFC
   std::string prefix = "cfdfc" + std::to_string(vars.cfdfcVars.size()) + "_";
@@ -283,60 +333,13 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   for (Operation *unit : cfdfc.units) {
     std::string suffix = "_" + getUniqueName(unit).str();
 
-    // Default-initialize unit variables and retrieve a reference
-    UnitVars &unitVars = cfVars.unitVars[unit];
-
-    // Ops that implement RetimingFlowsOpInterface partition their operands
-    // and results into independent flows. Each flow gets one retIn and one
-    // retOut variable; channels touching any operand or result of the flow
-    // tie to those variables. Every operand and every result of the op must
-    // be claimed by exactly one flow.
-    if (auto flowsOp = dyn_cast<handshake::RetimingFlowsOpInterface>(unit)) {
-      unitVars.usePerFlow = true;
-      llvm::SmallVector<buffer::RetimingFlow> declaredFlows =
-          flowsOp.getRetimingFlows();
-      for (auto [flowIdx, flow] : llvm::enumerate(declaredFlows)) {
-        UnitFlowVars flowVars;
-        flowVars.latency = flow.latency;
-        flowVars.retIn =
-            createVar("retIn" + suffix + "_flow" + std::to_string(flowIdx));
-        if (flow.latency == 0.0)
-          flowVars.retOut = flowVars.retIn;
-        else
-          flowVars.retOut =
-              createVar("retOut" + suffix + "_flow" + std::to_string(flowIdx));
-        unitVars.flows.push_back(flowVars);
-
-        for (unsigned operandIdx : flow.operands) {
-          auto [it, inserted] =
-              unitVars.operandToFlow.try_emplace(operandIdx, flowIdx);
-          assert(inserted && "operand claimed by more than one flow");
-        }
-        for (unsigned resultIdx : flow.results) {
-          auto [it, inserted] =
-              unitVars.resultToFlow.try_emplace(resultIdx, flowIdx);
-          assert(inserted && "result claimed by more than one flow");
-        }
-      }
-      assert(unitVars.operandToFlow.size() == unit->getNumOperands() &&
-             "every operand must be claimed by exactly one flow");
-      assert(unitVars.resultToFlow.size() == unit->getNumResults() &&
-             "every result must be claimed by exactly one flow");
-      continue;
-    }
-
-    unitVars.retIn = createVar("retIn" + suffix);
-
-    // If the component is combinational (i.e., 0 latency) its output fluid
-    // retiming equals its input fluid retiming, otherwise it is different
+    // The unit's combinational latency on the data path (0 if unavailable).
     double latency;
     if (failed(
             timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
       latency = 0.0;
-    if (latency == 0.0)
-      unitVars.retOut = unitVars.retIn;
-    else
-      unitVars.retOut = createVar("retOut" + suffix);
+
+    cfVars.unitVars.insert(unit, suffix, createVar, latency);
   }
 
   // Create a variable to represent the throughput of each CFDFC channel
@@ -349,26 +352,58 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   cfVars.throughput = createVar("throughput");
 }
 
-CPVar &BufferPlacementMILP::getRetIn(CFDFCVars &cfVars, Operation *op,
-                                     unsigned operandIdx) {
-  UnitVars &unitVars = cfVars.unitVars[op];
-  if (!unitVars.usePerFlow)
-    return unitVars.retIn;
-  auto it = unitVars.operandToFlow.find(operandIdx);
-  assert(it != unitVars.operandToFlow.end() &&
-         "operand index has no declared flow");
-  return unitVars.flows[it->second].retIn;
+void BufferPlacementMILP::populateCFDFCThroughputAndOccupancy() {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+
+    cf->throughput = model->getValue(cfVars.throughput);
+
+    // Store the channel occupancy into the CFDFC data structure.
+    for (auto &[val, var] : cfVars.channelThroughputs) {
+      double occupancy = model->getValue(var);
+      // Approximate occupancy to 0 if it is negative but bigger than
+      // -MILP_EPSILON.
+      if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+        occupancy = 0.0;
+      }
+      assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
+      cf->channelOccupancy[val] = occupancy;
+    }
+  }
 }
 
-CPVar &BufferPlacementMILP::getRetOut(CFDFCVars &cfVars, Operation *op,
-                                      unsigned resultIdx) {
-  UnitVars &unitVars = cfVars.unitVars[op];
-  if (!unitVars.usePerFlow)
-    return unitVars.retOut;
-  auto it = unitVars.resultToFlow.find(resultIdx);
-  assert(it != unitVars.resultToFlow.end() &&
-         "result index has no declared flow");
-  return unitVars.flows[it->second].retOut;
+CPVar &UnitVars::getRetIn(unsigned operandIdx) {
+  if (!usePerFlow)
+    return retIn;
+  auto it = operandToFlow.find(operandIdx);
+  assert(it != operandToFlow.end() && "operand index has no declared flow");
+  return flows[it->second].retIn;
+}
+
+CPVar &UnitVars::getRetOut(unsigned resultIdx) {
+  if (!usePerFlow)
+    return retOut;
+  auto it = resultToFlow.find(resultIdx);
+  assert(it != resultToFlow.end() && "result index has no declared flow");
+  return flows[it->second].retOut;
+}
+
+llvm::SmallVector<CPVar> UnitVars::getInputRetimingVars() {
+  if (!usePerFlow)
+    return {retIn};
+  llvm::SmallVector<CPVar> vars;
+  for (UnitFlowVars &flow : flows)
+    vars.push_back(flow.retIn);
+  return vars;
+}
+
+llvm::SmallVector<CPVar> UnitVars::getOutputRetimingVars() {
+  if (!usePerFlow)
+    return {retOut};
+  llvm::SmallVector<CPVar> vars;
+  for (UnitFlowVars &flow : flows)
+    vars.push_back(flow.retOut);
+  return vars;
 }
 
 void BufferPlacementMILP::addChannelTimingConstraints(
@@ -611,8 +646,8 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     unsigned srcResultIdx = cast<OpResult>(channel).getResultNumber();
 
     CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
-    CPVar &retSrc = getRetOut(cfVars, srcOp, srcResultIdx);
-    CPVar &retDst = getRetIn(cfVars, dstOp, dstOperandIdx);
+    CPVar &retSrc = cfVars.unitVars[srcOp].getRetOut(srcResultIdx);
+    CPVar &retDst = cfVars.unitVars[dstOp].getRetIn(dstOperandIdx);
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
 
     // If the channel isn't a backedge, its throughput equals the difference
@@ -790,7 +825,7 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
     // Ops with declared independent flows get one retiming equation per
     // flow, using the flow's own latency. Zero-latency flows already alias
     // retOut to retIn, so the equation collapses to 0 == 0 and is skipped.
-    if (unitVars.usePerFlow) {
+    if (isa<handshake::RetimingFlowsOpInterface>(unit)) {
       for (UnitFlowVars &flow : unitVars.flows) {
         if (flow.latency == 0.0)
           continue;
@@ -1651,20 +1686,15 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     os << "Unit retimings of CFDFC #" << idx << ":\n";
     os.indent();
-    for (auto &[op, unitVars] : cfVars.unitVars) {
-      if (unitVars.usePerFlow) {
-        os << getUniqueName(op) << ":\n";
-        os.indent();
-        for (auto [flowIdx, flow] : llvm::enumerate(unitVars.flows)) {
-          os << "flow " << flowIdx << " (latency " << flow.latency << "):"
-             << " (in: " << model->getValue(flow.retIn)
-             << ", out: " << model->getValue(flow.retOut) << ")\n";
-        }
-        os.unindent();
-        continue;
-      }
-      os << getUniqueName(op) << ": (in: " << model->getValue(unitVars.retIn)
-         << ", out: " << model->getValue(unitVars.retOut) << ")\n";
+    for (Operation *op : cf->units) {
+      UnitVars &unitVars = cfVars.unitVars[op];
+      os << getUniqueName(op) << ":\n";
+      os.indent();
+      for (auto [idx, var] : llvm::enumerate(unitVars.getInputRetimingVars()))
+        os << "in " << idx << ": " << model->getValue(var) << "\n";
+      for (auto [idx, var] : llvm::enumerate(unitVars.getOutputRetimingVars()))
+        os << "out " << idx << ": " << model->getValue(var) << "\n";
+      os.unindent();
     }
     os.unindent();
     os << "\n";
