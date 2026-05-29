@@ -291,21 +291,20 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
     // retOut variable; channels touching any operand or result of the flow
     // tie to those variables. Every operand and every result of the op must
     // be claimed by exactly one flow.
-    if (auto flowsOp =
-            dyn_cast<handshake::RetimingFlowsOpInterface>(unit)) {
+    if (auto flowsOp = dyn_cast<handshake::RetimingFlowsOpInterface>(unit)) {
       unitVars.usePerFlow = true;
       llvm::SmallVector<buffer::RetimingFlow> declaredFlows =
           flowsOp.getRetimingFlows();
       for (auto [flowIdx, flow] : llvm::enumerate(declaredFlows)) {
         UnitFlowVars flowVars;
         flowVars.latency = flow.latency;
-        flowVars.retIn = createVar(
-            "retIn" + suffix + "_flow" + std::to_string(flowIdx));
+        flowVars.retIn =
+            createVar("retIn" + suffix + "_flow" + std::to_string(flowIdx));
         if (flow.latency == 0.0)
           flowVars.retOut = flowVars.retIn;
         else
-          flowVars.retOut = createVar(
-              "retOut" + suffix + "_flow" + std::to_string(flowIdx));
+          flowVars.retOut =
+              createVar("retOut" + suffix + "_flow" + std::to_string(flowIdx));
         unitVars.flows.push_back(flowVars);
 
         for (unsigned operandIdx : flow.operands) {
@@ -795,9 +794,9 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
       for (UnitFlowVars &flow : unitVars.flows) {
         if (flow.latency == 0.0)
           continue;
-        model->addConstr(
-            cfVars.throughput * flow.latency == flow.retOut - flow.retIn,
-            "through_unitRetiming_flow");
+        model->addConstr(cfVars.throughput * flow.latency ==
+                             flow.retOut - flow.retIn,
+                         "through_unitRetiming_flow");
       }
       continue;
     }
