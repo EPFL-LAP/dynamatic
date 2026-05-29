@@ -14,7 +14,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Support/LogicalResult.h"
 
-#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
