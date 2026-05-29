@@ -47,16 +47,9 @@ private:
                               llvm::DenseSet<mlir::Operation *> &visitedOps,
                               llvm::DenseSet<mlir::Value> &outsideDrivers);
 
-  template <typename T>
-  std::pair<mlir::Value, mlir::Value>
-  createBranchCond(mlir::OpBuilder &builder, mlir::Location loc,
-                   mlir::Value selectRes, T comparisonValue);
-
   struct PredictionData;
-  LogicalResult parseValuesList(llvm::StringRef valuesStr,
-                                std::vector<int> &intVals,
-                                std::vector<float> &floatVals,
-                                std::string &dataType);
+  LogicalResult parseValuesList(mlir::ModuleOp modOp, llvm::StringRef valuesStr,
+                                mlir::ArrayAttr &values, std::string &dataType);
 
   LogicalResult readPredictMarker(mlir::ModuleOp modOp,
                                   std::vector<PredictionData> &pragmaData);
@@ -113,54 +106,17 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
   return success();
 }
 
-template <typename T>
-std::pair<mlir::Value, mlir::Value> PipelineDuplicationPass::createBranchCond(
-    mlir::OpBuilder &builder, mlir::Location loc, mlir::Value selectRes,
-    T comparisonValue) {
-
-  Value constantComp;
-  Value branchCond;
-  if constexpr (std::is_floating_point_v<T>) {
-    // float or double
-    mlir::Type floatTy =
-        std::is_same_v<T, double> ? builder.getF64Type() : builder.getF32Type();
-
-    constantComp = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getFloatAttr(floatTy, comparisonValue));
-
-    branchCond = builder.create<mlir::arith::CmpFOp>(
-        loc, mlir::arith::CmpFPredicate::OEQ, selectRes, constantComp);
-
-  } else if constexpr (std::is_integral_v<T>) {
-    // int or bool
-    constantComp = builder.create<mlir::arith::ConstantOp>(
-        loc, builder.getIntegerAttr(builder.getI32Type(), comparisonValue));
-    llvm::errs() << "building of constantComp succeeded: " << constantComp
-                 << '\n';
-
-    branchCond = builder.create<mlir::arith::CmpIOp>(
-        loc, mlir::arith::CmpIPredicate::eq, selectRes, constantComp);
-    llvm::errs() << "building of branchCond succeeded: " << branchCond << '\n';
-  } else {
-    llvm::errs() << "this should not happen!\n";
-  }
-
-  return {branchCond, constantComp};
-}
-
-// maybe change datatype to an enum
 struct PipelineDuplicationPass::PredictionData {
   mlir::Operation *startOp;
   mlir::Value predInput;
   std::vector<mlir::Operation *> endOps;
-  std::vector<float> floatValList;
-  std::vector<int> intValList;
+  mlir::ArrayAttr values;
   std::string dataType;
 };
 
 LogicalResult PipelineDuplicationPass::parseValuesList(
-    llvm::StringRef valuesStr, std::vector<int> &intVals,
-    std::vector<float> &floatVals, std::string &dataType) {
+    mlir::ModuleOp modOp, llvm::StringRef valuesStr, mlir::ArrayAttr &values,
+    std::string &dataType) {
 
   std::string s = valuesStr.str();
   llvm::errs() << "string containing values list: " << s << '\n';
@@ -177,36 +133,30 @@ LogicalResult PipelineDuplicationPass::parseValuesList(
   // split the string by commas to parse each individual number
   llvm::SmallVector<llvm::StringRef> tokens;
   ref.split(tokens, ',', -1, false);
+  bool isFloat = ref.contains('.');
+  llvm::SmallVector<mlir::Attribute> attrValues;
+  mlir::OpBuilder builder(modOp.getContext());
 
-  if (ref.contains('.')) {
-    dataType = "float";
-    llvm::errs() << "datatype float recognized\n";
-
-    for (auto token : tokens) {
-      token = token.trim();
+  for (auto token : tokens) {
+    token = token.trim();
+    if (isFloat) {
       double doubleVal;
       if (token.getAsDouble(doubleVal)) {
         return failure();
       }
-      floatVals.push_back(static_cast<float>(doubleVal));
-    }
-    return success();
-
-  } else {
-    dataType = "int";
-    llvm::errs() << "datatype int recognized\n";
-
-    for (auto token : tokens) {
+      attrValues.push_back(
+          builder.getFloatAttr(builder.getF32Type(), doubleVal));
+    } else {
       int intVal;
       if (token.getAsInteger(10, intVal)) {
-        // TODO: bools
         return failure();
       }
-      intVals.push_back(intVal);
+      attrValues.push_back(
+          builder.getIntegerAttr(builder.getI32Type(), intVal));
     }
-
-    return success();
   }
+  values = builder.getArrayAttr(attrValues);
+  return success();
 }
 
 LogicalResult PipelineDuplicationPass::readPredictMarker(
@@ -258,8 +208,8 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
       PredictionData newData;
       newData.startOp = nullptr;
       if (valuesAttr) {
-        if (failed(parseValuesList(valuesAttr.getValue(), newData.intValList,
-                                   newData.floatValList, newData.dataType))) {
+        if (failed(parseValuesList(modOp, valuesAttr.getValue(), newData.values,
+                                   newData.dataType))) {
           llvm::errs() << "Failed to parse value attributes for marker ID "
                        << markerId << '\n';
           return failure();
@@ -322,22 +272,9 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
   // print pragmadata
   for (auto data : pragmaData) {
-    llvm::errs() << "Data Type : " << data.dataType << "\n";
+    // llvm::errs() << "Data Type : " << data.dataType << "\n";
 
-    // Print values list based on data type
-    llvm::errs() << "Values    : [";
-    if (data.dataType == "float") {
-      for (size_t i = 0; i < data.floatValList.size(); ++i) {
-        llvm::errs() << data.floatValList[i]
-                     << (i + 1 < data.floatValList.size() ? ", " : "");
-      }
-    } else {
-      for (size_t i = 0; i < data.intValList.size(); ++i) {
-        llvm::errs() << data.intValList[i]
-                     << (i + 1 < data.intValList.size() ? ", " : "");
-      }
-    }
-    llvm::errs() << "]\n";
+    llvm::errs() << "new Values: " << data.values << '\n';
 
     // Print the start operation
     llvm::errs() << "Start Op  : ";
@@ -416,30 +353,28 @@ void PipelineDuplicationPass::runDynamaticPass() {
     }
 
     // PREDICTED PATHS
-    int size = std::max(data.floatValList.size(), data.intValList.size());
-    for (int i = 0; i < size; i++) {
+    int i = 0;
+    for (mlir::Attribute attr : data.values) {
       // create branch condition
       builder.setInsertionPointToEnd(targetBlock);
 
       Value branchCond, constantComp;
-      if (data.dataType == "float" || data.dataType == "double") {
-        std::tie(branchCond, constantComp) =
-            createBranchCond(builder, loc, predictInput, data.floatValList[i]);
-      } else if (data.dataType == "int") {
-        llvm::errs() << data.intValList[i] << ", " << predictInput << '\n';
-        std::tie(branchCond, constantComp) =
-            createBranchCond(builder, loc, predictInput, data.intValList[i]);
-        llvm::errs() << "branchCond: " << branchCond
-                     << "\nconstantComp: " << constantComp << '\n';
+      // does not change for f32 or f64 :)
+      if (auto floatAttr = llvm::dyn_cast<mlir::FloatAttr>(attr)) {
+        constantComp = builder.create<mlir::arith::ConstantOp>(loc, floatAttr);
+        branchCond = builder.create<mlir::arith::CmpFOp>(
+            loc, mlir::arith::CmpFPredicate::OEQ, predictInput, constantComp);
+      } else if (auto intAttr = llvm::dyn_cast<mlir::IntegerAttr>(attr)) {
+        constantComp = builder.create<mlir::arith::ConstantOp>(loc, intAttr);
+        branchCond = builder.create<mlir::arith::CmpIOp>(
+            loc, mlir::arith::CmpIPredicate::eq, predictInput, constantComp);
       } else {
-        llvm::errs() << "Error: Unknown or unsupported data type: "
-                     << data.dataType << "\n";
         return signalPassFailure();
       }
 
       mlir::Block *trueBlock = funcOp.addBlock(); // true path
       mlir::Block *nextElseBlock;                 // false path
-      if (i + 1 < size)
+      if (i + 1 < (int)data.values.size())
         nextElseBlock = funcOp.addBlock();
       else
         nextElseBlock = falseBlock;
@@ -493,6 +428,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
       // update
       targetBlock = nextElseBlock;
+      i++;
     }
 
     // FALSE PATH
