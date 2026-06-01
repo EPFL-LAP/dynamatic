@@ -63,7 +63,7 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
 
   unsigned bitwidth;
   switch (signalType) {
-  case SignalType::DATA:
+  case SignalType::DATA: {
     bitwidth = getHandshakeTypeBitWidth(channel.getType());
 
     // getPortDelays is not written in a way that it can fail elegantly
@@ -87,6 +87,7 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
 
     // and return them
     return {inBufDelay, outBufDelay};
+  }
   case SignalType::VALID:
     return {model->inputModel.validDelay, model->outputModel.validDelay};
   case SignalType::READY:
