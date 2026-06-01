@@ -289,8 +289,7 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
     // to one retiming path through the unit
     UnitVars unitVars(unit);
 
-    // Then for each path through the unit,
-
+    // Then for each path through the unit
     for (auto [pathIdx, pathVars] : llvm::enumerate(unitVars.retPathVarList)) {
       // we need the latency through that path
       // (since the occupancy of that path is related
@@ -302,11 +301,10 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
       if (succeeded(pathLatencyOrFail))
         pathVars.latency = *pathLatencyOrFail;
       else
-        // really we should fail here if the timingDB fails
-        // but thats a bigger refactor
+        // assume latency 0 if the timing model fails
         pathVars.latency = 0.0;
 
-      // and we need to create retiming variables for that path
+      // and we need to create retiming variables for the unit
       // for the MILP to move channel occupancy around
       pathVars.retIn =
           createVar("retIn" + suffix + "_path" + std::to_string(pathIdx));

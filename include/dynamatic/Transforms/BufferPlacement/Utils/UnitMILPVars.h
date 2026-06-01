@@ -77,9 +77,9 @@ struct UnitVars {
   /// Returns the output-side fluid retiming variables
   llvm::SmallVector<CPVar> getOutputRetimingVars();
 
-  /// Asserts that every retiming path has its MILP variables (`retIn`,
-  /// `retOut`) and `latency` set. Call once before generating constraints
-  /// that read these fields.
+  /// Asserts that every retiming path has all additional variables 
+  /// (`retIn`, `retOut`, and `latency`) set. 
+  /// Call once before generating constraints that read these fields.
   void validate() const;
 
   /// [FPGA24] Occupancy contribution of this unit (real).

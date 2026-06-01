@@ -76,7 +76,6 @@ llvm::SmallVector<CPVar> UnitVars::getInputRetimingVars() {
 }
 
 // small encapsulation function
-
 llvm::SmallVector<CPVar> UnitVars::getOutputRetimingVars() {
   llvm::SmallVector<CPVar> outputVars;
   for (RetPathVars &pathVars : retPathVarList) {
