@@ -407,7 +407,7 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculator -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "types"
+      "types", "spec_types"
     ]
   },
   {
@@ -425,7 +425,10 @@
         "type": "unsigned"
       }
     ],
-    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_save_commit -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_save_commit -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "spec_types"
+    ]
   },
   {
     "name": "handshake.speculating_branch",
@@ -565,6 +568,9 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/spec_types.vhd"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"

@@ -32,7 +32,7 @@ int runIntegrationTest(IntegrationTestData &config) {
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << cSourcePath.string() << std::endl
-             << "set-clock-period 5" << std::endl;
+             << "set-clock-period " << config.clockPeriod << std::endl;
 
   // clang-format off
   scriptFile << "compile"

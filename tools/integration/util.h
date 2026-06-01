@@ -34,11 +34,11 @@ struct IntegrationTestData {
   // Use model checking to remove redundant logic.
   bool useRigidification = false;
   bool verifyInvariants = false;
-  // Enable speculation. Placement is driven by the `dynamatic.speculate`
-  // attribute on the source.
+  // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
+  unsigned clockPeriod = 5;
 
   // Results
   int simTime;
