@@ -22,8 +22,9 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/MILP.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/UnitMILPVars.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
 #include "experimental/Support/SubjectGraph.h"
@@ -35,6 +36,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include <functional>
+#include <optional>
 
 namespace dynamatic {
 struct SimpleCycle;
@@ -53,48 +55,6 @@ struct TimeVars {
   CPVar tIn;
   /// Time at channel's output (i.e., at destination unit's input port).
   CPVar tOut;
-};
-
-/// MILP variables for one retiming path of a unit. A path groups a set of
-/// operands and results that share a single token-conservation accounting:
-/// channels touching any operand in the path tie to `retIn`, channels
-/// touching any result tie to `retOut`, and the unit throughput constraint
-/// `throughput * latency == retOut - retIn` is added once per path.
-struct RetPathVars {
-  CPVar retIn;
-  CPVar retOut;
-  double latency;
-};
-
-/// Holds MILP variables associated to every CFDFC unit. Note that a unit may
-/// appear in multiple CFDFCs and so may have multiple sets of these variables.
-/// Every unit is modelled as one or more retiming paths: ops implementing
-/// handshake::RetimingPathsOpInterface provide their own partition, while all
-/// other ops get a single path spanning every operand and result.
-struct UnitVars {
-  UnitVars() = default;
-
-  /// Returns the fluid retiming variable of the path that owns the operand.
-  CPVar &getRetIn(unsigned operandIdx);
-  /// Returns the fluid retiming variable of the path that owns the result.
-  CPVar &getRetOut(unsigned resultIdx);
-
-  /// Returns the input-side fluid retiming variable of each path.
-  llvm::SmallVector<CPVar> getInputRetimingVars();
-  /// Returns the output-side fluid retiming variable of each path.
-  llvm::SmallVector<CPVar> getOutputRetimingVars();
-
-  /// [FPGA24] Occupancy contribution of this unit (real).
-  CPVar occupancy;
-
-  /// The unit's retiming paths (at least one).
-  llvm::SmallVector<RetPathVars> retPaths;
-  /// Maps an operand index to the index of its path in `retPaths`. Every
-  /// operand appears here exactly once.
-  llvm::DenseMap<unsigned, unsigned> operandToPath;
-  /// Maps a result index to the index of its path in `retPaths`. Every result
-  /// appears here exactly once.
-  llvm::DenseMap<unsigned, unsigned> resultToPath;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)

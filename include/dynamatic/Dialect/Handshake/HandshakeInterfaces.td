@@ -139,10 +139,11 @@ def RetimingPathsOpInterface : OpInterface<"RetimingPathsOpInterface"> {
     InterfaceMethod<[{
       Returns the list of independent retiming paths of this op. Each
       ::dynamatic::buffer::RetimingPath declares a set of operand
-      indices, a set of result indices, and a cycle latency. The union
-      of operand sets must equal the op's operand range, and the union
-      of result sets must equal the op's result range — each index
-      appearing in exactly one path.
+      indices and a set of result indices. The union of operand sets must
+      equal the op's operand range, and the union of result sets must equal
+      the op's result range — each index appearing in exactly one path.
+      The MILP queries TimingDatabase::getLatency(unit, DATA, lat, period,
+      pathIdx) per path to obtain its cycle latency.
     }],
     "llvm::SmallVector<::dynamatic::buffer::RetimingPath>",
     "getRetimingPaths", (ins)

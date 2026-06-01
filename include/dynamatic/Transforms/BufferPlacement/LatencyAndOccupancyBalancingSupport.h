@@ -15,7 +15,7 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/Operation.h"
 #include "llvm/ADT/ArrayRef.h"

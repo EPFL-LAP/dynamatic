@@ -24,7 +24,7 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
 #include "experimental/Support/IOG.h"
 #include "mlir/IR/Value.h"

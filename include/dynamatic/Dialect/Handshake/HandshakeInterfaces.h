@@ -30,6 +30,7 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "llvm/ADT/SmallSet.h"
 
 namespace dynamatic {
 namespace handshake {
@@ -90,10 +91,27 @@ namespace buffer {
 /// fluid-retiming token-conservation accounting in the buffer placement
 /// MILP, plus the cycle latency for that path.
 struct RetimingPath {
-  SmallVector<unsigned> operands;
-  SmallVector<unsigned> results;
-  double latency;
+  llvm::SmallSet<unsigned, 4> operands;
+  llvm::SmallSet<unsigned, 4> results;
+
+  RetimingPath() = default;
+
+  /// Builds a single-path descriptor that spans every operand and every
+  /// result of `unit`.
+  RetimingPath(Operation *unit) {
+    for (unsigned i = 0, e = unit->getNumOperands(); i < e; ++i)
+      operands.insert(i);
+    for (unsigned i = 0, e = unit->getNumResults(); i < e; ++i)
+      results.insert(i);
+  }
 };
+
+/// Returns the path partition for `unit`: the interface's declaration if the
+/// op implements RetimingPathsOpInterface, otherwise a single path spanning
+/// every operand and result. Free function (not a member of RetimingPath)
+/// because `SmallVector<RetimingPath>` cannot be used inside RetimingPath's
+/// own class definition (incomplete type).
+SmallVector<RetimingPath> getRetimingPaths(Operation *unit);
 
 } // end namespace buffer
 } // end namespace dynamatic

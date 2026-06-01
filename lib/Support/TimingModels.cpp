@@ -133,34 +133,45 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   return getModel(baseName);
 }
 
-LogicalResult TimingDatabase::getLatency(
-    Operation *op, SignalType signalType, double &latency, double targetPeriod,
-    unsigned pathId) const // Our current timing model doesn't have latency
-                           // information for valid and
-// ready signals, assume it is 0
-{
-
-  if (signalType != SignalType::DATA) {
-    latency = 0.0;
-    return success();
-  }
+FailureOr<double> TimingDatabase::getLatency(Operation *op,
+                                             SignalType signalType,
+                                             double targetPeriod,
+                                             unsigned pathId) const {
+  // Our current timing model doesn't have latency information for valid and
+  // ready signals; assume it is 0.
+  if (signalType != SignalType::DATA)
+    return 0.0;
 
   const TimingModel *model = getModel(op);
-  if (!model)
+  if (!model) {
+    op->emitWarning() << "TimingDatabase::getLatency: no timing model for op";
     return failure();
+  }
 
   // Walk inward through the path -> bitwidth -> clock-period nesting.
   auto latAndMaxFreqByBitwidth = model->latAndMaxFreqByPath.select(pathId);
-  if (failed(latAndMaxFreqByBitwidth))
+  if (failed(latAndMaxFreqByBitwidth)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: no entry for retiming-path id "
+        << pathId;
     return failure();
+  }
   auto latAndMaxFreqByClockPeriod = latAndMaxFreqByBitwidth->get().select(op);
-  if (failed(latAndMaxFreqByClockPeriod))
+  if (failed(latAndMaxFreqByClockPeriod)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: bitwidth not characterised in the "
+           "timing model";
     return failure();
+  }
   auto latencyOrFail =
       latAndMaxFreqByClockPeriod->get().selectLatency(targetPeriod);
-  if (failed(latencyOrFail))
+  if (failed(latencyOrFail)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: no latency data for target period "
+        << targetPeriod;
     return failure();
-  latency = *latencyOrFail;
+  }
+  double latency = *latencyOrFail;
 
   // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
   // of latency on loads compared to an MC here because our timing models are
@@ -172,7 +183,7 @@ LogicalResult TimingDatabase::getLatency(
     if (isa_and_present<handshake::LSQOp>(memOp))
       latency += 3;
   }
-  return success();
+  return latency;
 }
 
 LogicalResult TimingDatabase::getInternalCombinationalDelay(

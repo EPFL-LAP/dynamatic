@@ -307,14 +307,13 @@ public:
   /// Returns the timing model corresponding to the operation, if any exists.
   const TimingModel *getModel(Operation *op) const;
 
-  /// Attempts to get an operation's latency for a specific signal type. On
-  /// success, sets the last argument to the requested latency.
+  /// Returns the operation's latency for a specific signal type, or failure
+  /// if the timing model cannot supply it (with an op-attached warning).
   /// TODO: Currently the latency is always 0 for valid and ready signals, which
   /// may not always be true. Once we have formal timing models we will be able
   /// to return the real latency for those signal types too.
-  LogicalResult getLatency(Operation *op, SignalType signalType,
-                           double &latency, double targetPeriod,
-                           unsigned pathId = 0) const;
+  FailureOr<double> getLatency(Operation *op, SignalType signalType,
+                               double targetPeriod, unsigned pathId = 0) const;
 
   LogicalResult getInternalCombinationalDelay(Operation *op,
                                               SignalType signalType,
