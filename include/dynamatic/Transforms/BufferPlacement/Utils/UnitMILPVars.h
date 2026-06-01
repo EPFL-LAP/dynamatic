@@ -29,8 +29,8 @@
 namespace dynamatic {
 namespace buffer {
 
-/// MILP variables and partition for one retiming path of a unit. 
-/// The occupancy of channels between units depends on 
+/// MILP variables and partition for one retiming path of a unit.
+/// The occupancy of channels between units depends on
 /// having at least one retiming variable for the path through the unit
 /// that connects to that channel.  channels touching any
 /// result in `results` tie to `retOut`. The unit throughput constraint
@@ -77,8 +77,8 @@ struct UnitVars {
   /// Returns the output-side fluid retiming variables
   llvm::SmallVector<CPVar> getOutputRetimingVars();
 
-  /// Asserts that every retiming path has all additional variables 
-  /// (`retIn`, `retOut`, and `latency`) set. 
+  /// Asserts that every retiming path has all additional variables
+  /// (`retIn`, `retOut`, and `latency`) set.
   /// Call once before generating constraints that read these fields.
   void validate() const;
 
