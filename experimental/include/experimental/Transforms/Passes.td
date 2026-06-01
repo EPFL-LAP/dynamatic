@@ -38,24 +38,24 @@ def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
 def HandshakeSpeculation : Pass<"handshake-speculation", "::mlir::ModuleOp"> {
   let summary = "Place Speculation operations";
   let description = [{
-      Speculative execution involves speculating on the output of a long 
-      latency operation or chain of operations, allowing operations that 
-      depend on it to begin execution early, without impacting correctness. 
-      
-      There are several situations that can benefit from early execution, 
-      including reducing the initiation interval (II) of loops with conditions 
-      that take several cycles to calculate, or loops with 
-      loop-carried dependencies. 
-      
-      Speculator placement is driven by a `dynamatic.speculate` dictionary
-      attribute on a single producer op (typically the loop-continuation
-      predicate), carrying `max_predictions : i32` and `style : str`.
-      The attribute is created based on a speculate pragma in the 
-      C source code.
-      The pass requires the attribute to be present, and so should only 
-      be called on kernels which contain a speculate pragma.
-      Save / Commit / SaveCommit placements are auto-found 
-      from the speculator position. 
+    Speculative execution involves speculating on the output of a long 
+    latency operation or chain of operations, allowing operations that 
+    depend on it to begin execution early, without impacting correctness. 
+    
+    There are several situations that can benefit from early execution, 
+    including reducing the initiation interval (II) of loops with conditions 
+    that take several cycles to calculate, or loops with 
+    loop-carried dependencies. 
+    
+    Speculator placement is driven by a `dynamatic.speculate` dictionary
+    attribute on a single producer op (typically the loop-continuation
+    predicate), carrying `max_predictions : i32` and `style : str`.
+    The attribute is created based on a speculate pragma in the 
+    C source code.
+    The pass requires the attribute to be present, and so should only 
+    be called on kernels which contain a speculate pragma.
+    Save / Commit / SaveCommit placements are auto-decided 
+    from the speculator position. 
   }];
   let options = [];
 
@@ -65,12 +65,9 @@ def HandshakeSpeculation : Pass<"handshake-speculation", "::mlir::ModuleOp"> {
 def HandshakeSpecPostBuffer : Pass<"handshake-spec-post-buffer", "::mlir::ModuleOp"> {
   let summary = "Post-buffering speculation pass";
   let description = [{
-    Speculation integration requires some steps to be performed after the
-    buffer placement pass:
-    - Merge the two speculator units into a single speculator unit
-    - Add an additional buffer on commit control inputs, 
-      which is needed due to the conditionally-present join in the commit unit
-      being unrepresentable to the buffering algorithm.
+    Adds an additional buffer on commit control inputs, 
+    which is needed due to the conditionally-present join in the commit unit
+    being unrepresentable to the buffering algorithm.
   }];
   let options = [];
 

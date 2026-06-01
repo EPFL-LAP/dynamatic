@@ -569,6 +569,7 @@ def _generate_sc_issue_decoder(name):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
+use work.spec_types.all;
 
 entity {name} is
   port (
@@ -591,15 +592,13 @@ end entity;
     architecture = f"""
 architecture arch of {name} is
 begin
-  -- TODO: use a library to store these codes 
-  -- rather than manually handling
   -- resend is sent along both channels for ordering
   -- no_cmp is sent along both channels for ordering
   -- resolve is independant of issue
   outs <=
-    "01" when resend_in_valid = '1' else
-    "10" when no_cmp_in_valid = '1' else
-    "00";
+    to_slv(ISSUE_RESEND)  when resend_in_valid = '1' else
+    to_slv(ISSUE_NO_CMP)  when no_cmp_in_valid = '1' else
+    to_slv(ISSUE_DO_SPEC);
 
   -- any (mutually exclusive valid)
   -- means we have a valid output
@@ -619,6 +618,7 @@ def _generate_sc_resolve_decoder(name):
     entity = f"""
 library ieee;
 use ieee.std_logic_1164.all;
+use work.spec_types.all;
 
 entity {name} is
   port (
@@ -641,15 +641,13 @@ end entity;
     architecture = f"""
 architecture arch of {name} is
 begin
-  -- TODO: use a library to store these codes 
-  -- rather than manually handling
   -- resend is sent along both channels for ordering
   -- no_cmp is sent along both channels for ordering
   -- resolve is independant of issue
   outs <=
-    "01" when resend_in_valid = '1' else
-    "10" when no_cmp_in_valid = '1' else
-    "00";
+    to_slv(HISTORY_RESEND)  when resend_in_valid = '1' else
+    to_slv(HISTORY_NO_CMP)  when no_cmp_in_valid = '1' else
+    to_slv(HISTORY_RESOLVE);
 
   -- any of the (mutually exclusive) valids
   -- is a valid output

@@ -64,6 +64,9 @@ architecture arch of {name} is
   signal leaving_recovery : std_logic;
   signal no_unkilled_mispreds : std_logic;
 
+  signal issue_decoded   : IssueCtrl_type;
+  signal history_decoded : HistoryCtrl_type;
+
   signal issue_is_do_spec : std_logic;
   signal issue_is_resend : std_logic;
   signal issue_is_no_cmp : std_logic;
@@ -85,13 +88,16 @@ begin
 
   ------------------------
 
-  issue_is_do_spec   <= ctrl_issue_valid when ctrl_issue = "00" else '0';
-  issue_is_resend  <= ctrl_issue_valid when ctrl_issue = "01" else '0';
-  issue_is_no_cmp  <= ctrl_issue_valid when ctrl_issue = "10" else '0';
+  issue_decoded   <= slv_to_issue_ctrl(ctrl_issue);
+  history_decoded <= slv_to_history_ctrl(ctrl_history);
 
-  resolve_is_resolve <= ctrl_history_valid when ctrl_history = "00" else '0';
-  resolve_is_resend  <= ctrl_history_valid when ctrl_history = "01" else '0';
-  resolve_is_no_cmp  <= ctrl_history_valid when ctrl_history = "10" else '0';
+  issue_is_do_spec <= ctrl_issue_valid when issue_decoded = ISSUE_DO_SPEC else '0';
+  issue_is_resend  <= ctrl_issue_valid when issue_decoded = ISSUE_RESEND  else '0';
+  issue_is_no_cmp  <= ctrl_issue_valid when issue_decoded = ISSUE_NO_CMP  else '0';
+
+  resolve_is_resolve <= ctrl_history_valid when history_decoded = HISTORY_RESOLVE else '0';
+  resolve_is_resend  <= ctrl_history_valid when history_decoded = HISTORY_RESEND  else '0';
+  resolve_is_no_cmp  <= ctrl_history_valid when history_decoded = HISTORY_NO_CMP  else '0';
 
   -----------------------------
 
