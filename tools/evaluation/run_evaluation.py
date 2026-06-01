@@ -378,11 +378,18 @@ def main() -> None:
         metavar="PATH",
         help="Write extracted metrics as JSON to PATH after all kernels complete.",
     )
+    parser.add_argument(
+        "--kernel",
+        type=str,
+        help="Run evaluation for a specific kernel only."
+    )
     args = parser.parse_args()
 
     if args.no_synth and args.synth_lsqs:
         logging.error("Cannot use --synth-lsqs without synthesis. Please remove --synth-lsqs or add --no-synth.")
         sys.exit(1)
+
+    kernels = [args.kernel] if args.kernel else KERNELS
 
     build()
 
@@ -392,14 +399,14 @@ def main() -> None:
         clock_period=args.clock_period,
     )
 
-    logging.info("Running %d kernel(s) with %d parallel job(s)...", len(KERNELS), args.jobs)
+    logging.info("Running %d kernel(s) with %d parallel job(s)...", len(kernels), args.jobs)
     start_time = time.time()
 
     passed: list[str] = []
     failed: list[tuple[str, str | None]] = []
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
-        futures = {executor.submit(run_kernel, k, cfg): k for k in KERNELS}
+        futures = {executor.submit(run_kernel, k, cfg): k for k in kernels}
         for future in as_completed(futures):
             kernel, failure_reason = future.result()
             if failure_reason is None:
@@ -413,7 +420,7 @@ def main() -> None:
     minutes = elapsed % 60
     logging.info("Total time: %dh %02dm.", hours, minutes)
 
-    total = len(KERNELS)
+    total = len(kernels)
     logging.info(
         "Results: %d/%d passed, %d failed.",
         len(passed),
@@ -423,7 +430,7 @@ def main() -> None:
 
     if args.json is not None:
         results = {}
-        for kernel in sorted(KERNELS):
+        for kernel in sorted(kernels):
             out_dir = REPO_ROOT / "integration-test" / kernel / "out"
             failure_reason = next((r for k, r in failed if k == kernel), None)
             entry: dict = {"failure_reason": failure_reason}
