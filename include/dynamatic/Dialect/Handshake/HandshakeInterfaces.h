@@ -84,12 +84,12 @@ class ControlType;
 
 namespace buffer {
 
-/// One independent retiming flow declared by an op implementing
-/// handshake::RetimingFlowsOpInterface. The flow groups a set of operand
+/// One independent retiming path declared by an op implementing
+/// handshake::RetimingPathsOpInterface. The path groups a set of operand
 /// indices and a set of result indices that share a single
 /// fluid-retiming token-conservation accounting in the buffer placement
-/// MILP, plus the cycle latency for that flow.
-struct RetimingFlow {
+/// MILP, plus the cycle latency for that path.
+struct RetimingPath {
   SmallVector<unsigned> operands;
   SmallVector<unsigned> results;
   double latency;

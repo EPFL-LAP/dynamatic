@@ -55,92 +55,46 @@ struct TimeVars {
   CPVar tOut;
 };
 
-/// Holds MILP variables associated to every CFDFC unit. Note that a unit may
-/// appear in multiple CFDFCs and so may have multiple sets of these variables.
-/// MILP variables for one retiming flow of a unit that implements
-/// handshake::RetimingFlowsOpInterface. Channels touching any operand in
-/// the flow's operand set tie to `retIn`; channels touching any result in
-/// the flow's result set tie to `retOut`. The unit throughput constraint
-/// `throughput * latency == retOut - retIn` is added once per flow.
-struct UnitFlowVars {
+/// MILP variables for one retiming path of a unit. A path groups a set of
+/// operands and results that share a single token-conservation accounting:
+/// channels touching any operand in the path tie to `retIn`, channels
+/// touching any result tie to `retOut`, and the unit throughput constraint
+/// `throughput * latency == retOut - retIn` is added once per path.
+struct RetPathVars {
   CPVar retIn;
   CPVar retOut;
   double latency;
 };
 
+/// Holds MILP variables associated to every CFDFC unit. Note that a unit may
+/// appear in multiple CFDFCs and so may have multiple sets of these variables.
+/// Every unit is modelled as one or more retiming paths: ops implementing
+/// handshake::RetimingPathsOpInterface provide their own partition, while all
+/// other ops get a single path spanning every operand and result.
 struct UnitVars {
-  /// Creates this unit's retiming variables. For ops implementing
-  /// handshake::RetimingFlowsOpInterface, creates one retIn/retOut pair per
-  /// declared flow; otherwise creates a single retIn/retOut pair (with retOut
-  /// aliased to retIn when `latency` is 0). `suffix` is appended to variable
-  /// names; `createVar` builds a real MILP variable from a name.
-  UnitVars(Operation *unit, const std::string &suffix,
-           const std::function<CPVar(const llvm::Twine &)> &createVar,
-           double latency);
+  UnitVars() = default;
 
-  /// Returns the fluid retiming variable at the given operand. For ops with
-  /// per-flow retiming, returns the variable of the flow that owns the
-  /// operand; otherwise returns the singular retIn.
+  /// Returns the fluid retiming variable of the path that owns the operand.
   CPVar &getRetIn(unsigned operandIdx);
-  /// Returns the fluid retiming variable at the given result. For ops with
-  /// per-flow retiming, returns the variable of the flow that owns the
-  /// result; otherwise returns the singular retOut.
+  /// Returns the fluid retiming variable of the path that owns the result.
   CPVar &getRetOut(unsigned resultIdx);
 
-  /// Returns all input-side fluid retiming variables: one per flow for
-  /// per-flow ops, otherwise the singular retIn.
+  /// Returns the input-side fluid retiming variable of each path.
   llvm::SmallVector<CPVar> getInputRetimingVars();
-  /// Returns all output-side fluid retiming variables: one per flow for
-  /// per-flow ops, otherwise the singular retOut.
+  /// Returns the output-side fluid retiming variable of each path.
   llvm::SmallVector<CPVar> getOutputRetimingVars();
 
-  /// Fluid retiming of tokens at unit's input (real). Used when the op does
-  /// not implement the RetimingFlowsOpInterface; otherwise see `flows`.
-  CPVar retIn;
-  /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
-  /// input if the latter is combinational (real). Used when the op does not
-  /// implement the RetimingFlowsOpInterface; otherwise see `flows`.
-  CPVar retOut;
   /// [FPGA24] Occupancy contribution of this unit (real).
   CPVar occupancy;
 
-  /// Independent retiming flows for ops that implement the
-  /// RetimingFlowsOpInterface. Empty for default ops.
-  llvm::SmallVector<UnitFlowVars> flows;
-  /// Maps an operand index to the index of its flow in `flows`. Every
-  /// operand of an interface-implementing op appears here exactly once.
-  llvm::DenseMap<unsigned, unsigned> operandToFlow;
-  /// Maps a result index to the index of its flow in `flows`. Every result
-  /// of an interface-implementing op appears here exactly once.
-  llvm::DenseMap<unsigned, unsigned> resultToFlow;
-  /// Whether per-flow retiming variables are used for this unit.
-  bool usePerFlow = false;
-};
-
-/// Maps each CFDFC unit to its retiming variables. Wraps a DenseMap so that
-/// looking up an absent unit fails an assertion rather than silently
-/// default-constructing an entry.
-class UnitVarsMap {
-private:
-  llvm::DenseMap<Operation *, UnitVars> map;
-
-public:
-  /// Creates and inserts the variables for a unit. See UnitVars' constructor
-  /// for the argument meanings. Returns the (iterator, inserted) pair.
-  auto insert(Operation *op, const std::string &suffix,
-              const std::function<CPVar(const llvm::Twine &)> &createVar,
-              double latency) {
-    return map.insert({op, UnitVars(op, suffix, createVar, latency)});
-  }
-
-  /// Returns the variables for a unit, which must already be present. Unlike a
-  /// standard map's operator[], this asserts on a missing key rather than
-  /// inserting a default entry.
-  UnitVars &operator[](Operation *op) {
-    auto it = map.find(op);
-    assert(it != map.end() && "expected unit present");
-    return it->second;
-  }
+  /// The unit's retiming paths (at least one).
+  llvm::SmallVector<RetPathVars> retPaths;
+  /// Maps an operand index to the index of its path in `retPaths`. Every
+  /// operand appears here exactly once.
+  llvm::DenseMap<unsigned, unsigned> operandToPath;
+  /// Maps a result index to the index of its path in `retPaths`. Every result
+  /// appears here exactly once.
+  llvm::DenseMap<unsigned, unsigned> resultToPath;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -184,7 +138,7 @@ struct SynchronizationPatternVars {
 /// the CFDFC, and a CFDFC throughput variable.
 struct CFDFCVars {
   /// Maps each CFDFC unit to its retiming variables.
-  UnitVarsMap unitVars;
+  llvm::DenseMap<Operation *, UnitVars> unitVars;
   /// Channel throughput variables (real).
   llvm::MapVector<Value, CPVar> channelThroughputs;
   /// CFDFC throughput (real).
@@ -203,8 +157,6 @@ struct MILPVars {
   SmallVector<SynchronizationPatternVars> reconvergentPathVars;
   /// [FPGA24] Balancing variables for synchronizing cycles.
   SmallVector<SynchronizationPatternVars> syncCycleVars;
-  /// List of units in the function.
-  UnitVarsMap unitVars;
 };
 
 /// Abstract class holding the basic logic for the smart buffer placement pass,
