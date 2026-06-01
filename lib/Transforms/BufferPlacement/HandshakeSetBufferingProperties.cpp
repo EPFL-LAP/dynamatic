@@ -198,10 +198,10 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
 
   // The speculator has outputs which require buffers
   // for correctness
-  auto specOps = funcOp.getOps<handshake::SpecPreBufferOp1>();
+  auto specOps = funcOp.getOps<handshake::SpeculatorOp>();
   auto specCount = std::distance(specOps.begin(), specOps.end());
   if (specCount > 1) {
-    funcOp.emitError() << "Expected at most one SpecPreBufferOp1";
+    funcOp.emitError() << "Expected at most one SpeculatorOp";
     return failure();
   }
   if (specCount == 1) {
@@ -236,16 +236,12 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     Channel resolveChannel(historyCtrl, true);
     resolveChannel.props->minTrans =
         std::max(resolveChannel.props->minTrans, minTrans);
-  }
 
-  // The speculator's KILL_ONLY_DATA state stalls the data input for
-  // 1 cycle during misspeculation recovery. A transparent buffer on
-  // the data input absorbs this stall and prevents it from propagating
-  // upstream and causing throughput loss.
-  auto specOps2 = funcOp.getOps<handshake::SpecPreBufferOp2>();
-  if (std::distance(specOps2.begin(), specOps2.end()) == 1) {
-    auto specOp2 = *specOps2.begin();
-    Value dataIn = specOp2.getDataIn();
+    // The speculator's KILL_ONLY_DATA state stalls the data input for
+    // 1 cycle during misspeculation recovery. A transparent buffer on
+    // the data input absorbs this stall and prevents it from propagating
+    // upstream and causing throughput loss.
+    Value dataIn = specOp.getDataIn();
     Channel dataInChannel(dataIn, true);
     dataInChannel.props->minTrans = std::max(dataInChannel.props->minTrans, 1u);
   }

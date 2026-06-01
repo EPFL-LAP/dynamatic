@@ -56,8 +56,7 @@ struct HandshakeSpeculationPass
 
 private:
   SpeculationPlacements placements;
-  SpecPreBufferOp1 specOp1;
-  SpecPreBufferOp2 specOp2;
+  SpeculatorOp speculatorOp;
 
   // In the placeCommits method, commit units are temporarily connected to
   // this value as an alternative to control signals and are subsequently
@@ -183,7 +182,7 @@ static std::optional<BranchOpType> findExistingBranch(Value condition,
 // branches it finds in the way. It stops at commits and connects them to the
 // newly created path with value ctrlSignal
 static void
-routeCommitControlRecursive(MLIRContext *ctx, SpecPreBufferOp2 &specOp,
+routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
                             llvm::DenseSet<Operation *> &arrived,
                             OpOperand &currOpOperand,
                             std::vector<BranchTracingItem> &branchTrace) {
@@ -308,16 +307,16 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
   llvm::DenseSet<Operation *> arrived;
   std::vector<BranchTracingItem> branchTrace;
   // Start traversal from the speculator
-  for (OpOperand &succOpOperand : specOp1.getDataOut().getUses()) {
-    routeCommitControlRecursive(&getContext(), specOp2, arrived, succOpOperand,
-                                branchTrace);
+  for (OpOperand &succOpOperand : speculatorOp.getDataOut().getUses()) {
+    routeCommitControlRecursive(&getContext(), speculatorOp, arrived,
+                                succOpOperand, branchTrace);
   }
   // Start traversal from save-commit units
-  for (auto saveCommitOp :
-       mlir::cast<FuncOp>(specOp1->getParentOp()).getOps<SpecSaveCommitOp>()) {
+  for (auto saveCommitOp : mlir::cast<FuncOp>(speculatorOp->getParentOp())
+                               .getOps<SpecSaveCommitOp>()) {
     for (OpOperand &succOpOperand : saveCommitOp.getDataOut().getUses()) {
       branchTrace.clear();
-      routeCommitControlRecursive(&getContext(), specOp2, arrived,
+      routeCommitControlRecursive(&getContext(), speculatorOp, arrived,
                                   succOpOperand, branchTrace);
     }
   }
@@ -328,7 +327,7 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
 
 LogicalResult HandshakeSpeculationPass::placeCommits() {
   // Create a temporal value to connect the commits
-  Value commitCtrl = specOp2.getCommitCtrl();
+  Value commitCtrl = speculatorOp.getCommitCtrl();
   OpBuilder builder(&getContext());
 
   // Build a temporary control value using mlir::UnrealizedConversionCastOp
@@ -339,7 +338,7 @@ LogicalResult HandshakeSpeculationPass::placeCommits() {
   fakeControlForCommits =
       builder
           .create<mlir::UnrealizedConversionCastOp>(
-              specOp2->getLoc(), commitCtrl.getType(), ValueRange{})
+              speculatorOp->getLoc(), commitCtrl.getType(), ValueRange{})
           .getResult(0);
 
   // Place commits and connect to the fake control signal
@@ -376,8 +375,8 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
   // both are sent simultaneously from the speculator
   // and consumed simultaneously from the save-commit
   // to ensure each atomic action is processed correctly
-  Value issueCtrl = specOp1.getIssueCtrl();
-  Value historyCtrl = specOp1.getHistoryCtrl();
+  Value issueCtrl = speculatorOp.getIssueCtrl();
+  Value historyCtrl = speculatorOp.getHistoryCtrl();
 
   // Get the specified FIFO depth
   unsigned fifoDepth = placements.getSaveCommitsFifoDepth();
@@ -488,22 +487,19 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
     return failure();
   }
 
-  // resultType is tentative and will be updated in the addSpecTag algorithm
+  // dataOutType is tentative and will be updated in the addSpecTag algorithm
   // later.
-  specOp1 = builder.create<SpecPreBufferOp1>(
-      dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-      /*specIn=*/specTrigger.value(), fifoDepth);
-  specOp2 = builder.create<SpecPreBufferOp2>(dstOp->getLoc(),
-                                             /*dataIn=*/srcOpResult, fifoDepth);
+  speculatorOp = builder.create<SpeculatorOp>(
+      dstOp->getLoc(), /*dataOutType=*/srcOpResult.getType(),
+      /*dataIn=*/srcOpResult, /*trigger=*/specTrigger.value(), fifoDepth);
 
   // Replace uses of the original source operation's result with the
-  // specOp1's result, except in the specOp2's operands (otherwise this
-  // would create a self-loop from the speculator to the speculator)
-  srcOpResult.replaceAllUsesExcept(specOp1.getDataOut(), specOp2);
+  // speculator's dataOut, except where srcOpResult feeds the speculator
+  // itself (otherwise this would create a self-loop on the speculator).
+  srcOpResult.replaceAllUsesExcept(speculatorOp.getDataOut(), speculatorOp);
 
   // Assign a Basic Block to the speculator
-  inheritBB(dstOp, specOp1);
-  inheritBB(dstOp, specOp2);
+  inheritBB(dstOp, speculatorOp);
 
   return success();
 }
@@ -683,13 +679,12 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
 
 LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
   llvm::DenseSet<Operation *> visited;
-  visited.insert(specOp1);
-  visited.insert(specOp2);
+  visited.insert(speculatorOp);
 
   // For the speculator, perform downstream traversal to only dataOut, skipping
   // control signals. The upstream dataIn will be handled by the recursive
   // traversal.
-  for (OpOperand &opOperand : specOp1.getDataOut().getUses()) {
+  for (OpOperand &opOperand : speculatorOp.getDataOut().getUses()) {
     if (failed(addSpecTagToSpecRegionRecursive(getContext(), opOperand, true,
                                                visited)))
       return failure();
@@ -698,7 +693,7 @@ LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
 }
 
 LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
-  auto funcOp = cast<FuncOp>(specOp1->getParentOp());
+  auto funcOp = cast<FuncOp>(speculatorOp->getParentOp());
   OpBuilder builder(&getContext());
 
   for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {

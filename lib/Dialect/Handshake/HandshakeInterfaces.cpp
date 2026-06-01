@@ -549,4 +549,52 @@ SmallVector<buffer::RetimingPath> buffer::getRetimingPaths(Operation *unit) {
   return {buffer::RetimingPath(unit)};
 }
 
+/// SpeculatorOp has two independent retiming paths:
+///   - trigger (operand 1) feeds dataOut (result 0) and issueCtrl (result 1):
+///     these are produced when the speculator decides to issue a speculative
+///     token.
+///   - dataIn (operand 0) feeds historyCtrl (result 2) and commitCtrl
+///     (result 3): once the real data arrives the speculator resolves the
+///     speculation and emits the history-control and commit-control signals.
+SmallVector<buffer::RetimingPath> SpeculatorOp::getRetimingPaths() {
+  SmallVector<buffer::RetimingPath> paths;
+
+  buffer::RetimingPath triggerPath;
+  triggerPath.operands.insert(1); // trigger
+  triggerPath.results.insert(0);  // dataOut
+  triggerPath.results.insert(1);  // issueCtrl
+  paths.push_back(triggerPath);
+
+  buffer::RetimingPath dataInPath;
+  dataInPath.operands.insert(0); // dataIn
+  dataInPath.results.insert(2);  // historyCtrl
+  dataInPath.results.insert(3);  // commitCtrl
+  paths.push_back(dataInPath);
+
+  return paths;
+}
+
+/// SpecSaveCommitOp has two independent retiming paths:
+///   - dataIn (operand 0) and issueCtrl (operand 1) feed dataOut (result 0):
+///     the save-commit issues output tokens when both data and the issue
+///     control are present.
+///   - historyCtrl (operand 2) is consumed independently to advance the
+///     internal head pointer. It is on a path with no outputs so its retiming
+///     variable is decoupled from the data path.
+SmallVector<buffer::RetimingPath> SpecSaveCommitOp::getRetimingPaths() {
+  SmallVector<buffer::RetimingPath> paths;
+
+  buffer::RetimingPath dataPath;
+  dataPath.operands.insert(0); // dataIn
+  dataPath.operands.insert(1); // issueCtrl
+  dataPath.results.insert(0);  // dataOut
+  paths.push_back(dataPath);
+
+  buffer::RetimingPath historyPath;
+  historyPath.operands.insert(2); // historyCtrl
+  paths.push_back(historyPath);
+
+  return paths;
+}
+
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

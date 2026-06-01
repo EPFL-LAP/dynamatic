@@ -1369,7 +1369,8 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   IsIntSizedChannel<2, "historyCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -1449,81 +1450,6 @@ def SpeculatorOp : Handshake_Op<"speculator", [
         {::mlir::StringAttr::get(ctx, "FIFO_DEPTH"),
          ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32), getFifoDepth())}
       };
-    }
-  }];
-}
-
-def SpecPreBufferOp1 : Handshake_Op<"spec_prebuffer1", [
-  HasValidSpecTag<"dataOut">,
-  IsSimpleHandshake<"issueCtrl">,
-  IsIntSizedChannel<2, "issueCtrl">,
-  IsSimpleHandshake<"historyCtrl">,
-  IsIntSizedChannel<2, "historyCtrl">,
-]> {
-  let summary = "";
-  let description = [{
-  }];
-
-  let arguments = (ins ControlType:$trigger,
-                       UI32Attr:$fifoDepth);
-  let results = (outs ChannelType:$dataOut,
-                      ChannelType:$issueCtrl,
-                      ChannelType:$historyCtrl);
-
-  let assemblyFormat = [{
-    `[` $trigger `]` attr-dict `:` type($trigger) `,`
-    type($dataOut) `,` type($issueCtrl) `,` type($historyCtrl)
-  }];
-
-  // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Type":$dataOutType, "Value":$trigger, "unsigned":$fifoDepth), [{
-    $_state.addOperands({trigger});
-    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
-
-    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(2));
-
-    $_state.addTypes({dataOutType, ctrlType, ctrlType});
-  }]>];
-
-  let extraClassDefinition = [{
-    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
-    SpecPreBufferOp1::getRTLParameters() {
-      return ::llvm::SmallVector<::mlir::NamedAttribute>{};
-    }
-  }];
-}
-
-def SpecPreBufferOp2 : Handshake_Op<"spec_prebuffer2", [
-  HasValidSpecTag<"dataIn">,
-  IsSimpleHandshake<"commitCtrl">,
-  IsIntSizedChannel<1, "commitCtrl">
-]> {
-  let summary = "";
-  let description = [{
-  }];
-
-  let arguments = (ins ChannelType:$dataIn,
-                       UI32Attr:$fifoDepth);
-  let results = (outs ChannelType:$commitCtrl);
-
-  let assemblyFormat = [{
-    $dataIn attr-dict `:` type($dataIn) `,` type($commitCtrl)
-  }];
-
-  // Infer the type of the control signals
-  let builders = [OpBuilder<(ins "Value":$dataIn, "unsigned":$fifoDepth), [{
-    $_state.addOperands({dataIn});
-    $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
-
-    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
-
-    $_state.addTypes({ctrlType});
-  }]>];
-
-  let extraClassDefinition = [{
-    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
-    SpecPreBufferOp2::getRTLParameters() {
-      return ::llvm::SmallVector<::mlir::NamedAttribute>{};
     }
   }];
 }
@@ -1648,7 +1574,8 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   IsIntSizedChannel<2, "issueCtrl">,
   IsSimpleHandshake<"historyCtrl">,
   IsIntSizedChannel<2, "historyCtrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{

@@ -38,45 +38,6 @@ struct HandshakeSpecPostBufferPass
   void runDynamaticPass() override;
 };
 
-/// Struct to allow packaged return of the funcOp
-/// and pre-buffering spec ops
-struct SpecOps {
-  FuncOp funcOp;
-  SpecPreBufferOp1 specOp1;
-  SpecPreBufferOp2 specOp2;
-};
-
-/// Safely get the FuncOp, SpecPreBufferOp1, and SpecPreBufferOp2
-FailureOr<SpecOps> getSpecOps(ModuleOp modOp) {
-
-  // There should be exactly one function
-  auto funcOps = modOp.getOps<FuncOp>();
-  if (std::distance(funcOps.begin(), funcOps.end()) != 1) {
-    modOp.emitError() << "Expected a single FuncOp";
-    return failure();
-  }
-  FuncOp funcOp = *funcOps.begin();
-
-  // The speculation pass splits the speculator into two placeholder
-  // ops (SpecPreBuffer1 and SpecPreBuffer2) so the MILP can treat
-  // them as standard join-semantic units. There should be exactly
-  // one of each — they get coalesced into the real speculator
-  // by this pass.
-  auto op1Range = funcOp.getOps<SpecPreBufferOp1>();
-  if (std::distance(op1Range.begin(), op1Range.end()) != 1) {
-    funcOp.emitError() << "Expected exactly one SpecPreBufferOp1";
-    return failure();
-  }
-
-  auto op2Range = funcOp.getOps<SpecPreBufferOp2>();
-  if (std::distance(op2Range.begin(), op2Range.end()) != 1) {
-    funcOp.emitError() << "Expected exactly one SpecPreBufferOp2";
-    return failure();
-  }
-
-  return SpecOps{funcOp, *op1Range.begin(), *op2Range.begin()};
-}
-
 /// Stores in a do-while loop have commit units before them,
 /// but the values in iteration 0 are non-speculative,
 /// and so pass through the commit without any control signal.
@@ -129,59 +90,28 @@ void bufferCommitCtrl(FuncOp funcOp, SpeculatorOp speculator) {
   }
 }
 
-FailureOr<SpeculatorOp> coalesceSpecOps(FuncOp funcOp, SpecPreBufferOp1 specOp1,
-                                        SpecPreBufferOp2 specOp2,
-                                        unsigned specBB, OpBuilder &builder) {
-  // Build the SpeculatorOp
-  // (specify inputs at construction)
-  SpeculatorOp speculator = builder.create<SpeculatorOp>(
-      /*error message origin=*/specOp1.getLoc(),
-      /*type we are speculating=*/specOp1.getDataOut().getType(),
-      /*the actual value=*/specOp2.getDataIn(),
-      /*trigger=*/specOp1.getTrigger(),
-      /*prediction fifo depth=*/specOp1.getFifoDepth());
-
-  // inherit bb
-  setBB(speculator, specBB);
-
-  // rewire the rest of the IR to use the speculator outputs
-  specOp1.getDataOut().replaceAllUsesWith(speculator.getDataOut());
-  specOp2.getCommitCtrl().replaceAllUsesWith(speculator.getCommitCtrl());
-
-  specOp1.getIssueCtrl().replaceAllUsesWith(speculator.getIssueCtrl());
-  specOp1.getHistoryCtrl().replaceAllUsesWith(speculator.getHistoryCtrl());
-
-  specOp1->erase();
-  specOp2->erase();
-
-  return speculator;
-}
-
 void HandshakeSpecPostBufferPass::runDynamaticPass() {
   ModuleOp modOp = getOperation();
 
-  // safely get the funcOp, specOp1 and specOp2
-  auto ops = getSpecOps(modOp);
-  if (failed(ops))
+  // There should be exactly one function.
+  auto funcOps = modOp.getOps<FuncOp>();
+  if (std::distance(funcOps.begin(), funcOps.end()) != 1) {
+    modOp.emitError() << "Expected a single FuncOp";
     return signalPassFailure();
+  }
+  FuncOp funcOp = *funcOps.begin();
 
-  // getSpecOps returns a struct, unpacking here
-  auto [funcOp, specOp1, specOp2] = *ops;
-
-  // get the spec bb
-  unsigned specBB = getLogicBB(specOp1).value();
-
-  // setup builder, set insertion point in serialized IR
-  OpBuilder builder(funcOp.getContext());
-  builder.setInsertionPoint(specOp1);
-
-  auto speculator = coalesceSpecOps(funcOp, specOp1, specOp2, specBB, builder);
-  if (failed(speculator))
+  // There should be exactly one SpeculatorOp in the function.
+  auto specOps = funcOp.getOps<SpeculatorOp>();
+  if (std::distance(specOps.begin(), specOps.end()) != 1) {
+    funcOp.emitError() << "Expected exactly one SpeculatorOp";
     return signalPassFailure();
+  }
+  SpeculatorOp specOp = *specOps.begin();
 
   // solve underbuffering of cross iteration joining
   // at commits on stores in do-while loops
-  bufferCommitCtrl(funcOp, *speculator);
+  bufferCommitCtrl(funcOp, specOp);
 }
 
 } // namespace
