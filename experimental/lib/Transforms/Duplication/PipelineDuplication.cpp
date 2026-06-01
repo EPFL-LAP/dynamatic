@@ -337,7 +337,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
     llvm::DenseSet<mlir::Value> outsideDrivers;
     visitedOps.insert(startOp);
 
-    if (startOp != data.endOps[0]) {
+    if (!data.endOps.empty() && startOp != data.endOps[0]) {
       for (auto op : startOp->getResults()) {
         if (failed(
                 collectOpsDFS(op, data.endOps, visitedOps, outsideDrivers))) {
