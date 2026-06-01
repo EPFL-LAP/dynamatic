@@ -401,6 +401,103 @@ Take for example this situation:
 
 The speculator has sent `do spec` twice along `issue control` and then `resend` on both `issue control` and `history control`. `resend` wipes the internal history and `do spec` reads from the internal history: if we apply these in the wrong order, the `do spec` instruction will have nothing to send. Synchronized acceptance means the save-commit sees the `resend` along `history control`, but does not accept it until `resend` also arrives along `issue control`.
 
+## Save-Commit Mis-Prediction Recovery
+
+Save-commit mis-prediction recovery poses a challenge due to the dual requirements of 1) re-sending the original value as `non-spec` and 2) discarding all mis-speculated values.
+
+### Situation 1: Resolving Deadlock
+
+Take the following situation:
+
+<img alt="Save Commit Unit" src="./Figures/full_save_commit.png" width="300" />
+
+The pointer-based prediction history of the save-commit wants to resend the `4`, the green value, and have it arrive in `Buffer0`. However, `Buffer0` is full with `6`: the speculator has two unresolved mis-predictions, which on the cycle through the save-commit are present as `5` and `6`.
+
+The save-commit must accept the value from `Buffer0` before it can re-issue `4`. However, the save-commit knowns any incoming values must be mis-speculated. Therefore, to resolve the deadlock, it accepts the value from `Buffer0` without placing it in its history or passing it onwards. This in practice `kill`-s the value.
+
+<img alt="Save Commit Unit" src="./Figures/save_commit_buffer0_empty.png" width="300" />
+
+
+With `Buffer0` now empty, the save-commit can resend the green `4` value. As it does so, it completely resets its pointers, clearing its entire prediction history.
+
+<img alt="Save Commit Unit" src="./Figures/save_commit_resend.png" width="300" />
+
+### Situation 2: Killing Later Mis-Speculations
+
+Consider another situation, where `Buffer0` has 3 slots and a latency of 3.
+<img alt="Save Commit Unit" src="./Figures/save_commit_late_misspec.png" width="300" />
+
+The save-commit can immediately re-issue the value `4` and reset its pointers. 
+
+<img alt="Save Commit Unit" src="./Figures/save_commit_late_misspec_resend.png" width="300" />
+
+However, the save-commit will still receive the mis-speculated `6` value after having performed the resend. 
+
+Therefore, save-commits kill all incoming `spec` value after resend until a `non-spec` value arrives.
+
+### Pseudo-Code
+
+Pseudo-code of the save-commits behaviour is:
+
+```
+NORMAL:
+      # speculate
+      if ctrl_issue is DO_SPEC:
+          if no unsent data:
+              if input data valid and space to store:
+                  emit input data as speculative
+                  if consumer ready:
+                      accept ctrl_issue
+                      update pointers for the transfer
+          else:
+              emit oldest unsent data as speculative
+              if consumer ready:
+                  accept ctrl_issue
+                  update pointers for the transfer
+
+      # discard the oldest data since speculation resolved as correct
+      if ctrl_history is RESOLVE:
+          accept ctrl_history
+          discard oldest data
+
+      # resend the oldest token to recover from misspeculation
+      # — requires RESEND on BOTH control channels simultaneously
+      if ctrl_issue is RESEND and ctrl_history is RESEND:
+          emit oldest token
+          set entering recovery
+          if consumer ready:
+              accept ctrl_issue
+              accept ctrl_history
+              reset pointers
+              # FSM moves to RECOVERY
+
+      # use the input data non-speculatively
+      # — requires NO_CMP on BOTH control channels simultaneously
+      if ctrl_issue is NO_CMP and ctrl_history is NO_CMP:
+          if no data:
+              if input data valid:
+                  emit input data
+          else:
+              emit oldest data
+          if consumer ready:
+              accept ctrl_issue
+              accept ctrl_history
+              update pointers for the transfer
+
+      if entering recovery and input is spec:
+          accept input (killed)
+      else if input arrives and space to store:
+          accept input, write to memory
+
+  RECOVERY:
+      if input is spec:
+          accept input (killed)
+
+      if input is non-spec:
+          exit recovery
+```
+
+<!-- 
 # Cut Content
 
 The placement of the `Save-Commit` units to form the "snapshot point" must-trade off the extent of redundant computation with the number of `Save-Commit` units required to cut every path through the circuit. 
@@ -485,4 +582,4 @@ The speculator and save-commits units therefore individually exit from their mis
 ## Internal Structure
 
 
-
+ -->

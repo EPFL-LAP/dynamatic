@@ -377,7 +377,7 @@ fi
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
-exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"

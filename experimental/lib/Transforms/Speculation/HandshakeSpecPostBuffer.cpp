@@ -50,10 +50,12 @@ void HandshakeSpecPostBufferPass::runOnOperation() {
   }
   FuncOp funcOp = *funcOps.begin();
 
-  // There should be exactly one SpeculatorOp in the function.
+  // No speculator: nothing for this pass to do.
   auto specOps = funcOp.getOps<SpeculatorOp>();
+  if (specOps.empty())
+    return;
   if (std::distance(specOps.begin(), specOps.end()) != 1) {
-    funcOp.emitError() << "Expected exactly one SpeculatorOp";
+    funcOp.emitError() << "Expected at most one SpeculatorOp";
     return signalPassFailure();
   }
   SpeculatorOp specOp = *specOps.begin();

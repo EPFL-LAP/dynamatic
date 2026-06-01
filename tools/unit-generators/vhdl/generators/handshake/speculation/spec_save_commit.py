@@ -83,7 +83,6 @@ architecture arch of {name} is
   signal resend_accept : std_logic;
   signal drop_spec_ins : std_logic;
 
-  signal head_behind_curr : std_logic;
 begin
 
   ------------------------
@@ -113,8 +112,6 @@ begin
 
   -- we can accept save controls when the next cycle is not misspec recovery
   no_unkilled_mispreds <= (not misspec_recovery_bit) or leaving_recovery;
-
-  head_behind_curr <= '1' when Head /= Curr else '0';
 
   ----------------------------
 
@@ -187,15 +184,10 @@ begin
     -- if we want to discard the oldest data
     -- in the save commit
     -- since speculation resolved as correct
-    --
-    -- note: gating head to always be behind curr
-    -- probably unneeded, but we keep for right
-    -- now for simplicity
     if do_cmp_correct = '1' then
-        -- accept control if head is behind curr
-        ctrl_history_ready <= head_behind_curr;
+        ctrl_history_ready <= '1';
 
-        HeadEn <= head_behind_curr;
+        HeadEn <= '1';
     end if;
 
     -- if we want to resend the oldest token
