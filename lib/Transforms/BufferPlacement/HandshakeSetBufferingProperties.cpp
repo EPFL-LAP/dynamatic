@@ -86,16 +86,14 @@ setSpeculatorBufferingProperties(handshake::FuncOp funcOp) {
   // We place a buffer here for safety.
   Value issueCtrl = specOp.getIssueCtrl();
   Channel issueChannel(issueCtrl, true);
-  issueChannel.props->minTrans =
-      std::max(issueChannel.props->minTrans, 1U);
+  issueChannel.props->minTrans = std::max(issueChannel.props->minTrans, 1U);
 
   // historyCtrl is on a path from a lazy fork
   // to a join
   // and so needs a buffer to prevent deadlock
   Value historyCtrl = specOp.getHistoryCtrl();
   Channel resolveChannel(historyCtrl, true);
-  resolveChannel.props->minTrans =
-      std::max(resolveChannel.props->minTrans, 1U);
+  resolveChannel.props->minTrans = std::max(resolveChannel.props->minTrans, 1U);
 
   // The speculator's KILL_ONLY_DATA state stalls the data input for
   // 1 cycle during misspeculation recovery. A transparent buffer on

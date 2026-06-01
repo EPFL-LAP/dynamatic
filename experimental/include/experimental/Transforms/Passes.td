@@ -35,7 +35,7 @@ def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
-def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
+def HandshakeSpeculation : Pass<"handshake-speculation", "::mlir::ModuleOp"> {
   let summary = "Place Speculation operations";
   let description = [{
       Speculative execution involves speculating on the output of a long 
@@ -58,9 +58,11 @@ def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
       from the speculator position. 
   }];
   let options = [];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
-def HandshakeSpecPostBuffer : DynamaticPass<"handshake-spec-post-buffer"> {
+def HandshakeSpecPostBuffer : Pass<"handshake-spec-post-buffer", "::mlir::ModuleOp"> {
   let summary = "Post-buffering speculation pass";
   let description = [{
     Speculation integration requires some steps to be performed after the
@@ -70,8 +72,9 @@ def HandshakeSpecPostBuffer : DynamaticPass<"handshake-spec-post-buffer"> {
       which is needed due to the conditionally-present join in the commit unit
       being unrepresentable to the buffering algorithm.
   }];
-  let options = [
-  ];
+  let options = [];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {

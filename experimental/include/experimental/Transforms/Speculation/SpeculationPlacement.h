@@ -52,7 +52,7 @@ public:
 
   /// Initializer with operand specifying the speculator position
   SpeculationPlacements(OpOperand &speculatorPosition)
-      : speculator(&speculatorPosition){};
+      : speculator(&speculatorPosition) {};
 
   /// Set the speculator position from a `dynamatic.speculate` dict attribute
   /// on the given producer op. Sets both speculatorFifoDepth and

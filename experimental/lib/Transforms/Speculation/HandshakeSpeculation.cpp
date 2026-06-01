@@ -15,7 +15,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -52,7 +51,7 @@ struct HandshakeSpeculationPass
 
   using HandshakeSpeculationBase::HandshakeSpeculationBase;
 
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 private:
   SpeculationPlacements placements;
@@ -730,7 +729,7 @@ LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
   return success();
 }
 
-void HandshakeSpeculationPass::runDynamaticPass() {
+void HandshakeSpeculationPass::runOnOperation() {
   mlir::ModuleOp modOp = getOperation();
 
   if (failed(SpeculationPlacements::readFromAttribute(modOp, this->placements)))
@@ -772,6 +771,13 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
+
+  // Name any ops created by this pass; subsequent passes assume every op has
+  // a unique name.
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+  markAnalysesPreserved<NameAnalysis>();
 }
 
 } // namespace

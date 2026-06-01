@@ -1585,8 +1585,8 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     a copy of them.
 
     Two control inputs broadcast from the speculator:
-    $issueCtrl (begin vs resend, 1-bit payload) triggers issuing on outs;
-    $historyCtrl (resolve) advances Head independently of outs_ready.
+    $issueCtrl affects how tokens are issued
+    $historyCtrl affects how the internalt token history is updated
 
     Example:
 

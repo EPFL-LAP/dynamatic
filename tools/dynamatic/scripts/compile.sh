@@ -54,6 +54,7 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
@@ -302,9 +303,8 @@ else
     "Applied transformations to handshake"
 fi
 
-# Speculation (pre-buffer): canonicalize, then place speculative units.
+# Speculation (pre-buffer): place speculative units and then materialize.
 if [[ "$SPECULATION" == "1" ]]; then
-  F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-speculation \
     --handshake-materialize \
@@ -367,19 +367,13 @@ else
   cd - > /dev/null
 fi
 
-# Speculation (post-buffer): coalesce speculative units, rewire commit ctrl.
-if [[ "$SPECULATION" == "1" ]]; then
-  F_HANDSHAKE_SPEC_POST_BUFFER="$COMP_DIR/handshake_spec_post_buffer.mlir"
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
-    --handshake-spec-post-buffer \
-    --handshake-materialize \
-    > "$F_HANDSHAKE_SPEC_POST_BUFFER"
-  exit_on_fail "Failed spec post-buffering" "Spec post-buffering done"
-  F_HANDSHAKE_BUFFERED="$F_HANDSHAKE_SPEC_POST_BUFFER"
-fi
-
-# handshake canonicalization
+# speculation (post-buffer): 
+# add extra buffer slots to cover the commit unit weirdness 
+# materialize and then
+# canonicalize
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+  --handshake-spec-post-buffer \
+  --handshake-materialize \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"

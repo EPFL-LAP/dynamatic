@@ -8,6 +8,7 @@ namespace experimental {
 } // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
@@ -35,32 +36,50 @@ struct HandshakeSpecPostBufferPass
     : public dynamatic::experimental::impl::HandshakeSpecPostBufferBase<
           HandshakeSpecPostBufferPass> {
   using HandshakeSpecPostBufferBase::HandshakeSpecPostBufferBase;
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 };
 
-/// Stores in a do-while loop have commit units before them,
-/// but the values in iteration 0 are non-speculative,
-/// and so pass through the commit without any control signal.
-///
-/// The commit control generated in iteration 0 is then used
-/// to kill/discard the value going to the store in iteration 1.
-/// In general, at that commit unit, the commit control joins
-/// with data from the next iteration.
-///
-/// Since the MILP buffering algorithm cannot see this,
-/// the commit control path is sometimes underbuffered,
-/// which causes backpressure into the speculator
-/// until the data from the next iteration arrives.
-///
-/// We therefore add 1 extra buffer on the control path
-/// to the commit, if the commit is inside the same BB
-/// as the speculator
-///
-/// Maybe more are actually needed on some kernels, we do not
-/// know exactly what the buffering requirements here are.
-void bufferCommitCtrl(FuncOp funcOp, SpeculatorOp speculator) {
+void HandshakeSpecPostBufferPass::runOnOperation() {
+  ModuleOp modOp = getOperation();
+
+  // There should be exactly one function.
+  auto funcOps = modOp.getOps<FuncOp>();
+  if (std::distance(funcOps.begin(), funcOps.end()) != 1) {
+    modOp.emitError() << "Expected a single FuncOp";
+    return signalPassFailure();
+  }
+  FuncOp funcOp = *funcOps.begin();
+
+  // There should be exactly one SpeculatorOp in the function.
+  auto specOps = funcOp.getOps<SpeculatorOp>();
+  if (std::distance(specOps.begin(), specOps.end()) != 1) {
+    funcOp.emitError() << "Expected exactly one SpeculatorOp";
+    return signalPassFailure();
+  }
+  SpeculatorOp specOp = *specOps.begin();
+
+  // Stores in a do-while loop have commit units before them,
+  // but the values in iteration 0 are non-speculative,
+  // and so pass through the commit without any control signal.
+  //
+  // The commit control generated in iteration 0 is then used
+  // to kill/discard the value going to the store in iteration 1.
+  // In general, at that commit unit, the commit control joins
+  // with data from the next iteration.
+  //
+  // Since the MILP buffering algorithm cannot see this,
+  // the commit control path is sometimes underbuffered,
+  // which causes backpressure into the speculator
+  // until the data from the next iteration arrives.
+  //
+  // We therefore add 1 extra buffer on the control path
+  // to the commit, if the commit is inside the same BB
+  // as the speculator
+  //
+  // Maybe more are actually needed on some kernels, we do not
+  // know exactly what the buffering requirements here are.
   OpBuilder builder(funcOp.getContext());
-  unsigned specBB = getLogicBB(speculator).value();
+  unsigned specBB = getLogicBB(specOp).value();
 
   // any commit could be in the do-while loop
   for (auto commitOp : funcOp.getOps<SpecCommitOp>()) {
@@ -88,30 +107,12 @@ void bufferCommitCtrl(FuncOp funcOp, SpeculatorOp speculator) {
           /*exceptedUser=*/bufCtrl);
     }
   }
-}
 
-void HandshakeSpecPostBufferPass::runDynamaticPass() {
-  ModuleOp modOp = getOperation();
-
-  // There should be exactly one function.
-  auto funcOps = modOp.getOps<FuncOp>();
-  if (std::distance(funcOps.begin(), funcOps.end()) != 1) {
-    modOp.emitError() << "Expected a single FuncOp";
+  // Name any ops created by this pass.
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
     return signalPassFailure();
-  }
-  FuncOp funcOp = *funcOps.begin();
-
-  // There should be exactly one SpeculatorOp in the function.
-  auto specOps = funcOp.getOps<SpeculatorOp>();
-  if (std::distance(specOps.begin(), specOps.end()) != 1) {
-    funcOp.emitError() << "Expected exactly one SpeculatorOp";
-    return signalPassFailure();
-  }
-  SpeculatorOp specOp = *specOps.begin();
-
-  // solve underbuffering of cross iteration joining
-  // at commits on stores in do-while loops
-  bufferCommitCtrl(funcOp, specOp);
+  markAnalysesPreserved<NameAnalysis>();
 }
 
 } // namespace
