@@ -5,6 +5,7 @@ OUTPUT_DIR=$2
 KERNEL_NAME=$3
 F_HANDSHAKE_EXPORT=$4
 F_HANDSHAKE_RIGIDIFIED=$5
+USE_K_INDUCTION=$6
 
 # We need python (version>=3.12) for the RTL/SMV codegen (this environment is installed via CMake).
 source "$DYNAMATIC_DIR/build/python3-venv/bin/activate"
@@ -38,10 +39,9 @@ for i in $@; do
   fi
 done
 
-if [ ! -z $VERIFY_INVARIANTS ]; then
-  ANNOTATE_FLAGS="annotate-list=EagerForkNotAllOutputSent,CopiedSlotsOfActiveForksAreFull,EagerForkPathTokenCopiedMaximumOnce"
-  SMV_GENERATION_FLAGS="--verify-invariants"
-  RESULT_PARSE_FLAGS="--abort-on-unproven"
+if [ $USE_K_INDUCTION -gt 0 ]; then
+  echo "Setting up k-induction with k=$USE_K_INDUCTION"
+  ANNOTATE_FLAGS="annotate-properties annotate-invariants"
   NUXMV_SCRIPT="set verbose_level 0;
 set pp_list cpp;
 set counter_examples 0;
@@ -54,11 +54,12 @@ set cone_of_influence;
 set use_coi_size_sorting 1;
 read_model -i $MODEL_DIR/main.smv;
 go_bmc;
-check_invar_bmc -a classic;
+check_invar_bmc -a een-sorensson -k $USE_K_INDUCTION;
 show_property -o $F_NUXMV_PROP;
 time;
 quit"
 else
+  echo "Setting up BDD-based reachability analysis"
   ANNOTATE_FLAGS="annotate-properties"
   NUXMV_SCRIPT="set verbose_level 0;
 set pp_list cpp;
@@ -77,6 +78,12 @@ check_ctlspec;
 show_property -o $F_NUXMV_PROP;
 time;
 quit"
+fi
+
+if [ ! -z $VERIFY_INVARIANTS ]; then
+  ANNOTATE_FLAGS="annotate-list=EagerForkNotAllOutputSent,CopiedSlotsOfActiveForksAreFull,EagerForkPathTokenCopiedMaximumOnce"
+  SMV_GENERATION_FLAGS="--verify-invariants"
+  RESULT_PARSE_FLAGS="--abort-on-unproven"
 fi
 
 
@@ -117,7 +124,7 @@ exit_on_fail "Failed to create formal testbench" \
   "Created formal testbench"
 
 # use the modelcheker
-echo $NUXMV_SCRIPT > $F_NUXMV_CMD
+echo "$NUXMV_SCRIPT" > $F_NUXMV_CMD
 exit_on_fail "Failed to create SMV script" \
   "Created SMV script"
 
