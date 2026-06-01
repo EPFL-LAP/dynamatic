@@ -24,6 +24,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/JSON.h"
+#include <functional>
 #include <unordered_map>
 
 namespace dynamatic {
@@ -57,9 +58,9 @@ public:
   /// sets the metric's value otherwise. For the returned metric to make any
   /// sense, the metric must be monotonically increasing with respect to the
   /// bitwidth.
-  LogicalResult getCeilMetric(unsigned bitwidth, M &metric) const {
+  FailureOr<std::reference_wrapper<const M>> select(unsigned bitwidth) const {
     std::optional<unsigned> widthCeil;
-    M metricCeil{};
+    const M *metricCeil = nullptr;
 
     // Iterate over the available bitwidths and determine which is the closest
     // one above the operation's bitwidth
@@ -67,7 +68,7 @@ public:
       if (width >= bitwidth) {
         if (!widthCeil.has_value() || *widthCeil > width) {
           widthCeil = width;
-          metricCeil = metric;
+          metricCeil = &metric;
         }
       }
     }
@@ -78,38 +79,36 @@ public:
       // we have to fail
       return failure();
 
-    metric = metricCeil;
-    return success();
+    // convert from pointer to a const reference wrapper
+    return std::cref(*metricCeil);
   }
 
   /// Determines the value of the metric at the bitwidth that is closest and
   /// greater than or equal to the passed operation's datawidth. See override's
   /// documentation for more details.
-  LogicalResult getCeilMetric(Operation *op, M &metric) const {
-    return getCeilMetric(getOpDatawidth(op), metric);
+  FailureOr<std::reference_wrapper<const M>> select(Operation *op) const {
+    return select(getOpDatawidth(op));
   }
 };
 
-/// Represents a metric of type M that is delay-dependent i.e., whose value
-/// changes depending on the delay of the signal it refers to. Internally, it
-/// maps any number of the metric's data points (with no specific order) with
-/// the delay at which they were measured.
-template <typename M>
+/// Represents a delay-dependent latency: maps any number of internal
+/// combinational delays (with no specific order) to the latency measured at
+/// that delay.
 struct DelayDepMetric {
 public:
   /// Data points for the metric, mapping a delay with the metric's value
   std::map<double, double> data;
+
   /// Computes and returns the metric value for the highest delay that does not
   /// exceed the target period—effectively selecting the fastest implementation
   /// that still meets timing constraints.
   ///
   /// Based on observed trends, higher combinational delays generally correspond
-  /// to lower latency, due to deeper pipelining. Since this struct is currently
-  /// only used for delay-to-latency maps, this assumption motivates the
-  /// selection strategy.
-  LogicalResult getDelayCeilMetric(double targetPeriod, M &metric) const {
+  /// to lower latency, due to deeper pipelining.
+  /// This assumption motivates the selection strategy.
+  FailureOr<double> selectLatency(double targetPeriod) const {
     std::optional<double> opDelayCeil;
-    M metricFloor = 0.0;
+    double metricFloor = 0.0;
     // Find highest delay that's <= targetPeriod
     for (const auto &[opDelay, val] : data) {
       if (opDelay <= targetPeriod) {
@@ -136,11 +135,10 @@ public:
       metricFloor = minIt->second;
     }
 
-    metric = metricFloor;
-    return success();
+    return metricFloor;
   }
 
-  LogicalResult getDelayCeilValue(double targetPeriod, double &delay) const {
+  FailureOr<double> selectDelay(double targetPeriod) const {
     std::optional<double> opDelayCeil;
     // Find highest delay that's <= targetPeriod
     for (const auto &[opDelay, val] : data) {
@@ -166,8 +164,29 @@ public:
       opDelayCeil = minIt->first;
     }
 
-    delay = *opDelayCeil;
-    return success();
+    return *opDelayCeil;
+  }
+};
+
+/// Represents a metric of type M that is retiming-path-dependent:
+/// a unit with multiple independent retiming paths
+/// may have different timing info along those paths
+/// Lookup is by exact path id; ops with a single retiming path use id 0.
+struct PathDepMetric {
+public:
+  /// Data points for the metric, mapping a retiming-path id to the
+  /// bitwidth-dependent timing metric for that path.
+  std::unordered_map<unsigned, BitwidthDepMetric<DelayDepMetric>> data;
+
+  /// Returns a reference to the metric stored for the given path id. Fails
+  /// if the path id is not present.
+  FailureOr<std::reference_wrapper<const BitwidthDepMetric<DelayDepMetric>>>
+  select(unsigned pathId) const {
+    auto it = data.find(pathId);
+    if (it == data.end())
+      return failure();
+    // convert to const reference wrapper
+    return std::cref(it->second);
   }
 };
 
@@ -177,13 +196,21 @@ public:
 bool fromJSON(const llvm::json::Value &value, BitwidthDepMetric<double> &metric,
               llvm::json::Path path);
 
-/// Deserializes a JSON map into a BitwidthDepMetric<DelayDepMetric<double>>
-/// struct. This is done by first deserialising individual values with a nested
-/// fromJSON, to fill a latency map which will be passed as the data field of
-/// the struct.
-bool fromJSON(const llvm::json::Value &value,
-              BitwidthDepMetric<DelayDepMetric<double>> &metric,
+/// Deserializes a JSON map keyed by combinational-delay strings into a
+/// DelayDepMetric, populating its delay->latency table.
+bool fromJSON(const llvm::json::Value &value, DelayDepMetric &metric,
               llvm::json::Path path);
+
+/// Deserializes a JSON map into a BitwidthDepMetric<DelayDepMetric>,
+/// deserializing each value with the DelayDepMetric fromJSON above.
+bool fromJSON(const llvm::json::Value &value,
+              BitwidthDepMetric<DelayDepMetric> &metric, llvm::json::Path path);
+
+/// Deserializes a JSON map keyed by retiming-path id into a per-path timing
+/// metric, deserializing each value with the BitwidthDepMetric<DelayDepMetric>
+/// overload above.
+bool fromJSON(const llvm::json::Value &value,
+              PathDepMetric &latAndMaxFreqByPath, llvm::json::Path path);
 
 /// Stores the timing model for an operation's type, usually parsed from a JSON
 /// file. It stores the operation's (datawidth-dependent) latencies,
@@ -202,11 +229,18 @@ public:
     double readyDelay = 0.0;
   };
 
-  /// Operation's latency, depending on its bitwidth and internal combinational
-  /// delay. This information is saved in a nested two-level map where the keys
-  /// of the first level are bitwidth (BitwidthDepMetric map) and the ones of
-  /// the second level are delays (DelayDepMetric map).
-  BitwidthDepMetric<DelayDepMetric<double>> latency;
+  /// Operation's latency and max frequency (as clock period)
+  /// rather than a sensible characterization system
+  /// we pretend latency and max frequency info is dependent on
+  /// retiming path, bitwidth, and target frequency (as clock period)
+  /// (so target clock period is an input,
+  /// and max frequency (as clock period) is a value returned)
+  ///
+  /// This is done with a confusing stack of dictionaries
+  /// rather a triplet based key
+  /// because the data structures are coupled to more than one system :(
+  PathDepMetric latAndMaxFreqByPath;
+
   /// Operation's data delay, depending on its bitwidth.
   BitwidthDepMetric<double> dataDelay;
   /// Delay of valid wire.
@@ -279,7 +313,8 @@ public:
   /// may not always be true. Once we have formal timing models we will be able
   /// to return the real latency for those signal types too.
   LogicalResult getLatency(Operation *op, SignalType signalType,
-                           double &latency, double targetPeriod) const;
+                           double &latency, double targetPeriod,
+                           unsigned pathId = 0) const;
 
   LogicalResult getInternalCombinationalDelay(Operation *op,
                                               SignalType signalType,

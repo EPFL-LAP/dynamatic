@@ -61,15 +61,31 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
   if (!model)
     return {0.0, 0.0};
 
-  double inBufDelay = 0.0, outBufDelay = 0.0;
   unsigned bitwidth;
   switch (signalType) {
   case SignalType::DATA:
     bitwidth = getHandshakeTypeBitWidth(channel.getType());
-    /// TODO: It's bad to discard these results, needs a safer way of querying
-    /// for these delays
-    (void)model->inputModel.dataDelay.getCeilMetric(bitwidth, inBufDelay);
-    (void)model->outputModel.dataDelay.getCeilMetric(bitwidth, outBufDelay);
+
+    // getPortDelays is not written in a way that it can fail elegantly
+    // so if our timing model crashes, we have no simple way to signal it
+    // (other than to crash)
+    //
+    // the last person who wrote this set the delays to a 0.0 default
+    // instead of fixing it to fail elegantly or to crash
+    // and had a TODO marker on it
+    double inBufDelay = 0.0, outBufDelay = 0.0;
+
+    // if the timing model doesn't crash, set in buffer delay properly
+    if (auto inBufDelayOrFail = model->inputModel.dataDelay.select(bitwidth);
+        succeeded(inBufDelayOrFail))
+      inBufDelay = inBufDelayOrFail->get();
+
+    // if the timing model doesn't crash, set out buffer delay properly
+    if (auto outBufDelayOrFail = model->outputModel.dataDelay.select(bitwidth);
+        succeeded(outBufDelayOrFail))
+      outBufDelay = outBufDelayOrFail->get();
+
+    // and return them
     return {inBufDelay, outBufDelay};
   case SignalType::VALID:
     return {model->inputModel.validDelay, model->outputModel.validDelay};
