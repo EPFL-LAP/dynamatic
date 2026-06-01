@@ -562,9 +562,12 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    // Get the ports the channels connect and their retiming MILP variables
+    // Get the operations, operand number, and result number
+    // of this channel
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
+    unsigned dstOperandIdx = channel.use_begin()->getOperandNumber();
+    unsigned srcResultIdx = cast<OpResult>(channel).getResultNumber();
 
     /// No throughput constraints on channels going to stores which
     /// are not connected to the LSQ. In the legacy implementation,
@@ -587,24 +590,20 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
       if (channel == selOp.getTrueValue())
         continue;
 
-    // Retrieve the MILP variables we need. For ops implementing
-    // RetimingPathsOpInterface, the retiming variable depends on which
-    // port of the unit the channel touches; otherwise the singular per-unit
-    // variable is returned.
-    OpOperand &use = *channel.getUses().begin();
-    unsigned dstOperandIdx = use.getOperandNumber();
-    unsigned srcResultIdx = cast<OpResult>(channel).getResultNumber();
+    // Retrieve the struct storing MILP variables
+    // for the src op and dst op
+    UnitVars &srcVars = cfVars.getUnitVarsFor(srcOp);
+    UnitVars &dstVars = cfVars.getUnitVarsFor(dstOp);
 
-    auto srcIt = cfVars.unitVars.find(srcOp);
-    auto dstIt = cfVars.unitVars.find(dstOp);
-    assert(srcIt != cfVars.unitVars.end() && "expected source unit present");
-    assert(dstIt != cfVars.unitVars.end() && "expected dest unit present");
-    UnitVars &srcVars = srcIt->second;
-    UnitVars &dstVars = dstIt->second;
-
+    // get the MILP variable for the channels throughput
     CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
+
+    // get the MILP variable for the retiming variables
+    // for the top and bottom of the channel
     CPVar &retSrc = srcVars.getRetOut(srcResultIdx);
     CPVar &retDst = dstVars.getRetIn(dstOperandIdx);
+
+    // get if the channel is a backedge as an integer
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
 
     // If the channel isn't a backedge, its steady-state occupancy
@@ -613,6 +612,9 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     // We initially place a token in the CFDFC at the loop's backedge
     // so if the channel is a backedge, the occupancy is 1 more
     // than the difference
+    //
+    // occupancy of the channel places a limit on throughput
+    // if a buffer breaking data and valid is placed on the channel
     model->addConstr(chTokenOccupancy == backedge + retDst - retSrc,
                      "throughput_channelRetiming");
   }
@@ -783,9 +785,7 @@ void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
   // for each unit
   for (Operation *unit : cfdfc.units) {
     // get the MILP variables for that unit in this cfdfc
-    auto it = cfVars.unitVars.find(unit);
-    assert(it != cfVars.unitVars.end() && "expected unit present");
-    UnitVars &unitVars = it->second;
+    UnitVars &unitVars = cfVars.getUnitVarsFor(unit);
 
     // enforce that the variables have been initialized correctly
     // (debug mode only)
@@ -1643,9 +1643,7 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     os << "Unit retimings of CFDFC #" << idx << ":\n";
     os.indent();
     for (Operation *op : cf->units) {
-      auto it = cfVars.unitVars.find(op);
-      assert(it != cfVars.unitVars.end() && "expected unit present");
-      UnitVars &unitVars = it->second;
+      UnitVars &unitVars = cfVars.getUnitVarsFor(op);
       os << getUniqueName(op) << ":\n";
       os.indent();
       for (auto [idx, var] : llvm::enumerate(unitVars.getInputRetimingVars()))

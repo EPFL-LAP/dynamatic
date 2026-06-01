@@ -103,6 +103,18 @@ struct CFDFCVars {
   llvm::MapVector<Value, CPVar> channelThroughputs;
   /// CFDFC throughput (real).
   CPVar throughput;
+
+  /// Returns the UnitVars for `op`. Hard-aborts (with an op-attached error
+  /// diagnostic so the unit name and location are visible) if the unit is
+  /// not present in the CFDFC.
+  UnitVars &getUnitVarsFor(Operation *op) {
+    auto it = unitVars.find(op);
+    if (it == unitVars.end()) {
+      op->emitError("expected unit present in CFDFC");
+      llvm_unreachable("getUnitVarsFor: unit not present in CFDFC");
+    }
+    return it->second;
+  }
 };
 
 /// Holds all variables that may be used in the MILP. These are a set of
