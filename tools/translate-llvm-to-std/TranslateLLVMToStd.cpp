@@ -1144,6 +1144,11 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
     llvm::report_fatal_error("__dyn_predict: marker arg is not a ConstantInt");
   uint64_t markerValue = markerValueConst->getValue().getLimitedValue();
 
+  llvm::StringRef typeStr;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(4), typeStr))
+    llvm::report_fatal_error(
+        "__dyn_predict: type arg is not a constant C string");
+
   // get the value we want to predict
   llvm::Value *predVar = callInst->getArgOperand(0);
 
@@ -1168,7 +1173,8 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
       ctx,
       {builder.getNamedAttr("values", builder.getStringAttr(valuesStr)),
        builder.getNamedAttr("location", builder.getStringAttr(location)),
-       builder.getNamedAttr("marker", builder.getI32IntegerAttr(markerValue))});
+       builder.getNamedAttr("marker", builder.getI32IntegerAttr(markerValue)),
+       builder.getNamedAttr("name", builder.getStringAttr(typeStr))});
 
   // build the operationstate that is used for the unregistered op
   mlir::OperationState markerState(

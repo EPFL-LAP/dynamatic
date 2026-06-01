@@ -18,9 +18,11 @@ void prediction(inout_float_t a[N], inout_float_t b[N], in_float_t c) {
     } else {
       b[i] = (y + c) * 10.0f;
     } */
-#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = 0
+#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = \
+                                                    0 type = float
     b[i] = (y + c) * 10.0f;
-#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = 1
+#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = \
+                                                    1 type = float
     a[i] = (y - c) * 10.0f;
   }
 }

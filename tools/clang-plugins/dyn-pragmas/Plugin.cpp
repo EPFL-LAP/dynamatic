@@ -260,6 +260,7 @@ struct PredictPragmaInfo {
   std::string Variable;
   std::string Values;   // "[7, 3, 1]"
   std::string Location; // start or end
+  std::string Type;
   SourceLocation PragmaLoc;
 };
 
@@ -292,7 +293,7 @@ private:
 
     // booleans to track which info we have received
     bool sawVariable = false, sawValues = false, sawLocation = false,
-         sawMarker = false;
+         sawMarker = false, sawType = false;
 
     // store output of lexer
     Token Tok;
@@ -406,6 +407,37 @@ private:
         }
         sawMarker = true;
 
+      } else if (Name == "type") {
+        PP.Lex(Tok);
+        bool isValidType = false;
+
+        // check if it's an inherent keyword type
+        if (Tok.is(tok::kw_int) || Tok.is(tok::kw_float) ||
+            Tok.is(tok::kw_double)) {
+          isValidType = true;
+          PredPragmaInfo.Type = tok::getKeywordSpelling(Tok.getKind());
+        }
+        // check allowed custom identifier types (like int32_t)
+        else if (Tok.is(tok::identifier)) {
+          std::string identName = Tok.getIdentifierInfo()->getName().str();
+          if (identName == "int32_t" || identName == "int64_t") {
+            isValidType = true;
+            PredPragmaInfo.Type = identName;
+          }
+        }
+
+        // else error
+        if (!isValidType) {
+          error(PP, Tok,
+                "expected valid type identifier after type= (e.g., int, float, "
+                "int32_t)");
+          return failure();
+        }
+
+        sawType = true;
+
+        // lex the initial token for the next iteration
+        PP.Lex(Tok);
       } else {
         // otherwise we have gotten an unknown named option
         error(PP, Tok, "unknown option in #pragma DYN predict");
@@ -416,10 +448,11 @@ private:
     // Enforce that we got every option needed
     bool valuesRequired = (PredPragmaInfo.Location != "end");
     if (!sawVariable || (valuesRequired && !sawValues) || !sawLocation ||
-        !sawMarker) {
+        !sawMarker || (valuesRequired && !sawType)) {
       error(PP, FirstToken,
             "#pragma DYN predict requires variable=, "
-            "values= (unless location=end), location=, marker=");
+            "values= (unless location=end), location=, marker=, name= (unless "
+            "location=end)");
       return failure();
     }
     return success();
@@ -433,42 +466,42 @@ private:
     // for each type of variable we could predict on
     // so that no casts are added before or after the speculator
     std::string FuncDecls = "extern _Bool  __dyn_predict_b(_Bool,  const "
-                            "char*, const char*, unsigned int) "
+                            "char*, const char*, unsigned int, const char*) "
                             "__attribute__((noinline, noduplicate));\n"
                             "extern char   __dyn_predict_c(char,   const "
-                            "char*, const char*, unsigned int) "
+                            "char*, const char*, unsigned int, const char*) "
                             "__attribute__((noinline, noduplicate));\n"
                             "extern short  __dyn_predict_s(short,  const "
-                            "char*, const char*, unsigned int) "
+                            "char*, const char*, unsigned int, const char*) "
                             "__attribute__((noinline, noduplicate));\n"
                             "extern int    __dyn_predict_i(int,    const "
-                            "char*, const char*, unsigned int) "
+                            "char*, const char*, unsigned int, const char*) "
                             "__attribute__((noinline, noduplicate));\n"
                             "extern long   __dyn_predict_l(long,   const "
-                            "char*, const char*, unsigned int) "
+                            "char*, const char*, unsigned int, const char*) "
                             "__attribute__((noinline, noduplicate));\n"
                             "extern float  __dyn_predict_f(float,  const "
-                            "char*, const char*, unsigned int) "
+                            "char*, const char*, unsigned int, const char*) "
                             "__attribute__((noinline, noduplicate));\n"
                             "extern double __dyn_predict_d(double, const "
-                            "char*, const char*, unsigned int) "
+                            "char*, const char*, unsigned int, const char*) "
                             "__attribute__((noinline, noduplicate));\n";
 
     // use a generic macro
     std::string GenericMacro =
-        "#define __dyn_predict(x, n, s, m) _Generic((x), \\\n"
+        "#define __dyn_predict(x, n, s, m, t) _Generic((x), \\\n"
         "  _Bool:  __dyn_predict_b, \\\n"
         "  char:   __dyn_predict_c, \\\n"
         "  short:  __dyn_predict_s, \\\n"
         "  int:    __dyn_predict_i, \\\n"
         "  long:   __dyn_predict_l, \\\n"
         "  float:  __dyn_predict_f, \\\n"
-        "  double: __dyn_predict_d)((x), (n), (s), (m))\n";
+        "  double: __dyn_predict_d)((x), (n), (s), (m), (t))\n";
 
-    std::string Call =
-        llvm::formatv("{0} = __dyn_predict({0}, \"{1}\", \"{2}\", {3});\n",
-                      PredPragmaInfo.Variable, PredPragmaInfo.Values,
-                      PredPragmaInfo.Location, PredPragmaInfo.Marker);
+    std::string Call = llvm::formatv(
+        "{0} = __dyn_predict({0}, \"{1}\", \"{2}\", {3}, \"{4}\");\n",
+        PredPragmaInfo.Variable, PredPragmaInfo.Values, PredPragmaInfo.Location,
+        PredPragmaInfo.Marker, PredPragmaInfo.Type);
 
     // LLVM reads files into memory buffers before processing them
     auto MB = llvm::MemoryBuffer::getMemBufferCopy(
