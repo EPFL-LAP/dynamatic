@@ -81,6 +81,7 @@ class Configs:
     # addresses to reduce hardware usage and/or improve timing performance at the cost of potential false conflicts
     # (false positives) between loads and stores, which can reduce performance
     bloomFilter: bool = False
+    bloomFilterSequential: bool = False        # Whether to create the per-address filters in the dispathers and store them in the queue
     bloomFilterHashCount: int = 2              # Number of hash functions used in the Bloom filter (k)
     bloomFilterHashW: int = 8                  # Width of each hash function output
     bloomFilterW: int = 2 ** bloomFilterHashW  # Width of the Bloom filter (m)
@@ -166,6 +167,9 @@ class Configs:
         bloomFilter = get_env("LSQ_BLOOM_FILTER")
         if bloomFilter is not None:
             self.bloomFilter = bool(bloomFilter)
+        bloomFilterSequential = get_env("LSQ_BLOOM_FILTER_SEQUENTIAL")
+        if bloomFilterSequential is not None:
+            self.bloomFilterSequential = bool(bloomFilterSequential)
         bloomFilterHashCount = get_env("LSQ_BLOOM_FILTER_HASH_COUNT")
         if bloomFilterHashCount is not None:
             self.bloomFilterHashCount = bloomFilterHashCount

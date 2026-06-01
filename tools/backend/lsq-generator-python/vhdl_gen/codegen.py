@@ -38,7 +38,9 @@ def codeGen(path_rtl, configs: Configs):
     if configs.numLdPorts > 0:
         # Load Address Port Dispatcher
         ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
-            name, '_lda', configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW)
+            name, '_lda', configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW,
+            bloomFilter=configs.bloomFilter and configs.bloomFilterSequential,
+            bloomFilterW=configs.bloomFilterW)
         ptq_dispatcher_lda.generate(lsq_submodules, path_rtl)
         lsq_submodules.ptq_dispatcher_lda = ptq_dispatcher_lda
 
@@ -50,7 +52,9 @@ def codeGen(path_rtl, configs: Configs):
 
     # Store Address Port Dispatcher
     ptq_dispatcher_sta = dispatchers.PortToQueueDispatcher(
-        name, '_sta', configs.numStPorts, configs.numStqEntries, configs.addrW, configs.stpAddrW)
+        name, '_sta', configs.numStPorts, configs.numStqEntries, configs.addrW, configs.stpAddrW,
+        bloomFilter=configs.bloomFilter and configs.bloomFilterSequential,
+        bloomFilterW=configs.bloomFilterW)
     ptq_dispatcher_sta.generate(lsq_submodules, path_rtl)
     lsq_submodules.ptq_dispatcher_sta = ptq_dispatcher_sta
 
