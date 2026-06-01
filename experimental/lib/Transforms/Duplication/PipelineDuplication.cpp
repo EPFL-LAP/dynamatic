@@ -133,26 +133,33 @@ LogicalResult PipelineDuplicationPass::parseValuesList(
   // split the string by commas to parse each individual number
   llvm::SmallVector<llvm::StringRef> tokens;
   ref.split(tokens, ',', -1, false);
-  bool isFloat = ref.contains('.');
   llvm::SmallVector<mlir::Attribute> attrValues;
   mlir::OpBuilder builder(modOp.getContext());
 
   for (auto token : tokens) {
     token = token.trim();
-    if (isFloat) {
+    if (dataType == "double" || dataType == "float") {
       double doubleVal;
       if (token.getAsDouble(doubleVal)) {
         return failure();
       }
-      attrValues.push_back(
-          builder.getFloatAttr(builder.getF32Type(), doubleVal));
+      if (dataType == "float")
+        attrValues.push_back(
+            builder.getFloatAttr(builder.getF32Type(), doubleVal));
+      else
+        attrValues.push_back(
+            builder.getFloatAttr(builder.getF64Type(), doubleVal));
     } else {
       int intVal;
       if (token.getAsInteger(10, intVal)) {
         return failure();
       }
-      attrValues.push_back(
-          builder.getIntegerAttr(builder.getI32Type(), intVal));
+      if (dataType == "int64_t")
+        attrValues.push_back(
+            builder.getIntegerAttr(builder.getI64Type(), intVal));
+      else
+        attrValues.push_back(
+            builder.getIntegerAttr(builder.getI32Type(), intVal));
     }
   }
   values = builder.getArrayAttr(attrValues);
@@ -199,6 +206,7 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
     auto locationAttr = predictAttr.getAs<mlir::StringAttr>("location");
     auto markerAttr = predictAttr.getAs<mlir::IntegerAttr>("marker");
     auto valuesAttr = predictAttr.getAs<mlir::StringAttr>("values");
+    auto typeAttr = predictAttr.getAs<mlir::StringAttr>("type");
 
     int markerId = markerAttr.getInt();
     llvm::StringRef location = locationAttr.getValue();
@@ -208,6 +216,7 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
       PredictionData newData;
       newData.startOp = nullptr;
       if (valuesAttr) {
+        newData.dataType = typeAttr.getValue();
         if (failed(parseValuesList(modOp, valuesAttr.getValue(), newData.values,
                                    newData.dataType))) {
           llvm::errs() << "Failed to parse value attributes for marker ID "
@@ -322,10 +331,12 @@ void PipelineDuplicationPass::runDynamaticPass() {
     mlir::Block *exitBlock = targetBlock->splitBlock(startOp);
     mlir::Block *falseBlock = funcOp.addBlock();
 
-    // DFS starting from predictInput to find all ops that have to be duplicated
+    // DFS starting from the result of startop to find all ops that have to be
+    // duplicated
     llvm::DenseSet<mlir::Operation *> visitedOps;
     llvm::DenseSet<mlir::Value> outsideDrivers;
     visitedOps.insert(startOp);
+    // TODO: do i need different results?
     if (startOp->getResult(0) == 0 ||
         failed(collectOpsDFS(startOp->getResult(0), data.endOps, visitedOps,
                              outsideDrivers))) {

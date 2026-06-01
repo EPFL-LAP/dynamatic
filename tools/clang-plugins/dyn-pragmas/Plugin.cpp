@@ -429,8 +429,8 @@ private:
         // else error
         if (!isValidType) {
           error(PP, Tok,
-                "expected valid type identifier after type= (e.g., int, float, "
-                "int32_t)");
+                "expected valid type identifier after type= (e.g., int, "
+                "int32_t, int64_t, float, double)");
           return failure();
         }
 

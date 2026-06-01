@@ -1174,7 +1174,7 @@ void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
       {builder.getNamedAttr("values", builder.getStringAttr(valuesStr)),
        builder.getNamedAttr("location", builder.getStringAttr(location)),
        builder.getNamedAttr("marker", builder.getI32IntegerAttr(markerValue)),
-       builder.getNamedAttr("name", builder.getStringAttr(typeStr))});
+       builder.getNamedAttr("type", builder.getStringAttr(typeStr))});
 
   // build the operationstate that is used for the unregistered op
   mlir::OperationState markerState(
