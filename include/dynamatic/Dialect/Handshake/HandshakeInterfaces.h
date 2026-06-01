@@ -85,20 +85,24 @@ class ControlType;
 
 namespace buffer {
 
-/// One independent retiming path declared by an op implementing
-/// handshake::RetimingPathsOpInterface. The path groups a set of operand
-/// indices and a set of result indices that share a single
-/// fluid-retiming token-conservation accounting in the buffer placement
-/// MILP, plus the cycle latency for that path.
+/// One independent retiming path through a unit.
+/// Each operand and result must belong to a single path through the unit
+///
+/// Channels which connect to an operand or result use the retiming variable
+/// of the path the operand or result belongs to.
+///
+/// This allows the MILP solver to correctly distribute token occupancy
+/// accross channels to achieve maximum performance.
 struct RetimingPath {
   llvm::SmallSet<unsigned, 4> operands;
   llvm::SmallSet<unsigned, 4> results;
 
   RetimingPath() = default;
 
-  /// Builds a single-path descriptor that spans every operand and every
-  /// result of `unit`.
-  RetimingPath(Operation *unit) {
+  /// Default constructor for units which do not specify otherwise:
+  /// a single retiming path through the unit
+  /// which all operands and all results belong to
+  explicit RetimingPath(Operation *unit) {
     for (unsigned i = 0, e = unit->getNumOperands(); i < e; ++i)
       operands.insert(i);
     for (unsigned i = 0, e = unit->getNumResults(); i < e; ++i)
@@ -106,11 +110,7 @@ struct RetimingPath {
   }
 };
 
-/// Returns the path partition for `unit`: the interface's declaration if the
-/// op implements RetimingPathsOpInterface, otherwise a single path spanning
-/// every operand and result. Free function (not a member of RetimingPath)
-/// because `SmallVector<RetimingPath>` cannot be used inside RetimingPath's
-/// own class definition (incomplete type).
+/// Returns the retiming paths through a unit
 SmallVector<RetimingPath> getRetimingPaths(Operation *unit);
 
 } // end namespace buffer

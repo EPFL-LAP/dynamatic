@@ -315,7 +315,8 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
       if (pathVars.latency.has_value() && *pathVars.latency == 0.0)
         pathVars.retOut = pathVars.retIn;
       else
-        // otherwise make one
+        // otherwise, the pipelined unit will have an occupancy in steady-state
+        // so the MILP needs a retiming variable to represent this
         pathVars.retOut =
             createVar("retOut" + suffix + "_path" + std::to_string(pathIdx));
     }

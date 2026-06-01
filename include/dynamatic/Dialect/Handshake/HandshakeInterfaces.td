@@ -120,30 +120,22 @@ def ShiftLikeArithOpInterface : OpInterface<"ShiftLikeArithOpInterface"> {
 def RetimingPathsOpInterface : OpInterface<"RetimingPathsOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
-    For ops with independent paths through them. The default buffer
-    placement MILP gives every unit a single fluid retiming variable
-    `r_u`, which forces every input channel of the unit to share a
-    single token-conservation equation with every output channel. Ops
-    that implement this interface partition their operands and results
-    into independent paths. Each path gets its own pair of fluid
-    retiming variables in the MILP, with one throughput constraint per
-    path. The constraint shape is unchanged from the default model — only
-    which retiming variables a given channel ties to changes.
+    For ops with multiple independent paths through them. 
+    
+    If tokens can pass through a unit from a set of operands to a set
+    of results without affecting a separate set of operands and results,
+    then there is multiple paths through the unit.
+    
+    The MILP buffering algorithms require a unique retiming algorithm
+    per path through a unit to correctly distribute token occupancy 
+    among the circuits channels to achieve maximum performance. 
 
-    Every operand and every result of the op must belong to exactly
-    one path. The MILP will assert at variable-creation time if an
-    operand or result is left uncovered or claimed by more than one
-    path.
+    Eachh operand and result of the op must belong to exactly
+    one path.
   }];
   let methods = [
     InterfaceMethod<[{
-      Returns the list of independent retiming paths of this op. Each
-      ::dynamatic::buffer::RetimingPath declares a set of operand
-      indices and a set of result indices. The union of operand sets must
-      equal the op's operand range, and the union of result sets must equal
-      the op's result range — each index appearing in exactly one path.
-      The MILP queries TimingDatabase::getLatency(unit, DATA, lat, period,
-      pathIdx) per path to obtain its cycle latency.
+      Returns the list of independent retiming paths of this op.
     }],
     "llvm::SmallVector<::dynamatic::buffer::RetimingPath>",
     "getRetimingPaths", (ins)
