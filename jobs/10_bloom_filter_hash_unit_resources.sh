@@ -94,7 +94,7 @@ addr_width = int(sys.argv[2])
 
 with open(lsq_json, 'r') as f:
     lsq_config = json.load(f)
-lsq_config['addrW'] = addr_width
+lsq_config['addrWidth'] = addr_width
 with open(lsq_json, 'w') as f:
     json.dump(lsq_config, f)
 EOF
