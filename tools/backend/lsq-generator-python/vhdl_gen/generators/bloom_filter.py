@@ -169,8 +169,14 @@ class BloomFilterHash:
         # generate hash matrices
         rng = random.Random(self.configs.bloomFilterSeed)  # fixed seed for reproducibility
 
-        self.hash_matrices = _generate_h3_hash_matrices(
-            self.configs.bloomFilterHashCount, self.configs.bloomFilterHashW, self.configs.addrW, rng)
+        if self.configs.bloomFilterHashCount == 1 and self.configs.bloomFilterHashW == self.configs.addrW:
+            # Optimization for the case of a single hash function with output width equal to input width. In this case,
+            # we can just use the identity matrix, which is guaranteed to have full rank and no zero rows/columns.
+            identity_matrix = [[1 if i == j else 0 for j in range(self.configs.addrW)] for i in range(self.configs.bloomFilterHashW)]
+            self.hash_matrices = [identity_matrix]
+        else:
+            self.hash_matrices = _generate_h3_hash_matrices(
+                self.configs.bloomFilterHashCount, self.configs.bloomFilterHashW, self.configs.addrW, rng)
 
     def generate(self, lsq_submodules, path_rtl) -> None:
         """

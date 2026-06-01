@@ -206,8 +206,13 @@ class Configs:
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
 
         if self.bloomFilter:
-            # TODO: If bloomFilterHashW > addrW, we should just clamp it to addrW. Otherwise, there will be linearly
-            # dependent hash functions and we will not reach all the bits in the filter. This just wastes resources.
+            # If bloomFilterHashW >= addrW, there at least as many bits in the filter as there are addresses. In this
+            # case, we can simply use a single "hash" which is just the address itself, and there cannot be any false
+            # positives. Thus, we clamp the hash width to the address width, and use a single hash function. This also
+            # avoids linearly dependent hash functions.
+            if self.bloomFilterHashW > self.addrW:
+                self.bloomFilterHashW = self.addrW
+                self.bloomFilterHashCount = 1
             self.bloomFilterW = 2 ** self.bloomFilterHashW
 
         pprint(self.__dict__)
