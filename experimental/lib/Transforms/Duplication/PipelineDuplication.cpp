@@ -336,16 +336,20 @@ void PipelineDuplicationPass::runDynamaticPass() {
     llvm::DenseSet<mlir::Operation *> visitedOps;
     llvm::DenseSet<mlir::Value> outsideDrivers;
     visitedOps.insert(startOp);
-    // TODO: do i need different results?
-    if (startOp->getResult(0) == 0 ||
-        failed(collectOpsDFS(startOp->getResult(0), data.endOps, visitedOps,
-                             outsideDrivers))) {
-      llvm::errs() << "Could not find a valid graph to duplicate. Are all the "
-                      "endops placed correctly?\n";
-      return signalPassFailure();
-    }
-    llvm::errs() << "dfs succeeded\n";
 
+    if (startOp != data.endOps[0]) {
+      for (auto op : startOp->getResults()) {
+        if (failed(
+                collectOpsDFS(op, data.endOps, visitedOps, outsideDrivers))) {
+          llvm::errs()
+              << "Could not find a valid graph to duplicate. Are all the "
+                 "endops placed correctly?\n";
+          return signalPassFailure();
+        }
+      }
+      llvm::errs() << "dfs succeeded\n";
+    } else
+      outsideDrivers.insert(startOp->getResult(0));
     // iterate through the function to sort
     llvm::SmallVector<mlir::Operation *> opsToMove;
     for (mlir::Operation &blockOp : funcOp.getOps()) {
