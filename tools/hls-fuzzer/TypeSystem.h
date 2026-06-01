@@ -218,7 +218,11 @@ public:
               std::move(argTuple)));
         }) {
 
-    static std::array<std::size_t, sizeof...(inputIndices)> storage{
+    // Since the number (and values) of input indices are known at compile time
+    // we can define and reference a statically allocated array in an 'ArrayRef'
+    // without lifetime issues.
+    // A unique array is created for every template instantiation.
+    constexpr static std::array<std::size_t, sizeof...(inputIndices)> storage{
         inputIndices...};
     this->inputIndices = storage;
   }

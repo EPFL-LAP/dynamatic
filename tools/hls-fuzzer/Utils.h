@@ -5,6 +5,15 @@
 
 namespace dynamatic {
 
+//===----------------------------------------------------------------------===//
+//
+// Utility methods that operate on tuples.
+// These are different from existing range based methods in LLVM or the C++
+// standard library in that they need to be able to handle the heterogeneity of
+// tuples, making existing methods impossible to use with tuples.
+//
+//===----------------------------------------------------------------------===//
+
 /// Given a an 'std::index_sequence' filled with the values 'is', constructs
 /// an 'std::tuple' of 'std::integral_constant's with the values in 'is'.
 ///
@@ -102,7 +111,7 @@ decltype(auto) enumerateTuples(F &&f, First &&first, Others &&...others) {
 }
 
 /// Applies the function 'f' to all elements in the tuples 'first' and 'others'
-/// at the same time.
+/// at the same time (like 'zip' in many programming languages).
 /// 'first' and 'others' are required to be of the same length.
 /// 'f' is not expected to return any value.
 template <typename First, typename... Others, typename F>
