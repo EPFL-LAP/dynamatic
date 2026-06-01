@@ -722,7 +722,8 @@ CommandResult VerifyInvariants::execute(CommandArguments &args) {
                                 getSeparator() + "handshake_export.mlir";
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), handshakeExport, "--verify-invariants");
+                 state.getKernelName(), handshakeExport, "\"\"", "1",
+                 "--verify-invariants");
 }
 
 CommandResult Compile::execute(CommandArguments &args) {
