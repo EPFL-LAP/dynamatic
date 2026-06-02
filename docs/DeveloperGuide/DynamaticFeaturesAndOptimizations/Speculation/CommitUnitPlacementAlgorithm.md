@@ -12,7 +12,7 @@ Note that commit units are **not** placed for LoadOp.
 
 MemoryControllerOp is a bit complex, as we want to place commit units for some operands but not for others. Here's how we place them:
 
-<img alt="MC Commit Unit Placement" src="./Figures/CommitUnitPlacementAlgorithm.png" width="600" />
+<img alt="MC Commit Unit Placement" src="./2025/Figures/CommitUnitPlacementAlgorithm.png" width="600" />
 
 When a memory controller communicates with a LoadOp, five ports of the memory controller are used:
 

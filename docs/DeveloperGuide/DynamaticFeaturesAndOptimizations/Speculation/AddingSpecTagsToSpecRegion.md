@@ -12,11 +12,11 @@ The algorithm uses **depth-first search (DFS)** starting from the speculator, ad
 
 Consider the following example (omitting the input to the speculator for simplicity):
 
-![Algorithm Running Example](./Figures/AddingSpecTag1.png)
+![Algorithm Running Example](./2025/Figures/AddingSpecTag1.png)
 
 The algorithm follows these steps:
 
-<img alt="Algorithm Running Example Steps" src="./Figures/AddingSpecTag2.png" width="500" />
+<img alt="Algorithm Running Example Steps" src="./2025/Figures/AddingSpecTag2.png" width="500" />
 
 1. **Start DFS from the speculator**, first reaching `cond_br`.
 

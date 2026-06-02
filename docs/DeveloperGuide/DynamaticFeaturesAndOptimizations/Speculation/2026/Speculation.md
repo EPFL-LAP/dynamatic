@@ -202,6 +202,8 @@ The logic of the speculator is divided into two halves: a "brain", and a "commun
 
 <img alt="Save Commit Unit" src="./Figures/speculator.png" width="800" />
 
+This figure introduces for the first time the `trigger` input of the speculator, which is forked from the control token of the circuit. This is a data-less value Dynamatic uses to indicate a basic block has begun execution. The `trigger` input is used to match the token count between predictions made and `data in` values received, so we can safely use the `data in` input to resolve predictions. 
+
 
 The speculator "brain" unit has 5 elastic output channels: `no cmp`, `do spec`,  `resend`, `kill`, and `resolve`m as well as 3 data outputs: `in data`, `predicted data`, and `resend data`, which do not have a valid and ready signal. 
 
@@ -309,7 +311,7 @@ A simple pseudocode is the easiest way to describe the behaviour of the Output U
 IDLE:
     if mis-prediction detected:
         store data in to resend reg
-        accept trigger              # any trigger now is spec, so kill it
+        accept trigger if present (to kill)
         set resend not done
         # FSM will move to KILL
 
@@ -323,7 +325,8 @@ IDLE:
                 accept data in
                 pop oldest prediction from history
 
-        # if statement 2: did real data arrive before any prediction
+        # if statement 2: did real data arrive 
+        # before any prediction
         if data arrived before prediction:
             emit no_cmp
 
@@ -343,9 +346,9 @@ IDLE:
 
 KILL:
     if data in is spec:
-        accept data in            # to kill it
+        accept data in if present (to kill)
     if trigger is spec:
-        accept trigger            # to kill it
+        accept trigger if present (to kill)
 
     if history not empty:
         emit kill
@@ -363,7 +366,10 @@ KILL:
 
 KILL_ONLY_DATA:
     if data in is spec:
-        accept data in            # to kill it
+        accept data in if present (to kill)
+
+    # if data in is non-spec
+    # FSM will move from KILL_ONLY_DATA
 
     # speculate on the new trigger
     if trigger present and history has room:
@@ -393,7 +399,7 @@ When backpressure propagates to the `issue control` channel, a value can still t
 
 Two handshaking channels between two units poses a issue: there is no guaranteed relative arrival order between the two channels. However, the speculator expects its instructions to be applied in the order they are issued. Additionally, some instructions affect the internal history and also require a value to be issued. How should these instructions be communicated and applied to ensure correctness?
 
-The solution is synchronized acceptance of problematic instructions. Any instruction which affects both the internal history and the issuing of values must be applied after all previous instructions have been succesffuly applied. To avoid the instruction overtaking a value on the other channel, we send the instruction along both channels, and only accept it once it has arrived on both channels.
+The solution is synchronized acceptance of problematic instructions. Any instruction which affects both the internal history and the issuing of values must be applied after all previous instructions have been successfuly applied. To avoid the instruction overtaking a value on the other channel, we send the instruction along both channels, and only accept it once it has arrived on both channels.
 
 Take for example this situation:
 
@@ -476,10 +482,11 @@ NORMAL:
       if ctrl_issue is NO_CMP and ctrl_history is NO_CMP:
           if no data:
               if input data valid:
-                  emit input data
+                  emit input data    
           else:
               emit oldest data
-          if consumer ready:
+
+          if consumer ready and emitting data:
               accept ctrl_issue
               accept ctrl_history
               update pointers for the transfer
@@ -497,89 +504,91 @@ NORMAL:
           exit recovery
 ```
 
-<!-- 
-# Cut Content
-
-The placement of the `Save-Commit` units to form the "snapshot point" must-trade off the extent of redundant computation with the number of `Save-Commit` units required to cut every path through the circuit. 
-
-For example, we could also form the "snapshot" point using 2 `Save-Commit` units, one on each of the outputs of `f1(ai)`, reducing the number of redundant re-executions by 1. However, since speculator can have multiple in-flight predictions, `f1` must still execute many more times than in the original schedule, as each mis-speculation resets the loop iterator back to a prior value. 
-
-This approach simplifies consideration of how to combine speculative and non-speculative values: they are never combined, because a set of values passing through the "snapshot point" must either be all speculative or all non-speculative. 
+## Buffering a Speculative Dataflow Circuit
 
 
-When a prediction is discovered to be correct, the speculator informs the save-commit and commit units of this, so they can take the appropriate response. 
+### Background
 
-When mis-prediction is discovered, the effects of that prediction and also all later predictions must be `kill`-ed, and the computation must be re-executed with the correct input values. The speculator informs the save-commits of the mis-prediction once, causing the computation to receive a full set of correct inputs. The speculator then sends one `kill` communication to the commit units per unresolved prediction in its history. This causes the effects of all predictions after the mis-prediction to be `kill`-ed.
+To achieve maximum throughput of a dataflow circuit, we must ensure that pipelined units in that circuit have enough occupancy. The steady-state throughput of a pipelined unit is a function of its steady-state occupancy: for a given unit with a latency of `L` and steady-state occupancy `N`, the steady-state throughput `θ` will be equal to `N/L`. Increasing the occupancy of the unit therefore increases the throughput of the unit. If the unit is the lowest-throughput unit in the circuit, increasing its throughput increases the throughput of the circuit as a whole.
 
-However, the speculator may still also receive mis-speculated values as input which must also be `kill`-ed. Therefore after mis-prediction is discovered, the speculator `kill`-s all incoming speculative values until a non-speculative value arrives. We discuss the arrival order of mis-speculated and non-speculative values in more detail below.
+Whenever a dataflow circuit contains reconvergent paths, that is two (or more) disjoint paths which begin at a common vertex and end at a common vertex, those paths will have identical steady-state occupancies: tokens must enter all paths at an equal rate and leave all paths at an equal rate. However, occupancy is limited by capacity: a path cannot contain more tokens than it has slots. If one of the paths has a low capacity, all paths will have their occupancy limited by that capacity, which as discussed above, can limit throughput. Therefore, for throughput maximization, it can be required to place additional buffer slots to increase capacity.
 
-### High-Level Overview: The Commit Units
+This can be seen in the figure below:
 
+<img alt="Save Commit Unit" src="./Figures/reconvergent_paths.png" width="200" />
 
-Computations performed with predicted inputs may cause different paths through the circuit to execute, and so commit units are not guaranteed to receives a value each time prediction happens. Therefore, the communication network between the speculator and the commit units must mirror the network used to deliver data inputs to the commit unit.  
+If we wish to achieve a throughput of `1` through `f(x)`, which has a latency of `5`, it must have an occupancy of `5`. `f(x)` is on a reconvergent path from a fork unit to a store unit. In order for `f(x)` to have an occupancy of `5`, the other path from the fork to the store unit must have an occupancy of `5`. In order for the other path to have an occupancy of `5`, it must have at least a capacity of `5`. Therefore to maximize the throughput of `f(x)`, we place 5 buffer slots on the other path from the fork unit to the store unit.
 
+### Reconvergent Paths from Speculator to Commit Units
 
-### High-Level Overview: The Save-Commit Units
+Take the following example circuit, which is the simplest real example of what a speculative dataflow circuit can look like:
 
-The secondary purpose of the save-commits is the "commit" purpose. 
+<img alt="Save Commit Unit" src="./Figures/reconvergent_paths_speculator.png" width="400" />
 
-When a save-commit is informed a prediction was correct, it `discards` the oldest saved value, as the computation the value belongs to will not be re-executed. We use `discard` for "dropping" values which are correct but no longer needed. 
+In order to achieve maximum throughput, we must ensure `f(x)` and `g(x)` have enough steady-state occupancy, and therefore we must ensure that any path on a set of reconvergent paths which include these units have enough capacity. 
 
-When a save-commit is informed a prediction was incorrect, it re-issues the oldest undiscarded value, to allow the re-execution of the computation with correct inputs. The save-commit also `kills` its **entire history of saved values**, as all outputs generated after the mis-prediction are considered mis-speculated.
+In order to correctly identify reconvergent paths, we must examine the speculator, which has two inputs and four outputs. Despite having multiple inputs, the speculator does not act as a join: the input paths do not converge at the speculator and so the speculator cannot be the end vertex of reconvergent paths. In steady state, the speculator produces the the `issue control` and `data out` outputs (blue and green edges, respectively), whenever it receives a `trigger` input (purple). The speculator then produces (again in steady state), the `history control` and `commit control output` (brown and orange, respectively) when it receives the `data in` input (black). In the figure, we show the speculator unit broken in two (`spec` and `ulator`) to show the input-output semantics. 
 
-However, the save-commit may still also receive mis-speculated values as input which must also be `kill`-ed. Therefore after mis-prediction is discovered, the save-commit `kill`-s all incoming speculative values until a non-speculative value arrives. We discuss the arrival order of mis-speculated and non-speculative values in more detail below.
+We must also examine the save-commit unit: while the `data in` input and `issue control` input are joined inside the save-commit to produce the `data out` output, the `history control` input is not involved in producing outputs from the save-commit (in steady-state).
 
-### High-Level Overview: Commit vs. Save-Commit vs. Speculator Mis-Prediction Kill Behaviour
+To identify a set of reconvergent paths, let us filter this circuit to only look at a single commit unit. 
 
-Communication between the speculator and the save-commit for mis-prediction is simpler than communication between the speculator the commit units. 
+<img alt="Save Commit Unit" src="./Figures/reconvergent_paths_speculator1.png" width="400" />
 
-One reason for this simpler communication is that commit units may be placed on conditional paths, and so have no guarantee they will ever execute. The sequence of `kill` or `pass` values that arrive at an arbitrary commit unit could therefore take any value, and so the exact sequence must be communicated to the commit unit.
+The first reconvergent path is from CMerge unit down to the Branch unit joining the green and orange paths. One capacity solution would be to place buffer slots on the green input, to avoid limiting the occupancy of `f(x)`:
 
-If the speculator went multiple predictions ahead and then discovers mis-prediction, the effects of the later predictions must also be `killed`. The speculator performs a round of communication with the commit units for each prediction that must be resolved. For each round of communication, the set of commit units that executed for that specific prediction will receive the communication to `kill` the next incoming value. 
+<img alt="Save Commit Unit" src="./Figures/reconvergent_paths_speculator2.png" width="400" />
 
-The speculator and save-commits instead execute unconditionally, that is they must all execute for every round of speculation. This provides useful information about the sequences of `pass` and `kill` that should be applied at their inputs. 
+Another reconvergent path is from the Fork unit through both `f(x)` and `g(x)`. If `g(x)` has a longer latency than `f(x)`, additional buffering may be required on the commit unit's `commit control` input:
 
-A second reason for this simpler communication is that the speculator and save-commit units do not wait for `pass` values before consuming speculative values. If they did, we would be limited to 1 in-flight speculation, as the speculator and save-commits would wait for the first speculation to resolved before beginning the next round of speculation.
+<img alt="Save Commit Unit" src="./Figures/reconvergent_paths_speculator3.png" width="300" />
 
+This non-exhaustive reconvergent path analysis illustrates how we must characterize the speculative units to the buffering approach, for it to correctly identify reconvergent paths and therefore additional capacity requirements. 
 
-If the speculator went multiple predictions ahead and then discovers mis-prediction, the speculator still only communicates with the save-commit units once. 
+### Speculative Units Re-Timing
 
-th the save-commit and speculator receive mis-speculated values at their input.
+The buffering approach used by Dynamatic represents token occupancy using **fluid retiming variables**. The absolute value of a fluid retiming variable has no particular meaning. However, the difference between two fluid retiming variables indicates the occupancy of the path(s) between those two points during steady-state execution. 
 
+Most units in Dynamatic have a single fluid retiming variable, as there is a single path through the unit. 
 
-There have been 2 previous approaches for deciding how to save non-speculative input values in order to re-execute when mis-prediction occurs. 
+The figure below shows two important concepts: 1) for a set of reconvergent paths, the difference between the fluid retiming variables at the start and end vertices is the steady-state occupancy of the reconvergent paths, and 2) the difference between the retiming variables at the top and bottom of a channel indicate how many buffer slots the buffering approach has requested be placed on that channel.
 
-The original approach saved non-speculative values using 2 different types of dataflow units, and only saved non-speculative values directly before they interacted with a speculative value. This caused complications in cases where the speculative value did not impact the control flow of the circuit. 
+<img alt="Save Commit Unit" src="./Figures/reconvergent_occupancy.png" width="400" />
 
-An example of such a circuit is below:
+The buffering approach then uses a linear solver to select values for fluid retiming variables which maximize the occupancy of pipelined operations and therefore throughput, while minimizing the number of buffers placed. It additionally minimizes critical path delay, and minimizes the number of opaque buffers sequentially placed on cycles (these can separately limit throughput).
 
-<img alt="Pre-speculation circuit" src="./Figures/loop_with_spec.png" width="600" />
+The figures below specify the retiming variables used with the buffering approach for the speculative units: 
 
-Dynamatic does not literally use combined loop header units, however the connections between the units which make up this behaviour are not compatible with the assumptions of the original approach. 
+<img alt="Save Commit Unit" src="./Figures/retiming_variables.png" width="300" />
 
-A second approach by Haoran Zhao solved these issues by moving to 3 units for deciding how values are saved and computations re-executed. By simplifying this to the use of a single unit, we arrived at the current approach, which we call the "snapshot" approach.
+The speculator has two independant paths with independant occupancies, the save commit has one real (joined) path and one dead end, and the commit unit is a normal single-path unit.
 
+### Additional Buffering
 
-This is also what allows the `Save-Commit` units to `kill` their entire input history when mis-prediction is detected. Every value generated after the prediction is considered mis-speculated, even if they were not affected by the prediction.
+Beyond the throughput-maximizing buffers placed by the buffering approach, speculative dataflow circuits require a handful of extra buffers. Some of these we specify to the buffering approach as additional requirements, and one we add post-automated-buffering.
 
-### High Level Overview: Re-Speculating after Mis-Prediction 
+#### Additional Automated Buffering Requirements
 
-When mis-prediction occurs, the speculator and save-commits issue non-speculative values for mis-prediction recovery. 
+The speculator requires at least 1 transparent buffer on 3 of its 4 outputs.
 
-All speculative values anywhere in the circuit are at this point considered mis-speculated, and should be killed. Fine-grained dataflow circuits do not guarantee the location or arrival time of any of these speculative values. 
+<img alt="Save Commit Unit" src="./Figures/spec_buff_min.png" width="300" />
 
-However, for correct execution, we must be able to tell this set of mis-speculated values from a future round of speculation, if speculation begins again. 
+For `data out` and `issue control`, this buffer must be placed directly after the speculator. This is because `data out` and `issue control` are volatile: they may change their value without having the previous value be accepted. This is unsafe to connect to an eager fork unit, as an eager fork unit forwards input data without accepting it. Volatile channels connected to an eager fork can cause the consumers of the eager fork to receive different values when they should all receive the same value. `data out` and `issue control` are volatile as the change their value when mis-prediction is detected, which could occur at any point.
 
-Despite providing no guarantees about arrival time, with some effort we can provide guarantees about the arrival order of tokens.
+`history control` is not volatile. However, `history control` and `issue control` are produced by a lazy fork, and may be joined together in the save-commit unit. Lazy forks outputs which converge at a join can deadlock if an output channel has zero capacity. To avoid this, we request at least one buffer on the `history control` from the buffering approach. 
 
-Therefore, in the current implementation, we separate the two sets of values by the arrival of the non-speculative values. Values that arrived before the non-speculative data are considered mis-speculated, and and values that arrive after the non-speculative data are considered to be from a new round of speculation.
+#### Additional Extra Buffers for Performance 
 
-The speculator and save-commits units therefore individually exit from their mis-prediction recovery state with the arrival of a non-speculative value at their input.
+One aspect of the speculative units that is unrepresentable to the buffering approach is the conditional join at the commit units.
 
+We re-include here the commit unit internals figure:
 
-## Interface
+<img alt="Commit Unit" src="./Figures/commit_unit_internals.png" width="200" />
 
-## Internal Structure
+A `non-spec` `data in` of iteration 0 will pass through the commit unit before a `control` token arrives. Then, if prediction occurs, the `data in` from iteration 1 will arrive as `spec`. The `control` value from iteration 0 will then join with it.
 
+This cross-iteration joining means that the capacities required for maximized occupancy calculated by the buffering approaches may not be correct. 
 
- -->
+To join with the same input but from iteration `i + 1` instead of `i` means the reconvergent path should include the "cycle update calculation", but is does not. In Dynamatic, the steady-state occupancy of the "cycle update calculation" is always exactly 1, as the cycle is guaranteed to contain exactly a single token. 
+
+The steady-state occupancy of the reconvergent paths may therefore actually be 1 larger than the buffering approach identifies. The capacity of the `commit control` channel may therefore need to be 1 more than the number requested by the buffering approach. For this reason, we identify all commit unit at which a cross-iteration join may occur, and add 1 additional buffer slot on the commit control input.
