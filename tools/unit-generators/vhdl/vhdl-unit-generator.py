@@ -97,6 +97,7 @@ if __name__ == "__main__":
     generators.add("handshake", "minimumf")
     generators.add("handshake", "mem_controller")
     generators.add("handshake", "merge")
+    generators.add("handshake", "init")
     generators.add("handshake", "mulf")
     generators.add("handshake", "muli")
     generators.add("handshake", "mux")

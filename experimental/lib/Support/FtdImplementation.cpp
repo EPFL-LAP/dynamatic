@@ -2643,7 +2643,6 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
   BlockIndexing bi(shadowRegion);
   DominanceInfo domInfo(shadow.shadowFunc);
   CFGLoopInfo loopInfo(domInfo.getDomTree(&shadowRegion));
-  auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
   // it comes from the explicit gsa gate insertion process or if it is a generic
@@ -2699,8 +2698,6 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
     return;
 
   Value regeneratedValue = operand;
-  auto cstType = builder.getIntegerType(1);
-  auto cstAttr = IntegerAttr::get(cstType, 0);
 
   // The real (flattened) block where new ops are inserted
   Block *realBlock = &funcOp.getBody().front();
@@ -2795,22 +2792,15 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
     fullDecisionGraph->containerOp->erase();
     locGraph->containerOp->erase();
 
-    // Create the false constant to feed `init`
-    auto constOp = builder.create<handshake::ConstantOp>(consumerOp->getLoc(),
-                                                          cstAttr, startValue);
-    constOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
-    constOp->setAttr("handshake.bb", headerBBAttr);
-  
     // Create the `init` operation
-    SmallVector<Value> mergeOperands = {constOp.getResult(), conditionValue};
-    auto initMergeOp = builder.create<handshake::MergeOp>(consumerOp->getLoc(),
-                                                           mergeOperands);
-    initMergeOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
-    initMergeOp->setAttr("handshake.bb", headerBBAttr);
+    auto initOp = builder.create<handshake::InitOp>(consumerOp->getLoc(),
+                                                    conditionValue);
+    initOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
+    initOp->setAttr("handshake.bb", headerBBAttr);
   
     // The multiplexer is to be fed by the init block, and takes as inputs the
     // regenerated value and the result itself (to be set after) it was created.
-    auto selectSignal = initMergeOp.getResult();
+    auto selectSignal = initOp.getResult();
     selectSignal.setType(channelifyType(selectSignal.getType()));
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
@@ -2954,7 +2944,7 @@ void ftd::addRegen(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
 
 LogicalResult experimental::ftd::addGsaGates(
     Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
-    Backedge startValue,
+    Backedge /*startValue*/,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
     bool removeTerminators) {
 
@@ -2963,13 +2953,11 @@ LogicalResult experimental::ftd::addGsaGates(
 
   // The function instantiates the GAMMA and MU gates as provided by the GSA
   // analysis pass. A GAMMA function is translated into a multiplexer driven by
-  // single control signal and fed by two operands; a MU function is
-  // translated into a multiplexer driven by an init (it is currently
-  // implemented as a Merge fed by a constant triggered from Start once and
-  // from the loop condition thereafter). The input of one of these functions
-  // might be another GSA function, and it's possible that the function was
-  // not instantiated yet. For this reason, we keep track of the missing
-  // operands, and reconnect them later on.
+  // single control signal and fed by two operands; a MU function is translated
+  // into a multiplexer driven by an init. The input of one of these functions
+  // might be another GSA function, and it's possible that the function was not
+  // instantiated yet. For this reason, we keep track of the missing operands,
+  // and reconnect them later on.
   //
   // To simplify the way GSA functions are handled, each of them has an unique
   // index.
@@ -3183,32 +3171,13 @@ LogicalResult experimental::ftd::addGsaGates(
         mlir::DominanceInfo domInfo;
         mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
-        // The inputs of the merge are the condition value and a `false`
-        // constant driven by the start value of the function. This will
-        // created later on, so we use a dummy value.
-        SmallVector<Value> mergeOperands;
-        mergeOperands.push_back(conditionValue);
-        mergeOperands.push_back(conditionValue);
-
-        auto initMergeOp =
-            rewriter.create<handshake::MergeOp>(loc, mergeOperands);
-
-        initMergeOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-        setBBAttr(initMergeOp, gate->getBlock(), rewriter);
+        auto initOp = rewriter.create<handshake::InitOp>(loc, conditionValue);
+        initOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
+        setBBAttr(initOp, gate->getBlock(), rewriter);
 
         // Replace the new condition value
-        conditionValue = initMergeOp->getResult(0);
+        conditionValue = initOp.getResult();
         conditionValue.setType(channelifyType(conditionValue.getType()));
-
-        // Add the activation constant driven by the backedge value, which will
-        // be then updated with the real start value, once available
-        auto cstType = rewriter.getIntegerType(1);
-        auto cstAttr = IntegerAttr::get(cstType, 0);
-        rewriter.setInsertionPointToStart(initMergeOp->getBlock());
-        auto constOp = rewriter.create<handshake::ConstantOp>(
-            initMergeOp->getLoc(), cstAttr, startValue);
-        constOp->setAttr(FTD_INIT_MERGE, rewriter.getUnitAttr());
-        initMergeOp->setOperand(0, constOp.getResult());
       }
 
       // When a single input gamma is encountered, a mux is inserted as a

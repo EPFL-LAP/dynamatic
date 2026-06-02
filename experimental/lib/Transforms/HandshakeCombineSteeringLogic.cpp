@@ -110,73 +110,28 @@ static bool areEquivalentValues(Value a, Value b) {
   return false;
 }
 
-static FailureOr<int>
-getSingleConstantOperandIndex(handshake::MergeOp mergeOp) {
-  int constIdx = -1;
-  for (int i = 0; i < 2; i++) {
-    if (!isa_and_nonnull<handshake::ConstantOp>(
-            mergeOp.getDataOperands()[i].getDefiningOp()))
-      continue;
-
-    if (constIdx != -1)
-      return failure();
-    constIdx = i;
-  }
-
-  if (constIdx == -1)
-    return failure();
-  return constIdx;
-}
-
-/// Combine redundant init merges. These merges have one constant input and a
-/// condition input. If two merges are identical, then one of them can be
-/// removed
-struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
+/// Combine redundant init operations fed by the same condition.
+struct CombineInits : public OpRewritePattern<handshake::InitOp> {
+  using OpRewritePattern<handshake::InitOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::InitOp initOp,
                                 PatternRewriter &rewriter) const override {
 
-    // Work only with merges having two inputs
-    if (mergeOp->getNumOperands() != 2)
+    // Work only with init operations having one input.
+    if (initOp->getNumOperands() != 1)
       return failure();
 
-    // Exactly one of the inputs of the merge must be a constant.
-    FailureOr<int> maybeConstIdx = getSingleConstantOperandIndex(mergeOp);
-    if (failed(maybeConstIdx))
-      return failure();
-    int constIdx = *maybeConstIdx;
-
-    // Get the index of the other input
-    int loopIdx = 1 - constIdx;
-
-    SmallVector<handshake::MergeOp> redundantInits;
-    mergeOp->getParentRegion()->walk([&](handshake::MergeOp mergeUser) {
-      if (mergeUser == mergeOp)
-        return;
-      if (mergeUser->getNumOperands() != 2)
-        return;
-
-      FailureOr<int> maybeUserConstIdx =
-          getSingleConstantOperandIndex(mergeUser);
-      if (failed(maybeUserConstIdx) || *maybeUserConstIdx != constIdx)
-        return;
-
-      if (!areEquivalentValues(mergeUser.getDataOperands()[constIdx],
-                               mergeOp.getDataOperands()[constIdx]))
-        return;
-      if (!areEquivalentValues(mergeUser.getDataOperands()[loopIdx],
-                               mergeOp.getDataOperands()[loopIdx]))
-        return;
-
-      redundantInits.push_back(mergeUser);
-    });
+    DenseSet<handshake::InitOp> redundantInits;
+    for (auto *user : initOp.getOperand().getUsers())
+      if (isa_and_nonnull<handshake::InitOp>(user) && user != initOp) {
+        handshake::InitOp initUser = cast<handshake::InitOp>(user);
+        redundantInits.insert(initUser);
+      }
 
     if (redundantInits.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineInits applied");
     for (auto init : redundantInits) {
-      rewriter.replaceAllUsesWith(init.getResult(), mergeOp.getResult());
+      rewriter.replaceAllUsesWith(init.getResult(), initOp.getResult());
       rewriter.eraseOp(init);
     }
 
