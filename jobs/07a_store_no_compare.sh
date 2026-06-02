@@ -5,16 +5,28 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 RUN_EVALUATION_PY="${SCRIPT_DIR}/../tools/evaluation/run_evaluation.py"
 GIT_REVISION="$(git rev-parse --short HEAD)"
 
-LSQ_SIZE=20
+LSQ_SIZES=(4 6 8 10 12 16 20)
 PIPELINE_CONFIGS=(
+	"none"
+	"pipecomp"
+	"pipe0"
+	"pipe1"
+	"pipecomp_pipe0"
+	"pipecomp_pipe1"
+	"pipe0_pipe1"
+	"pipecomp_pipe0_pipe1"
 	"headlag"
+	"headlag_pipecomp"
 	"headlag_pipe0"
+	"headlag_pipe1"
+	"headlag_pipecomp_pipe0"
+	"headlag_pipecomp_pipe1"
+	"headlag_pipe0_pipe1"
+	"headlag_pipecomp_pipe0_pipe1"
 )
 
 export SYNTHESIS_CLOCK_PERIOD_NS="2.5"
 export LSQ_NO_BYPASS=1
-export LSQ_NUM_LDQ_ENTRIES=$LSQ_SIZE
-export LSQ_NUM_STQ_ENTRIES=$LSQ_SIZE
 export LSQ_ST_ISSUE_NO_COMPARE=1
 
 EXPERIMENT_NAME="$(basename "$0" .sh)"
@@ -24,11 +36,15 @@ cat <<EOF >"${OUTPUT_DIR}/README.txt"
 Experiment 7a: Store issue without store-load comparison
 - synthesis target clock period: ${SYNTHESIS_CLOCK_PERIOD_NS} ns
 - pipeline configurations: ${PIPELINE_CONFIGS[*]}
-- LSQ size: ${LSQ_SIZE} entries
+- LSQ sizes: ${LSQ_SIZES[*]} entries
 - git revision: ${GIT_REVISION}
 EOF
 
 for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
+	OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}"
+	echo "Output directory for pipeline configuration = ${PIPELINE_CONFIG}: ${OUTPUT_SUBDIR}"
+	mkdir -p "${OUTPUT_SUBDIR}"
+
 	export LSQ_PIPE_COMP_EN=0
 	export LSQ_PIPE0_EN=0
 	export LSQ_PIPE1_EN=0
@@ -46,11 +62,12 @@ for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
 		export LSQ_HEAD_LAG_EN=1
 	fi
 
-	OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}"
-	echo "Output directory for pipeline configuration = ${PIPELINE_CONFIG}: ${OUTPUT_SUBDIR}"
-	mkdir -p "${OUTPUT_SUBDIR}"
+	for LSQ_SIZE in "${LSQ_SIZES[@]}"; do
+		export LSQ_NUM_LDQ_ENTRIES=$LSQ_SIZE
+		export LSQ_NUM_STQ_ENTRIES=$LSQ_SIZE
 
-	echo "Running evaluation with pipeline configuration = ${PIPELINE_CONFIG}"
-	"$RUN_EVALUATION_PY" --no-synth -j 16 \
-		--json "${OUTPUT_SUBDIR}/data.json"
+		echo "Running evaluation with pipeline configuration = ${PIPELINE_CONFIG}; LSQ size = $LSQ_SIZE"
+		"$RUN_EVALUATION_PY" --no-synth -j 8 \
+			--json "${OUTPUT_SUBDIR}/lsq_${LSQ_SIZE}_${LSQ_SIZE}.json"
+	done
 done
