@@ -26,7 +26,7 @@ def generate_memory_controller(name, params):
 
 
 def _generate_mem_controller_loadless(
-    name, num_stores, num_controls, data_type, addr_type, ctrl_type, smv_input_symbols = None
+    name, num_stores, num_controls, data_type, addr_type, ctrl_type, smv_input_symbols=None
 ):
 
     control_ports = [f"ctrl_{n}" for n in range(num_controls)] + [
@@ -47,11 +47,13 @@ def _generate_mem_controller_loadless(
         + ["memEnd_ready"]
     )
 
-    p_valid_ports = [f"stAddr_{n}_valid & stData_{n}_valid" for n in range(num_stores)]
+    p_valid_ports = [
+        f"stAddr_{n}_valid & stData_{n}_valid" for n in range(num_stores)]
     address_ports = [f"stAddr_{n}" for n in range(num_stores)]
     data_ports = [f"stData_{n}" for n in range(num_stores)]
     n_valid_ports = [f"TRUE" for _ in range(num_stores)]
-    arbiter_args = ", ".join(p_valid_ports + address_ports + data_ports + n_valid_ports)
+    arbiter_args = ", ".join(
+        p_valid_ports + address_ports + data_ports + n_valid_ports)
 
     mc_in_ports = mc_in_ports if smv_input_symbols == None else smv_input_symbols
 
@@ -179,7 +181,6 @@ def _generate_mem_controller(
         f"stData_{n}_valid" for n in range(num_stores)
     ]
 
-
     mc_in_ports = ", ".join(
         ["loadData", "memStart_valid"]
         + control_ports
@@ -190,7 +191,6 @@ def _generate_mem_controller(
         + load_data_ports
         + ["memEnd_ready"]
     )
-
 
     mc_loadless_in_ports = ", ".join(
         ["loadData", "memStart_valid"]
