@@ -1159,11 +1159,13 @@ class LSQ:
         # checks for current and next (if needed) store entry
         store_req_valid_curr = Logic(ctx, 'store_req_valid_curr', 'w')
         store_is_older_arr_curr = LogicArray(ctx, 'store_is_older_arr_curr', 'w', self.configs.numLdqEntries)
+        st_ld_addr_same_or_invalid_curr = LogicArray(ctx, 'st_ld_addr_same_or_invalid_curr', 'w', self.configs.numLdqEntries)
         st_ld_conflict_curr = LogicVec(ctx, 'st_ld_conflict_curr', 'w', self.configs.numLdqEntries)
         if self.configs.pipe0:
             # with pipelining: also compute for the next entry
             store_req_valid_next = Logic(ctx, 'store_req_valid_next', 'w')
             store_is_older_arr_next = LogicArray(ctx, 'store_is_older_arr_next', 'w', self.configs.numLdqEntries)
+            st_ld_addr_same_or_invalid_next = LogicArray(ctx, 'st_ld_addr_same_or_invalid_curr', 'w', self.configs.numLdqEntries)
             st_ld_conflict_next = LogicVec(ctx, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries)
 
         # validity lookup
@@ -1180,11 +1182,31 @@ class LSQ:
                 # with pipelining: also compute for the next entry
                 arch += Op(ctx, store_is_older_arr_next[i], MuxIndex(store_is_older_pcomp[i], stq_issue_next))
 
+        if self.configs.stIssueNoCompare:
+            # To avoid address comparison, we just claim that, for the purpose of store issue, each load has the same
+            # address as each store. This means that a store can only be issued when there are no younger loads, which
+            # is a stronger condition than the actual dependency check.
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, st_ld_addr_same_or_invalid_curr[i], 1)
+            if self.configs.pipe0:
+                # with pipelining: also compute for the next entry
+                for i in range(self.configs.numLdqEntries):
+                    arch += Op(ctx, st_ld_addr_same_or_invalid_next[i], 1)
+        else:
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, st_ld_addr_same_or_invalid_curr[i],
+                           MuxIndex(addr_same_pcomp[i], stq_issue), 'or', 'not', (ldq_addr_valid_pcomp, i))
+            if self.configs.pipe0:
+                # with pipelining: also compute for the next entry
+                for i in range(self.configs.numLdqEntries):
+                    arch += Op(ctx, st_ld_addr_same_or_invalid_next[i],
+                               MuxIndex(addr_same_pcomp[i], stq_issue_next), 'or', 'not', (ldq_addr_valid_pcomp, i))
+
         # A store conflicts with a load when:
         # 1. The load entry is valid, and
         # 2. The load entry hasn't completed (received data from memory), and
         # 3. The load is older than the store, and
-        # 4. The address conflicts(same or invalid store address).
+        # 4. The address conflicts(same or invalid load address).
         # Index order are reversed for store matrix.
         for i in range(self.configs.numLdqEntries):
             arch += Op(ctx,
@@ -1192,9 +1214,7 @@ class LSQ:
                        (ldq_alloc_pcomp, i), 'and',
                        'not', (load_completed, i), 'and',
                        'not', store_is_older_arr_curr[i], 'and',
-                       '(', MuxIndex(
-                           addr_same_pcomp[i], stq_issue), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
-                       )
+                       st_ld_addr_same_or_invalid_curr[i])
         if self.configs.pipe0:
             # with pipelining: also compute for the next entry
             for i in range(self.configs.numLdqEntries):
@@ -1203,13 +1223,10 @@ class LSQ:
                            (ldq_alloc_pcomp, i), 'and',
                            'not', (load_completed, i), 'and',
                            'not', store_is_older_arr_next[i], 'and',
-                           '(', MuxIndex(
-                               addr_same_pcomp[i], stq_issue_next), 'or', 'not', (ldq_addr_valid_pcomp, i), ')'
-                           )
+                           st_ld_addr_same_or_invalid_next[i])
 
         if self.configs.pipe0:
             # with pipelining: multiplex between current and next store entry
-            # Multiplex from current and next
             arch += Op(ctx, st_ld_conflict_p0, st_ld_conflict_next,
                        'when', stq_issue_en, 'else', st_ld_conflict_curr)
             arch += Op(ctx, store_req_valid_p0, store_req_valid_next, 'when',

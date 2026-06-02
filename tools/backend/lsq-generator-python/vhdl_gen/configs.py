@@ -73,6 +73,10 @@ class Configs:
     fallbackIssueLoad: bool = False
     fallbackIssueStore: bool = False
 
+    # no address comparison for store issue: if enabled, stores can only be issued if there are no older pending or
+    # in-flight loads, regardless of the store's address. Effectively, stores are issued fully in-order in this case.
+    stIssueNoCompare: bool = False
+
     # fully in-order issue: operations are issued in program order (oldest first, globally across loads and stores;
     # implies fallbackIssueLoad=True, fallbackIssueStore=True, bypass=False)
     inOrder: bool = False
@@ -117,6 +121,7 @@ class Configs:
         self.bypass = True
         self.fallbackIssueLoad = False
         self.fallbackIssueStore = False
+        self.stIssueNoCompare = False
         self.inOrder = False
 
         self.gaNumLoads = config["numLoads"]
@@ -146,6 +151,9 @@ class Configs:
         noBypass = get_env("LSQ_NO_BYPASS")
         if noBypass is not None:
             self.bypass = not bool(noBypass)
+        stIssueNoCompare = get_env("LSQ_ST_ISSUE_NO_COMPARE")
+        if stIssueNoCompare is not None:
+            self.stIssueNoCompare = bool(stIssueNoCompare)
         inOrder = get_env("LSQ_IN_ORDER")
         if inOrder is not None:
             self.inOrder = bool(inOrder)
