@@ -42,11 +42,11 @@ In this example, we create two speculative paths for two different markers. Each
 void prediction(inout_float_t a[N], inout_float_t b[N], in_float_t c) {
   for (unsigned i = 0; i < N; ++i) {
     float y = a[i];
-#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = 0
+#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = 0 type = float
     z = (y + c) * 10.0f;
 #pragma DYN predict variable = z location = end marker = 0
     x = z * 3.0f;
-#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = 1
+#pragma DYN predict variable = y values = [7.0, 7.5] location = start marker = 1 type = float
     a[i] = (y - c) * 10.0f;
   }
 }
