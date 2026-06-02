@@ -827,10 +827,8 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         // order of the ports. This passes the order directly to the SMV backend
         std::string smvInputSymbolNames;
         llvm::raw_string_ostream os(smvInputSymbolNames);
-        SmallVector<std::string> smvInputSymbols;
+        SmallVector<std::string> smvInputSymbols{"loadData"};
         auto mcOp = dyn_cast<handshake::MemoryControllerOp>(op);
-        if (ports.getNumPorts<LoadPort>() + lsqPort >= 1)
-          smvInputSymbols.push_back("loadData");
         for (unsigned i = 0; i < op->getNumOperands(); i++) {
           Value operand = op->getOperand(i);
           if (isa<handshake::ChannelType>(operand.getType())) {
