@@ -539,4 +539,14 @@ bool ShRUIOp::isShiftByConstant() {
   return isShiftByConstantImpl(this->getOperation());
 }
 
+//===----------------------------------------------------------------------===//
+// RetimingPathsOpInterface
+//===----------------------------------------------------------------------===//
+
+SmallVector<buffer::RetimingPath> buffer::getRetimingPaths(Operation *unit) {
+  if (auto pathsOp = dyn_cast<RetimingPathsOpInterface>(unit))
+    return pathsOp.getRetimingPaths();
+  return {buffer::RetimingPath(unit)};
+}
+
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

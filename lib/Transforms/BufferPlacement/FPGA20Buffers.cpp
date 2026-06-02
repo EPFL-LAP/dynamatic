@@ -15,7 +15,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/IR/Value.h"
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when

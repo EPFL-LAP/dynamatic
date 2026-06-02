@@ -1,6 +1,7 @@
 #include "TargetUtils.h"
 
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Program.h"
 
 constexpr std::string_view EXECUTE_SCRIPT = "execute.sh";
@@ -8,18 +9,22 @@ constexpr std::string_view SHELL = "bash";
 
 dynamatic::AbstractWorker::VerificationResult
 dynamatic::performDifferentialTesting(const std::filesystem::path &sourceFile,
-                                      llvm::StringRef dynamaticPath) {
+                                      llvm::StringRef dynamaticPath,
+                                      std::optional<size_t> timeout) {
   // Create an 'execute.sh' that can additionally be used as a nice reproducer
   // for e.g. 'cvise'.
   std::filesystem::path parentPath = sourceFile.parent_path();
   std::string executeFile = (parentPath / EXECUTE_SCRIPT).string();
   llvm::cantFail(llvm::writeToOutput(
       executeFile, [&](llvm::raw_ostream &os) -> llvm::Error {
-        outputDynamaticInvocation(os, sourceFile, dynamaticPath, R"(
+        outputDynamaticInvocation(os, sourceFile, dynamaticPath,
+                                  llvm::formatv(R"(
 compile
 write-hdl
-simulate --timeout 20000
-)");
+simulate --timeout {0}
+)",
+                                                timeout.value_or(0))
+                                      .str());
         return llvm::Error::success();
       }));
   return executeInWorkingDirectory(parentPath,
@@ -80,8 +85,10 @@ trap 'rm "$file"' EXIT
   os << "echo \"static_assert((test_bench(), true));\"  >> $file\n";
   os << (dynamaticSourceRoot / "bin" / "clang++").string()
      << " $file -std=c++20 -DHLS_FUZZER_VERIFY ";
+  // Add an error limit to circumvent clang bugs where it gets stuck and speed
+  // up reduction.
   os << "-I" << (dynamaticSourceRoot / "include").string()
-     << " -Wno-deprecated -o /dev/null\n";
+     << " -Wno-deprecated -o /dev/null -ferror-limit=1\n";
 
   // Invoke dynamatic.
   os << dynamaticPath << " --exit-on-failure <<EOF 2>&1 | tee >(cat - >&5)\n";

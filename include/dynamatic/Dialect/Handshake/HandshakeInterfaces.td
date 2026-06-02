@@ -117,6 +117,32 @@ def ShiftLikeArithOpInterface : OpInterface<"ShiftLikeArithOpInterface"> {
   ];
 }
 
+def RetimingPathsOpInterface : OpInterface<"RetimingPathsOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    For ops with multiple independent paths through them. 
+    
+    If tokens can pass through a unit from a set of operands to a set
+    of results without affecting a separate set of operands and results,
+    then there is multiple paths through the unit.
+    
+    The MILP buffering algorithms require a unique retiming algorithm
+    per path through a unit to correctly distribute token occupancy 
+    among the circuits channels to achieve maximum performance. 
+
+    Eachh operand and result of the op must belong to exactly
+    one path.
+  }];
+  let methods = [
+    InterfaceMethod<[{
+      Returns the list of independent retiming paths of this op.
+    }],
+    "llvm::SmallVector<::dynamatic::buffer::RetimingPath>",
+    "getRetimingPaths", (ins)
+    >,
+  ];
+}
+
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =

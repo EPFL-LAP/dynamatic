@@ -3,7 +3,7 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 using namespace llvm;

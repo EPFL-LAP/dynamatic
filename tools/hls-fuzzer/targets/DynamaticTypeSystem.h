@@ -182,6 +182,11 @@ public:
     };
   }
 
+  static bool discardStructuredForStatement(const DynamaticTypingContext &) {
+    // TODO: Figure out how we want to handle non-termination.
+    return true;
+  }
+
 private:
   /// Returns the given type constraint that matches the given 'scalarType'.
   static DynamaticTypingContext

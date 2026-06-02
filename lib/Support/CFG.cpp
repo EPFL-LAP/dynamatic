@@ -383,14 +383,6 @@ HandshakeCFG::HandshakeCFG(handshake::FuncOp funcOp) : funcOp(funcOp) {
 
 void HandshakeCFG::getNonCyclicPaths(unsigned from, unsigned to,
                                      SmallVector<CFGPath> &paths) {
-  if (this->successors.empty()) {
-    assert(
-        from == 0 && to == 0 &&
-        "If the CFG has no edges, then we must have a single BB with ID == 0");
-    paths = {{0}};
-    return;
-  }
-
   // Both blocks must exist in the CFG
   assert(bbs.contains(from) && "source block must exist in the CFG");
   assert(bbs.contains(to) && "source block must exist in the CFG");
@@ -473,17 +465,19 @@ HandshakeCFG::getControlValues(DenseMap<unsigned, Value> &ctrlVals) {
 void HandshakeCFG::findPathsTo(const mlir::SetVector<unsigned> &pathSoFar,
                                unsigned to, SmallVector<CFGPath> &paths) {
   assert(!pathSoFar.empty() && "path cannot be empty");
+  if (pathSoFar.back() == to) {
+    // End reached, terminate the recursion.
+    paths.emplace_back(pathSoFar.begin(), pathSoFar.end());
+    return;
+  }
+
   for (unsigned nextBB : successors[pathSoFar.back()]) {
-    if (nextBB == to) {
-      CFGPath newPath;
-      llvm::copy(pathSoFar, std::back_inserter(newPath));
-      newPath.push_back(to);
-      paths.push_back(newPath);
-    } else if (!pathSoFar.contains(nextBB)) {
-      mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
-      nextPathSoFar.insert(nextBB);
-      findPathsTo(nextPathSoFar, to, paths);
-    }
+    if (pathSoFar.contains(nextBB))
+      continue;
+
+    mlir::SetVector<unsigned> nextPathSoFar(pathSoFar);
+    nextPathSoFar.insert(nextBB);
+    findPathsTo(nextPathSoFar, to, paths);
   }
 }
 
@@ -578,8 +572,11 @@ static GIIDStatus foldGIIDStatusAnd(GIIDFoldFunc func, ValueRange operands) {
 /// circuit on the CFG path. At any point, the path's last block is the one
 /// which the operand's owning operation was a part of on the parent call to
 /// `isGIIDRec`.
-static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
-                            ArrayRef<unsigned> path) {
+static GIIDStatus isGIIDRec(
+    Value predecessor, OpOperand &oprd, ArrayRef<unsigned> path,
+    llvm::DenseMap<std::tuple<OpOperand *, ArrayRef<unsigned>>, GIIDStatus>
+        &seen) {
+
   Value val = oprd.get();
   if (predecessor == val)
     return GIIDStatus::SUCCEED;
@@ -632,77 +629,89 @@ static GIIDStatus isGIIDRec(Value predecessor, OpOperand &oprd,
     }
   }
 
+  // With the path now adjusted such that its last block is the basic block of
+  // 'oprd', check whether we have checked 'oprd' to contain the predecessor
+  // along 'path' before.
+  auto iter = seen.find({&oprd, path});
+  if (iter != seen.end())
+    return iter->second;
+
   // Recursively calls the function with a new value as second argument (meant
   // to be an operand of the defining operation identified above) and changing
   // the current defining operation to be the current one
   auto recurse = [&](Value newVal) -> GIIDStatus {
     for (OpOperand &oprd : defOp->getOpOperands()) {
       if (oprd.get() == newVal)
-        return isGIIDRec(predecessor, oprd, path);
+        return isGIIDRec(predecessor, oprd, path, seen);
     }
     llvm_unreachable("recursive call should be on operand of defining op");
   };
 
   // The backtracking logic depends on the type of the defining operation
-  return llvm::TypeSwitch<Operation *, GIIDStatus>(defOp)
-      .Case<handshake::ConditionalBranchOp>(
-          [&](handshake::ConditionalBranchOp condBrOp) {
-            // The data operand or the condition operand must depend on the
-            // predecessor
-            return foldGIIDStatusAnd(recurse, condBrOp->getOperands());
+  GIIDStatus result =
+      llvm::TypeSwitch<Operation *, GIIDStatus>(defOp)
+          .Case<handshake::ConditionalBranchOp>(
+              [&](handshake::ConditionalBranchOp condBrOp) {
+                // The data operand or the condition operand must depend on the
+                // predecessor
+                return foldGIIDStatusAnd(recurse, condBrOp->getOperands());
+              })
+          .Case<handshake::MergeOp, handshake::ControlMergeOp>([&](auto) {
+            // The data input on the path must depend on the predecessor
+            return foldGIIDStatusAnd(recurse, defOp->getOperands());
           })
-      .Case<handshake::MergeOp, handshake::ControlMergeOp>([&](auto) {
-        // The data input on the path must depend on the predecessor
-        return foldGIIDStatusAnd(recurse, defOp->getOperands());
-      })
-      .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
-        // If the select operand depends on the predecessor, then the mux
-        // depends on the predecessor
-        if (recurse(muxOp.getSelectOperand()) == GIIDStatus::SUCCEED)
-          return GIIDStatus::SUCCEED;
+          .Case<handshake::MuxOp>([&](handshake::MuxOp muxOp) {
+            // If the select operand depends on the predecessor, then the mux
+            // depends on the predecessor
+            if (recurse(muxOp.getSelectOperand()) == GIIDStatus::SUCCEED)
+              return GIIDStatus::SUCCEED;
 
-        // Otherwise, data inputs on the path must depend on the predecessor
-        return foldGIIDStatusAnd(recurse, defOp->getOperands());
-      })
-      .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
-        if (loadOp.getDataResult() != val)
-          return GIIDStatus::FAIL_ON_PATH;
+            // Otherwise, data inputs on the path must depend on the predecessor
+            return foldGIIDStatusAnd(recurse, defOp->getOperands());
+          })
+          .Case<handshake::LoadOp>([&](handshake::LoadOp loadOp) {
+            if (loadOp.getDataResult() != val)
+              return GIIDStatus::FAIL_ON_PATH;
 
-        // If the address operand depends on the predecessor then the data
-        // result depends on the predecessor
-        return recurse(loadOp.getAddress());
-      })
-      .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
-        // Similarly to the mux, if the select operand depends on the
-        // predecessor, then the select depends on the predecessor
-        if (recurse(selectOp.getCondition()) == GIIDStatus::SUCCEED)
-          return GIIDStatus::SUCCEED;
+            // If the address operand depends on the predecessor then the data
+            // result depends on the predecessor
+            return recurse(loadOp.getAddress());
+          })
+          .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
+            // Similarly to the mux, if the select operand depends on the
+            // predecessor, then the select depends on the predecessor
+            if (recurse(selectOp.getCondition()) == GIIDStatus::SUCCEED)
+              return GIIDStatus::SUCCEED;
 
-        // The select's true value or false value must depend on the predecessor
-        llvm::SmallVector<Value> values{selectOp.getTrueValue(),
-                                        selectOp.getFalseValue()};
-        return foldGIIDStatusAnd(recurse, values);
-      })
-      .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
-            handshake::BranchOp, handshake::AddIOp, handshake::AndIOp,
-            handshake::CmpIOp, handshake::DivSIOp, handshake::DivUIOp,
-            handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
-            handshake::OrIOp, handshake::ShLIOp, handshake::ShRUIOp,
-            handshake::SubIOp, handshake::TruncIOp, handshake::XOrIOp,
-            handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
-            handshake::MulFOp, handshake::SubFOp>([&](auto) {
-        // At least one operand must depend on the predecessor
-        return foldGIIDStatusOr(recurse, defOp->getOperands());
-      })
-      .Default([&](auto) {
-        // To err on the conservative side, produce the most terminating kind of
-        // failure on encoutering an unsupported operation
-        return GIIDStatus::FAIL_ON_PATH;
-      });
+            // The select's true value or false value must depend on the
+            // predecessor
+            llvm::SmallVector<Value> values{selectOp.getTrueValue(),
+                                            selectOp.getFalseValue()};
+            return foldGIIDStatusAnd(recurse, values);
+          })
+          .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp,
+                handshake::BranchOp, handshake::AddIOp, handshake::AndIOp,
+                handshake::CmpIOp, handshake::DivSIOp, handshake::DivUIOp,
+                handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
+                handshake::OrIOp, handshake::ShLIOp, handshake::ShRUIOp,
+                handshake::SubIOp, handshake::TruncIOp, handshake::XOrIOp,
+                handshake::AddFOp, handshake::CmpFOp, handshake::DivFOp,
+                handshake::MulFOp, handshake::SubFOp>([&](auto) {
+            // At least one operand must depend on the predecessor
+            return foldGIIDStatusOr(recurse, defOp->getOperands());
+          })
+          .Default([&](auto) {
+            // To err on the conservative side, produce the most terminating
+            // kind of failure on encoutering an unsupported operation
+            return GIIDStatus::FAIL_ON_PATH;
+          });
+  seen[{&oprd, path}] = result;
+  return result;
 }
 
 bool dynamatic::isGIID(Value predecessor, OpOperand &oprd, CFGPath &path) {
-  return isGIIDRec(predecessor, oprd, path) == GIIDStatus::SUCCEED;
+  llvm::DenseMap<std::tuple<OpOperand *, ArrayRef<unsigned>>, GIIDStatus> seen;
+  return isGIIDRec(predecessor, oprd, path, seen) == GIIDStatus::SUCCEED;
 }
 
 bool dynamatic::isChannelOnCycle(mlir::Value channel) {

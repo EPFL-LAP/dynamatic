@@ -16,6 +16,9 @@ print_help_and_exit () {
 
 List of options:
   --release | -r                       : build in \"Release\" mode (default is \"Debug\")
+  --enable-llvm-assertions             : enable LLVM assertions in Release mode.
+                                         Should only be used for the CI integration tests
+                                         to allow faster pull request validation.
   --visual-dataflow | -v               : build visual-dataflow's C++ library
   --export-godot | -e <godot-path>     : export the Godot project (requires engine)
   --force | -f                         : force cmake reconfiguration in each (sub)project
@@ -145,6 +148,7 @@ BUILD_CHIESEL_LSQ=0
 ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
 CMAKE_DYNAMATIC_ENABLE_ABC=""
+CMAKE_LLVM_ENABLE_ASSERTIONS=""
 LLVM_DIR="$PWD/build/llvm-project"
 
 
@@ -178,6 +182,9 @@ do
               ;;
           "--release" | "-r")
               BUILD_TYPE="Release"
+              ;;
+          "--enable-llvm-assertions")
+              CMAKE_LLVM_ENABLE_ASSERTIONS="-DLLVM_ENABLE_ASSERTIONS=ON"
               ;;
           "--check" | "-c")
               ENABLE_TESTS=1
@@ -365,6 +372,7 @@ if should_run_cmake ; then
             $CMAKE_DYNAMATIC_ENABLE_XLS \
             $CMAKE_DYNAMATIC_ENABLE_CBC \
             $CMAKE_DYNAMATIC_ENABLE_ABC \
+            $CMAKE_LLVM_ENABLE_ASSERTIONS \
             $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
   else
     cmake -G Ninja .. \

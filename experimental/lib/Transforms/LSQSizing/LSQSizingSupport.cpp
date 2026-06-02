@@ -21,7 +21,7 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 
 #include <set>
 #include <stack>
@@ -39,11 +39,9 @@ using namespace dynamatic::experimental::lsqsizing;
 /// 3. If the operation is neither, then its latency is set to 0
 static int extractNodeLatency(mlir::Operation *op,
                               const TimingDatabase &timingDB, double targetCP) {
-  double latency = 0;
-
-  if (!failed(timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
-    return latency;
-  }
+  auto latencyOrFail = timingDB.getLatency(op, SignalType::DATA, targetCP);
+  if (succeeded(latencyOrFail))
+    return *latencyOrFail;
 
   if (auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op)) {
     return bufferOp.getLatencyDV();

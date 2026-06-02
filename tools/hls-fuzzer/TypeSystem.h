@@ -158,15 +158,6 @@ private:
 /// or shouldn't be used.
 template <typename ASTNode>
 class OpaqueTransferFn {
-  template <typename Tuple>
-  struct OpaqueContextTupleImpl;
-
-  template <typename... NonTerminals>
-  struct OpaqueContextTupleImpl<std::tuple<NonTerminals...>> {
-    using type = std::tuple<
-        std::optional<std::conditional_t<true, OpaqueContext, NonTerminals>>...,
-        std::optional<OpaqueContext>>;
-  };
 
   template <typename Tuple>
   struct NonTerminalsTupleImpl;
@@ -189,7 +180,8 @@ public:
   /// 'OpaqueDependency' to calculate a context.
   /// Elements are optional, since they may not yet have been calculated.
   using ContextTuple =
-      typename OpaqueContextTupleImpl<typename ASTNode::SubElements>::type;
+      std::array<std::optional<OpaqueContext>,
+                 std::tuple_size_v<typename ASTNode::SubElements> + 1>;
 
   /// Constructs an 'OpaqueDependency' from a 'Dependency'.
   template <typename TypingContext, std::size_t... inputIndices>
@@ -226,15 +218,31 @@ public:
               std::move(argTuple)));
         }) {
 
-    static std::array<std::size_t, sizeof...(inputIndices)> storage{
+    // Since the number (and values) of input indices are known at compile time
+    // we can define and reference a statically allocated array in an 'ArrayRef'
+    // without lifetime issues.
+    // A unique array is created for every template instantiation.
+    constexpr static std::array<std::size_t, sizeof...(inputIndices)> storage{
         inputIndices...};
     this->inputIndices = storage;
   }
 
+  explicit OpaqueTransferFn(
+      std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
+          inputIndices,
+      std::any dep,
+      OpaqueContext (*computationFn)(const std::any &dep,
+                                     const SubElementsTuple &nonTerminals,
+                                     const ContextTuple &tuple))
+      : dep(std::move(dep)), computationFn(computationFn),
+        inputIndices(std::move(inputIndices)) {}
+
   /// Returns the indices of the subelements (or input) that this dependency
   /// depends on.
   llvm::ArrayRef<std::size_t> getInputDependencies() const {
-    return inputIndices;
+    return std::visit(
+        [](auto &&value) -> llvm::ArrayRef<std::size_t> { return value; },
+        inputIndices);
   }
 
   /// Calculates the context from the currently calculated subelements and
@@ -249,7 +257,8 @@ private:
   OpaqueContext (*computationFn)(const std::any &dep,
                                  const SubElementsTuple &nonTerminals,
                                  const ContextTuple &tuple);
-  llvm::ArrayRef<std::size_t> inputIndices;
+  std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
+      inputIndices;
 };
 
 /// Class responsible for calculating the output context after generating an
@@ -346,6 +355,13 @@ public:
               },
               std::move(castedContexts));
         }) {}
+
+  explicit OutputTransferFn(
+      std::function<OpaqueContext(
+          const ASTNode &,
+          const typename OpaqueTransferFn<ASTNode>::ContextTuple &)>
+          computationFn)
+      : computationFn(std::move(computationFn)) {}
 
   /// Convenience overload for 'OutputTransferFn' that do not have any input
   /// dependencies.
@@ -629,6 +645,45 @@ public:
         /*output=*/copyInputToOutput<ast::StatementList>(),
     };
   }
+
+  virtual bool
+  discardStructuredForStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() {
+    return {
+        /*start=*/copyFromInput<ast::StructuredForStatement>(),
+        /*end=*/copyFromInput<ast::StructuredForStatement>(),
+        /*step=*/copyFromInput<ast::StructuredForStatement>(),
+        /*statements=*/copyFromInput<ast::StructuredForStatement>(),
+        /*output=*/copyInputToOutput<ast::StructuredForStatement>(),
+    };
+  }
+
+  using ExpressionKey =
+      std::variant<ast::Constant::Tag, ast::CastExpression::Tag,
+                   ast::Variable::Tag, ast::ArrayReadExpression::Tag,
+                   ast::ConditionalExpression::Tag, ast::BinaryExpression::Tag,
+                   ast::UnaryExpression::Tag>;
+
+  /// Returns the probability table for a given expression, represented by their
+  /// tag, to be selected.
+  ///
+  /// The method may return different probabilities for different contexts but
+  /// should be a pure function otherwise.
+  virtual ProbabilityTable<ExpressionKey>
+  getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
+
+  using StatementKey = std::variant<ast::StructuredForStatement::Tag,
+                                    ast::ArrayAssignmentStatement::Tag>;
+
+  /// Returns the probability table for a given statement, represented by their
+  /// tag, to be selected.
+  ///
+  /// The method may return different probabilities for different contexts but
+  /// should be a pure function otherwise.
+  virtual ProbabilityTable<StatementKey>
+  getStatementProbabilityTableOpaque(const OpaqueContext &context) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -699,6 +754,7 @@ public:
   /// Shorthand for derived classes to be able to call the default
   /// implementation of methods.
   using Super = TypeSystem;
+  using Context = TypingContext;
 
   // Methods that can be overwritten in subclasses. Note these are not virtual
   // since we use CRTP-techniques to call these. They may be but are not
@@ -772,6 +828,20 @@ public:
   }
 
   static bool discardStatementList(const TypingContext &) { return false; }
+
+  static bool discardStructuredForStatement(const TypingContext &) {
+    return false;
+  }
+
+  static ProbabilityTable<ExpressionKey>
+  getExpressionProbabilityTable(const TypingContext &) {
+    return {};
+  }
+
+  static ProbabilityTable<StatementKey>
+  getStatementProbabilityTable(const TypingContext &) {
+    return {};
+  }
 
   // Implementations of the virtual methods in 'AbstractTypeSystem'.
   // These are automatically implemented to unbox the 'TypingContext's out of
@@ -851,6 +921,20 @@ public:
     return self().discardStatementList(context.cast<TypingContext>());
   }
 
+  bool discardStructuredForStatementOpaque(const OpaqueContext &context) final {
+    return self().discardStructuredForStatement(context.cast<TypingContext>());
+  }
+
+  ProbabilityTable<ExpressionKey>
+  getExpressionProbabilityTableOpaque(const OpaqueContext &context) final {
+    return self().getExpressionProbabilityTable(context.cast<TypingContext>());
+  }
+
+  ProbabilityTable<StatementKey>
+  getStatementProbabilityTableOpaque(const OpaqueContext &context) final {
+    return self().getStatementProbabilityTable(context.cast<TypingContext>());
+  }
+
 private:
   Self &self() { return static_cast<Self &>(*this); }
 
@@ -926,6 +1010,10 @@ public:
   }
 
   static bool discardStatementList(const TypingContext &) { return true; }
+
+  static bool discardStructuredForStatement(const TypingContext &) {
+    return true;
+  }
 };
 
 } // namespace dynamatic::gen

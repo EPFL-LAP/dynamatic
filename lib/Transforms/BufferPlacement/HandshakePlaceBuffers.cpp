@@ -20,13 +20,13 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/MAPBUFBuffers.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -672,7 +672,7 @@ static void insertBufferOpAndOccupancyInCFDFC(
     tokensInBufOp =
         (bufOp.getLatencyDV() / totalChannelLatency) * totalChannelOccupancy;
     tokensInBufOp = fmin(tokensInBufOp, static_cast<double>(effectiveCapacity));
-    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
+    cfdfc.bufferOccupancy[bufOp] = tokensInBufOp;
   } else {
     // Case "#tokens in the channel" => "Total latency of the channel":
     // Assign one token to each bufer slot with latency, the rest is assigned
@@ -699,7 +699,7 @@ static void insertBufferOpAndOccupancyInCFDFC(
         fmin(nonLatencyCapacity, remainingTknsToDistribute);
     tokensInBufOp = fmin(tokensInBufOp, static_cast<double>(effectiveCapacity));
 
-    cfdfc.unitOccupancy[bufOp] = tokensInBufOp;
+    cfdfc.bufferOccupancy[bufOp] = tokensInBufOp;
   }
 
   // Sanity check: we should never assign more tokens to the buffer than its

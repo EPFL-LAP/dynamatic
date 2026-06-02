@@ -23,6 +23,7 @@ add_llvm_executable(hls-fuzzer
         hls-fuzzer.cpp
         AbstractTarget.cpp
         AbstractWorker.cpp
+        LimitTypeSystem.cpp
         Options.cpp
         OptionsParser.cpp
         TargetRegistry.cpp

@@ -16,8 +16,8 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
 #include <optional>

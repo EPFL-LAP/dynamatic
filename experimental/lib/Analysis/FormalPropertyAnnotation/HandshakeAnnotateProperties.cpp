@@ -24,7 +24,7 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LinearAlgebra/Gaussian.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
 #include "experimental/Support/IOG.h"
 #include "mlir/IR/Value.h"
@@ -70,7 +70,8 @@ private:
   unsigned int uid;
   json::Array propertyTable;
 
-  LogicalResult annotateProperty(ModuleOp modOp, FormalProperty::TYPE t);
+  LogicalResult annotateProperty(ModuleOp modOp, const std::vector<IOG> &iogs,
+                                 FormalProperty::TYPE t);
   LogicalResult annotateQueriedProperties(const std::vector<IOG> &iogs);
   LogicalResult annotateAbsenceOfBackpressure(ModuleOp modOp);
   LogicalResult annotateValidEquivalence(ModuleOp modOp);
@@ -83,12 +84,15 @@ private:
                          Operation &curOp);
   LogicalResult annotateCopiedSlots(Operation &op);
   LogicalResult annotateCopiedSlotsOfAllForks(ModuleOp modOp);
+  LogicalResult annotateEagerForkPath(ModuleOp modOp);
   LogicalResult annotateReconvergentPathFlow(ModuleOp modOp);
   LogicalResult annotateIOGSingleToken(const IOG &iog);
   LogicalResult annotateIOGConsecutiveTokens(const IOG &iog);
   LogicalResult annotateEntryTokenOrderPaths(ControlMergeOp cmerge,
                                              int32_t entryValue);
   LogicalResult annotateEntryTokenOrder(ModuleOp modOp);
+  LogicalResult annotateSingleEntryToken(ModuleOp modOp);
+  LogicalResult annotateExitTokenOrder(const std::vector<IOG> &iog);
 };
 
 bool isChannelToBeChecked(OpResult res) {
@@ -247,6 +251,22 @@ HandshakeAnnotatePropertiesPass::annotateCopiedSlotsOfAllForks(ModuleOp modOp) {
 }
 
 LogicalResult
+HandshakeAnnotatePropertiesPass::annotateEagerForkPath(ModuleOp modOp) {
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (Operation &op : funcOp.getOps()) {
+      if (auto forkOp = dyn_cast<ForkOp>(op)) {
+        EagerForkPathTokenCopiedMaximumOnce p(uid, FormalProperty::TAG::INVAR,
+                                              forkOp);
+
+        propertyTable.push_back(p.toJSON());
+        uid++;
+      }
+    }
+  }
+  return success();
+}
+
+LogicalResult
 HandshakeAnnotatePropertiesPass::annotateReconvergentPathFlow(ModuleOp modOp) {
   auto &indexChannelAnalysis = getAnalysis<dynamatic::IndexChannelAnalysis>();
 
@@ -347,13 +367,9 @@ findCopiedSents(const IOG &iog, Operation *startSlot, Operation *endSlot) {
 LogicalResult
 HandshakeAnnotatePropertiesPass::annotateIOGSingleToken(const IOG &iog) {
   std::vector<std::unique_ptr<InternalStateNamer>> slots(0);
-  Operation *op = iog.entry.getOwner()->getParentOp();
-  auto nameAttr =
-      op->getAttrOfType<ArrayAttr>("argNames")[iog.entry.getArgNumber()];
-  std::string name = dyn_cast<StringAttr>(nameAttr).str();
 
   // We model the entry node as a buffer that initially has one token.
-  slots.push_back(std::make_unique<EntrySlotNamer>(name));
+  slots.push_back(std::make_unique<EntrySlotNamer>(iog.entry));
   std::vector<EagerForkSentNamer> forks(0);
   // Collecting the slots and sents inside the IOG. The invariant relation of
   // num(slots) = 1 + num(eager fork sents)
@@ -422,50 +438,98 @@ HandshakeAnnotatePropertiesPass::annotateIOGConsecutiveTokens(const IOG &iog) {
   return success();
 }
 namespace {
-struct EntryCMerge {
-  ControlMergeOp op;
+
+struct EntryCMergePath {
+  std::vector<EffectiveSlotNamer> slots;
+  ControlMergeOp cmerge;
   int32_t entryValue;
 };
+
 // This function is used to find entry control merges (i.e. control merges with
-// one input coming from an entry node), and is used in the annotation of the
-// entry token order invariant
-std::vector<EntryCMerge> findEntryCMerge(BlockArgument start) {
-  std::vector<EntryCMerge> ret;
-  std::vector<mlir::Value> stack;
+// one input coming from an entry node), and returns the effective slots along
+// the path. It is used in the annotation of the entry token order invariant and
+// single entry token invariant
+std::vector<EntryCMergePath> findEntryCMergePaths(BlockArgument startChannel) {
+  struct PartialPath {
+    std::vector<EffectiveSlotNamer> slots;
+    mlir::Value cur;
+  };
+  std::vector<EntryCMergePath> ret;
+  std::vector<PartialPath> stack;
+  PartialPath start = {
+      .slots = {},
+      .cur = startChannel,
+  };
+  start.slots.emplace_back(std::make_unique<EntrySlotNamer>(startChannel));
   stack.push_back(start);
   while (!stack.empty()) {
-    mlir::Value cur = stack.back();
+    PartialPath path = std::move(stack.back());
     stack.pop_back();
 
-    Operation *next = *cur.getUsers().begin();
+    Operation *next = *path.cur.getUsers().begin();
     if (auto cmerge = dyn_cast<ControlMergeOp>(next)) {
-      int32_t entry;
-      for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
-        if (input == cur) {
-          entry = i;
+      // Path is terminated by ControlMergeOp, so this is the end of the path
+
+      // CMerge uses the following logic to generate index token:
+      // - When a CMerge receives a token from the i-th data input channel, it
+      // sends a token with value i to the index channel Here, if the path to
+      // CMerge ends at the 0-th channel, then an entry token will cause the
+      // CMerge to emit a token carrying a value = 0 to the index channel. This
+      // function determines the actual entry value of the index channel.
+      auto getEntryValue = [&](ControlMergeOp cmerge, Value entryChannel) {
+        for (auto [i, input] : llvm::enumerate(cmerge.getDataOperands())) {
+          if (input == entryChannel) {
+            return (int32_t)i;
+          }
         }
+        llvm::report_fatal_error(
+            "entryChannel is not a data operand of cmerge");
+      };
+      EntryCMergePath retPath = {
+          .slots = path.slots,
+          .cmerge = cmerge,
+          .entryValue = getEntryValue(cmerge, path.cur),
+      };
+      ret.push_back(retPath);
+    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
+      // Add the slots of this buffer to the list of effective slot (copied
+      // sents will be added later)
+      for (auto &slot : buffer.getInternalSlotStateNamers()) {
+        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
       }
-      ret.push_back({cmerge, entry});
-    }
-    if (isa<BufferOp, ForkOp>(next)) {
-      for (mlir::Value channel : next->getResults()) {
-        stack.push_back(channel);
+      path.cur = buffer.getResult();
+      stack.push_back(std::move(path));
+    } else if (auto fork = dyn_cast<ForkOp>(next)) {
+      // Branch into multiple paths, and add the sent state of the selected
+      // channel as a copied sent for the last slot
+      // Note: This last slot always exists, as the entry contains a
+      // slot
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
+        PartialPath nextPath = {
+            .slots = path.slots,
+            .cur = channel,
+        };
+        assert(!nextPath.slots.empty());
+        EffectiveSlotNamer &back = nextPath.slots.back();
+        back.copiedSents.push_back(sents[i]);
+        stack.push_back(nextPath);
       }
     }
   }
   return ret;
 }
-} // namespace
 
-LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
-    ControlMergeOp cmerge, int32_t entryValue) {
-  // Usually, the index of the cmerge is used for as the select input for a mux
-  // operator for each argument of the function. Each of these paths can be
-  // annotated.
+// This function finds any path from a control merge to a mux operation. Note
+// that there can be multiple paths due to forks that replicate the index token
+// of the CMerge to multiple muxes.
+std::vector<std::vector<EffectiveSlotNamer>>
+findCMergeMuxPaths(ControlMergeOp cmerge) {
   struct PartialPath {
     std::vector<EffectiveSlotNamer> slots;
     mlir::Value cur;
   };
+  std::vector<std::vector<EffectiveSlotNamer>> ret{};
   std::vector<PartialPath> stack;
   EffectiveSlotNamer mergeSlot(std::make_unique<BufferSlotFullNamer>(
       cmerge.getInternalSlotStateNamers()[0]));
@@ -479,16 +543,10 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     PartialPath path = stack.back();
     stack.pop_back();
 
-    Operation *next = path.cur.getUses().begin()->getOwner();
+    Operation *next = *path.cur.getUsers().begin();
     if (auto mux = dyn_cast<MuxOp>(next)) {
       // Path is terminated by MuxOp, so this is the end of the path
-      if (path.slots.size() < 2) {
-        // This path does not contain enough slots to actually mean anything
-        continue;
-      }
-      EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path.slots,
-                        entryValue);
-      propertyTable.push_back(p.toJSON());
+      ret.push_back(std::move(path.slots));
     } else if (auto buffer = dyn_cast<BufferOp>(next)) {
       // Add the slots of this buffer to the list of effective slot (copied
       // sents will be added later)
@@ -500,8 +558,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
     } else if (auto fork = dyn_cast<ForkOp>(next)) {
       // Branch into multiple paths, and add the sent state of the selected
       // channel as a copied sent for the last slot
-      // Note: This last slot always exists, as the control merge contains a
-      // slot
+      // Note: This last slot always exists, as the initial control merge
+      // contains a slot
       auto sents = fork.getInternalSentStateNamers();
       for (auto [i, channel] : llvm::enumerate(next->getResults())) {
         PartialPath nextPath = {
@@ -513,9 +571,22 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
         stack.push_back(nextPath);
       }
     } else {
-      assert(false && "unexpected op detected!");
-      return failure();
+      llvm::report_fatal_error("unexpected op detected");
     }
+  }
+  return ret;
+}
+} // namespace
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateEntryTokenOrderPaths(
+    ControlMergeOp cmerge, int32_t entryValue) {
+  for (const auto &path : findCMergeMuxPaths(cmerge)) {
+    if (path.size() < 2) {
+      // The regex of this invariant trivially holds for any path of length 1
+      continue;
+    }
+    EntryTokenOrder p(uid++, FormalProperty::TAG::INVAR, path, entryValue);
+    propertyTable.push_back(p.toJSON());
   }
   return success();
 }
@@ -524,8 +595,9 @@ LogicalResult
 HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder(ModuleOp modOp) {
   for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (BlockArgument arg : funcOp.getRegion().getArguments()) {
-      for (auto [cmerge, entryValue] : findEntryCMerge(arg)) {
-        if (failed(annotateEntryTokenOrderPaths(cmerge, entryValue))) {
+      for (const auto &path : findEntryCMergePaths(arg)) {
+        if (failed(
+                annotateEntryTokenOrderPaths(path.cmerge, path.entryValue))) {
           return failure();
         }
       }
@@ -535,8 +607,310 @@ HandshakeAnnotatePropertiesPass::annotateEntryTokenOrder(ModuleOp modOp) {
 }
 
 LogicalResult
-HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
-                                                  FormalProperty::TYPE t) {
+HandshakeAnnotatePropertiesPass::annotateSingleEntryToken(ModuleOp modOp) {
+  for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (BlockArgument arg : funcOp.getRegion().getArguments()) {
+      for (const auto &ec : findEntryCMergePaths(arg)) {
+        for (const auto &cm : findCMergeMuxPaths(ec.cmerge)) {
+          SingleEntryToken p(uid++, FormalProperty::TAG::INVAR, ec.slots, cm);
+          propertyTable.push_back(p.toJSON());
+        }
+      }
+    }
+  }
+  return success();
+}
+
+namespace {
+// This function returns the `decider` operation of a branch, meaning the
+// operation that emits the final condition token used by the branch.
+std::optional<Operation *> getDecider(ConditionalBranchOp branch) {
+  mlir::Value next = branch.getConditionOperand();
+  while (true) {
+    Operation *op = next.getDefiningOp();
+
+    if (!op)
+      return std::nullopt;
+
+    // Forks and buffers only propagate the condition token without modifying it
+    if (auto forkOp = dyn_cast<ForkOp>(op)) {
+      next = forkOp.getOperand();
+    } else if (auto buffer = dyn_cast<BufferOp>(op)) {
+      next = buffer.getOperand();
+    } else {
+      return op;
+    }
+  }
+}
+
+// Paths from decider to the branch might contain a fork before they contain a
+// slot. If this is the case, these forks cannot be added as copied sents of any
+// effective slot. However, in the path annotation from ancestor to branch,
+// these copied sents are necessary for the path of effective slots. The
+// UnstartedPath struct represents this partial path for this usage. It stores
+// the initial sents along the path `startSents`, then the effective slots of
+// the decider->branch path from the first slot onwards `started`, and finally
+// the branch operation that terminates the path. See the comment before the
+// declaration of ExitTokenNoAncestors for a visual explanation
+struct UnstartedPath {
+  std::vector<EffectiveSlotNamer> started;
+  std::vector<EagerForkSentNamer> startSents;
+  ConditionalBranchOp end;
+};
+
+std::vector<UnstartedPath> findDeciderBranchPaths(Operation *dec) {
+  struct PartialPath {
+    std::vector<EffectiveSlotNamer> slots;
+    std::vector<EagerForkSentNamer> startSents;
+    mlir::Value cur;
+  };
+  std::vector<UnstartedPath> ret{};
+  std::vector<PartialPath> stack;
+  mlir::Value startChannel;
+  if (auto arith = dyn_cast<ArithOpInterface>(dec)) {
+    startChannel = arith->getResult(0);
+  } else if (auto load = dyn_cast<LoadOp>(dec)) {
+    load->emitError("TODO: Handle load decider");
+    llvm::report_fatal_error("");
+  } else {
+    load->emitError("Unexpected decider type");
+    llvm::report_fatal_error("");
+  }
+  PartialPath start = {
+      .slots = {},
+      .startSents = {},
+      .cur = startChannel,
+  };
+  stack.push_back(start);
+  while (!stack.empty()) {
+    PartialPath path = stack.back();
+    stack.pop_back();
+
+    Operation *next = *path.cur.getUsers().begin();
+    if (auto fork = dyn_cast<ForkOp>(next)) {
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, channel] : llvm::enumerate(next->getResults())) {
+        PartialPath nextPath = {
+            .slots = path.slots,
+            .startSents = path.startSents,
+            .cur = channel,
+        };
+        if (!nextPath.slots.empty()) {
+          EffectiveSlotNamer &back = nextPath.slots.back();
+          back.copiedSents.push_back(sents[i]);
+        } else {
+          path.startSents.push_back(sents[i]);
+        }
+        stack.push_back(nextPath);
+      }
+    } else if (auto buffer = dyn_cast<BufferOp>(next)) {
+      for (auto &slot : buffer.getInternalSlotStateNamers()) {
+        path.slots.emplace_back(std::make_unique<BufferSlotFullNamer>(slot));
+      }
+      path.cur = buffer.getResult();
+      stack.push_back(std::move(path));
+    } else if (auto branch = dyn_cast<ConditionalBranchOp>(next)) {
+      // Path is terminated by ConditionalBranchOp, so this is the end of the
+      // path
+      ret.push_back(
+          {std::move(path.slots), std::move(path.startSents), branch});
+    } else {
+      llvm::report_fatal_error("unexpected op detected");
+    }
+  }
+  return ret;
+}
+
+// This function finds the ancestor slots of the decider as shown in the diagram
+// before the ExitTokenNoAncestors declaration. The reason the exit branch is
+// required for this search is so that the search does not go back past this
+// branch and overlap with the decider-branch path
+std::vector<std::vector<EffectiveSlotNamer>>
+findAncestorSlots(const IOG &iog, Operation *dec, ConditionalBranchOp exit) {
+  struct PartialPath {
+    mlir::Value channel;
+    // `back` means the paths are annotated backwards, meaning the paths flow in
+    // the direction of operands (rather than results)
+    std::vector<EffectiveSlotNamer> backPath;
+    // `backSents` stores eager fork sent states that should be added to the
+    // next fork found along this path, in backwards order in comparison to the
+    // direction tokens flow
+    std::vector<EagerForkSentNamer> backSents;
+    llvm::DenseSet<Operation *> visited;
+  };
+  std::vector<PartialPath> stack;
+  std::vector<EffectiveSlotNamer> startSlots;
+  PartialPath start{
+      .channel = *dec->getOperands().begin(),
+      .backPath = {},
+      .backSents = {},
+      .visited = {},
+  };
+  std::vector<std::vector<EffectiveSlotNamer>> ret;
+  stack.push_back(std::move(start));
+  while (!stack.empty()) {
+    // In this function, the operations are not handled case-by-case, but
+    // instead using their interfaces as any operation is allowed here. The
+    // order cannot be changed without breaking the behaviour:
+    // First, terminate in bad cases (otherwise potentially too many things are
+    // annotated).
+    // Second, if applicable, an eager fork output is added as a
+    // copied sent to the next slot.
+    // Third, slots are annotated.
+    // Lastly, all inputs are followed backwards (regardless of the number of
+    // inputs, can be 1 for buffer or fork, or 2 for arithmetic operations or
+    // loads)
+    auto cur = std::move(stack.back());
+    stack.pop_back();
+
+    if (!iog.contains(cur.channel)) {
+      assert(false && "should not happen");
+      continue;
+    }
+
+    if (cur.channel == iog.entry) {
+      EffectiveSlotNamer es(std::make_unique<EntrySlotNamer>(iog.entry));
+      while (!cur.backSents.empty()) {
+        es.addCopiedSent(cur.backSents.back());
+        cur.backSents.pop_back();
+      }
+      cur.backPath.push_back(std::move(es));
+    }
+
+    Operation *op = cur.channel.getDefiningOp();
+    // The search for ancestor slots is terminated by any of the following:
+    // 1. No defining op
+    // 2. op is not part of the IOG (ancestors must be part of the IOG)
+    // 3. The operation is the exit branch (Any operation before this is part of
+    // the decider-branch path, and is therefore not an ancestor of those slots)
+    // 4. op has already been visited (to avoid loops)
+    if (!op || !iog.contains(op) || op == exit ||
+        cur.visited.find(op) != cur.visited.end()) {
+      std::vector<EffectiveSlotNamer> forwardPath{};
+      while (!cur.backPath.empty()) {
+        forwardPath.push_back(std::move(cur.backPath.back()));
+        cur.backPath.pop_back();
+      }
+      ret.push_back(std::move(forwardPath));
+      continue;
+    }
+    cur.visited.insert(op);
+
+    if (auto fork = dyn_cast<EagerForkLikeOpInterface>(op)) {
+      // Store the appropriate sent state as a copied sent for the next slot
+      // found
+      auto sents = fork.getInternalSentStateNamers();
+      for (auto [i, chan] : llvm::enumerate(fork->getResults())) {
+        if (chan == cur.channel) {
+          cur.backSents.push_back(sents[i]);
+        }
+      }
+    }
+    auto curSlots = getAllSlotsOfOperation(op);
+    // Annotate the slots backwards, using the stored copied sents to build
+    // effective slots.
+    for (int i = curSlots.size() - 1; i >= 0; --i) {
+      auto &slot = curSlots[i];
+      EffectiveSlotNamer es(std::move(slot));
+      while (!cur.backSents.empty()) {
+        es.addCopiedSent(cur.backSents.back());
+        cur.backSents.pop_back();
+      }
+      cur.backPath.push_back(std::move(es));
+    }
+
+    // Follow the inputs of the operand
+    for (auto back : op->getOperands()) {
+      if (!iog.contains(back)) {
+        continue;
+      }
+      cur.channel = back;
+      stack.push_back(cur);
+    }
+  }
+  return ret;
+}
+
+} // namespace
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateExitTokenOrder(
+    const std::vector<IOG> &iogs) {
+  llvm::DenseMap<ConditionalBranchOp, int32_t> exitBranches;
+  for (const auto &iog : iogs) {
+    for (auto *op : iog.units) {
+      if (auto branch = dyn_cast<ConditionalBranchOp>(op)) {
+        if (auto optExitValue = iog.isExitBranch(branch)) {
+          exitBranches.insert({branch, *optExitValue});
+        }
+      }
+    }
+  }
+  llvm::DenseMap<Operation *, int32_t> deciders;
+  for (auto [branch, exitValue] : exitBranches) {
+    Operation *dec = *getDecider(branch);
+    deciders.insert({dec, exitValue});
+  }
+  for (auto [dec, exitValue] : deciders) {
+    auto slotPaths = findDeciderBranchPaths(dec);
+    // [START Enumerating ExitTokenOrder invariants]
+    for (const auto &slots : slotPaths) {
+      if (slots.started.size() < 2) {
+        // Invariant is trivially true
+        continue;
+      }
+      ExitTokenOrder p(uid++, FormalProperty::TAG::INVAR, slots.started,
+                       exitValue);
+      propertyTable.push_back(p.toJSON());
+    }
+    // [END Enumerating ExitTokenOrder invariants]
+
+    // [START Enumerating ExitTokenNoAncestors invariants]
+    for (const auto &iog : iogs) {
+      if (!iog.contains(dec)) {
+        continue;
+      }
+
+      // Find the branch that is part of the IOG of the decider
+      std::optional<ConditionalBranchOp> iogBranch;
+      for (const auto &slots : slotPaths) {
+        if (iog.contains(slots.end)) {
+          assert(!iogBranch);
+          iogBranch = slots.end;
+        }
+      }
+      if (!iogBranch) {
+        return failure();
+      }
+
+      auto ancestorPaths = findAncestorSlots(iog, dec, *iogBranch);
+      for (auto ancestorPath : ancestorPaths) {
+        if (ancestorPath.empty())
+          continue;
+        for (const auto &decPath : slotPaths) {
+          if (decPath.started.empty())
+            continue;
+          // Extend the ancestor path using the startSents
+          for (const auto &startSent : decPath.startSents) {
+            ancestorPath.back().addCopiedSent(startSent);
+          }
+          std::vector<std::shared_ptr<InternalStateNamer>> exitSlots;
+          exitSlots.reserve(decPath.started.size());
+          for (const auto &es : decPath.started) {
+            exitSlots.push_back(es.slot);
+          }
+          ExitTokenNoAncestors p(uid++, FormalProperty::TAG::INVAR, exitSlots,
+                                 ancestorPath, exitValue);
+          propertyTable.push_back(p.toJSON());
+        }
+      }
+    }
+    // [END Enumerating ExitTokenNoAncestors invariants]
+  }
+  return success();
+}
+
+LogicalResult HandshakeAnnotatePropertiesPass::annotateProperty(
+    ModuleOp modOp, const std::vector<IOG> &iogs, FormalProperty::TYPE t) {
   switch (t) {
   case FormalProperty::TYPE::AbsenceOfBackpressure:
     return annotateAbsenceOfBackpressure(modOp);
@@ -546,15 +920,31 @@ HandshakeAnnotatePropertiesPass::annotateProperty(ModuleOp modOp,
     return annotateEagerForkNotAllOutputSent(modOp);
   case FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull:
     return annotateCopiedSlotsOfAllForks(modOp);
+  case FormalProperty::TYPE::EagerForkPathTokenCopiedMaximumOnce:
+    return annotateEagerForkPath(modOp);
   case FormalProperty::TYPE::ReconvergentPathFlow:
     return annotateReconvergentPathFlow(modOp);
   case FormalProperty::TYPE::IOGSingleToken:
+    for (const auto &iog : iogs) {
+      if (failed(annotateIOGSingleToken(iog)))
+        return failure();
+    }
+    return success();
   case FormalProperty::TYPE::IOGConsecutiveTokens:
-    assert(false &&
-           "TODO: IOG as pass so that this function has access to IOGs");
-    return failure();
+    for (const auto &iog : iogs) {
+      if (failed(annotateIOGConsecutiveTokens(iog)))
+        return failure();
+    }
+    return success();
   case FormalProperty::TYPE::EntryTokenOrder:
     return annotateEntryTokenOrder(modOp);
+  case FormalProperty::TYPE::SingleEntryToken:
+    return annotateSingleEntryToken(modOp);
+  case FormalProperty::TYPE::ExitTokenOrder:
+    return annotateExitTokenOrder(iogs);
+  case FormalProperty::TYPE::ExitTokenNoAncestors:
+    llvm::errs() << "ExitTokenNoAncestors is annotated with ExitTokenOrder\n";
+    return failure();
   }
   return failure();
 }
@@ -567,7 +957,7 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
     for (auto &elem : llvm::split(annotateList, ',')) {
       std::string typeStr = elem.trim().str();
       if (auto t = FormalProperty::typeFromStr(typeStr)) {
-        if (failed(annotateProperty(modOp, *t)))
+        if (failed(annotateProperty(modOp, iogs, *t)))
           res = failure();
       } else {
         llvm::errs() << typeStr << " is not a property\n";
@@ -587,6 +977,8 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
       return failure();
     if (failed(annotateCopiedSlotsOfAllForks(modOp)))
       return failure();
+    if (failed(annotateEagerForkPath(modOp)))
+      return failure();
     if (failed(annotateReconvergentPathFlow(modOp)))
       return failure();
 
@@ -597,6 +989,10 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
         return failure();
     }
     if (failed(annotateEntryTokenOrder(modOp)))
+      return failure();
+    if (failed(annotateSingleEntryToken(modOp)))
+      return failure();
+    if (failed(annotateExitTokenOrder(iogs)))
       return failure();
   }
   return success();

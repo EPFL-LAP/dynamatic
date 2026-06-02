@@ -1284,6 +1284,18 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
                         bufferFull)
               .str();
       data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<EagerForkPathTokenCopiedMaximumOnce>(
+                   property.get())) {
+      std::string channelName =
+          llvm::formatv("{0}.{1}_valid", p->getValidOp(), p->getValidChannel());
+      auto sentStates = p->getSentStateNamers();
+      std::vector<std::string> forkOutNames{sentStates.size()};
+      for (unsigned i = 0; i < sentStates.size(); ++i) {
+        forkOutNames[i] = sentStates[i].getSMVName();
+      }
+      std::string propertyString = llvm::formatv(
+          "({0}) -> {1}", llvm::join(forkOutNames, " | "), channelName);
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else if (auto *p = llvm::dyn_cast<ReconvergentPathFlow>(property.get())) {
       std::vector<std::string> eqs{};
       for (auto &eq : p->getEquations()) {
@@ -1369,6 +1381,59 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
       // two slots
       assert(!ends.empty());
       std::string propertyString = llvm::join(ends, " & ");
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<SingleEntryToken>(property.get())) {
+      std::vector<std::string> cmStrs;
+      for (const auto &x : p->getCmPath()) {
+        cmStrs.push_back(x.getSMVName());
+      }
+      std::vector<std::string> ecStrs;
+      for (const auto &x : p->getEcPath()) {
+        ecStrs.push_back(x.getSMVName());
+      }
+      std::string propertyString =
+          llvm::formatv("count({0}) > 0 -> count({1}) = 0",
+                        llvm::join(cmStrs, ", "), llvm::join(ecStrs, ", "));
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<ExitTokenOrder>(property.get())) {
+      // (buffer3.full & buffer3.data = exit) -> (!buffer1.full & !buffer2.full)
+      const auto &slots = p->getSlots();
+      assert(slots.size() >= 2);
+      std::vector<std::string> earlierSlots;
+      std::vector<std::string> ends{};
+      earlierSlots.push_back(
+          llvm::formatv("!({0})", slots.begin()->getSMVName()));
+      for (auto start = slots.begin() + 1; start != slots.end(); ++start) {
+        std::string exitToken = start->constrain(p->getValue())->getSMVName();
+        ends.push_back(llvm::formatv("(({0}) -> ({1}))", exitToken,
+                                     llvm::join(earlierSlots, " & ")));
+        earlierSlots.push_back(llvm::formatv("!({0})", start->getSMVName()));
+      }
+
+      std::string propertyString = llvm::join(ends, " & ");
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<ExitTokenNoAncestors>(property.get())) {
+      const auto &exitSlots = p->getExitSlots();
+      int32_t exitValue = p->getValue();
+      std::vector<std::string> exitFulls;
+      exitFulls.reserve(exitSlots.size());
+      for (const auto &exitSlot : exitSlots) {
+        auto name = exitSlot->tryConstrain(exitValue)->getSMVName();
+        exitFulls.push_back(name);
+      }
+      std::string left =
+          llvm::formatv("count({0}) > 0", llvm::join(exitFulls, ", "));
+
+      const auto &ancestors = p->getAncestors();
+      std::vector<std::string> ancestorSlots;
+      ancestorSlots.reserve(ancestors.size());
+      for (const auto &slot : ancestors) {
+        auto name = slot.getSMVName();
+        ancestorSlots.push_back(name);
+      }
+      std::string right =
+          llvm::formatv("count({0}) = 0", llvm::join(ancestorSlots, ", "));
+      std::string propertyString = llvm::formatv("({0}) -> ({1})", left, right);
       data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";

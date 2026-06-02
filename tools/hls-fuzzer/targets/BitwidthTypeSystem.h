@@ -63,23 +63,6 @@ public:
   static bool discardScalarType(const ast::ScalarType &scalarType,
                                 const BitwidthTypingContext &);
 
-  bool discardReturnType(const ast::ReturnType &returnType,
-                         const BitwidthTypingContext &context) {
-    // Disallow void.
-    if (llvm::isa<ast::VoidType>(returnType))
-      return true;
-
-    return Super::discardReturnType(returnType, context);
-  }
-
-  /// Disallow array-assignment statements.
-  /// There is no rationale for doing so beyond the fact that we don't need
-  /// them, since we can just generate expression trees, and that it makes
-  /// synthesis faster.
-  static bool discardArrayAssignmentStatement(const BitwidthTypingContext &) {
-    return true;
-  }
-
   /// Forces constants to fit in the given bitwidth requirement.
   std::optional<ast::Constant>
   discardConstant(const ast::Constant &constant,
@@ -104,6 +87,12 @@ public:
 
   TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionTransferFns() override;
+
+  TransferFnArray<ast::ArrayAssignmentStatement>
+  getArrayAssignmentStatementTransferFns() override;
+
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override;
 
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range

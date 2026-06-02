@@ -32,10 +32,14 @@ public:
     ValidEquivalence,
     EagerForkNotAllOutputSent,
     CopiedSlotsOfActiveForksAreFull,
+    EagerForkPathTokenCopiedMaximumOnce,
     ReconvergentPathFlow,
     IOGSingleToken,
     IOGConsecutiveTokens,
     EntryTokenOrder,
+    SingleEntryToken,
+    ExitTokenOrder,
+    ExitTokenNoAncestors,
   };
 
   TAG getTag() const { return tag; }
@@ -238,6 +242,75 @@ private:
   inline static const StringLiteral COPIED_SLOT_LIT = "copied_slot";
 };
 
+// A path of eager forks without slots in between can only contain a single
+// active fork. This is annotated by asserting that, for each fork, if a single
+// output is active, the input must be valid: If there is a path with two forks
+// in a row, and the second one is sent, the input to the second one must be
+// valid. The units "carry" this invariant backwards, until it reaches the other
+// fork, for which the output must be valid. For the output of a fork to be
+// valid, the input must be ready and that output must not be sent, but this
+// means that the other fork cannot have the output sent as well. Note that, if
+// there is a slot along this path, the validity is no longer carried backwards,
+// so this case is handled as well.
+//
+// For example, this invariant rules out the following case (impossible to have
+// two "sent == True" in a row without a slot in between):
+//
+//
+//     |
+//     | Valid
+//     v
+//   EFork0
+//       | sent
+//       |
+//       v
+//     EFork1
+//         | sent
+//         |
+//         v
+//         .
+//
+// Reasoning:
+// sent == true implies the corresponding output handshake signal is not valid
+// Thus EFork0's output (and EFork1's input) has valid == false
+// But invariant states that, as EFork1 has an output with sent == true, EFork's
+// input has valid == true
+// This is a contradiction, so the invalid state shown is ruled out.
+//
+// This invariant is derived from (and equivalent to) Invariant 3 of
+// https://ieeexplore.ieee.org/document/10323796
+class EagerForkPathTokenCopiedMaximumOnce : public FormalProperty {
+public:
+  inline std::string getValidOp() { return validOp; }
+  inline std::string getValidChannel() { return validChannel; }
+  std::vector<handshake::EagerForkSentNamer> getSentStateNamers() {
+    return sentStateNamers;
+  }
+
+  llvm::json::Value extraInfoToJSON() const override;
+
+  static std::unique_ptr<EagerForkPathTokenCopiedMaximumOnce>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
+  EagerForkPathTokenCopiedMaximumOnce() = default;
+  EagerForkPathTokenCopiedMaximumOnce(uint64_t id, TAG tag, ForkOp &op);
+  ~EagerForkPathTokenCopiedMaximumOnce() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::EagerForkPathTokenCopiedMaximumOnce;
+  }
+
+private:
+  // The input channel of the eager fork
+  std::string validOp;
+  std::string validChannel;
+  // The `sent` states that imply the input is active
+  std::vector<handshake::EagerForkSentNamer> sentStateNamers;
+  inline static const StringLiteral SENTS_LIT = "sents";
+  inline static const StringLiteral VALID_CHANNEL_LIT = "valid_channel";
+  inline static const StringLiteral VALID_OP_LIT = "valid_op";
+};
+
 // A pair of two paths is called reconvergent if they split at the same fork,
 // and later reconverge at some join. Both of these paths will contain the same
 // number of tokens (although one needs to account for eager forks "generating"
@@ -347,11 +420,14 @@ private:
 // merge to mux `slots`, and by the value of the entry token `entryValue` (which
 // corresponds to the index of the control merge's input connected to the
 // entry path).
+// e.g. if the path from start -> cmerge arrives at the 0th input of cmerge,
+// `entryValue` will be 0
 //
 // clang-format off
 //
 // Example: fir (using fpl22)
 //
+// %0:3 = fork [3] %arg4 {...} : <>
 // %result, %index = control_merge [%0#2, %trueResult_6]  {...} : [<>, <>] to <>, <i1>
 // %16:2 = fork [2] %index {...} : <i1>
 // %10 = buffer %16#1
@@ -366,6 +442,8 @@ private:
 // buffer4.outs_valid_i
 // buffer5.full
 // buffer6.full
+//
+// The entry value is 0, as %0#2 comes from the entry.
 //
 // clang-format on
 class EntryTokenOrder : public FormalProperty {
@@ -391,6 +469,179 @@ private:
   int32_t entryValue;
   inline static const StringLiteral SLOTS_LIT = "slots";
   inline static const StringLiteral ENTRY_VALUE_LIT = "entry_value";
+};
+
+// SingleEntryToken describes the invariant that only a single token is emitted
+// from the entry unit. This means that, if any path between an entry cmerge and
+// a subsequent mux operation contains a token (regardless of whether it is an
+// entry token or a loop token), the path between the entry and cmerge must be
+// empty. This is because both entry tokens and loop tokens only exist after a
+// token has propagated from entry to cmerge.
+// This invariant is represented by the path from entry to cmerge `ec`, and the
+// path from cmerge to mux `cm`. Effective slots are used to ensure that
+// duplicated tokens are not counted double
+//
+// clang-format off
+//
+// Example: fir (using fpl22)
+//
+// %0:3 = fork [3] %arg4 {...} : <>
+// %result, %index = control_merge [%0#2, %trueResult_6]  {...} : [<>, <>] to <>, <i1>
+// %16:2 = fork [2] %index {...} : <i1>
+// %10 = buffer %16#1
+// %11 = buffer %10
+// %12 = buffer %11
+// %15 = mux %12 [%3#1, %14] {...} : <i1>, [<i32>, <i32>] to <i32>
+//
+// Annotates the following paths consisting of effective slots
+// slot (copied sent)
+//
+// cmerge -> mux path:
+//
+// control_merge0.slot_full (fork3.outs_1_sent)
+// buffer4.outs_valid_i
+// buffer5.full
+// buffer6.full
+//
+//
+// entry -> cmerge path:
+//
+// start_valid (fork0.outs_2_sent)
+//
+// clang-format on
+class SingleEntryToken : public FormalProperty {
+public:
+  const std::vector<EffectiveSlotNamer> &getEcPath() const { return ec; }
+  const std::vector<EffectiveSlotNamer> &getCmPath() const { return cm; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<SingleEntryToken>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  SingleEntryToken() = default;
+  SingleEntryToken(unsigned long id, TAG tag,
+                   std::vector<EffectiveSlotNamer> ec,
+                   std::vector<EffectiveSlotNamer> cm)
+      : FormalProperty(id, tag, TYPE::SingleEntryToken), ec(std::move(ec)),
+        cm(std::move(cm)) {}
+  ~SingleEntryToken() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::SingleEntryToken;
+  }
+
+private:
+  std::vector<EffectiveSlotNamer> ec;
+  std::vector<EffectiveSlotNamer> cm;
+  inline static const StringLiteral PATH_EC_LIT = "entry_cmerge_path";
+  inline static const StringLiteral PATH_CM_LIT = "cmerge_mux_path";
+};
+
+// In a path between a decider unit and a branch, only the first token along the
+// path can have the value that exits the loop. This is because, after the exit
+// token is generated, control flow will never come back to the decider unit
+// again, so no new token will be propagated into the path.
+// A unit is a decider unit if:
+// 1. It generates a token with a new value used as the condition by one or more
+// branches
+// 2. At least one of the branches is part of an IOG, and only one of the output
+// paths of this branch loops back to the branch
+class ExitTokenOrder : public FormalProperty {
+public:
+  const std::vector<EffectiveSlotNamer> &getSlots() const { return slots; }
+  int32_t getValue() const { return exitValue; }
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ExitTokenOrder>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  ExitTokenOrder() = default;
+  ExitTokenOrder(unsigned long id, TAG tag,
+                 std::vector<EffectiveSlotNamer> slots, int32_t value)
+      : FormalProperty(id, tag, TYPE::ExitTokenOrder), slots(std::move(slots)),
+        exitValue(value) {}
+  ~ExitTokenOrder() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::ExitTokenOrder;
+  }
+
+private:
+  std::vector<EffectiveSlotNamer> slots;
+  int32_t exitValue;
+  inline static const StringLiteral SLOTS_LIT = "slots";
+  inline static const StringLiteral EXIT_VALUE_LIT = "exit_value";
+};
+
+// The ExitTokenNoAncestors invariant states that, for any decider-branch path,
+// if an exit token exists anywhere, ancestors of the decider cannot contain any
+// effective tokens. Any unit that can reach the decider is called an ancestor
+// of the decider.
+//
+// The following graphic should assist in understanding what ancestor slots are,
+// and visualize the terminology used in the search algorithm.
+// ```
+// EffectiveSlot            --|--|
+// ...                        |  |
+// EffectiveSlot              |  | Ancestor slots
+//                            |  |
+// Slot                       |--|
+// EagerFork                  |
+// ...                        | Effective Ancestors
+// EagerFork                  |
+//                            |
+//                            |
+// Decider (e.g. <)           |  --|
+//                            |    | Unstarted path
+//                            |    |
+// EagerFork   --|            |    |
+// ...           | startSents |    |
+// EagerFork   --|          --|    |
+//                                 |
+// EffectiveSlot    --|            |--|
+// ...                | DecBrPath  |  |
+// EffectiveSlot      |            |  | Started path
+//                    |            |  |
+// ExitBranch       --|          --|--|
+// ```
+//
+// The reason for the complicated search algorithm is due to the edge cases of
+// eager forks, and due to the presence of multiple possible paths: There might
+// be multiple paths of ancestors before the decider, and there are multiple
+// paths to exit branches after the decider. However, to get the effective path
+// of ancestors, the forks labelled `startSents` are still required, as they are
+// copied sents of the last ancestor.
+class ExitTokenNoAncestors : public FormalProperty {
+public:
+  const std::vector<std::shared_ptr<InternalStateNamer>> &getExitSlots() const {
+    return exitSlots;
+  }
+  const std::vector<EffectiveSlotNamer> &getAncestors() const {
+    return ancestors;
+  }
+  int32_t getValue() const { return exitValue; }
+
+  llvm::json::Value extraInfoToJSON() const override;
+  static std::unique_ptr<ExitTokenNoAncestors>
+  fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+  ExitTokenNoAncestors() = default;
+  ExitTokenNoAncestors(
+      unsigned long id, TAG tag,
+      std::vector<std::shared_ptr<InternalStateNamer>> exitSlots,
+      std::vector<EffectiveSlotNamer> ancestors, int32_t value)
+      : FormalProperty(id, tag, TYPE::ExitTokenNoAncestors),
+        exitSlots(std::move(exitSlots)), ancestors(std::move(ancestors)),
+        exitValue(value) {}
+  ~ExitTokenNoAncestors() = default;
+
+  static bool classof(const FormalProperty *fp) {
+    return fp->getType() == TYPE::ExitTokenNoAncestors;
+  }
+
+private:
+  std::vector<std::shared_ptr<InternalStateNamer>> exitSlots;
+  std::vector<EffectiveSlotNamer> ancestors;
+  int32_t exitValue;
+  inline static const StringLiteral EXIT_SLOTS_LIT = "exit_slots";
+  inline static const StringLiteral ANCESTORS_LIT = "ancestors";
+  inline static const StringLiteral EXIT_VALUE_LIT = "exit_value";
 };
 
 class FormalPropertyTable {

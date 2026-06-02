@@ -31,6 +31,8 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::EagerForkNotAllOutputSent;
   if (s == "CopiedSlotsOfActiveForksAreFull")
     return FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull;
+  if (s == "EagerForkPathTokenCopiedMaximumOnce")
+    return FormalProperty::TYPE::EagerForkPathTokenCopiedMaximumOnce;
   if (s == "ReconvergentPathFlow")
     return FormalProperty::TYPE::ReconvergentPathFlow;
   if (s == "IOGSingleToken")
@@ -39,6 +41,12 @@ FormalProperty::typeFromStr(const std::string &s) {
     return FormalProperty::TYPE::IOGConsecutiveTokens;
   if (s == "EntryTokenOrder")
     return FormalProperty::TYPE::EntryTokenOrder;
+  if (s == "SingleEntryToken")
+    return FormalProperty::TYPE::SingleEntryToken;
+  if (s == "ExitTokenOrder")
+    return FormalProperty::TYPE::ExitTokenOrder;
+  if (s == "ExitTokenNoAncestors")
+    return FormalProperty::TYPE::ExitTokenNoAncestors;
 
   return std::nullopt;
 }
@@ -53,6 +61,8 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "EagerForkNotAllOutputSent";
   case TYPE::CopiedSlotsOfActiveForksAreFull:
     return "CopiedSlotsOfActiveForksAreFull";
+  case TYPE::EagerForkPathTokenCopiedMaximumOnce:
+    return "EagerForkPathTokenCopiedMaximumOnce";
   case TYPE::ReconvergentPathFlow:
     return "ReconvergentPathFlow";
   case TYPE::IOGSingleToken:
@@ -61,6 +71,12 @@ std::string FormalProperty::typeToStr(TYPE t) {
     return "IOGConsecutiveTokens";
   case TYPE::EntryTokenOrder:
     return "EntryTokenOrder";
+  case TYPE::SingleEntryToken:
+    return "SingleEntryToken";
+  case TYPE::ExitTokenOrder:
+    return "ExitTokenOrder";
+  case TYPE::ExitTokenNoAncestors:
+    return "ExitTokenNoAncestors";
   }
 }
 
@@ -118,6 +134,9 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
   case TYPE::CopiedSlotsOfActiveForksAreFull:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::EagerForkPathTokenCopiedMaximumOnce:
+    return EagerForkPathTokenCopiedMaximumOnce::fromJSON(value,
+                                                         path.field(INFO_LIT));
   case TYPE::ReconvergentPathFlow:
     return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
   case TYPE::IOGSingleToken:
@@ -126,6 +145,12 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return IOGConsecutiveTokens::fromJSON(value, path.field(INFO_LIT));
   case TYPE::EntryTokenOrder:
     return EntryTokenOrder::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::SingleEntryToken:
+    return SingleEntryToken::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::ExitTokenOrder:
+    return ExitTokenOrder::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::ExitTokenNoAncestors:
+    return ExitTokenNoAncestors::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -348,6 +373,39 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
+// Eager Fork Path
+
+EagerForkPathTokenCopiedMaximumOnce::EagerForkPathTokenCopiedMaximumOnce(
+    uint64_t id, TAG tag, ForkOp &op)
+    : FormalProperty(id, tag, TYPE::EagerForkPathTokenCopiedMaximumOnce) {
+  PortNamer namer(op);
+  // ForkOp has only 1 input
+  validOp = getUniqueName(op);
+  validChannel = namer.getInputName(0).str();
+  sentStateNamers = op.getInternalSentStateNamers();
+}
+
+llvm::json::Value EagerForkPathTokenCopiedMaximumOnce::extraInfoToJSON() const {
+  return llvm::json::Object({{VALID_OP_LIT, validOp},
+                             {VALID_CHANNEL_LIT, validChannel},
+                             {SENTS_LIT, sentStateNamers}});
+}
+
+std::unique_ptr<EagerForkPathTokenCopiedMaximumOnce>
+EagerForkPathTokenCopiedMaximumOnce::fromJSON(const llvm::json::Value &value,
+                                              llvm::json::Path path) {
+  auto prop = std::make_unique<EagerForkPathTokenCopiedMaximumOnce>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(VALID_OP_LIT, prop->validOp) ||
+      !mapper.map(VALID_CHANNEL_LIT, prop->validChannel) ||
+      !mapper.map(SENTS_LIT, prop->sentStateNamers))
+    return nullptr;
+  return prop;
+}
+
 // Reconvergent path flow
 
 ReconvergentPathFlow::ReconvergentPathFlow(unsigned long id, TAG tag)
@@ -443,6 +501,60 @@ EntryTokenOrder::fromJSON(const llvm::json::Value &value,
 
   if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
       !mapper.map(ENTRY_VALUE_LIT, prop->entryValue))
+    return nullptr;
+  return prop;
+}
+
+llvm::json::Value SingleEntryToken::extraInfoToJSON() const {
+  return llvm::json::Object({{PATH_CM_LIT, cm}, {PATH_EC_LIT, ec}});
+}
+
+std::unique_ptr<SingleEntryToken>
+SingleEntryToken::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<SingleEntryToken>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(PATH_CM_LIT, prop->cm) ||
+      !mapper.map(PATH_EC_LIT, prop->ec))
+    return nullptr;
+  return prop;
+}
+llvm::json::Value ExitTokenOrder::extraInfoToJSON() const {
+  return llvm::json::Object({{EXIT_VALUE_LIT, exitValue}, {SLOTS_LIT, slots}});
+}
+std::unique_ptr<ExitTokenOrder>
+ExitTokenOrder::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  auto prop = std::make_unique<ExitTokenOrder>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(EXIT_VALUE_LIT, prop->exitValue) ||
+      !mapper.map(SLOTS_LIT, prop->slots))
+    return nullptr;
+  return prop;
+}
+
+llvm::json::Value ExitTokenNoAncestors::extraInfoToJSON() const {
+  return llvm::json::Object({{EXIT_VALUE_LIT, exitValue},
+                             {EXIT_SLOTS_LIT, exitSlots},
+                             {ANCESTORS_LIT, ancestors}});
+}
+std::unique_ptr<ExitTokenNoAncestors>
+ExitTokenNoAncestors::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<ExitTokenNoAncestors>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(EXIT_VALUE_LIT, prop->exitValue) ||
+      !mapper.map(EXIT_SLOTS_LIT, prop->exitSlots) ||
+      !mapper.map(ANCESTORS_LIT, prop->ancestors))
     return nullptr;
   return prop;
 }

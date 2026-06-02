@@ -16,11 +16,12 @@ TARGET_CP=$6
 USE_SHARING=$7
 FPUNITS_GEN=$8
 USE_RIGIDIFICATION=${9}
-DISABLE_LSQ=${10}
-FAST_TOKEN_DELIVERY=${11}
-MILP_SOLVER=${12}
-STRAIGHT_TO_QUEUE=${13}
-ENABLE_SHORT_CIRCUIT=${14}
+USE_K_INDUCTION=${10}
+DISABLE_LSQ=${11}
+FAST_TOKEN_DELIVERY=${12}
+MILP_SOLVER=${13}
+STRAIGHT_TO_QUEUE=${14}
+ENABLE_SHORT_CIRCUIT=${15}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -291,7 +292,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-optimize-bitwidths \
     --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
@@ -303,7 +304,7 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
@@ -377,7 +378,7 @@ export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
-  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED"
+  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED" "$USE_K_INDUCTION"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level

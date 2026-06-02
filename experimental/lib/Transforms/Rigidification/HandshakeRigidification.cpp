@@ -22,7 +22,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"

@@ -212,6 +212,10 @@ struct Constant {
                    std::int32_t, std::uint32_t, float, double>;
   Variant value;
 
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
   /// Returns the type of this expression.
   PrimitiveType getType() const {
     return llvm::TypeSwitch<Variant, PrimitiveType>(value)
@@ -255,6 +259,10 @@ struct Variable {
 
   using SubElements = std::tuple<ScalarParameter>;
   constexpr static std::size_t PARAMETER = 0;
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const Variable &variable);
@@ -316,6 +324,7 @@ public:
     NotEqual,
     MAX_VALUE = NotEqual,
   };
+  using Tag = Op;
 
   BinaryExpression(Expression lhs, Op op, Expression rhs)
       : lhs(std::move(lhs)), op(op), rhs(std::move(rhs)) {}
@@ -363,6 +372,10 @@ public:
   constexpr static std::size_t TARGET_TYPE = 0;
   constexpr static std::size_t OPERAND = 1;
 
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
 private:
   ScalarType targetType;
   Expression expression;
@@ -381,6 +394,7 @@ public:
     Minus,
     MAX_VALUE = Minus,
   };
+  using Tag = Op;
 
   UnaryExpression(Op op, Expression expression)
       : op(op), expression(std::move(expression)) {}
@@ -424,6 +438,10 @@ public:
   constexpr static std::size_t TRUE_VAL = 1;
   constexpr static std::size_t FALSE_VAL = 2;
 
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
 private:
   Expression condition;
   Expression trueVal;
@@ -460,6 +478,10 @@ public:
 
   constexpr static std::size_t ARRAY_PARAMETER = 0;
   constexpr static std::size_t INDEX = 1;
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
 
 private:
   ScalarType dataType;
@@ -507,6 +529,10 @@ public:
   /// Returns the value that will be assigned to the element.
   const Expression &getValueExpression() const { return valueExpression; }
 
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
   using SubElements = std::tuple<ArrayParameter, Expression, Expression>;
   constexpr static std::size_t ARRAY = 0;
   constexpr static std::size_t INDEX = 1;
@@ -522,8 +548,11 @@ llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
            const ArrayAssignmentStatement &arrayAssignmentStatement);
 
+class StructuredForStatement;
+
 class Statement {
-  using Variant = std::variant<ArrayAssignmentStatement>;
+  using Variant =
+      std::variant<ArrayAssignmentStatement, StructuredForStatement>;
 
 public:
   Statement() = default;
@@ -571,9 +600,63 @@ public:
   // statement after the list.
   using SubElements = std::tuple<StatementList, Statement>;
 
+  constexpr static std::size_t STATEMENT_LIST = 0;
+  constexpr static std::size_t STATEMENT = 1;
+
 private:
   std::vector<Statement> statements;
 };
+
+/// ASTNode representing a structured for statement.
+/// A structured for-statement is a statement with a defined 'start', 'end' and
+/// 'step' value. It defines an iterator of type 'uint32_t' that is
+/// initialized to 'start' and is incremented using 'step' until it is greater
+/// or equal to 'end' (i.e., end value is exclusive).
+class StructuredForStatement {
+public:
+  StructuredForStatement(std::string iterVariable, Expression start,
+                         Expression end, Expression step,
+                         StatementList statements)
+      : iterVariable(std::move(iterVariable)), start(std::move(start)),
+        end(std::move(end)), step(std::move(step)),
+        statements(std::move(statements)) {}
+
+  /// Returns the name of the iterator.
+  llvm::StringRef getIterVariable() const { return iterVariable; }
+
+  /// Returns the start expression.
+  const Expression &getStart() const { return start; }
+
+  /// Returns the end expression.
+  const Expression &getEnd() const { return end; }
+
+  /// Returns the step expression.
+  const Expression &getStep() const { return step; }
+
+  /// Returns the body of the for-statement.
+  const StatementList &getStatements() const { return statements; }
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
+  using SubElements =
+      std::tuple<Expression, Expression, Expression, StatementList>;
+  constexpr static std::size_t START = 0;
+  constexpr static std::size_t END = 1;
+  constexpr static std::size_t STEP = 2;
+  constexpr static std::size_t BODY = 3;
+
+private:
+  std::string iterVariable;
+  Expression start;
+  Expression end;
+  Expression step;
+  StatementList statements;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const StructuredForStatement &forStatement);
 
 /// AST-Node representing a scalar function parameter in C.
 class ScalarParameter {

@@ -382,6 +382,11 @@ struct EffectiveSlotNamer : InternalStateNamer {
   EffectiveSlotNamer(std::unique_ptr<InternalStateNamer> slot)
       : InternalStateNamer(TYPE::EffectiveSlot), slot(std::move(slot)),
         copiedSents(std::vector<EagerForkSentNamer>()) {}
+
+  EffectiveSlotNamer(std::unique_ptr<InternalStateNamer> slot,
+                     std::vector<EagerForkSentNamer> sents)
+      : InternalStateNamer(TYPE::EffectiveSlot), slot(std::move(slot)),
+        copiedSents(std::move(sents)) {}
   ~EffectiveSlotNamer() = default;
   static inline bool classof(const InternalStateNamer *fp) {
     return fp->type == TYPE::EffectiveSlot;
@@ -426,8 +431,7 @@ struct EntrySlotNamer : InternalStateNamer {
   // x_start_valid
   // start_valid
   EntrySlotNamer() = default;
-  EntrySlotNamer(const std::string &name)
-      : InternalStateNamer(TYPE::EntrySlot), argName(name) {}
+  EntrySlotNamer(BlockArgument arg);
   ~EntrySlotNamer() = default;
 
   static inline bool classof(const InternalStateNamer *fp) {

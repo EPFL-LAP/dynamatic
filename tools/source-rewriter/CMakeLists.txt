@@ -18,3 +18,9 @@ target_link_libraries(source-rewriter
   clangToolingRefactoring
   clangTransformer
 )
+
+# If building LLVM from source
+# LLVM must be built before source-rewriter
+if(DYNAMATIC_BUILD_LLVM)
+  add_dependencies(source-rewriter clang-tablegen-targets)
+endif()

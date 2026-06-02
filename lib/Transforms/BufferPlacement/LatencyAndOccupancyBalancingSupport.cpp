@@ -15,8 +15,10 @@
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graph_utility.hpp>
@@ -28,6 +30,7 @@
 #include <fstream>
 #include <numeric>
 #include <queue>
+#include <set>
 
 #define DEBUG_TYPE "latency-and-occupancy-balancing-support"
 
@@ -43,10 +46,15 @@ void renumber_vertex_indices(BoostDataflowSubgraph const &) {}
 
 namespace dynamatic {
 
+using namespace dynamatic::handshake;
+
 ///=== RECONVERGENT PATH FINDER ===///
 
 std::string
 CFGTransitionSequenceSubgraph::getNodeLabel(NodeIdType nodeId) const {
+  if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
+    return "synthetic_start_fork\\nStep: " +
+           std::to_string(getNodeStep(nodeId));
   auto opName = nodes[nodeId].op->getAttrOfType<mlir::StringAttr>(
       NameAnalysis::ATTR_NAME);
   return opName.str() + "\\nStep: " + std::to_string(getNodeStep(nodeId));
@@ -111,8 +119,9 @@ void CFGTransitionSequenceSubgraph::buildGraphFromSequence(
       for (Operation *user : result.getUsers()) {
         // Check if user exists at the same step
         if (nodeMap.count({user, step})) {
-          addEdge(node.id, nodeMap[{user, step}], result,
-                  DataflowGraphEdgeType::INTRA_BB);
+          addEdge(/*pred=*/node.id, /*succ=*/nodeMap[{user, step}],
+                  /*mlirValue=*/result,
+                  /*type=*/DataflowGraphEdgeType::INTRA_BB);
         }
       }
     }
@@ -142,13 +151,78 @@ void CFGTransitionSequenceSubgraph::buildGraphFromSequence(
         for (Operation *user : result.getUsers()) {
           // Check if user exists at the destination step of this arch
           if (nodeMap.count({user, dstStep})) {
-            addEdge(node.id, nodeMap[{user, dstStep}], result,
-                    DataflowGraphEdgeType::INTER_BB);
+            addEdge(/*pred=*/node.id, /*succ=*/nodeMap[{user, dstStep}],
+                    /*mlirValue=*/result,
+                    /*type=*/DataflowGraphEdgeType::INTER_BB);
           }
         }
       }
     }
   }
+
+  addSyntheticStartForkForBalancing();
+}
+
+void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
+  if (nodes.empty())
+    return;
+
+  // `edgesToAdd` collects the set of edges (target node ID and mlir::Value)
+  // that will be added from the newly created synthetic start fork to the first
+  // operations consuming the function's input arguments.
+  //
+  // For example, take this snippet from the IIR benchmark (details omitted)
+  // ```
+  // handshake.func @iir(%arg0: memref<1000xi32>, %arg1: memref<1000xi32>,
+  // %arg2: !handshake.channel<i32>, %arg3: !handshake.channel<i32>, %arg4:
+  // !handshake.control<>, %arg5: !handshake.control<>, %arg6:
+  // !handshake.control<>, ...) -> (!handshake.channel<i32>,
+  // !handshake.control<>, !handshake.control<>, !handshake.control<>)
+  // attributes
+  // {} {
+  //   ... // (other operations)
+  //   %7 = br %arg3 {handshake.bb = 0 : ui32, handshake.name = "br4"} : <i32>
+  //   ... // (other operations)
+  // }
+  // ```
+  //
+  // One of the pairs in edgesToAdd is ("br4", %arg3)
+  std::vector<std::pair<NodeIdType, mlir::Value>> edgesToAdd;
+  for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
+    if (isa<mlir::MemRefType>(arg.getType()) || arg.getUsers().empty())
+      continue;
+    Operation *user = *arg.getUsers().begin();
+
+    // Only add the edges in the very first step (entry BB)
+    auto it = nodeMap.find({user, 0});
+    if (it != nodeMap.end()) {
+      edgesToAdd.push_back({it->second, arg});
+    }
+  }
+
+  LLVM_DEBUG(
+      { llvm::errs() << "=== Synthetic start fork block arguments ===\n"; });
+
+  handshake::PortNamer namer(funcOp);
+  for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
+    if (isa<mlir::MemRefType>(arg.getType()))
+      continue;
+    LLVM_DEBUG({
+      llvm::errs() << "  arg #" << arg.getArgNumber() << " \""
+                   << namer.getInputName(arg.getArgNumber())
+                   << "\": " << arg.getType() << "\n";
+    });
+  }
+
+  if (edgesToAdd.size() < 2)
+    return;
+
+  NodeIdType forkId = addNode(nullptr, DataflowGraphNode::SYNTHETIC_FORK);
+  nodeIdToStep[forkId] = 0;
+
+  for (const auto &edge : edgesToAdd)
+    addEdge(/*pred=*/forkId, /*succ=*/edge.first, /*mlirValue=*/edge.second,
+            /*type=*/DataflowGraphEdgeType::INTRA_BB);
 }
 
 std::vector<ReconvergentPath>
@@ -644,13 +718,15 @@ void SynchronizingCyclesFinderGraph::buildFromCFDFC(
              "CFDFC channel consumer must be in CFDFC units");
       NodeIdType srcId = opToNodeId[producer];
       NodeIdType dstId = opToNodeId[consumer];
-      addEdge(srcId, dstId, channel);
+      addEdge(/*pred=*/srcId, /*succ=*/dstId, /*mlirValue=*/channel);
     }
   }
 }
 
 std::string
 SynchronizingCyclesFinderGraph::getNodeLabel(NodeIdType nodeId) const {
+  if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
+    return "synthetic_start_fork";
   return nodes[nodeId].op->getName().getStringRef().str();
 }
 

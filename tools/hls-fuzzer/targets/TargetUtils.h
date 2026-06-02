@@ -12,12 +12,15 @@ namespace dynamatic {
 /// dynamatic, i.e., use 'CALL_KERNEL' and pass variables as arguments that are
 /// identical to the corresponding parameter names.
 /// 'dynamaticPath' should refer to where the dynamatic executable.
+/// 'timeout' may optionally contain the number of cycles that the program may
+/// at most require in the simulator iff present.
 ///
 /// The directory of 'sourceFile' is assumed to be scratch space used for build
 /// artifacts.
 AbstractWorker::VerificationResult
 performDifferentialTesting(const std::filesystem::path &sourceFile,
-                           llvm::StringRef dynamaticPath);
+                           llvm::StringRef dynamaticPath,
+                           std::optional<size_t> timeout = std::nullopt);
 
 /// Performs non-functional testing on the compilation of a C file called
 /// 'sourceFile'.

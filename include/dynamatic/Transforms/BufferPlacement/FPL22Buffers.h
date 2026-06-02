@@ -22,9 +22,9 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_FPL22BUFFERS_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "llvm/ADT/MapVector.h"
 
 namespace dynamatic {

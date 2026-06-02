@@ -79,11 +79,10 @@ struct HandshakeSetUnitImplAttributesPass
 
     getOperation().walk([&](LatencyInterface latencyInterfaceOp) {
       // [START mark the latency]
-      double latency;
-      if (!failed(timingDB.getLatency(latencyInterfaceOp, SignalType::DATA,
-                                      latency, targetCP))) {
-
-        int64_t latencyInt = static_cast<int64_t>(latency);
+      auto latencyOrFail =
+          timingDB.getLatency(latencyInterfaceOp, SignalType::DATA, targetCP);
+      if (succeeded(latencyOrFail)) {
+        int64_t latencyInt = static_cast<int64_t>(*latencyOrFail);
         latencyInterfaceOp.setLatency(latencyInt);
       } else {
         latencyInterfaceOp->emitError(

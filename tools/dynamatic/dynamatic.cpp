@@ -298,6 +298,7 @@ public:
   static constexpr llvm::StringLiteral MILP_SOLVER = "milp-solver";
   static constexpr llvm::StringLiteral SHARING = "sharing";
   static constexpr llvm::StringLiteral RIGIDIFICATION = "rigidification";
+  static constexpr llvm::StringLiteral K_INDUCTION = "k-induction";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
   static constexpr llvm::StringLiteral ENABLE_SHORT_CIRCUIT =
@@ -325,6 +326,8 @@ public:
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
+    addOption(
+        {K_INDUCTION, "Use the k-induction algorithm for rigidification"});
     addFlag({DISABLE_LSQ, "Force usage of memory controllers instead of LSQs. "
                           "Warning: This may result in out-of-order memory "
                           "accesses, use with caution!"});
@@ -719,7 +722,8 @@ CommandResult VerifyInvariants::execute(CommandArguments &args) {
                                 getSeparator() + "handshake_export.mlir";
 
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), handshakeExport, "--verify-invariants");
+                 state.getKernelName(), handshakeExport, "\"\"", "1",
+                 "--verify-invariants");
 }
 
 CommandResult Compile::execute(CommandArguments &args) {
@@ -766,6 +770,10 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
+  std::string kInduction = "0";
+  if (auto it = args.options.find(K_INDUCTION); it != args.options.end()) {
+    kInduction = it->second;
+  }
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
   std::string enableShortCircuit =
       args.flags.contains(ENABLE_SHORT_CIRCUIT) ? "1" : "0";
@@ -773,8 +781,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   return execCmd(
       script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
       state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery,
-      milpSolver, straightToQueue, enableShortCircuit);
+      state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
+      fastTokenDelivery, milpSolver, straightToQueue, enableShortCircuit);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
@@ -61,16 +61,33 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
   if (!model)
     return {0.0, 0.0};
 
-  double inBufDelay = 0.0, outBufDelay = 0.0;
   unsigned bitwidth;
   switch (signalType) {
-  case SignalType::DATA:
+  case SignalType::DATA: {
     bitwidth = getHandshakeTypeBitWidth(channel.getType());
-    /// TODO: It's bad to discard these results, needs a safer way of querying
-    /// for these delays
-    (void)model->inputModel.dataDelay.getCeilMetric(bitwidth, inBufDelay);
-    (void)model->outputModel.dataDelay.getCeilMetric(bitwidth, outBufDelay);
+
+    // getPortDelays is not written in a way that it can fail elegantly
+    // so if our timing model crashes, we have no simple way to signal it
+    // (other than to crash)
+    //
+    // the last person who wrote this set the delays to a 0.0 default
+    // instead of fixing it to fail elegantly or to crash
+    // and had a TODO marker on it
+    double inBufDelay = 0.0, outBufDelay = 0.0;
+
+    // if the timing model doesn't crash, set in buffer delay properly
+    if (auto inBufDelayOrFail = model->inputModel.dataDelay.select(bitwidth);
+        succeeded(inBufDelayOrFail))
+      inBufDelay = inBufDelayOrFail->get();
+
+    // if the timing model doesn't crash, set out buffer delay properly
+    if (auto outBufDelayOrFail = model->outputModel.dataDelay.select(bitwidth);
+        succeeded(outBufDelayOrFail))
+      outBufDelay = outBufDelayOrFail->get();
+
+    // and return them
     return {inBufDelay, outBufDelay};
+  }
   case SignalType::VALID:
     return {model->inputModel.validDelay, model->outputModel.validDelay};
   case SignalType::READY:
@@ -79,7 +96,10 @@ getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
 }
 
 /// [FPGA24] Returns whether the unit has variable latency.
-static bool hasVariableLatencyUnit(Operation *unit) {
+static bool hasVariableLatencyUnit(const DataflowGraphNode &node) {
+  if (node.type != DataflowGraphNode::REGULAR)
+    return false;
+  Operation *unit = node.op;
   if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
     auto memOp = findMemInterface(loadOp.getAddress());
     if (isa_and_present<handshake::LSQOp>(memOp))
@@ -99,53 +119,96 @@ static bool hasVariableLatencyUnit(Operation *unit) {
 static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
                                    const DataflowSubgraphBase &graph) {
   return std::any_of(nodeIds.begin(), nodeIds.end(), [&](NodeIdType nodeId) {
-    return hasVariableLatencyUnit(graph.nodes[nodeId].op);
+    return hasVariableLatencyUnit(graph.nodes[nodeId]);
   });
 }
 
 /// [FPGA24] Computes cycle latency expression.
-static LinExpr
-computeCycleLatency(const SimpleCycle &cycle,
-                    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
-                    const MILPVars &vars, const TimingDatabase &timingDB,
-                    double targetPeriod) {
+static LinExpr computeCycleLatency(const SimpleCycle &cycle,
+                                   const SynchronizingCyclesFinderGraph &graph,
+                                   const MILPVars &vars,
+                                   const TimingDatabase &timingDB,
+                                   double targetPeriod) {
   LinExpr latency;
 
   for (NodeIdType nodeId : cycle.nodes) {
-    Operation *op = graph.nodes[nodeId].op;
-    double unitLatency = 0.0;
-    (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
-    latency += unitLatency;
+    const DataflowGraphNode &node = graph.nodes[nodeId];
+    if (node.type != DataflowGraphNode::REGULAR)
+      continue;
+    Operation *op = node.op;
+    auto unitLatencyOrFail =
+        timingDB.getLatency(op, SignalType::DATA, targetPeriod);
+    if (succeeded(unitLatencyOrFail))
+      latency += *unitLatencyOrFail;
   }
+
+  auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId != dst)
+        continue;
+      return graph.edges[edgeId].channel;
+    }
+    llvm_unreachable("Edge not found");
+    return Value();
+  };
 
   for (size_t i = 0; i < cycle.nodes.size(); ++i) {
     NodeIdType src = cycle.nodes[i];
     NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
-    for (EdgeIdType edgeId : graph.adjList[src]) {
-      if (graph.edges[edgeId].dstId == dst) {
-        Value channel = graph.edges[edgeId].channel;
-        if (vars.channelVars.count(channel))
-          latency += vars.channelVars.lookup(channel).dataLatency;
-        break;
-      }
-    }
+    Value channel = findChannel(src, dst);
+
+    if (vars.channelVars.count(channel))
+      latency += vars.channelVars.lookup(channel).dataLatency;
   }
 
   return latency;
 }
 
 /// [FPGA24] Computes cycle base latency.
-static double computeCycleBaseLatency(
-    const SimpleCycle &cycle,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &graph,
-    const TimingDatabase &timingDB, double targetPeriod) {
+static double
+computeCycleBaseLatency(const SimpleCycle &cycle,
+                        const SynchronizingCyclesFinderGraph &graph,
+                        const TimingDatabase &timingDB, double targetPeriod) {
   double latency = 0.0;
   for (NodeIdType nodeId : cycle.nodes) {
-    Operation *op = graph.nodes[nodeId].op;
-    double unitLatency = 0.0;
-    (void)timingDB.getLatency(op, SignalType::DATA, unitLatency, targetPeriod);
-    latency += unitLatency;
+    const DataflowGraphNode &node = graph.nodes[nodeId];
+    if (node.type != DataflowGraphNode::REGULAR)
+      continue;
+    Operation *op = node.op;
+    auto unitLatencyOrFail =
+        timingDB.getLatency(op, SignalType::DATA, targetPeriod);
+    if (succeeded(unitLatencyOrFail))
+      latency += *unitLatencyOrFail;
   }
+  return latency;
+}
+
+double BufferPlacementMILP::computeCycleForcedLatencyLowerBound(
+    const SimpleCycle &cycle,
+    const SynchronizingCyclesFinderGraph &graph) const {
+  double latency =
+      computeCycleBaseLatency(cycle, graph, timingDB, targetPeriod);
+
+  auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId != dst)
+        continue;
+      return graph.edges[edgeId].channel;
+    }
+    llvm_unreachable("Edge not found");
+    return Value();
+  };
+
+  for (size_t i = 0; i < cycle.nodes.size(); ++i) {
+    NodeIdType src = cycle.nodes[i];
+    NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
+    Value channel = findChannel(src, dst);
+
+    const auto *propsIt = channelProps.find(channel);
+    if (propsIt != channelProps.end() && propsIt->second.minOpaque > 0)
+      latency += 1.0;
+  }
+
   return latency;
 }
 
@@ -213,7 +276,6 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   std::string prefix = "cfdfc" + std::to_string(vars.cfdfcVars.size()) + "_";
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
 
-  // Create a CPVar variable of the given name (prefixed by the CFDFC index)
   auto createVar = [&](const llvm::Twine &name) {
     return model->addVar((prefix + name).str(), REAL, 0, std::nullopt);
   };
@@ -222,20 +284,43 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
   for (Operation *unit : cfdfc.units) {
     std::string suffix = "_" + getUniqueName(unit).str();
 
-    // Default-initialize unit variables and retrieve a reference
-    UnitVars &unitVars = cfVars.unitVars[unit];
-    unitVars.retIn = createVar("retIn" + suffix);
+    // Construct UnitVars from the op
+    // this assigns each operand and each result
+    // to one retiming path through the unit
+    UnitVars unitVars(unit);
 
-    // If the component is combinational (i.e., 0 latency) its output fluid
-    // retiming equals its input fluid retiming, otherwise it is different
-    double latency;
-    if (failed(
-            timingDB.getLatency(unit, SignalType::DATA, latency, targetPeriod)))
-      latency = 0.0;
-    if (latency == 0.0)
-      unitVars.retOut = unitVars.retIn;
-    else
-      unitVars.retOut = createVar("retOut" + suffix);
+    // Then for each path through the unit
+    for (auto [pathIdx, pathVars] : llvm::enumerate(unitVars.retPathVarList)) {
+      // we need the latency through that path
+      // (since the occupancy of that path is related
+      // to its latency)
+
+      // try get the latency from the timingDB
+      auto pathLatencyOrFail =
+          timingDB.getLatency(unit, SignalType::DATA, targetPeriod, pathIdx);
+      if (succeeded(pathLatencyOrFail))
+        pathVars.latency = *pathLatencyOrFail;
+      else
+        // assume latency 0 if the timing model fails
+        pathVars.latency = 0.0;
+
+      // and we need to create retiming variables for the unit
+      // for the MILP to move channel occupancy around
+      pathVars.retIn =
+          createVar("retIn" + suffix + "_path" + std::to_string(pathIdx));
+      // combinatorial units (zero-latency) have occupancy zero
+      // and so don't need a retiming variable for their output
+      if (pathVars.latency.has_value() && *pathVars.latency == 0.0)
+        pathVars.retOut = pathVars.retIn;
+      else
+        // otherwise, the pipelined unit will have an occupancy in steady-state
+        // so the MILP needs a retiming variable to represent this
+        pathVars.retOut =
+            createVar("retOut" + suffix + "_path" + std::to_string(pathIdx));
+    }
+
+    // and store the MILP variables for that unit using the unit as key
+    cfVars.unitVars.insert({unit, std::move(unitVars)});
   }
 
   // Create a variable to represent the throughput of each CFDFC channel
@@ -246,6 +331,26 @@ void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
 
   // Create a variable for the CFDFC's throughput
   cfVars.throughput = createVar("throughput");
+}
+
+void BufferPlacementMILP::populateCFDFCThroughputAndOccupancy() {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+
+    cf->throughput = model->getValue(cfVars.throughput);
+
+    // Store the channel occupancy into the CFDFC data structure.
+    for (auto &[val, var] : cfVars.channelThroughputs) {
+      double occupancy = model->getValue(var);
+      // Approximate occupancy to 0 if it is negative but bigger than
+      // -MILP_EPSILON.
+      if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+        occupancy = 0.0;
+      }
+      assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
+      cf->channelOccupancy[val] = occupancy;
+    }
+  }
 }
 
 void BufferPlacementMILP::addChannelTimingConstraints(
@@ -306,9 +411,10 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
                                                    SignalType signalType,
                                                    ChannelFilter filter) {
   // Add path constraints for units
-  double latency;
-  if (failed(timingDB.getLatency(unit, signalType, latency, targetPeriod)))
-    latency = 0.0;
+  double latency = 0.0;
+  auto latencyOrFail = timingDB.getLatency(unit, signalType, targetPeriod);
+  if (succeeded(latencyOrFail))
+    latency = *latencyOrFail;
 
   if (latency == 0.0) {
     double delay;
@@ -454,9 +560,12 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
   for (Value channel : cfdfc.channels) {
-    // Get the ports the channels connect and their retiming MILP variables
+    // Get the operations, operand number, and result number
+    // of this channel
     Operation *srcOp = channel.getDefiningOp();
     Operation *dstOp = *channel.getUsers().begin();
+    unsigned dstOperandIdx = channel.use_begin()->getOperandNumber();
+    unsigned srcResultIdx = cast<OpResult>(channel).getResultNumber();
 
     /// No throughput constraints on channels going to stores which
     /// are not connected to the LSQ. In the legacy implementation,
@@ -479,16 +588,32 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
       if (channel == selOp.getTrueValue())
         continue;
 
-    // Retrieve the MILP variables we need
+    // Retrieve the struct storing MILP variables
+    // for the src op and dst op
+    UnitVars &srcVars = cfVars.getUnitVarsFor(srcOp);
+    UnitVars &dstVars = cfVars.getUnitVarsFor(dstOp);
+
+    // get the MILP variable for the channels throughput
     CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
-    CPVar &retSrc = cfVars.unitVars[srcOp].retOut;
-    CPVar &retDst = cfVars.unitVars[dstOp].retIn;
+
+    // get the MILP variable for the retiming variables
+    // for the top and bottom of the channel
+    CPVar &retSrc = srcVars.getRetOut(srcResultIdx);
+    CPVar &retDst = dstVars.getRetIn(dstOperandIdx);
+
+    // get if the channel is a backedge as an integer
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
 
-    // If the channel isn't a backedge, its throughput equals the difference
-    // between the fluid retiming of tokens at its endpoints. Otherwise, it is
-    // one less than this difference
-    model->addConstr(chTokenOccupancy - backedge == retDst - retSrc,
+    // If the channel isn't a backedge, its steady-state occupancy
+    // equals the difference between the fluid retiming variables
+    // of the producer and consumer.
+    // We initially place a token in the CFDFC at the loop's backedge
+    // so if the channel is a backedge, the occupancy is 1 more
+    // than the difference
+    //
+    // occupancy of the channel places a limit on throughput
+    // if a buffer breaking data and valid is placed on the channel
+    model->addConstr(chTokenOccupancy == backedge + retDst - retSrc,
                      "throughput_channelRetiming");
   }
 }
@@ -653,23 +778,32 @@ void BufferPlacementMILP::
 }
 
 void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
+  // get the MILP variables for the cfdfc
   CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  // for each unit
   for (Operation *unit : cfdfc.units) {
-    double latency;
-    if (failed(timingDB.getLatency(unit, SignalType::DATA, latency,
-                                   targetPeriod)) ||
-        latency == 0.0)
-      continue;
+    // get the MILP variables for that unit in this cfdfc
+    UnitVars &unitVars = cfVars.getUnitVarsFor(unit);
 
-    // Retrieve the MILP variables corresponding to the unit's fluid retiming
-    UnitVars &unitVars = cfVars.unitVars[unit];
-    CPVar &retIn = unitVars.retIn;
-    CPVar &retOut = unitVars.retOut;
+    // enforce that the variables have been initialized correctly
+    // (debug mode only)
+    unitVars.validate();
 
-    // The fluid retiming of tokens across the non-combinational unit must
-    // be the same as its latency multiplied by the CFDFC's throughput
-    model->addConstr(cfVars.throughput * latency == retOut - retIn,
-                     "through_unitRetiming");
+    // For each retiming path through the unit
+    for (RetPathVars &retPath : unitVars.retPathVarList) {
+      double latency = *retPath.latency;
+      // zero-latency units do not require a certain occupancy
+      // to achieve a certain throughput
+      if (latency == 0.0)
+        continue;
+
+      // to achieve a certain steady-state throughput
+      // units with a latency *must* have a steady-state occupancy
+      // equal to that throughput by their latency
+      model->addConstr(cfVars.throughput * latency ==
+                           *retPath.retOut - *retPath.retIn,
+                       "through_unitRetiming");
+    }
   }
 }
 
@@ -1118,7 +1252,7 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
 
 void BufferPlacementMILP::addLatencyBalancingVars(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs) {
   for (auto &[channel, _] : channelProps) {
     if (isa<MemRefType>(channel.getType()))
       continue;
@@ -1161,7 +1295,7 @@ void BufferPlacementMILP::addReconvergentPathVars(
 }
 
 void BufferPlacementMILP::addSyncCycleVars(
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs) {
   vars.syncCycleVars.resize(syncCyclePairs.size());
   for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
     vars.syncCycleVars[pairIdx].imbalanced =
@@ -1170,7 +1304,7 @@ void BufferPlacementMILP::addSyncCycleVars(
 }
 
 void BufferPlacementMILP::addOccupancyVars(
-    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy,
+    ValueRange channels, llvm::MapVector<Value, CPVar> &channelOccupancy,
     double maxOccupancy) {
   for (Value channel : channels) {
     std::string name = getUniqueName(*channel.getUses().begin());
@@ -1180,22 +1314,20 @@ void BufferPlacementMILP::addOccupancyVars(
 }
 
 void BufferPlacementMILP::setOccupancyBalancingObjective(
-    ValueRange channels, DenseMap<Value, CPVar> &channelOccupancy) {
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c)
   LinExpr objective;
-  for (Value channel : channels) {
-    assert(channelOccupancy.count(channel) &&
-           "missing occupancy variable for channel");
+  for (auto &[channel, occupancy] : channelOccupancy) {
     unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
     // Control channels may have bitwidth 0, weight them with 1.
-    objective += (bitwidth == 0 ? 1 : bitwidth) * channelOccupancy[channel];
+    objective += (bitwidth == 0 ? 1 : bitwidth) * occupancy;
   }
   model->setMaximizeObjective(-objective);
 }
 
 void BufferPlacementMILP::addMinOccupancyConstraints(
-    const DenseMap<Value, double> &requiredOccupancy,
-    DenseMap<Value, CPVar> &channelOccupancy) {
+    const llvm::MapVector<Value, double> &requiredOccupancy,
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
   for (auto const &[channel, minOccupancy] : requiredOccupancy) {
     model->addConstr(channelOccupancy[channel] >= minOccupancy,
                      "n_c>=(L_c/II)" +
@@ -1204,7 +1336,7 @@ void BufferPlacementMILP::addMinOccupancyConstraints(
 }
 
 void BufferPlacementMILP::addBackedgeConstraints(
-    ArrayRef<CFDFC *> cfdfcs, DenseMap<Value, CPVar> &channelOccupancy) {
+    ArrayRef<CFDFC *> cfdfcs, llvm::MapVector<Value, CPVar> &channelOccupancy) {
   size_t cycleConstraints = 0;
   for (size_t i = 0; i < cfdfcs.size(); ++i) {
     CFDFC *cfdfc = cfdfcs[i];
@@ -1229,7 +1361,7 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
 
     bool hasVarLatency = std::any_of(
         path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
-          return hasVariableLatencyUnit(graph->nodes[id].op);
+          return hasVariableLatencyUnit(graph->nodes[id]);
         });
 
     if (hasVarLatency) {
@@ -1248,10 +1380,14 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
       LinExpr pathLatency;
 
       for (NodeIdType nodeId : simplePath.nodes) {
-        double unitLat = 0.0;
-        (void)timingDB.getLatency(graph->nodes[nodeId].op, SignalType::DATA,
-                                  unitLat, targetPeriod);
-        pathLatency += unitLat;
+        const DataflowGraphNode &node = graph->nodes[nodeId];
+        if (node.type != DataflowGraphNode::REGULAR)
+          continue;
+        Operation *unitOp = node.op;
+        auto unitLatOrFail =
+            timingDB.getLatency(unitOp, SignalType::DATA, targetPeriod);
+        if (succeeded(unitLatOrFail))
+          pathLatency += *unitLatOrFail;
       }
 
       for (EdgeIdType edgeId : simplePath.edges) {
@@ -1282,10 +1418,10 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
 }
 
 void BufferPlacementMILP::addSyncCycleConstraints(
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+    const SynchronizingCyclesFinderGraph &syncGraph) {
   for (size_t pairIdx = 0; pairIdx < syncCyclePairs.size(); ++pairIdx) {
-    const ::dynamatic::SynchronizingCyclePair &pair = syncCyclePairs[pairIdx];
+    const SynchronizingCyclePair &pair = syncCyclePairs[pairIdx];
     CPVar &patternImbalanced = vars.syncCycleVars[pairIdx].imbalanced;
 
     bool hasVarLatency =
@@ -1318,8 +1454,8 @@ void BufferPlacementMILP::addSyncCycleConstraints(
 /// so channels are marked stalled if any associated pattern is imbalanced.
 void BufferPlacementMILP::addStallPropagationConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-    ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-    const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph) {
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+    const SynchronizingCyclesFinderGraph &syncGraph) {
   DenseMap<Value, SmallVector<CPVar *>> channelToPatterns;
   auto addPatternToChannelStallProp = [&](Value channel, CPVar *imbalanced) {
     channelToPatterns[channel].push_back(imbalanced);
@@ -1375,26 +1511,23 @@ void BufferPlacementMILP::addCycleTimeConstraints(
   }
 
   for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
-    ::dynamatic::SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp,
-                                                           *cfdfc);
+    SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp, *cfdfc);
     std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
     if (cycles.empty()) {
       continue;
     }
 
     assert(!cycles.empty() && "empty cycle list should have been skipped");
-    auto maxCycleIt =
-        std::max_element(cycles.begin(), cycles.end(),
-                         [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
-                           return computeCycleBaseLatency(
-                                      lhs, cfdfcGraph, timingDB, targetPeriod) <
-                                  computeCycleBaseLatency(
-                                      rhs, cfdfcGraph, timingDB, targetPeriod);
-                         });
-    double maxBaseLatency = computeCycleBaseLatency(*maxCycleIt, cfdfcGraph,
-                                                    timingDB, targetPeriod);
+    auto maxCycleIt = std::max_element(
+        cycles.begin(), cycles.end(),
+        [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
+          return computeCycleForcedLatencyLowerBound(lhs, cfdfcGraph) <
+                 computeCycleForcedLatencyLowerBound(rhs, cfdfcGraph);
+        });
+    double maxRequiredLatency =
+        computeCycleForcedLatencyLowerBound(*maxCycleIt, cfdfcGraph);
 
-    double iiCFC = std::max(1.0, std::ceil(maxBaseLatency));
+    double iiCFC = std::max(1.0, std::ceil(maxRequiredLatency));
     computedII = std::max(computedII, iiCFC);
     iiMap[cfdfc] = iiCFC;
 
@@ -1507,9 +1640,15 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     os << "Unit retimings of CFDFC #" << idx << ":\n";
     os.indent();
-    for (auto &[op, unitVars] : cfVars.unitVars) {
-      os << getUniqueName(op) << ": (in: " << model->getValue(unitVars.retIn)
-         << ", out: " << model->getValue(unitVars.retOut) << ")\n";
+    for (Operation *op : cf->units) {
+      UnitVars &unitVars = cfVars.getUnitVarsFor(op);
+      os << getUniqueName(op) << ":\n";
+      os.indent();
+      for (auto [idx, var] : llvm::enumerate(unitVars.getInputRetimingVars()))
+        os << "in " << idx << ": " << model->getValue(var) << "\n";
+      for (auto [idx, var] : llvm::enumerate(unitVars.getOutputRetimingVars()))
+        os << "out " << idx << ": " << model->getValue(var) << "\n";
+      os.unindent();
     }
     os.unindent();
     os << "\n";

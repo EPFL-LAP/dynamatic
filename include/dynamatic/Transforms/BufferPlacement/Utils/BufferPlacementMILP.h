@@ -22,8 +22,9 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/MILP.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/UnitMILPVars.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
 #include "experimental/Support/SubjectGraph.h"
@@ -34,8 +35,11 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include <functional>
+#include <optional>
 
 namespace dynamatic {
+struct SimpleCycle;
 struct SynchronizingCyclePair;
 class SynchronizingCyclesFinderGraph;
 
@@ -51,18 +55,6 @@ struct TimeVars {
   CPVar tIn;
   /// Time at channel's output (i.e., at destination unit's input port).
   CPVar tOut;
-};
-
-/// Holds MILP variables associated to every CFDFC unit. Note that a unit may
-/// appear in multiple CFDFCs and so may have multiple sets of these variables.
-struct UnitVars {
-  /// Fluid retiming of tokens at unit's input (real).
-  CPVar retIn;
-  /// Fluid retiming of tokens at unit's output. Identical to retiming at unit's
-  /// input if the latter is combinational (real).
-  CPVar retOut;
-  /// [FPGA24] Occupancy contribution of this unit (real).
-  CPVar occupancy;
 };
 
 /// Holds MILP variables related to a specific signal (e.g., data, valid, ready)
@@ -106,11 +98,23 @@ struct SynchronizationPatternVars {
 /// the CFDFC, and a CFDFC throughput variable.
 struct CFDFCVars {
   /// Maps each CFDFC unit to its retiming variables.
-  llvm::MapVector<Operation *, UnitVars> unitVars;
+  llvm::DenseMap<Operation *, UnitVars> unitVars;
   /// Channel throughput variables (real).
   llvm::MapVector<Value, CPVar> channelThroughputs;
   /// CFDFC throughput (real).
   CPVar throughput;
+
+  /// Returns the UnitVars for `op`. Hard-aborts (with an op-attached error
+  /// diagnostic so the unit name and location are visible) if the unit is
+  /// not present in the CFDFC.
+  UnitVars &getUnitVarsFor(Operation *op) {
+    auto it = unitVars.find(op);
+    if (it == unitVars.end()) {
+      op->emitError("expected unit present in CFDFC");
+      llvm_unreachable("getUnitVarsFor: unit not present in CFDFC");
+    }
+    return it->second;
+  }
 };
 
 /// Holds all variables that may be used in the MILP. These are a set of
@@ -125,8 +129,6 @@ struct MILPVars {
   SmallVector<SynchronizationPatternVars> reconvergentPathVars;
   /// [FPGA24] Balancing variables for synchronizing cycles.
   SmallVector<SynchronizationPatternVars> syncCycleVars;
-  /// List of units in the function.
-  llvm::MapVector<Operation *, UnitVars> unitVars;
 };
 
 /// Abstract class holding the basic logic for the smart buffer placement pass,
@@ -402,7 +404,7 @@ protected:
   /// pattern imbalance variables, and links R_c to L_c.
   void addLatencyBalancingVars(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
   /// [FPGA24] Links the binary buffer-presence variable R_c to the integer
   /// latency variable L_c for every channel. (Paper: Section 4, Equation 6)
@@ -413,45 +415,49 @@ protected:
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
 
   /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
-  void addSyncCycleVars(
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs);
+  void addSyncCycleVars(ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
   /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
   void addOccupancyVars(ValueRange channels,
-                        DenseMap<Value, CPVar> &channelOccupancy,
+                        llvm::MapVector<Value, CPVar> &channelOccupancy,
                         double maxOccupancy);
 
   /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum.
-  void setOccupancyBalancingObjective(ValueRange channels,
-                                      DenseMap<Value, CPVar> &channelOccupancy);
+  void setOccupancyBalancingObjective(
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds minimum occupancy constraints: N_c >= L_c / II.
   /// (Paper: Section 5, Equation 8 and 15)
-  void
-  addMinOccupancyConstraints(const DenseMap<Value, double> &requiredOccupancy,
-                             DenseMap<Value, CPVar> &channelOccupancy);
+  void addMinOccupancyConstraints(
+      const llvm::MapVector<Value, double> &requiredOccupancy,
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
   /// least one token. (Paper: Section 5, Equation 12)
   void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
-                              DenseMap<Value, CPVar> &channelOccupancy);
+                              llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
   void addReconvergentPathConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
 
   /// [FPGA24] Adds imbalance constraints for synchronizing cycle pairs in LP1.
-  void addSyncCycleConstraints(
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+  void addSyncCycleConstraints(ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+                               const SynchronizingCyclesFinderGraph &syncGraph);
 
   /// [FPGA24] For each channel involved in a reconvergent path or
   /// synchronizing cycle pair, constrains stalled_c >= imbalanced_p so that
   /// pattern imbalance surfaces in the per-channel stall term of the objective.
   void addStallPropagationConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-      ArrayRef<::dynamatic::SynchronizingCyclePair> syncCyclePairs,
-      const ::dynamatic::SynchronizingCyclesFinderGraph &syncGraph);
+      ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+      const SynchronizingCyclesFinderGraph &syncGraph);
+
+  /// [FPGA24] Computes the lower bound on latency forced by channel properties
+  /// for a given cycle. Used to determine the minimum II.
+  double computeCycleForcedLatencyLowerBound(
+      const SimpleCycle &cycle,
+      const SynchronizingCyclesFinderGraph &graph) const;
 
   /// [FPGA24] Adds cycle-time constraints and computes required II values.
   void addCycleTimeConstraints(ArrayRef<CFDFC *> cfdfcs, double &computedII,
@@ -477,37 +483,7 @@ protected:
   /// Store the buffer placement MILP solution. This makes it possible for a
   /// later pass in the pass pipeline to retrieve the throughput and occupancy
   /// of each CFDFC of the current function.
-  void populateCFDFCThroughputAndOccupancy() {
-    for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-      auto [cf, cfVars] = cfdfcWithVars;
-
-      cf->throughput = model->getValue(cfVars.throughput);
-      // Store the unit occupancy into the CFDFC data structure.
-      for (auto &[op, var] : cfVars.unitVars) {
-        double occupancy =
-            model->getValue(var.retOut) - model->getValue(var.retIn);
-        // Approximate occupancy to 0 if it is negative but bigger than
-        // -MILP_EPSILON.
-        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
-          occupancy = 0.0;
-        }
-        assert(occupancy >= 0.0 && "Unit occupancy must not be non-negative!");
-        cf->unitOccupancy[op] = occupancy;
-      }
-
-      // Store the channel occupancy into the CFDFC data structure.
-      for (auto &[val, var] : cfVars.channelThroughputs) {
-        double occupancy = model->getValue(var);
-        // Approximate occupancy to 0 if it is negative but bigger than
-        // -MILP_EPSILON.
-        if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
-          occupancy = 0.0;
-        }
-        assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
-        cf->channelOccupancy[val] = occupancy;
-      }
-    }
-  }
+  void populateCFDFCThroughputAndOccupancy();
 
 private:
   /// Common logic for all constructors. Fills the channel to buffering
