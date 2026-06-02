@@ -1165,7 +1165,7 @@ class LSQ:
             # with pipelining: also compute for the next entry
             store_req_valid_next = Logic(ctx, 'store_req_valid_next', 'w')
             store_is_older_arr_next = LogicArray(ctx, 'store_is_older_arr_next', 'w', self.configs.numLdqEntries)
-            st_ld_addr_same_or_invalid_next = LogicArray(ctx, 'st_ld_addr_same_or_invalid_curr', 'w', self.configs.numLdqEntries)
+            st_ld_addr_same_or_invalid_next = LogicArray(ctx, 'st_ld_addr_same_or_invalid_next', 'w', self.configs.numLdqEntries)
             st_ld_conflict_next = LogicVec(ctx, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries)
 
         # validity lookup
