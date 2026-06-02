@@ -56,6 +56,13 @@ public:
     return FALLBACK_WEIGHT;
   }
 
+  /// Combines the probability table 'other' into '*this'.
+  /// This is done by multiplying the weights.
+  void inplaceMerge(const ProbabilityTable &other) {
+    for (auto &iter : other.keyToWeight)
+      (*this)[iter.first] *= iter.second;
+  }
+
 private:
   std::map<Key, std::size_t> keyToWeight;
 };

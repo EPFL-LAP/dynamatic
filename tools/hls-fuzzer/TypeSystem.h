@@ -158,15 +158,6 @@ private:
 /// or shouldn't be used.
 template <typename ASTNode>
 class OpaqueTransferFn {
-  template <typename Tuple>
-  struct OpaqueContextTupleImpl;
-
-  template <typename... NonTerminals>
-  struct OpaqueContextTupleImpl<std::tuple<NonTerminals...>> {
-    using type = std::tuple<
-        std::optional<std::conditional_t<true, OpaqueContext, NonTerminals>>...,
-        std::optional<OpaqueContext>>;
-  };
 
   template <typename Tuple>
   struct NonTerminalsTupleImpl;
@@ -189,7 +180,8 @@ public:
   /// 'OpaqueDependency' to calculate a context.
   /// Elements are optional, since they may not yet have been calculated.
   using ContextTuple =
-      typename OpaqueContextTupleImpl<typename ASTNode::SubElements>::type;
+      std::array<std::optional<OpaqueContext>,
+                 std::tuple_size_v<typename ASTNode::SubElements> + 1>;
 
   /// Constructs an 'OpaqueDependency' from a 'Dependency'.
   template <typename TypingContext, std::size_t... inputIndices>
@@ -226,15 +218,31 @@ public:
               std::move(argTuple)));
         }) {
 
-    static std::array<std::size_t, sizeof...(inputIndices)> storage{
+    // Since the number (and values) of input indices are known at compile time
+    // we can define and reference a statically allocated array in an 'ArrayRef'
+    // without lifetime issues.
+    // A unique array is created for every template instantiation.
+    constexpr static std::array<std::size_t, sizeof...(inputIndices)> storage{
         inputIndices...};
     this->inputIndices = storage;
   }
 
+  explicit OpaqueTransferFn(
+      std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
+          inputIndices,
+      std::any dep,
+      OpaqueContext (*computationFn)(const std::any &dep,
+                                     const SubElementsTuple &nonTerminals,
+                                     const ContextTuple &tuple))
+      : dep(std::move(dep)), computationFn(computationFn),
+        inputIndices(std::move(inputIndices)) {}
+
   /// Returns the indices of the subelements (or input) that this dependency
   /// depends on.
   llvm::ArrayRef<std::size_t> getInputDependencies() const {
-    return inputIndices;
+    return std::visit(
+        [](auto &&value) -> llvm::ArrayRef<std::size_t> { return value; },
+        inputIndices);
   }
 
   /// Calculates the context from the currently calculated subelements and
@@ -249,7 +257,8 @@ private:
   OpaqueContext (*computationFn)(const std::any &dep,
                                  const SubElementsTuple &nonTerminals,
                                  const ContextTuple &tuple);
-  llvm::ArrayRef<std::size_t> inputIndices;
+  std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
+      inputIndices;
 };
 
 /// Class responsible for calculating the output context after generating an
@@ -346,6 +355,13 @@ public:
               },
               std::move(castedContexts));
         }) {}
+
+  explicit OutputTransferFn(
+      std::function<OpaqueContext(
+          const ASTNode &,
+          const typename OpaqueTransferFn<ASTNode>::ContextTuple &)>
+          computationFn)
+      : computationFn(std::move(computationFn)) {}
 
   /// Convenience overload for 'OutputTransferFn' that do not have any input
   /// dependencies.
@@ -738,6 +754,7 @@ public:
   /// Shorthand for derived classes to be able to call the default
   /// implementation of methods.
   using Super = TypeSystem;
+  using Context = TypingContext;
 
   // Methods that can be overwritten in subclasses. Note these are not virtual
   // since we use CRTP-techniques to call these. They may be but are not
@@ -818,22 +835,7 @@ public:
 
   static ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTable(const TypingContext &) {
-    // Default probabilities for expressions.
-    // Most expressions are 100 times more likely to be generated than a
-    // constant.
-    // Variables are only 10 times more likely, conditional expressions too.
-    std::vector<std::pair<ExpressionKey, std::size_t>> probs{
-        {ast::Variable::Tag{}, 10},
-        {ast::ConditionalExpression::Tag{}, 10},
-        {ast::CastExpression::Tag{}, 100},
-        {ast::ArrayReadExpression::Tag{}, 100}};
-    for (auto op : enumRange<ast::BinaryExpression::Op>())
-      probs.emplace_back(op, 100);
-
-    for (auto op : enumRange<ast::UnaryExpression::Op>())
-      probs.emplace_back(op, 100);
-
-    return ProbabilityTable<ExpressionKey>(std::move(probs));
+    return {};
   }
 
   static ProbabilityTable<StatementKey>

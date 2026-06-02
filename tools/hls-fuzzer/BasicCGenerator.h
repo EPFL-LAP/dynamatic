@@ -30,7 +30,9 @@ public:
   explicit BasicCGenerator(Randomly &random,
                            TypeSystem<TypingContext, Self> &typeSystem,
                            const TypingContext &entryContext = {})
-      : random(random), typeSystem(typeSystem), entryContext(entryContext) {}
+      : random(random), typeSystem(typeSystem), entryContext(entryContext) {
+    initGenerators();
+  }
 
   /// Generates an entire C program that can compile and run.
   void generate(llvm::raw_ostream &os, std::string_view functionName);
@@ -52,39 +54,35 @@ private:
   generateReturnStatement(const OpaqueContext &constraints);
 
   std::pair<ast::Expression, OpaqueContext>
-  generateExpression(const OpaqueContext &context, std::size_t depth);
+  generateExpression(const OpaqueContext &context);
 
   std::optional<std::pair<ast::Expression, OpaqueContext>>
   generateBinaryExpression(ast::BinaryExpression::Op op,
-                           const OpaqueContext &constraints, std::size_t depth);
+                           const OpaqueContext &constraints);
 
   std::optional<std::pair<ast::Expression, OpaqueContext>>
   generateUnaryExpression(ast::UnaryExpression::Op op,
-                          const OpaqueContext &context, std::size_t depth);
+                          const OpaqueContext &context);
 
   std::optional<std::pair<ast::ConditionalExpression, OpaqueContext>>
-  generateConditionalExpression(const OpaqueContext &constraint,
-                                std::size_t depth);
+  generateConditionalExpression(const OpaqueContext &constraint);
 
   std::optional<std::pair<ast::CastExpression, OpaqueContext>>
-  generateCastExpression(const OpaqueContext &constraint, std::size_t depth);
+  generateCastExpression(const OpaqueContext &constraint);
 
   ast::Constant getConstantForType(const ast::ScalarType &scalarType) const;
 
   std::optional<std::pair<ast::Constant, OpaqueContext>>
-  generateConstant(const OpaqueContext &constraint,
-                   std::size_t depth = 0) const;
+  generateConstant(const OpaqueContext &constraint) const;
 
   std::optional<std::pair<ast::ArrayReadExpression, OpaqueContext>>
-  generateArrayReadExpression(const OpaqueContext &context,
-                              std::size_t depth = 0);
+  generateArrayReadExpression(const OpaqueContext &context);
 
   std::optional<std::pair<ast::ArrayParameter, OpaqueContext>>
-  generateArrayParameter(const OpaqueContext &context, std::size_t depth = 0);
+  generateArrayParameter(const OpaqueContext &context);
 
   std::optional<std::pair<ast::Variable, OpaqueContext>>
-  generateScalarParameter(const OpaqueContext &constraints,
-                          std::size_t depth = 0);
+  generateScalarParameter(const OpaqueContext &constraints);
 
   /// Generates a scalar type or none if it was impossible to generate a scalar
   /// type in the given context.
@@ -99,16 +97,16 @@ private:
   generateReturnType(const OpaqueContext &context) const;
 
   std::pair<ast::StatementList, OpaqueContext>
-  generateStatementList(const OpaqueContext &context, size_t depth);
+  generateStatementList(const OpaqueContext &context);
 
   std::optional<std::pair<ast::Statement, OpaqueContext>>
-  generateStatement(const OpaqueContext &context, size_t depth);
+  generateStatement(const OpaqueContext &context);
 
   std::optional<std::pair<ast::ArrayAssignmentStatement, OpaqueContext>>
   generateArrayAssignmentStatement(const OpaqueContext &context);
 
   std::optional<std::pair<ast::StructuredForStatement, OpaqueContext>>
-  generateStructuredForStatement(const OpaqueContext &context, size_t depth);
+  generateStructuredForStatement(const OpaqueContext &context);
 
   Randomly &random;
   std::optional<ast::ReturnType> maybeReturnType;
@@ -127,6 +125,23 @@ private:
   void addVariable(ast::ScalarType type, std::string name) {
     localVariableStack.back().emplace_back(std::move(type), std::move(name));
   }
+
+  template <typename ASTNode>
+  using Constructor =
+      std::function<std::optional<std::pair<ASTNode, OpaqueContext>>(
+          BasicCGenerator *, const OpaqueContext &)>;
+
+  template <typename ASTNode, typename Key>
+  using ConstructorKeyPair = std::pair<Constructor<ASTNode>, Key>;
+
+  std::vector<
+      ConstructorKeyPair<ast::Expression, AbstractTypeSystem::ExpressionKey>>
+      expressionGenerators;
+  std::vector<
+      ConstructorKeyPair<ast::Statement, AbstractTypeSystem::StatementKey>>
+      statementGenerators;
+
+  void initGenerators();
 
   /// Returns a tuple of 'std::integral_constant's for every element in 'is'.
   template <std::size_t... is>
