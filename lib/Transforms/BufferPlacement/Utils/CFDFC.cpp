@@ -215,15 +215,16 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
       else
         dstBB = *optBB;
 
-      // FTD circuits may contain channels between blocks without a matching CFG
-      // edge. Include every channel whose endpoints belong to the cycle, except
-      // backward channels that belong to another CFG cycle.
       if (!cycle.contains(dstBB))
         continue;
 
-      if (!backwardChannels.contains(res)) {
+      // FTD circuits may contain channels between blocks without a matching CFG
+      // edge. Include every non-backward channel whose endpoints belong to the
+      // cycle. Include backward channels only when they correspond to an edge
+      // in the CFG cycle currently being modeled.
+      if (!backwardChannels.contains(res))
         channels.insert(res);
-      } else if (isCycleEdge(srcBB, dstBB)) {
+      else if (isCFGCompliant(srcBB, dstBB)) {
         channels.insert(res);
         backedges.insert(res);
       }
@@ -231,7 +232,7 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
   }
 }
 
-bool CFDFC::isCycleEdge(unsigned srcBB, unsigned dstBB) const {
+bool CFDFC::isCFGCompliant(unsigned srcBB, unsigned dstBB) const {
   for (size_t i = 0; i < cycle.size(); ++i) {
     unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
     if (srcBB == cycle[i] && dstBB == cycle[nextBB])

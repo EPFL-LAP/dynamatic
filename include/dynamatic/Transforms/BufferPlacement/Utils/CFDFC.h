@@ -62,9 +62,9 @@ struct CFDFC {
   CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
         const DenseSet<Value> &backwardChannels);
 
-  /// Returns whether the channel between the two blocks is an edge of this
-  /// CFDFC's CFG cycle.
-  bool isCycleEdge(unsigned srcBB, unsigned dstBB) const;
+  /// Returns whether the channel between the two blocks has a corresponding
+  /// edge in this CFDFC's CFG cycle.
+  bool isCFGCompliant(unsigned srcBB, unsigned dstBB) const;
 
   // Determines whether the channel is a "CFDFC backedge" i.e., the first
   // channel along a sequence of backedges from a source block to a destination
