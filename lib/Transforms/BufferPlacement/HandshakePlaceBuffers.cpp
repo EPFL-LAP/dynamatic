@@ -344,39 +344,7 @@ static void logFuncInfo(FuncInfo &info) {
   os.flush();
 }
 
-static void
-printBackwardChannels(const llvm::DenseSet<Value> &backwardChannels) {
-  llvm::errs() << "=== Backward Channels (with src/dst ops) ===\n";
-  int idx = 0;
-
-  for (Value v : backwardChannels) {
-    llvm::errs() << "Channel " << idx++ << ":\n";
-
-    // Source operation
-    if (Operation *srcOp = v.getDefiningOp()) {
-      llvm::errs() << "  Source: ";
-      srcOp->print(llvm::errs());
-      llvm::errs() << "\n";
-    } else {
-      llvm::errs() << "  Source: <block argument>\n";
-    }
-
-    // Destination operations
-    for (auto &use : v.getUses()) {
-      Operation *dstOp = use.getOwner();
-      llvm::errs() << "  Destination: ";
-      dstOp->print(llvm::errs());
-      llvm::errs() << "\n";
-    }
-    llvm::errs() << "\n";
-  }
-
-  if (backwardChannels.empty())
-    llvm::errs() << "(empty)\n";
-}
-
 namespace {
-
 struct CircuitEdge {
   Operation *src;
   Operation *dst;
@@ -530,24 +498,8 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     bbs.insert(arch.dstBB);
   }
 
-  //////////// AYA added the following to identify all graph cycles in the
-  /// circuit graph
-  // Identify the cycles and the backward channels in your circuit
-  llvm::errs() << "\nBefore findALlCycles\n";
-
-  // CycleList circuitCycles =
-  // findAllCycles(info.funcOp);
-  // // llvm::errs() << "\nAfter findALlCycles\n";
-
-  // AYA TO AYA: The goal is to send mlir::DenseSet<Value> backwardChannels
-  // structure to the constructor of CFDFC below.
-  // GraphForJohnson johnsonGraph(info.funcOp);
-  // CycleList circuitCycles = johnsonGraph.findAllCycles();
-
-  // printCycles(circuitCycles);
   mlir::DenseSet<Value> backwardChannels =
       findBackwardChannelPerCyclicRegion(info.funcOp);
-  printBackwardChannels(backwardChannels);
 
   // Set of selected archs
   ArchSet selectedArchs;
