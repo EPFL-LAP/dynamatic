@@ -230,10 +230,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
-    // Check IR invariants and parse basic block archs from disk
-    if (failed(checkFuncInvariants(info)))
-      return failure();
-
     // Get CFDFCs from the function unless the functions has no archs (i.e.,
     // it has a single block) in which case there are no CFDFCs
     std::vector<CFDFC> cfdfcs;
@@ -348,35 +344,97 @@ static void logFuncInfo(FuncInfo &info) {
   os.flush();
 }
 
+static void
+printBackwardChannels(const llvm::DenseSet<Value> &backwardChannels) {
+  llvm::errs() << "=== Backward Channels (with src/dst ops) ===\n";
+  int idx = 0;
+
+  for (Value v : backwardChannels) {
+    llvm::errs() << "Channel " << idx++ << ":\n";
+
+    // Source operation
+    if (Operation *srcOp = v.getDefiningOp()) {
+      llvm::errs() << "  Source: ";
+      srcOp->print(llvm::errs());
+      llvm::errs() << "\n";
+    } else {
+      llvm::errs() << "  Source: <block argument>\n";
+    }
+
+    // Destination operations
+    for (auto &use : v.getUses()) {
+      Operation *dstOp = use.getOwner();
+      llvm::errs() << "  Destination: ";
+      dstOp->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+    llvm::errs() << "\n";
+  }
+
+  if (backwardChannels.empty())
+    llvm::errs() << "(empty)\n";
+}
+
 namespace {
+
 struct CircuitEdge {
   Operation *src;
   Operation *dst;
   Value channel;
 };
 
-/// Finds loop-feedback channels in cyclic regions of the dataflow circuit.
-/// These channels need special treatment when a CFG cycle is converted to a
-/// CFDFC because a backward channel may belong to a different nested cycle.
-static llvm::DenseSet<Value> findBackwardChannels(handshake::FuncOp funcOp) {
+static bool isBackedgeSourceLike(Operation *op) {
+  do {
+    if (!op)
+      return false;
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::CmpIOp, handshake::CmpFOp>(op))
+      return true;
+    if (isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+            handshake::TruncIOp>(op))
+      op = op->getOperand(0).getDefiningOp();
+    else
+      return false;
+  } while (true);
+}
+
+static bool isBackedgeDestinationLike(Operation *op) {
+  if (isa<handshake::InitOp, handshake::MergeLikeOpInterface>(op))
+    return true;
+
+  auto notOp = dyn_cast<handshake::NotIOp>(op);
+  if (!notOp)
+    return false;
+
+  return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
+    return isa<handshake::MergeLikeOpInterface>(user);
+  });
+}
+
+/// Finds all loop-feedback-source -> merge-like backward channels per cyclic
+/// SCC in the handshake graph. Grouping by SCC remains more stable than trying
+/// to assign channels to every simple cycle when cycles overlap.
+static mlir::DenseSet<Value>
+findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
   SmallVector<Operation *> ops;
   SmallVector<CircuitEdge> edges;
-  llvm::DenseMap<Operation *, SmallVector<Operation *, 4>> successors;
+  llvm::DenseMap<Operation *, SmallVector<Operation *, 4>> succs;
 
   for (Operation &op : funcOp.getOps()) {
     ops.push_back(&op);
-    successors[&op] = {};
+    succs[&op] = {};
   }
 
   for (Operation *src : ops) {
     for (Value result : src->getResults()) {
       for (OpOperand &use : result.getUses()) {
         Operation *dst = use.getOwner();
+
         if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(dst))
           continue;
 
         edges.push_back({src, dst, result});
-        successors[src].push_back(dst);
+        succs[src].push_back(dst);
       }
     }
   }
@@ -394,12 +452,12 @@ static llvm::DenseSet<Value> findBackwardChannels(handshake::FuncOp funcOp) {
     stack.push_back(op);
     onStack.insert(op);
 
-    for (Operation *successor : successors[op]) {
-      if (!index.contains(successor)) {
-        strongConnect(successor);
-        lowlink[op] = std::min(lowlink[op], lowlink[successor]);
-      } else if (onStack.contains(successor)) {
-        lowlink[op] = std::min(lowlink[op], index[successor]);
+    for (Operation *succ : succs[op]) {
+      if (!index.contains(succ)) {
+        strongConnect(succ);
+        lowlink[op] = std::min(lowlink[op], lowlink[succ]);
+      } else if (onStack.contains(succ)) {
+        lowlink[op] = std::min(lowlink[op], index[succ]);
       }
     }
 
@@ -422,9 +480,10 @@ static llvm::DenseSet<Value> findBackwardChannels(handshake::FuncOp funcOp) {
       strongConnect(op);
   }
 
-  llvm::DenseSet<Value> backwardChannels;
+  mlir::DenseSet<Value> backwardChannels;
   for (const auto &scc : sccs) {
     llvm::DenseSet<Operation *> sccNodes(scc.begin(), scc.end());
+
     bool isCyclic = scc.size() > 1;
     if (!isCyclic) {
       Operation *only = scc.front();
@@ -436,19 +495,26 @@ static llvm::DenseSet<Value> findBackwardChannels(handshake::FuncOp funcOp) {
       continue;
 
     for (const CircuitEdge &edge : edges) {
-      if (sccNodes.contains(edge.src) && sccNodes.contains(edge.dst) &&
-          isBackedge(edge.channel, edge.dst))
-        backwardChannels.insert(edge.channel);
+      if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
+        continue;
+      if (!isBackedge(edge.channel))
+        continue;
+      if (!isBackedgeSourceLike(edge.src))
+        continue;
+      if (!isBackedgeDestinationLike(edge.dst))
+        continue;
+      backwardChannels.insert(edge.channel);
     }
   }
+
   return backwardChannels;
 }
+
 } // namespace
 
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    std::vector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
-  llvm::DenseSet<Value> backwardChannels = findBackwardChannels(info.funcOp);
 
   auto solverKind = getSolverKind();
 
@@ -463,6 +529,25 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     bbs.insert(arch.srcBB);
     bbs.insert(arch.dstBB);
   }
+
+  //////////// AYA added the following to identify all graph cycles in the
+  /// circuit graph
+  // Identify the cycles and the backward channels in your circuit
+  llvm::errs() << "\nBefore findALlCycles\n";
+
+  // CycleList circuitCycles =
+  // findAllCycles(info.funcOp);
+  // // llvm::errs() << "\nAfter findALlCycles\n";
+
+  // AYA TO AYA: The goal is to send mlir::DenseSet<Value> backwardChannels
+  // structure to the constructor of CFDFC below.
+  // GraphForJohnson johnsonGraph(info.funcOp);
+  // CycleList circuitCycles = johnsonGraph.findAllCycles();
+
+  // printCycles(circuitCycles);
+  mlir::DenseSet<Value> backwardChannels =
+      findBackwardChannelPerCyclicRegion(info.funcOp);
+  printBackwardChannels(backwardChannels);
 
   // Set of selected archs
   ArchSet selectedArchs;
