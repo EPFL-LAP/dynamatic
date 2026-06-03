@@ -88,7 +88,7 @@ class Configs:
     bloomFilterStore: bool = False             # Whether to use a Bloom filter for store issue
     bloomFilterSequential: bool = False        # Whether to create the per-address filters in the dispathers and store them in the queue
     bloomFilterHashCount: int = 2              # Number of hash functions used in the Bloom filter (k)
-    bloomFilterHashW: int = 8                  # Width of each hash function output
+    bloomFilterHashW: int = 4                  # Width of each hash function output
     bloomFilterW: int = 2 ** bloomFilterHashW  # Width of the Bloom filter (m)
     bloomFilterSeed: int = 1                   # Seed for Bloom filter hash function generation
 
@@ -135,6 +135,13 @@ class Configs:
         self.pipe1 = bool(config["pipe1En"])
         self.pipeComp = bool(config["pipeCompEn"])
         self.headLag = bool(config["headLagEn"])
+
+        self.bloomFilterLoad = False
+        self.bloomFilterStore = False
+        self.bloomFilterSequential = False
+        self.bloomFilterHashCount = 2
+        self.bloomFilterHashW = 4
+        self.bloomFilterSeed = 1
 
         def get_env(name: str) -> int | None:
             value = os.environ.get(name, "")
