@@ -16,11 +16,15 @@ TARGET_CP=$6
 USE_SHARING=$7
 FPUNITS_GEN=$8
 USE_RIGIDIFICATION=${9}
-DISABLE_LSQ=${10}
-FAST_TOKEN_DELIVERY=${11}
-MILP_SOLVER=${12}
-STRAIGHT_TO_QUEUE=${13}
-OPTIMIZE_STEERING_REWRITES=${14}
+USE_K_INDUCTION=${10}
+DISABLE_LSQ=${11}
+FAST_TOKEN_DELIVERY=${12}
+MILP_SOLVER=${13}
+STRAIGHT_TO_QUEUE=${14}
+OPTIMIZE_STEERING_REWRITES=${15}
+SPECULATION=${16}
+ENABLE_SHORT_CIRCUIT=${17}
+
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -39,7 +43,8 @@ RIGIDIFICATION_SH="$DYNAMATIC_DIR/experimental/tools/rigidification/rigidificati
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
 
-F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c" 
+F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c"
+F_C_REWRITTEN="$COMP_DIR/$KERNEL_NAME.c"
 
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
@@ -52,6 +57,7 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
@@ -108,6 +114,15 @@ export_cfg() {
 # Reset output directory
 rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 
+cp "$F_C_SOURCE" "$F_C_REWRITTEN"
+exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"
+
+if [[ "$ENABLE_SHORT_CIRCUIT" != "1" ]]; then
+  "$DYNAMATIC_BINS/source-rewriter" "$F_C_REWRITTEN" -- \
+    -I "$DYNAMATIC_DIR/include" -I "$SRC_DIR" -I "$DYNAMATIC_DIR/build/include/clang_headers"
+  exit_on_fail "Failed to disable short-circuiting" "Disabled short-circuiting"
+fi
+
 # ------------------------------------------------------------------------------
 # NOTE:
 # - ffp-contract will prevent clang from adding "fused add mul" into the IR
@@ -115,8 +130,11 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 # optimizations, e.g., loop unrolling:
 # https://clang.llvm.org/docs/LanguageExtensions.html#loop-unrolling
 # ------------------------------------------------------------------------------
-$DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_SOURCE" \
+$DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_REWRITTEN" \
   -I "$DYNAMATIC_DIR/include"  \
+  -I "$SRC_DIR" \
+  -I "$DYNAMATIC_DIR/build/include/clang_headers" \
+  -fplugin="$DYNAMATIC_DIR/build/lib/DynPragmasPlugin.so" \
   -Xclang \
   -ffp-contract=off \
   -o "$F_CLANG"
@@ -212,6 +230,7 @@ exit_on_fail "Failed to convert to std dialect" \
 # - "arith-reduce-strength": Convert muls to adds. "max-adder-depth-mul" limits
 # the maximum length of the adder chain created via this pass.
 $DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
   "$F_CF" \
   --drop-unlisted-functions="function-names=$KERNEL_NAME" \
   --func-set-arg-names="source=$F_C_SOURCE" \
@@ -219,6 +238,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
+  --consume-producer-output-attr-marker \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
@@ -257,8 +277,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   # FPT19 should run before straight to the queue, so that no useless components are instantiated.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage \
-    --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_SQ"
@@ -294,11 +313,21 @@ if [[ $OPTIMIZE_STEERING_REWRITES -ne 0 ]]; then
 else #  --handshake-combine-steering-logic ???????TODO
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_MEM" \
     --handshake-remove-unused-memrefs \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
+fi
+
+# Speculation (pre-buffer): place speculative units and then materialize.
+if [[ "$SPECULATION" == "1" ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-speculation \
+    --handshake-materialize \
+    > "$F_HANDSHAKE_SPECULATION"
+  exit_on_fail "Failed to add speculative units" "Added speculative units"
+  F_HANDSHAKE_TRANSFORMED="$F_HANDSHAKE_SPECULATION"
 fi
 
 # Credit-based sharing
@@ -355,12 +384,17 @@ else
   cd - > /dev/null
 fi
 
-# handshake canonicalization
+# speculation (post-buffer): 
+# add extra buffer slots to cover the commit unit weirdness 
+# materialize and then
+# canonicalize
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+  --handshake-spec-post-buffer \
+  --handshake-materialize \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
-exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
@@ -368,7 +402,7 @@ export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
-  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED"
+  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED" "$USE_K_INDUCTION"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level

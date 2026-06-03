@@ -24,8 +24,8 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
 #include "dynamatic/Transforms/ResourceSharing/SharingSupport.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -264,7 +264,6 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
                     TimingDatabase &timingDB, FuncPerfInfo &funcPerfInfo,
                     double targetCP) {
 
-  double latency;
   for (Operation *target : sharingTargets) {
     // By default, the op is assigned with no occupancy. If a performance
     // critical CFC contains that op, then we set the occupancy to the occupancy
@@ -273,9 +272,11 @@ void getOpOccupancy(const SmallVector<Operation *> &sharingTargets,
     for (auto cf : funcPerfInfo.critCfcs) {
       if (funcPerfInfo.cfUnits[cf].find(target) !=
           funcPerfInfo.cfUnits[cf].end()) {
-        if (failed(timingDB.getLatency(target, SignalType::DATA, latency,
-                                       targetCP)))
-          latency = 0.0;
+        double latency = 0.0;
+        auto latencyOrFail =
+            timingDB.getLatency(target, SignalType::DATA, targetCP);
+        if (succeeded(latencyOrFail))
+          latency = *latencyOrFail;
         // Formula for operation occupancy:
         // Occupancy = Latency / II = Latency * Throughput.
         opOccupancy[target] = latency * funcPerfInfo.cfThroughput[cf];
@@ -359,10 +360,11 @@ LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     // Elect one operation as the shared operation.
     Operation *sharedOp = *group.begin();
 
-    double latency;
-    if (failed(
-            timingDB.getLatency(sharedOp, SignalType::DATA, latency, targetCP)))
-      latency = 0.0;
+    double latency = 0.0;
+    auto latencyOrFail =
+        timingDB.getLatency(sharedOp, SignalType::DATA, targetCP);
+    if (succeeded(latencyOrFail))
+      latency = *latencyOrFail;
 
     // Maps each original successor and the input operand (Value)
     std::vector<std::tuple<Operation *, Value>> succValueMap;

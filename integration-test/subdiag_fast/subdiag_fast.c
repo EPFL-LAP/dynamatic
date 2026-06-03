@@ -1,3 +1,4 @@
+// clang-format off
 #include "subdiag_fast.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"
@@ -6,12 +7,15 @@
 int subdiag_fast(in_float_t d1[N], in_float_t d2[N], in_float_t e[N]) {
   int i = 0;
   bool cond_break = false;
+  bool loop_again = false;
   do {
     float dd = d1[i] + d2[i + 1];
     float x = 0.001;
     i++;
     cond_break = (e[i]) <= x * dd;
-  } while (i < N_DEC && !cond_break);
+    loop_again = !cond_break && i < N_DEC;
+    #pragma DYN speculate variable=loop_again max_predictions=16 style=standard
+  } while (loop_again);
   return i;
 }
 

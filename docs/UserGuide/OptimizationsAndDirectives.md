@@ -125,4 +125,4 @@ In such case, one should invoke components such as `dynamatic-opt` (also located
 Some optimization strategies, such as speculation or fast token delivery, aren't accessible through the standard `dynamatic` interactive environment.  
 These approaches often require a custom compilation flow. For example, speculation provides a Python script that enables a push-button flow execution.  
 
-For more details, refer to the [speculation documentation](../DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/IntegrationTests.md).
+For more details, refer to the [speculation documentation](../DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/2025/IntegrationTests.md).

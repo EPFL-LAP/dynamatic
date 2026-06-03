@@ -1,3 +1,4 @@
+// clang-format off
 #include "if_convert.h"
 #include "dynamatic/Integration.h"
 #include "stdbool.h"
@@ -7,7 +8,9 @@ void if_convert(in_int_t a[N], inout_int_t b[N]) {
   int i = 1;
   do {
     int tmp = a[i];
-    if (i * tmp < 10000) {
+    bool ifPred = i * tmp < 10000;
+    #pragma DYN speculate variable=ifPred max_predictions=7 style=standard
+    if (ifPred) {
       i++;
     }
     i++;

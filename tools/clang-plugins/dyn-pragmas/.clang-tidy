@@ -1,0 +1,10 @@
+# Follow LLVM naming style for this plugin: variables, parameters, and
+# members are CamelCase, overriding the repo-wide camelBack convention.
+InheritParentConfig: true
+CheckOptions:
+  - key:             readability-identifier-naming.VariableCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.ParameterCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.MemberCase
+    value:           CamelCase

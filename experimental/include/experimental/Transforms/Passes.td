@@ -35,29 +35,43 @@ def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
-def HandshakeSpeculation : DynamaticPass<"handshake-speculation"> {
+def HandshakeSpeculation : Pass<"handshake-speculation", "::mlir::ModuleOp"> {
   let summary = "Place Speculation operations";
   let description = [{
-      Speculative execution involves speculating on the output of a long 
-      latency operation or chain of operations, allowing operations that 
-      depend on it to begin execution early, without impacting correctness. 
-      
-      There are several situations that can benefit from early execution, 
-      including reducing the initiation interval (II) of loops with conditions 
-      that take several cycles to calculate, or loops with 
-      loop-carried dependencies. 
-      
-      The pass needs to specify the position of the Speculation Units by 
-      means of an input JSON file.
+    Speculative execution involves speculating on the output of a long 
+    latency operation or chain of operations, allowing operations that 
+    depend on it to begin execution early, without impacting correctness. 
+    
+    There are several situations that can benefit from early execution, 
+    including reducing the initiation interval (II) of loops with conditions 
+    that take several cycles to calculate, or loops with 
+    loop-carried dependencies. 
+    
+    Speculator placement is driven by a `dynamatic.speculate` dictionary
+    attribute on a single producer op (typically the loop-continuation
+    predicate), carrying `max_predictions : i32` and `style : str`.
+    The attribute is created based on a speculate pragma in the 
+    C source code.
+    The pass requires the attribute to be present, and so should only 
+    be called on kernels which contain a speculate pragma.
+    Save / Commit / SaveCommit placements are auto-decided 
+    from the speculator position. 
   }];
-  let options = [
-    Option<"jsonPath", "json-path", "std::string", "",
-           "Path to JSON-formatted file containing the positions for speculative "
-           "operations.">,
-    Option<"automatic", "automatic", "bool", "true",
-           "When the automatic mode is enabled, the speculative unit positions are "
-           "automatically detected. The speculator position still needs to be "
-           "specified in the JSON-formatted file.">];
+  let options = [];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
+}
+
+def HandshakeSpecPostBuffer : Pass<"handshake-spec-post-buffer", "::mlir::ModuleOp"> {
+  let summary = "Post-buffering speculation pass";
+  let description = [{
+    Adds an additional buffer on commit control inputs, 
+    which is needed due to the conditionally-present join in the commit unit
+    being unrepresentable to the buffering algorithm.
+  }];
+  let options = [];
+
+  let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
 def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {

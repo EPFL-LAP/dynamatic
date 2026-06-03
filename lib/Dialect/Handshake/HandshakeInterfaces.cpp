@@ -418,7 +418,8 @@ std::vector<BufferSlotFullNamer> ControlMergeOp::getInternalSlotStateNamers() {
          "Cannot get names of slot states for operation without name");
   handshake::ChannelType ct = getIndex().getType();
 
-  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot", ct.getDataBitWidth());
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), "slot_full", "data",
+                               ct.getDataBitWidth());
   return ret;
 }
 
@@ -429,9 +430,11 @@ std::vector<BufferSlotFullNamer> LoadOp::getInternalSlotStateNamers() {
   assert(nameAttr &&
          "Cannot get names of slot states for operation without name");
 
-  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str(),
+  ret[0] = BufferSlotFullNamer(nameAttr.str(), ADDR_SLOT_LIT.str() + "_full",
+                               "NOT_ACCESSIBLE",
                                getAddress().getType().getDataBitWidth());
-  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str(),
+  ret[1] = BufferSlotFullNamer(nameAttr.str(), DATA_SLOT_LIT.str() + "_full",
+                               "NOT_ACCESSIBLE",
                                getData().getType().getDataBitWidth());
   return ret;
 }
@@ -454,10 +457,44 @@ std::vector<BufferSlotFullNamer> BufferOp::getInternalSlotStateNamers() {
     assert(false && "Operand of BufferOp is not a channel");
   }
 
-  for (size_t i = 0; i < getNumSlots(); ++i) {
-    ret[i] =
-        BufferSlotFullNamer(nameAttr.str(), "slot_" + std::to_string(i), width);
+  BufferType t = getBufferType();
+  switch (t) {
+  case BufferType::ONE_SLOT_BREAK_DV:
+    assert(ret.size() == 1);
+    ret[0] = BufferSlotFullNamer(nameAttr.str(), /*full value=*/"outs_valid_i",
+                                 /*data value=*/"data", width);
+    break;
+  case BufferType::ONE_SLOT_BREAK_R:
+    assert(ret.size() == 1);
+    ret[0] = BufferSlotFullNamer(nameAttr.str(), "full", "data", width);
+    break;
+  case BufferType::FIFO_BREAK_NONE:
+    if (ret.size() == 1) {
+      ret[0] = BufferSlotFullNamer(nameAttr.str(), "full", "reg", width);
+    } else {
+      for (size_t i = 0; i < ret.size(); ++i) {
+        ret[i] = BufferSlotFullNamer(nameAttr.str(),
+                                     llvm::formatv("b{0}.full", i).str(),
+                                     llvm::formatv("b{0}.reg", i).str(), width);
+      }
+    }
+    break;
+  case BufferType::FIFO_BREAK_DV:
+  case BufferType::ONE_SLOT_BREAK_DVR:
+  case BufferType::SHIFT_REG_BREAK_DV:
+  case BufferType::COUNTER_BUFFER:
+    llvm::report_fatal_error(
+        llvm::formatv("no name for buffer slot of type {0}", t));
   }
+  return ret;
+}
+std::vector<BufferSlotFullNamer> DeadBufferOp::getInternalSlotStateNamers() {
+  StringAttr nameAttr =
+      getOperation()->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+  assert(nameAttr &&
+         "Cannot get names of slot states for operation without name");
+  std::vector<BufferSlotFullNamer> ret;
+  ret.emplace_back(nameAttr.str(), "full", "", 0);
   return ret;
 }
 
@@ -500,6 +537,64 @@ bool ShRSIOp::isShiftByConstant() {
 
 bool ShRUIOp::isShiftByConstant() {
   return isShiftByConstantImpl(this->getOperation());
+}
+
+//===----------------------------------------------------------------------===//
+// RetimingPathsOpInterface
+//===----------------------------------------------------------------------===//
+
+SmallVector<buffer::RetimingPath> buffer::getRetimingPaths(Operation *unit) {
+  if (auto pathsOp = dyn_cast<RetimingPathsOpInterface>(unit))
+    return pathsOp.getRetimingPaths();
+  return {buffer::RetimingPath(unit)};
+}
+
+/// SpeculatorOp has two independent retiming paths:
+///   - trigger (operand 1) feeds dataOut (result 0) and issueCtrl (result 1):
+///     these are produced when the speculator decides to issue a speculative
+///     token.
+///   - dataIn (operand 0) feeds historyCtrl (result 2) and commitCtrl
+///     (result 3): once the real data arrives the speculator resolves the
+///     speculation and emits the history-control and commit-control signals.
+SmallVector<buffer::RetimingPath> SpeculatorOp::getRetimingPaths() {
+  SmallVector<buffer::RetimingPath> paths;
+
+  buffer::RetimingPath triggerPath;
+  triggerPath.operands.insert(1); // trigger
+  triggerPath.results.insert(0);  // dataOut
+  triggerPath.results.insert(1);  // issueCtrl
+  paths.push_back(triggerPath);
+
+  buffer::RetimingPath dataInPath;
+  dataInPath.operands.insert(0); // dataIn
+  dataInPath.results.insert(2);  // historyCtrl
+  dataInPath.results.insert(3);  // commitCtrl
+  paths.push_back(dataInPath);
+
+  return paths;
+}
+
+/// SpecSaveCommitOp has two independent retiming paths:
+///   - dataIn (operand 0) and issueCtrl (operand 1) feed dataOut (result 0):
+///     the save-commit issues output tokens when both data and the issue
+///     control are present.
+///   - historyCtrl (operand 2) is consumed independently to advance the
+///     internal head pointer. It is on a path with no outputs so its retiming
+///     variable is decoupled from the data path.
+SmallVector<buffer::RetimingPath> SpecSaveCommitOp::getRetimingPaths() {
+  SmallVector<buffer::RetimingPath> paths;
+
+  buffer::RetimingPath dataPath;
+  dataPath.operands.insert(0); // dataIn
+  dataPath.operands.insert(1); // issueCtrl
+  dataPath.results.insert(0);  // dataOut
+  paths.push_back(dataPath);
+
+  buffer::RetimingPath historyPath;
+  historyPath.operands.insert(2); // historyCtrl
+  paths.push_back(historyPath);
+
+  return paths;
 }
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.cpp.inc"

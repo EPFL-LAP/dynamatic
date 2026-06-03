@@ -85,7 +85,7 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
 
       - name: build
-        run: ./build.sh --release --enable-cbc --enable-leq-binaries --force 
+        run: ./build.sh --release --enable-llvm-assertions --enable-cbc --enable-leq-binaries --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
@@ -125,10 +125,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
-        with: 
+        with:
           name: integration-report
           path: |
             integration-test/*/out*/comp
+            integration-test/*/out*/formal
             integration-test/*/out*/sim/report.txt
             integration-test/*/out/dynamatic_out.txt
             integration-test/*/out/dynamatic_err.txt

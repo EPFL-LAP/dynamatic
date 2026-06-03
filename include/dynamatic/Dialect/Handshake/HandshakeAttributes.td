@@ -200,10 +200,19 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   let parameters = (ins 
     "::mlir::StringAttr":$dstAccess,
     "unsigned":$loopDepth,
-    "unsigned":$distance
+    "unsigned":$distance,
+    "bool":$isActive
   );
 
-  let assemblyFormat = "`[` $dstAccess `,` $loopDepth `,` $distance `]`";
+  let assemblyFormat = "`{``dstAccess` `:` $dstAccess `,` `loopDepth` `:` $loopDepth `,` `distance` `:` $distance `,` `isActive` `:` $isActive`}`";
+
+  let builders = [
+    AttrBuilder<(ins "::mlir::StringAttr":$dstAccess, "unsigned":$loopDepth,
+                     "unsigned":$distance), [{
+      return $_get($_ctxt, dstAccess, loopDepth, distance, /*isActive=*/true);
+    }]>
+  ];
+
 }
 
 def MemDependenceArrayAttr : Handshake_Attr<"MemDependenceArray", "deps"> {
@@ -257,7 +266,10 @@ def Handshake_BufferTypeAttr : I64EnumAttr<
       /// SHIFT_REG_BREAK_DV: Breaks D and V paths. Multiple slots share the same
       /// handshake control signals, causing them to accept or stall inputs
       /// simultaneously.
-      I64EnumAttrCase<"SHIFT_REG_BREAK_DV", 5>
+      I64EnumAttrCase<"SHIFT_REG_BREAK_DV", 5>,
+      
+      /// COUNTER_BUFFER: Holds one token for a given number of cycles.
+      I64EnumAttrCase<"COUNTER_BUFFER", 6>
     ]> {
   let cppNamespace = "::dynamatic::handshake";
 }

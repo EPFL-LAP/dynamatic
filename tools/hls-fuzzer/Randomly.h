@@ -1,6 +1,11 @@
 #ifndef DYNAMATIC_HLS_FUZZER_RANDOMLY
 #define DYNAMATIC_HLS_FUZZER_RANDOMLY
 
+#include "ProbabilityTable.h"
+
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+
 #include <algorithm>
 #include <cassert>
 #include <random>
@@ -28,6 +33,48 @@ public:
   template <class Range>
   void shuffle(Range &range) {
     std::shuffle(range.begin(), range.end(), generator);
+  }
+
+  /// Performs a weighted-shuffling operation of 'Range' using the
+  /// probabilities/weights given in 'probabilityTable'.
+  /// See 'ProbabilityTable' for the interpretation of the weights.
+  ///
+  /// 'Range' is used to provide both the keys that are to be used to fetch the
+  /// weights from 'probabilityTable' and the resulting elements that should be
+  /// returned from this method.
+  /// The keys are fetched by calling 'keyF' on every element of 'range'.
+  ///
+  /// The shuffled 'llvm::SmallVector' returned is the result of calling 'mapF'
+  /// on every element of 'range'.
+  template <typename Range, typename Key, typename KeyF, typename MapF,
+            typename ResultType = std::decay_t<std::invoke_result_t<
+                MapF, typename std::iterator_traits<
+                          typename std::decay_t<Range>::iterator>::value_type>>>
+  llvm::SmallVector<ResultType>
+  shuffle(Range &&range, const ProbabilityTable<Key> &probabilityTable,
+          KeyF &&keyF, MapF &&mapF) {
+    llvm::SmallVector<std::pair<ResultType, double>> temp;
+
+    // A-res algorithm implementation according to:
+    // Efraimidis, Pavlos S.; Spirakis, Paul G. (2006-03-16). "Weighted random
+    // sampling with a reservoir". Information Processing Letters. 97 (5):
+    // 181–185. doi:10.1016/j.ipl.2005.11.003
+    std::uniform_real_distribution<> dist;
+    for (auto &&iter : range) {
+      double value = dist(generator);
+      std::size_t weight = probabilityTable.getWeight(std::invoke(keyF, iter));
+      // Weight 0 removes the element from the range.
+      if (!weight)
+        continue;
+
+      temp.emplace_back(std::invoke(mapF, iter), -std::log(value) / weight);
+    }
+    std::sort(temp.begin(), temp.end(), llvm::less_second{});
+
+    llvm::SmallVector<ResultType> result;
+    for (auto &&iter : temp)
+      result.push_back(std::move(iter.first));
+    return result;
   }
 
   /// Returns a random bool.

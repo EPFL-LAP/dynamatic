@@ -3,6 +3,8 @@
 #include "DynamaticTypeSystem.h"
 #include "TargetUtils.h"
 #include "hls-fuzzer/BasicCGenerator.h"
+#include "hls-fuzzer/ConjunctionTypeSystem.h"
+#include "hls-fuzzer/LimitTypeSystem.h"
 #include "hls-fuzzer/TargetRegistry.h"
 
 REGISTER_TARGET("random-c", dynamatic::RandomCTarget);
@@ -30,25 +32,21 @@ RandomCTarget::createWorker(const Options &options, Randomly randomly) const {
 
 void RandomCWorker::generate(llvm::raw_ostream &os,
                              llvm::StringRef functionName) {
-  gen::DynamaticTypeSystem dynamaticTypeSystem(random);
+  gen::ConjunctionTypeSystem<gen::DynamaticTypeSystem, gen::LimitTypeSystem>
+      dynamaticTypeSystem{gen::DynamaticTypeSystem(random),
+                          gen::LimitTypeSystem()};
   gen::BasicCGenerator generator(
       random, dynamaticTypeSystem,
       /*entryContext=*/
-      {random.fromEnum<gen::DynamaticTypingContext::Constraint>()});
-
-  ast::Function function = generator.generate(functionName);
-  os << R"(
-#include <stdint.h>
-#include <math.h>
-#include "dynamatic/Integration.h"
-
-)";
-  os << function << '\n';
-  os << generator.generateTestBench(function);
+      {
+          {gen::DynamaticTypingContext::Unconstrained},
+          {},
+      });
+  generator.generate(os, functionName);
 }
 
 AbstractWorker::VerificationResult
 RandomCWorker::verify(const std::filesystem::path &sourceFile) const {
-  return performDifferentialTesting(sourceFile,
-                                    options.dynamaticExecutablePath);
+  return performDifferentialTesting(sourceFile, options.dynamaticExecutablePath,
+                                    20000);
 }

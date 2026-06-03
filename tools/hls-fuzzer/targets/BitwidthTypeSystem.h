@@ -60,24 +60,39 @@ public:
       : globalMaxBitwidth(globalMaxBitwidth), random(random) {}
 
   /// Disallows floats and doubles.
-  static std::optional<ConclusionOf<ast::ScalarType>>
-  checkScalarType(const ast::ScalarType &scalarType,
-                  const BitwidthTypingContext &);
+  static bool discardScalarType(const ast::ScalarType &scalarType,
+                                const BitwidthTypingContext &);
 
   /// Forces constants to fit in the given bitwidth requirement.
-  std::optional<ConclusionOf<ast::Constant>>
-  checkConstant(const ast::Constant &constant,
-                const BitwidthTypingContext &context) const;
+  std::optional<ast::Constant>
+  discardConstant(const ast::Constant &constant,
+                  const BitwidthTypingContext &context) const;
 
-  std::optional<ConclusionOf<ast::BinaryExpression>>
-  checkBinaryExpression(ast::BinaryExpression::Op op,
-                        const BitwidthTypingContext &context) const;
+  bool discardBinaryExpression(ast::BinaryExpression::Op op,
+                               const BitwidthTypingContext &context) const;
 
-  ConclusionOf<ast::ConditionalExpression>
-  checkConditionalExpression(const BitwidthTypingContext &context) const;
+  static bool discardUnaryExpression(ast::UnaryExpression::Op,
+                                     const BitwidthTypingContext &) {
+    // TODO: Figure out and implement logic here.
+    return true;
+  }
 
-  static ConclusionOf<ast::Function>
-  checkFunction(const BitwidthTypingContext &context);
+  TransferFnArray<ast::BinaryExpression>
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) final;
+
+  TransferFnArray<ast::ConditionalExpression>
+  getConditionalExpressionTransferFns() override;
+
+  TransferFnArray<ast::Function> getFunctionTransferFns() override;
+
+  TransferFnArray<ast::ArrayReadExpression>
+  getArrayReadExpressionTransferFns() override;
+
+  TransferFnArray<ast::ArrayAssignmentStatement>
+  getArrayAssignmentStatementTransferFns() override;
+
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override;
 
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range

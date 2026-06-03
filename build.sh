@@ -16,6 +16,9 @@ print_help_and_exit () {
 
 List of options:
   --release | -r                       : build in \"Release\" mode (default is \"Debug\")
+  --enable-llvm-assertions             : enable LLVM assertions in Release mode.
+                                         Should only be used for the CI integration tests
+                                         to allow faster pull request validation.
   --visual-dataflow | -v               : build visual-dataflow's C++ library
   --export-godot | -e <godot-path>     : export the Godot project (requires engine)
   --force | -f                         : force cmake reconfiguration in each (sub)project
@@ -145,7 +148,9 @@ BUILD_CHIESEL_LSQ=0
 ENABLE_CBC=0
 CMAKE_DYNAMATIC_ENABLE_CBC=""
 CMAKE_DYNAMATIC_ENABLE_ABC=""
-LLVM_DIR="$PWD/llvm-project/build"
+CMAKE_LLVM_ENABLE_ASSERTIONS=""
+LLVM_DIR="$PWD/build/llvm-project"
+
 
 # Loop over command line arguments and update script variables
 PARSE_ARG=""
@@ -178,6 +183,9 @@ do
           "--release" | "-r")
               BUILD_TYPE="Release"
               ;;
+          "--enable-llvm-assertions")
+              CMAKE_LLVM_ENABLE_ASSERTIONS="-DLLVM_ENABLE_ASSERTIONS=ON"
+              ;;
           "--check" | "-c")
               ENABLE_TESTS=1
               ;;
@@ -192,7 +200,6 @@ do
               ;;
           "--use-prebuilt-llvm")
               PREBUILT_LLVM=1
-              LLVM_DIR="$PWD/build/llvm-project"
               ;;
           "--export-godot" | "-e")
               PARSE_ARG="godot-path"
@@ -365,9 +372,8 @@ if should_run_cmake ; then
             $CMAKE_DYNAMATIC_ENABLE_XLS \
             $CMAKE_DYNAMATIC_ENABLE_CBC \
             $CMAKE_DYNAMATIC_ENABLE_ABC \
+            $CMAKE_LLVM_ENABLE_ASSERTIONS \
             $CMAKE_DYNAMATIC_ENABLE_LEQ_BINARIES
-
-    LLVM_DIR="../build/llvm-project"
   else
     cmake -G Ninja .. \
         -DMLIR_DIR="$LLVM_DIR/lib/cmake/mlir" \
@@ -474,6 +480,7 @@ create_symlink ../build/bin/handshake-simulator
 create_symlink ../build/bin/hls-verifier
 create_symlink ../build/bin/import-blif
 create_symlink ../build/bin/log2csv
+create_symlink ../build/bin/source-rewriter
 create_symlink "../build/bin/rigidification-testbench"
 create_generator_symlink build/bin/rtl-cmpf-generator
 create_generator_symlink build/bin/rtl-cmpi-generator

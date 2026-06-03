@@ -117,6 +117,32 @@ def ShiftLikeArithOpInterface : OpInterface<"ShiftLikeArithOpInterface"> {
   ];
 }
 
+def RetimingPathsOpInterface : OpInterface<"RetimingPathsOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    For ops with multiple independent paths through them. 
+    
+    If tokens can pass through a unit from a set of operands to a set
+    of results without affecting a separate set of operands and results,
+    then there is multiple paths through the unit.
+    
+    The MILP buffering algorithms require a unique retiming algorithm
+    per path through a unit to correctly distribute token occupancy 
+    among the circuits channels to achieve maximum performance. 
+
+    Eachh operand and result of the op must belong to exactly
+    one path.
+  }];
+  let methods = [
+    InterfaceMethod<[{
+      Returns the list of independent retiming paths of this op.
+    }],
+    "llvm::SmallVector<::dynamatic::buffer::RetimingPath>",
+    "getRetimingPaths", (ins)
+    >,
+  ];
+}
+
 def MemoryOpInterface : OpInterface<"MemoryOpInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
@@ -406,6 +432,27 @@ def BLIFImplInterface : OpInterface<"BLIFImplInterface"> {
       }
       return StringAttr::get(op->getContext(), "");
     }]>
+  ];
+}
+
+def RTLAttrInterface : OpInterface<"RTLAttrInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Allow specification of generic values to be used in the RTL generation of a
+     Handshake operation. Implementations return the complete set of RTL
+     parameters (generic values) as a list of named attributes, where each entry
+     maps a parameter name to its value. These are passed to the component
+     generator specified in the rtl-config file.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the RTL parameters for this operation as a list of named
+      attributes. Each entry maps a parameter name to its corresponding
+      attribute value. Returns failure if parameters cannot be determined
+      (e.g., unsupported constant bitwidth).
+    }], "::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>",
+    "getRTLParameters", (ins)>
   ];
 }
 

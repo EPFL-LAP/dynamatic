@@ -1,33 +1,36 @@
 #include "BitwidthTypeSystem.h"
 
-auto dynamatic::gen::BitwidthTypeSystem::checkScalarType(
-    const ast::ScalarType &scalarType, const BitwidthTypingContext &context)
-    -> std::optional<ConclusionOf<ast::ScalarType>> {
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "bitwidth-type-system"
+
+bool dynamatic::gen::BitwidthTypeSystem::discardScalarType(
+    const ast::ScalarType &scalarType, const BitwidthTypingContext &context) {
   if (scalarType == ast::PrimitiveType::Double ||
       scalarType == ast::PrimitiveType::Float)
-    return std::nullopt;
+    return true;
 
   // Only allow a datatype if either: We have no bitwidth requirement OR
   // the type restricts it to fit in the given bitwidth.
   if (std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
       !req || *req >= scalarType.getBitwidth())
-    return ConclusionOf<ast::ScalarType>{};
+    return false;
 
-  return std::nullopt;
+  return true;
 }
 
-auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
+auto dynamatic::gen::BitwidthTypeSystem::discardConstant(
     const ast::Constant &constant, const BitwidthTypingContext &context) const
-    -> std::optional<ConclusionOf<ast::Constant>> {
+    -> std::optional<ast::Constant> {
   // Allow all integer constants as we manually truncate them
   // (regardless of their C++ type).
-  if (!checkScalarType(constant.getType(), ResultIsTruncated{}))
+  if (discardScalarType(constant.getType(), ResultIsTruncated{}))
     return std::nullopt;
 
   // Any integer constant is okay.
   std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
   if (!req)
-    return ConclusionOf<ast::Constant>{};
+    return constant;
 
   // Otherwise restrain it to our bitwidth.
   return std::visit(
@@ -44,46 +47,75 @@ auto dynamatic::gen::BitwidthTypeSystem::checkConstant(
       constant.value);
 }
 
-auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
-    ast::BinaryExpression::Op op, const BitwidthTypingContext &context) const
-    -> std::optional<ConclusionOf<ast::BinaryExpression>> {
+bool dynamatic::gen::BitwidthTypeSystem::discardBinaryExpression(
+    ast::BinaryExpression::Op op, const BitwidthTypingContext &context) const {
   switch (op) {
-  case ast::BinaryExpression::BitAnd: {
-    // Bitand is distributive: Sub-expressions can assume they are truncated
-    // as well.
-    std::optional<std::uint8_t> req = context.bitwidthRequirementOrNone();
-    if (!req)
-      return ConclusionOf<ast::BinaryExpression>{ResultIsTruncated{},
-                                                 ResultIsTruncated{}};
+  case ast::BinaryExpression::BitAnd:
+  case ast::BinaryExpression::BitOr:
+  case ast::BinaryExpression::BitXor:
+    // Always allowed.
+    return false;
 
-    // Otherwise, one operand is constrained to of the given maximum bitwidth
-    // while the other can assume it is being truncated.
-    // The choice of whether the left or right-hand-side is constrained is
-    // arbitrary.
-    return ConclusionOf<ast::BinaryExpression>{
-        ResultIsTruncated{}, getInterestingBitWidthInRange(*req)};
-  }
+  case ast::BinaryExpression::ShiftRight:
   case ast::BinaryExpression::ShiftLeft:
-    // TODO: Left shift is distributive for the shifted operand but not the
-    //       shift-amount.
-    //       Under a fixed bitwidth, we can also choose bitwidths for both
-    //       operands such that it fits within a fixed bitwidth.
-    return std::nullopt;
+    // TODO: Implement logic for these.
+    return true;
 
   case ast::BinaryExpression::Plus:
   case ast::BinaryExpression::Mul:
   case ast::BinaryExpression::Minus:
-    if (context.resultIsTruncated())
-      return ConclusionOf<ast::BinaryExpression>{ResultIsTruncated{},
-                                                 ResultIsTruncated{}};
+    // Only allowed if truncated.
+    return !context.resultIsTruncated();
 
-    // TODO: We can choose bitwidths for the left and right operands of these
-    //       expressions here to fit a maximum bitwidth.
-    return std::nullopt;
+  case ast::BinaryExpression::Greater:
+  case ast::BinaryExpression::GreaterEqual:
+  case ast::BinaryExpression::Less:
+  case ast::BinaryExpression::LessEqual:
+  case ast::BinaryExpression::Equal:
+  case ast::BinaryExpression::NotEqual:
+    if (globalMaxBitwidth == 1) {
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "Discarding NotEqualExpression as the maximum global "
+               "bitwidth == 1, which requires the comparison to be done "
+               "on 0-bit integers (which does not exist in C)";
+      });
+      return true;
+    }
+    return false;
+  }
+  llvm_unreachable("all enum cases handled");
+}
 
-  case ast::BinaryExpression::ShiftRight:
-    // TODO: Figure out constraints here.
-    return std::nullopt;
+auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionTransferFns(
+    ast::BinaryExpression::Op op) -> TransferFnArray<ast::BinaryExpression> {
+  switch (op) {
+  case ast::BinaryExpression::BitAnd:
+    return {
+        /*lhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*rhs=*/
+        TransferFn<ast::BinaryExpression, INPUT_DEPENDENCY>(
+            [&](const BitwidthTypingContext &context) -> BitwidthTypingContext {
+              // Bitand is distributive: Sub-expressions can assume they are
+              // truncated as well.
+              std::optional<std::uint8_t> req =
+                  context.bitwidthRequirementOrNone();
+              if (!req)
+                return ResultIsTruncated{};
+
+              return getInterestingBitWidthInRange(*req);
+            }),
+        /*output=*/copyInputToOutput<ast::BinaryExpression>(),
+    };
+
+  case ast::BinaryExpression::Plus:
+  case ast::BinaryExpression::Minus:
+  case ast::BinaryExpression::Mul:
+    return {
+        /*lhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*rhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
+        /*output=*/copyInputToOutput<ast::BinaryExpression>(),
+    };
   case ast::BinaryExpression::Greater:
   case ast::BinaryExpression::GreaterEqual:
   case ast::BinaryExpression::Less:
@@ -93,40 +125,119 @@ auto dynamatic::gen::BitwidthTypeSystem::checkBinaryExpression(
     // These operations consume all bits to produce its result, we cannot
     // leave it unconstrained, otherwise the input expressions must be done
     // with higher bitwidths.
-    return ConclusionOf<ast::BinaryExpression>{
-        {getInterestingBitWidthInRange(globalMaxBitwidth)},
-        {getInterestingBitWidthInRange(globalMaxBitwidth)}};
+
+    // C performs automatic promotion to 'int' for all data types that are
+    // smaller than 'int'. This might cause sign-extension in which case the
+    // semantics are not equal to just performing the comparison at a given
+    // bitwidth. If the comparison must be done with 'n' bits, the operands
+    // then have to be computable with 'n - 1' bits.
+    // We account for that by requiring one less bit than the global maximum
+    // for the operands.
+    // TODO: The sign-extension of the inputs is dependent on whether the type
+    //       of the operands are signed or not. We could track this
+    //       theoretically.
+    return {
+        /*lhs=*/TransferFn<ast::BinaryExpression>(
+            getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
+        /*rhs=*/
+        TransferFn<ast::BinaryExpression>(
+            getInterestingBitWidthInRange(globalMaxBitwidth - 1)),
+        /*output=*/copyInputToOutput<ast::BinaryExpression>(),
+    };
 
   case ast::BinaryExpression::BitOr:
   case ast::BinaryExpression::BitXor:
-    // Distribute regarding truncation.
-    return ConclusionOf<ast::BinaryExpression>{context, context};
+  case ast::BinaryExpression::ShiftLeft:
+  case ast::BinaryExpression::ShiftRight:
+    return TypeSystem::getBinaryExpressionTransferFns(op);
   }
   llvm_unreachable("all enum cases handled");
 }
 
-auto dynamatic::gen::BitwidthTypeSystem::checkConditionalExpression(
-    const BitwidthTypingContext &context) const
-    -> ConclusionOf<ast::ConditionalExpression> {
-  // The condition must be constrained to fit within the global max bitwidth.
-  return {{getInterestingBitWidthInRange(globalMaxBitwidth)}, context, context};
+dynamatic::gen::TransferFnArray<dynamatic::ast::ConditionalExpression>
+dynamatic::gen::BitwidthTypeSystem::getConditionalExpressionTransferFns() {
+  return {
+      /*condition=*/TransferFn<ast::ConditionalExpression>(
+          BitwidthTypingContext(globalMaxBitwidth)),
+      /*true value=*/copyFromInput<ast::ConditionalExpression>(),
+      /*false value=*/copyFromInput<ast::ConditionalExpression>(),
+      /*output=*/copyInputToOutput<ast::ConditionalExpression>(),
+  };
 }
 
-auto dynamatic::gen::BitwidthTypeSystem::checkFunction(
-    const BitwidthTypingContext &context) -> ConclusionOf<ast::Function> {
+dynamatic::gen::TransferFnArray<dynamatic::ast::Function>
+dynamatic::gen::BitwidthTypeSystem::getFunctionTransferFns() {
   // Return types are exempt from the bitwidth rules as they're an interface
   // type.
   // Any integer type is allowed in that case.
-  return ConclusionOf<ast::Function>{
-      /*returnType=*/ResultIsTruncated{},
-      /*returnStatement=*/context,
+  return {
+      /*return type=*/TransferFn<ast::Function>(ResultIsTruncated{}),
+      /*statement list=*/copyFromInput<ast::Function>(),
+      /*return statement=*/copyFromInput<ast::Function>(),
+      /*output=*/copyInputToOutput<ast::Function>(),
+  };
+}
+
+auto dynamatic::gen::BitwidthTypeSystem::getArrayReadExpressionTransferFns()
+    -> TransferFnArray<ast::ArrayReadExpression> {
+  return {
+      /*array parameter=*/copyFromInput<ast::ArrayReadExpression>(),
+      /*index=*/
+      TransferFn<ast::ArrayReadExpression,
+                 ast::ArrayReadExpression::ARRAY_PARAMETER>(
+          [&](const BitwidthTypingContext &,
+              const ast::ArrayParameter &parameter) {
+            assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
+                   "implementation depends on dimensions being powers of 2");
+            return BitwidthTypingContext{std::min<std::uint8_t>(
+                llvm::Log2_64(parameter.getDimension()), globalMaxBitwidth)};
+          }),
+      /*output=*/copyInputToOutput<ast::ArrayReadExpression>(),
+  };
+}
+
+dynamatic::gen::TransferFnArray<dynamatic::ast::ArrayAssignmentStatement>
+dynamatic::gen::BitwidthTypeSystem::getArrayAssignmentStatementTransferFns() {
+  return {
+      /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+      /*index=*/
+      TransferFn<ast::ArrayAssignmentStatement,
+                 ast::ArrayAssignmentStatement::ARRAY>(
+          [&](const BitwidthTypingContext &,
+              const ast::ArrayParameter &parameter) {
+            assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
+                   "implementation depends on dimensions being powers of 2");
+            return BitwidthTypingContext{std::min<std::uint8_t>(
+                llvm::Log2_64(parameter.getDimension()), globalMaxBitwidth)};
+          }),
+      copyFromInput<ast::ArrayAssignmentStatement>(),
+      /*output=*/copyInputToOutput<ast::ArrayAssignmentStatement>(),
+  };
+}
+
+dynamatic::gen::TransferFnArray<dynamatic::ast::StructuredForStatement>
+dynamatic::gen::BitwidthTypeSystem::getStructuredForStatementTransferFns() {
+  auto subBitwidth = random.getInteger<std::uint8_t>(
+      1, std::min<std::uint8_t>(4, globalMaxBitwidth));
+  // Restricting all expressions to have a specific bitwidth also inherently
+  // forces a specific range in loop iterations.
+  return {
+      TransferFn<ast::StructuredForStatement>(
+          BitwidthTypingContext{subBitwidth}),
+      TransferFn<ast::StructuredForStatement>(
+          BitwidthTypingContext{subBitwidth}),
+      // NOTE: Still allows 0!
+      TransferFn<ast::StructuredForStatement>(
+          BitwidthTypingContext{subBitwidth}),
+      copyFromInput<ast::StructuredForStatement>(),
+      copyInputToOutput<ast::StructuredForStatement>(),
   };
 }
 
 dynamatic::gen::BitwidthTypingContext
 dynamatic::gen::BitwidthTypeSystem::getInterestingBitWidthInRange(
     uint8_t bitWidth) const {
-  if (random.getRatherLowProbabilityBool())
+  if (bitWidth > 0 && random.getRatherLowProbabilityBool())
     return BitwidthTypingContext(random.getInteger<std::uint32_t>(1, bitWidth));
 
   return BitwidthTypingContext(bitWidth);

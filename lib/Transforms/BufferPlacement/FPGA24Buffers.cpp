@@ -20,14 +20,15 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
 #include <list>
@@ -61,12 +62,34 @@ void LatencyBalancingMILP::setup() {
     return;
 
   addLatencyBalancingVars(reconvergentPaths, syncCyclePairs);
+  addChannelPropertyLatencyConstraints();
   addReconvergentPathConstraints(reconvergentPaths);
   addSyncCycleConstraints(syncCyclePairs, syncGraph);
   addStallPropagationConstraints(reconvergentPaths, syncCyclePairs, syncGraph);
   addCycleTimeConstraints(cfdfcs, computedII, computedCFDFCIIs);
   setLatencyBalancingObjective();
   markReadyToOptimize();
+}
+
+void LatencyBalancingMILP::addChannelPropertyLatencyConstraints() {
+  for (auto &[channel, chVars] : vars.channelVars) {
+    handshake::ChannelBufProps &props = channelProps[channel];
+    std::string name = getUniqueName(*channel.getUses().begin());
+
+    /// As in `FPGA20Buffers::addCustomChannelConstraints`, `minOpaque` only
+    /// forces the binary "data/valid is broken" decision. The total slot count
+    /// is handled in the occupancy LP.
+    if (props.minOpaque > 0) {
+      model->addConstr(chVars.bufPresent == 1, "fpga24_forceOpaque_R_" + name);
+    }
+
+    if (props.maxOpaque.has_value() && *props.maxOpaque == 0) {
+      model->addConstr(chVars.dataLatency == 0,
+                       "fpga24_forceTransparent_L_" + name);
+      model->addConstr(chVars.bufPresent == 0,
+                       "fpga24_forceTransparent_R_" + name);
+    }
+  }
 }
 
 /// The latency variable L_c is the number of extra latencies to be added to a
@@ -116,29 +139,12 @@ void OccupancyBalancingLP::setup() {
     return;
   }
 
-  /// Collect all channels from CFDFCs
-  mlir::DenseSet<Value> allChannelsSet;
-  for (CFDFC *cfdfc : cfdfcs) {
-    for (Value channel : cfdfc->channels) {
-      allChannelsSet.insert(channel);
-    }
+  SmallVector<Value> allChannels;
+  for (auto &[channel, _] : channelProps) {
+    if (isa<MemRefType>(channel.getType()))
+      continue;
+    allChannels.push_back(channel);
   }
-  /// Also include channels from reconvergent paths (including non-CFDFC edges)
-  /// This ensures LP2 handles entry/exit paths that LP1 balanced.
-  for (const auto &pathWithGraph : reconvergentPaths) {
-    const ReconvergentPath &path = pathWithGraph.path;
-    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
-    for (NodeIdType nodeId : path.nodeIds) {
-      for (EdgeIdType edgeId : graph->adjList[nodeId]) {
-        const auto &edge = graph->edges[edgeId];
-        if (path.nodeIds.count(edge.dstId)) {
-          allChannelsSet.insert(edge.channel);
-        }
-      }
-    }
-  }
-
-  SmallVector<Value> allChannels(allChannelsSet.begin(), allChannelsSet.end());
   if (allChannels.empty()) {
     unsatisfiable = true;
     return;
@@ -160,7 +166,7 @@ void OccupancyBalancingLP::setup() {
   /// (Paper: Section 5, Equation 15): Making the required occupancy the
   /// maximum of all CFDFCs' II.
 
-  DenseMap<Value, double> requiredOccupancy;
+  llvm::MapVector<Value, double> requiredOccupancy;
 
   // Initialize with global II constraint
   for (Value channel : allChannels) {
@@ -187,10 +193,47 @@ void OccupancyBalancingLP::setup() {
 
   addMinOccupancyConstraints(requiredOccupancy, channelOccupancy);
   addBackedgeConstraints(cfdfcs, channelOccupancy);
+  addChannelPropertyOccupancyConstraints(channelOccupancy);
 
-  this->setOccupancyBalancingObjective(allChannels, channelOccupancy);
+  this->setOccupancyBalancingObjective(channelOccupancy);
 
   markReadyToOptimize();
+}
+
+void OccupancyBalancingLP::addChannelPropertyOccupancyConstraints(
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
+  for (auto &[channel, n] : channelOccupancy) {
+    handshake::ChannelBufProps &props = channelProps[channel];
+    std::string name = getUniqueName(*channel.getUses().begin());
+
+    bool hasOpaqueLatency =
+        latencyResult.channelExtraLatency.lookup(channel) > 0;
+
+    /// Same case split as `FPGA20Buffers::addCustomChannelConstraints`, with
+    /// `hasOpaqueLatency` replacing FPGA20's binary data-buffer variable.
+    if (props.minOpaque > 0) {
+      if (props.minTrans > 0) {
+        unsigned minTotal = props.minOpaque + props.minTrans;
+        model->addConstr(n >= minTotal, "fpga24_minOpaqueAndTrans_N_" + name);
+      } else {
+        model->addConstr(n >= props.minOpaque, "fpga24_minOpaque_N_" + name);
+      }
+    } else if (props.minTrans > 0) {
+      model->addConstr(n >= props.minTrans + (hasOpaqueLatency ? 1 : 0),
+                       "fpga24_minTrans_N_" + name);
+    } else if (props.minSlots > 0) {
+      model->addConstr(n >= props.minSlots, "fpga24_minSlots_N_" + name);
+    }
+
+    if (props.maxOpaque.has_value() && props.maxTrans.has_value()) {
+      unsigned maxSlots = *props.maxOpaque + *props.maxTrans;
+      if (maxSlots == 0) {
+        model->addConstr(n == 0, "fpga24_noSlots_N_" + name);
+      } else {
+        model->addConstr(n <= maxSlots, "fpga24_maxSlots_N_" + name);
+      }
+    }
+  }
 }
 
 void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
@@ -221,22 +264,35 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
 
     PlacementResult result;
 
-    /// Buffer configuration (Paper: Section 6)
+    /// Buffer configuration with COUNTER_BUFFER:
     /// L_c = latencyCycles (extra latency to add)
     /// N_c = numSlots (occupancy/capacity needed)
+    ///
+    /// Counter Buffer Placement Logic:
+    /// - place K counter buffers where K is bounded by both latency and
+    ///   occupancy requirements;
+    /// - distribute total latency across these K buffers so that
+    ///   sum(dvLatency_i) = L_c;
+    /// - add FIFO_BREAK_NONE slots when occupancy requires more pure storage.
     if (latencyCycles == 0 && numSlots > 0) {
       /// Case 1: L=0, N>0 - No latency, just storage
       result.numFifoNone = numSlots;
-    } else if (numSlots > latencyCycles) {
-      /// Case 3: N > L - Need L pipeline stages + (N-L) transparent FIFO slots
-      result.numOneSlotDV = latencyCycles;
-      result.numFifoNone = numSlots - latencyCycles;
-    } else {
-      /// Case 2: L >= N - Need L cycles of latency
-      /// Paper suggests ⌈L/N⌉ latency per slot, but our infrastructure
-      /// uses 1-cycle DV buffers. We use L DV buffers for correctness.
-      /// This provides L cycles latency and L capacity (>= N, so sufficient).
-      result.numOneSlotDV = latencyCycles;
+    } else if (latencyCycles > 0) {
+      /// Case 2/3: L>0
+      unsigned kCounter = std::max(1u, std::min(latencyCycles, numSlots));
+      unsigned baseDelay = latencyCycles / kCounter;
+      unsigned remainder = latencyCycles % kCounter;
+
+      for (unsigned i = 0; i < kCounter; ++i) {
+        unsigned delay = baseDelay + (i < remainder ? 1u : 0u);
+        if (delay > 0)
+          result.counterBufferLatencies.push_back(delay);
+      }
+
+      /// If occupancy requires more one-token buffers than those used to carry
+      /// latency, add transparent slots for pure storage.
+      if (numSlots > kCounter)
+        result.numFifoNone = numSlots - kCounter;
     }
 
     /// For Mux/Merge/ControlMerge on cycles, add break_r for deadlock
@@ -246,12 +302,12 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
                         handshake::ControlMergeOp>(srcOp) &&
         srcOp->getNumOperands() > 1 && isChannelOnCycle(channel)) {
       result.numOneSlotR = 1;
-      if (result.numOneSlotDV == 0)
-        result.numOneSlotDV = 1;
+      if (result.numOneSlotDV == 0 && result.counterBufferLatencies.empty())
+        result.counterBufferLatencies.push_back(1);
     }
 
     if (result.numFifoNone > 0 || result.numOneSlotDV > 0 ||
-        result.numOneSlotR > 0) {
+        result.numOneSlotR > 0 || !result.counterBufferLatencies.empty()) {
       placement[channel] = result;
     }
   }
@@ -281,7 +337,7 @@ void FPGA24Buffers::findSynchronizationPatterns(
   if (archTransitions.empty())
     return;
 
-  constexpr size_t sequenceLength = 2;
+  constexpr size_t sequenceLength = 4;
   auto sequences =
       enumerateTransitionSequences(archTransitions, sequenceLength);
 
@@ -350,25 +406,30 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
 
       for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
         unsigned totalLatency = 0;
-        llvm::errs() << "  Cycle " << cycleIdx << ": ";
+        LLVM_DEBUG({ llvm::errs() << "  Cycle " << cycleIdx << ": "; });
+        auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+          for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
+            if (cfdfcGraph.edges[edgeId].dstId != dst)
+              continue;
+            return cfdfcGraph.edges[edgeId].channel;
+          }
+          llvm_unreachable("Edge not found");
+        };
+
         for (size_t i = 0; i < cycle.nodes.size(); ++i) {
           NodeIdType src = cycle.nodes[i];
           NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
-          for (EdgeIdType edgeId : cfdfcGraph.adjList[src]) {
-            if (cfdfcGraph.edges[edgeId].dstId == dst) {
-              Value channel = cfdfcGraph.edges[edgeId].channel;
-              unsigned extraLat = 0;
-              if (result.channelExtraLatency.count(channel)) {
-                extraLat = result.channelExtraLatency.lookup(channel);
-              }
-              if (extraLat > 0) {
-                llvm::errs() << getUniqueName(*channel.getUses().begin())
-                             << "(L=" << extraLat << ") ";
-              }
-              totalLatency += extraLat;
-              break;
-            }
+          Value channel = findChannel(src, dst);
+
+          unsigned extraLat = 0;
+          if (result.channelExtraLatency.count(channel)) {
+            extraLat = result.channelExtraLatency.lookup(channel);
           }
+          if (extraLat > 0) {
+            llvm::errs() << getUniqueName(*channel.getUses().begin())
+                         << "(L=" << extraLat << ") ";
+          }
+          totalLatency += extraLat;
         }
         llvm::errs() << "-> Total cycle latency = " << totalLatency << "\n";
         if (totalLatency > 1) {
@@ -410,8 +471,7 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
 
       if (isMergeLike) {
         PlacementResult &result = placement[channel];
-        // if (result.numOneSlotDV == 0)
-        //   result.numOneSlotDV = 1;
+
         result.numOneSlotR = 1;
         llvm::errs() << "  Adding R for merge-like: "
                      << getUniqueName(*channel.getUses().begin()) << "\n";
@@ -419,51 +479,28 @@ void FPGA24Buffers::addPostProcessingBuffers(BufferPlacement &placement,
     }
   }
 
-  /// Buffer forks connected to memory controllers.
-  /// TODO: We will model this in the MILP soon, but for now we just add buffers
-  /// here.
-  for (Operation &op : funcInfo.funcOp.getOps()) {
-    auto forkOp = dyn_cast<handshake::ForkOp>(op);
-    if (!forkOp)
-      continue;
-
-    bool connectsToMemCtrl = false;
-    for (Value res : forkOp.getResults()) {
-      for (Operation *user : res.getUsers()) {
-        if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(user)) {
-          connectsToMemCtrl = true;
-          break;
-        }
-      }
-      if (connectsToMemCtrl)
-        break;
-    }
-
-    if (!connectsToMemCtrl)
-      continue;
-
-    for (Value res : forkOp.getResults()) {
-      if (!placement.count(res)) {
-        PlacementResult result;
-        result.numFifoNone = 1;
-        placement[res] = result;
-      }
-    }
-  }
-
-  /// Buffer memory controller end signals (di_end, idx_end).
-  for (Operation &op : funcInfo.funcOp.getOps()) {
-    if (!isa<handshake::MemoryControllerOp, handshake::LSQOp>(op))
-      continue;
-
-    for (Value res : op.getResults()) {
-      if (!isa<handshake::ControlType>(res.getType()))
+  /// It is hard to accurately model when memory controllers emit a "done"
+  /// signal, which synchronizes with other function outputs. To prevent the
+  /// backpressure to the function outputs from propagating into the internal
+  /// logic,
+  ///  we buffer the paths to EndOp (<out0> or <end>) that represent the
+  ///  function end.
+  /// (The ones not directly produced by memory controllers.)
+  auto *terminator = funcInfo.funcOp.getBodyBlock()->getTerminator();
+  if (auto endOp = dyn_cast<handshake::EndOp>(terminator)) {
+    for (Value operand : endOp->getOperands()) {
+      Operation *producer = operand.getDefiningOp();
+      if (!producer)
         continue;
 
-      if (!placement.count(res)) {
-        PlacementResult result;
+      // Skip memory-completion paths; they do not represent function end.
+      if (isa<handshake::MemoryOpInterface>(producer))
+        continue;
+
+      PlacementResult &result = placement[operand];
+      if (result.numFifoNone == 0 && result.numOneSlotDV == 0 &&
+          result.counterBufferLatencies.empty()) {
         result.numFifoNone = 1;
-        placement[res] = result;
       }
     }
   }
