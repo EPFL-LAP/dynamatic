@@ -59,7 +59,12 @@ struct CFDFC {
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
-  CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
+  CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
+        const DenseSet<Value> &backwardChannels);
+
+  /// Returns whether the channel between the two blocks is an edge of this
+  /// CFDFC's CFG cycle.
+  bool isCycleEdge(unsigned srcBB, unsigned dstBB) const;
 
   // Determines whether the channel is a "CFDFC backedge" i.e., the first
   // channel along a sequence of backedges from a source block to a destination
