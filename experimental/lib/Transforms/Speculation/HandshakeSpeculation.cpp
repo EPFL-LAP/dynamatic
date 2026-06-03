@@ -626,26 +626,46 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
     return success();
   }
 
-  if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
-    if (isDownstream) {
-      // Continue normal downstream traversal, including the index channel
-      // (i.e., ControlMergeOp).
-      for (auto result : op->getResults()) {
-        for (auto &operand : result.getUses()) {
-          if (failed(
-                  addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
-            return failure();
-        }
+  if (isa<handshake::ControlMergeOp>(op)) {
+    // Downstream traversal only of the cmerge,
+    // we do not know if the operands are part of the spec region
+    // so only if they are encountered through a separate downstream
+    // are they labelled
+    for (auto result : op->getResults()) {
+      for (auto &operand : result.getUses()) {
+        // Skip the operand that is the same as the current operand
+        if (!isDownstream && &operand == &opOperand)
+          continue;
+        if (failed(
+                addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
+          return failure();
       }
-    } else {
-      // Continue upstream traversal only to the MuxOp's index channel
-      if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
-        for (auto &operand : muxOp.getSelectOperand().getUses()) {
-          if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false,
-                                                     visited)))
-            return failure();
-        }
+    }
+
+    return success();
+  }
+
+  if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+    // Normal downstream traversal
+    for (auto result : op->getResults()) {
+      for (auto &operand : result.getUses()) {
+        // Skip the operand that is the same as the current operand
+        if (!isDownstream && &operand == &opOperand)
+          continue;
+        if (failed(
+                addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
+          return failure();
       }
+    }
+    // Continue upstream traversal only to the MuxOp's index channel
+    // we do not know if the data operands are part of the spec region
+    // so only if they are encountered through a separate downstream
+    // are they labelled
+    for (auto &operand : muxOp.getSelectOperand().getUses()) {
+      if (isDownstream && &operand == &opOperand)
+        continue;
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited)))
+        return failure();
     }
 
     return success();
