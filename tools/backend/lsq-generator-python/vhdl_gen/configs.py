@@ -84,7 +84,8 @@ class Configs:
     # approximate address comparison: whether to enable Bloom-filter-based approximate comparison of load and store
     # addresses to reduce hardware usage and/or improve timing performance at the cost of potential false conflicts
     # (false positives) between loads and stores, which can reduce performance
-    bloomFilter: bool = False
+    bloomFilterLoad: bool = False              # Whether to use a Bloom filter for load issue
+    bloomFilterStore: bool = False             # Whether to use a Bloom filter for store issue
     bloomFilterSequential: bool = False        # Whether to create the per-address filters in the dispathers and store them in the queue
     bloomFilterHashCount: int = 2              # Number of hash functions used in the Bloom filter (k)
     bloomFilterHashW: int = 8                  # Width of each hash function output
@@ -174,7 +175,15 @@ class Configs:
         ### BLOOM FILTER ###
         bloomFilter = get_env("LSQ_BLOOM_FILTER")
         if bloomFilter is not None:
-            self.bloomFilter = bool(bloomFilter)
+            # legacy environment variable, supported for consistency
+            self.bloomFilterLoad = bool(bloomFilter)
+            self.bloomFilterStore = bool(bloomFilter)
+        bloomFilterLoad = get_env("LSQ_BLOOM_FILTER_LOAD")
+        if bloomFilterLoad is not None:
+            self.bloomFilterLoad = bool(bloomFilterLoad)
+        bloomFilterStore = get_env("LSQ_BLOOM_FILTER_STORE")
+        if bloomFilterStore is not None:
+            self.bloomFilterStore = bool(bloomFilterStore)
         bloomFilterSequential = get_env("LSQ_BLOOM_FILTER_SEQUENTIAL")
         if bloomFilterSequential is not None:
             self.bloomFilterSequential = bool(bloomFilterSequential)
@@ -217,7 +226,7 @@ class Configs:
         self.ldpAddrW = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
 
-        if self.bloomFilter:
+        if self.bloomFilterLoad or self.bloomFilterStore:
             # If bloomFilterHashW >= addrW, there at least as many bits in the filter as there are addresses. In this
             # case, we can simply use a single "hash" which is just the address itself, and there cannot be any false
             # positives. Thus, we clamp the hash width to the address width, and use a single hash function. This also
@@ -253,14 +262,23 @@ class Configs:
             # currently used by Dynamatic, so this is left as future work.
             assert self.numLdMem == 1, "Fallback issue is only supported for single load port configuration."
 
+        if self.stIssueNoCompare:
+            assert not self.bypass, "No-compare store issue is not compatible with bypassing."
+            assert not self.fallbackIssueLoad and not self.fallbackIssueStore, "No-compare store issue is not compatible with fallback issue."
+
         # Bloom filter
-        if self.bloomFilter:
+        if self.bloomFilterLoad or self.bloomFilterStore:
             assert self.bloomFilterHashCount > 0, "Bloom filter hash count must be positive."
             assert self.bloomFilterHashW > 0, "Bloom filter hash width must be positive."
             assert self.bloomFilterW == 2 ** self.bloomFilterHashW, "Bloom filter width must be equal to 2 ** bloomFilterHashW."
             assert not self.bypass, "Bloom filter is not compatible with bypass."
             assert self.issueOldestLoads is None, "Bloom filter is not compatible with oldest load issue restriction (which relies on exact address comparison)."
             assert not self.fallbackIssueLoad and not self.fallbackIssueStore, "Bloom filter is not compatible with fallback issue."
+            assert not self.inOrder, "Bloom filter is not compatible with fully in-order issue."
+
+        if self.bloomFilterStore:
+            assert self.bloomFilterLoad, "Bloom filter only for store issue has not been implemented yet."
+            assert not self.stIssueNoCompare, "Bloom filter for store issue is not compatible with no-compare store issue."
 
         # synthetic issue restrictions
         if self.issueOldestLoads is not None:
