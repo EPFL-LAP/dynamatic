@@ -90,13 +90,6 @@ struct IntegrationTestData {
   std::string getVerboseOutputDirName() {
     std::vector<std::string> symbols{"out"};
 
-    if (this->testVerilog and !this->testVHDL)
-      symbols.emplace_back("hdl:vhdl");
-    else if (!this->testVerilog and this->testVHDL)
-      symbols.emplace_back("hdl:verilog");
-    else
-      assert(false && "must select one of vhdl/verilog to test");
-
     auto stringifyBoolean = [](bool b) {
       return std::string(b ? "on" : "off");
     };
