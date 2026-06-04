@@ -253,7 +253,7 @@ TEST_P(CBCSolverFixture, basic) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(config.runIntegrationTest(), 0);
+  EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
@@ -273,7 +273,7 @@ TEST_P(FPL22Fixture, basic) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(config), 0);
+  EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
 }
 #endif
