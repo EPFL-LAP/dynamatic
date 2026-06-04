@@ -10,9 +10,205 @@
 // that run Dynamatic without any special flags/settings.
 //
 //===----------------------------------------------------------------------===//
-#include "util.h"
 
 #include <gtest/gtest.h>
+
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <optional>
+#include <regex>
+#include <string>
+#include <vector>
+
+namespace fs = std::filesystem;
+
+struct IntegrationTestData {
+  // Configurations
+  std::string name;
+  fs::path benchmarkPath;
+  bool testVerilog;
+  bool testVHDL = true; // default to true
+  // Use resource sharing to reduce the functional unit usage.
+  bool useSharing = false;
+  // Use model checking to remove redundant logic.
+  bool useRigidification = false;
+  bool verifyInvariants = false;
+  // Enable speculation, using the speculate pragma
+  bool useSpeculation = false;
+  std::string milpSolver = "gurobi";
+  std::string bufferAlgorithm = "fpga20";
+  unsigned clockPeriod = 5;
+
+  // Results
+  int simTime;
+
+  // This func. generate a prefix string according to the configuration.
+  // For example, for the default configuration, we generate:
+  // out-hdl:vhdl-milpSolver:gurobi-bufferAlgorithm:fpga20-cp:5
+  //
+  // For example, if we just enable sharing
+  // out-hdl:vhdl-sharing:on-milpSolver:gurobi-bufferAlgorithm:fpga20-cp:5
+  std::string getOutputDirName() {
+    std::vector<std::string> symbols{"out"};
+
+    if (this->testVerilog and !this->testVHDL)
+      symbols.emplace_back("hdl:vhdl");
+    else if (!this->testVerilog and this->testVHDL)
+      symbols.emplace_back("hdl:verilog");
+    else
+      assert(false && "must select one of vhdl/verilog to test");
+
+    auto stringifyBoolean = [](bool b) {
+      return std::string(b ? "on" : "off");
+    };
+
+    if (useSharing)
+      symbols.emplace_back("sharing:" + stringifyBoolean(this->useSharing));
+
+    if (this->useRigidification)
+      symbols.emplace_back("rigidification:" +
+                           stringifyBoolean(this->useRigidification));
+
+    if (this->verifyInvariants)
+      symbols.emplace_back("verifyInvariants:" +
+                           stringifyBoolean(this->verifyInvariants));
+
+    if (this->useSpeculation)
+      symbols.emplace_back("useSpeculation:" +
+                           stringifyBoolean(this->useSpeculation));
+
+    symbols.emplace_back("milpSolver:" + this->milpSolver);
+    symbols.emplace_back("bufferAlgorithm:" + this->bufferAlgorithm);
+    symbols.emplace_back("cp:" + std::to_string(this->clockPeriod));
+
+    // Generating the output file name: Interleaving the fields with "-".
+    std::stringstream ss;
+    bool started = false;
+    for (const auto &symbol : symbols) {
+      if (started)
+        ss << "-";
+      started = true;
+      ss << symbol;
+    }
+    return ss.str();
+  }
+};
+
+namespace {
+
+int getSimulationTime(const fs::path &logFile) {
+  std::ifstream file(logFile);
+  if (!file.is_open()) {
+    std::cout << "[WARNING] Failed to open " << logFile << std::endl;
+    return -1;
+  }
+
+  std::vector<std::string> lines;
+  std::string line;
+
+  // Read all lines into a vector
+  while (std::getline(file, line)) {
+    lines.push_back(line);
+  }
+
+  std::regex pattern("Simulation done! Latency = (\\d+) cycles");
+  std::smatch match;
+
+  // Search lines in reverse order
+  for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
+    if (std::regex_search(*it, match, pattern)) {
+      return std::stoi(match[1]);
+    }
+  }
+
+  std::cout << "[WARNING] Log file does not contain simulation time!"
+            << std::endl;
+  return -1;
+}
+
+int runIntegrationTest(IntegrationTestData &config) {
+  fs::path cSourcePath =
+      config.benchmarkPath / config.name / (config.name + ".c");
+
+  std::string tmpFilename = "tmp_" + config.name + ".dyn";
+  std::ofstream scriptFile(tmpFilename);
+  if (!scriptFile.is_open()) {
+    std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
+    return -1;
+  }
+
+  auto outputDirName = config.getOutputDirName();
+
+  scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
+             << "set-src " << cSourcePath.string() << std::endl
+             << "set-clock-period " << config.clockPeriod << std::endl
+             << "set-output-dir " << outputDirName << std::endl;
+
+  // clang-format off
+  scriptFile << "compile"
+             << " --buffer-algorithm " << config.bufferAlgorithm
+             << (config.useSharing ? " --sharing" : "")
+             << (config.useRigidification ? " --rigidification" : "")
+             << (config.useSpeculation ? " --speculation" : "")
+             << " --milp-solver " << config.milpSolver << std::endl;
+  // clang-format on
+
+  // Assert testVHDL or testVerilog is true
+  if (!config.testVHDL && !config.testVerilog) {
+    std::cout << "[ERROR] Either testVHDL or testVerilog must be true"
+              << std::endl;
+    return -1;
+  }
+
+  if (config.verifyInvariants) {
+    scriptFile << "verify-invariants" << std::endl;
+  }
+
+  // Verify Verilog works correctly
+  if (config.testVerilog) {
+    scriptFile << "write-hdl --hdl verilog" << std::endl
+               << "simulate" << std::endl;
+  }
+  // Verify VHDL works correctly
+  if (config.testVHDL) {
+    // By default, the report containing the simulation time is re-written
+    // during the second simulation (i.e., the VHDL simulation).
+    scriptFile << "write-hdl --hdl vhdl" << std::endl
+               << "simulate" << std::endl;
+  }
+  scriptFile << "exit" << std::endl;
+
+  scriptFile.close();
+
+  fs::path dynamaticPath = fs::path(DYNAMATIC_ROOT) / "bin" / "dynamatic";
+  fs::path dynamaticOutPath =
+      cSourcePath.parent_path() / outputDirName / "dynamatic_out.txt";
+  fs::path dynamaticErrPath =
+      cSourcePath.parent_path() / outputDirName / "dynamatic_err.txt";
+  if (!fs::exists(dynamaticOutPath.parent_path())) {
+    fs::create_directories(dynamaticOutPath.parent_path());
+  }
+
+  std::string cmd = dynamaticPath.string() + " --exit-on-failure --run ";
+  cmd += tmpFilename;
+  cmd += " 1> ";
+  cmd += dynamaticOutPath;
+  cmd += " 2> ";
+  cmd += dynamaticErrPath;
+
+  int status = system(cmd.c_str());
+  if (status == 0) {
+    fs::path logFilePath =
+        cSourcePath.parent_path() / outputDirName / "sim" / "report.txt";
+    config.simTime = getSimulationTime(logFilePath);
+  }
+
+  return status;
+}
+
+} // namespace
 
 /// Base class for Dynamatic unit tests
 /// provides utilities

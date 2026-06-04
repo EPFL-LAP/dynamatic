@@ -1,7 +1,6 @@
 add_executable(
   integration
   TEST_SUITE.cpp
-  util.cpp
 )
 target_link_libraries(
   integration
