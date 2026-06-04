@@ -203,8 +203,6 @@ int IntegrationTest::run() {
   return status;
 }
 
-namespace {} // namespace
-
 /// Base class for Dynamatic unit tests
 /// provides utilities
 class BaseFixture : public testing::TestWithParam<std::string> {
