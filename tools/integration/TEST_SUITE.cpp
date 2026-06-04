@@ -87,7 +87,7 @@ struct IntegrationTestData {
   //
   // For example, if we just enable sharing
   // out-hdl:vhdl-sharing:on-milpSolver:gurobi-bufferAlgorithm:fpga20-cp:5
-  std::string getVerboseOutputDirName() {
+  std::string getVerboseSuffixName() {
     std::vector<std::string> symbols{"out"};
 
     auto stringifyBoolean = [](bool b) {
@@ -162,7 +162,8 @@ int runIntegrationTest(IntegrationTestData &config) {
   fs::path cSourcePath =
       config.benchmarkPath / config.name / (config.name + ".c");
 
-  std::string tmpFilename = "tmp_" + config.name + ".dyn";
+  std::string tmpFilename =
+      "tmp_" + config.name + "_" + config.getVerboseSuffixName() + ".dyn";
   std::ofstream scriptFile(tmpFilename);
   if (!scriptFile.is_open()) {
     std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
@@ -171,7 +172,7 @@ int runIntegrationTest(IntegrationTestData &config) {
 
   std::string outputDirName;
   if (clVerboseOutDir)
-    outputDirName = config.getVerboseOutputDirName();
+    outputDirName = config.getVerboseSuffixName();
   else
     outputDirName = "out";
 
