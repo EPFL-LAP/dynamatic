@@ -241,7 +241,7 @@ TEST_P(BasicFixture, basic) {
 
 #ifdef DYNAMATIC_ENABLE_CBC
 TEST_P(CBCSolverFixture, basic) {
-  IntegrationTestData config{
+  IntegrationTest config{
       // clang-format off
       .name = GetParam(),
       .testName = getVerboseOutdirSuffix(),
@@ -261,7 +261,7 @@ TEST_P(CBCSolverFixture, basic) {
 
 #if 0
 TEST_P(FPL22Fixture, basic) {
-  IntegrationTestData config{
+  IntegrationTest config{
       // clang-format off
       .name = GetParam(),
       .testName = getVerboseOutdirSuffix(),
