@@ -104,7 +104,7 @@ int IntegrationTest::run() {
 
   std::string outputDirName;
 
-  outputDirName = "out-" + this->testName;
+  outputDirName = "out_" + this->testName;
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << cSourcePath.string() << std::endl

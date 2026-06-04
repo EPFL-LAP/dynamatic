@@ -41,7 +41,7 @@ add_custom_target(
   COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> --parallel ${PARALLEL_FACTOR} --timeout 1500 --output-on-failure --exclude-regex _NoCI 
   DEPENDS integration
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/tools/integration
-  COMMENT "Run integration tests that aren't marked with '_NoCI'. Also automatically delete the generated files after the test has passed."
+  COMMENT "Run integration tests that aren't marked with '_NoCI'."
   VERBATIM
   USES_TERMINAL
 )
