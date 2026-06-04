@@ -34,13 +34,20 @@ namespace fs = std::filesystem;
 namespace {
 // Make it a global variable to avoid the need to route this flag all the way to
 // the integration test config
+//
+// Config: whether we append the name of the output directory with suffix
 bool clVerboseOutDir = false;
+// Config: whether we remove the outdir if the test has passed
+bool clRemoveOutDirOnSuccess = false;
 void parseClOptions(int argc, char **argv) {
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg.rfind("--verbose-outdir", 0) == 0) {
-      // Global variable
       clVerboseOutDir = true;
+    }
+
+    if (arg.rfind("--remove-outdir-on-success", 0) == 0) {
+      clRemoveOutDirOnSuccess = true;
     }
 
     // Print out flags before gtest's flags
@@ -52,9 +59,11 @@ void parseClOptions(int argc, char **argv) {
       std::cout << "---------------------------------------------\n";
       std::cout << "---------------------------------------------\n";
       std::cout << "Custom options:\n";
-      std::cout << "-h|--help            print this page\n";
-      std::cout << "--verbose-outdir     instead of \"out\", explicitly print "
-                   "the option into the output directory\n";
+      // clang-format off
+      std::cout << "-h|--help                      print this page and quit.\n";
+      std::cout << "--verbose-outdir               instead of \"out\", explicitly print the option into the output directory.\n";
+      std::cout << "--remove-outdir-on-success     remove the output directory if the test passed.\n";
+      // clang-format on
       std::cout << "----------------------------------------------\n\n";
     }
   }
@@ -198,6 +207,10 @@ int IntegrationTest::run() {
     fs::path logFilePath =
         cSourcePath.parent_path() / outputDirName / "sim" / "report.txt";
     this->simTime = getSimulationTime(logFilePath);
+  }
+
+  if (clRemoveOutDirOnSuccess) {
+    fs::remove_all(dynamaticOutPath.parent_path());
   }
 
   return status;
