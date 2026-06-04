@@ -60,8 +60,25 @@ def extract_generics_ports(vhdl_code, entity_name):
         lines = re.split(r';\s*\n', raw)
         return [line.strip() for line in lines if line.strip()]
 
-    generics = split_definitions(generics_raw)
-    ports = split_definitions(ports_raw)
+    def expand_grouped(defs: List[str]) -> List[str]:
+        # Expand "clk, rst : in std_logic" into one entry per name so each
+        # gets its own port_map line.
+        out = []
+        for d in defs:
+            if ":" not in d:
+                out.append(d)
+                continue
+            lhs, rhs = d.split(":", 1)
+            names = [n.strip() for n in lhs.split(",") if n.strip()]
+            if len(names) <= 1:
+                out.append(d)
+                continue
+            for n in names:
+                out.append(f"{n} :{rhs}")
+        return out
+
+    generics = expand_grouped(split_definitions(generics_raw))
+    ports = expand_grouped(split_definitions(ports_raw))
 
     return entity_name, VhdlInterfaceInfo(generics, ports)
 
@@ -226,9 +243,13 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
             hdl_files = [tb_file, unit_vhd] + support_hdl_files
             unit_char_obj = UnitCharacterization(
                 unit_name, top_entity_name, params_dict, hdl_files, vhdl_interface_info, id)
-            list_tcls.append(unit_char_obj.generate_tcl(
-                tcl_dir, rpt_dir, sdc_file))
+            tcl_file = unit_char_obj.generate_tcl(tcl_dir, rpt_dir, sdc_file)
             unit_characterization_list.append(unit_char_obj)
+            if all(os.path.exists(p) for p in unit_char_obj.map_pair_to_rpt.values()):
+                print(
+                    f"[skip] {unit_name} combo {id} {params_dict}: reports already present")
+                continue
+            list_tcls.append(tcl_file)
     else:
         print(f"Extracting generics and ports from {top_def_file}")
         with open(top_def_file, 'r') as f:
@@ -247,11 +268,19 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
                 f.write(wrapper_top_combined)
             unit_char_obj = UnitCharacterization(unit_name, top_entity_name, dict(zip(
                 param_names, combination)), [top_file] + support_hdl_files, vhdl_interface_info, id)
-            list_tcls.append(unit_char_obj.generate_tcl(
-                tcl_dir, rpt_dir, sdc_file))
+            tcl_file = unit_char_obj.generate_tcl(tcl_dir, rpt_dir, sdc_file)
             unit_characterization_list.append(unit_char_obj)
+            if all(os.path.exists(p) for p in unit_char_obj.map_pair_to_rpt.values()):
+                print(
+                    f"[skip] {unit_name} combo {id}: reports already present")
+                continue
+            list_tcls.append(tcl_file)
 
     log_file = f"{log_dir}/synth_{unit_name}_log.txt"
-    run_synthesis(list_tcls, synth_tool, log_file)
+    if list_tcls:
+        run_synthesis(list_tcls, synth_tool, log_file)
+    else:
+        print(
+            f"[skip] {unit_name}: all combos already characterized; nothing to synth")
 
     return unit_characterization_list

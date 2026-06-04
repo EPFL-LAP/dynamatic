@@ -1,0 +1,4222 @@
+{
+  "handshake.speculator": {
+    "delays": [
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.307
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.343
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.343
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.699
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.114
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.114
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.327
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "trigger",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.161
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.214
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.432
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.661
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.935
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.935
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.269
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.38
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.38
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.38
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.109
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.696
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 4.26
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 4.523
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.515
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.82
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.375
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.375
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.436
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.397
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.397
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.397
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.0
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.136
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.243
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.577
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.218
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.218
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.485
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.588
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.896
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.935
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.339
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_commit",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.788
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.788
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.551
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.701
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.997
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.081
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.303
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.343
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.527
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.527
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.527
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.527
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.527
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "trigger",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.161
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.214
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.318
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.318
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.318
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.318
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.318
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.38
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.38
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.77
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.77
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.978
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.178
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.855
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.696
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.696
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.696
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.696
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.696
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.911
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.911
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.355
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.355
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.421
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.421
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.421
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.799
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.898
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.898
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.335
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.335
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.335
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.335
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.335
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.28
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.28
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.28
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.28
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.28
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_commit",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.788
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.788
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.196
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.196
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.196
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.196
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.196
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.226
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.23
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.525
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.525
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.525
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.525
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.525
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "trigger",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.135
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.135
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.316
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.304
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.455
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.455
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.461
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.735
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.178
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.855
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.683
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.911
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.911
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.227
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.227
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.229
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.229
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.334
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.799
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.799
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.894
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.894
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.206
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.206
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.206
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.206
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.206
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.278
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.278
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.013
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.013
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.013
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.077
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.307
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.307
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.307
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "trigger",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.002
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.002
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.291
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.291
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.316
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.266
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.266
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.266
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.266
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.625
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.625
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.731
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.746
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.746
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.746
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.746
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.746
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.746
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.746
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.128
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.128
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.128
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.129
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.631
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.82
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.82
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.887
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.887
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.887
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.887
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.013
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.013
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.013
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.077
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.307
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.307
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.307
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "trigger",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.002
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.002
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.291
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.291
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.316
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.316
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.639
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.724
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.306
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.306
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.306
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.936
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.358
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.606
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.606
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.29
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.29
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.29
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.29
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.327
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.128
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.128
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.129
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.129
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.631
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.683
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.816
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.816
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.887
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.887
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.887
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.887
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.701
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.842
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.842
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.842
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.118
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.118
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.118
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "trigger",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.596
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.614
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.921
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.921
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.921
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.921
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.921
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.521
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.717
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.74
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.911
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.241
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.936
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.074
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.606
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.743
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.743
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.743
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.743
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.966
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.327
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.123
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.125
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.128
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.128
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.625
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.625
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.731
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.633
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.71
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.715
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.715
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.715
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.8
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.8
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_commit",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.514
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.514
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.514
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.514
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.514
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.69
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.69
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_commit",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.627
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.627
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.813
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.813
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.118
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.118
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.118
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_commit",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.538
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.538
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.571
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.571
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.571
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.571
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.607
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.724
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.724
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.178
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.178
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.139
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.139
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.255
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.611
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.611
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.335
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.335
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.898
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.898
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.92
+          }
+        ]
+      }
+    ]
+  },
+  "handshake.spec_save_commit": {
+    "delays": [
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 4.052
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 4.052
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 4.052
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 4.052
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 4.052
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 4.052
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 4.052
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.949
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.949
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.949
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.949
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.949
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.949
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.949
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 3.327
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 3.327
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 3.327
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.327
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.327
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.327
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.327
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 3.694
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 3.694
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 3.694
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.694
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.694
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.694
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.694
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.434
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.434
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.434
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.434
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.434
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.434
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.434
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.32
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.32
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.32
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.32
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.32
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.32
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.32
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.631
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.631
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.463
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.463
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.463
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.463
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.463
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.463
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.463
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.555
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.555
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.555
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.555
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.555
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.555
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.555
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.048
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.14
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.638
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.019
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.677
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.31
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.402
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.638
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.281
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.677
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.048
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.048
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.14
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.14
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.638
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.019
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.019
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.677
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.31
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.31
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.402
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.402
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "data"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 3.638
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 3.638
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "outs",
+          "signal": "valid"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 2.281
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 2.281
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "port": "ins",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.677
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.677
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_issue",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.415
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.415
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.415
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.415
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.415
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.415
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.415
+          }
+        ]
+      },
+      {
+        "from": {
+          "port": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "port": "ctrl_history",
+          "signal": "ready"
+        },
+        "samples": [
+          {
+            "params": {
+              "BITWIDTH": 1
+            },
+            "delay": 1.126
+          },
+          {
+            "params": {
+              "BITWIDTH": 2
+            },
+            "delay": 1.126
+          },
+          {
+            "params": {
+              "BITWIDTH": 4
+            },
+            "delay": 1.126
+          },
+          {
+            "params": {
+              "BITWIDTH": 8
+            },
+            "delay": 1.126
+          },
+          {
+            "params": {
+              "BITWIDTH": 16
+            },
+            "delay": 1.126
+          },
+          {
+            "params": {
+              "BITWIDTH": 32
+            },
+            "delay": 1.126
+          },
+          {
+            "params": {
+              "BITWIDTH": 64
+            },
+            "delay": 1.126
+          }
+        ]
+      }
+    ]
+  }
+}

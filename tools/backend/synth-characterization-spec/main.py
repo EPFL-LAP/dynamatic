@@ -78,7 +78,7 @@ def get_dependency_dict(dataflow_units):
     return dependency_dict
 
 
-def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period):
+def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period, clean=False):
     """
     Run characterization of dataflow units based on the provided JSON input.
 
@@ -93,9 +93,9 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
         dataflow_units = json.load(f)
 
     tmp_dir = f"{dynamatic_dir}/tools/backend/synth-characterization-spec/tmp"
-    # Generate the temporary directory if it does not exist
-    if not os.path.exists(tmp_dir):
-        os.makedirs(tmp_dir)
+    if clean and os.path.exists(tmp_dir):
+        os.system(f"rm -rf {tmp_dir}")
+    os.makedirs(tmp_dir, exist_ok=True)
     # Generate hdl directory
     hdl_dir = f"{tmp_dir}/hdl"
     if not os.path.exists(hdl_dir):
@@ -139,9 +139,10 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
                     break
             if skip_unit:
                 continue
-        # Clean previous RTL files and tcl files
-        os.system(f"rm -rf {hdl_dir}/*")
-        os.system(f"rm -rf {tcl_dir}/*")
+        # Note: hdl_dir / tcl_dir are no longer wiped between units. With
+        # incremental mode each combo's files are uniquely named (e.g.
+        # speculator_0.vhd) so leftover files from prior units don't collide.
+        # Use --clean to wipe everything from scratch.
         # Copy the RTL files or generate them if necessary
         print(f"Processing unit: {unit_name}")
         top_def_file = get_hdl_files(
@@ -189,6 +190,11 @@ if __name__ == "__main__":
         default=4.0,
         help="Clock period in nanoseconds to use for synthesis (default: 4.0 ns)",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Wipe the tmp directory before running. Default behaviour is incremental: combos whose report files already exist are skipped (re-runs only fill holes).",
+    )
     args = parser.parse_args()
     json_input = args.json_input
     json_output = args.json_output
@@ -198,4 +204,5 @@ if __name__ == "__main__":
     if not json_input:
         json_input = f"{dynamatic_dir}/data/rtl-config-vhdl-vivado.json"
     run_characterization(json_input, json_output,
-                         dynamatic_dir, synth_tool, clock_period)
+                         dynamatic_dir, synth_tool, clock_period,
+                         clean=args.clean)

@@ -39,6 +39,8 @@ struct IntegrationTestData {
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
   unsigned clockPeriod = 5;
+  // Hard cap on simulation length in nanoseconds. 0 = no timeout.
+  unsigned simTimeoutNs = 0;
 
   // Results
   int simTime;

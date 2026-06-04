@@ -4,7 +4,7 @@ from typing import List, Tuple, Dict
 
 # Constants for the characterization process
 
-NUM_CORES = 10  # Number of cores to use for parallel synthesis (if applicable)
+NUM_CORES = 4  # Number of cores to use for parallel synthesis (if applicable)
 
 # List of units to skip during characterization
 # These units are either empty, unused, or characterized by other scripts
@@ -50,7 +50,7 @@ skipping_units = [
 parameters_ranges = {
     "DATA_TYPE": [1, 2, 4, 8, 16, 32, 64],
     "BITWIDTH": [1, 2, 4, 8, 16, 32, 64],
-    "FIFO_DEPTH": [4],
+    "FIFO_DEPTH": [4, 5, 6, 7, 8, 10, 12, 14, 16],
     "SIZE": [2],
     "SELECT_TYPE": [2],
     "INDEX_TYPE": [2],
@@ -126,15 +126,20 @@ class VhdlInterfaceInfo:
             n = port_name.strip()
             return n in ("clk", "clock", "rst", "reset") or n.startswith(("clk_", "rst_"))
 
-        ins = [port.split(":")[0].strip(
-        ) for port in self.ports if "in" in port and not "data_array" in port]
+        # Match the mode after the colon, not anywhere in the port string —
+        # otherwise a port like `outs_ready : in std_logic` matches both "in"
+        # and "out" via its name.
+        mode_in = re.compile(r":\s*in\b", re.IGNORECASE)
+        mode_out = re.compile(r":\s*out\b", re.IGNORECASE)
+        ins = [port.split(":")[0].strip()
+               for port in self.ports
+               if mode_in.search(port) and "data_array" not in port]
         ins = [p for p in ins if not is_clock_or_reset(p)]
-        # Add 2d data_array ports to ins
         ins.extend(add_2d_ports(self.ports, "in"))
-        outs = [port.split(":")[0].strip(
-        ) for port in self.ports if "out" in port and not "data_array" in port]
+        outs = [port.split(":")[0].strip()
+                for port in self.ports
+                if mode_out.search(port) and "data_array" not in port]
         outs = [p for p in outs if not is_clock_or_reset(p)]
-        # Add 2d data_array ports to outs
         outs.extend(add_2d_ports(self.ports, "out"))
         return ins, outs
 

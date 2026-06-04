@@ -291,6 +291,33 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel &model,
 bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
 
+/// One characterised combinational path between two pins of an op, loaded from
+/// the spec-timing JSON. Used for ops whose internal timing cannot be
+/// expressed by the named scalars in TimingModel (e.g., handshake.speculator,
+/// handshake.spec_save_commit).
+struct SpecTimingEdge {
+  /// Endpoint identified by a port name (matching NamedIOInterface) plus a
+  /// signal kind ("data", "valid", or "ready").
+  struct Endpoint {
+    std::string port;
+    std::string signal;
+  };
+  Endpoint from;
+  Endpoint to;
+  /// Each sample is a measurement at one combination of sweep parameters
+  /// (e.g., BITWIDTH=16, FIFO_DEPTH=4).
+  struct Sample {
+    llvm::StringMap<int64_t> params;
+    double delay;
+  };
+  std::vector<Sample> samples;
+};
+
+/// Per-op-name set of characterised port-pair edges.
+struct SpecTimingModel {
+  std::vector<SpecTimingEdge> edges;
+};
+
 /// Holds the timing models for a set of operations (internally identified by
 /// their unique timing model key), usually parsed from a JSON file. The class
 /// provides accessor methods to quickly get specific information from the
@@ -341,10 +368,28 @@ public:
   static LogicalResult readFromJSON(std::string &jsonPath,
                                     TimingDatabase &timingDB);
 
+  /// Loads the per-port-pair spec timing entries (e.g. for SpeculatorOp and
+  /// SpecSaveCommitOp) from the JSON file at `jsonPath`. Fails if the file is
+  /// missing or malformed.
+  static LogicalResult readSpecTimingFromJSON(std::string &jsonPath,
+                                              TimingDatabase &timingDB);
+
+  /// Returns the spec timing model for the given op-name key, or nullptr if
+  /// none was loaded.
+  const SpecTimingModel *getSpecModel(StringRef timingModelKey) const;
+
+  /// Convenience overload returning the spec timing model corresponding to
+  /// the op (looked up by op->getName().getStringRef()).
+  const SpecTimingModel *getSpecModel(Operation *op) const;
+
 private:
   /// Maps from an operation's timing key to their timing model.
   /// Timing keys are generated based on operation name and implementation
   llvm::StringMap<TimingModel> models;
+
+  /// Per-op-name set of per-port-pair edges loaded from spec-timing.json.
+  /// Sparse: only ops that need port-pair-keyed delays appear here.
+  llvm::StringMap<SpecTimingModel> specModels;
 };
 
 /// Deserializes a JSON value into a TimingDatabase. See ::llvm::json::Value's

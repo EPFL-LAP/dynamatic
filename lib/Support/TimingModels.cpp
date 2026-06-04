@@ -282,6 +282,103 @@ LogicalResult TimingDatabase::getTotalDelay(Operation *op,
   }
 }
 
+const SpecTimingModel *
+TimingDatabase::getSpecModel(StringRef timingModelKey) const {
+  auto it = specModels.find(timingModelKey);
+  if (it == specModels.end())
+    return nullptr;
+  return &it->second;
+}
+
+const SpecTimingModel *TimingDatabase::getSpecModel(Operation *op) const {
+  if (!op)
+    return nullptr;
+  return getSpecModel(op->getName().getStringRef());
+}
+
+LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
+                                                     TimingDatabase &timingDB) {
+  std::ifstream inputFile(jsonpath);
+  if (!inputFile.is_open()) {
+    llvm::errs() << "Failed to open spec timing JSON at \"" << jsonpath
+                 << "\"\n";
+    return failure();
+  }
+
+  std::string jsonString;
+  std::string line;
+  while (std::getline(inputFile, line))
+    jsonString += line;
+
+  llvm::Expected<ljson::Value> value = ljson::parse(jsonString);
+  if (!value) {
+    llvm::errs() << "Failed to parse spec timing JSON in \"" << jsonpath
+                 << "\"\n";
+    return failure();
+  }
+
+  const ljson::Object *root = value->getAsObject();
+  if (!root) {
+    llvm::errs() << "Spec timing JSON root must be an object\n";
+    return failure();
+  }
+
+  for (const auto &unitEntry : *root) {
+    StringRef unitKey = unitEntry.first;
+    const ljson::Object *unitObj = unitEntry.second.getAsObject();
+    if (!unitObj)
+      continue;
+    const ljson::Array *delaysArr = unitObj->getArray("delays");
+    if (!delaysArr)
+      continue;
+
+    SpecTimingModel model;
+    for (const ljson::Value &edgeVal : *delaysArr) {
+      const ljson::Object *edgeObj = edgeVal.getAsObject();
+      if (!edgeObj)
+        continue;
+
+      SpecTimingEdge edge;
+      for (const auto &which : {std::make_pair("from", &edge.from),
+                                std::make_pair("to", &edge.to)}) {
+        const ljson::Object *endObj = edgeObj->getObject(which.first);
+        if (!endObj)
+          continue;
+        std::optional<StringRef> p = endObj->getString("port");
+        std::optional<StringRef> s = endObj->getString("signal");
+        if (p)
+          which.second->port = p->str();
+        if (s)
+          which.second->signal = s->str();
+      }
+
+      const ljson::Array *samplesArr = edgeObj->getArray("samples");
+      if (samplesArr) {
+        for (const ljson::Value &sampleVal : *samplesArr) {
+          const ljson::Object *sampleObj = sampleVal.getAsObject();
+          if (!sampleObj)
+            continue;
+          SpecTimingEdge::Sample sample;
+          if (auto d = sampleObj->getNumber("delay"))
+            sample.delay = *d;
+          else
+            continue;
+          if (const ljson::Object *paramObj = sampleObj->getObject("params")) {
+            for (const auto &paramEntry : *paramObj) {
+              if (auto pv = paramEntry.second.getAsInteger())
+                sample.params[paramEntry.first] = *pv;
+            }
+          }
+          edge.samples.push_back(std::move(sample));
+        }
+      }
+      model.edges.push_back(std::move(edge));
+    }
+    timingDB.specModels[unitKey] = std::move(model);
+  }
+  return success();
+}
+
 LogicalResult TimingDatabase::readFromJSON(std::string &jsonpath,
                                            TimingDatabase &timingDB) {
   // Open the timing database

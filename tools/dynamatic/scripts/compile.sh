@@ -109,7 +109,7 @@ export_cfg() {
 # ============================================================================ #
 
 # Reset output directory
-rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+rm -rf "$OUTPUT_DIR" && mkdir -p "$COMP_DIR"
 
 cp "$F_C_SOURCE" "$F_C_REWRITTEN"
 exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"

@@ -20,6 +20,7 @@
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
+#include <limits>
 #include <optional>
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
@@ -301,6 +302,131 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
   }
 }
 
+void FPL22BuffersBase::addSpecUnitPathConstraints(Operation *unit,
+                                                  ChannelFilter filter) {
+  const SpecTimingModel *specModel = timingDB.getSpecModel(unit);
+  if (!specModel) {
+    unit->emitError() << "addSpecUnitPathConstraints: no spec timing model "
+                      << "loaded for op '" << unit->getName().getStringRef()
+                      << "'";
+    return;
+  }
+
+  auto namedIO = dyn_cast<handshake::NamedIOInterface>(unit);
+  if (!namedIO) {
+    unit->emitError() << "addSpecUnitPathConstraints: op does not implement "
+                      << "NamedIOInterface";
+    return;
+  }
+
+  // Build the per-instance port-name -> SSA Value map by asking the op for
+  // each operand/result's name.
+  llvm::StringMap<Value> portToValue;
+  for (unsigned i = 0, e = unit->getNumOperands(); i < e; ++i)
+    portToValue[namedIO.getOperandName(i)] = unit->getOperand(i);
+  for (unsigned i = 0, e = unit->getNumResults(); i < e; ++i)
+    portToValue[namedIO.getResultName(i)] = unit->getResult(i);
+
+  // Determine the current sweep-parameter targets for this op instance. Each
+  // op type names its bitwidth-carrying channel differently; dispatch.
+  Value bitwidthChannel =
+      llvm::TypeSwitch<Operation *, Value>(unit)
+          .Case<handshake::SpeculatorOp>(
+              [](handshake::SpeculatorOp op) { return op.getDataIn(); })
+          .Case<handshake::SpecSaveCommitOp>(
+              [](handshake::SpecSaveCommitOp op) { return op.getDataIn(); })
+          .Default([&](Operation *op) {
+            op->emitError() << "addSpecUnitPathConstraints called on op type "
+                            << "with no bitwidth accessor registered";
+            return Value();
+          });
+  if (!bitwidthChannel)
+    return;
+  llvm::StringMap<int64_t> currentParams;
+  if (auto chTy = dyn_cast<handshake::ChannelType>(bitwidthChannel.getType()))
+    currentParams["BITWIDTH"] = chTy.getDataBitWidth();
+  else
+    currentParams["BITWIDTH"] = 0;
+  if (auto fifoAttr = unit->getAttrOfType<IntegerAttr>("fifoDepth"))
+    currentParams["FIFO_DEPTH"] = fifoAttr.getValue().getZExtValue();
+
+  auto parseSignal = [](StringRef s) -> std::optional<SignalType> {
+    if (s == "data")
+      return SignalType::DATA;
+    if (s == "valid")
+      return SignalType::VALID;
+    if (s == "ready")
+      return SignalType::READY;
+    return std::nullopt;
+  };
+
+  auto pickClosest =
+      [&](const std::vector<SpecTimingEdge::Sample> &samples) -> double {
+    assert(!samples.empty() && "spec timing edge has no samples");
+    const SpecTimingEdge::Sample *best = &samples.front();
+    int64_t bestDist = std::numeric_limits<int64_t>::max();
+    for (const auto &s : samples) {
+      int64_t dist = 0;
+      for (const auto &targetKV : currentParams) {
+        auto it = s.params.find(targetKV.first());
+        if (it == s.params.end())
+          continue;
+        int64_t d = it->second - targetKV.second;
+        dist += d * d;
+      }
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = &s;
+      }
+    }
+    return best->delay;
+  };
+
+  StringRef unitName = getUniqueName(unit);
+  unsigned idx = 0;
+  for (const SpecTimingEdge &edge : specModel->edges) {
+    auto fromIt = portToValue.find(edge.from.port);
+    auto toIt = portToValue.find(edge.to.port);
+    if (fromIt == portToValue.end()) {
+      unit->emitError() << "spec timing edge references unknown port '"
+                        << edge.from.port << "'";
+      return;
+    }
+    if (toIt == portToValue.end()) {
+      unit->emitError() << "spec timing edge references unknown port '"
+                        << edge.to.port << "'";
+      return;
+    }
+    std::optional<SignalType> fromSig = parseSignal(edge.from.signal);
+    std::optional<SignalType> toSig = parseSignal(edge.to.signal);
+    if (!fromSig || !toSig) {
+      unit->emitError() << "spec timing edge has unrecognised signal kind '"
+                        << edge.from.signal << "' or '" << edge.to.signal
+                        << "'";
+      return;
+    }
+
+    Value fromVal = fromIt->second;
+    Value toVal = toIt->second;
+    if (!filter(fromVal) || !filter(toVal))
+      continue;
+    if (edge.samples.empty()) {
+      unit->emitError() << "spec timing edge " << edge.from.port << "."
+                        << edge.from.signal << " -> " << edge.to.port << "."
+                        << edge.to.signal << " has no samples";
+      return;
+    }
+
+    double delay = pickClosest(edge.samples);
+
+    CPVar &tFrom = vars.channelVars[fromVal].signalVars[*fromSig].path.tOut;
+    CPVar &tTo = vars.channelVars[toVal].signalVars[*toSig].path.tIn;
+    std::string consName =
+        "path_spec_" + unitName.str() + "_" + std::to_string(idx++);
+    model->addConstr(tFrom + delay <= tTo, consName);
+  }
+}
+
 CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
                                      int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
@@ -369,6 +495,10 @@ void CFDFCUnionBuffers::setup() {
   // Add single-domain and mixed-domain path constraints as well as elasticity
   // constraints over all units in the CFDFC union
   for (Operation *unit : cfUnion.units) {
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(unit)) {
+      addSpecUnitPathConstraints(unit, channelFilter);
+      continue;
+    }
     addUnitTimingConstraints(unit, SignalType::DATA, channelFilter);
     addUnitTimingConstraints(unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(unit, SignalType::READY, channelFilter);
@@ -483,6 +613,10 @@ void OutOfCycleBuffers::setup() {
     if (cfUnion.units.contains(&unit))
       continue;
 
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(&unit)) {
+      addSpecUnitPathConstraints(&unit, channelFilter);
+      continue;
+    }
     addUnitTimingConstraints(&unit, SignalType::DATA, channelFilter);
     addUnitTimingConstraints(&unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(&unit, SignalType::READY, channelFilter);

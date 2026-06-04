@@ -95,13 +95,9 @@ setSpeculatorBufferingProperties(handshake::FuncOp funcOp) {
   Channel resolveChannel(historyCtrl, true);
   resolveChannel.props->minTrans = std::max(resolveChannel.props->minTrans, 1U);
 
-  // The speculator's KILL_ONLY_DATA state stalls the data input for
-  // 1 cycle during misspeculation recovery. A transparent buffer on
-  // the data input absorbs this stall and prevents it from propagating
-  // upstream and causing throughput loss.
-  Value dataIn = specOp.getDataIn();
-  Channel dataInChannel(dataIn, true);
-  dataInChannel.props->minTrans = std::max(dataInChannel.props->minTrans, 1U);
+  Value trigger = specOp.getTrigger();
+  Channel triggerChannel(trigger, true);
+  triggerChannel.props->minTrans = std::max(triggerChannel.props->minTrans, 1U);
 
   return success();
 }
