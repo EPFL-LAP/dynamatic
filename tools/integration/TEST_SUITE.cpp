@@ -24,6 +24,43 @@
 
 namespace fs = std::filesystem;
 
+// Parser for custom flags that are not googletest
+//
+// Remarks:
+// - This does not use the LLVM command line parser infrastructure because the
+// googletest flags are seen as undefined flags.
+// - This does not use abseil command line parser to avoid adding extra
+// dependencies.
+namespace {
+// Make it a global variable to avoid the need to route this flag all the way to
+// the integration test config
+bool clVerboseOutDir = false;
+void parseClOptions(int argc, char **argv) {
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg.rfind("--verbose-outdir", 0) == 0) {
+      // Global variable
+      clVerboseOutDir = true;
+    }
+
+    // Print out flags before gtest's flags
+    if (arg.rfind("--help") == 0 || arg.rfind("-h") == 0 ||
+        arg.rfind("--gtest_help") == 0) {
+      std::cout << "---------------------------------------------\n";
+      std::cout << "---------------------------------------------\n";
+      std::cout << "---- Dynamatic's integration test driver ----\n";
+      std::cout << "---------------------------------------------\n";
+      std::cout << "---------------------------------------------\n";
+      std::cout << "Custom options:\n";
+      std::cout << "-h|--help            print this page\n";
+      std::cout << "--verbose-outdir     instead of \"out\", explicitly print "
+                   "the option into the output directory\n";
+      std::cout << "----------------------------------------------\n\n";
+    }
+  }
+}
+} // namespace
+
 struct IntegrationTestData {
   // Configurations
   std::string name;
@@ -50,7 +87,7 @@ struct IntegrationTestData {
   //
   // For example, if we just enable sharing
   // out-hdl:vhdl-sharing:on-milpSolver:gurobi-bufferAlgorithm:fpga20-cp:5
-  std::string getOutputDirName() {
+  std::string getVerboseOutputDirName() {
     std::vector<std::string> symbols{"out"};
 
     if (this->testVerilog and !this->testVHDL)
@@ -139,7 +176,11 @@ int runIntegrationTest(IntegrationTestData &config) {
     return -1;
   }
 
-  auto outputDirName = config.getOutputDirName();
+  std::string outputDirName;
+  if (clVerboseOutDir)
+    outputDirName = config.getVerboseOutputDirName();
+  else
+    outputDirName = "out";
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << cSourcePath.string() << std::endl
@@ -662,3 +703,10 @@ INSTANTIATE_TEST_SUITE_P(Tiny, RigidificationFixture,
 // clang-format on
 
 #endif // DYNAMATIC_ENABLE_LEQ_BINARIES
+
+int main(int argc, char **argv) {
+  parseClOptions(argc, argv);
+  // https://google.github.io/googletest/primer.html#writing-the-main-function
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
