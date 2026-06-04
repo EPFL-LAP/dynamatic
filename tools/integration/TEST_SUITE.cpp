@@ -59,74 +59,6 @@ void parseClOptions(int argc, char **argv) {
     }
   }
 }
-} // namespace
-
-struct IntegrationTestData {
-  // Configurations
-  std::string name;
-  fs::path benchmarkPath;
-  bool testVerilog;
-  bool testVHDL = true; // default to true
-  // Use resource sharing to reduce the functional unit usage.
-  bool useSharing = false;
-  // Use model checking to remove redundant logic.
-  bool useRigidification = false;
-  bool verifyInvariants = false;
-  // Enable speculation, using the speculate pragma
-  bool useSpeculation = false;
-  std::string milpSolver = "gurobi";
-  std::string bufferAlgorithm = "fpga20";
-  unsigned clockPeriod = 5;
-
-  // Results
-  int simTime;
-
-  // This func. generate a prefix string according to the configuration.
-  // For example, for the default configuration, we generate:
-  // out-hdl:vhdl-milpSolver:gurobi-bufferAlgorithm:fpga20-cp:5
-  //
-  // For example, if we just enable sharing
-  // out-hdl:vhdl-sharing:on-milpSolver:gurobi-bufferAlgorithm:fpga20-cp:5
-  std::string getVerboseSuffixName() {
-    std::vector<std::string> symbols{"out"};
-
-    auto stringifyBoolean = [](bool b) {
-      return std::string(b ? "on" : "off");
-    };
-
-    if (useSharing)
-      symbols.emplace_back("sharing:" + stringifyBoolean(this->useSharing));
-
-    if (this->useRigidification)
-      symbols.emplace_back("rigidification:" +
-                           stringifyBoolean(this->useRigidification));
-
-    if (this->verifyInvariants)
-      symbols.emplace_back("verifyInvariants:" +
-                           stringifyBoolean(this->verifyInvariants));
-
-    if (this->useSpeculation)
-      symbols.emplace_back("useSpeculation:" +
-                           stringifyBoolean(this->useSpeculation));
-
-    symbols.emplace_back("milpSolver:" + this->milpSolver);
-    symbols.emplace_back("bufferAlgorithm:" + this->bufferAlgorithm);
-    symbols.emplace_back("cp:" + std::to_string(this->clockPeriod));
-
-    // Generating the output file name: Interleaving the fields with "-".
-    std::stringstream ss;
-    bool started = false;
-    for (const auto &symbol : symbols) {
-      if (started)
-        ss << "-";
-      started = true;
-      ss << symbol;
-    }
-    return ss.str();
-  }
-};
-
-namespace {
 
 int getSimulationTime(const fs::path &logFile) {
   std::ifstream file(logFile);
@@ -157,14 +89,42 @@ int getSimulationTime(const fs::path &logFile) {
             << std::endl;
   return -1;
 }
+} // namespace
 
-int runIntegrationTest(IntegrationTestData &config) {
-  fs::path cSourcePath =
-      config.benchmarkPath / config.name / (config.name + ".c");
+struct IntegrationTest {
+  // Configurations
+  std::string name;
+  // Use to deduplicate the generate output file folder
+  std::string testName;
+  fs::path benchmarkPath;
+  bool testVerilog;
+  bool testVHDL = true; // default to true
+  // Use resource sharing to reduce the functional unit usage.
+  bool useSharing = false;
+  // Use model checking to remove redundant logic.
+  bool useRigidification = false;
+  bool verifyInvariants = false;
+  // Enable speculation, using the speculate pragma
+  bool useSpeculation = false;
+  std::string milpSolver = "gurobi";
+  std::string bufferAlgorithm = "fpga20";
+  unsigned clockPeriod = 5;
 
-  std::string tmpFilename =
-      "tmp_" + config.name + "_" + config.getVerboseSuffixName() + ".dyn";
+  // Results
+  int simTime;
+  int run();
+};
+
+int IntegrationTest::run() {
+
+  fs::path cSourcePath = this->benchmarkPath / this->name / (this->name + ".c");
+
+  assert(this->testName.size() > 0);
+
+  std::string tmpFilename = "tmp_" + this->name + "_" + this->testName + ".dyn";
+
   std::ofstream scriptFile(tmpFilename);
+
   if (!scriptFile.is_open()) {
     std::cout << "[ERROR] Failed to create .dyn script file" << std::endl;
     return -1;
@@ -172,42 +132,42 @@ int runIntegrationTest(IntegrationTestData &config) {
 
   std::string outputDirName;
   if (clVerboseOutDir)
-    outputDirName = config.getVerboseSuffixName();
+    outputDirName = "out-" + this->testName;
   else
     outputDirName = "out";
 
   scriptFile << "set-dynamatic-path " << DYNAMATIC_ROOT << std::endl
              << "set-src " << cSourcePath.string() << std::endl
-             << "set-clock-period " << config.clockPeriod << std::endl
+             << "set-clock-period " << this->clockPeriod << std::endl
              << "set-output-dir " << outputDirName << std::endl;
 
   // clang-format off
   scriptFile << "compile"
-             << " --buffer-algorithm " << config.bufferAlgorithm
-             << (config.useSharing ? " --sharing" : "")
-             << (config.useRigidification ? " --rigidification" : "")
-             << (config.useSpeculation ? " --speculation" : "")
-             << " --milp-solver " << config.milpSolver << std::endl;
+             << " --buffer-algorithm " << this->bufferAlgorithm
+             << (this->useSharing ? " --sharing" : "")
+             << (this->useRigidification ? " --rigidification" : "")
+             << (this->useSpeculation ? " --speculation" : "")
+             << " --milp-solver " << this->milpSolver << std::endl;
   // clang-format on
 
   // Assert testVHDL or testVerilog is true
-  if (!config.testVHDL && !config.testVerilog) {
+  if (!this->testVHDL && !this->testVerilog) {
     std::cout << "[ERROR] Either testVHDL or testVerilog must be true"
               << std::endl;
     return -1;
   }
 
-  if (config.verifyInvariants) {
+  if (this->verifyInvariants) {
     scriptFile << "verify-invariants" << std::endl;
   }
 
   // Verify Verilog works correctly
-  if (config.testVerilog) {
+  if (this->testVerilog) {
     scriptFile << "write-hdl --hdl verilog" << std::endl
                << "simulate" << std::endl;
   }
   // Verify VHDL works correctly
-  if (config.testVHDL) {
+  if (this->testVHDL) {
     // By default, the report containing the simulation time is re-written
     // during the second simulation (i.e., the VHDL simulation).
     scriptFile << "write-hdl --hdl vhdl" << std::endl
@@ -237,13 +197,13 @@ int runIntegrationTest(IntegrationTestData &config) {
   if (status == 0) {
     fs::path logFilePath =
         cSourcePath.parent_path() / outputDirName / "sim" / "report.txt";
-    config.simTime = getSimulationTime(logFilePath);
+    this->simTime = getSimulationTime(logFilePath);
   }
 
   return status;
 }
 
-} // namespace
+namespace {} // namespace
 
 /// Base class for Dynamatic unit tests
 /// provides utilities
@@ -256,6 +216,14 @@ public:
     std::string fixtureName(info->test_suite_name());
     std::cout << "[INFO] Benchmark " << fixtureName << "/" << benchmarkName
               << " latency: " << cycles << " cycles" << std::endl;
+  }
+
+  // Use the fixture name as the suffix of the outdir when we set
+  // `--verbose-outdir`
+  std::string getVerboseOutdirSuffix() const {
+    auto *info = ::testing::UnitTest::GetInstance()->current_test_info();
+    const auto *fixtureName = info->test_suite_name();
+    return std::regex_replace(fixtureName, std::regex("/"), "_");
   }
 
 protected:
@@ -286,18 +254,19 @@ class RigidificationFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
-  IntegrationTestData config{
+  IntegrationTest config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = true,
       .useSharing = false,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
-      .simTime = -1
+      .simTime = -1,
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(config), 0);
+  EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
@@ -307,6 +276,7 @@ TEST_P(CBCSolverFixture, basic) {
   IntegrationTestData config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = true,
       .useSharing = false,
@@ -315,7 +285,7 @@ TEST_P(CBCSolverFixture, basic) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(config), 0);
+  EXPECT_EQ(config.runIntegrationTest(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
@@ -326,6 +296,7 @@ TEST_P(FPL22Fixture, basic) {
   IntegrationTestData config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
@@ -339,25 +310,11 @@ TEST_P(FPL22Fixture, basic) {
 }
 #endif
 
-//
-// This is an example test case which uses the Verilog backend.
-// It is currently disabled because a lot of benchmarks still
-// don't work properly with Verilog, so running it would create
-// a lot of errors, preventing the CI from running normally.
-//
-// TEST_P(BasicFixture, verilog) {
-//   std::string name = GetParam();
-//   int simTime = -1;
-
-//   EXPECT_EQ(runIntegrationTest(name, simTime, std::nullopt, true), 0);
-
-//   RecordProperty("cycles", std::to_string(simTime));
-// }
-
 TEST_P(MemoryFixture, basic) {
-  IntegrationTestData config{
+  IntegrationTest config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
       .testVerilog = true,
       .useSharing = false,
@@ -366,7 +323,7 @@ TEST_P(MemoryFixture, basic) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(config), 0);
+  EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
@@ -375,9 +332,10 @@ TEST_P(MemoryFixture, basic) {
 /// whenever the sharing option is enabled, the pass can run without any
 /// interruption and does not penalize the latency.
 TEST_P(SharingUnitTestFixture, basic) {
-  IntegrationTestData configWithSharing{
+  IntegrationTest configWithSharing{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
       .testVerilog = false,
       .useSharing = true,
@@ -386,11 +344,12 @@ TEST_P(SharingUnitTestFixture, basic) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(configWithSharing), 0);
+  EXPECT_EQ(configWithSharing.run(), 0);
 
-  IntegrationTestData configWithoutSharing{
+  IntegrationTest configWithoutSharing{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "sharing",
       .testVerilog = false,
       .useSharing = false,
@@ -399,7 +358,7 @@ TEST_P(SharingUnitTestFixture, basic) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(configWithoutSharing), 0);
+  EXPECT_EQ(configWithoutSharing.run(), 0);
 
   // Check if sharing brings under 5% latency increase
   EXPECT_EQ(configWithoutSharing.simTime * 1.05 > configWithSharing.simTime,
@@ -413,9 +372,10 @@ TEST_P(SharingUnitTestFixture, basic) {
 /// whenever the sharing option is enabled, the pass can run without any
 /// interruption and does not penalize the latency.
 TEST_P(SharingFixture, sharing_NoCI) {
-  IntegrationTestData configWithSharing{
+  IntegrationTest configWithSharing{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
       .testVerilog = false,
       .useSharing = true,
@@ -424,11 +384,12 @@ TEST_P(SharingFixture, sharing_NoCI) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(configWithSharing), 0);
+  EXPECT_EQ(configWithSharing.run(), 0);
 
-  IntegrationTestData configWithoutSharing{
+  IntegrationTest configWithoutSharing{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" ,
       .testVerilog = false,
       .useSharing = false,
@@ -437,7 +398,7 @@ TEST_P(SharingFixture, sharing_NoCI) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(configWithoutSharing), 0);
+  EXPECT_EQ(configWithoutSharing.run(), 0);
 
   // Check if sharing brings under 5% latency increase
   EXPECT_EQ(configWithoutSharing.simTime * 1.05 > configWithSharing.simTime,
@@ -448,9 +409,10 @@ TEST_P(SharingFixture, sharing_NoCI) {
 }
 
 TEST_P(SpecFixture, spec) {
-  IntegrationTestData config{
+  IntegrationTest config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
@@ -461,7 +423,7 @@ TEST_P(SpecFixture, spec) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(config), 0);
+  EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
@@ -649,9 +611,10 @@ INSTANTIATE_TEST_SUITE_P(Tiny, VerifyInvariantsFixture,
                          [](const auto &info) { return info.param; });
 
 TEST_P(VerifyInvariantsFixture, basic) {
-  IntegrationTestData config{
+  IntegrationTest config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
@@ -663,15 +626,16 @@ TEST_P(VerifyInvariantsFixture, basic) {
       // clang-format on
   };
 
-  EXPECT_EQ(runIntegrationTest(config), 0);
+  EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
 
 TEST_P(RigidificationFixture, basic) {
-  IntegrationTestData config{
+  IntegrationTest config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
@@ -681,7 +645,7 @@ TEST_P(RigidificationFixture, basic) {
       .simTime = -1
       // clang-format on
   };
-  EXPECT_EQ(runIntegrationTest(config), 0);
+  EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
