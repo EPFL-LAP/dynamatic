@@ -39,7 +39,7 @@ struct PipelineDuplicationPass
 
   using PipelineDuplicationBase::PipelineDuplicationBase;
 
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 private:
   LogicalResult collectOpsDFS(mlir::Value currentVal,
@@ -47,7 +47,14 @@ private:
                               llvm::DenseSet<mlir::Operation *> &visitedOps,
                               llvm::DenseSet<mlir::Value> &outsideDrivers);
 
-  struct PredictionData;
+  struct PredictionData {
+    mlir::Operation *startOp;
+    mlir::Value predInput;
+    std::vector<mlir::Operation *> endOps;
+    mlir::ArrayAttr values;
+    std::string dataType;
+  };
+
   LogicalResult parseValuesList(mlir::ModuleOp modOp, llvm::StringRef valuesStr,
                                 mlir::ArrayAttr &values, std::string &dataType);
 
@@ -105,14 +112,6 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
   }
   return success();
 }
-
-struct PipelineDuplicationPass::PredictionData {
-  mlir::Operation *startOp;
-  mlir::Value predInput;
-  std::vector<mlir::Operation *> endOps;
-  mlir::ArrayAttr values;
-  std::string dataType;
-};
 
 LogicalResult PipelineDuplicationPass::parseValuesList(
     mlir::ModuleOp modOp, llvm::StringRef valuesStr, mlir::ArrayAttr &values,
@@ -266,7 +265,7 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
   return success();
 }
 
-void PipelineDuplicationPass::runDynamaticPass() {
+void PipelineDuplicationPass::runOnOperation() {
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
@@ -337,7 +336,8 @@ void PipelineDuplicationPass::runDynamaticPass() {
     llvm::DenseSet<mlir::Value> outsideDrivers;
     visitedOps.insert(startOp);
 
-    if (!data.endOps.empty() && startOp != data.endOps[0]) {
+    if (data.endOps.empty() ||
+        (!data.endOps.empty() && startOp != data.endOps[0])) {
       for (auto op : startOp->getResults()) {
         if (failed(
                 collectOpsDFS(op, data.endOps, visitedOps, outsideDrivers))) {
@@ -357,6 +357,14 @@ void PipelineDuplicationPass::runDynamaticPass() {
         opsToMove.push_back(&blockOp);
       }
     }
+
+    /* for (mlir::Block &block : funcOp.getBlocks()) {
+      for (mlir::Operation &blockOp : block.getOperations()) {
+        if (visitedOps.count(&blockOp)) {
+          opsToMove.push_back(&blockOp);
+        }
+      }
+    } */
 
     // add values that are needed in next block as arguments to the next block
     llvm::SmallVector<Value> exitBlockArgs;
@@ -458,6 +466,7 @@ void PipelineDuplicationPass::runDynamaticPass() {
     // make sure exitBlock reads its stuff from block arguments instead of old
     // operations that do not exist anymore in that sense
     for (size_t i = 0; i < originalOutputs.size(); ++i) {
+      llvm::errs() << originalOutputs[i] << '\n' << exitBlockArgs[i] << '\n';
       originalOutputs[i].replaceUsesWithIf(
           exitBlockArgs[i], [&](OpOperand &operand) {
             mlir::Block *userBlock = operand.getOwner()->getBlock();
@@ -467,9 +476,12 @@ void PipelineDuplicationPass::runDynamaticPass() {
 
             // Otherwise, only replace it if it's completely outside the
             // true/false cascade structures we generated.
+            // TODO: this is wrong
             bool isCondBranch =
                 userBlock->getTerminator() &&
                 isa<mlir::cf::CondBranchOp>(userBlock->getTerminator());
+
+            llvm::errs() << isCondBranch << " condbranch\n";
 
             return userBlock != targetBlock &&
                    userBlock->getParentOp() == funcOp && isCondBranch;

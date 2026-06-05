@@ -94,7 +94,7 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
-def PipelineDuplication : DynamaticPass<"pipeline-duplication"> {
+def PipelineDuplication : Pass<"pipeline-duplication", "mlir::ModuleOp"> {
   let summary = "Duplicates calculations with a hardcoded value";
   let description = [{
     Adds an additional connection for the fork and duplicates the addition, multiplication,

@@ -17,3 +17,4 @@ add_dynamatic_library(DynamaticDuplication
   DynamaticExperimentalSupport
   DynamaticBufferPlacement
   )
+  
