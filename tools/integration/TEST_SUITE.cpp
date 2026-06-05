@@ -24,13 +24,6 @@
 
 namespace fs = std::filesystem;
 
-// Parser for custom flags that are not googletest
-//
-// Remarks:
-// - This does not use the LLVM command line parser infrastructure because the
-// googletest flags are seen as undefined flags.
-// - This does not use abseil command line parser to avoid adding extra
-// dependencies.
 namespace {
 int getSimulationTime(const fs::path &logFile) {
   std::ifstream file(logFile);
