@@ -19,6 +19,11 @@
 #include <algorithm>
 #include <fstream>
 
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
+#define DEBUG_TYPE "pipeline-duplication"
+
 using namespace llvm;
 using namespace dynamatic;
 
@@ -61,9 +66,37 @@ private:
 
   LogicalResult readPredictMarker(mlir::ModuleOp modOp,
                                   std::vector<PredictionData> &pragmaData);
+
+  void
+  collectDependenciesUpstream(mlir::Operation *op, mlir::Block *targetBlock,
+                              llvm::DenseSet<mlir::Operation *> &visitedOps);
 };
 
 } // namespace
+
+/// Helper function to backward-traverse and collect all intra-block
+/// dependencies
+void PipelineDuplicationPass::collectDependenciesUpstream(
+    mlir::Operation *op, mlir::Block *targetBlock,
+    llvm::DenseSet<mlir::Operation *> &visitedOps) {
+
+  if (!op || op->getBlock() != targetBlock) {
+    return;
+  }
+
+  for (mlir::Value operand : op->getOperands()) {
+    if (mlir::Operation *defOp = operand.getDefiningOp()) {
+      // Only care about operations within the same basic block
+      if (defOp->getBlock() == targetBlock) {
+        // If it's a new operation, mark it and recursively fetch its
+        // dependencies
+        if (visitedOps.insert(defOp).second) {
+          collectDependenciesUpstream(defOp, targetBlock, visitedOps);
+        }
+      }
+    }
+  }
+}
 
 /// Performs a Depth-first Search (DFS) from a starting MLIR value to identify
 /// all operations for duplication. It traverses the dataflow chain until it
@@ -83,6 +116,9 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
     return failure();
   }
 
+  // Get the current block context to restrict our backward search
+  mlir::Block *currentBlock = currentVal.getParentBlock();
+
   // for each use of the value
   for (mlir::OpOperand &use : currentVal.getUses()) {
     // get the operation which uses the value
@@ -97,12 +133,17 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
     // record the value being stored as an external output driver and skip
     // adding the store operation itself to visitedOps
     if (isa<mlir::memref::StoreOp>(user)) {
-      outsideDrivers.insert(currentVal);
+      // outsideDrivers.insert(currentVal);
+      llvm::errs() << "store inserted\n";
+      visitedOps.insert(user);
+      // CRITICAL: Even though store terminates forward flow,
+      // we MUST pull in its address/index calculations upstream!
+      collectDependenciesUpstream(user, currentBlock, visitedOps);
       continue;
     }
 
     visitedOps.insert(user);
-
+    collectDependenciesUpstream(user, currentBlock, visitedOps);
     // an end operation is found which is a marker to terminate the duplicated
     // region
     if (llvm::is_contained(endOps, user)) {
@@ -334,7 +375,7 @@ void PipelineDuplicationPass::runOnOperation() {
 
   // read input data given in the form of pragmas
   std::vector<PredictionData> pragmaData;
-  llvm::errs() << "start reading predict marker data \n";
+  LLVM_DEBUG(llvm::errs() << "start reading predict marker data \n");
   if (failed(readPredictMarker(modOp, pragmaData)))
     return signalPassFailure();
   llvm::errs() << "done reading predict marker data \n";
@@ -411,10 +452,39 @@ void PipelineDuplicationPass::runOnOperation() {
       llvm::errs() << "dfs succeeded\n";
     } else
       outsideDrivers.insert(startOp->getResult(0));
+
+    // 1. Start with your forward DFS results
+    llvm::DenseSet<mlir::Operation *> finalOpsToMove = visitedOps;
+    llvm::SmallVector<mlir::Operation *> worklist(visitedOps.begin(),
+                                                  visitedOps.end());
+
+    // 2. Backward traversal: pulling in missing dependencies (like index
+    // calculations)
+    while (!worklist.empty()) {
+      mlir::Operation *currentOp = worklist.pop_back_val();
+
+      for (mlir::Value operand : currentOp->getOperands()) {
+        if (mlir::Operation *defOp = operand.getDefiningOp()) {
+          // If the defining op is inside the same block but wasn't caught by
+          // the forward DFS
+          if (defOp->getBlock() == targetBlock &&
+              !finalOpsToMove.count(defOp)) {
+            // Only pull in pure/invariant calculations (Casts, Constants,
+            // Index/Pointer Arith)
+            if (llvm::isa<mlir::arith::IndexCastOp, mlir::arith::AddIOp,
+                          mlir::memref::SubViewOp>(defOp)) {
+              finalOpsToMove.insert(defOp);
+              worklist.push_back(defOp);
+            }
+          }
+        }
+      }
+    }
+
     // iterate through the function to sort
     llvm::SmallVector<mlir::Operation *> opsToMove;
     for (mlir::Operation &blockOp : funcOp.getOps()) {
-      if (visitedOps.count(&blockOp)) {
+      if (finalOpsToMove.count(&blockOp)) {
         opsToMove.push_back(&blockOp);
       }
     }
@@ -483,6 +553,7 @@ void PipelineDuplicationPass::runOnOperation() {
         mlir::Operation *cloned = builder.clone(*origOp, mapper);
         std::string newName =
             namer.getName(origOp).str() + "_dup" + std::to_string(i);
+        llvm::errs() << "newName: " << newName << '\n';
         cloned->setAttr("handshake.name", builder.getStringAttr(newName));
 
         for (unsigned j = 0; j < cloned->getNumResults(); j++) {
