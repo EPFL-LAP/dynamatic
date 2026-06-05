@@ -95,33 +95,14 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
 }
 
 def PipelineDuplication : Pass<"pipeline-duplication", "mlir::ModuleOp"> {
-  let summary = "Duplicates calculations with a hardcoded value";
+  let summary = "Value prediction from a compile-time-fixed finite list.";
   let description = [{
-    Adds an additional connection for the fork and duplicates the addition, multiplication,
-    and more of the pipeline, with a hardcoded value that we know should come up often.
+    The pass duplicates a sequence of operations, replacing a variable operand with a 
+    predicted constant value. It identifies the exact operations to duplicate by using 
+    custom pragmas, which also specify the target variable and give a finite list for its 
+    predicted constant values. This makes it possible to convert data dependencies to control
+    flow dependencies.
   }];
-  let options = [
-    Option<"jsonPath", "json-path", "std::string", "",
-           "Path to JSON-formatted file containing the positions for speculative "
-           "operations.">];
-}
-
-def ShortcutPath : DynamaticPass<"add-shortcut-path"> {
-  let summary = "Calculate a possible shortcut with a hardcoded value";
-  let description = [{
-    Adds an additional connection for the fork and duplicates the addition, multiplication,
-    and more of the pipeline, with a hardcoded value that we know should come up often.
-  }];
-  let options = [];
-}
-
-def NDuplication : DynamaticPass<"n-duplication"> {
-  let summary = "Duplicate the computational path n times";
-  let description = [{
-    Adds an additional connection for the fork and duplicates a 
-    path N times with N-1 predicted values.
-  }];
-  let options = [];
 }
 
 

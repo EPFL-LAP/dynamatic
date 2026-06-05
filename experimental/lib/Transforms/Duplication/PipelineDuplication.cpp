@@ -48,15 +48,16 @@ private:
                               llvm::DenseSet<mlir::Value> &outsideDrivers);
 
   struct PredictionData {
-    mlir::Operation *startOp;
+    mlir::Operation *startOp = nullptr;
     mlir::Value predInput;
     std::vector<mlir::Operation *> endOps;
     mlir::ArrayAttr values;
     std::string dataType;
   };
 
-  LogicalResult parseValuesList(mlir::ModuleOp modOp, llvm::StringRef valuesStr,
-                                mlir::ArrayAttr &values, std::string &dataType);
+  FailureOr<mlir::ArrayAttr> parseValuesList(mlir::ModuleOp modOp,
+                                             llvm::StringRef valuesStr,
+                                             std::string &dataType);
 
   LogicalResult readPredictMarker(mlir::ModuleOp modOp,
                                   std::vector<PredictionData> &pragmaData);
@@ -64,17 +65,27 @@ private:
 
 } // namespace
 
+/// Performs a Depth-first Search (DFS) from a starting MLIR value to identify
+/// all operations for duplication. It traverses the dataflow chain until it
+/// either hits a store or a user-defined end operation. Operations that
+/// must be duplicated are saved in `visitedOps`, and any results that are used
+/// outside of the duplicated region are saved in `outsideDrivers`. The function
+/// returns failure if it encounters a dead-end branch before reaching an end
+/// operation, indicating an ill-defined duplication graph.
 LogicalResult PipelineDuplicationPass::collectOpsDFS(
     mlir::Value currentVal, std::vector<mlir::Operation *> endOps,
     llvm::DenseSet<mlir::Operation *> &visitedOps,
     llvm::DenseSet<mlir::Value> &outsideDrivers) {
 
-  // if a value has no uses, it's a dead end branch
+  // if a value has no uses, it's a dead end branch without an end operation or
+  // store, making the duplicated region ill-defined
   if (currentVal.use_empty()) {
     return failure();
   }
 
+  // for each use of the value
   for (mlir::OpOperand &use : currentVal.getUses()) {
+    // get the operation which uses the value
     mlir::Operation *user = use.getOwner();
 
     // check if already visited
@@ -82,7 +93,9 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
       continue;
     }
 
-    // when a store op is hit do not add it to visitedops
+    // stores terminate the duplicated region
+    // record the value being stored as an external output driver and skip
+    // adding the store operation itself to visitedOps
     if (isa<mlir::memref::StoreOp>(user)) {
       outsideDrivers.insert(currentVal);
       continue;
@@ -90,20 +103,23 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
 
     visitedOps.insert(user);
 
-    // endOp is found
+    // an end operation is found which is a marker to terminate the duplicated
+    // region
     if (llvm::is_contained(endOps, user)) {
+      // the results of this operation are added to outsideDrivers
       for (mlir::Value res : user->getResults()) {
         outsideDrivers.insert(res);
       }
       continue;
     }
 
-    // if the operation has no results (but this is handled above already?)
+    // if the operation has no results and is neither and end operation nor a
+    // store, this makes the duplicated region ill-defined
     if (user->getNumResults() == 0) {
       return failure();
     }
 
-    // recursive step
+    // recursive dfs step
     for (mlir::Value result : user->getResults()) {
       if (failed(collectOpsDFS(result, endOps, visitedOps, outsideDrivers))) {
         return failure();
@@ -113,32 +129,34 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
   return success();
 }
 
-LogicalResult PipelineDuplicationPass::parseValuesList(
-    mlir::ModuleOp modOp, llvm::StringRef valuesStr, mlir::ArrayAttr &values,
-    std::string &dataType) {
+/// Parse the string containing the predicted values into an ArrayAttr.
+FailureOr<mlir::ArrayAttr> PipelineDuplicationPass::parseValuesList(
+    mlir::ModuleOp modOp, llvm::StringRef valuesStr, std::string &dataType) {
 
-  std::string s = valuesStr.str();
-  llvm::errs() << "string containing values list: " << s << '\n';
+  // strip potential leading and trailing whitespace
+  llvm::StringRef ref = valuesStr.trim();
 
-  llvm::StringRef ref(s);
-  if (ref.startswith("["))
-    ref = ref.drop_front(1);
-  if (ref.endswith("]"))
-    ref = ref.drop_back(1);
+  // strip brackets
+  ref.consume_front("[");
+  ref.consume_back("]");
 
-  if (ref.empty())
+  if (ref.empty()) {
+    llvm::errs() << "Error: Value List is empty.\n";
     return failure();
+  }
 
-  // split the string by commas to parse each individual number
+  // split the string by commas into tokens to parse each individual number
   llvm::SmallVector<llvm::StringRef> tokens;
   ref.split(tokens, ',', -1, false);
+
   llvm::SmallVector<mlir::Attribute> attrValues;
   mlir::OpBuilder builder(modOp.getContext());
 
   for (auto token : tokens) {
-    token = token.trim();
     if (dataType == "double" || dataType == "float") {
       double doubleVal;
+      // returns true if casting the string value to double fails
+      // otherwise sets doubleVal by reference and returns false
       if (token.getAsDouble(doubleVal)) {
         return failure();
       }
@@ -150,6 +168,8 @@ LogicalResult PipelineDuplicationPass::parseValuesList(
             builder.getFloatAttr(builder.getF64Type(), doubleVal));
     } else {
       int intVal;
+      // try to parse the string value of token as a base 10 int and store in
+      // intVal. returns true if failed, false if succeeded
       if (token.getAsInteger(10, intVal)) {
         return failure();
       }
@@ -161,24 +181,31 @@ LogicalResult PipelineDuplicationPass::parseValuesList(
             builder.getIntegerAttr(builder.getI32Type(), intVal));
     }
   }
-  values = builder.getArrayAttr(attrValues);
-  return success();
+  return (builder.getArrayAttr(attrValues));
 }
 
+/// Parses and removes the `dynamatic.prediction_marker` operations from the IR
+/// to populate `pragmaData`. It extracts the necessary data from each marker's
+/// attributes and identifies the exact start and end operations for each marker
+/// before erasing the physical markers from the function.
 LogicalResult PipelineDuplicationPass::readPredictMarker(
     mlir::ModuleOp modOp, std::vector<PredictionData> &pragmaData) {
 
+  // maps marker IDs to their corresponding data
   std::map<int, PredictionData> markerMap;
+  // tracks all marker operations
   std::vector<mlir::Operation *> markers;
 
   auto funcOps = modOp.getOps<mlir::func::FuncOp>();
   mlir::func::FuncOp funcOp = *funcOps.begin();
 
+  // find all prediction markers
   for (mlir::Operation &opRef : funcOp.getOps()) {
     mlir::Operation *op = &opRef;
     if (op->getName().getStringRef() != "dynamatic.prediction_marker")
       continue;
 
+    // validate structural expectations of the marker operations
     if (op->getNumOperands() != 1) {
       llvm::errs() << "prediction marker must have exactly one operand";
       return failure();
@@ -188,59 +215,92 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
       return failure();
     }
 
+    // forward the marker's input directly to its users, making it possible to
+    // safely delete the markers in the end
+    // TODO: could this be placed somewhere else?
     op->getResult(0).replaceAllUsesWith(op->getOperand(0));
     markers.push_back(op);
   }
 
+  // process the dynamatic.predict markers
   for (auto op : markers) {
 
-    // extract the dictionary attribute 'dynamatic.predict'
+    // extract the dictionary attribute 'dynamatic.predict' which contains the
+    // pragma configuration details
     auto predictAttr =
         op->getAttrOfType<mlir::DictionaryAttr>("dynamatic.predict");
     if (!predictAttr) {
-      llvm::errs() << "no dynamatic.predict attribute!\n";
+      llvm::errs()
+          << "Error: This prediction marker doesn't have a dynamatic.predict "
+             "attribute containing the pragma configuration details.\n";
       return failure();
     }
 
+    // unpack the specific pragma data fields from the dynamatic.predict
+    // dictionary attribute
     auto locationAttr = predictAttr.getAs<mlir::StringAttr>("location");
     auto markerAttr = predictAttr.getAs<mlir::IntegerAttr>("marker");
     auto valuesAttr = predictAttr.getAs<mlir::StringAttr>("values");
     auto typeAttr = predictAttr.getAs<mlir::StringAttr>("type");
 
-    int markerId = markerAttr.getInt();
-    llvm::StringRef location = locationAttr.getValue();
+    // verify the always necessary attributes (location and marker) were
+    // successfully found and parsed
+    if (!locationAttr || !markerAttr) {
+      llvm::errs() << "Error: Malformed 'dynamatic.predict' location or marker "
+                      "attribute.\n";
+      return failure();
+    }
 
     // initialize the struct for this marker ID if it doesn't yet exist
+    int markerId = markerAttr.getInt();
     if (markerMap.find(markerId) == markerMap.end()) {
       PredictionData newData;
-      newData.startOp = nullptr;
-      if (valuesAttr) {
-        newData.dataType = typeAttr.getValue();
-        if (failed(parseValuesList(modOp, valuesAttr.getValue(), newData.values,
-                                   newData.dataType))) {
-          llvm::errs() << "Failed to parse value attributes for marker ID "
-                       << markerId << '\n';
-          return failure();
-        }
-      } else
+
+      // verify attributes values and type were successfully found and parsed
+      // for a new prediction marker ID. They must exist because the start
+      // marker always has to come before any corresponding end markers
+      if (!valuesAttr || !typeAttr) {
+        llvm::errs() << "Error: Malformed 'dynamatic.predict' values or type "
+                        "attribute.\n";
         return failure();
+      }
+
+      newData.dataType = typeAttr.getValue();
+      auto parsedValues =
+          parseValuesList(modOp, valuesAttr.getValue(), newData.dataType);
+      if (failed(parsedValues)) {
+        llvm::errs() << "Failed to parse value attributes for marker ID "
+                     << markerId << '\n';
+        return failure();
+      }
+      newData.values = *parsedValues;
+
+      // insert populated marker into map
       markerMap[markerId] = newData;
     }
 
     // because of replaceAllUsesWith this is equal to the result
     mlir::Value markerInput = op->getOperand(0);
+    llvm::StringRef location = locationAttr.getValue();
+
+    // process the "start" marker to find the starting operation
     if (location == "start") {
       mlir::Operation *nextNode = op->getNextNode();
       bool isUser = llvm::is_contained(nextNode->getOperands(), markerInput);
       if (isUser) {
         markerMap[markerId].startOp = nextNode;
       } else {
+        // fall back to the first avilable downstream consumer if the code
+        // layout is different than expected (e.g. having the startop right
+        // after the marker)
         llvm::errs() << "Warning: Next node does not use the marker. Falling "
                         "back on the next operation that uses it.\n";
         markerMap[markerId].startOp = *markerInput.user_begin();
       }
       markerMap[markerId].predInput = markerInput;
 
+      // process the "end" marker to register the terminating operations of the
+      // duplicated region
     } else if (location == "end") {
       // the endop is the definingop of the markerinput
       mlir::Operation *definingOp = markerInput.getDefiningOp();
@@ -248,19 +308,20 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
     }
   }
 
+  // clean up the IR
   for (auto op : markers) {
     op->erase();
   }
 
-  for (auto &pair : markerMap) {
-    PredictionData &data = pair.second;
+  // ensure every collected prediction group has a defined entry point
+  for (auto &[op, data] : markerMap) {
     if (!data.startOp) {
-      llvm::errs() << "Marker ID " << pair.first
+      llvm::errs() << "Marker ID " << op
                    << "does not have a valid start operation\n";
       return failure();
     }
 
-    pragmaData.push_back(std::move(pair.second));
+    pragmaData.push_back(data);
   }
   return success();
 }
