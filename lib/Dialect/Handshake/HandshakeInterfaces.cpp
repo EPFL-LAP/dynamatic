@@ -30,6 +30,23 @@ using namespace dynamatic;
 using namespace dynamatic::handshake;
 
 //===----------------------------------------------------------------------===//
+// NamedIOInterface accessor
+//===----------------------------------------------------------------------===//
+
+namespace dynamatic {
+namespace handshake {
+
+NamedIOInterface getNamedIO(Operation *op) {
+  if (auto iface = llvm::dyn_cast<NamedIOInterface>(op))
+    return iface;
+  op->emitError() << "must implement NamedIOInterface, op: " << *op;
+  llvm::report_fatal_error("Missing NamedIOInterface");
+}
+
+} // namespace handshake
+} // namespace dynamatic
+
+//===----------------------------------------------------------------------===//
 // MemoryOpInterface
 //===----------------------------------------------------------------------===//
 

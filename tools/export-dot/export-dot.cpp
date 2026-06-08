@@ -328,13 +328,12 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       Operation *srcOp = res.getDefiningOp();
       srcNodeName = getUniqueName(srcOp).str();
       srcIdx = res.getResultNumber();
-      auto handshakeOp = getHandshakeBase(srcOp);
-      srcPortName = handshakeOp.getResultName(srcIdx);
+      srcPortName = handshake::getNamedIO(srcOp).getResultName(srcIdx);
     } else {
       Operation *parentOp = val.getParentBlock()->getParentOp();
       srcIdx = cast<BlockArgument>(val).getArgNumber();
-      auto handshakeOp = getHandshakeBase(parentOp);
-      srcNodeName = srcPortName = handshakeOp.getOperandName(srcIdx);
+      srcNodeName = srcPortName =
+          handshake::getNamedIO(parentOp).getOperandName(srcIdx);
     }
 
     // Determine the edge's destination
@@ -343,13 +342,12 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     if (isa<handshake::EndOp>(dstOp)) {
       Operation *parentOp = dstOp->getParentOp();
       dstIdx = oprd.getOperandNumber();
-      auto handshakeOp = getHandshakeBase(parentOp);
-      dstNodeName = dstPortName = handshakeOp.getResultName(dstIdx);
+      dstNodeName = dstPortName =
+          handshake::getNamedIO(parentOp).getResultName(dstIdx);
     } else {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();
-      auto handshakeOp = getHandshakeBase(dstOp);
-      dstPortName = handshakeOp.getOperandName(dstIdx);
+      dstPortName = handshake::getNamedIO(dstOp).getOperandName(dstIdx);
     }
 
     DOTGraph::Edge &edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);

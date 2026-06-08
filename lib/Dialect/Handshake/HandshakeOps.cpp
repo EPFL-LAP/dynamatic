@@ -2157,7 +2157,7 @@ static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   return "";
 }
 
-std::string LSQOp::getOperandNameImpl(unsigned idx) {
+std::string LSQOp::getOperandName(unsigned idx) {
 
   assert(idx < getOperation()->getNumOperands() && "index too high");
 
@@ -2176,7 +2176,7 @@ std::string LSQOp::getOperandNameImpl(unsigned idx) {
   return "ldDataFromMC";
 }
 
-std::string LSQOp::getResultNameImpl(unsigned idx) {
+std::string LSQOp::getResultName(unsigned idx) {
   assert(idx < getOperation()->getNumResults() && "index too high");
 
   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
@@ -2198,7 +2198,7 @@ std::string LSQOp::getResultNameImpl(unsigned idx) {
   return "stDataToMC";
 }
 
-std::string MemoryControllerOp::getOperandNameImpl(unsigned idx) {
+std::string MemoryControllerOp::getOperandName(unsigned idx) {
   assert(idx < getOperation()->getNumOperands() && "index too high");
 
   if (StringRef name = getIfControlOprd(*this, idx); !name.empty())
@@ -2220,7 +2220,7 @@ std::string MemoryControllerOp::getOperandNameImpl(unsigned idx) {
   return getArrayElemName(ST_DATA, mcPorts.getNumPorts<StorePort>());
 }
 
-std::string MemoryControllerOp::getResultNameImpl(unsigned idx) {
+std::string MemoryControllerOp::getResultName(unsigned idx) {
   assert(idx < getOperation()->getNumResults() && "index too high");
 
   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
@@ -2240,19 +2240,6 @@ std::string MemoryControllerOp::getResultNameImpl(unsigned idx) {
 
 namespace dynamatic {
 namespace handshake {
-
-//===----------------------------------------------------------------------===//
-// Operand and Result Names
-//===----------------------------------------------------------------------===//
-
-handshake::HandshakeBaseInterface getHandshakeBase(Operation *op) {
-  if (auto handshakeBase =
-          llvm::dyn_cast<handshake::HandshakeBaseInterface>(op)) {
-    return handshakeBase;
-  }
-  op->emitError() << "must implement HandshakeBaseInterface, op: " << *op;
-  llvm::report_fatal_error("Missing HandshakeBaseInterface");
-}
 
 } // end namespace handshake
 } // end namespace dynamatic

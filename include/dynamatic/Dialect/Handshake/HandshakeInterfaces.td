@@ -270,135 +270,31 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
 //
 //===----------------------------------------------------------------------===//
 
-def SimpleNamedIOInterface : OpInterface<"SimpleNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake::detail::io";
-  let description =
-      [{"Used by operations whose operands and results are named 'ins" and 'outs'."}];
-
-  let methods = [
-    InterfaceMethod<
-      "Returns the name of a specific operand.",
-      "std::string", "getOperandNameImpl", (ins "unsigned" : $idx),
-      "",
-      [{
-        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-
-        return simpleOperandName(idx, concreteOp->getNumOperands());
-      }]>,
-    InterfaceMethod<
-      "Returns the name of a specific result.",
-      "std::string", "getResultNameImpl", (ins "unsigned" : $idx),
-      "",
-      [{
-        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-
-        return simpleResultName(idx, concreteOp->getNumResults());
-      }]>
-  ];
-}
-
-def BinaryArithNamedIOInterface : OpInterface<"BinaryArithNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake::detail::io";
-  let description =
-      [{"Used by operations whose operands are named 'lhs' and 'rhs', and result is named 'result'."}];
-
-  let methods = [
-    InterfaceMethod<
-      "Returns the name of a specific operand.",
-      "std::string", "getOperandNameImpl", (ins "unsigned" : $idx),
-      "",
-      [{
-        assert(idx < 2 && "index too high");
-        return (idx == 0) ? "lhs" : "rhs";
-      }]>,
-    InterfaceMethod<
-      "Returns the name of a specific result.",
-      "std::string", "getResultNameImpl", (ins "unsigned" : $idx),
-      "",
-      [{
-        assert(idx < 1 && "index too high");
-        return "result";
-      }]>
-  ];
-}
-
-def CustomNamedIOInterface : OpInterface<"CustomNamedIOInterface"> {
-  let cppNamespace = "::dynamatic::handshake::detail::io";
+def NamedIOInterface : OpInterface<"NamedIOInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
   let description =
       [{"Used by operations with unique names for their operands and results."}];
 
   let methods = [
     InterfaceMethod<
       "Returns the name of a specific operand.",
-      "std::string", "getOperandNameImpl", (ins "unsigned" : $idx)>,
+      "std::string", "getOperandName", (ins "unsigned" : $idx)>,
     InterfaceMethod<
       "Returns the name of a specific result.",
-      "std::string", "getResultNameImpl", (ins "unsigned" : $idx)
+      "std::string", "getResultName", (ins "unsigned" : $idx)
     >
   ];
 }
 
-//===----------------------------------------------------------------------===//
-// Handshake Base Interface
-//===----------------------------------------------------------------------===//
-//
-// The MLIR Operation inheritance hierarchy does not allow a shared base 
-// class to place shared functionality into.
-//
-// Instead we use this interface, present on every handshake operation,
-// to implement shared functionality
-//
-//===----------------------------------------------------------------------===//
+// Trait that defaults operand/result names to "ins"/"ins_N" and "outs"/"outs_N"
+// based on operand/result count. Bundled with NamedIOInterface so ops
+// using SimpleNamedIO get both the interface contract and the default body.
+def SimpleNamedIOTrait : NativeOpTrait<"SimpleNamedIO">;
+def SimpleNamedIO : TraitList<[NamedIOInterface, SimpleNamedIOTrait]>;
 
-def HandshakeBaseInterface : OpInterface<"HandshakeBaseInterface"> {
-  let cppNamespace = "::dynamatic::handshake";
-  let description =
-      [{"Base interface for shared functionality of all handshake operations."}];
-
-  let methods = [
-    InterfaceMethod<
-      "Returns the name of a specific operand.",
-      "std::string", "getOperandName", (ins "unsigned" : $idx),
-      "",
-      [{
-        auto *op = const_cast<mlir::Operation *>($_op.getOperation());
-
-        if (auto nameInterface = dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
-          return nameInterface.getOperandNameImpl(idx);
-        } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
-          return nameInterface.getOperandNameImpl(idx);
-        } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(op)) {
-          return nameInterface.getOperandNameImpl(idx);
-        }
-
-        op->emitError() << "must specify operand names, op: " << *op;
-        llvm::report_fatal_error("All operation must specify IO names");
-      }]>,
-    InterfaceMethod<
-      "Returns the name of a specific result.",
-      "std::string", "getResultName", (ins "unsigned" : $idx),
-      "",
-      [{
-        auto *op = const_cast<mlir::Operation *>($_op.getOperation());
-
-        if (auto nameInterface = dyn_cast<handshake::detail::io::SimpleNamedIOInterface>(op)) {
-          return nameInterface.getResultNameImpl(idx);
-        } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::BinaryArithNamedIOInterface>(op)) {
-          return nameInterface.getResultNameImpl(idx);
-        } else if (auto nameInterface =
-                      dyn_cast<handshake::detail::io::CustomNamedIOInterface>(op)) {
-          return nameInterface.getResultNameImpl(idx);
-        }
-
-        op->emitError() << "must specify result names, op: " << *op;
-        llvm::report_fatal_error("All operation must specify IO names");
-      }]>
-  ];
-}
-
+// Trait that defaults operands to "lhs"/"rhs" and the single result to "result".
+def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO">;
+def BinaryArithNamedIO : TraitList<[NamedIOInterface, BinaryArithNamedIOTrait]>;
 
 //===----------------------------------------------------------------------===//
 

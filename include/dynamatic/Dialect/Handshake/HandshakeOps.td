@@ -31,14 +31,13 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
-         HandshakeBaseInterface,
          DeclareOpInterfaceMethods<ControlInterface>,
          DeclareOpInterfaceMethods<RTLAttrInterface>,
          DeclareOpInterfaceMethods<BLIFImplInterface>]> {
   // Shared functions to include in child classes
   string validateIO = [{
     //===------------------------------------------------------------------===//
-    // Helper Methods for CustomNamedIOInterface
+    // Helper Methods for NamedIOInterface
     //===------------------------------------------------------------------===//
 
     void validateOperandIdx(unsigned idx){
@@ -63,11 +62,10 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    RegionKindInterface,
    OpAsmOpInterface,
    HasClock,
-   HandshakeBaseInterface,
   // The IOs of a FuncOp have custom names,
   // defined here in the Tablegen
   // as part of the FuncOp declaration
-   CustomNamedIOInterface
+   NamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -159,14 +157,14 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     }
 
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
-    std::string getOperandNameImpl(unsigned idx){
+    std::string getOperandName(unsigned idx){
       return getArgName(idx).str();
     }
 
-    std::string getResultNameImpl(unsigned idx){
+    std::string getResultName(unsigned idx){
       return getResName(idx).str();
     }
   }];
@@ -267,7 +265,7 @@ def InstanceOp : Handshake_Op<"instance", [
 def BufferOp : Handshake_Op<"buffer", [
   HasClock,
   SameOperandsAndResultType,
-  SimpleNamedIOInterface,
+  SimpleNamedIO,
   DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
 ]> {
   let summary = "buffer operation";
@@ -373,7 +371,7 @@ def BufferOp : Handshake_Op<"buffer", [
 def InitOp : Handshake_Op<"init", [
   HasClock,
   SameOperandsAndResultType,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "init operation";
   let description = [{
@@ -405,7 +403,7 @@ def InitOp : Handshake_Op<"init", [
 def NDWireOp : Handshake_Op<"ndwire", [
   HasClock,
   SameOperandsAndResultType,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "non-deterministic wire operation";
   let description = [{
@@ -436,7 +434,7 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
     Pure,
     HasClock,
     SameOperandsAndResultType,
-    SimpleNamedIOInterface
+    SimpleNamedIO
 ]> {
   let arguments = (ins HandshakeType:$operand);
   let results = (outs Variadic<HandshakeType>:$result);
@@ -509,7 +507,7 @@ def MergeOp : Handshake_Op<"merge", [
   SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "merge operation";
   let description = [{
@@ -557,7 +555,7 @@ def MuxOp : Handshake_Op<"mux", [
   // The IOs of a MuxOp have custom names,
   // defined here in the Tablegen
   // as part of the MuxOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "mux operation";
   let description = [{
@@ -585,19 +583,19 @@ def MuxOp : Handshake_Op<"mux", [
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named "index"
     /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
     /// simpleOperandName handles validation
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       return idx == 0 ? "index" : detail::simpleOperandName(idx - 1, getOperation()->getNumOperands() - 1);
     }
 
     /// Result 0 is named "outs"
     /// simpleResultName handles validation
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       return detail::simpleResultName(idx, 1);
     }
   }];
@@ -636,7 +634,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   // The IOs of a CMergeOP have custom names,
   // defined here in the Tablegen
   // as part of the CMergeOP declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "control merge operation";
   let description = [{
@@ -671,18 +669,18 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     /// simpleOperandName handles validation
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       return detail::simpleOperandName(idx, getOperation()->getNumOperands());
     }
 
     /// Result 0 is named outs
     /// Result 1 is named index
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return idx == 0 ? "outs" : "index";
     }
@@ -711,7 +709,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 def BranchOp : Handshake_Op<"br", [
   Pure,
   SameOperandsAndResultType,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "branch operation";
   let description = [{
@@ -755,7 +753,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   // The IOs of a ConditionalBranch have custom names,
   // defined here in the Tablegen
   // as part of the ConditionalBranch declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -784,7 +782,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     // These are the indices into the dests list.
@@ -792,14 +790,14 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 
     /// Operand 0 is named condition
     /// Operand 1 is named data
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "condition" : "data";
     }
 
     /// Operand 0 is named trueOut
     /// Operand 1 is named falseOut
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return idx == trueIndex ? "trueOut" : "falseOut";
     }
@@ -818,7 +816,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
 }
 
 def SinkOp : Handshake_Op<"sink", [
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "sink operation";
   let description = [{
@@ -884,7 +882,7 @@ def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
 
 def SourceOp : Handshake_Op<"source", [
   Pure,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "source operation";
   let description = [{
@@ -922,7 +920,7 @@ def SourceOp : Handshake_Op<"source", [
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "join operation";
   let description = [{
@@ -957,7 +955,7 @@ def JoinOp : Handshake_Op<"join", [
 // once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
   SameOperandsAndResultType,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "blocker operation";
   let description = [{
@@ -993,7 +991,7 @@ def BlockerOp : Handshake_Op<"blocker", [
 def NotIOp : Handshake_Op<"noti", [
   Pure,
   SameOperandsAndResultType,
-  SimpleNamedIOInterface,
+  SimpleNamedIO,
   IsIntChannel<"operand">,
   IsIntChannel<"result">
 ]> {
@@ -1040,7 +1038,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   // The IOs of a MemoryControllerOp have custom names,
   // As they are complex, they are declared here,
   // but defined in HandshakeOps.cpp
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
@@ -1118,11 +1116,11 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
 
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
-    std::string getOperandNameImpl(unsigned idx);
-    std::string getResultNameImpl(unsigned idx);
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
 
     size_t getNumLoadPorts();
     std::optional<LoadPort> getLoadPort(size_t index);
@@ -1143,7 +1141,7 @@ def LSQOp : Handshake_Op<"lsq", [
   // The IOs of a MemoryControllerOp have custom names,
   // As they are complex, they are declared here,
   // but defined in HandshakeOps.cpp
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "load-store queue  (dynamatic)";
   let description = [{
@@ -1234,11 +1232,11 @@ def LSQOp : Handshake_Op<"lsq", [
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
 
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
-    std::string getOperandNameImpl(unsigned idx);
-    std::string getResultNameImpl(unsigned idx);
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
   }];
 
   let extraClassDefinition = [{
@@ -1291,7 +1289,7 @@ def LoadOp : Handshake_MemPortOp<"load", [
   // The IOs of a LoadOp have custom names,
   // defined here in the Tablegen
   // as part of the LoadOp declaration
-  CustomNamedIOInterface,
+  NamedIOInterface,
   DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
 ], [
   // TODO: Please add comments on why this builder is necessary
@@ -1340,19 +1338,19 @@ def LoadOp : Handshake_MemPortOp<"load", [
     static constexpr ::llvm::StringLiteral DATA_SLOT_LIT = "data";
 
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataFromMem
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataOut
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataOut";
     }
@@ -1380,7 +1378,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
   // The IOs of a StoreOp have custom names,
   // defined here in the Tablegen
   // as part of the StoreOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ], []> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
@@ -1407,23 +1405,25 @@ def StoreOp : Handshake_MemPortOp<"store", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named addrIn
     /// Operand 1 is named dataIn
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
     /// Result 0 is named addrOut
     /// Result 1 is named dataToMem
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
-    
+  }];
+
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     StoreOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1500,7 +1500,7 @@ def RAMOp : Handshake_Op<"ram", []>  {
 
 def EndOp : Handshake_Op<"end", [
   Terminator,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
@@ -1548,7 +1548,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   // The IOs of the SpeculatorOp have custom names
   // defined here in the Tablegen
   // as part of the SpeculatorOp declaration
-  CustomNamedIOInterface,
+  NamedIOInterface,
   DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
@@ -1603,12 +1603,12 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named ins
     /// Operand 1 is named trigger
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "trigger";
     }
@@ -1619,7 +1619,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     /// Result 3 is named ctrl_sc_save
     /// Result 4 is named ctrl_sc_commit
     /// Result 5 is named ctrl_sc_branch
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       switch (idx) {
       case 0:
@@ -1632,7 +1632,9 @@ def SpeculatorOp : Handshake_Op<"speculator", [
         return "ctrl_commit";
       }
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpeculatorOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1656,7 +1658,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   // The IOs of a SpecSaveOp have custom names,
   // defined here in the Tablegen
   // as part of the SpecSaveOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -1685,22 +1687,24 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     /// Result 0 is named outs
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return "outs";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpecSaveOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1722,7 +1726,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   // The IOs of a SpecCommitOp have custom names,
   // defined here in the Tablegen
   // as part of the SpecCommitOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1752,22 +1756,24 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
 
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
     /// Result 0 is named result
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return "outs";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpecCommitOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1790,7 +1796,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   // The IOs of a SpecSaveCommitOp have custom names,
   // defined here in the Tablegen
   // as part of the SpecCommitOp declaration
-  CustomNamedIOInterface,
+  NamedIOInterface,
   DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
@@ -1822,13 +1828,13 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named ins
     /// Operand 1 is named ctrl_issue
     /// Operand 2 is named ctrl_history
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       switch (idx) {
       case 0: return "ins";
@@ -1838,7 +1844,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     }
 
     /// Result 0 is named outs
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return "outs";
     }
@@ -1868,7 +1874,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   // The IOs of a SpeculatingBranchOp have custom names,
   // defined here in the Tablegen
   // as part of the SpeculatingBranchOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1900,23 +1906,25 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named spec_tag_data
     /// Operand 1 is named data
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
     /// Result 0 is named trueOut
     /// Result 1 is named falseOut
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return idx == 0 ? "trueOut" : "falseOut";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpeculatingBranchOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1938,7 +1946,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   // The IOs of a NonSpecOp have custom names,
   // defined here in the Tablegen
   // as part of the NonSpecOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "Adds a non-speculative spec bit.";
   let description = [{
@@ -1964,21 +1972,23 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named dataIn
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return "dataIn";
     }
 
     /// Result 0 is named dataOut
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return "dataOut";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     NonSpecOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1999,7 +2009,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   // The IOs of a SharingWrapperOp have custom names,
   // defined here in the Tablegen
   // as part of the SharingWrapperOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
 
   let summary = "sharing wrapper operation";
@@ -2047,12 +2057,12 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// The first set of operands are named op_<i>_in_<j>
     /// The last operand is named fromSharedUnitOut0
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       if (idx < getNumSharedOperands() * getNumSharedOperations()) {
         return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
@@ -2063,7 +2073,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
 
     /// The first set of results are named op_<i>_out_0
     /// The last set of results are named toSharedUnitIn_<j>
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       if (idx < getNumSharedOperations())
         return "op" + std::to_string(idx) + "out0";
@@ -2239,7 +2249,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = [{
     Rigidifies a channel to simplify the handshake logic.
@@ -2274,7 +2284,7 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   // The IOs of a ValidMergerOp have custom names,
   // defined here in the Tablegen
   // as part of the ValidMergerOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = [{
     Merges the valid signals of two channels.
@@ -2295,23 +2305,25 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   // include validateIO functions from handshake op
   let extraClassDeclaration = validateIO # [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     /// Operand 0 is named lhs_ins
     /// Operand 1 is named rhs_ins
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       validateOperandIdx(idx);
       return (idx == 0) ? "lhs_ins" : "rhs_ins";
     }
 
     /// Result 0 is named lhs_outs
     /// Result 1 is named rhs_outs
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       validateResultIdx(idx);
       return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     ValidMergerOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();

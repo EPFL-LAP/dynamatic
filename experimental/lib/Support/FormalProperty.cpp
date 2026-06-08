@@ -203,11 +203,10 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
   userChannel.operationName = getUniqueName(userOp).str();
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
-  auto handshakeOwnerOp = handshake::getHandshakeBase(ownerOp);
   ownerChannel.channelName =
-      handshakeOwnerOp.getResultName(res.getResultNumber());
-  auto handshakeUserOp = handshake::getHandshakeBase(userOp);
-  userChannel.channelName = handshakeUserOp.getOperandName(operandIndex);
+      handshake::getNamedIO(ownerOp).getResultName(res.getResultNumber());
+  userChannel.channelName =
+      handshake::getNamedIO(userOp).getOperandName(operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -253,10 +252,8 @@ ValidEquivalence::ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  auto handshakeOp1 = handshake::getHandshakeBase(op1);
-  auto handshakeOp2 = handshake::getHandshakeBase(op2);
-  ownerChannel.channelName = handshakeOp1.getResultName(i);
-  targetChannel.channelName = handshakeOp2.getResultName(j);
+  ownerChannel.channelName = handshake::getNamedIO(op1).getResultName(i);
+  targetChannel.channelName = handshake::getNamedIO(op2).getResultName(j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
@@ -377,10 +374,9 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 EagerForkPathTokenCopiedMaximumOnce::EagerForkPathTokenCopiedMaximumOnce(
     uint64_t id, TAG tag, ForkOp &op)
     : FormalProperty(id, tag, TYPE::EagerForkPathTokenCopiedMaximumOnce) {
-  PortNamer namer(op);
   // ForkOp has only 1 input
   validOp = getUniqueName(op);
-  validChannel = namer.getInputName(0).str();
+  validChannel = handshake::getNamedIO(op).getOperandName(0);
   sentStateNamers = op.getInternalSentStateNamers();
 }
 

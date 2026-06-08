@@ -1462,20 +1462,17 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   auto inputModPorts = memState.getMemInputPorts(parentModOp);
   for (auto [port, arg] : llvm::zip_equal(inputModPorts, memArgs))
     converter.addInput(removePortNamePrefix(port), arg);
+  auto namedIOInterface = handshake::getNamedIO(memOp);
   for (auto [idx, oprd] : llvm::enumerate(operands)) {
-    if (!isa<mlir::MemRefType>(oprd.getType())) {
-      auto handshakeOp = handshake::getHandshakeBase(memOp);
-      converter.addInput(handshakeOp.getOperandName(idx), oprd);
-    }
+    if (!isa<mlir::MemRefType>(oprd.getType()))
+      converter.addInput(namedIOInterface.getOperandName(idx), oprd);
   }
   converter.addClkAndRst(parentModOp);
 
   // The HW instance will be connected to the top-level module through a
   // number of output ports, add those last after the regular interface ports
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    auto handshakeOp = handshake::getHandshakeBase(memOp);
-
-    converter.addOutput(handshakeOp.getResultName(idx),
+    converter.addOutput(namedIOInterface.getResultName(idx),
                         lowerType(res.getType()));
   }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
@@ -1593,17 +1590,15 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
   }
 
   // Add the ports from handshake op
+  auto namedIOInterface = handshake::getNamedIO(memOp);
   for (auto [i, oprd] : llvm::enumerate(operands)) {
-    if (!isa<MemRefType>(oprd.getType())){
-      auto handshakeOp = handshake::getHandshakeBase(memOp);
-      memInterfaceConverter.addInput(handshakeOp.getOperandName(i), oprd);
-    }
+    if (!isa<MemRefType>(oprd.getType()))
+      memInterfaceConverter.addInput(namedIOInterface.getOperandName(i), oprd);
   }
   memInterfaceConverter.addClkAndRst(parentModOp);
 
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    auto handshakeOp = handshake::getHandshakeBase(memOp);
-    memInterfaceConverter.addOutput(handshakeOp.getResultName(idx),
+    memInterfaceConverter.addOutput(namedIOInterface.getResultName(idx),
                                     lowerType(res.getType()));
   }
 
@@ -1656,18 +1651,14 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
   HWConverter converter(this->getContext());
 
   // Add all operation operands to the inputs
-  for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands())){
-    auto handshakeOp = handshake::getHandshakeBase(op);
-    converter.addInput(handshakeOp.getOperandName(idx), oprd);
-  }
+  auto namedIOInterface = handshake::getNamedIO(op);
+  for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
+    converter.addInput(namedIOInterface.getOperandName(idx), oprd);
   converter.addClkAndRst(((Operation *)op)->getParentOfType<hw::HWModuleOp>());
 
   // Add all operation results to the outputs
-  for (auto [idx, type] : llvm::enumerate(op->getResultTypes())){
-    auto handshakeOp = handshake::getHandshakeBase(op);
-
-    converter.addOutput(handshakeOp.getResultName(idx), lowerType(type));
-  }
+  for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
+    converter.addOutput(namedIOInterface.getResultName(idx), lowerType(type));
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
 }

@@ -119,8 +119,8 @@ std::string NameAnalysis::getName(OpOperand &oprd) {
   Value val = oprd.get();
   if (Operation *defOp = val.getDefiningOp()) {
     defName = getName(defOp);
-    auto handshakeOp = getHandshakeBase(defOp);
-    resName = handshakeOp.getResultName(cast<OpResult>(val).getResultNumber());
+    resName = handshake::getNamedIO(defOp).getResultName(
+        cast<OpResult>(val).getResultNumber());
   } else {
     getBlockArgName(cast<BlockArgument>(val), defName, resName);
   }
@@ -129,8 +129,8 @@ std::string NameAnalysis::getName(OpOperand &oprd) {
   std::string userName, oprName;
   Operation *userOp = oprd.getOwner();
   userName = getName(userOp);
-  auto handshakeOp = getHandshakeBase(userOp);
-  oprName = handshakeOp.getOperandName(oprd.getOperandNumber());
+  oprName = handshake::getNamedIO(userOp).getOperandName(
+      oprd.getOperandNumber());
   return defName + "_" + resName + "_" + oprName + "_" + userName;
 }
 
@@ -296,8 +296,8 @@ std::string dynamatic::getUniqueName(OpOperand &oprd) {
   if (Operation *defOp = val.getDefiningOp()) {
     if (mlir::StringAttr attr = getNameAttr(defOp)) {
       defName = attr.str();
-      auto handshakeOp = getHandshakeBase(defOp);
-      resName = handshakeOp.getResultName(cast<OpResult>(val).getResultNumber());
+      resName = handshake::getNamedIO(defOp).getResultName(
+          cast<OpResult>(val).getResultNumber());
     } else {
       return "";
     }
@@ -313,8 +313,8 @@ std::string dynamatic::getUniqueName(OpOperand &oprd) {
   Operation *userOp = oprd.getOwner();
   if (mlir::StringAttr attr = getNameAttr(userOp)) {
     userName = attr.str();
-    auto handshakeOp = getHandshakeBase(userOp);
-    oprName = handshakeOp.getOperandName(oprd.getOperandNumber());
+    oprName = handshake::getNamedIO(userOp).getOperandName(
+        oprd.getOperandNumber());
   } else {
     return "";
   }

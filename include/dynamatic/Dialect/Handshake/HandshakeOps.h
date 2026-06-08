@@ -42,8 +42,6 @@ class StoreOp;
 class MemoryControllerOp;
 class LSQOp;
 
-HandshakeBaseInterface getHandshakeBase(Operation *op);
-
 } // end namespace handshake
 } // end namespace dynamatic
 

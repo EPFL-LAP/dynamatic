@@ -255,7 +255,7 @@ class Handshake_Arith_FToICastOp<string mnemonic, list<Trait> traits = []> :
 
 def Handshake_AddFOp : Handshake_Arith_FloatBinaryOp<"addf", [
   Commutative,
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   FPUImplInterface,
   LatencyInterface
 ]> {
@@ -264,14 +264,14 @@ def Handshake_AddFOp : Handshake_Arith_FloatBinaryOp<"addf", [
 
 def Handshake_AddIOp : Handshake_Arith_IntBinaryOp<"addi", [
   Commutative,
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Integer addition.";
 }
 
 def Handshake_AndIOp : Handshake_Arith_IntBinaryOp<"andi", [
   Commutative,
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Bitwise conjunction.";
 }
@@ -303,7 +303,7 @@ def Handshake_CmpFPredicateAttr : I64EnumAttr<
 def Handshake_CmpFOp : Handshake_Arith_CompareOp<"cmpf", [
   IsFloatChannel<"lhs">,
   IsFloatChannel<"rhs">,
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   FPUImplInterface,
   LatencyInterface
 ]> {
@@ -334,7 +334,7 @@ def Handshake_CmpIPredicateAttr : I64EnumAttr<
 def Handshake_CmpIOp : Handshake_Arith_CompareOp<"cmpi", [
   IsIntChannel<"lhs">,
   IsIntChannel<"rhs">,
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Integer comparison.";
 
@@ -355,7 +355,7 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
   // The IOs of a Handshake_ConstantOp have custom names,
   // defined here in the Tablegen
   // as part of the Handshake_ConstantOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "constant operation";
   let description = [{
@@ -378,18 +378,18 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     // Operand 0 is named ctrl
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < 1 && "index too high");
       return "ctrl";
     }
 
     // Result 0 is named outs
     // detail::simpleResultName handles idx validation
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       return detail::simpleResultName(idx, 1);
     }
   }];
@@ -444,7 +444,7 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
 }
 
 def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   FPUImplInterface,
   LatencyInterface
 ]> {
@@ -453,7 +453,7 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
 
 
 def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   IsIntSizedChannel<32, "lhs">,
   IsIntSizedChannel<32, "rhs">,
   IsIntSizedChannel<32, "result">,
@@ -463,7 +463,7 @@ def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
 }
 
 def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   IsIntSizedChannel<32, "lhs">,
   IsIntSizedChannel<32, "rhs">,
   IsIntSizedChannel<32, "result">,
@@ -473,7 +473,7 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
 }
 
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   IsIntSizedChannel<32, "lhs">,
   IsIntSizedChannel<32, "rhs">,
   IsIntSizedChannel<32, "result">,
@@ -484,13 +484,13 @@ def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
 }
 
 def Handshake_MaxSIOp : Handshake_Arith_IntBinaryOp<"maxsi", [
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Outputs the maximum between two input signed integers";
 }
 
 def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui", [
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Outputs the maximum between two input unsigned integers";
 }
@@ -504,20 +504,20 @@ def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
 }
 
 def Handshake_ExtSIOp : Handshake_Arith_IToICastOp<"extsi", [
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "Integer unsigned width extension.";
 }
 
 def Handshake_ExtUIOp : Handshake_Arith_IToICastOp<"extui", [
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "Integer signed width extension.";
 }
 
 def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
   Commutative,
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   IsFloatSizedChannel<32, "lhs">,
   IsFloatSizedChannel<32, "rhs">,
   IsFloatSizedChannel<32, "result">,
@@ -528,7 +528,7 @@ def Handshake_MaximumFOp : Handshake_Arith_FloatBinaryOp<"maximumf", [
 
 def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
   Commutative,
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   IsFloatSizedChannel<32, "lhs">,
   IsFloatSizedChannel<32, "rhs">,
   IsFloatSizedChannel<32, "result">,
@@ -539,7 +539,7 @@ def Handshake_MinimumFOp : Handshake_Arith_FloatBinaryOp< "minimumf", [
 
 def Handshake_MulFOp : Handshake_Arith_FloatBinaryOp<"mulf", [
   Commutative,
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   FPUImplInterface,
   LatencyInterface
 ]> {
@@ -548,21 +548,21 @@ def Handshake_MulFOp : Handshake_Arith_FloatBinaryOp<"mulf", [
 
 def Handshake_MulIOp : Handshake_Arith_IntBinaryOp<"muli", [
   Commutative,
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   LatencyInterface
 ]> {
   let summary = "Integer multiplication.";
 }
 
 def Handshake_NegFOp : Handshake_Arith_FloatUnaryOp<"negf", [
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "Floating-point sign negation.";
 }
 
 def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [
   Commutative,
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Bitwise union.";
 }
@@ -574,7 +574,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
   // The IOs of a Handshake_SelectOp have custom names,
   // defined here in the Tablegen
   // as part of the Handshake_SelectOp declaration
-  CustomNamedIOInterface
+  NamedIOInterface
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
 
@@ -584,13 +584,13 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
-    // CustomNamedIOInterface Methods
+    // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
 
     // Operand 0 is named condition
     // Operand 1 is named trueValue
     // Operand 2 is named falseValue
-    std::string getOperandNameImpl(unsigned idx) {
+    std::string getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
       if (idx == 0)
         return "condition";
@@ -598,7 +598,7 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
     }
 
     // Result 0 is named result
-    std::string getResultNameImpl(unsigned idx) {
+    std::string getResultName(unsigned idx) {
       assert(idx < 1 && "index too high");
       return "result";
     }
@@ -622,28 +622,28 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
 }
 
 def Handshake_ShLIOp : Handshake_Arith_IntBinaryOp<"shli", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
 ]> {
   let summary = "Logical left shift.";
 }
 
 def Handshake_ShRSIOp : Handshake_Arith_IntBinaryOp<"shrsi", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
 ]> {
   let summary = "Arithmetic right shift.";
 }
 
 def Handshake_ShRUIOp : Handshake_Arith_IntBinaryOp<"shrui", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   DeclareOpInterfaceMethods<ShiftLikeArithOpInterface, []>
 ]> {
   let summary = "Logical right shift.";
 }
 
 def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf", [
-  BinaryArithNamedIOInterface,
+  BinaryArithNamedIO,
   FPUImplInterface,
   LatencyInterface
 ]> {
@@ -651,19 +651,19 @@ def Handshake_SubFOp : Handshake_Arith_FloatBinaryOp<"subf", [
 }
 
 def Handshake_SubIOp : Handshake_Arith_IntBinaryOp<"subi", [
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Integer subtraction.";
 }
 
 def Handshake_TruncIOp : Handshake_Arith_IToICastOp<"trunci", [
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "Integer truncation.";
 }
 
 def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf", [
-  SimpleNamedIOInterface,
+  SimpleNamedIO,
   IsFloatSizedChannel<64, "in">,
   IsFloatSizedChannel<32, "out">
 ]>{
@@ -686,13 +686,13 @@ def Handshake_TruncFOp : Handshake_Arith_FToFCastOp<"truncf", [
 
 def Handshake_XOrIOp : Handshake_Arith_IntBinaryOp<"xori", [
   Commutative,
-  BinaryArithNamedIOInterface
+  BinaryArithNamedIO
 ]> {
   let summary = "Bitwise exclusive union.";
 }
 
 def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
-  SimpleNamedIOInterface,
+  SimpleNamedIO,
   IsFloatSizedChannel<32, "out">,
   LatencyInterface
 ]> {
@@ -711,7 +711,7 @@ def Handshake_UIToFPOp : Handshake_Arith_IToFCastOp<"uitofp", [
 }
 
 def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
-  SimpleNamedIOInterface,
+  SimpleNamedIO,
   IsIntSizedChannel<32, "in">,
   IsFloatSizedChannel<32, "out">,
   LatencyInterface
@@ -720,7 +720,7 @@ def Handshake_SIToFPOp : Handshake_Arith_IToFCastOp<"sitofp", [
 }
 
 def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
-  SimpleNamedIOInterface,
+  SimpleNamedIO,
   IsFloatSizedChannel<32, "in">,
   IsIntSizedChannel<32, "out">,
   LatencyInterface
@@ -729,7 +729,7 @@ def Handshake_FPToSIOp : Handshake_Arith_FToICastOp<"fptosi", [
 }
 
 def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf", [
-  SimpleNamedIOInterface,
+  SimpleNamedIO,
   IsFloatSizedChannel<32, "in">,
   IsFloatSizedChannel<64, "out">
 ]>{
@@ -751,7 +751,7 @@ def Handshake_ExtFOp : Handshake_Arith_FToFCastOp<"extf", [
 }
 
 def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf", [
-  SimpleNamedIOInterface
+  SimpleNamedIO
 ]> {
   let summary = "floating point absolute-value operation";
   // TODO: add folder

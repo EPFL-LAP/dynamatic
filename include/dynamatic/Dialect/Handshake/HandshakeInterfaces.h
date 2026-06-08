@@ -36,7 +36,12 @@ namespace dynamatic {
 namespace handshake {
 
 class LatencyInterface;
+class NamedIOInterface;
 class FuncOp;
+
+/// Returns the NamedIOInterface for `op`, emitting a fatal error if the op
+/// does not implement it.
+NamedIOInterface getNamedIO(Operation *op);
 
 class ControlType;
 
@@ -68,6 +73,42 @@ inline std::string simpleResultName(unsigned idx, unsigned numResults) {
 
 } // end namespace detail
 } // end namespace handshake
+} // end namespace dynamatic
+
+namespace mlir {
+namespace OpTrait {
+
+template <typename ConcreteOp>
+class SimpleNamedIO : public TraitBase<ConcreteOp, SimpleNamedIO> {
+public:
+  std::string getOperandName(unsigned idx) {
+    return ::dynamatic::handshake::detail::simpleOperandName(
+        idx, this->getOperation()->getNumOperands());
+  }
+  std::string getResultName(unsigned idx) {
+    return ::dynamatic::handshake::detail::simpleResultName(
+        idx, this->getOperation()->getNumResults());
+  }
+};
+
+template <typename ConcreteOp>
+class BinaryArithNamedIO : public TraitBase<ConcreteOp, BinaryArithNamedIO> {
+public:
+  std::string getOperandName(unsigned idx) {
+    assert(idx < 2 && "index too high");
+    return (idx == 0) ? "lhs" : "rhs";
+  }
+  std::string getResultName(unsigned idx) {
+    assert(idx < 1 && "index too high");
+    return "result";
+  }
+};
+
+} // namespace OpTrait
+} // namespace mlir
+
+namespace dynamatic {
+namespace handshake {
 
 namespace buffer {
 
