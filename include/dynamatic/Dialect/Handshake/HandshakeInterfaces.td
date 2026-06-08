@@ -300,10 +300,7 @@ def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO">;
 // using BinaryArithNamedIO get both the interface contract and the impl.
 def BinaryArithNamedIO : TraitList<[NamedIOInterface, BinaryArithNamedIOTrait]>;
 
-// Provides helper methods (validateOperandIdx / validateResultIdx /
-// simpleOperandName / simpleResultName) shared by all handshake ops. Mixed
-// into Handshake_Op so every handshake op gets these without per-op
-// boilerplate.
+// Provides helper methods for naming IOs in custom functions
 def NamedIOUtilities : NativeOpTrait<"NamedIOUtilities">;
 
 //===----------------------------------------------------------------------===//
