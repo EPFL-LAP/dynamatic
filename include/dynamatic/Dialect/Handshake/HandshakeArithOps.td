@@ -388,9 +388,9 @@ def Handshake_ConstantOp : Handshake_Arith_Op<"constant", [
     }
 
     // Result 0 is named outs
-    // detail::simpleResultName handles idx validation
+    // simpleResultName handles idx validation
     std::string getResultName(unsigned idx) {
-      return detail::simpleResultName(idx, 1);
+      return simpleResultName(idx);
     }
   }];
 

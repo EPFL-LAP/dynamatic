@@ -34,7 +34,7 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          DeclareOpInterfaceMethods<ControlInterface>,
          DeclareOpInterfaceMethods<RTLAttrInterface>,
          DeclareOpInterfaceMethods<BLIFImplInterface>,
-         ValidateIO]> {
+         NamedIOUtilities]> {
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -575,13 +575,14 @@ def MuxOp : Handshake_Op<"mux", [
     /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
     /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
-      return idx == 0 ? "index" : detail::simpleOperandName(idx - 1, getOperation()->getNumOperands() - 1);
+      return idx == 0 ? "index"
+                      : simpleOperandName(idx - 1, getNumOperands() - 1);
     }
 
     /// Result 0 is named "outs"
     /// simpleResultName handles validation
     std::string getResultName(unsigned idx) {
-      return detail::simpleResultName(idx, 1);
+      return simpleResultName(idx);
     }
   }];
 
@@ -659,7 +660,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
     /// Operands 0 to N are named "ins_0" to "ins_<N>"
     /// simpleOperandName handles validation
     std::string getOperandName(unsigned idx) {
-      return detail::simpleOperandName(idx, getOperation()->getNumOperands());
+      return simpleOperandName(idx);
     }
 
     /// Result 0 is named outs

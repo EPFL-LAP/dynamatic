@@ -249,15 +249,16 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
 // but this does not generate any way to access the names as strings
 // only using the names to generate functions.
 //
-// There are 3 interfaces: simple, binary arith, custom
-// For an operation which uses the simple interface:
+// There are 2 useful traits that represent common implementations
+// For an operation which uses the simple trait:
 // The operand names are 'ins_n', where n is the index of the operand
 // the result names are 'outs_n' where n is the idnex of the result
 //
 // If there is only 1 operand or 1 result, the name is 'ins' or 'outs',
 // respectively.
 //
-// To use binary arith, the operation must have 2 operands and 1 result
+// For an operation which uses the BinaryArith trait: 
+// the operation should have 2 operands and 1 result
 // They will be named 'lhs', 'rhs', and 'result'.
 //
 // If the custom interface is used, the name uses a fully custom function
@@ -273,7 +274,7 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
 def NamedIOInterface : OpInterface<"NamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
-      [{"Used by operations with unique names for their operands and results."}];
+      [{"Provide access to string representations of operand and result names."}];
 
   let methods = [
     InterfaceMethod<
@@ -286,20 +287,24 @@ def NamedIOInterface : OpInterface<"NamedIOInterface"> {
   ];
 }
 
-// Trait that defaults operand/result names to "ins"/"ins_N" and "outs"/"outs_N"
-// based on operand/result count. Bundled with NamedIOInterface so ops
-// using SimpleNamedIO get both the interface contract and the default body.
+// Trait that returns operand/result names as "ins"/"ins_N" and "outs"/"outs_N"
+// based on operand/result count. 
 def SimpleNamedIOTrait : NativeOpTrait<"SimpleNamedIO">;
+// Bundled with NamedIOInterface so ops
+// using SimpleNamedIO get both the interface contract and the impl.
 def SimpleNamedIO : TraitList<[NamedIOInterface, SimpleNamedIOTrait]>;
 
-// Trait that defaults operands to "lhs"/"rhs" and the single result to "result".
+// Trait that returns operands as "lhs"/"rhs" and the single result as "result".
 def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO">;
+// Bundled with NamedIOInterface so ops
+// using BinaryArithNamedIO get both the interface contract and the impl.
 def BinaryArithNamedIO : TraitList<[NamedIOInterface, BinaryArithNamedIOTrait]>;
 
-// Provides validateOperandIdx / validateResultIdx helpers (report_fatal_error
-// on out-of-range index). Mixed into Handshake_Op so every handshake op gets
-// these without per-op boilerplate.
-def ValidateIO : NativeOpTrait<"ValidateIO">;
+// Provides helper methods (validateOperandIdx / validateResultIdx /
+// simpleOperandName / simpleResultName) shared by all handshake ops. Mixed
+// into Handshake_Op so every handshake op gets these without per-op
+// boilerplate.
+def NamedIOUtilities : NativeOpTrait<"NamedIOUtilities">;
 
 //===----------------------------------------------------------------------===//
 

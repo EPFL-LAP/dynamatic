@@ -39,81 +39,99 @@ class LatencyInterface;
 class NamedIOInterface;
 class FuncOp;
 
-/// Returns the NamedIOInterface for `op`, emitting a fatal error if the op
-/// does not implement it.
 NamedIOInterface getNamedIO(Operation *op);
 
 class ControlType;
 
-namespace detail {
-
-inline std::string simpleOperandName(unsigned idx, unsigned numOperands) {
-  assert(idx < numOperands && "index too high");
-
-  // TODO: Remove 2D I/O packing
-  // but for now this is needed
-  if (numOperands == 1) {
-    return "ins";
-  }
-
-  return "ins_" + std::to_string(idx);
-}
-
-inline std::string simpleResultName(unsigned idx, unsigned numResults) {
-  assert(idx < numResults && "index too high");
-
-  // TODO: Remove 2D I/O packing
-  // but for now this is needed
-  if (numResults == 1) {
-    return "outs";
-  }
-
-  return "outs_" + std::to_string(idx);
-}
-
-} // end namespace detail
 } // end namespace handshake
 } // end namespace dynamatic
 
 namespace mlir {
 namespace OpTrait {
 
+// Trait with useful functionality for use
+// in getting string representations of operand and result names
+template <typename ConcreteOp>
+class NamedIOUtilities : public TraitBase<ConcreteOp, NamedIOUtilities> {
+public:
+  void validateOperandIdx(unsigned idx, unsigned count) {
+    if (idx >= count)
+      llvm::report_fatal_error("operand index too high");
+  }
+
+  void validateOperandIdx(unsigned idx) {
+    validateOperandIdx(idx, this->getOperation()->getNumOperands());
+  }
+
+  void validateResultIdx(unsigned idx, unsigned count) {
+    if (idx >= count)
+      llvm::report_fatal_error("result index too high");
+  }
+
+  void validateResultIdx(unsigned idx) {
+    validateResultIdx(idx, this->getOperation()->getNumResults());
+  }
+
+  std::string simpleOperandName(unsigned idx, unsigned count) {
+    validateOperandIdx(idx, count);
+
+    // TODO: remove 2D io packing
+    // but the underscore marking is needed currently
+    // as the netlist printer uses it to identify 2D signals
+    if (count == 1)
+      return "ins";
+    return "ins_" + std::to_string(idx);
+  }
+
+  std::string simpleOperandName(unsigned idx) {
+    return simpleOperandName(idx, this->getOperation()->getNumOperands());
+  }
+
+  std::string simpleResultName(unsigned idx, unsigned count) {
+    validateResultIdx(idx, count);
+
+    // TODO: remove 2D io packing
+    // but the underscore marking is needed currently
+    // as the netlist printer uses it to identify 2D signals
+    if (count == 1)
+      return "outs";
+    return "outs_" + std::to_string(idx);
+  }
+
+  std::string simpleResultName(unsigned idx) {
+    return simpleResultName(idx, this->getOperation()->getNumResults());
+  }
+};
+
+// Trait that calls simpleOperandName and simpleResultName
+// for the NamedIOInterface functions
+// so ops with this behaviour can just declare the trait
 template <typename ConcreteOp>
 class SimpleNamedIO : public TraitBase<ConcreteOp, SimpleNamedIO> {
 public:
   std::string getOperandName(unsigned idx) {
-    return ::dynamatic::handshake::detail::simpleOperandName(
-        idx, this->getOperation()->getNumOperands());
+    return static_cast<ConcreteOp *>(this)->simpleOperandName(idx);
   }
   std::string getResultName(unsigned idx) {
-    return ::dynamatic::handshake::detail::simpleResultName(
-        idx, this->getOperation()->getNumResults());
+    return static_cast<ConcreteOp *>(this)->simpleResultName(idx);
   }
 };
 
+// Trait that returns "lhs"/"rhs" and "result"
+// for the NamedIOInterface functions
+// so ops with this behaviour can just declare the trait
 template <typename ConcreteOp>
 class BinaryArithNamedIO : public TraitBase<ConcreteOp, BinaryArithNamedIO> {
 public:
   std::string getOperandName(unsigned idx) {
-    assert(idx < 2 && "index too high");
+    if (idx >= 2)
+      llvm::report_fatal_error("operand index too high");
     return (idx == 0) ? "lhs" : "rhs";
   }
   std::string getResultName(unsigned idx) {
-    assert(idx < 1 && "index too high");
-    return "result";
-  }
-};
-
-template <typename ConcreteOp>
-class ValidateIO : public TraitBase<ConcreteOp, ValidateIO> {
-public:
-  void validateOperandIdx(unsigned idx) {
-    if (idx >= this->getOperation()->getNumOperands())
-      llvm::report_fatal_error("operand index too high");
-  }
-  void validateResultIdx(unsigned idx) {
-    if (idx >= this->getOperation()->getNumResults())
+    if (idx >= 1)
       llvm::report_fatal_error("result index too high");
+    return "result";
   }
 };
 
@@ -121,7 +139,6 @@ public:
 } // namespace mlir
 
 namespace dynamatic {
-namespace handshake {
 
 namespace buffer {
 
@@ -154,7 +171,6 @@ struct RetimingPath {
 SmallVector<RetimingPath> getRetimingPaths(Operation *unit);
 
 } // end namespace buffer
-} // end namespace handshake
 } // end namespace dynamatic
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"
