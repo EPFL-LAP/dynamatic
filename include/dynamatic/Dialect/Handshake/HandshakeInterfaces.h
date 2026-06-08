@@ -104,6 +104,19 @@ public:
   }
 };
 
+template <typename ConcreteOp>
+class ValidateIO : public TraitBase<ConcreteOp, ValidateIO> {
+public:
+  void validateOperandIdx(unsigned idx) {
+    if (idx >= this->getOperation()->getNumOperands())
+      llvm::report_fatal_error("operand index too high");
+  }
+  void validateResultIdx(unsigned idx) {
+    if (idx >= this->getOperation()->getNumResults())
+      llvm::report_fatal_error("result index too high");
+  }
+};
+
 } // namespace OpTrait
 } // namespace mlir
 
@@ -141,6 +154,7 @@ struct RetimingPath {
 SmallVector<RetimingPath> getRetimingPaths(Operation *unit);
 
 } // end namespace buffer
+} // end namespace handshake
 } // end namespace dynamatic
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"

@@ -296,6 +296,11 @@ def SimpleNamedIO : TraitList<[NamedIOInterface, SimpleNamedIOTrait]>;
 def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO">;
 def BinaryArithNamedIO : TraitList<[NamedIOInterface, BinaryArithNamedIOTrait]>;
 
+// Provides validateOperandIdx / validateResultIdx helpers (report_fatal_error
+// on out-of-range index). Mixed into Handshake_Op so every handshake op gets
+// these without per-op boilerplate.
+def ValidateIO : NativeOpTrait<"ValidateIO">;
+
 //===----------------------------------------------------------------------===//
 
 def ControlInterface : OpInterface<"ControlInterface"> {

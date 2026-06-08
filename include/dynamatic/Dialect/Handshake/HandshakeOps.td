@@ -33,23 +33,8 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
          traits #[HasParent<"handshake::FuncOp">,
          DeclareOpInterfaceMethods<ControlInterface>,
          DeclareOpInterfaceMethods<RTLAttrInterface>,
-         DeclareOpInterfaceMethods<BLIFImplInterface>]> {
-  // Shared functions to include in child classes
-  string validateIO = [{
-    //===------------------------------------------------------------------===//
-    // Helper Methods for NamedIOInterface
-    //===------------------------------------------------------------------===//
-
-    void validateOperandIdx(unsigned idx){
-      if (idx >= getOperation()->getNumOperands())
-        llvm::report_fatal_error("operand index too high");
-    }
-
-    void validateResultIdx(unsigned idx){
-      if (idx >= getOperation()->getNumResults())
-        llvm::report_fatal_error("result index too high");
-    }
-  }];
+         DeclareOpInterfaceMethods<BLIFImplInterface>,
+         ValidateIO]> {
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -666,8 +651,7 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -779,8 +763,7 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -1332,8 +1315,7 @@ def LoadOp : Handshake_MemPortOp<"load", [
     ```
   }];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral ADDR_SLOT_LIT = "addr";
     static constexpr ::llvm::StringLiteral DATA_SLOT_LIT = "data";
 
@@ -1402,8 +1384,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
     ```
   }];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -1600,8 +1581,7 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     $_state.addTypes({dataOutType, issueResolveType, issueResolveType, commitType});
   }]>];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -1684,8 +1664,7 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -1754,7 +1733,7 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -1825,8 +1804,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     `[` $issueCtrl `,` $historyCtrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($issueCtrl) `,` type($historyCtrl)
   }];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -1903,8 +1881,7 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   }];
 
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -1969,8 +1946,7 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   }];
 
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -2054,8 +2030,7 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<ChannelType> : $dataOut);
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
@@ -2302,8 +2277,7 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
   }];
 
-  // include validateIO functions from handshake op
-  let extraClassDeclaration = validateIO # [{
+  let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
     // NamedIOInterface Methods
     //===------------------------------------------------------------------===//
