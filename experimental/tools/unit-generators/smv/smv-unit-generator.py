@@ -16,6 +16,7 @@ import generators.handshake.merge as merge
 import generators.handshake.mux as mux
 import generators.handshake.select as select
 import generators.handshake.sink as sink
+import generators.handshake.dead_buffer as dead_buffer
 import generators.handshake.source as source
 import generators.handshake.store as store
 import generators.handshake.ndwire as ndwire
@@ -82,6 +83,8 @@ def generate_code(name, mod_type, parameters):
             return select.generate_select(name, parameters)
         case "sink":
             return sink.generate_sink(name, parameters)
+        case "dead_buffer":
+            return dead_buffer.generate_dead_buffer(name, parameters)
         case "source":
             return source.generate_source(name, parameters)
         case "store":
@@ -122,8 +125,8 @@ def generate_code(name, mod_type, parameters):
             return muli.generate_muli(name, parameters)
         case "negf":
             return negf.generate_negf(name, parameters)
-        case "not":
-            return noti.generate_not(name, parameters)
+        case "noti":
+            return noti.generate_noti(name, parameters)
         case "ori":
             return ori.generate_ori(name, parameters)
         case "shli":

@@ -1,16 +1,21 @@
+// clang-format off
 #include "sparse.h"
 #include "dynamatic/Integration.h"
+#include "stdbool.h"
 #include "stdlib.h"
 
 float sparse(in_float_t a[N], in_float_t x[N]) {
   float sum = 0.0f;
   int i = 0;
   float mul;
+  bool loopAgain;
   do {
     mul = a[i] * x[i];
     sum += mul;
     i++;
-  } while (sum >= 0.0f);
+    loopAgain = sum >= 0.0f;
+    #pragma DYN speculate variable=loopAgain max_predictions=2 style=standard
+  } while (loopAgain);
   return sum;
 }
 

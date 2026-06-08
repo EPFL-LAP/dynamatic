@@ -16,6 +16,7 @@ add_lit_testsuite(check-dynamatic-experimental "Running the Dynamatic regression
   DEPENDS ${DYNAMATIC_TEST_DEPENDS}
   )
 set_target_properties(check-dynamatic-experimental PROPERTIES FOLDER "Tests")
+add_to_unit_testing(check-dynamatic-experimental)
 
 add_lit_testsuites(DynamaticExperimental ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${DYNAMATIC_TEST_DEPENDS}

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/Rigidification/HandshakeRigidification.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
@@ -23,7 +22,7 @@
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "experimental/Support/FormalProperty.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
@@ -41,17 +40,23 @@ using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::rigidification;
+
+// [START Boilerplate code for the MLIR pass]
+#include "experimental/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+namespace experimental {
+#define GEN_PASS_DEF_HANDSHAKERIGIDIFICATION
+#include "experimental/Transforms/Passes.h.inc"
+} // namespace experimental
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
 struct HandshakeRigidificationPass
-    : public dynamatic::experimental::rigidification::impl::
-          HandshakeRigidificationBase<HandshakeRigidificationPass> {
-
-  HandshakeRigidificationPass(const std::string &jsonPath = "") {
-    this->jsonPath = jsonPath;
-  }
+    : public dynamatic::experimental::impl::HandshakeRigidificationBase<
+          HandshakeRigidificationPass> {
+  using HandshakeRigidificationBase::HandshakeRigidificationBase;
 
   void runDynamaticPass() override;
 
@@ -119,10 +124,4 @@ HandshakeRigidificationPass::insertValidMerger(ValidEquivalence prop) {
   ownerChannel.replaceAllUsesExcept(newOp.getLhsOut(), newOp);
   targetChannel.replaceAllUsesExcept(newOp.getRhsOut(), newOp);
   return success();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::experimental::rigidification::createRigidification(
-    const std::string &jsonPath) {
-  return std::make_unique<HandshakeRigidificationPass>(jsonPath);
 }

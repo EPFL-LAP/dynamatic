@@ -76,7 +76,7 @@ static cl::opt<LabelType>
                                     "type of the operation, default"),
                          clEnumValN(LabelType::UNAME, "uname",
                                     "unique name of the operation")),
-              cl::init(LabelType::TYPE), cl::cat(mainCategory));
+              cl::init(LabelType::UNAME), cl::cat(mainCategory));
 
 static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
     NORMAL("normal");
@@ -486,6 +486,13 @@ int main(int argc, char **argv) {
       return 1;
     }
     funcOp = op;
+  }
+
+  if (funcOp == nullptr) {
+    modOp->emitError()
+        << "No handshake function found in the mlir module (maybe you "
+           "specified wrong function name to synthesize)! Aborting..\n";
+    return 1;
   }
 
   // Name all operations in the IR

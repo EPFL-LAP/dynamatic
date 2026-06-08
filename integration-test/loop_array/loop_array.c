@@ -1,5 +1,6 @@
 #include "loop_array.h"
 #include "dynamatic/Integration.h"
+#include <assert.h>
 #include <stdlib.h>
 
 void loop_array(in_int_t n, in_int_t k, inout_int_t c[10]) {
@@ -14,10 +15,11 @@ int main(void) {
 
   srand(13);
   k = rand() % 10;
-  n = rand() % 10;
+  n = 2 + rand() % 8;
   for (int j = 0; j < 10; ++j)
     c[j] = 0;
 
+  assert(n >= 2 && "No trivial loop bound");
   CALL_KERNEL(loop_array, n, k, c);
   return 0;
 }

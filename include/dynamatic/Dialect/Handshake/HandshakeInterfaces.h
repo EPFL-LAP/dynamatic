@@ -18,7 +18,9 @@
 #ifndef DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 #define DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_INTERFACES_H
 
+#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOpInternalStateNamer.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/IR/OpDefinition.h"
@@ -28,10 +30,12 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "llvm/ADT/SmallSet.h"
 
 namespace dynamatic {
 namespace handshake {
 
+class LatencyInterface;
 class FuncOp;
 
 class ControlType;
@@ -64,6 +68,38 @@ inline std::string simpleResultName(unsigned idx, unsigned numResults) {
 
 } // end namespace detail
 } // end namespace handshake
+
+namespace buffer {
+
+/// One independent retiming path through a unit.
+/// Each operand and result must belong to a single path through the unit
+///
+/// Channels which connect to an operand or result use the retiming variable
+/// of the path the operand or result belongs to.
+///
+/// This allows the MILP solver to correctly distribute token occupancy
+/// accross channels to achieve maximum performance.
+struct RetimingPath {
+  llvm::SmallSet<unsigned, 4> operands;
+  llvm::SmallSet<unsigned, 4> results;
+
+  RetimingPath() = default;
+
+  /// Default constructor for units which do not specify otherwise:
+  /// a single retiming path through the unit
+  /// which all operands and all results belong to
+  explicit RetimingPath(Operation *unit) {
+    for (unsigned i = 0, e = unit->getNumOperands(); i < e; ++i)
+      operands.insert(i);
+    for (unsigned i = 0, e = unit->getNumResults(); i < e; ++i)
+      results.insert(i);
+  }
+};
+
+/// Returns the retiming paths through a unit
+SmallVector<RetimingPath> getRetimingPaths(Operation *unit);
+
+} // end namespace buffer
 } // end namespace dynamatic
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h.inc"

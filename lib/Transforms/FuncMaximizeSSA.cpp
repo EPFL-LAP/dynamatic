@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -21,6 +22,14 @@
 
 using namespace mlir;
 using namespace dynamatic;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_FUNCMAXIMIZESSA
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 /// Determines the block to which the value belongs.
 static Block *getDefiningBlock(Value value) {
@@ -75,7 +84,13 @@ bool dynamatic::SSAMaximizationStrategy::maximizeArgument(BlockArgument arg) {
   return true;
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeOp(Operation &op) {
-  return true;
+  return !isa<
+      // clang-format off
+      memref::AllocOp,
+      memref::AllocaOp,
+      memref::GetGlobalOp
+      // clang-format on
+      >(op);
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeResult(OpResult res) {
   return true;
@@ -211,8 +226,3 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<func::FuncOp>>
-dynamatic::createFuncMaximizeSSA() {
-  return std::make_unique<FuncMaximizeSSAPass>();
-}

@@ -15,12 +15,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/ScfToCf.h"
 #include "dynamatic/Analysis/NumericAnalysis.h"
+#include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Support/LLVM.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_SCFTOCF
+#include "dynamatic/Conversion/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
@@ -127,6 +140,8 @@ struct ForLowering : public OpRewritePattern<scf::ForOp> {
 
 struct ScfToCfPass : public dynamatic::impl::ScfToCfBase<ScfToCfPass> {
 
+  using ScfToCfBase::ScfToCfBase;
+
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
@@ -149,9 +164,3 @@ struct ScfToCfPass : public dynamatic::impl::ScfToCfBase<ScfToCfPass> {
   };
 };
 } // namespace
-
-namespace dynamatic {
-std::unique_ptr<dynamatic::DynamaticPass> createLowerScfToCf() {
-  return std::make_unique<ScfToCfPass>();
-}
-} // namespace dynamatic

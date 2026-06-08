@@ -34,6 +34,8 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
      Some handshake operations can have predecessors in other
      blocks. This is primarily useful for verification purposes during
      lowering from other dialect, such as the standard CDFG dialect.
+     Implementations can be found in:
+     lib/Dialect/Handshake/HandshakeInterfaces.cpp
   }];
 
   let methods = [
@@ -46,6 +48,97 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
         Returns the operation's result representing the selected data operand.
       }],
       "mlir::OpResult", "getDataResult", (ins)
+    >,
+  ];
+}
+
+def JoinLikeOpInterface : OpInterface<"JoinLikeOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    A two-input handshake operation that contains a join.
+  }];
+}
+
+def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Some handshake operations have slots in which tokens can
+     be stored. This interface shows how many slots are present,
+     which is useful for the annotation of formal properties.
+  }];
+  let methods = [
+   InterfaceMethod<[{
+       Get the internal state namer of each slot.
+     }],
+     "std::vector<BufferSlotFullNamer>", "getInternalSlotStateNamers", (ins)
+   >,
+  ];
+}
+
+def EagerForkLikeOpInterface : OpInterface<"EagerForkLikeOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Some handshake operations eagerly fork an input token into
+     mutltiple different output channels, keeping track which
+     channels have been sent.
+  }];
+ 
+  let methods = [
+   InterfaceMethod<[{
+       Get the number of fork outputs.
+     }],
+     "int", "getNumEagerOutputs", (ins)
+   >,
+   InterfaceMethod<[{
+       Get all the states as std::vector<EagerForkSentNamer>
+     }],
+     "std::vector<EagerForkSentNamer>", "getInternalSentStateNamers", (ins)
+   >,
+  ];
+}
+
+def ShiftLikeArithOpInterface : OpInterface<"ShiftLikeArithOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Shift operations' often have delays and latency that depend on its context.
+    For example, if the shift value is a constant, then it has a zero delay.
+
+    Unlike in LLVM, where an instruction operand can be an immediate value,
+    MLIR materializes the constants (also, in a suboptimal IR, the constant
+    might be transformed before consumed by the shift op), so we need to have
+    special interface methods to check if the shift value is a constant.
+  }];
+  let methods = [
+   InterfaceMethod<[{
+       Returns true if the shift value (RHS) is a constant.
+     }],
+     "bool", "isShiftByConstant", (ins)
+   >,
+  ];
+}
+
+def RetimingPathsOpInterface : OpInterface<"RetimingPathsOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    For ops with multiple independent paths through them. 
+    
+    If tokens can pass through a unit from a set of operands to a set
+    of results without affecting a separate set of operands and results,
+    then there is multiple paths through the unit.
+    
+    The MILP buffering algorithms require a unique retiming algorithm
+    per path through a unit to correctly distribute token occupancy 
+    among the circuits channels to achieve maximum performance. 
+
+    Eachh operand and result of the op must belong to exactly
+    one path.
+  }];
+  let methods = [
+    InterfaceMethod<[{
+      Returns the list of independent retiming paths of this op.
+    }],
+    "llvm::SmallVector<::dynamatic::buffer::RetimingPath>",
+    "getRetimingPaths", (ins)
     >,
   ];
 }
@@ -346,6 +439,27 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
   }]>,
 
   InterfaceMethod<[{
+    Gets the pipeline slots based on the II and the latency.
+    TODO: Actually retrieve the II, instead of just assuming II=1
+
+    Implementation is done here instead of in HandshakeOps.cpp as
+    the code will look the same for any operation.
+  }], "std::vector<PipelineSlotNamer>", "getPipelineSlots", (ins), [{
+    Operation *op = $_op.getOperation();
+    auto attr = op->getAttrOfType<IntegerAttr>("latency");
+    assert(attr && "cannot latency slot without defined latency");
+    auto name = op->getAttrOfType<::mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+    assert(name && "cannot latency slot without defined op name");
+    int64_t latency = attr.getInt();
+    int64_t II = 1;
+    int64_t numSlots = latency / II;
+    std::vector<PipelineSlotNamer> ret(numSlots);
+    for (int64_t i = 0; i < numSlots; ++i) {
+      ret[i] = PipelineSlotNamer(name.str(), i);
+    }
+    return ret;
+  }]>,
+  InterfaceMethod<[{
   Sets the operation latency.
     }], "void", "setLatency", (ins "int64_t":$latency), [{
       $_op->setAttr("latency", IntegerAttr::get(IntegerType::get($_op->getContext(), 64), latency));
@@ -395,6 +509,57 @@ InterfaceMethod<[{
         return attr;
       return StringAttr::get(op->getContext(), "0_0");
     }]>
+  ];
+}
+
+
+def BLIFImplInterface : OpInterface<"BLIFImplInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Allows specification of attributes to specify the BLIF
+      implementation of a Handshake operation, which is used in the
+      Handshake to Synth lowering.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Sets the BLIF Impl. as a StringAttr attr named "blif_impl".
+    }], "void", "setBLIFImpl", (ins "::llvm::StringRef":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("blif_impl",
+                  StringAttr::get(op->getContext(), value));
+    }]>,
+
+    InterfaceMethod<[{
+      Gets the BLIF impl. as a StringAttr named "blif_impl". Defaults to an empty string if not set.
+    }], "StringAttr", "getBLIFImpl", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<StringAttr>("blif_impl")) {
+        return attr;
+      }
+      return StringAttr::get(op->getContext(), "");
+    }]>
+  ];
+}
+
+def RTLAttrInterface : OpInterface<"RTLAttrInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Allow specification of generic values to be used in the RTL generation of a
+     Handshake operation. Implementations return the complete set of RTL
+     parameters (generic values) as a list of named attributes, where each entry
+     maps a parameter name to its value. These are passed to the component
+     generator specified in the rtl-config file.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the RTL parameters for this operation as a list of named
+      attributes. Each entry maps a parameter name to its corresponding
+      attribute value. Returns failure if parameters cannot be determined
+      (e.g., unsupported constant bitwidth).
+    }], "::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>",
+    "getRTLParameters", (ins)>
   ];
 }
 

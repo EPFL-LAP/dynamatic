@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Conversion/AffineToScf.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
@@ -34,6 +33,14 @@ using namespace mlir;
 using namespace mlir::vector;
 using namespace mlir::affine;
 using namespace dynamatic;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_AFFINETOSCF
+#include "dynamatic/Conversion/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
@@ -125,9 +132,3 @@ class AffineToScfPass
   }
 };
 } // namespace
-
-/// Lowers If and For operations within a function into their lower level CFG
-/// equivalent blocks.
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::createAffineToScfPass() {
-  return std::make_unique<AffineToScfPass>();
-}

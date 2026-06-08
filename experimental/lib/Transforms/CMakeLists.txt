@@ -1,6 +1,7 @@
 add_dynamatic_library(DynamaticExperimentalTransforms
   HandshakePlaceBuffersCustom.cpp
   HandshakeCombineSteeringLogic.cpp
+  HandshakeStraightToQueue.cpp
 
   DEPENDS
   DynamaticExperimentalTransformsPassIncGen
@@ -17,6 +18,5 @@ add_dynamatic_library(DynamaticExperimentalTransforms
 )
 
 add_subdirectory(Speculation)
-add_subdirectory(ResourceSharing)
 add_subdirectory(LSQSizing)
 add_subdirectory(Rigidification)

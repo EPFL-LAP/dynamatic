@@ -15,16 +15,18 @@ target_link_libraries(dynamatic-opt
   PRIVATE
   AffineToScf
   DynamaticLowerScfToCf
-  DynamaticLLVMToControlFlow
   DynamaticBufferPlacement
   DynamaticLSQSizing
   DynamaticSpeculation
   DynamaticRigidification
   DynamaticFormalPropertyAnnotation
-  DynamaticExperimentalResourceSharing
+  DynamaticResourceSharing
   DynamaticCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW
+  DynamaticHandshakeToSynth
+  DynamaticBlifExporter
+  DynamaticBlifImporter
   DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
@@ -47,12 +49,7 @@ target_link_libraries(dynamatic-opt
   MLIRSupport
   MLIRTransforms
   MLIRSCFDialect
-
-  ${CBC_LIBRARIES}
-  ${CLPCORE_LIBRARIES}
-  ${OSI_LIBRARIES}
 )
-
 
 if(DYNAMATIC_ENABLE_XLS)
   target_link_libraries(dynamatic-opt

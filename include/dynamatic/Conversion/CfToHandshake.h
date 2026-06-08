@@ -274,12 +274,6 @@ public:
                   ConversionPatternRewriter &rewriter) const override;
 };
 
-#define GEN_PASS_DECL_CFTOHANDSHAKE
-#define GEN_PASS_DEF_CFTOHANDSHAKE
-#include "dynamatic/Conversion/Passes.h.inc"
-
-std::unique_ptr<dynamatic::DynamaticPass> createCfToHandshake();
-
 } // namespace dynamatic
 
 #endif // DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H

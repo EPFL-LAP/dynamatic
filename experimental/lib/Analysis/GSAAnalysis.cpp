@@ -16,6 +16,7 @@
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/FtdSupport.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -61,11 +62,19 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
   };
 
   // Add to the list of operands of the new gate all the values which were not
-  // already used
-  // TODO: Edit senders if needed
+  // already used.
+  // Since in STQ one block can't be producer of more than one phi operand,
+  // sender logic is not needed.
+
+  // Handle self-dependent merges: if the merge uses its own result as an input,
+  // record that operand so it can be reconnected to the generated phi later.
+  SmallVector<GateInput *> selfInputs;
+
   for (Value v : mergeOp.getOperands()) {
     if (!isAlreadyPresent(v)) {
       GateInput *gateInput = new GateInput(v);
+      if (v == mergeOp.getResult())
+        selfInputs.push_back(gateInput);
       gateInputList.push_back(gateInput);
       operands.push_back(gateInput);
     }
@@ -73,13 +82,18 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSAMerges(
 
   // If the list of operands is not empty (i.e. the phi has at least
   // one input), add it to the phis associated to that block
+  Gate *newPhi = nullptr;
   if (!operands.empty()) {
-    Gate *newPhi = new Gate(mergeOp.getResult(), operands, GateType::PhiGate,
-                            ++uniqueGateIndex);
+    newPhi = new Gate(mergeOp.getResult(), operands, GateType::PhiGate,
+                      ++uniqueGateIndex);
     gatesPerBlock[block].push_back(newPhi);
   }
 
-  convertPhiToMu(region);
+  // Reconnect self-dependent operands to the newly created Phi
+  for (GateInput *gi : selfInputs)
+    gi->input = newPhi;
+
+  convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
 
   // After the conversion is done, `gatesPerBlock` will contain some phis, some
@@ -124,7 +138,7 @@ experimental::gsa::GSAAnalysis::GSAAnalysis(Operation *operation) {
   // an inappropriate operation
   if (functionsCovered != 1)
     llvm::errs() << "[GSA] GSAAnalysis failed due to a wrong input type\n";
-};
+}
 
 experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
     ListExpressionsPerGate &expressions, std::queue<unsigned> conditions,
@@ -217,9 +231,11 @@ experimental::gsa::Gate *experimental::gsa::GSAAnalysis::expandGammaTree(
 
   // Get the index of the condition (it is associated to a basic block in
   // "indexPerBlock" mapping)
-  Gate *newGate =
-      new Gate(originalPhi->result, operandsGamma, GateType::GammaGate,
-               ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value());
+  Gate *newGate = new Gate(
+      originalPhi->result, operandsGamma, GateType::GammaGate,
+      ++uniqueGateIndex, bi.getBlockFromIndex(indexToUse).value(),
+      BoolExpression::boolVar(conditionToUse),
+      {conditionToUse}); // since condition is one block boolvar is enough
 
   // If the Gamma is a result of the expansion of a Mu that has more than two
   // inputs, force its placement in the block of its condition because placing
@@ -394,7 +410,7 @@ void experimental::gsa::GSAAnalysis::convertSSAToGSA(Region &region) {
     missing.pi->input = *foundGate;
   }
 
-  convertPhiToMu(region);
+  convertPhiToMu(region, bi);
   convertPhiToGamma(region, bi);
 
   // After the conversion is done, `gatesPerBlock` will contain some phis, some
@@ -410,8 +426,9 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
+  auto gatesSnapshot = gatesPerBlock;
   // For each block
-  for (auto const &[phiBlock, phis] : gatesPerBlock) {
+  for (auto const &[phiBlock, phis] : gatesSnapshot) {
 
     // For each phi
     for (Gate *phi : phis) {
@@ -524,8 +541,52 @@ static bool IsBlockInLoop(Block *block, CFGLoop *loop, mlir::CFGLoopInfo &li) {
   return false;
 }
 
-void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
+// TODO: reuse functions from FtdImplementation
+BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
+                                          CFGLoopInfo &li,
+                                          const BlockIndexing &bi) {
 
+  // Get the boolean expression associated to the block exit
+  BoolExpression *blockCond =
+      BoolExpression::parseSop(bi.getBlockCondition(loopExit));
+
+  // Since we are in a loop, the terminator is a conditional branch.
+  auto *terminatorOperation = loopExit->getTerminator();
+  auto condBranch = dyn_cast<cf::CondBranchOp>(terminatorOperation);
+  assert(condBranch && "Terminator of a loop must be `cf::CondBranchOp`");
+
+  // If the destination of the false outcome is not the block, then the
+  // condition must be negated
+  if (li.getLoopFor(condBranch.getFalseDest()) != loop)
+    blockCond->boolNegate();
+
+  return blockCond;
+}
+
+static BoolExpression *
+getLoopExitCondition(CFGLoop *loop, std::vector<std::string> *cofactorList,
+                     mlir::CFGLoopInfo &li, const BlockIndexing &bi) {
+
+  SmallVector<Block *> exitBlocks;
+  loop->getExitingBlocks(exitBlocks);
+
+  BoolExpression *fLoopExit = BoolExpression::boolZero();
+
+  // Get the list of all the cofactors related to possible exit conditions
+  for (Block *exitBlock : exitBlocks) {
+    BoolExpression *blockCond =
+        getBlockLoopExitCondition(exitBlock, loop, li, bi);
+    fLoopExit = BoolExpression::boolOr(fLoopExit, blockCond);
+    cofactorList->push_back(bi.getBlockCondition(exitBlock));
+    fLoopExit = fLoopExit->boolMinimize();
+  }
+  // Sort the cofactors alphabetically
+  std::sort(cofactorList->begin(), cofactorList->end());
+  return fLoopExit;
+}
+
+void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
+                                                    const BlockIndexing &bi) {
   mlir::DominanceInfo domInfo;
   mlir::CFGLoopInfo loopInfo(domInfo.getDomTree(&region));
 
@@ -585,8 +646,11 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
       if (loopInputs.size() == 1)
         operandLoop = loopInputs[0];
       else {
+        // The new Phi gate has a flag muGenerated so later in the convert phi
+        // to gamma it effects the place that gaama is added
         Gate *loopPhi = new Gate(phi->result, loopInputs, GateType::PhiGate,
-                                 ++uniqueGateIndex, nullptr, true);
+                                 ++uniqueGateIndex, nullptr,
+                                 BoolExpression::boolZero(), {}, true);
         gatesPerBlock[phiBlock].push_back(loopPhi);
         operandLoop = new GateInput(loopPhi);
         gateInputList.push_back(operandLoop);
@@ -599,6 +663,12 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region) {
       // innermost loop the MU is in
       phi->conditionBlock =
           loopInfo.getLoopFor(phi->getBlock())->getExitingBlock();
+
+      // Mu condition is the negation of loop exit-> if loop exit == false ? use
+      // loop input : use initial input
+      phi->condition = getLoopExitCondition(loopInfo.getLoopFor(phiBlock),
+                                            &phi->cofactorList, loopInfo, bi)
+                           ->boolNegate();
       phi->isRoot = true;
     }
   }

@@ -86,12 +86,15 @@ int main(int argc, char **argv) {
       >();
   MLIRContext context(registry);
 
+  context.getOrLoadDialect<LLVM::LLVMDialect>();
   context.getOrLoadDialect<func::FuncDialect>();
   context.getOrLoadDialect<memref::MemRefDialect>();
   context.getOrLoadDialect<arith::ArithDialect>();
   context.getOrLoadDialect<math::MathDialect>();
   context.getOrLoadDialect<cf::ControlFlowDialect>();
   context.getOrLoadDialect<dynamatic::handshake::HandshakeDialect>();
+
+  context.allowUnregisteredDialects();
 
   OpBuilder builder(&context);
 
