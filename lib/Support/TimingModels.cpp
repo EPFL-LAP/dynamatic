@@ -319,14 +319,14 @@ LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
     SpecTimingModel model;
 
     auto parseSamples = [](const ljson::Array *samplesArr,
-                           std::vector<SpecTimingEdge::Sample> &out) {
+                           std::vector<SpecTimingSample> &out) {
       if (!samplesArr)
         return;
       for (const ljson::Value &sampleVal : *samplesArr) {
         const ljson::Object *sampleObj = sampleVal.getAsObject();
         if (!sampleObj)
           continue;
-        SpecTimingEdge::Sample sample;
+        SpecTimingSample sample;
         if (auto d = sampleObj->getNumber("delay"))
           sample.delay = *d;
         else

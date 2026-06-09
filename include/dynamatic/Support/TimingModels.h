@@ -285,34 +285,50 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel &model,
 bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
 
-/// One characterised combinational path between two pins of an op, loaded from
-/// the spec-timing JSON. Used for ops whose internal timing cannot be
-/// expressed by the named scalars in TimingModel (e.g., handshake.speculator,
-/// handshake.spec_save_commit).
+/// Input or output of a unit.
+/// signal is stored separately from the rest of the port name
+/// since it affects which CPVar the delay applies to
+struct SpecTimingEndpoint {
+  std::string port;
+  std::string signal;
+};
+
+/// One measurement of an internal delay at one combination of unit parameters
+/// (e.g., BITWIDTH=16, FIFO_DEPTH=4).
+struct SpecTimingSample {
+  llvm::StringMap<int64_t> params;
+  double delay;
+};
+
+/// One characterised combinational path between two pins of an op,
+/// loaded from the spec-timing JSON.
+/// Used for ops whose internal timing requires more expressivity
 struct SpecTimingEdge {
-  /// Endpoint identified by a port name (matching NamedIOInterface) plus a
-  /// signal kind ("data", "valid", or "ready").
-  struct Endpoint {
-    std::string port;
-    std::string signal;
-  };
-  Endpoint from;
-  Endpoint to;
-  /// Each sample is a measurement at one combination of sweep parameters
-  /// (e.g., BITWIDTH=16, FIFO_DEPTH=4).
-  struct Sample {
-    llvm::StringMap<int64_t> params;
-    double delay;
-  };
-  std::vector<Sample> samples;
+  /// input to the unit
+  SpecTimingEndpoint from;
+
+  /// output of the unit
+  SpecTimingEndpoint to;
+
+  /// List of sampled parameters + delay
+  /// present from the JSON file
+  std::vector<SpecTimingSample> samples;
 };
 
-/// Per-port boundary delay (input pin -> register or register -> output pin).
+/// Per-port boundary delay
+/// (input pin -> register or register -> output pin).
 struct SpecTimingPortDelay {
-  SpecTimingEdge::Endpoint port;
-  std::vector<SpecTimingEdge::Sample> samples;
+  SpecTimingEndpoint port;
+
+  /// List of sampled parameters + delay
+  /// present from the JSON file
+  std::vector<SpecTimingSample> samples;
 };
 
+/// A full timing model for an operation
+/// with full expressivity of
+/// internal, input, and output delay
+/// for parameterized units
 struct SpecTimingModel {
   std::vector<SpecTimingEdge> pin2pin;
   std::vector<SpecTimingPortDelay> pin2reg;
@@ -388,8 +404,8 @@ private:
   /// Timing keys are generated based on operation name and implementation
   llvm::StringMap<TimingModel> models;
 
-  /// Per-op-name set of per-port-pair edges loaded from spec-timing.json.
-  /// Sparse: only ops that need port-pair-keyed delays appear here.
+  /// Maps from an operation's timing key to their timing model.
+  /// for operations which require more expressivity
   llvm::StringMap<SpecTimingModel> specModels;
 };
 

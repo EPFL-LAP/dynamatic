@@ -359,9 +359,9 @@ void FPL22BuffersBase::addSpecUnitPathConstraints(Operation *unit,
   };
 
   auto pickClosest =
-      [&](const std::vector<SpecTimingEdge::Sample> &samples) -> double {
+      [&](const std::vector<SpecTimingSample> &samples) -> double {
     assert(!samples.empty() && "spec timing edge has no samples");
-    const SpecTimingEdge::Sample *best = &samples.front();
+    const SpecTimingSample *best = &samples.front();
     int64_t bestDist = std::numeric_limits<int64_t>::max();
     for (const auto &s : samples) {
       int64_t dist = 0;
