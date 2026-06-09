@@ -204,9 +204,11 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
   ownerChannel.channelName =
-      handshake::getNamedIO(ownerOp).getResultName(res.getResultNumber());
+      mlir::cast<handshake::NamedIOInterface>(ownerOp).getResultName(
+          res.getResultNumber());
   userChannel.channelName =
-      handshake::getNamedIO(userOp).getOperandName(operandIndex);
+      mlir::cast<handshake::NamedIOInterface>(userOp).getOperandName(
+          operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -252,8 +254,10 @@ ValidEquivalence::ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  ownerChannel.channelName = handshake::getNamedIO(op1).getResultName(i);
-  targetChannel.channelName = handshake::getNamedIO(op2).getResultName(j);
+  ownerChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(op1).getResultName(i);
+  targetChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(op2).getResultName(j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
@@ -376,7 +380,8 @@ EagerForkPathTokenCopiedMaximumOnce::EagerForkPathTokenCopiedMaximumOnce(
     : FormalProperty(id, tag, TYPE::EagerForkPathTokenCopiedMaximumOnce) {
   // ForkOp has only 1 input
   validOp = getUniqueName(op);
-  validChannel = handshake::getNamedIO(op).getOperandName(0);
+  validChannel = mlir::cast<handshake::NamedIOInterface>(op.getOperation())
+                     .getOperandName(0);
   sentStateNamers = op.getInternalSentStateNamers();
 }
 

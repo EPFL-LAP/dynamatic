@@ -288,20 +288,26 @@ def NamedIOInterface : OpInterface<"NamedIOInterface"> {
 }
 
 // Trait that returns operand/result names as "ins"/"ins_N" and "outs"/"outs_N"
-// based on operand/result count. 
-def SimpleNamedIOTrait : NativeOpTrait<"SimpleNamedIO">;
+// based on operand/result count.
+def SimpleNamedIOTrait : NativeOpTrait<"SimpleNamedIO"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
 // Bundled with NamedIOInterface so ops
 // using SimpleNamedIO get both the interface contract and the impl.
 def SimpleNamedIO : TraitList<[NamedIOInterface, SimpleNamedIOTrait]>;
 
 // Trait that returns operands as "lhs"/"rhs" and the single result as "result".
-def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO">;
+def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
 // Bundled with NamedIOInterface so ops
 // using BinaryArithNamedIO get both the interface contract and the impl.
 def BinaryArithNamedIO : TraitList<[NamedIOInterface, BinaryArithNamedIOTrait]>;
 
 // Provides helper methods for naming IOs in custom functions
-def NamedIOUtilities : NativeOpTrait<"NamedIOUtilities">;
+def NamedIOUtilities : NativeOpTrait<"NamedIOUtilities"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
 
 //===----------------------------------------------------------------------===//
 

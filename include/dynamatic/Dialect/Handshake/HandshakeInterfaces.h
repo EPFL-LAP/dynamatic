@@ -39,40 +39,37 @@ class LatencyInterface;
 class NamedIOInterface;
 class FuncOp;
 
-NamedIOInterface getNamedIO(Operation *op);
-
 class ControlType;
 
 } // end namespace handshake
 } // end namespace dynamatic
 
-namespace mlir {
-namespace OpTrait {
+namespace dynamatic {
+namespace handshake {
 
 // Trait with useful functionality for use
 // in getting string representations of operand and result names
 template <typename ConcreteOp>
-class NamedIOUtilities : public TraitBase<ConcreteOp, NamedIOUtilities> {
+class NamedIOUtilities
+    : public mlir::OpTrait::TraitBase<ConcreteOp, NamedIOUtilities> {
 public:
-  void validateOperandIdx(unsigned idx, unsigned count) {
-    if (idx >= count)
-      llvm::report_fatal_error("operand index too high");
+  static void validateOperandIdx(unsigned idx, unsigned count) {
+    assert(idx < count && "operand index too high");
   }
 
   void validateOperandIdx(unsigned idx) {
     validateOperandIdx(idx, this->getOperation()->getNumOperands());
   }
 
-  void validateResultIdx(unsigned idx, unsigned count) {
-    if (idx >= count)
-      llvm::report_fatal_error("result index too high");
+  static void validateResultIdx(unsigned idx, unsigned count) {
+    assert(idx < count && "result index too high");
   }
 
   void validateResultIdx(unsigned idx) {
     validateResultIdx(idx, this->getOperation()->getNumResults());
   }
 
-  std::string simpleOperandName(unsigned idx, unsigned count) {
+  static std::string simpleOperandName(unsigned idx, unsigned count) {
     validateOperandIdx(idx, count);
 
     // TODO: remove 2D io packing
@@ -87,7 +84,7 @@ public:
     return simpleOperandName(idx, this->getOperation()->getNumOperands());
   }
 
-  std::string simpleResultName(unsigned idx, unsigned count) {
+  static std::string simpleResultName(unsigned idx, unsigned count) {
     validateResultIdx(idx, count);
 
     // TODO: remove 2D io packing
@@ -107,7 +104,8 @@ public:
 // for the NamedIOInterface functions
 // so ops with this behaviour can just declare the trait
 template <typename ConcreteOp>
-class SimpleNamedIO : public TraitBase<ConcreteOp, SimpleNamedIO> {
+class SimpleNamedIO
+    : public mlir::OpTrait::TraitBase<ConcreteOp, SimpleNamedIO> {
 public:
   std::string getOperandName(unsigned idx) {
     return static_cast<ConcreteOp *>(this)->simpleOperandName(idx);
@@ -121,22 +119,21 @@ public:
 // for the NamedIOInterface functions
 // so ops with this behaviour can just declare the trait
 template <typename ConcreteOp>
-class BinaryArithNamedIO : public TraitBase<ConcreteOp, BinaryArithNamedIO> {
+class BinaryArithNamedIO
+    : public mlir::OpTrait::TraitBase<ConcreteOp, BinaryArithNamedIO> {
 public:
-  std::string getOperandName(unsigned idx) {
-    if (idx >= 2)
-      llvm::report_fatal_error("operand index too high");
+  static std::string getOperandName(unsigned idx) {
+    ConcreteOp::validateOperandIdx(idx, 2);
     return (idx == 0) ? "lhs" : "rhs";
   }
-  std::string getResultName(unsigned idx) {
-    if (idx >= 1)
-      llvm::report_fatal_error("result index too high");
+  static std::string getResultName(unsigned idx) {
+    ConcreteOp::validateResultIdx(idx, 1);
     return "result";
   }
 };
 
-} // namespace OpTrait
-} // namespace mlir
+} // namespace handshake
+} // namespace dynamatic
 
 namespace dynamatic {
 

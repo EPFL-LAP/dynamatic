@@ -832,7 +832,8 @@ def SinkOp : Handshake_Op<"sink", [
 }
 
 def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
-  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
+  SimpleNamedIO
  ]> {
   let summary = "buffer operation without successor";
   let description = [{
@@ -1423,8 +1424,9 @@ def StoreOp : Handshake_MemPortOp<"store", [
 // Memory hierarchy
 //===----------------------------------------------------------------------===//
 
-def RAMOp : Handshake_Op<"ram", []>  {
+def RAMOp : Handshake_Op<"ram", [NamedIOInterface]>  {
   let arguments = (ins ElementsAttr:$initialValue);
+  let results = (outs AnyStaticShapeMemRef:$result);
 
   let description = [{
     A placeholder operation for an RAM or ROM instantiated inside the handshake
@@ -1465,7 +1467,22 @@ def RAMOp : Handshake_Op<"ram", []>  {
     ```
   }];
 
-  let results = (outs AnyStaticShapeMemRef:$result);
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    std::string getOperandName(unsigned idx) {
+      llvm_unreachable("RAMOp has no operands");
+    }
+
+    // As a memory interface representation, this output is an abstraction
+    // we replace later, and so this string value is not currently used.
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      return "memref";
+    }
+  }];
 
   let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
