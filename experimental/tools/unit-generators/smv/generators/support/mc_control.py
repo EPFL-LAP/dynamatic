@@ -13,7 +13,7 @@ MODULE {name}(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done)
   
   -- Function is returning if:
   -- 1. There are no more requests (from the circuit)
-  -- 2. All pending requests are done (from the controller's counter)
+  -- 2. All pending requests are done (from the counter of the controller)
   -- 3. MemEnd pin is ready
   -- 4. The function is running
   function_return := (no_more_request & all_requests_done & memEnd_ready & fsm_running);
