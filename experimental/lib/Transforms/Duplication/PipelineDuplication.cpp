@@ -453,38 +453,10 @@ void PipelineDuplicationPass::runOnOperation() {
     } else
       outsideDrivers.insert(startOp->getResult(0));
 
-    // 1. Start with your forward DFS results
-    llvm::DenseSet<mlir::Operation *> finalOpsToMove = visitedOps;
-    llvm::SmallVector<mlir::Operation *> worklist(visitedOps.begin(),
-                                                  visitedOps.end());
-
-    // 2. Backward traversal: pulling in missing dependencies (like index
-    // calculations)
-    while (!worklist.empty()) {
-      mlir::Operation *currentOp = worklist.pop_back_val();
-
-      for (mlir::Value operand : currentOp->getOperands()) {
-        if (mlir::Operation *defOp = operand.getDefiningOp()) {
-          // If the defining op is inside the same block but wasn't caught by
-          // the forward DFS
-          if (defOp->getBlock() == targetBlock &&
-              !finalOpsToMove.count(defOp)) {
-            // Only pull in pure/invariant calculations (Casts, Constants,
-            // Index/Pointer Arith)
-            if (llvm::isa<mlir::arith::IndexCastOp, mlir::arith::AddIOp,
-                          mlir::memref::SubViewOp>(defOp)) {
-              finalOpsToMove.insert(defOp);
-              worklist.push_back(defOp);
-            }
-          }
-        }
-      }
-    }
-
     // iterate through the function to sort
     llvm::SmallVector<mlir::Operation *> opsToMove;
     for (mlir::Operation &blockOp : funcOp.getOps()) {
-      if (finalOpsToMove.count(&blockOp)) {
+      if (visitedOps.count(&blockOp)) {
         opsToMove.push_back(&blockOp);
       }
     }
@@ -505,6 +477,8 @@ void PipelineDuplicationPass::runOnOperation() {
       exitBlockArgs.push_back(exitBlock->addArgument(origOut.getType(), loc));
       llvm::errs() << origOut << " origOut\n ";
     }
+
+    llvm::DenseSet<mlir::Block *> trueBlocksSet;
 
     // PREDICTED PATHS
     int i = 0;
@@ -527,7 +501,9 @@ void PipelineDuplicationPass::runOnOperation() {
       }
 
       mlir::Block *trueBlock = funcOp.addBlock(); // true path
-      mlir::Block *nextElseBlock;                 // false path
+      trueBlocksSet.insert(trueBlock);
+
+      mlir::Block *nextElseBlock; // false path
       if (i + 1 < (int)data.values.size())
         nextElseBlock = funcOp.addBlock();
       else
@@ -597,6 +573,7 @@ void PipelineDuplicationPass::runOnOperation() {
 
     // make sure exitBlock reads its stuff from block arguments instead of old
     // operations that do not exist anymore in that sense
+    // rewrite to have only downstream users read from block arguments?
     for (size_t i = 0; i < originalOutputs.size(); ++i) {
       llvm::errs() << originalOutputs[i] << '\n' << exitBlockArgs[i] << '\n';
       originalOutputs[i].replaceUsesWithIf(
@@ -608,15 +585,12 @@ void PipelineDuplicationPass::runOnOperation() {
 
             // Otherwise, only replace it if it's completely outside the
             // true/false cascade structures we generated.
-            // TODO: this is wrong
-            bool isCondBranch =
-                userBlock->getTerminator() &&
-                isa<mlir::cf::CondBranchOp>(userBlock->getTerminator());
-
-            llvm::errs() << isCondBranch << " condbranch\n";
+            if (trueBlocksSet.count(userBlock)) {
+              return false;
+            }
 
             return userBlock != targetBlock &&
-                   userBlock->getParentOp() == funcOp && isCondBranch;
+                   userBlock->getParentOp() == funcOp;
           });
     }
   }
@@ -626,4 +600,9 @@ void PipelineDuplicationPass::runOnOperation() {
   pm.addPass(dynamatic::createPushConstants());
   if (failed(pm.run(modOp)))
     return signalPassFailure();
+
+  /* // dump the entire IR
+  llvm::errs() << "=== IR BEFORE PUSH CONSTANTS AND HANDSHAKE ===\n";
+  modOp.dump();
+  llvm::errs() << "==============================================\n"; */
 }
