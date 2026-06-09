@@ -147,7 +147,10 @@ def generate_wrapper_top_no_generics(entity_name, vhdl_interface_info):
     """
     Wrapper used when the unit's VHDL has no generics (modern self-contained generator output).
     The tb just wires every dut port to a top-level port of the same name.
+    Entity is uniquely named (tb_<entity_name>) so multiple combos can coexist
+    in the same hdl directory without colliding.
     """
+    tb_entity_name = f"tb_{entity_name}"
     ports = vhdl_interface_info.get_list_ports()
     tb_ports = list(ports)
 
@@ -156,12 +159,12 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
 use work.types.all;
-entity tb is
+entity {tb_entity_name} is
 port (
 {';\n'.join(tb_ports)}
 );
 end entity;
-architecture tb_arch of tb is
+architecture arch of {tb_entity_name} is
 begin
 dut: entity work.{entity_name}
 port map (
@@ -245,7 +248,10 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
                 unit_name, top_entity_name, params_dict, hdl_files, vhdl_interface_info, id)
             tcl_file = unit_char_obj.generate_tcl(tcl_dir, rpt_dir, sdc_file)
             unit_characterization_list.append(unit_char_obj)
-            if all(os.path.exists(p) for p in unit_char_obj.map_pair_to_rpt.values()):
+            all_rpts = list(unit_char_obj.map_pair_to_rpt.values()) + \
+                list(unit_char_obj.map_in_port_to_rpt.values()) + \
+                list(unit_char_obj.map_out_port_to_rpt.values())
+            if all(os.path.exists(p) for p in all_rpts):
                 print(
                     f"[skip] {unit_name} combo {id} {params_dict}: reports already present")
                 continue
@@ -270,7 +276,10 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
                 param_names, combination)), [top_file] + support_hdl_files, vhdl_interface_info, id)
             tcl_file = unit_char_obj.generate_tcl(tcl_dir, rpt_dir, sdc_file)
             unit_characterization_list.append(unit_char_obj)
-            if all(os.path.exists(p) for p in unit_char_obj.map_pair_to_rpt.values()):
+            all_rpts = list(unit_char_obj.map_pair_to_rpt.values()) + \
+                list(unit_char_obj.map_in_port_to_rpt.values()) + \
+                list(unit_char_obj.map_out_port_to_rpt.values())
+            if all(os.path.exists(p) for p in all_rpts):
                 print(
                     f"[skip] {unit_name} combo {id}: reports already present")
                 continue

@@ -505,8 +505,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
     }
-    return solveMILP<fpga20::FPGA20Buffers>(placement, solverKind, timeout,
-                                            info, timingDB, targetCP, writeTo);
+    return solveMILP<fpga20::FPGA20Buffers>(placement, polishPaths, solverKind,
+                                            timeout, info, timingDB, targetCP,
+                                            writeTo);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -526,8 +527,8 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
         writeTo = dumpDir + sep + funcName + "-cfunion" + std::to_string(idx);
       }
       if (failed(solveMILP<fpl22::CFDFCUnionBuffers>(
-              placement, solverKind, timeout, info, timingDB, targetCP, cfUnion,
-              writeTo)))
+              placement, polishPaths, solverKind, timeout, info, timingDB,
+              targetCP, cfUnion, writeTo)))
         return failure();
     }
 
@@ -536,8 +537,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
-    return solveMILP<fpl22::OutOfCycleBuffers>(
-        placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
+    return solveMILP<fpl22::OutOfCycleBuffers>(placement, polishPaths,
+                                               solverKind, timeout, info,
+                                               timingDB, targetCP, writeTo);
   }
 
   if (algorithm == FPGA24) {
@@ -550,8 +552,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
       writeTo = dumpDir + sep + funcName + "-cost-aware";
     }
     // Create and solve the MILP
-    return solveMILP<costaware::CostAwareBuffers>(
-        placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
+    return solveMILP<costaware::CostAwareBuffers>(placement, polishPaths,
+                                                  solverKind, timeout, info,
+                                                  timingDB, targetCP, writeTo);
   }
 
   if (algorithm == MAPBUF) {
@@ -560,8 +563,8 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     }
     // Create and solve the MILP
     return solveMILP<mapbuf::MAPBUFBuffers>(
-        placement, solverKind, timeout, info, timingDB, targetCP, blifFiles,
-        lutDelay, lutSize, acyclicType, writeTo);
+        placement, polishPaths, solverKind, timeout, info, timingDB, targetCP,
+        blifFiles, lutDelay, lutSize, acyclicType, writeTo);
   }
 
   llvm_unreachable("unknown algorithm");

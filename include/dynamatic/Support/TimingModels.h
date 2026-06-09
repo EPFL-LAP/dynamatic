@@ -270,15 +270,9 @@ public:
   /// delay.
   LogicalResult getTotalDataDelay(unsigned bitwidth, double &delay) const;
 
-  /// Returns the total valid delay (input + internal + output delays).
-  double getTotalValidDelay() const {
-    return inputModel.validDelay + validDelay + outputModel.validDelay;
-  };
+  double getTotalValidDelay() const { return validDelay; };
 
-  /// Returns the total ready delay (input + internal + output delays).
-  double getTotalReadyDelay() const {
-    return inputModel.readyDelay + readyDelay + outputModel.readyDelay;
-  };
+  double getTotalReadyDelay() const { return readyDelay; };
 };
 
 /// Deserializes a JSON value into a TimingModel. See ::llvm::json::Value's
@@ -313,9 +307,16 @@ struct SpecTimingEdge {
   std::vector<Sample> samples;
 };
 
-/// Per-op-name set of characterised port-pair edges.
+/// Per-port boundary delay (input pin -> register or register -> output pin).
+struct SpecTimingPortDelay {
+  SpecTimingEdge::Endpoint port;
+  std::vector<SpecTimingEdge::Sample> samples;
+};
+
 struct SpecTimingModel {
-  std::vector<SpecTimingEdge> edges;
+  std::vector<SpecTimingEdge> pin2pin;
+  std::vector<SpecTimingPortDelay> pin2reg;
+  std::vector<SpecTimingPortDelay> reg2pin;
 };
 
 /// Holds the timing models for a set of operations (internally identified by

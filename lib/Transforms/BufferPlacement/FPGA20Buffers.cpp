@@ -17,6 +17,8 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/IR/Value.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
 // - Dynamatic is built in debug mode
@@ -36,6 +38,163 @@ FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
                           writeTo) {
   if (!unsatisfiable)
     setup();
+}
+
+void FPGA20Buffers::addSpecUnitDataPathConstraints(Operation *unit) {
+  const SpecTimingModel *specModel = timingDB.getSpecModel(unit);
+  if (!specModel) {
+    unit->emitError() << "addSpecUnitDataPathConstraints: no spec timing model "
+                      << "loaded for op '" << unit->getName().getStringRef()
+                      << "'";
+    return;
+  }
+
+  auto namedIO = dyn_cast<handshake::NamedIOInterface>(unit);
+  if (!namedIO) {
+    unit->emitError() << "addSpecUnitDataPathConstraints: op does not "
+                      << "implement NamedIOInterface";
+    return;
+  }
+
+  llvm::StringMap<Value> portToValue;
+  for (unsigned i = 0, e = unit->getNumOperands(); i < e; ++i)
+    portToValue[namedIO.getOperandName(i)] = unit->getOperand(i);
+  for (unsigned i = 0, e = unit->getNumResults(); i < e; ++i)
+    portToValue[namedIO.getResultName(i)] = unit->getResult(i);
+
+  Value bitwidthChannel =
+      llvm::TypeSwitch<Operation *, Value>(unit)
+          .Case<handshake::SpeculatorOp>(
+              [](handshake::SpeculatorOp op) { return op.getDataIn(); })
+          .Case<handshake::SpecSaveCommitOp>(
+              [](handshake::SpecSaveCommitOp op) { return op.getDataIn(); })
+          .Default([&](Operation *op) {
+            op->emitError() << "addSpecUnitDataPathConstraints called on op "
+                            << "type with no bitwidth accessor registered";
+            return Value();
+          });
+  if (!bitwidthChannel)
+    return;
+
+  llvm::StringMap<int64_t> currentParams;
+  if (auto chTy = dyn_cast<handshake::ChannelType>(bitwidthChannel.getType()))
+    currentParams["BITWIDTH"] = chTy.getDataBitWidth();
+  else
+    currentParams["BITWIDTH"] = 0;
+
+  auto pickClosest =
+      [&](const std::vector<SpecTimingEdge::Sample> &samples) -> double {
+    assert(!samples.empty() && "spec timing edge has no samples");
+    const SpecTimingEdge::Sample *best = &samples.front();
+    int64_t bestDist = std::numeric_limits<int64_t>::max();
+    for (const auto &s : samples) {
+      int64_t dist = 0;
+      for (const auto &targetKV : currentParams) {
+        auto it = s.params.find(targetKV.first());
+        if (it == s.params.end())
+          continue;
+        int64_t d = it->second - targetKV.second;
+        dist += d * d;
+      }
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = &s;
+      }
+    }
+    return best->delay;
+  };
+
+  StringRef unitName = getUniqueName(unit);
+  unsigned idx = 0;
+  for (const SpecTimingEdge &edge : specModel->pin2pin) {
+    if (edge.from.signal != "data" || edge.to.signal != "data")
+      continue;
+    auto fromIt = portToValue.find(edge.from.port);
+    auto toIt = portToValue.find(edge.to.port);
+    if (fromIt == portToValue.end()) {
+      unit->emitError() << "spec timing edge references unknown port '"
+                        << edge.from.port << "'";
+      return;
+    }
+    if (toIt == portToValue.end()) {
+      unit->emitError() << "spec timing edge references unknown port '"
+                        << edge.to.port << "'";
+      return;
+    }
+    Value fromVal = fromIt->second;
+    Value toVal = toIt->second;
+    if (vars.channelVars.find(fromVal) == vars.channelVars.end() ||
+        vars.channelVars.find(toVal) == vars.channelVars.end())
+      continue;
+    if (edge.samples.empty()) {
+      unit->emitError() << "spec timing edge " << edge.from.port << "."
+                        << edge.from.signal << " -> " << edge.to.port << "."
+                        << edge.to.signal << " has no samples";
+      return;
+    }
+    double delay = pickClosest(edge.samples);
+    CPVar &tFrom =
+        vars.channelVars[fromVal].signalVars[SignalType::DATA].path.tOut;
+    CPVar &tTo = vars.channelVars[toVal].signalVars[SignalType::DATA].path.tIn;
+    std::string consName =
+        "path_spec_p2p_" + unitName.str() + "_" + std::to_string(idx++);
+    model->addConstr(tFrom + delay <= tTo, consName);
+  }
+
+  auto unitSideDataVar = [&](Value v) -> CPVar & {
+    bool unitIsProducer = (v.getDefiningOp() == unit);
+    if (unitIsProducer)
+      return vars.channelVars[v].signalVars[SignalType::DATA].path.tIn;
+    return vars.channelVars[v].signalVars[SignalType::DATA].path.tOut;
+  };
+
+  for (const SpecTimingPortDelay &pd : specModel->pin2reg) {
+    if (pd.port.signal != "data")
+      continue;
+    auto it = portToValue.find(pd.port.port);
+    if (it == portToValue.end()) {
+      unit->emitError() << "spec pin2reg references unknown port '"
+                        << pd.port.port << "'";
+      return;
+    }
+    Value v = it->second;
+    if (vars.channelVars.find(v) == vars.channelVars.end())
+      continue;
+    if (pd.samples.empty()) {
+      unit->emitError() << "spec pin2reg " << pd.port.port << "."
+                        << pd.port.signal << " has no samples";
+      return;
+    }
+    double delay = pickClosest(pd.samples);
+    CPVar &tArr = unitSideDataVar(v);
+    std::string consName =
+        "path_spec_p2r_" + unitName.str() + "_" + std::to_string(idx++);
+    model->addConstr(tArr + delay <= targetPeriod, consName);
+  }
+
+  for (const SpecTimingPortDelay &pd : specModel->reg2pin) {
+    if (pd.port.signal != "data")
+      continue;
+    auto it = portToValue.find(pd.port.port);
+    if (it == portToValue.end()) {
+      unit->emitError() << "spec reg2pin references unknown port '"
+                        << pd.port.port << "'";
+      return;
+    }
+    Value v = it->second;
+    if (vars.channelVars.find(v) == vars.channelVars.end())
+      continue;
+    if (pd.samples.empty()) {
+      unit->emitError() << "spec reg2pin " << pd.port.port << "."
+                        << pd.port.signal << " has no samples";
+      return;
+    }
+    double delay = pickClosest(pd.samples);
+    CPVar &tDep = unitSideDataVar(v);
+    std::string consName =
+        "path_spec_r2p_" + unitName.str() + "_" + std::to_string(idx++);
+    model->addConstr(tDep >= delay, consName);
+  }
 }
 
 void FPGA20Buffers::extractResult(BufferPlacement &placement) {
@@ -181,6 +340,10 @@ void FPGA20Buffers::setup() {
 
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(&op)) {
+      addSpecUnitDataPathConstraints(&op);
+      continue;
+    }
     addUnitTimingConstraints(&op, SignalType::DATA);
   }
 

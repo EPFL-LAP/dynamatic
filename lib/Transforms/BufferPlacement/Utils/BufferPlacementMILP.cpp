@@ -1663,3 +1663,44 @@ void BufferPlacementMILP::initialize() {
   auto ops = funcInfo.funcOp.getOps();
   largeCst = std::distance(ops.begin(), ops.end()) + 2;
 }
+
+LogicalResult BufferPlacementMILP::polishArrivalTimes() {
+  // Pin all buffer-decision variables to their currently-solved values so the
+  // re-solve cannot move them.
+  // Pin only the variables every buffer placement algorithm initialises.
+  // FPGA24-specific fields (dataLatency, shiftReg, stalled, maxOccupancy) may
+  // hold uninitialised CPVar handles for fpl22/fpga20 and would crash on
+  // getValue/addConstr.
+  auto pinVar = [&](CPVar &v) {
+    model->addConstr(v == model->getValue(v), "polish_pin");
+  };
+  for (auto &[channel, chVars] : vars.channelVars) {
+    pinVar(chVars.bufPresent);
+    pinVar(chVars.bufNumSlots);
+    for (auto &[sigType, sigVars] : chVars.signalVars)
+      pinVar(sigVars.bufPresent);
+  }
+
+  // Replace objective with minimisation of the sum of path arrival variables
+  // (Σ tIn + tOut). CPSolver only exposes setMaximizeObjective so we negate.
+  LinExpr minSum;
+  for (auto &[channel, chVars] : vars.channelVars) {
+    for (auto &[sigType, sigVars] : chVars.signalVars) {
+      minSum += sigVars.path.tIn;
+      minSum += sigVars.path.tOut;
+    }
+  }
+  model->setMaximizeObjective(-minSum);
+
+  model->optimize();
+  if (model->status != CPSolver::OPTIMAL &&
+      model->status != CPSolver::NONOPTIMAL) {
+    llvm::errs() << "polishArrivalTimes: re-solve failed status="
+                 << model->status << "\n";
+    return failure();
+  }
+
+  if (!writeTo.empty())
+    model->writeSol(writeTo + "_polished_sol.log");
+  return success();
+}

@@ -68,6 +68,8 @@ private:
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
   void setup();
+
+  void addSpecUnitDataPathConstraints(Operation *unit);
 };
 
 } // namespace fpga20

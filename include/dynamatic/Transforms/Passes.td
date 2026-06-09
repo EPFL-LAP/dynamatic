@@ -280,6 +280,10 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
     Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
     "If true, dump MILP models into a directory named 'buffer-placement'.">,
+    Option<"polishPaths", "polish-paths", "bool", "false",
+    "If true, after the throughput-maximising solve, fix buffer decisions and "
+    "re-solve minimising path arrival times. Lets the dumped sol log show the "
+    "true min-feasible arrival on each channel signal.">,
     Option<"blifFiles", "blif-files", "std::string", "",
     "Path to AND-Inverter Graphs of dataflow components in Berkeley "
     "Logic Interchange Format (BLIF).">,

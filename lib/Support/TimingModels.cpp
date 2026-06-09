@@ -90,19 +90,7 @@ LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
   auto unitDelayOrFail = dataDelay.select(bitwidth);
   if (failed(unitDelayOrFail))
     return failure();
-  double unitDelay = unitDelayOrFail->get();
-
-  auto inPortDelayOrFail = inputModel.dataDelay.select(bitwidth);
-  if (failed(inPortDelayOrFail))
-    return failure();
-  double inPortDelay = inPortDelayOrFail->get();
-
-  auto outPortDelayOrFail = outputModel.dataDelay.select(bitwidth);
-  if (failed(outPortDelayOrFail))
-    return failure();
-  double outPortDelay = outPortDelayOrFail->get();
-
-  delay = unitDelay + inPortDelay + outPortDelay;
+  delay = unitDelayOrFail->get();
   return success();
 }
 
@@ -328,52 +316,73 @@ LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
     const ljson::Object *unitObj = unitEntry.second.getAsObject();
     if (!unitObj)
       continue;
-    const ljson::Array *delaysArr = unitObj->getArray("delays");
-    if (!delaysArr)
-      continue;
-
     SpecTimingModel model;
-    for (const ljson::Value &edgeVal : *delaysArr) {
-      const ljson::Object *edgeObj = edgeVal.getAsObject();
-      if (!edgeObj)
-        continue;
 
-      SpecTimingEdge edge;
-      for (const auto &which : {std::make_pair("from", &edge.from),
-                                std::make_pair("to", &edge.to)}) {
-        const ljson::Object *endObj = edgeObj->getObject(which.first);
-        if (!endObj)
+    auto parseSamples = [](const ljson::Array *samplesArr,
+                           std::vector<SpecTimingEdge::Sample> &out) {
+      if (!samplesArr)
+        return;
+      for (const ljson::Value &sampleVal : *samplesArr) {
+        const ljson::Object *sampleObj = sampleVal.getAsObject();
+        if (!sampleObj)
           continue;
-        std::optional<StringRef> p = endObj->getString("port");
-        std::optional<StringRef> s = endObj->getString("signal");
-        if (p)
-          which.second->port = p->str();
-        if (s)
-          which.second->signal = s->str();
-      }
-
-      const ljson::Array *samplesArr = edgeObj->getArray("samples");
-      if (samplesArr) {
-        for (const ljson::Value &sampleVal : *samplesArr) {
-          const ljson::Object *sampleObj = sampleVal.getAsObject();
-          if (!sampleObj)
-            continue;
-          SpecTimingEdge::Sample sample;
-          if (auto d = sampleObj->getNumber("delay"))
-            sample.delay = *d;
-          else
-            continue;
-          if (const ljson::Object *paramObj = sampleObj->getObject("params")) {
-            for (const auto &paramEntry : *paramObj) {
-              if (auto pv = paramEntry.second.getAsInteger())
-                sample.params[paramEntry.first] = *pv;
-            }
+        SpecTimingEdge::Sample sample;
+        if (auto d = sampleObj->getNumber("delay"))
+          sample.delay = *d;
+        else
+          continue;
+        if (const ljson::Object *paramObj = sampleObj->getObject("params")) {
+          for (const auto &paramEntry : *paramObj) {
+            if (auto pv = paramEntry.second.getAsInteger())
+              sample.params[paramEntry.first] = *pv;
           }
-          edge.samples.push_back(std::move(sample));
         }
+        out.push_back(std::move(sample));
       }
-      model.edges.push_back(std::move(edge));
+    };
+
+    if (const ljson::Array *pin2pinArr = unitObj->getArray("pin2pin")) {
+      for (const ljson::Value &edgeVal : *pin2pinArr) {
+        const ljson::Object *edgeObj = edgeVal.getAsObject();
+        if (!edgeObj)
+          continue;
+        SpecTimingEdge edge;
+        for (const auto &which : {std::make_pair("from", &edge.from),
+                                  std::make_pair("to", &edge.to)}) {
+          const ljson::Object *endObj = edgeObj->getObject(which.first);
+          if (!endObj)
+            continue;
+          if (auto p = endObj->getString("port"))
+            which.second->port = p->str();
+          if (auto s = endObj->getString("signal"))
+            which.second->signal = s->str();
+        }
+        parseSamples(edgeObj->getArray("samples"), edge.samples);
+        model.pin2pin.push_back(std::move(edge));
+      }
     }
+
+    auto parsePortDelayArr = [&](const char *key,
+                                 std::vector<SpecTimingPortDelay> &out) {
+      const ljson::Array *arr = unitObj->getArray(key);
+      if (!arr)
+        return;
+      for (const ljson::Value &v : *arr) {
+        const ljson::Object *o = v.getAsObject();
+        if (!o)
+          continue;
+        SpecTimingPortDelay pd;
+        if (auto p = o->getString("port"))
+          pd.port.port = p->str();
+        if (auto s = o->getString("signal"))
+          pd.port.signal = s->str();
+        parseSamples(o->getArray("samples"), pd.samples);
+        out.push_back(std::move(pd));
+      }
+    };
+    parsePortDelayArr("pin2reg", model.pin2reg);
+    parsePortDelayArr("reg2pin", model.reg2pin);
+
     timingDB.specModels[unitKey] = std::move(model);
   }
   return success();

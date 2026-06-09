@@ -156,6 +156,12 @@ public:
                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
                       double targetPeriod, llvm::StringRef writeTo = "");
 
+  /// Pins all buffer-decision variables to their currently-solved values,
+  /// replaces the objective with `min Σ(t_*)`, re-optimises, and rewrites the
+  /// sol log. Lets the dumped values reflect the true min-feasible arrival on
+  /// each channel signal instead of being packed to the period bound.
+  LogicalResult polishArrivalTimes() override;
+
 protected:
   /// Represents a list of signals that are buffered together by a single
   /// buffer type, which is denoted by its (potentially null) timing model.

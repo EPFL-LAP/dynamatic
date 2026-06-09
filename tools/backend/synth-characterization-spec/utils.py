@@ -50,7 +50,7 @@ skipping_units = [
 parameters_ranges = {
     "DATA_TYPE": [1, 2, 4, 8, 16, 32, 64],
     "BITWIDTH": [1, 2, 4, 8, 16, 32, 64],
-    "FIFO_DEPTH": [4, 5, 6, 7, 8, 10, 12, 14, 16],
+    "FIFO_DEPTH": [4],
     "SIZE": [2],
     "SELECT_TYPE": [2],
     "INDEX_TYPE": [2],
@@ -62,30 +62,41 @@ parameters_ranges = {
 # Function to write the TCL file for synthesis
 
 
-def write_tcl_multiport(top_entity_name, hdl_files, tcl_file, sdc_file, pair_to_rpt):
+def write_tcl_multiport(top_entity_name, hdl_files, tcl_file, sdc_file,
+                        pair_to_rpt, in_port_to_rpt, out_port_to_rpt,
+                        is_vector):
     """
-    Write a TCL file that synthesises the design and then runs one
-    `report_timing` per (input_port, output_port) pair, each writing to its own
-    report file.
+    Synthesise then emit three classes of report_timing:
+      - per (input_port, output_port) pair: pin-to-pin path delay
+      - per input_port (no -to): worst path starting at this pin
+      - per output_port (no -from): worst path ending at this pin
 
-    Args:
-        pair_to_rpt: dict keyed by (in_port, out_port) tuple, value is the
-                     report file path for that pair.
+    `is_vector` is a callable (port_name) -> bool; chooses between
+    `[get_ports {name[*]}]` (vector) and `[get_ports name]` (scalar).
     """
+    def _gp(p):
+        if is_vector(p):
+            return f"[get_ports {{{p}[*]}}]"
+        return f"[get_ports {p}]"
     with open(tcl_file, 'w') as f:
         for hdl_file in hdl_files:
             f.write(f"read_vhdl -vhdl2008 {hdl_file}\n")
         f.write(f"read_xdc {sdc_file}\n")
         f.write(
-            "synth_design -top tb -part xc7k160tfbg484-2 -no_iobuf -mode out_of_context\n")
+            f"synth_design -top tb_{top_entity_name} -part xc7k160tfbg484-2 -no_iobuf -mode out_of_context\n")
         f.write("opt_design\n")
         f.write("place_design\n")
         f.write("phys_opt_design\n")
         f.write("route_design\n")
         f.write("phys_opt_design\n")
+        f.write("puts \"PORTS_AVAILABLE: [get_ports]\"\n")
         for (iport, oport), rpt_path in pair_to_rpt.items():
             f.write(
-                f"report_timing -from [get_ports {iport}] -to [get_ports {oport}] > {rpt_path}\n")
+                f"report_timing -from {_gp(iport)} -to {_gp(oport)} > {rpt_path}\n")
+        for iport, rpt_path in in_port_to_rpt.items():
+            f.write(f"report_timing -from {_gp(iport)} > {rpt_path}\n")
+        for oport, rpt_path in out_port_to_rpt.items():
+            f.write(f"report_timing -to {_gp(oport)} > {rpt_path}\n")
 
 
 # Class to hold VHDL interface information
@@ -107,6 +118,15 @@ class VhdlInterfaceInfo:
         ins, outs = self.extract_ins_outs()
         self.ins_per_type = self.categorize_ports(ins)
         self.outs_per_type = self.categorize_ports(outs)
+        self.is_vector_map = {}
+        for raw in ports:
+            if ":" not in raw:
+                continue
+            name = raw.split(":")[0].strip()
+            self.is_vector_map[name] = "std_logic_vector" in raw
+
+    def is_vector(self, port_name: str) -> bool:
+        return self.is_vector_map.get(port_name, False)
 
     def __repr__(self):
         return f"VhdlInterfaceInfo(generics={self.generics}, ports={self.ports})"
@@ -322,9 +342,21 @@ class UnitCharacterization:
             for oport in output_ports:
                 rpt_path = f"{rpt_dir}/rpt_{self.top_entity_name}_top_{self.unique_id}__{iport}__{oport}.txt"
                 pair_to_rpt[(iport, oport)] = rpt_path
+        in_port_to_rpt = {}
+        for iport in input_ports:
+            rpt_path = f"{rpt_dir}/rpt_{self.top_entity_name}_top_{self.unique_id}__in__{iport}.txt"
+            in_port_to_rpt[iport] = rpt_path
+        out_port_to_rpt = {}
+        for oport in output_ports:
+            rpt_path = f"{rpt_dir}/rpt_{self.top_entity_name}_top_{self.unique_id}__out__{oport}.txt"
+            out_port_to_rpt[oport] = rpt_path
         self.map_pair_to_rpt = pair_to_rpt
+        self.map_in_port_to_rpt = in_port_to_rpt
+        self.map_out_port_to_rpt = out_port_to_rpt
         write_tcl_multiport(self.top_entity_name, self.hdl_files,
-                            tcl_file, sdc_file, pair_to_rpt)
+                            tcl_file, sdc_file, pair_to_rpt,
+                            in_port_to_rpt, out_port_to_rpt,
+                            self.vhdl_interface_info.is_vector)
         self.tcl_file = tcl_file
         return tcl_file
 

@@ -83,15 +83,16 @@ def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
       2. A .matrix.txt next to it: per-bitwidth physical-port matrices for
          human inspection.
     """
-    # Per-unit nested matrix for the human-readable view (keyed by physical port
-    # names, indexed by bitwidth string).
     matrix_by_unit = {}
-    # Per-unit edge map: (from_port, from_sig, to_port, to_sig) -> list of samples.
     edges_by_unit = {}
+    in_port_by_unit = {}
+    out_port_by_unit = {}
 
     for unit_name, list_unit_chars in map_unit_to_list_unit_chars.items():
         matrix = {}
         edges = {}
+        in_ports = {}
+        out_ports = {}
         for unit_char in list_unit_chars:
             sample_params = dict(unit_char.params)
             bw = str(sample_params.get("BITWIDTH", ""))
@@ -104,9 +105,7 @@ def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
                 delay = extract_single_rpt(rpt_path)
                 if delay is None:
                     continue
-                # Matrix view: keep zeros, key by bitwidth for display.
                 matrix.setdefault(iport, {}).setdefault(oport, {})[bw] = delay
-                # Edges view: drop spec endpoints; drop zero samples; pre-split.
                 from_port, from_sig = split_physical_port(iport)
                 to_port, to_sig = split_physical_port(oport)
                 if from_sig == "spec" or to_sig == "spec":
@@ -117,10 +116,37 @@ def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
                 edges.setdefault(edge_key, []).append(
                     {"params": sample_params, "delay": delay})
 
+            in_port_to_rpt = getattr(unit_char, "map_in_port_to_rpt", {})
+            for iport, rpt_path in in_port_to_rpt.items():
+                delay = extract_single_rpt(rpt_path)
+                if delay is None:
+                    continue
+                port, sig = split_physical_port(iport)
+                if sig == "spec":
+                    continue
+                if delay == 0.0:
+                    continue
+                in_ports.setdefault((port, sig), []).append(
+                    {"params": sample_params, "delay": delay})
+
+            out_port_to_rpt = getattr(unit_char, "map_out_port_to_rpt", {})
+            for oport, rpt_path in out_port_to_rpt.items():
+                delay = extract_single_rpt(rpt_path)
+                if delay is None:
+                    continue
+                port, sig = split_physical_port(oport)
+                if sig == "spec":
+                    continue
+                if delay == 0.0:
+                    continue
+                out_ports.setdefault((port, sig), []).append(
+                    {"params": sample_params, "delay": delay})
+
         matrix_by_unit[unit_name] = matrix
         edges_by_unit[unit_name] = edges
+        in_port_by_unit[unit_name] = in_ports
+        out_port_by_unit[unit_name] = out_ports
 
-    # Assemble the edges-list output.
     output_data = {}
     for unit_name, edges in edges_by_unit.items():
         edge_list = []
@@ -130,7 +156,21 @@ def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
                 "to": {"port": tp, "signal": ts},
                 "samples": samples,
             })
-        output_data[unit_name] = {"delays": edge_list}
+        pin2reg_list = []
+        for (port, sig), samples in in_port_by_unit.get(unit_name, {}).items():
+            pin2reg_list.append({
+                "port": port, "signal": sig, "samples": samples,
+            })
+        reg2pin_list = []
+        for (port, sig), samples in out_port_by_unit.get(unit_name, {}).items():
+            reg2pin_list.append({
+                "port": port, "signal": sig, "samples": samples,
+            })
+        output_data[unit_name] = {
+            "pin2pin": edge_list,
+            "pin2reg": pin2reg_list,
+            "reg2pin": reg2pin_list,
+        }
 
     # Render matrices per unit per bitwidth.
     matrix_path = json_output + ".matrix.txt"

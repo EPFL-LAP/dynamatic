@@ -158,6 +158,11 @@ public:
   /// Marks the MILP as initial state.
   void resetMILPState() { state = State::FAILED_TO_SETUP; }
 
+  /// Optional second-pass polish hook. Default is a no-op; subclasses can
+  /// override to e.g. pin solution variables, change the objective, and
+  /// re-optimize. Called by `solveMILP` when its `polish` argument is true.
+  virtual LogicalResult polishArrivalTimes() { return success(); }
+
   /// Determines whether the MILP is in a valid state to be optimized. If this
   /// returns true, `MILP::optimize` can be called to solve the MILP.
   /// Conversely, if this returns false then a call to optimize will necessarily
@@ -179,6 +184,11 @@ protected:
   /// Gurobi model holding the MILP's state.
   std::unique_ptr<CPSolver> model;
 
+  /// Path to a file at which to store the MILP's model and its solution after
+  /// optimization. Empty disables logging. Available to overrides such as
+  /// `polishArrivalTimes()` that want to dump a second-pass sol log.
+  std::string writeTo;
+
   /// Fills in the argument with the desired results extract from the MILP's
   /// solution. Called by `MILP::getResult` after checking that the underlying
   /// MILP model was optimized successfully. This cannot fail.
@@ -199,11 +209,6 @@ private:
 
   /// MILP's state, which changes during the object's lifetime.
   State state = State::FAILED_TO_SETUP;
-  /// Path to a file at which to store the MILP's model and its solution after
-  /// optimization. The model will be stored under `writeTo`_model.lp and the
-  /// solution under `writeTo`_solution.json. Nothing will be stored if the
-  /// string is empty.
-  std::string writeTo;
 
   /// Returns a description of the MILP's current state.
   StringRef getStateMessage() {
@@ -226,11 +231,16 @@ private:
 /// Creates, optimizes, and extract results from an MILP in one go. Fails and
 /// displays an error message to stderr if any step along the process fails.
 /// Otherwise succeeds and stores the MILP's results in the first function
-/// argument.
+/// argument. If `polish` is true, runs `polishArrivalTimes()` between optimize
+/// and result extraction (a no-op for MILP classes that don't override it).
 template <typename MILP, typename MILPRes, typename... Args>
-LogicalResult solveMILP(MILPRes &milpResult, Args &&...args) {
+LogicalResult solveMILP(MILPRes &milpResult, bool polish, Args &&...args) {
   MILP milp = MILP(std::forward<Args>(args)...);
-  if (failed(milp.optimize()) || failed(milp.getResult(milpResult)))
+  if (failed(milp.optimize()))
+    return failure();
+  if (polish && failed(milp.polishArrivalTimes()))
+    return failure();
+  if (failed(milp.getResult(milpResult)))
     return failure();
   return success();
 }

@@ -347,8 +347,6 @@ void FPL22BuffersBase::addSpecUnitPathConstraints(Operation *unit,
     currentParams["BITWIDTH"] = chTy.getDataBitWidth();
   else
     currentParams["BITWIDTH"] = 0;
-  if (auto fifoAttr = unit->getAttrOfType<IntegerAttr>("fifoDepth"))
-    currentParams["FIFO_DEPTH"] = fifoAttr.getValue().getZExtValue();
 
   auto parseSignal = [](StringRef s) -> std::optional<SignalType> {
     if (s == "data")
@@ -384,7 +382,7 @@ void FPL22BuffersBase::addSpecUnitPathConstraints(Operation *unit,
 
   StringRef unitName = getUniqueName(unit);
   unsigned idx = 0;
-  for (const SpecTimingEdge &edge : specModel->edges) {
+  for (const SpecTimingEdge &edge : specModel->pin2pin) {
     auto fromIt = portToValue.find(edge.from.port);
     auto toIt = portToValue.find(edge.to.port);
     if (fromIt == portToValue.end()) {
@@ -422,8 +420,64 @@ void FPL22BuffersBase::addSpecUnitPathConstraints(Operation *unit,
     CPVar &tFrom = vars.channelVars[fromVal].signalVars[*fromSig].path.tOut;
     CPVar &tTo = vars.channelVars[toVal].signalVars[*toSig].path.tIn;
     std::string consName =
-        "path_spec_" + unitName.str() + "_" + std::to_string(idx++);
+        "path_spec_p2p_" + unitName.str() + "_" + std::to_string(idx++);
     model->addConstr(tFrom + delay <= tTo, consName);
+  }
+
+  for (const SpecTimingPortDelay &pd : specModel->pin2reg) {
+    auto it = portToValue.find(pd.port.port);
+    if (it == portToValue.end()) {
+      unit->emitError() << "spec pin2reg references unknown port '"
+                        << pd.port.port << "'";
+      return;
+    }
+    std::optional<SignalType> sig = parseSignal(pd.port.signal);
+    if (!sig) {
+      unit->emitError() << "spec pin2reg has unrecognised signal kind '"
+                        << pd.port.signal << "'";
+      return;
+    }
+    Value v = it->second;
+    if (!filter(v))
+      continue;
+    if (pd.samples.empty()) {
+      unit->emitError() << "spec pin2reg " << pd.port.port << "."
+                        << pd.port.signal << " has no samples";
+      return;
+    }
+    double delay = pickClosest(pd.samples);
+    std::string consName =
+        "path_spec_p2r_" + unitName.str() + "_" + std::to_string(idx++);
+    CPVar &tInPort = vars.channelVars[v].signalVars[*sig].path.tOut;
+    model->addConstr(tInPort + delay <= targetPeriod, consName);
+  }
+
+  for (const SpecTimingPortDelay &pd : specModel->reg2pin) {
+    auto it = portToValue.find(pd.port.port);
+    if (it == portToValue.end()) {
+      unit->emitError() << "spec reg2pin references unknown port '"
+                        << pd.port.port << "'";
+      return;
+    }
+    std::optional<SignalType> sig = parseSignal(pd.port.signal);
+    if (!sig) {
+      unit->emitError() << "spec reg2pin has unrecognised signal kind '"
+                        << pd.port.signal << "'";
+      return;
+    }
+    Value v = it->second;
+    if (!filter(v))
+      continue;
+    if (pd.samples.empty()) {
+      unit->emitError() << "spec reg2pin " << pd.port.port << "."
+                        << pd.port.signal << " has no samples";
+      return;
+    }
+    double delay = pickClosest(pd.samples);
+    std::string consName =
+        "path_spec_r2p_" + unitName.str() + "_" + std::to_string(idx++);
+    CPVar &tOutPort = vars.channelVars[v].signalVars[*sig].path.tIn;
+    model->addConstr(tOutPort >= delay, consName);
   }
 }
 
