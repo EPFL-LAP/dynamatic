@@ -237,9 +237,10 @@ BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
                                          int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod,
+                                         Algorithm algorithm,
                                          llvm::StringRef writeTo)
     : MILP<BufferPlacement>(solverKind, timeout, writeTo), timingDB(timingDB),
-      targetPeriod(targetPeriod), funcInfo(funcInfo) {
+      targetPeriod(targetPeriod), algorithm(algorithm), funcInfo(funcInfo) {
   initialize();
 }
 
@@ -1664,15 +1665,18 @@ void BufferPlacementMILP::initialize() {
   largeCst = std::distance(ops.begin(), ops.end()) + 2;
 }
 
-LogicalResult BufferPlacementMILP::polishArrivalTimes() {
+LogicalResult BufferPlacementMILP::calculatePathDelays() {
+  if (algorithm != Algorithm::FPGA20 && algorithm != Algorithm::FPL22) {
+    llvm::errs() << "BufferPlacementMILP::calculatePathDelays() only supports "
+                 << "FPGA20 and FPL22 buffering algorithms\n";
+    return failure();
+  }
+
   // Pin all buffer-decision variables to their currently-solved values so the
   // re-solve cannot move them.
-  // Pin only the variables every buffer placement algorithm initialises.
-  // FPGA24-specific fields (dataLatency, shiftReg, stalled, maxOccupancy) may
-  // hold uninitialised CPVar handles for fpl22/fpga20 and would crash on
-  // getValue/addConstr.
+  // Pin only the variables used by FPGA'20 and FPL'22
   auto pinVar = [&](CPVar &v) {
-    model->addConstr(v == model->getValue(v), "polish_pin");
+    model->addConstr(v == model->getValue(v), "pin_buffers");
   };
   for (auto &[channel, chVars] : vars.channelVars) {
     pinVar(chVars.bufPresent);
@@ -1681,8 +1685,9 @@ LogicalResult BufferPlacementMILP::polishArrivalTimes() {
       pinVar(sigVars.bufPresent);
   }
 
-  // Replace objective with minimisation of the sum of path arrival variables
-  // (Σ tIn + tOut). CPSolver only exposes setMaximizeObjective so we negate.
+  // Replace objective with minimizing path delay
+  // since buffer positions are fixed this is equivalent to
+  // calculating path delays
   LinExpr minSum;
   for (auto &[channel, chVars] : vars.channelVars) {
     for (auto &[sigType, sigVars] : chVars.signalVars) {
@@ -1692,15 +1697,18 @@ LogicalResult BufferPlacementMILP::polishArrivalTimes() {
   }
   model->setMaximizeObjective(-minSum);
 
+  // actually solve
   model->optimize();
   if (model->status != CPSolver::OPTIMAL &&
       model->status != CPSolver::NONOPTIMAL) {
-    llvm::errs() << "polishArrivalTimes: re-solve failed status="
+    llvm::errs() << "calculatePathDelays: re-solve failed status="
                  << model->status << "\n";
     return failure();
   }
 
+  // and store the MILP solution but this time
+  // with accurate path delay numbers
   if (!writeTo.empty())
-    model->writeSol(writeTo + "_polished_sol.log");
+    model->writeSol(writeTo + "_accurate_delays.log");
   return success();
 }

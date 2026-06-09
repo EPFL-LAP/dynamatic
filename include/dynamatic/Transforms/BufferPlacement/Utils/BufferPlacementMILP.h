@@ -140,11 +140,15 @@ struct MILPVars {
 /// some pre/post-processind steps and verification they are likely to need.
 class BufferPlacementMILP : public MILP<BufferPlacement> {
 public:
+  // Enum representation of algorithm class
+  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF };
+
   /// Contains timing characterizations for dataflow components required to
   /// create the MILP constraints.
   const TimingDatabase &timingDB;
   /// Target clock period.
   const double targetPeriod;
+  const Algorithm algorithm;
 
   /// Starts setting up a the buffer placement MILP for a Handshake function
   /// (with its CFDFCs) with specific component timing models. The constructor
@@ -154,13 +158,14 @@ public:
   /// constructor sets the `unsatisfiable` flag to true.
   BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod, llvm::StringRef writeTo = "");
+                      double targetPeriod, Algorithm algorithm,
+                      llvm::StringRef writeTo = "");
 
-  /// Pins all buffer-decision variables to their currently-solved values,
+  /// Locks all buffer-decision variables to their currently-solved values,
   /// replaces the objective with `min Σ(t_*)`, re-optimises, and rewrites the
   /// sol log. Lets the dumped values reflect the true min-feasible arrival on
   /// each channel signal instead of being packed to the period bound.
-  LogicalResult polishArrivalTimes() override;
+  LogicalResult calculatePathDelays() override;
 
 protected:
   /// Represents a list of signals that are buffered together by a single
