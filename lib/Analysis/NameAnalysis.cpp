@@ -129,8 +129,8 @@ std::string NameAnalysis::getName(OpOperand &oprd) {
   std::string userName, oprName;
   Operation *userOp = oprd.getOwner();
   userName = getName(userOp);
-  oprName = handshake::getNamedIO(userOp).getOperandName(
-      oprd.getOperandNumber());
+  oprName =
+      handshake::getNamedIO(userOp).getOperandName(oprd.getOperandNumber());
   return defName + "_" + resName + "_" + oprName + "_" + userName;
 }
 
@@ -313,8 +313,8 @@ std::string dynamatic::getUniqueName(OpOperand &oprd) {
   Operation *userOp = oprd.getOwner();
   if (mlir::StringAttr attr = getNameAttr(userOp)) {
     userName = attr.str();
-    oprName = handshake::getNamedIO(userOp).getOperandName(
-        oprd.getOperandNumber());
+    oprName =
+        handshake::getNamedIO(userOp).getOperandName(oprd.getOperandNumber());
   } else {
     return "";
   }

@@ -2238,11 +2238,5 @@ std::string MemoryControllerOp::getResultName(unsigned idx) {
   return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
 }
 
-namespace dynamatic {
-namespace handshake {
-
-} // end namespace handshake
-} // end namespace dynamatic
-
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.cpp.inc"
