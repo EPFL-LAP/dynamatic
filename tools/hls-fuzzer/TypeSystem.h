@@ -89,7 +89,7 @@ private:
     explicit Derived(const T &data) : data(data) {}
 
     void moveInto(void *destination) const override {
-      new (destination) T(std::move(data));
+      new (destination) Derived(std::move(data));
     }
 
     const void *pointer() const override {
