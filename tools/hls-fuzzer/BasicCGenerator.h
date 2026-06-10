@@ -200,11 +200,12 @@ private:
           [&](auto elementIndex, auto &&transferFn) {
             constexpr std::size_t index = decltype(elementIndex){};
             if constexpr (index < sizeof...(SubElements)) {
-              if (transferFn.getInputDependencies().empty() ||
-                  transferFn.getInputDependencies() ==
-                      llvm::ArrayRef{INPUT_DEPENDENCY}) {
-                // No dependency (besides the parent context which is
-                // satisfied).
+              if (llvm::all_of(
+                      transferFn.getInputDependencies(), [](std::size_t index) {
+                        return index == INPUT_DEPENDENCY || isWeak(index);
+                      })) {
+                // No dependency (besides the input context and weak ones which
+                // are satisfied by default).
                 worklist[workListSize++] = index;
                 return;
               }
@@ -212,7 +213,7 @@ private:
               // Build the outgoing edge list but do keep track of the
               // number of incoming edges.
               for (auto fromIndex : transferFn.getInputDependencies())
-                if (fromIndex != INPUT_DEPENDENCY) {
+                if (fromIndex != INPUT_DEPENDENCY && !isWeak(fromIndex)) {
                   forwardEdgeList[fromIndex][forwardEdgeCount[fromIndex]++] =
                       index;
                   ++incomingEdgeCount[index];

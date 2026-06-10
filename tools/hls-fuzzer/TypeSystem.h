@@ -127,6 +127,26 @@ private:
 /// Sentinel value representing a dependency on the input context.
 constexpr std::size_t INPUT_DEPENDENCY = -1;
 
+/// Marks a dependency as weak. This is a noop for 'INPUT_DEPENDENCY' as it
+/// cannot be weak.
+constexpr std::size_t weak(std::size_t dependency) {
+  return dependency | (1ull << (std::numeric_limits<std::size_t>::digits - 1));
+}
+
+/// Returns true if 'dependency' is weak.
+constexpr bool isWeak(std::size_t dependency) {
+  return dependency != INPUT_DEPENDENCY && weak(dependency) == dependency;
+}
+
+/// If 'dependency' is weak, then it returns the original non-weak dependency.
+/// Otherwise, returns 'dependency'.
+constexpr std::size_t unwrapWeak(std::size_t dependency) {
+  if (dependency == INPUT_DEPENDENCY)
+    return INPUT_DEPENDENCY;
+
+  return dependency & ~weak(0);
+}
+
 /// Class responsible for telling the generator how to calculate the input
 /// 'TypingContext' for a given subelement of 'ASTNode'.
 /// The subelement whose input-context we are calculating for is given by its
@@ -139,12 +159,21 @@ constexpr std::size_t INPUT_DEPENDENCY = -1;
 /// this instance depends on within 'ASTNode::SubElements'.
 /// The special value 'INPUT_DEPENDENCY' represents depending on the
 /// input-context of 'ASTNode'.
-/// It is the user's responsibility to not create cyclic dependencies.
+/// Dependencies can additionally be marked 'weak'. In that case, the elements
+/// and contexts will be passed to the transfer function if present, but do not
+/// require them to have been generated.
+///
+/// It is the user's responsibility to not create cyclic non-weak dependencies.
 template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
 class TransferFn {
 
   template <typename Tuple, std::size_t current, std::size_t... remaining>
   struct CalcCompFn {
+    using SubElementType = std::tuple_element_t<
+        std::min(unwrapWeak(current),
+                 std::tuple_size_v<typename ASTNode::SubElements> - 1),
+        typename ASTNode::SubElements>;
+
     // Recursive case.
     using type = typename CalcCompFn<
         decltype(std::tuple_cat(
@@ -155,12 +184,11 @@ class TransferFn {
                 std::tuple<const TypingContext &>,
                 // Add both the context and the ASTNode to the arguments.
                 std::tuple<
-                    const TypingContext &,
-                    const std::tuple_element_t<
-                        std::min(current, std::tuple_size_v<
-                                              typename ASTNode::SubElements> -
-                                              1),
-                        typename ASTNode::SubElements> &>>>())),
+                    std::conditional_t<isWeak(current), const TypingContext *,
+                                       const TypingContext &>,
+                    const std::conditional_t<isWeak(current),
+                                             std::optional<SubElementType>,
+                                             SubElementType> &>>>())),
         remaining...>::type;
   };
 
@@ -191,13 +219,24 @@ public:
   /// Specifically, for every element of 'inputIndices' and in the order as
   /// given in 'inputIndices', the arguments are:
   /// * The input 'TypingContext' if the value is 'INPUT_DEPENDENCY'
-  /// * The output 'TypingContext' of the 'i'th subelement of 'ASTNode' followed
+  /// * If 'i' is not weak, the output 'TypingContext' of the 'i'th subelement
+  /// of 'ASTNode' followed
   ///   by the subelement's AST node itself.
+  /// * If 'i' is weak, a pointer to the output 'TypingContext' of the 'i'th
+  ///   subelement of 'ASTNode' or null if not present, followed by an optional
+  ///   of the subelement's AST node itself if already generated.
   ///
   /// Example:
   /// Dependency<Context, ast::BinaryExpression,
-  ///   /*rhs=*/ast::BINARY_EXPRESSION::RHS, INPUT_DEPENDENCY>(
+  ///   ast::BINARY_EXPRESSION::RHS, INPUT_DEPENDENCY>(
   ///   [](const Context& rhsContext, const ast::Expression& rhs,
+  ///      const Context& inputContext) -> Context {
+  ///     ...
+  ///   }
+  /// )
+  /// Dependency<Context, ast::BinaryExpression,
+  ///   weak(ast::BINARY_EXPRESSION::RHS), INPUT_DEPENDENCY>(
+  ///   [](const Context* rhsContext, const std::optional<ast::Expression>& rhs,
   ///      const Context& inputContext) -> Context {
   ///     ...
   ///   }
@@ -220,7 +259,7 @@ public:
   }
 
 private:
-  static_assert(((inputIndices <
+  static_assert(((unwrapWeak(inputIndices) <
                       std::tuple_size_v<typename ASTNode::SubElements> ||
                   inputIndices == INPUT_DEPENDENCY) &&
                  ...),
@@ -284,11 +323,19 @@ public:
                   *reinterpret_cast<const TypingContext *>(
                       std::get<std::tuple_size_v<ContextTuple> - 1>(contexts)));
             } else {
-              // Subelement context + ASTNode.
-              return std::forward_as_tuple(
-                  *reinterpret_cast<const TypingContext *>(
-                      std::get<index>(contexts)),
-                  *std::get<index>(subElements));
+              if constexpr (isWeak(index)) {
+                // Subelement context + ASTNode.
+                return std::make_tuple(
+                    reinterpret_cast<const TypingContext *>(
+                        std::get<unwrapWeak(index)>(contexts)),
+                    std::cref(std::get<unwrapWeak(index)>(subElements)));
+              } else {
+                // Subelement context + ASTNode.
+                return std::forward_as_tuple(
+                    *reinterpret_cast<const TypingContext *>(
+                        std::get<index>(contexts)),
+                    *std::get<index>(subElements));
+              }
             }
           }(std::integral_constant<std::size_t, inputIndices>{})...);
 
@@ -719,6 +766,33 @@ protected:
   static auto copyFrom() {
     return TransferFn<ASTNode, index>(
         [](const TypingContext &context, auto &&...) { return context; });
+  }
+
+  /// Returns an instance of 'TransferFn' which forwards the first present
+  /// context from the weak dependencies 'indices'.
+  template <typename ASTNode, std::size_t... indices>
+  static auto copyFirstOf() {
+    return TransferFn<ASTNode, weak(indices)...>([](auto &&...args) {
+      std::optional<TypingContext> result;
+      foreachInTuples(
+          [&](auto &&element) {
+            if (result)
+              return;
+
+            if constexpr (std::is_same_v<std::decay_t<decltype(element)>,
+                                         TypingContext>) {
+              result = element;
+            }
+            if constexpr (std::is_same_v<std::decay_t<decltype(element)>,
+                                         const TypingContext *>) {
+              if (element)
+                result = *element;
+            }
+          },
+          std::forward_as_tuple(std::forward<decltype(args)>(args)...));
+
+      return std::move(*result);
+    });
   }
 
   /// Returns a noop 'OutputTransferFn' that keeps the output context
