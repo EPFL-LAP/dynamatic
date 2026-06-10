@@ -1042,10 +1042,14 @@ class LSQ:
             assert not self.configs.issueOldestLoads
             assert not self.configs.fallbackIssueLoad
 
-            # load_candidate_oh is non-zero iff load_pending is non-zero (through CyclicPriorityMasking), so we can
-            # OR-reduce load_pending instead of load_candidate_oh to reduce timing pressure
             load_candidate_valid = Logic(ctx, 'load_candidate_valid', 'w')
-            arch += Reduce(ctx, load_candidate_valid, load_pending, 'or')
+            if self.configs.pipe0:
+                arch += Reduce(ctx, load_candidate_valid, load_candidate_oh_p0, 'or')
+            else:
+                # Without pipe0, load_candidate_oh_p0 is non-zero iff load_pending is non-zero (through
+                # CyclicPriorityMasking and load_candidate_curr_oh), so we can OR-reduce load_pending instead of
+                # load_candidate_oh_p0 to reduce timing pressure.
+                arch += Reduce(ctx, load_candidate_valid, load_pending, 'or')
 
             arch += Op(ctx, load_idx_oh[0], load_candidate_oh_p0)
             arch += Op(ctx, load_en[0], load_candidate_valid, 'and', load_candidate_not_in_store_filter)
