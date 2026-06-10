@@ -452,7 +452,7 @@ private:
       error(PP, FirstToken,
             "#pragma DYN predict requires variable=, "
             "values= (unless location=end), location=, marker=, name= (unless "
-            "location=end)");
+            "location=end), type= (unless location=end)");
       return failure();
     }
     return success();

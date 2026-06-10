@@ -241,6 +241,7 @@ $DYNAMATIC_OPT_BIN \
   --allow-unregistered-dialect \
   "$F_CF_TRANSFORMED" \
   --pipeline-duplication \
+  --canonicalize \
   --consume-producer-output-attr-marker \
   > "$F_CF_DUPLICATED"
 exit_on_fail "Failed to apply CF duplication" \
