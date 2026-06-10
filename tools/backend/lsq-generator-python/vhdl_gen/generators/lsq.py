@@ -276,8 +276,9 @@ class LSQ:
                                  self.configs.numStqEntries, self.configs.dataW)
 
         # Load / Store Queue Bloom Filters
-        if (self.configs.bloomFilterLoad or self.configs.bloomFilterStore) and self.configs.bloomFilterSequential:
+        if self.configs.bloomFilterStore and self.configs.bloomFilterSequential:
             ldq_bloom_filter = LogicVecArray(ctx, 'ldq_bloom_filter', 'r', self.configs.numLdqEntries, self.configs.bloomFilterW)
+        if self.configs.bloomFilterLoad and self.configs.bloomFilterSequential:
             stq_bloom_filter = LogicVecArray(ctx, 'stq_bloom_filter', 'r', self.configs.numStqEntries, self.configs.bloomFilterW)
 
         # Order for load-store
@@ -513,8 +514,9 @@ class LSQ:
         stq_data.regInit(stq_data_wen)
 
         # Load / Store Queue Bloom Filters
-        if (self.configs.bloomFilterLoad or self.configs.bloomFilterStore) and self.configs.bloomFilterSequential:
+        if self.configs.bloomFilterStore and self.configs.bloomFilterSequential:
             ldq_bloom_filter.regInit(enable=ldq_addr_wen)
+        if self.configs.bloomFilterLoad and self.configs.bloomFilterSequential:
             stq_bloom_filter.regInit(enable=stq_addr_wen)
 
         # Order for load-store
@@ -549,9 +551,7 @@ class LSQ:
         # - TODO: Also remove the load queue when there are zero load ports.
         if lsq_submodules.ptq_dispatcher_lda != None:
             # Load Address Port Dispatcher
-            lda_entry_filter = ldq_bloom_filter if \
-                (self.configs.bloomFilterLoad or self.configs.bloomFilterStore) and self.configs.bloomFilterSequential \
-                else None
+            lda_entry_filter = ldq_bloom_filter if self.configs.bloomFilterStore and self.configs.bloomFilterSequential else None
             arch += lsq_submodules.ptq_dispatcher_lda.instantiate(
                 ctx,
                 ldp_addr_i, ldp_addr_valid_i, ldp_addr_ready_o,
@@ -573,9 +573,7 @@ class LSQ:
             )
 
         # Store Address Port Dispatcher
-        sta_entry_filter = stq_bloom_filter if \
-            (self.configs.bloomFilterLoad or self.configs.bloomFilterStore) and self.configs.bloomFilterSequential \
-            else None
+        sta_entry_filter = stq_bloom_filter if self.configs.bloomFilterLoad and self.configs.bloomFilterSequential else None
         arch += lsq_submodules.ptq_dispatcher_sta.instantiate(
             ctx,
             stp_addr_i, stp_addr_valid_i, stp_addr_ready_o,
@@ -708,15 +706,12 @@ class LSQ:
                 arch += Op(ctx, store_completed[i], 'not', stq_alloc[i])
 
         # Bloom filter generation
-        if self.configs.bloomFilterLoad or self.configs.bloomFilterStore:
+        if self.configs.bloomFilterStore:
             ldq_bloom_filter_raw = LogicVecArray(ctx, 'ldq_bloom_filter_raw', 'w', self.configs.numLdqEntries, self.configs.bloomFilterW)
-            stq_bloom_filter_raw = LogicVecArray(ctx, 'stq_bloom_filter_raw', 'w', self.configs.numStqEntries, self.configs.bloomFilterW)
             if self.configs.bloomFilterSequential:
                 # sequential: use Bloom filters stored in queue entries
                 for i in range(self.configs.numLdqEntries):
                     arch += Op(ctx, ldq_bloom_filter_raw[i], ldq_bloom_filter[i])
-                for i in range(self.configs.numStqEntries):
-                    arch += Op(ctx, stq_bloom_filter_raw[i], stq_bloom_filter[i])
             else:
                 # combinational: generate Bloom filters from addresses on the fly
                 for i in range(self.configs.numLdqEntries):
@@ -726,20 +721,11 @@ class LSQ:
                         addr_i=ldq_addr[i],
                         filter_o=ldq_bloom_filter_raw[i],
                     )
-                for i in range(self.configs.numStqEntries):
-                    arch += lsq_submodules.bf_hash.instantiate(
-                        ctx,
-                        f"stq_bf_hash_{i}",
-                        addr_i=stq_addr[i],
-                        filter_o=stq_bloom_filter_raw[i],
-                    )
 
             # pipeline register
             ldq_bloom_filter_pcomp = LogicVecArray(ctx, 'ldq_bloom_filter_pcomp', pipe_comp_type, self.configs.numLdqEntries, self.configs.bloomFilterW)
-            stq_bloom_filter_pcomp = LogicVecArray(ctx, 'stq_bloom_filter_pcomp', pipe_comp_type, self.configs.numStqEntries, self.configs.bloomFilterW)
             if self.configs.pipeComp:
                 ldq_bloom_filter_pcomp.regInit()
-                stq_bloom_filter_pcomp.regInit()
 
             # 1. If a queue entry is not allocated or already completed, we do not need to consider
             #    it for conflict checking, so we set the filter to all zeros.
@@ -751,6 +737,33 @@ class LSQ:
                 arch += Op(ctx, ldq_bloom_filter_pcomp[i],
                            0, 'when', '(', 'not', ldq_alloc[i], 'or', load_completed[i], ')', 'else',
                            all_ones, 'when', 'not', ldq_addr_valid[i], 'else', ldq_bloom_filter_raw[i])
+        if self.configs.bloomFilterLoad:
+            stq_bloom_filter_raw = LogicVecArray(ctx, 'stq_bloom_filter_raw', 'w', self.configs.numStqEntries, self.configs.bloomFilterW)
+            if self.configs.bloomFilterSequential:
+                # sequential: use Bloom filters stored in queue entries
+                for i in range(self.configs.numStqEntries):
+                    arch += Op(ctx, stq_bloom_filter_raw[i], stq_bloom_filter[i])
+            else:
+                # combinational: generate Bloom filters from addresses on the fly
+                for i in range(self.configs.numStqEntries):
+                    arch += lsq_submodules.bf_hash.instantiate(
+                        ctx,
+                        f"stq_bf_hash_{i}",
+                        addr_i=stq_addr[i],
+                        filter_o=stq_bloom_filter_raw[i],
+                    )
+
+            # pipeline register
+            stq_bloom_filter_pcomp = LogicVecArray(ctx, 'stq_bloom_filter_pcomp', pipe_comp_type, self.configs.numStqEntries, self.configs.bloomFilterW)
+            if self.configs.pipeComp:
+                stq_bloom_filter_pcomp.regInit()
+
+            # 1. If a queue entry is not allocated or already completed, we do not need to consider
+            #    it for conflict checking, so we set the filter to all zeros.
+            # 2. If a queue entry is allocated and does not have its address yet, we set the filter
+            #    to all ones to guarantee a conflict.
+            # 3. Otherwise, we use the actual Bloom filter value generated from the address.
+            all_ones = 2 ** self.configs.bloomFilterW - 1
             for i in range(0, self.configs.numStqEntries):
                 arch += Op(ctx, stq_bloom_filter_pcomp[i],
                            0, 'when', '(', 'not', stq_alloc[i], 'or', store_completed[i], ')', 'else',
@@ -828,16 +841,18 @@ class LSQ:
             ldq_addr_valid_p0.regInit(init=[0]*self.configs.numLdqEntries)
             can_load_p0.regInit(init=[0]*self.configs.numLdqEntries)
 
-        if self.configs.bloomFilterLoad or self.configs.bloomFilterStore:
-            store_is_older_p0 = LogicVecArray(ctx, 'store_is_older_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
+        if self.configs.bloomFilterStore:
             ldq_bloom_filter_p0 = LogicVecArray(ctx, 'ldq_bloom_filter_p0', pipe0_type, self.configs.numLdqEntries, self.configs.bloomFilterW)
+            if self.configs.pipe0:
+                ldq_bloom_filter_p0.regInit()
+            for i in range(self.configs.numLdqEntries):
+                arch += Op(ctx, ldq_bloom_filter_p0[i], ldq_bloom_filter_pcomp[i])
+        if self.configs.bloomFilterLoad:
+            store_is_older_p0 = LogicVecArray(ctx, 'store_is_older_p0', pipe0_type, self.configs.numLdqEntries, self.configs.numStqEntries)
             stq_bloom_filter_p0 = LogicVecArray(ctx, 'stq_bloom_filter_p0', pipe0_type, self.configs.numStqEntries, self.configs.bloomFilterW)
             if self.configs.pipe0:
                 store_is_older_p0.regInit()
-                ldq_bloom_filter_p0.regInit()
                 stq_bloom_filter_p0.regInit()
-            for i in range(self.configs.numLdqEntries):
-                arch += Op(ctx, ldq_bloom_filter_p0[i], ldq_bloom_filter_pcomp[i])
             for i in range(self.configs.numLdqEntries):
                 arch += Op(ctx, store_is_older_p0[i], store_is_older_pcomp[i])
             for i in range(self.configs.numStqEntries):
@@ -1002,9 +1017,22 @@ class LSQ:
             store_bloom_filter_for_load = LogicVec(ctx, 'store_bloom_filter_for_load', 'w', self.configs.bloomFilterW)
             arch += Reduce(ctx, store_bloom_filter_for_load, store_bloom_filters_masked_for_load, 'or')
 
-            # Get Bloom filter for the load candidate itself (to check against store filter)
+            # Get Bloom filter for the load candidate itself (to check against store filter):
+            # - If bloom filters are also used for store issue, we have already compute the Bloom filter for the load
+            #   candidate as part of the store issue logic (to check against loads), so we can just reuse that.
+            # - Otherwise, we select the right load candidate address and compute the Bloom filter on-the-fly here.
             load_candidate_bloom_filter = LogicVec(ctx, 'load_candidate_bloom_filter', 'w', self.configs.bloomFilterW)
-            arch += Mux1H(ctx, load_candidate_bloom_filter, ldq_bloom_filter_p0, load_candidate_oh_p0)
+            if self.configs.bloomFilterStore:
+                arch += Mux1H(ctx, load_candidate_bloom_filter, ldq_bloom_filter_p0, load_candidate_oh_p0)
+            else:
+                load_candidate_addr = LogicVec(ctx, 'load_candidate_addr', 'w', self.configs.addrW)
+                arch += Mux1H(ctx, load_candidate_addr, ldq_addr, load_candidate_oh_p0)
+                arch += lsq_submodules.bf_hash.instantiate(
+                    ctx,
+                    "load_bf_hash",
+                    addr_i=load_candidate_addr,
+                    filter_o=load_candidate_bloom_filter,
+                )
 
             # Test whether load candidate is in the Bloom filter of conflicting stores. There is a conflict if the set
             # membership test returns true (i.e., all bits in the load candidate's Bloom filter are also set in the
@@ -1253,9 +1281,26 @@ class LSQ:
 
         # Store Conflict Checking with Bloom Filter
         if self.configs.bloomFilterStore:
-            # Get Bloom filter for the store candidate (to check against load filter)
+            # Obtain Bloom filter for the store candidate:
+            # - If bloom filters are also used for load issue, we have already compute the Bloom filter for the store
+            #   candidate as part of the load issue logic (to check against loads), so we can just reuse that.
+            # - Otherwise, we select the right store candidate address and compute the Bloom filter on-the-fly here.
             store_bloom_filter_curr = LogicVec(ctx, 'store_bloom_filter_curr', 'w', self.configs.bloomFilterW)
-            arch += MuxLookUp(ctx, store_bloom_filter_curr, stq_bloom_filter_pcomp, stq_issue)
+            if self.configs.bloomFilterLoad:
+                # Select the Bloom filter of the current store candidate from the load issue logic
+                arch += MuxLookUp(ctx, store_bloom_filter_curr, stq_bloom_filter_pcomp, stq_issue)
+            else:
+                # Select store candidate address
+                store_addr_curr = LogicVec(ctx, 'store_addr_curr', 'w', self.configs.addrW)
+                arch += MuxLookUp(ctx, store_addr_curr, stq_addr, stq_issue)
+
+                # Hash store candidate address on-the-fly
+                arch += lsq_submodules.bf_hash.instantiate(
+                    ctx,
+                    "store_bf_hash_curr",
+                    addr_i=store_addr_curr,
+                    filter_o=store_bloom_filter_curr,
+                )
 
             # Build the combined Bloom filter for all loads that are older than the current store.
             # Masking by 'not store_is_older_arr_curr[i]' selects only loads older than the current store.
@@ -1269,7 +1314,17 @@ class LSQ:
             if self.configs.pipe0:
                 # same again for *_next
                 store_bloom_filter_next = LogicVec(ctx, 'store_bloom_filter_next', 'w', self.configs.bloomFilterW)
-                arch += MuxLookUp(ctx, store_bloom_filter_next, stq_bloom_filter_pcomp, stq_issue_next)
+                if self.configs.bloomFilterLoad:
+                    arch += MuxLookUp(ctx, store_bloom_filter_next, stq_bloom_filter_pcomp, stq_issue_next)
+                else:
+                    store_addr_next = LogicVec(ctx, 'store_addr_next', 'w', self.configs.addrW)
+                    arch += MuxLookUp(ctx, store_addr_next, stq_addr, stq_issue_next)
+                    arch += lsq_submodules.bf_hash.instantiate(
+                        ctx,
+                        "store_bf_hash_next",
+                        addr_i=store_addr_next,
+                        filter_o=store_bloom_filter_next,
+                    )
                 load_bloom_filters_masked_for_store_next = LogicVecArray(ctx, 'load_bloom_filters_masked_for_store_next', 'w',
                                                                          self.configs.numLdqEntries, self.configs.bloomFilterW)
                 for i in range(self.configs.numLdqEntries):

@@ -37,9 +37,11 @@ def codeGen(path_rtl, configs: Configs):
     # - TODO: Also remove the load queue when there are zero load ports.
     if configs.numLdPorts > 0:
         # Load Address Port Dispatcher
+        # NOTE: We need to generate all the Bloom filters for the load entries when they
+        #       are needed for store issue, hence the use of bloomFilter*Store* here.
         ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
             name, '_lda', configs.numLdPorts, configs.numLdqEntries, configs.addrW, configs.ldpAddrW,
-            bloomFilter=(configs.bloomFilterLoad or configs.bloomFilterStore) and configs.bloomFilterSequential,
+            bloomFilter=configs.bloomFilterStore and configs.bloomFilterSequential,
             bloomFilterW=configs.bloomFilterW)
         ptq_dispatcher_lda.generate(lsq_submodules, path_rtl)
         lsq_submodules.ptq_dispatcher_lda = ptq_dispatcher_lda
@@ -51,9 +53,11 @@ def codeGen(path_rtl, configs: Configs):
         lsq_submodules.qtp_dispatcher_ldd = qtp_dispatcher_ldd
 
     # Store Address Port Dispatcher
+    # NOTE: We need to generate all the Bloom filters for the store entries when they
+    #       are needed for load issue, hence the use of bloomFilter*Load* here.
     ptq_dispatcher_sta = dispatchers.PortToQueueDispatcher(
         name, '_sta', configs.numStPorts, configs.numStqEntries, configs.addrW, configs.stpAddrW,
-        bloomFilter=(configs.bloomFilterLoad or configs.bloomFilterStore) and configs.bloomFilterSequential,
+        bloomFilter=configs.bloomFilterLoad and configs.bloomFilterSequential,
         bloomFilterW=configs.bloomFilterW)
     ptq_dispatcher_sta.generate(lsq_submodules, path_rtl)
     lsq_submodules.ptq_dispatcher_sta = ptq_dispatcher_sta
