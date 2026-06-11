@@ -5,12 +5,12 @@ void wrap_if(inout_int_t a[N], inout_int_t b[N], in_int_t c) {
   for (unsigned i = 0; i < N; ++i) {
     int x = a[i];
 #pragma DYN predict variable = x values = [3] location = start marker =        \
-                                               0 type = int
+                                               1 type = int
     int y = x * 3;
-#pragma DYN predict variable = y location = end marker = 0
+#pragma DYN predict variable = y location = end marker = 1
     if (x > 0) {
 #pragma DYN predict variable = y values = [3, -4, 5] location = start marker = \
-                                                      1 type = int
+                                                      0 type = int
       b[i] = (y + c) * 10;
     }
     a[i] = (y - c) * 11;
