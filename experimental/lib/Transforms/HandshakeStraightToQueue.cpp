@@ -514,8 +514,9 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
       delete g;
   }
 
+  std::vector<Operation *> newUnits;
   // Replace each merge created by `createPhiNetwork` with a multiplxer
-  if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
+  if (failed(ftd::replaceMergeToGSA(funcOp, rewriter, newUnits)))
     return failure();
 
   // Run fast token delivery on the newly inserted operations

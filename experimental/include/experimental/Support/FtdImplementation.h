@@ -95,9 +95,6 @@ BoolExpression *enumeratePaths(Block *start, Block *end,
                                const ftd::BlockIndexing &bi,
                                const DenseSet<Block *> &controlDeps);
 
-Value bddToCircuit(PatternRewriter &rewriter, BDD *bdd, Block *block,
-                   const ftd::BlockIndexing &bi);
-
 /// Given two sets containing object of type `Block*`, remove the common
 /// entries.
 static void eliminateCommonBlocks(DenseSet<Block *> &s1,
@@ -120,14 +117,6 @@ static void eliminateCommonBlocks(DenseSet<Block *> &s1,
 BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
                                           CFGLoopInfo &li,
                                           const ftd::BlockIndexing &bi);
-
-/// Starting from a boolean expression which is a single variable (either
-/// direct or complement) return its corresponding circuit equivalent. This
-/// means, either we obtain the output of the operation determining the
-/// condition, or we add a `not` to complement.
-Value boolVariableToCircuit(PatternRewriter &rewriter,
-                            experimental::boolean::BoolExpression *expr,
-                            Block *block, const ftd::BlockIndexing &bi);
 
 }; // namespace ftd
 }; // namespace experimental

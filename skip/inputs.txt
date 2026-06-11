@@ -1,1 +1,1 @@
-mvt_float 1
+histogram 1

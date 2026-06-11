@@ -217,7 +217,6 @@ void HandshakePlaceBuffersPass::runOnOperation() {
   allAlgorithms[COST_AWARE] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[MAPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
   allAlgorithms[CPBUF] = &HandshakePlaceBuffersPass::placeUsingMILP;
-#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
   // Check that the algorithm exists
   if (!allAlgorithms.contains(algorithm)) {
@@ -488,6 +487,7 @@ LogicalResult HandshakePlaceBuffersPass::placeBuffers(
   if (failed(getBufferPlacement(info, timingDB, logger, placement)))
     return failure();
 
+  std::vector<CFDFC> cfdfcs;
   instantiateBuffers(placement, cfdfcs);
   cfdfcAnalysis.mapFuncOpToCFDFCs[info.funcOp] = cfdfcs;
   return success();
@@ -664,12 +664,8 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   if (algorithm == CPBUF) {
     // Create and solve the MILP
     return checkLoggerAndSolve<cpbuf::CPBuffers>(logger, "placement", placement,
-                                                 env, info, timingDB, targetCP);
-  }
-  if (algorithm == CPBUF) {
-    // Create and solve the MILP
-    return checkLoggerAndSolve<cpbuf::CPBuffers>(logger, "placement", placement,
-                                                 env, info, timingDB, targetCP);
+                                                 solverKind, timeout, info,
+                                                 timingDB, targetCP);
   }
 
   llvm_unreachable("unknown algorithm");

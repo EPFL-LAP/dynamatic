@@ -229,7 +229,7 @@ void BufferPlacementMILP::addChannelTimingConstraints(
   // If a buffer is present on the signal's path, then the arrival time at the
   // buffer's register must be lower than the clock period. The signal must
   // propagate on the channel through all potential buffers cutting other
-  // signals before its own, and inside its own buffer's input pin logic
+  // signbuffer's input pin logic
   double preBufCstDelay = props.inDelay + inBufDelay;
   model->addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
                        targetPeriod,
@@ -1100,9 +1100,6 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
   for (Value channel : channels) {
     totalExecs += getChannelNumExecs(channel);
   }
-
-  // Create the expression for the MILP objective
-  LinExpr objective;
 
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC

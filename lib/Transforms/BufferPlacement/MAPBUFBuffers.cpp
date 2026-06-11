@@ -317,7 +317,7 @@ void MAPBUFBuffers::setup() {
     addUnitThroughputConstraints(*cfdfc);
   }
 
-  GRBLinExpr objective = addBackedgeObjective(allChannels);
+  LinExpr objective = addBackedgeObjective(allChannels);
 
   addMaxThroughputObjective(allChannels, cfdfcs, objective);
   markReadyToOptimize();

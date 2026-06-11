@@ -100,15 +100,16 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = model->getValue(cfVars.throughput);
 
-  //   cfdfcTPResult[idx] = tmpThroughput;
-  // }
+    //   cfdfcTPResult[idx] = tmpThroughput;
+    // }
 
-  // Create and add the handshake.tp attribute
-  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
-      funcInfo.funcOp.getContext(), cfdfcTPResult);
-  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
+    // Create and add the handshake.tp attribute
+    auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
+        funcInfo.funcOp.getContext(), cfdfcTPResult);
+    setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
 
-  populateCFDFCThroughputAndOccupancy();
+    populateCFDFCThroughputAndOccupancy();
+  }
 }
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {

@@ -194,6 +194,7 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
     (together with buffer placement) that multiple group allocations to the same
     LSQ never happen on the same cycle.   
   }];
+  let constructor = "dynamatic::createHandshakeMaterialize()";
   let options = [Option<"replicateConstants", "replicate-constant", "bool", "false",
             "If true, replicate all the source->constant per each use.">,
             Option<"forkFifoSize", "forkFifoSize", "std::string", "\"0\"",

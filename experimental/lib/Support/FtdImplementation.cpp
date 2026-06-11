@@ -868,45 +868,6 @@ static Block *findClosestLoopExit(Operation *consumer, Value connection,
          "No loop exit found in any path between producer and consumer.");
   return closestExit;
 }
-namespace dynamatic {
-namespace experimental {
-namespace ftd {
-/// Starting from a boolean expression which is a single variable (either
-/// direct or complement) return its corresponding circuit equivalent. This
-/// means, either we obtain the output of the operation determining the
-/// condition, or we add a `not` to complement.
-Value boolVariableToCircuit(PatternRewriter &rewriter,
-                            experimental::boolean::BoolExpression *expr,
-                            Block *block, const ftd::BlockIndexing &bi) {
-
-  // Convert the expression into a single condition (for instance, `c0` or
-  // `~c0`).
-  SingleCond *singleCond = static_cast<SingleCond *>(expr);
-
-  // Use the BlockIndexing to access the block corresponding to such condition
-  // and access its terminator to determine the condition.
-  auto conditionOpt = bi.getBlockFromCondition(singleCond->id);
-  if (!conditionOpt.has_value()) {
-    llvm::errs() << "Cannot obtain block condition from `BlockIndexing`\n";
-    return nullptr;
-  }
-  auto condition = conditionOpt.value()->getTerminator()->getOperand(0);
-
-  // Add a not if the condition is negated.
-  if (singleCond->isNegated) {
-    rewriter.setInsertionPointToStart(block);
-    auto notOp = rewriter.create<handshake::NotOp>(
-        block->getOperations().front().getLoc(),
-        ftd::channelifyType(condition.getType()), condition);
-    notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-    return notOp->getResult(0);
-  }
-  condition.setType(ftd::channelifyType(condition.getType()));
-  return condition;
-}
-} // namespace ftd
-} // namespace experimental
-} // namespace dynamatic
 
 /// Get a circuit out a boolean expression, depending on the different kinds
 /// of expressions you might have.
@@ -934,35 +895,6 @@ static Value boolExpressionToCircuit(PatternRewriter &rewriter,
   constOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
 
   return constOp.getResult();
-}
-
-/// Convert a `BDD` object as obtained from the bdd expansion to a
-/// circuit
-Value experimental::ftd::bddToCircuit(PatternRewriter &rewriter, BDD *bdd,
-                                      Block *block,
-                                      const ftd::BlockIndexing &bi) {
-  if (!bdd->successors.has_value())
-    return boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
-
-  rewriter.setInsertionPointToStart(block);
-
-  // Get the two operands by recursively calling `bddToCircuit` (it possibly
-  // creates other muxes in a hierarchical way)
-  SmallVector<Value> muxOperands;
-  muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->successors.value().first, block, bi));
-  muxOperands.push_back(
-      bddToCircuit(rewriter, bdd->successors.value().second, block, bi));
-  Value muxCond =
-      boolExpressionToCircuit(rewriter, bdd->boolVariable, block, bi);
-
-  // Create the multiplxer and add it to the rest of the circuit
-  auto muxOp = rewriter.create<handshake::MuxOp>(
-      block->getOperations().front().getLoc(), muxOperands[0].getType(),
-      muxCond, muxOperands);
-  muxOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-
-  return muxOp.getResult();
 }
 
 using PairOperandConsumer = std::pair<Value, Operation *>;
@@ -1143,8 +1075,7 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
   // Do not take into account conditional branch
   if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
-      !consumerOp->hasAttr("drawing") &&
-      consumerOp->getOperand(0) != operand)
+      !consumerOp->hasAttr("drawing") && consumerOp->getOperand(0) != operand)
     return newUnits;
 
   // The consumer block is the block which contains the consumer

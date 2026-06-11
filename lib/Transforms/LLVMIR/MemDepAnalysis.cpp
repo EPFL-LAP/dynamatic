@@ -824,22 +824,40 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
     }
   }
 
-  auto nameMapping = nameAllLoadStores(f);
+  auto nameMapping = nameAllLoadStores(llvmFunction);
 
-  std::map<Instruction *, LLVMMemDependency> deps;
-  for (auto &meta : loopMetaInfos) {
-    for (auto &[src, dst] : getDependencyPairs(meta)) {
-      assert(nameMapping.count(src) > 0 && "Unnamed load/store op!");
-      if (deps.count(src) == 0) {
-        LLVMMemDependency newDep;
-        newDep.name = nameMapping[src];
-        newDep.destAndDepth.emplace_back(nameMapping[dst],
-                                         meta.loop->getLoopDepth());
-        deps[src] = newDep;
-      } else {
-        deps[src].destAndDepth.emplace_back(nameMapping[dst],
-                                            meta.loop->getLoopDepth());
-      }
+  // NOTE: LLVMMemDependency:
+  // A helper data structure that holds memory dependencies.
+  // It can dump the dependencies to many llvm meta data nodes (used in LLVM IR)
+  // or to an memory dependency attribute used in the handshake dialect.
+  std::map<Instruction *, LLVMMemDependency> instToDepsMap;
+  for (auto &[src, dst] : getDependencyPairs(llvmFunction, sameScopHelper)) {
+    assert(nameMapping.count(src) > 0 && "Unnamed load/store op!");
+    // In LLVM IR, one memory instruction might produce data that is needed by
+    // many successor instructions. E.g.,
+    //
+    // store %location, %data; name = "store1"
+    // %read_data1 = load %location; name = "load1"
+    // %read_data2 = load %location; name = "load2"
+    //
+    // Here, we have two RAW dependencies: dep1 = (store1, load1) and dep2 =
+    // (store1, load2). In LLVM IR, we annotate both of them on store1 as a list
+    // of dependencies [dep1, dep2].
+    //
+    // For each pair of memory dependencies:
+    // - dep: store -> load;
+    // - dep: store -> store;
+    if (instToDepsMap.count(src) == 0) {
+      // This branch creates the list [dep1] if the predecessor instruction
+      // hasn't been visited yet
+      LLVMMemDependency newDep;
+      newDep.name = nameMapping[src];
+      newDep.destAndDepth.emplace_back(nameMapping[dst], 1);
+      instToDepsMap[src] = newDep;
+    } else {
+      // Otherwise, populate the existing list [dep1, dep2, ...] with the new
+      // dep.
+      instToDepsMap[src].destAndDepth.emplace_back(nameMapping[dst], 1);
     }
   }
 
