@@ -1,6 +1,0 @@
-set-src integration-test/predictionN/predictionN.c
-compile
-write-hdl
-simulate
-visualize
-exit

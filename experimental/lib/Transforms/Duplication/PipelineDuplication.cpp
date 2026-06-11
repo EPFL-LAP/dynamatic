@@ -89,13 +89,15 @@ PipelineDuplicationPass::validateDuplicationStructure(
 
   // which blocks are involved
   llvm::DenseSet<mlir::Block *> duplicatedBlocks;
+  // in which blocks the duplication stops
   llvm::DenseSet<mlir::Block *> terminationBlocks;
 
+  // find all blocks that are involved
   for (mlir::Operation *op : visitedOps) {
     mlir::Block *bb = op->getBlock();
     duplicatedBlocks.insert(bb);
 
-    // Track blocks that contain an endop
+    // end ops and store ops mark that the duplication stops
     if (llvm::is_contained(endOps, op) || isa<mlir::memref::StoreOp>(op)) {
       terminationBlocks.insert(bb);
     }
@@ -134,8 +136,8 @@ PipelineDuplicationPass::validateDuplicationStructure(
   return {{duplicatedBlocks, terminationBlocks}};
 }
 
-/// Helper function to backward-traverse and collect all intra-block
-/// dependencies
+/// Helper function to backward-traverse and collect all dependencies coming
+/// from the same block
 void PipelineDuplicationPass::collectDependenciesUpstream(
     mlir::Operation *op, mlir::Block *targetBlock,
     llvm::DenseSet<mlir::Operation *> &visitedOps) {
@@ -148,8 +150,8 @@ void PipelineDuplicationPass::collectDependenciesUpstream(
     if (mlir::Operation *defOp = operand.getDefiningOp()) {
       // Only care about operations within the same basic block
       if (defOp->getBlock() == targetBlock) {
-        // If it's a new operation, mark it and recursively fetch its
-        // dependencies
+        // attempt to insert the op into our set of visited operations
+        // returns true only if the element was not already present in the set
         if (visitedOps.insert(defOp).second) {
           collectDependenciesUpstream(defOp, targetBlock, visitedOps);
         }
@@ -161,8 +163,7 @@ void PipelineDuplicationPass::collectDependenciesUpstream(
 /// Performs a Depth-first Search (DFS) from a starting MLIR value to identify
 /// all operations for duplication. It traverses the dataflow chain until it
 /// either hits a store or a user-defined end operation. Operations that
-/// must be duplicated are saved in `visitedOps`, and any results that are used
-/// outside of the duplicated region are saved in `outsideDrivers`. The function
+/// must be duplicated are saved in `visitedOps`. The function
 /// returns failure if it encounters a dead-end branch before reaching an end
 /// operation, indicating an ill-defined duplication graph.
 LogicalResult PipelineDuplicationPass::collectOpsDFS(
@@ -175,16 +176,13 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
     return failure();
   }
 
-  // Get the current block context to restrict our backward search and to check
+  // get the current block context to restrict our backward search and to check
   // if the dataflow has crossed into a different block
   mlir::Block *valBlock = currentVal.getParentBlock();
   if (valBlock != currentBlock) {
-    llvm::errs() << "we should not be here \nthis is only for duplicating "
-                    "multiple blocks\n";
     // we changed block and need to make sure we have its terminator (branch)
     if (mlir::Operation *terminator = currentBlock->getTerminator()) {
-      // the second return value evaluates to true if the item was newly
-      // inserted
+      // returns true only if the item was newly inserted
       if (visitedOps.insert(terminator).second) {
         // collect all calculations in the block needed for the branch operands
         collectDependenciesUpstream(terminator, currentBlock, visitedOps);
@@ -203,8 +201,8 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
     }
 
     visitedOps.insert(user);
-    // pull in its address/index calculations upstream which is necessary for
-    // e.g. store operations
+    // pull in its dependencies upstream which is necessary for
+    // e.g. store operations where we need its address/index calculations
     collectDependenciesUpstream(user, valBlock, visitedOps);
 
     // an end operation or store operation is found which mark the end of the
@@ -301,8 +299,6 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
   std::map<int, PredictionData> markerMap;
   // tracks all marker operations
   std::vector<mlir::Operation *> markers;
-  // tracks the order of marker IDs based on when their startOp is found
-  std::vector<int> markerIdsInOrder;
 
   auto funcOps = modOp.getOps<mlir::func::FuncOp>();
   mlir::func::FuncOp funcOp = *funcOps.begin();
@@ -325,7 +321,6 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
 
     // forward the marker's input directly to its users, making it possible to
     // safely delete the markers in the end
-    // TODO: could this be placed somewhere else?
     op->getResult(0).replaceAllUsesWith(op->getOperand(0));
     markers.push_back(op);
   }
@@ -373,6 +368,7 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
         return failure();
       }
 
+      // parse the list of values corresponding to the given data type
       newData.dataType = typeAttr.getValue();
       auto parsedValues =
           parseValuesList(modOp, valuesAttr.getValue(), newData.dataType);
@@ -387,7 +383,7 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
       markerMap[markerId] = newData;
     }
 
-    // because of replaceAllUsesWith this is equal to the result
+    // get the marker's operand which is the value it should replace
     mlir::Value markerInput = op->getOperand(0);
     llvm::StringRef location = locationAttr.getValue();
 
@@ -413,9 +409,6 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
       }
       markerMap[markerId].predInput = markerInput;
 
-      // save the structural appearance order of this startOp
-      markerIdsInOrder.push_back(markerId);
-
       // process the "end" marker to register the terminating operations of the
       // duplicated region
     } else if (location == "end") {
@@ -431,12 +424,10 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
   }
 
   // populate pragmaData using the ordered markerId list
-  for (int markerId : markerIdsInOrder) {
-    PredictionData &data = markerMap[markerId];
-
+  for (auto &[op, data] : markerMap) {
     // ensure every collected prediction group has a defined entry point
     if (!data.startOp) {
-      llvm::errs() << "Marker ID " << markerId
+      llvm::errs() << "Marker ID " << op
                    << "does not have a valid start operation\n";
       return failure();
     }
@@ -457,45 +448,10 @@ void PipelineDuplicationPass::runOnOperation() {
   LLVM_DEBUG(llvm::errs() << "start reading predict marker data \n");
   if (failed(readPredictMarker(modOp, pragmaData)))
     return signalPassFailure();
-  llvm::errs() << "done reading predict marker data \n"; // change to LLVM_DEBUG
+  LLVM_DEBUG(llvm::errs() << "done reading predict marker data \n");
 
-  // print pragmadata
-  for (auto data : pragmaData) {
-    // llvm::errs() << "Data Type : " << data.dataType << "\n";
-
-    llvm::errs() << "new Values: " << data.values << '\n';
-
-    // Print the start operation
-    llvm::errs() << "Start Op  : ";
-    if (data.startOp) {
-      data.startOp->print(llvm::errs());
-    }
-    llvm::errs() << "\n";
-
-    llvm::errs() << "predInput : ";
-    if (data.predInput) {
-      data.predInput.print(llvm::errs());
-    }
-    llvm::errs() << '\n';
-
-    // Print the end operations
-    llvm::errs() << "End Ops   : ";
-    if (data.endOps.empty()) {
-      llvm::errs() << "None\n";
-    } else {
-      llvm::errs() << "\n";
-      for (mlir::Operation *op : data.endOps) {
-        llvm::errs() << "  -> ";
-        if (op)
-          op->print(llvm::errs());
-        else
-          llvm::errs() << "nullptr";
-        llvm::errs() << "\n";
-      }
-    }
-    llvm::errs() << "------------------------------------\n";
-  }
-
+  // iterator for the new names
+  int i = 0;
   // iterate over all pragmas with a start
   for (auto data : pragmaData) {
 
@@ -513,13 +469,14 @@ void PipelineDuplicationPass::runOnOperation() {
     // DFS starting from the result of startop to find all ops that have to be
     // duplicated
     llvm::DenseSet<mlir::Operation *> visitedOps;
-    llvm::DenseSet<mlir::Value> outsideDrivers;
     visitedOps.insert(startOp);
 
+    // if the startOp is also in endOps we only have to duplicate this one
+    // operation and no DFS is necessary
     if (data.endOps.empty() ||
         (!data.endOps.empty() && startOp != data.endOps[0])) {
       for (auto op : startOp->getResults()) {
-        llvm::errs() << "start dfs \n";
+        LLVM_DEBUG(llvm::errs() << "start dfs \n");
         if (failed(collectOpsDFS(op, data.endOps, originalRemainderBlock,
                                  visitedOps))) {
           llvm::errs()
@@ -528,7 +485,7 @@ void PipelineDuplicationPass::runOnOperation() {
           return signalPassFailure();
         }
       }
-      llvm::errs() << "dfs succeeded\n";
+      LLVM_DEBUG(llvm::errs() << "dfs succeeded\n");
     }
 
     // check whether the duplicated graph is well-defined and save the blocks
@@ -541,7 +498,8 @@ void PipelineDuplicationPass::runOnOperation() {
     auto &involvedBlocks = result->first;
     auto &terminationBlocks = result->second;
 
-    // iterate through the function to sort
+    // iterate through the function to sort as the operations collected during
+    // the DFS might not be in the correct order
     llvm::SmallVector<mlir::Operation *> opsToMove;
     for (mlir::Block *block : involvedBlocks) {
       for (mlir::Operation &blockOp : *block) {
@@ -551,7 +509,8 @@ void PipelineDuplicationPass::runOnOperation() {
       }
     }
 
-    // Map to track outside drivers per block
+    // DenseMap to track outside drivers per block, which have to be given to
+    // the next block as block args
     llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Value>>
         blockOutsideDrivers;
     for (mlir::Operation *user : data.endOps) {
@@ -591,10 +550,10 @@ void PipelineDuplicationPass::runOnOperation() {
       lastPath = originalRemainderBlock;
     }
 
+    // keep track of the newly created blocks
     llvm::DenseSet<mlir::Block *> trueBlocksSet;
 
     // PREDICTED PATHS
-    int i = 0;
     for (mlir::Attribute attr : data.values) {
       // create branch condition
       builder.setInsertionPointToEnd(targetBlock);
@@ -615,13 +574,13 @@ void PipelineDuplicationPass::runOnOperation() {
       }
 
       mlir::Block *trueEntryBlock = funcOp.addBlock(); // true path
-      trueBlocksSet.insert(trueEntryBlock);
-
-      mlir::Block *nextElseBlock; // false path
+      mlir::Block *nextElseBlock;                      // false path
       if (i + 1 < (int)data.values.size())
         nextElseBlock = funcOp.addBlock();
       else
         nextElseBlock = lastPath;
+      trueBlocksSet.insert(trueEntryBlock);
+      trueBlocksSet.insert(nextElseBlock);
 
       builder.create<mlir::cf::CondBranchOp>(loc, branchCond, trueEntryBlock,
                                              nextElseBlock);
@@ -640,7 +599,6 @@ void PipelineDuplicationPass::runOnOperation() {
       // generate all duplicated blocks
       // map original block to the duplicated blocks
       llvm::DenseMap<mlir::Block *, mlir::Block *> blockMap;
-
       mlir::Block *firstOrigBlock = opsToMove.front()->getBlock();
       blockMap[firstOrigBlock] = trueEntryBlock;
       mapper.map(firstOrigBlock, trueEntryBlock);
@@ -682,7 +640,6 @@ void PipelineDuplicationPass::runOnOperation() {
           mlir::Operation *cloned = builder.clone(*origOp, mapper);
           std::string newName =
               namer.getName(origOp).str() + "_dup" + std::to_string(i);
-          llvm::errs() << "newName: " << newName << '\n';
           cloned->setAttr("handshake.name", builder.getStringAttr(newName));
 
           for (unsigned j = 0; j < cloned->getNumResults(); j++) {
@@ -712,16 +669,16 @@ void PipelineDuplicationPass::runOnOperation() {
       }
 
       // Print Value mappings (Original Value -> Cloned Value)
-      llvm::errs() << "--- Mapper Contents ---\n";
+      LLVM_DEBUG(llvm::errs() << "--- Mapper Contents ---\n");
       for (auto &pair : mapper.getValueMap()) {
         mlir::Value original = pair.first;
         mlir::Value cloned = pair.second;
 
-        llvm::errs() << "Value Mapping:\n";
-        llvm::errs() << "  From: " << original << "\n";
-        llvm::errs() << "  To:   " << cloned << "\n";
+        LLVM_DEBUG(llvm::errs() << "Value Mapping:\n");
+        LLVM_DEBUG(llvm::errs() << "  From: " << original << "\n");
+        LLVM_DEBUG(llvm::errs() << "  To:   " << cloned << "\n");
       }
-      llvm::errs() << "-----------------------\n";
+      LLVM_DEBUG(llvm::errs() << "-----------------------\n");
 
       // update
       targetBlock = nextElseBlock;
@@ -779,7 +736,6 @@ void PipelineDuplicationPass::runOnOperation() {
 
         origOut.replaceUsesWithIf(newBlockArg, [&](OpOperand &operand) {
           mlir::Block *userBlock = operand.getOwner()->getBlock();
-
           // if the user is inside the original block itself, it should now read
           // from the block argument
           if (userBlock == origBlock) {
@@ -810,7 +766,7 @@ void PipelineDuplicationPass::runOnOperation() {
     return signalPassFailure();
 
   // dump the entire IR
-  llvm::errs() << "=== IR BEFORE PUSH CONSTANTS AND HANDSHAKE ===\n";
+  /* llvm::errs() << "=== IR BEFORE PUSH CONSTANTS AND HANDSHAKE ===\n";
   modOp.dump();
-  llvm::errs() << "==============================================\n";
+  llvm::errs() << "==============================================\n"; */
 }

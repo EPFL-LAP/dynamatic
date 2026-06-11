@@ -4,10 +4,10 @@
 void finite_loop(inout_float_t a[N], inout_int_t b[N]) {
   int x = 0;
   for (unsigned i = 1; i < N; ++i) {
-    a[i] = a[i-1] * -2.0+15.0;
+    a[i] = a[i - 1] * -2.0 + 15.0;
     // x = a[i]*4 + 8 - x;
     // b[i] = i;
-  } 
+  }
 }
 
 int main(void) {

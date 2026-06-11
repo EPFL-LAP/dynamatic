@@ -72,16 +72,16 @@ struct PipelineDuplicationPass::PredictionData {
 ```
 
 ### Overview
-The core pass driver (`runDynamaticPass`) executes the transformation in four sequential phases for each prediction marker:
+The core pass driver (`runOnOperation`) executes the transformation in four sequential phases for each prediction marker:
 1. **Block Splitting**: The basic block containing the start operation is split immediately before. This isolates the original operations and the following logic into a separate block (`exitBlock`).
 2. **DFS**: A Depth-first Search goes through the data-flow chain beginning at `startOp` and terminates at either a user-defined `endOp` or store operations. This tracks all operations that must be duplicated. If the DFS does not find an `endOp` or store operation at all the "leaves" of the graph, it returns an error.
 3. **Cloning**: The pass iterates over the list of constants (`values`). For each constant, it inserts a comparison check and a conditional branch to ensure that we still have correct control flow. The `true` branch then generates a new block with cloned versions of the operations identified by the DFS, substituting `predInput` with the hardcoded constant.
 4. **False Path**: When all of the paths with constants have been created, the last `false` branch has all of the original operations moved into the last alternative block. All of these paths then merge back into the `exitBlock`.
 
-A high-level overview of the `runDynamaticPass` is given here:
+A high-level overview of the `runOnOperation` is given here:
 
 ```c++
-void PipelineDuplicationPass::runDynamaticPass() {
+void PipelineDuplicationPass::runOnOperation() {
   
   // read input data from the pragmas
   std::vector<PredictionData> pragmaData;
