@@ -814,6 +814,41 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addUnsigned("NUM_STORES", ports.getNumPorts<StorePort>() + lsqPort);
         addType("DATA_TYPE", ChannelType::get(dataType));
         addType("ADDR_TYPE", ChannelType::get(addrType));
+
+        // [START hack: pass the port order to the python generator]
+        //
+        // As of 26.5.2026, the port ordering of memory controller is very
+        // complex:
+        //
+        // loadData?, {control_port, load/store*,}+
+        //
+        // Basically the control ports and load/store ports are grouped by BBs,
+        // and this is very complex to encode. SMV backend doesn't know the
+        // order of the ports. This passes the order directly to the SMV backend
+        std::string smvInputSymbolNames;
+        llvm::raw_string_ostream os(smvInputSymbolNames);
+        SmallVector<std::string> smvInputSymbols{"loadData"};
+        auto mcOp = dyn_cast<handshake::MemoryControllerOp>(op);
+        for (unsigned i = 0; i < op->getNumOperands(); i++) {
+          Value operand = op->getOperand(i);
+          if (isa<handshake::ChannelType>(operand.getType())) {
+            smvInputSymbols.push_back(mcOp.getOperandName(i));
+            smvInputSymbols.push_back(mcOp.getOperandName(i) + "_valid");
+          } else if (isa<handshake::ControlType>(operand.getType())) {
+            smvInputSymbols.push_back(mcOp.getOperandName(i) + "_valid");
+          }
+        }
+        for (unsigned i = 0; i < op->getNumResults(); i++) {
+          Value res = op->getResult(i);
+          if (isa<handshake::ChannelType, handshake::ControlType>(
+                  res.getType())) {
+            smvInputSymbols.push_back(mcOp.getResultName(i) + "_ready");
+          }
+        }
+        llvm::interleaveComma(smvInputSymbols, os);
+        os.flush();
+        addString("SMV_INPUT_SYMBOLS", smvInputSymbolNames);
+        // [END hack: pass the port order to the python generator]
       })
       .Case<handshake::LSQOp>([&](auto) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());

@@ -1363,17 +1363,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"saveCtrl">,
-  IsIntSizedChannel<1, "saveCtrl">,
+  IsSimpleHandshake<"issueCtrl">,
+  IsIntSizedChannel<2, "issueCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
-  IsSimpleHandshake<"SCSaveCtrl">,
-  IsIntSizedChannel<3, "SCSaveCtrl">,
-  IsSimpleHandshake<"SCCommitCtrl">,
-  IsIntSizedChannel<3, "SCCommitCtrl">,
-  IsSimpleHandshake<"SCIsMisspec">,
-  IsIntSizedChannel<1, "SCIsMisspec">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -1381,19 +1378,21 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
-    It needs to send control tokens to save units and commit units
-    ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while
-    $SCCommitCtrl replicates the branches that $dataOut
-    follows and might not reach a save-commit. $SCIsMisspec is needed
-    in the replicated branches to discard the latter signal.
+    It exposes three control outputs.
+    Two unconditionally go to the save-commits 
+    $issueCtrl (which affects when tokens are issued by the save-commit)
+    and $historyCtrl (which affects what the save-commit does with its
+    internal token history)
+    One to the commit units: $commitCtrl
+    which conditionally connects to the commit units, routing through 
+    the speculative region's branches to reach the correct commits).
 
     Example:
 
     ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
+    %dataOut, %issueCtrl, %historyCtrl, %commitCtrl
       = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
-        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
+        <i1>, <i1>, <i1>
     ```
   }];
 
@@ -1401,15 +1400,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                        ControlType:$trigger,
                        UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
-                      ChannelType:$saveCtrl, ChannelType:$commitCtrl,
-                      ChannelType:$SCSaveCtrl,
-                      ChannelType:$SCCommitCtrl,
-                      ChannelType:$SCIsMisspec);
+                      ChannelType:$issueCtrl,
+                      ChannelType:$historyCtrl,
+                      ChannelType:$commitCtrl);
 
   let assemblyFormat = [{
     `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
-    type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
-    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCIsMisspec)
+    type($dataOut) `,` type($issueCtrl) `,` type($historyCtrl) `,`
+    type($commitCtrl)
   }];
 
   // Infer the type of the control signals
@@ -1417,11 +1415,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     $_state.addOperands({dataIn, trigger});
     $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
 
-    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
-    ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
+    ChannelType issueResolveType = ChannelType::get($_builder.getIntegerType(2));
+    ChannelType commitType = ChannelType::get($_builder.getIntegerType(1));
 
-    $_state.addTypes({dataOutType, ctrlType, ctrlType, wideControlType,
-      wideControlType, ctrlType});
+    $_state.addTypes({dataOutType, issueResolveType, issueResolveType, commitType});
   }]>];
 
   let extraClassDefinition = [{
@@ -1436,15 +1433,11 @@ def SpeculatorOp : Handshake_Op<"speculator", [
       case 0:
         return "outs";
       case 1:
-        return "ctrl_save";
+        return "ctrl_issue";
       case 2:
-        return "ctrl_commit";
-      case 3:
-        return "ctrl_sc_save";
-      case 4:
-        return "ctrl_sc_commit";
+        return "ctrl_history";
       default:
-        return "ctrl_sc_branch";
+        return "ctrl_commit";
       }
     }
 
@@ -1577,9 +1570,12 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"ctrl">,
-  IsIntSizedChannel<3, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  IsSimpleHandshake<"issueCtrl">,
+  IsIntSizedChannel<2, "issueCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
@@ -1588,24 +1584,33 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     speculative and non-speculative tokens pass as well as save
     a copy of them.
 
+    Two control inputs broadcast from the speculator:
+    $issueCtrl affects how tokens are issued
+    $historyCtrl affects how the internalt token history is updated
+
     Example:
 
     ```mlir
-    %dataOut = spec_save_commit[%ctrl] %dataIn : i11
+    %dataOut = spec_save_commit[%issueCtrl, %historyCtrl] %dataIn : i11
     ```
   }];
   let arguments = (ins HandshakeType:$dataIn,
-                       ChannelType:$ctrl,
+                       ChannelType:$issueCtrl,
+                       ChannelType:$historyCtrl,
                        UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+    `[` $issueCtrl `,` $historyCtrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($issueCtrl) `,` type($historyCtrl)
   }];
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
-      return idx == 0 ? "ins" : "ctrl";
+      switch (idx) {
+      case 0: return "ins";
+      case 1: return "ctrl_issue";
+      default: return "ctrl_history";
+      }
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
@@ -1620,7 +1625,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
         {::mlir::StringAttr::get(ctx, "BITWIDTH"),
          ::mlir::TypeAttr::get(getResult().getType())},
         {::mlir::StringAttr::get(ctx, "FIFO_DEPTH"),
-         ::mlir::TypeAttr::get(getCtrl().getType())}
+         ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32), getFifoDepth())}
       };
     }
   }];

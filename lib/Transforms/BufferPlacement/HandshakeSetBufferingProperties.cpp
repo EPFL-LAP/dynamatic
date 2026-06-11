@@ -53,6 +53,59 @@ static void makeUnbufferizable(Value val) {
   channel.props->maxTrans = 0;
 }
 
+// The speculator requires specific buffers
+// for correctness
+static LogicalResult
+setSpeculatorBufferingProperties(handshake::FuncOp funcOp) {
+  auto specOps = funcOp.getOps<handshake::SpeculatorOp>();
+  auto specCount = std::distance(specOps.begin(), specOps.end());
+  if (specCount > 1) {
+    funcOp.emitError() << "Expected at most one SpeculatorOp";
+    return failure();
+  }
+  // no spec op = successful buffer placement
+  if (specCount == 0)
+    return success();
+
+  auto specOp = *specOps.begin();
+
+  // dataOut is volatile
+  // (value can change without being accepted,
+  // from a predicted value
+  // to re-sending an mis-predicted value)
+  // and so is not safe to connect to an eager fork.
+  // We place a buffer here for safety
+  Value dataOut = specOp.getDataOut();
+  Channel dataChannel(dataOut, true);
+  dataChannel.props->minTrans = std::max(dataChannel.props->minTrans, 1U);
+
+  // issueCtrl is volatile
+  // (value can change without being accepted,
+  // from spec to resend)
+  // and so if not safe to connect to an eager fork
+  // We place a buffer here for safety.
+  Value issueCtrl = specOp.getIssueCtrl();
+  Channel issueChannel(issueCtrl, true);
+  issueChannel.props->minTrans = std::max(issueChannel.props->minTrans, 1U);
+
+  // historyCtrl is on a path from a lazy fork
+  // to a join
+  // and so needs a buffer to prevent deadlock
+  Value historyCtrl = specOp.getHistoryCtrl();
+  Channel resolveChannel(historyCtrl, true);
+  resolveChannel.props->minTrans = std::max(resolveChannel.props->minTrans, 1U);
+
+  // The speculator's KILL_ONLY_DATA state stalls the data input for
+  // 1 cycle during misspeculation recovery. A transparent buffer on
+  // the data input absorbs this stall and prevents it from propagating
+  // upstream and causing throughput loss.
+  Value dataIn = specOp.getDataIn();
+  Channel dataInChannel(dataIn, true);
+  dataInChannel.props->minTrans = std::max(dataInChannel.props->minTrans, 1U);
+
+  return success();
+}
+
 /// Sets buffering constraints related to the LSQ's control path. Output
 /// channels of group-allocation-signal-defining (lazy-)forks to the LSQ must be
 /// buffered in a particular way:
@@ -118,7 +171,7 @@ static void setLSQControlConstraints(handshake::LSQOp lsqOp) {
   }
 }
 
-static void setFPGA20Properties(handshake::FuncOp funcOp) {
+static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
   // See docs/Specs/Buffering.md
   // A merge with more than one input should have at least one
   // buffer slot at its output, and this is necessary only if
@@ -195,6 +248,11 @@ static void setFPGA20Properties(handshake::FuncOp funcOp) {
   // Control paths to LSQs have specific properties
   for (handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>())
     setLSQControlConstraints(lsqOp);
+
+  if (failed(setSpeculatorBufferingProperties(funcOp)))
+    return failure();
+
+  return success();
 }
 
 namespace {
@@ -223,7 +281,8 @@ struct HandshakeSetBufferingPropertiesPass
         funcOp.emitOpError() << ERR_NON_MATERIALIZED_FUNC;
         return signalPassFailure();
       }
-      setFPGA20Properties(funcOp);
+      if (failed(setFPGA20Properties(funcOp)))
+        return signalPassFailure();
     }
   };
 };

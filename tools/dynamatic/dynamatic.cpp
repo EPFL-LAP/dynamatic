@@ -303,6 +303,7 @@ public:
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
   static constexpr llvm::StringLiteral ENABLE_SHORT_CIRCUIT =
       "enable-short-circuit";
+  static constexpr llvm::StringLiteral SPECULATION = "speculation";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -336,6 +337,9 @@ public:
     addFlag({ENABLE_SHORT_CIRCUIT,
              "Enable short-circuit evaluation of && and ||, "
              "to match C specification"});
+    addFlag({SPECULATION,
+             "Enable speculation. Requires a #pragma DYN speculate "
+             "`in the source code file."});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -777,12 +781,14 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
   std::string enableShortCircuit =
       args.flags.contains(ENABLE_SHORT_CIRCUIT) ? "1" : "0";
+  std::string speculation = args.flags.contains(SPECULATION) ? "1" : "0";
 
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
-      fastTokenDelivery, milpSolver, straightToQueue, enableShortCircuit);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), sharing,
+                 state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
+                 fastTokenDelivery, milpSolver, straightToQueue, speculation,
+                 enableShortCircuit);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

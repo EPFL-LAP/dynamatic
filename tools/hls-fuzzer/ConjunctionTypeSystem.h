@@ -461,12 +461,11 @@ private:
   static auto contextTupleToSubContextTuple(
       const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts) {
     return mapTuplesIntoArray(
-        [&](auto &&context) -> std::optional<OpaqueContext> {
+        [&](auto &&context) -> const void * {
           if (!context)
-            return std::nullopt;
+            return nullptr;
 
-          return OpaqueContext(
-              std::get<index>(context->template cast<Context>()));
+          return &std::get<index>(*reinterpret_cast<const Context *>(context));
         },
         contexts);
   }

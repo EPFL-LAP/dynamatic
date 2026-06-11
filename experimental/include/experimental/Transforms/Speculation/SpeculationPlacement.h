@@ -30,7 +30,6 @@
 
 namespace dynamatic {
 namespace experimental {
-namespace speculation {
 
 struct PlacementOperand {
   std::string opName;
@@ -55,10 +54,9 @@ public:
   SpeculationPlacements(OpOperand &speculatorPosition)
       : speculator(&speculatorPosition) {};
 
-  /// Walk `modOp` for the single op carrying a `dynamatic.speculate` dict
-  /// attribute, then set the speculator position from it. Sets both
-  /// speculatorFifoDepth and saveCommitsFifoDepth from the attribute's
-  /// `max_predictions` entry. Fails if zero or more than one op is marked.
+  /// Set the speculator position from a `dynamatic.speculate` dict attribute
+  /// on the given producer op. Sets both speculatorFifoDepth and
+  /// saveCommitsFifoDepth from the attribute's `max_predictions` entry.
   static LogicalResult readFromAttribute(mlir::ModuleOp modOp,
                                          SpeculationPlacements &place);
 
@@ -102,7 +100,6 @@ public:
   void setSaveCommitsFifoDepth(unsigned int depth);
 };
 
-} // namespace speculation
 } // namespace experimental
 } // namespace dynamatic
 
