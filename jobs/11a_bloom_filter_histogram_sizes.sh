@@ -9,15 +9,16 @@ LSQ_SIZES=(4 6 8 10 12 16 20)
 
 # k, log2(m)
 BLOOM_FILTER_HASH_COUNTS_WIDTHS=(
-  "1 2"
+	"1 2"
 	"1 3"
-  "2 3"
+	"1 4"
+	"2 3"
 	"2 4"
-  "2 5"
-  "3 4"
+	"2 5"
+	"3 4"
 	"3 5"
-  "3 6"
-  "4 5"
+	"3 6"
+	"4 5"
 	"4 6"
 )
 
@@ -86,5 +87,6 @@ for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
 			"$RUN_EVALUATION_PY" --synth-lsqs -j 8 \
 				--kernel "${KERNEL}" \
 				--json "${OUTPUT_SUBDIR}/lsq_${LSQ_SIZE}_${LSQ_SIZE}.json"
+		done
 	done
 done
