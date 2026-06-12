@@ -23,6 +23,7 @@ MILP_SOLVER=${13}
 STRAIGHT_TO_QUEUE=${14}
 SPECULATION=${15}
 ENABLE_SHORT_CIRCUIT=${16}
+ENABLE_DUPLICATION=${17:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -49,6 +50,7 @@ F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
@@ -238,7 +240,9 @@ $DYNAMATIC_OPT_BIN \
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
-F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
+# duplicate parts of the operations specified by pragmas
+# consume all pragmas
+if [[ "$ENABLE_DUPLICATION" == "1" ]]; then
 $DYNAMATIC_OPT_BIN \
   --allow-unregistered-dialect \
   "$F_CF_TRANSFORMED" \
@@ -247,7 +251,19 @@ $DYNAMATIC_OPT_BIN \
   --consume-producer-output-attr-marker \
   > "$F_CF_DUPLICATED"
 exit_on_fail "Failed to apply CF duplication" \
-  "Applied CF duplication"
+  "Applied CF duplication!"
+
+else
+# only consume the markers
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --consume-producer-output-attr-marker \
+  > "$F_CF_DUPLICATED"
+exit_on_fail "Failed to consume markers" \
+  "Consumed markers successfully"
+fi
+
 
 if [[ $DISABLE_LSQ -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_CF_DUPLICATED" \

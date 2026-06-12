@@ -304,6 +304,8 @@ public:
   static constexpr llvm::StringLiteral ENABLE_SHORT_CIRCUIT =
       "enable-short-circuit";
   static constexpr llvm::StringLiteral SPECULATION = "speculation";
+  static constexpr llvm::StringLiteral ENABLE_DUPLICATION =
+      "enable-duplication";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -339,6 +341,9 @@ public:
              "to match C specification"});
     addFlag({SPECULATION,
              "Enable speculation. Requires a #pragma DYN speculate "
+             "`in the source code file."});
+    addFlag({ENABLE_DUPLICATION,
+             "Enable duplication. Requires a #pragma DYN predict "
              "`in the source code file."});
   }
 
@@ -782,13 +787,15 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string enableShortCircuit =
       args.flags.contains(ENABLE_SHORT_CIRCUIT) ? "1" : "0";
   std::string speculation = args.flags.contains(SPECULATION) ? "1" : "0";
+  std::string enableDuplication =
+      args.flags.contains(ENABLE_DUPLICATION) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
-                 enableShortCircuit);
+                 enableShortCircuit, enableDuplication);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
