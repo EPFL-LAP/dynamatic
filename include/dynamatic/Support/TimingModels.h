@@ -269,10 +269,6 @@ public:
   /// bitwidth in the model. On success, sets the last argument to the data
   /// delay.
   LogicalResult getTotalDataDelay(unsigned bitwidth, double &delay) const;
-
-  double getTotalValidDelay() const { return validDelay; };
-
-  double getTotalReadyDelay() const { return readyDelay; };
 };
 
 /// Deserializes a JSON value into a TimingModel. See ::llvm::json::Value's
@@ -385,14 +381,13 @@ public:
   static LogicalResult readFromJSON(std::string &jsonPath,
                                     TimingDatabase &timingDB);
 
-  /// Loads the per-port-pair spec timing entries (e.g. for SpeculatorOp and
-  /// SpecSaveCommitOp) from the JSON file at `jsonPath`. Fails if the file is
-  /// missing or malformed.
+  /// Parses a JSON file whose path is given as argument and adds all the
+  /// spec timing models it contains to the passed timing database.
   static LogicalResult readSpecTimingFromJSON(std::string &jsonPath,
                                               TimingDatabase &timingDB);
 
-  /// Returns the spec timing model for the given op-name key, or nullptr if
-  /// none was loaded.
+  /// Returns the spec timing model for the given op-name,
+  /// or nullptr if none was loaded.
   const SpecTimingModel *getSpecModel(StringRef timingModelKey) const;
 
   /// Convenience overload returning the spec timing model corresponding to

@@ -262,10 +262,10 @@ LogicalResult TimingDatabase::getTotalDelay(Operation *op,
   case SignalType::DATA:
     return model->getTotalDataDelay(getOpDatawidth(op), delay);
   case SignalType::VALID:
-    delay = model->getTotalValidDelay();
+    delay = model->validDelay;
     return success();
   case SignalType::READY:
-    delay = model->getTotalReadyDelay();
+    delay = model->readyDelay;
     return success();
   }
 }

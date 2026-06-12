@@ -227,9 +227,9 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
     (void)bufModel->getTotalDataDelay(bitwidth, delay);
     return delay;
   case SignalType::VALID:
-    return bufModel->getTotalValidDelay();
+    return bufModel->validDelay;
   case SignalType::READY:
-    return bufModel->getTotalReadyDelay();
+    return bufModel->readyDelay;
   }
 }
 
