@@ -120,8 +120,7 @@ public:
         /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
         /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
         /*output=*/
-        OutputTransferFn<ast::ArrayAssignmentStatement>(
-            std::index_sequence<INPUT_DEPENDENCY>{},
+        OutputTransferFn<ast::ArrayAssignmentStatement, INPUT_DEPENDENCY>(
             [](const ast::ArrayAssignmentStatement &,
                LimitTypingContext context) {
               context.totalNumberOfStatements++;
