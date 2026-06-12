@@ -46,14 +46,20 @@ public:
   /// It is undefined behaviour if this wasn't constructed with an instance of
   /// 'TypingContext'.
   template <typename TypingContext>
-  const TypingContext &cast() const {
+  const TypingContext &cast() const & {
     assert(data() != nullptr);
     return *reinterpret_cast<const TypingContext *>(data());
   }
 
+  template <typename TypingContext>
+  TypingContext &&cast() && {
+    assert(data() != nullptr);
+    return std::move(*reinterpret_cast<TypingContext *>(data()));
+  }
+
   // Enable noop casts to 'OpaqueContext'.
   template <>
-  const OpaqueContext &cast<OpaqueContext>() const {
+  const OpaqueContext &cast<OpaqueContext>() const & {
     return *this;
   }
 
@@ -70,6 +76,10 @@ public:
           return base->pointer();
         },
         storage);
+  }
+
+  void *data() {
+    return const_cast<void *>(static_cast<const OpaqueContext *>(this)->data());
   }
 
 private:
@@ -328,7 +338,7 @@ public:
   /// Constructs an 'OpaqueTransferFn' from a 'Dependency'.
   template <typename TypingContext, std::size_t... inputIndices>
   /*implicit*/ OpaqueTransferFn(
-      TransferFn<TypingContext, ASTNode, inputIndices...> &&dep)
+      TransferFn<TypingContext, ASTNode, inputIndices...> dep)
       : OpaqueTransferFn(
             llvm::identity<TypingContext>{},
             []() -> llvm::ArrayRef<std::size_t> {
@@ -414,6 +424,21 @@ public:
   OpaqueContext operator()(const SubElementsTuple<ASTNode> &subElements,
                            const ContextTuple<ASTNode> &contexts) const {
     return computationFn(subElements, contexts);
+  }
+
+  /// More type-safe variant of the call operator that accepts and returns
+  /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
+  /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
+  /// was originally constructed with.
+  template <typename TypingContext>
+  TypingContext
+  call(const SubElementsTuple<ASTNode> &subElements,
+       const TypedContextTuple<ASTNode, TypingContext> &contexts) const {
+    return (*this)(subElements,
+                   mapTuplesIntoArray([](const TypingContext *context)
+                                          -> const void * { return context; },
+                                      contexts))
+        .template cast<TypingContext>();
   }
 
 private:
@@ -551,6 +576,21 @@ public:
   OpaqueContext operator()(const ASTNode &astNode,
                            const ContextTuple<ASTNode> &contexts) const {
     return computationFn(astNode, contexts);
+  }
+
+  /// More type-safe variant of the call operator that accepts and returns
+  /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
+  /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
+  /// was originally constructed with.
+  template <typename TypingContext>
+  TypingContext
+  call(const ASTNode &astNode,
+       const TypedContextTuple<ASTNode, TypingContext> &contexts) const {
+    return (*this)(astNode,
+                   mapTuplesIntoArray([](const TypingContext *context)
+                                          -> const void * { return context; },
+                                      contexts))
+        .template cast<TypingContext>();
   }
 
 private:
