@@ -54,7 +54,7 @@ PIPELINE_CONFIGS=(
 
 # k, log2(m)
 BLOOM_FILTER_HASH_COUNTS_WIDTHS=(
- "baseline"
+	"baseline"
 	"1 3"
 	"2 4"
 	"3 5"
@@ -142,9 +142,10 @@ with open(lsq_json, 'w') as f:
 EOF
 
       for LSQ_SIZE in "${LSQ_SIZES[@]}"; do
-        OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/bf_m${FILTER_WIDTH}_k${HASH_COUNT}/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
         if [[ "$BASELINE" -eq 1 ]]; then
           OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/baseline/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
+        else
+          OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/bf_m${FILTER_WIDTH}_k${HASH_COUNT}/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
         fi
 
         echo "Output directory for"
