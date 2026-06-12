@@ -31,6 +31,8 @@ public:
       TypeSystem<std::tuple<typename SubTypeSystems::Context...>, Self>;
   using Context = typename Base::Context;
 
+  ConjunctionTypeSystemBase() = default;
+
   /// Constructs a conjunctive typesystem from the instances of the
   /// sub-typesystems.
   explicit ConjunctionTypeSystemBase(SubTypeSystems &&...subTypeSystems)
