@@ -143,10 +143,9 @@ public:
 
   TransferFnArray<ast::Constant> getConstantTransferFns() override {
     return {
-        OutputTransferFn<ast::Constant>(
-            [](const ast::Constant &constant) {
-              return typeToContext(constant.getType());
-            }),
+        OutputTransferFn<ast::Constant>([](const ast::Constant &constant) {
+          return typeToContext(constant.getType());
+        }),
     };
   }
 
