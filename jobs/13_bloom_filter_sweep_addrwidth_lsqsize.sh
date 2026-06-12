@@ -73,7 +73,6 @@ mkdir -p "${OUTPUT_DIR}"
 cat <<EOF >"${OUTPUT_DIR}/README.txt"
 Experiment 13: Bloom filter sweep with varying address widths and LSQ sizes
 - Bloom filter type: sequential, conservative store issue
-- synthesis target clock period: ${SYNTHESIS_CLOCK_PERIOD_NS} ns
 - sweep parameters:
   - LSQ sizes: ${LSQ_SIZES[*]} entries
   - address widths: ${ADDR_WIDTHS[*]} bits
@@ -156,8 +155,8 @@ EOF
           "$REPO_ROOT" \
           "$KERNEL_OUTPUT_DIR" \
           "handshake_lsq_lsq1_core" \
-          "2.500" \
-          "1.250" \
+          "4.000" \
+          "2.000" \
           "$SYNTH_DIR"
 
         echo "Copying artifacts..."
