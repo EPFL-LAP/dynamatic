@@ -54,6 +54,7 @@ PIPELINE_CONFIGS=(
 
 # k, log2(m)
 BLOOM_FILTER_HASH_COUNTS_WIDTHS=(
+ "baseline"
 	"1 3"
 	"2 4"
 	"3 5"
@@ -62,8 +63,6 @@ BLOOM_FILTER_HASH_COUNTS_WIDTHS=(
 
 # fixed parameters
 export LSQ_NO_BYPASS=1
-export LSQ_ST_ISSUE_NO_COMPARE=1
-export LSQ_BLOOM_FILTER_LOAD=1
 export LSQ_BLOOM_FILTER_SEQUENTIAL=1
 export LSQ_BLOOM_FILTER_SEED=1
 
@@ -105,12 +104,25 @@ for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
 	fi
 
 	for HASH_COUNT_WIDTH in "${BLOOM_FILTER_HASH_COUNTS_WIDTHS[@]}"; do
-		set -- $HASH_COUNT_WIDTH
-		HASH_COUNT=$1
-		HASH_WIDTH=$2
-		export LSQ_BLOOM_FILTER_HASH_COUNT=$HASH_COUNT
-		export LSQ_BLOOM_FILTER_HASH_WIDTH=$HASH_WIDTH
-		FILTER_WIDTH=$((2 ** HASH_WIDTH))
+    if [[ "$HASH_COUNT_WIDTH" == "baseline" ]]; then
+      BASELINE=1
+      echo "Running baseline configuration (no bloom filter)..."
+
+      export LSQ_ST_ISSUE_NO_COMPARE=0
+      export LSQ_BLOOM_FILTER_LOAD=0
+    else
+      BASELINE=0
+      set -- $HASH_COUNT_WIDTH
+      HASH_COUNT=$1
+      HASH_WIDTH=$2
+      FILTER_WIDTH=$((2 ** HASH_WIDTH))
+
+      export LSQ_ST_ISSUE_NO_COMPARE=1
+      export LSQ_BLOOM_FILTER_LOAD=1
+      export LSQ_BLOOM_FILTER_HASH_COUNT=$HASH_COUNT
+      export LSQ_BLOOM_FILTER_HASH_WIDTH=$HASH_WIDTH
+      echo "Running bloom filter configuration: m=${FILTER_WIDTH}, k=${HASH_COUNT}..."
+    fi
 
     for ADDR_WIDTH in "${ADDR_WIDTHS[@]}"; do
       # Change the address width in the LSQ configuration
@@ -131,10 +143,17 @@ EOF
 
       for LSQ_SIZE in "${LSQ_SIZES[@]}"; do
         OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/bf_m${FILTER_WIDTH}_k${HASH_COUNT}/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
+        if [[ "$BASELINE" -eq 1 ]]; then
+          OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/baseline/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
+        fi
 
         echo "Output directory for"
         echo "  - pipeline configuration: ${PIPELINE_CONFIG}"
-        echo "  - bloom filter:           m=${FILTER_WIDTH}, k=${HASH_COUNT}"
+        if [[ "$BASELINE" -eq 1 ]]; then
+          echo "  - bloom filter:           none (baseline)"
+        else
+          echo "  - bloom filter:           m=${FILTER_WIDTH}, k=${HASH_COUNT}"
+        fi
         echo "  - address width:          ${ADDR_WIDTH}"
         echo "  - LSQ size:               ${LSQ_SIZE}"
         echo "  => ${OUTPUT_SUBDIR}"
