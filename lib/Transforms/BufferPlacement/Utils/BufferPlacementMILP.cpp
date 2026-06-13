@@ -1350,6 +1350,72 @@ void BufferPlacementMILP::addBackedgeConstraints(
   }
 }
 
+void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+    ArrayRef<CFDFC *> cfdfcs,
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
+
+  // Collect all operations that belong to at least one CFDFC.
+  DenseSet<Operation *> cfdfcUnits;
+  for (CFDFC *cfdfc : cfdfcs)
+    for (Operation *op : cfdfc->units)
+      cfdfcUnits.insert(op);
+
+  for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
+    const ReconvergentPath &rp = pathWithGraph.path;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
+
+    // We skip paths whose fork is outside all CFDFCs.
+    const DataflowGraphNode &forkNode = graph->nodes[rp.forkNodeId];
+    if (forkNode.type == DataflowGraphNode::REGULAR &&
+        !cfdfcUnits.contains(forkNode.op))
+      continue;
+
+    std::vector<SimplePath> simplePaths =
+        enumerateSimplePaths(*graph, rp.forkNodeId, rp.joinNodeId, rp.nodeIds);
+    if (simplePaths.size() < 2)
+      continue;
+
+    // Compute the occupancy expression for each path (Eq 10):
+    //   Occupancy(p) = sum(L_u / II for pipelined units u) + sum(N_c)
+    std::vector<std::pair<LinExpr, double>> pathOccupancies;
+    for (const auto &path : simplePaths) {
+      LinExpr varPart;
+      double constPart = 0.0;
+
+      for (NodeIdType nodeId : path.nodes) {
+        if (nodeId == rp.forkNodeId || nodeId == rp.joinNodeId)
+          continue;
+        const DataflowGraphNode &node = graph->nodes[nodeId];
+        if (node.type != DataflowGraphNode::REGULAR)
+          continue;
+        auto latOrFail =
+            timingDB.getLatency(node.op, SignalType::DATA, targetPeriod);
+        if (succeeded(latOrFail) && *latOrFail > 0.0)
+          constPart += *latOrFail;
+      }
+
+      for (EdgeIdType edgeId : path.edges) {
+        Value channel = graph->edges[edgeId].channel;
+        if (channelOccupancy.count(channel))
+          varPart += channelOccupancy[channel];
+      }
+
+      pathOccupancies.emplace_back(std::move(varPart), constPart);
+    }
+
+    // (Eq 11): Occupancy(p0) = Occupancy(pi)
+    for (size_t i = 1; i < pathOccupancies.size(); ++i) {
+      auto &[vars0, const0] = pathOccupancies[0];
+      auto &[varsI, constI] = pathOccupancies[i];
+
+      std::string name =
+          llvm::formatv("pathOccEq_{0}_{1}", pathIdx, i).str();
+      model->addConstr(vars0 + const0 == varsI + constI, name);
+    }
+  }
+}
+
 void BufferPlacementMILP::addReconvergentPathConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
   for (size_t pathIdx = 0; pathIdx < reconvergentPaths.size(); ++pathIdx) {

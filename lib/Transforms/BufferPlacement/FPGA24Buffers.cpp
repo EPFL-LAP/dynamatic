@@ -26,6 +26,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -150,44 +151,45 @@ void OccupancyBalancingLP::setup() {
     return;
   }
 
-  /// Target II = 1 for maximum throughput
   double targetII = latencyResult.targetII;
   if (targetII <= 0.0) {
     targetII = 1.0;
   }
-  /// Create variables for each channel
-  /// N_c: Maximal token occupancy on channel c.
+
   /// (Paper: Section 5, Table 2)
+  /// N_c: Maximal token occupancy on channel c.
   this->addOccupancyVars(allChannels, channelOccupancy, MAX_OCCUPANCY);
 
+  /// Determine which channels belong to at least one CFDFC.
+  llvm::DenseSet<Value> cfdfcChannels;
+  for (CFDFC *cfdfc : cfdfcs)
+    for (Value channel : cfdfc->channels)
+      cfdfcChannels.insert(channel);
+
   /// (Paper: Section 5, Equation 8): N_c >= L_c / II
-  /// We enforce this for the global II, but also for each CFDFC's specific II
-  /// to ensure sufficient buffering in faster loops.
-  /// (Paper: Section 5, Equation 15): Making the required occupancy the
-  /// maximum of all CFDFCs' II.
-
+  /// Per-channel lower bound ensuring the pipeline has enough tokens in flight.
+  /// For non-CFDFC channels (executed once), N_c >= 1 suffices.
   llvm::MapVector<Value, double> requiredOccupancy;
-
-  // Initialize with global II constraint
   for (Value channel : allChannels) {
     unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
-    requiredOccupancy[channel] = static_cast<double>(latency) / targetII;
+    if (cfdfcChannels.contains(channel))
+      requiredOccupancy[channel] = static_cast<double>(latency) / targetII;
+    else
+      requiredOccupancy[channel] = (latency > 0) ? 1.0 : 0.0;
   }
 
-  // Update by taking the maximum of the per-CFDFC constraints
+  /// (Paper: Section 5, Equation 15): Take the maximum across per-CFDFC IIs.
   for (CFDFC *cfdfc : cfdfcs) {
     double cfdfcII = latencyResult.cfdfcTargetIIs.lookup(cfdfc);
     if (cfdfcII < 1.0)
       continue;
-
     for (Value channel : cfdfc->channels) {
-      if (requiredOccupancy.count(channel)) {
-        unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
-        double specificOcc = static_cast<double>(latency) / cfdfcII;
-        if (specificOcc > requiredOccupancy[channel]) {
-          requiredOccupancy[channel] = specificOcc;
-        }
-      }
+      if (!requiredOccupancy.count(channel))
+        continue;
+      unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
+      double specificOcc = static_cast<double>(latency) / cfdfcII;
+      if (specificOcc > requiredOccupancy[channel])
+        requiredOccupancy[channel] = specificOcc;
     }
   }
 
@@ -195,6 +197,11 @@ void OccupancyBalancingLP::setup() {
   addBackedgeConstraints(cfdfcs, channelOccupancy);
   addChannelPropertyOccupancyConstraints(channelOccupancy);
 
+  /// (Paper: Section 5, Equations 10-11): Path occupancy equality.
+  addPathOccupancyEqualityConstraints(reconvergentPaths, cfdfcs,
+                                      channelOccupancy);
+
+  /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c).
   this->setOccupancyBalancingObjective(channelOccupancy);
 
   markReadyToOptimize();

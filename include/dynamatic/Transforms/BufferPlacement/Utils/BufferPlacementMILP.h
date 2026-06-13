@@ -437,6 +437,14 @@ protected:
   void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
                               llvm::MapVector<Value, CPVar> &channelOccupancy);
 
+  /// [FPGA24] Adds path-level occupancy equality constraints for reconvergent
+  /// paths that are entirely within a CFDFC (Paper: Section 5, Equations 10-11).
+  /// We skip paths with forks outside all CFDFC's. 
+  void addPathOccupancyEqualityConstraints(
+      ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+      ArrayRef<CFDFC *> cfdfcs,
+      llvm::MapVector<Value, CPVar> &channelOccupancy);
+
   /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
   void addReconvergentPathConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths);
