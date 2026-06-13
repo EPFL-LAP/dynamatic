@@ -14,37 +14,37 @@ LSQ_JSON="${KERNEL_HDL_DIR}/handshake_lsq_lsq1.json"
 
 # sweep parameters
 LSQ_SIZES=(
-  4
-  6
-  8
-  10
-  12
-  16
-  20
-  24
-  28
-  32
-  40
-  48
-  56
-  64
+	4
+	6
+	8
+	10
+	12
+	16
+	20
+	24
+	28
+	32
+	40
+	48
+	56
+	64
 )
 
 ADDR_WIDTHS=(
-  4
-  6
-  8
-  10
-  12
-  64
-  20
-  24
-  28
-  32
-  40
-  48
-  56
-  64
+	4
+	6
+	8
+	10
+	12
+	64
+	20
+	24
+	28
+	32
+	40
+	48
+	56
+	64
 )
 
 PIPELINE_CONFIGS=(
@@ -104,30 +104,30 @@ for PIPELINE_CONFIG in "${PIPELINE_CONFIGS[@]}"; do
 	fi
 
 	for HASH_COUNT_WIDTH in "${BLOOM_FILTER_HASH_COUNTS_WIDTHS[@]}"; do
-    if [[ "$HASH_COUNT_WIDTH" == "baseline" ]]; then
-      BASELINE=1
-      echo "Running baseline configuration (no bloom filter)..."
+		if [[ "$HASH_COUNT_WIDTH" == "baseline" ]]; then
+			BASELINE=1
+			echo "Running baseline configuration (no bloom filter)..."
 
-      export LSQ_ST_ISSUE_NO_COMPARE=0
-      export LSQ_BLOOM_FILTER_LOAD=0
-    else
-      BASELINE=0
-      set -- $HASH_COUNT_WIDTH
-      HASH_COUNT=$1
-      HASH_WIDTH=$2
-      FILTER_WIDTH=$((2 ** HASH_WIDTH))
+			export LSQ_ST_ISSUE_NO_COMPARE=0
+			export LSQ_BLOOM_FILTER_LOAD=0
+		else
+			BASELINE=0
+			set -- $HASH_COUNT_WIDTH
+			HASH_COUNT=$1
+			HASH_WIDTH=$2
+			FILTER_WIDTH=$((2 ** HASH_WIDTH))
 
-      export LSQ_ST_ISSUE_NO_COMPARE=1
-      export LSQ_BLOOM_FILTER_LOAD=1
-      export LSQ_BLOOM_FILTER_HASH_COUNT=$HASH_COUNT
-      export LSQ_BLOOM_FILTER_HASH_WIDTH=$HASH_WIDTH
-      echo "Running bloom filter configuration: m=${FILTER_WIDTH}, k=${HASH_COUNT}..."
-    fi
+			export LSQ_ST_ISSUE_NO_COMPARE=1
+			export LSQ_BLOOM_FILTER_LOAD=1
+			export LSQ_BLOOM_FILTER_HASH_COUNT=$HASH_COUNT
+			export LSQ_BLOOM_FILTER_HASH_WIDTH=$HASH_WIDTH
+			echo "Running bloom filter configuration: m=${FILTER_WIDTH}, k=${HASH_COUNT}..."
+		fi
 
-    for ADDR_WIDTH in "${ADDR_WIDTHS[@]}"; do
-      # Change the address width in the LSQ configuration
-      echo "Changing address width to ${ADDR_WIDTH} in LSQ JSON configuration..."
-      python3 - "$LSQ_JSON" "$ADDR_WIDTH" <<EOF
+		for ADDR_WIDTH in "${ADDR_WIDTHS[@]}"; do
+			# Change the address width in the LSQ configuration
+			echo "Changing address width to ${ADDR_WIDTH} in LSQ JSON configuration..."
+			python3 - "$LSQ_JSON" "$ADDR_WIDTH" <<EOF
 import json
 import sys
 
@@ -141,49 +141,49 @@ with open(lsq_json, 'w') as f:
     json.dump(lsq_config, f)
 EOF
 
-      for LSQ_SIZE in "${LSQ_SIZES[@]}"; do
-        if [[ "$BASELINE" -eq 1 ]]; then
-          OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/baseline/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
-        else
-          OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/bf_m${FILTER_WIDTH}_k${HASH_COUNT}/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
-        fi
+			for LSQ_SIZE in "${LSQ_SIZES[@]}"; do
+				if [[ "$BASELINE" -eq 1 ]]; then
+					OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/baseline/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
+				else
+					OUTPUT_SUBDIR="${OUTPUT_DIR}/${PIPELINE_CONFIG}/bf_m${FILTER_WIDTH}_k${HASH_COUNT}/addr${ADDR_WIDTH}/lsq_${LSQ_SIZE}"
+				fi
 
-        echo "Output directory for"
-        echo "  - pipeline configuration: ${PIPELINE_CONFIG}"
-        if [[ "$BASELINE" -eq 1 ]]; then
-          echo "  - bloom filter:           none (baseline)"
-        else
-          echo "  - bloom filter:           m=${FILTER_WIDTH}, k=${HASH_COUNT}"
-        fi
-        echo "  - address width:          ${ADDR_WIDTH}"
-        echo "  - LSQ size:               ${LSQ_SIZE}"
-        echo "  => ${OUTPUT_SUBDIR}"
+				echo "Output directory for"
+				echo "  - pipeline configuration: ${PIPELINE_CONFIG}"
+				if [[ "$BASELINE" -eq 1 ]]; then
+					echo "  - bloom filter:           none (baseline)"
+				else
+					echo "  - bloom filter:           m=${FILTER_WIDTH}, k=${HASH_COUNT}"
+				fi
+				echo "  - address width:          ${ADDR_WIDTH}"
+				echo "  - LSQ size:               ${LSQ_SIZE}"
+				echo "  => ${OUTPUT_SUBDIR}"
 
-        mkdir -p "${OUTPUT_SUBDIR}"
+				mkdir -p "${OUTPUT_SUBDIR}"
 
-        export LSQ_NUM_LDQ_ENTRIES=$LSQ_SIZE
-        export LSQ_NUM_STQ_ENTRIES=$LSQ_SIZE
+				export LSQ_NUM_LDQ_ENTRIES=$LSQ_SIZE
+				export LSQ_NUM_STQ_ENTRIES=$LSQ_SIZE
 
-        echo "Running the LSQ generator with modified address width..."
-        python3 "$LSQ_GENERATOR_PY" \
-          -o "$KERNEL_HDL_DIR" \
-          -c "$LSQ_JSON"
+				echo "Running the LSQ generator with modified address width..."
+				python3 "$LSQ_GENERATOR_PY" \
+					-o "$KERNEL_HDL_DIR" \
+					-c "$LSQ_JSON"
 
-        echo "Running LSQ synthesis..."
-        SYNTH_DIR="${KERNEL_OUTPUT_DIR}/synth_sweep"
-        "$SYNTHESIZE_SH" \
-          "$REPO_ROOT" \
-          "$KERNEL_OUTPUT_DIR" \
-          "handshake_lsq_lsq1_core" \
-          "4.000" \
-          "2.000" \
-          "$SYNTH_DIR"
+				echo "Running LSQ synthesis..."
+				SYNTH_DIR="${KERNEL_OUTPUT_DIR}/synth_sweep"
+				"$SYNTHESIZE_SH" \
+					"$REPO_ROOT" \
+					"$KERNEL_OUTPUT_DIR" \
+					"handshake_lsq_lsq1_core" \
+					"4.000" \
+					"2.000" \
+					"$SYNTH_DIR"
 
-        echo "Copying artifacts..."
-        cp "$SYNTH_DIR/report.txt" "$OUTPUT_SUBDIR"
-        cp "$SYNTH_DIR/"*.rpt "$OUTPUT_SUBDIR"
-        ls "$OUTPUT_SUBDIR"
-      done
-    done
+				echo "Copying artifacts..."
+				cp "$SYNTH_DIR/report.txt" "$OUTPUT_SUBDIR"
+				cp "$SYNTH_DIR/"*.rpt "$OUTPUT_SUBDIR"
+				ls "$OUTPUT_SUBDIR"
+			done
+		done
 	done
 done
