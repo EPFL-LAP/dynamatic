@@ -1,0 +1,3 @@
+set-src integration-test/terminator_bypass/terminator_bypass.c
+compile --enable-duplication
+exit

@@ -1,0 +1,6 @@
+set-src integration-test/divergent_paths/divergent_paths.c
+compile --buffer-algorithm fpl22
+write-hdl
+simulate
+visualize
+exit

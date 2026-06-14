@@ -1,0 +1,6 @@
+set-src integration-test/terminator_bypass/terminator_bypass.c
+compile --buffer-algorithm fpl22
+write-hdl
+simulate
+visualize
+exit

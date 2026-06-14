@@ -1,0 +1,3 @@
+set-src integration-test/divergent_paths/divergent_paths.c
+compile --enable-duplication
+exit
