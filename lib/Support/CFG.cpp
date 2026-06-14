@@ -695,8 +695,12 @@ static GIIDStatus isGIIDRec(
                 handshake::ExtSIOp, handshake::ExtUIOp, handshake::MulIOp,
                 handshake::OrIOp, handshake::ShLIOp, handshake::ShRUIOp,
                 handshake::ShRSIOp, handshake::SubIOp, handshake::TruncIOp,
-                handshake::XOrIOp, handshake::AddFOp, handshake::CmpFOp,
-                handshake::DivFOp, handshake::MulFOp, handshake::SubFOp>(
+                handshake::XOrIOp, handshake::NotIOp, handshake::RemSIOp,
+                handshake::MaxSIOp, handshake::MaxUIOp, handshake::MinSIOp,
+                handshake::MinUIOp, handshake::MaximumFOp,
+                handshake::MinimumFOp, handshake::AddFOp, handshake::CmpFOp,
+                handshake::DivFOp, handshake::MulFOp, handshake::SubFOp,
+                handshake::NegFOp, handshake::AbsFOp, handshake::ExtFOp>(
               [&](auto) {
                 // At least one operand must depend on the predecessor
                 return foldGIIDStatusOr(recurse, defOp->getOperands());
