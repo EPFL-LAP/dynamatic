@@ -534,11 +534,7 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
       },
       /*index=*/
       [&](OpaqueContext &&context) {
-        auto [expression, outputContext] =
-            generateExpression(std::move(context));
-        expression = safeCastAsNeeded(
-            /*to=*/ast::PrimitiveType::UInt32, std::move(expression));
-        return std::pair(std::move(expression), std::move(outputContext));
+        return generateExpression(std::move(context));
       },
       /*value=*/
       [&](OpaqueContext &&context) {
@@ -547,6 +543,8 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
       /*constructor=*/
       [&](ast::ArrayParameter &&param, ast::Expression &&index,
           ast::Expression &&value) {
+        index = safeCastAsNeeded(
+            /*to=*/ast::PrimitiveType::UInt32, std::move(index));
         index = ast::BinaryExpression{std::move(index),
                                       ast::BinaryExpression::BitAnd,
                                       ast::Constant{static_cast<std::uint32_t>(

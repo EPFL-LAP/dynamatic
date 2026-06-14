@@ -33,14 +33,7 @@ RandomCTarget::createWorker(const Options &options, Randomly randomly) const {
 void RandomCWorker::generate(llvm::raw_ostream &os,
                              llvm::StringRef functionName) {
   gen::RandomCTypeSystem dynamaticTypeSystem(random);
-  gen::BasicCGenerator generator(
-      random, dynamaticTypeSystem,
-      /*entryContext=*/
-      {
-          {gen::DynamaticTypingContext::Unconstrained},
-          {},
-          std::nullopt,
-      });
+  gen::BasicCGenerator generator(random, dynamaticTypeSystem);
   generator.generate(os, functionName);
 }
 
