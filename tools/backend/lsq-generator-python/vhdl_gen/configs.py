@@ -238,7 +238,7 @@ class Configs:
             # case, we can simply use a single "hash" which is just the address itself, and there cannot be any false
             # positives. Thus, we clamp the hash width to the address width, and use a single hash function. This also
             # avoids linearly dependent hash functions.
-            if self.bloomFilterHashW > self.addrW:
+            if self.bloomFilterHashW >= self.addrW:
                 self.bloomFilterHashW = self.addrW
                 self.bloomFilterHashCount = 1
             self.bloomFilterW = 2 ** self.bloomFilterHashW
