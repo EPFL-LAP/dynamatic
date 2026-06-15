@@ -168,11 +168,13 @@ constexpr std::size_t unwrapWeak(std::size_t dependency) {
 ///
 /// Dependencies can additionally be marked 'weak'. In that case, the element
 /// and context will be passed to the transfer function if and only if they
-/// have been generated previously. Otherwise, empty optionals and nullptrs are
-/// passed instead. This is the big difference to normal dependencies: They do
-/// not force an AST-node to have been generated previously (i.e., do not
-/// participate in the topological sort performed by the generator). This makes
-/// it legal to have cycles involving weak dependencies.
+/// have been generated previously. Otherwise, an empty optional and nullptr
+/// are passed for the AST-node and context of that dependency instead.
+///
+/// This is the big difference to normal dependencies: They do not force an
+/// AST-node to have been generated previously (i.e., do not participate in the
+/// topological sort performed by the generator). This makes it legal to have
+/// cycles involving weak dependencies.
 ///
 /// It is the user's responsibility to not create cyclic non-weak dependencies.
 template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
