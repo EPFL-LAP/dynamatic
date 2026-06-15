@@ -20,8 +20,9 @@ void nested_conditionals(inout_int_t a[N], in_int_t c) {
         y = y / c;
       }
     }
-#pragma DYN predict variable = y location = end marker = 0
-    a[i] = y;
+    int z = y + 3;
+#pragma DYN predict variable = z location = end marker = 0
+    a[i] = z;
   }
 }
 

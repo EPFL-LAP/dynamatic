@@ -95,13 +95,17 @@ PipelineDuplicationPass::validateDuplicationStructure(
   // find all blocks that are involved
   for (mlir::Operation *op : visitedOps) {
     mlir::Block *bb = op->getBlock();
+    llvm::errs() << "a duplicated block: " << bb << '\n';
     duplicatedBlocks.insert(bb);
 
     // end ops and store ops mark that the duplication stops
     if (llvm::is_contained(endOps, op) || isa<mlir::memref::StoreOp>(op)) {
+      llvm::errs() << "a terminating block: " << bb << '\n';
       terminationBlocks.insert(bb);
     }
   }
+
+  llvm::errs() << "size of terminationBlocks: " << terminationBlocks.size();
 
   // verify that there are no espacing paths from the termination blocks
   for (mlir::Block *termBlock : terminationBlocks) {
@@ -121,6 +125,8 @@ PipelineDuplicationPass::validateDuplicationStructure(
     for (mlir::Block *successor : dupBlock->getSuccessors()) {
       // find the blocks that lead to a nonduplicated block
       if (!duplicatedBlocks.count(successor)) {
+        llvm::errs() << "blocks that lead to a nonduplicated block:" << dupBlock
+                     << "and its successor:" << successor << '\n';
         externalSuccessors.insert(successor);
       }
     }
@@ -211,14 +217,68 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
       continue;
     }
 
-    // If we have a cond_branch, it will have no results but we do not want to
-    // fail. Going through blocks is handled above already
+    // If we hit a terminator, we must follow the control flow paths
     if (user->hasTrait<mlir::OpTrait::IsTerminator>()) {
+      /*
+      if (auto branchOp = llvm::dyn_cast<mlir::BranchOpInterface>(user)) {
+        mlir::Block *userBlock = user->getBlock();
+
+        // Look through every successor block this branch can jump to
+        for (unsigned i = 0; i < userBlock->getNumSuccessors(); ++i) {
+          mlir::Block *successor = userBlock->getSuccessor(i);
+
+          // Get the operands being forwarded to this specific successor
+          auto successorOperands = branchOp.getSuccessorOperands(i);
+          bool followedBlockArg = false;
+
+          // Check if our current tracked value is one of the forwarded operands
+          for (unsigned argIdx = 0; argIdx < successorOperands.size();
+               ++argIdx) {
+            if (successorOperands[argIdx] == currentVal) {
+              // Map the operand to the corresponding Block Argument of the
+              // successor block
+              mlir::BlockArgument blockArg = successor->getArgument(argIdx);
+              followedBlockArg = true;
+
+              // Recurse into the successor block tracking the new block arg
+              if (failed(
+                      collectOpsDFS(blockArg, endOps, successor, visitedOps))) {
+                return failure();
+              }
+            }
+          }
+
+          // Fallback if there are no block args
+          if (!followedBlockArg && !successor->empty()) {
+            mlir::Operation *firstOp = &successor->front();
+            if (!visitedOps.count(firstOp)) {
+              visitedOps.insert(firstOp);
+              collectDependenciesUpstream(firstOp, successor, visitedOps);
+
+              if (llvm::is_contained(endOps, firstOp) ||
+                  isa<mlir::memref::StoreOp>(firstOp)) {
+                continue;
+              }
+
+              // Use the first value (result) of the first operation to keep DFS
+              // moving
+              if (firstOp->getNumResults() > 0) {
+                mlir::Value firstResult = firstOp->getResult(0);
+                if (failed(collectOpsDFS(firstResult, endOps, successor,
+                                         visitedOps))) {
+                  return failure();
+                }
+              }
+            }
+          }
+        }
+      }
+        */
       continue;
     }
 
-    // if the operation has no results and is neither and end operation nor a
-    // store, this makes the duplicated region ill-defined
+    // if the operation has no results and is neither and end operation nor
+    // a store, this makes the duplicated region ill-defined
     if (user->getNumResults() == 0) {
       return failure();
     }
@@ -272,8 +332,8 @@ FailureOr<mlir::ArrayAttr> PipelineDuplicationPass::parseValuesList(
             builder.getFloatAttr(builder.getF64Type(), doubleVal));
     } else {
       int intVal;
-      // try to parse the string value of token as a base 10 int and store in
-      // intVal. returns true if failed, false if succeeded
+      // try to parse the string value of token as a base 10 int and store
+      // in intVal. returns true if failed, false if succeeded
       if (token.getAsInteger(10, intVal)) {
         return failure();
       }
@@ -288,10 +348,10 @@ FailureOr<mlir::ArrayAttr> PipelineDuplicationPass::parseValuesList(
   return (builder.getArrayAttr(attrValues));
 }
 
-/// Parses and removes the `dynamatic.prediction_marker` operations from the IR
-/// to populate `pragmaData`. It extracts the necessary data from each marker's
-/// attributes and identifies the exact start and end operations for each marker
-/// before erasing the physical markers from the function.
+/// Parses and removes the `dynamatic.prediction_marker` operations from the
+/// IR to populate `pragmaData`. It extracts the necessary data from each
+/// marker's attributes and identifies the exact start and end operations
+/// for each marker before erasing the physical markers from the function.
 LogicalResult PipelineDuplicationPass::readPredictMarker(
     mlir::ModuleOp modOp, std::vector<PredictionData> &pragmaData) {
 
@@ -319,8 +379,8 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
       return failure();
     }
 
-    // forward the marker's input directly to its users, making it possible to
-    // safely delete the markers in the end
+    // forward the marker's input directly to its users, making it possible
+    // to safely delete the markers in the end
     op->getResult(0).replaceAllUsesWith(op->getOperand(0));
     markers.push_back(op);
   }
@@ -328,13 +388,14 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
   // process the dynamatic.predict markers
   for (auto op : markers) {
 
-    // extract the dictionary attribute 'dynamatic.predict' which contains the
-    // pragma configuration details
+    // extract the dictionary attribute 'dynamatic.predict' which contains
+    // the pragma configuration details
     auto predictAttr =
         op->getAttrOfType<mlir::DictionaryAttr>("dynamatic.predict");
     if (!predictAttr) {
       llvm::errs()
-          << "Error: This prediction marker doesn't have a dynamatic.predict "
+          << "Error: This prediction marker doesn't have a "
+             "dynamatic.predict "
              "attribute containing the pragma configuration details.\n";
       return failure();
     }
@@ -359,9 +420,10 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
     if (markerMap.find(markerId) == markerMap.end()) {
       PredictionData newData;
 
-      // verify attributes values and type were successfully found and parsed
-      // for a new prediction marker ID. They must exist because the start
-      // marker always has to come before any corresponding end markers
+      // verify attributes values and type were successfully found and
+      // parsed for a new prediction marker ID. They must exist because the
+      // start marker always has to come before any corresponding end
+      // markers
       if (!valuesAttr || !typeAttr) {
         llvm::errs() << "Error: Malformed 'dynamatic.predict' values or type "
                         "attribute.\n";
@@ -409,11 +471,15 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
       }
       markerMap[markerId].predInput = markerInput;
 
-      // process the "end" marker to register the terminating operations of the
-      // duplicated region
+      // process the "end" marker to register the terminating operations of
+      // the duplicated region
     } else if (location == "end") {
       // the endop is the definingop of the markerinput
       mlir::Operation *definingOp = markerInput.getDefiningOp();
+      if (!definingOp) {
+        llvm::errs() << "The end marker needs to be on an actual operation.\n";
+        return failure();
+      }
       markerMap[markerId].endOps.push_back(definingOp);
     }
   }
@@ -450,8 +516,44 @@ void PipelineDuplicationPass::runOnOperation() {
     return signalPassFailure();
   LLVM_DEBUG(llvm::errs() << "done reading predict marker data \n");
 
-  // iterator for the new names
-  int i = 0;
+  // print pragmadata
+  for (auto data : pragmaData) {
+    // llvm::errs() << "Data Type : " << data.dataType << "\n";
+
+    llvm::errs() << "new Values: " << data.values << '\n';
+
+    // Print the start operation
+    llvm::errs() << "Start Op  : ";
+    if (data.startOp) {
+      data.startOp->print(llvm::errs());
+    }
+    llvm::errs() << "\n";
+
+    llvm::errs() << "predInput : ";
+    if (data.predInput) {
+      data.predInput.print(llvm::errs());
+    }
+    llvm::errs() << '\n';
+
+    // Print the end operations
+    llvm::errs() << "End Ops   : ";
+    if (data.endOps.empty()) {
+      llvm::errs() << "None\n";
+    } else {
+      llvm::errs() << "\n";
+      for (mlir::Operation *op : data.endOps) {
+        llvm::errs() << "  -> ";
+        if (op)
+          op->print(llvm::errs());
+        else
+          llvm::errs() << "nullptr";
+        llvm::errs() << "\n";
+      }
+    }
+    llvm::errs() << "------------------------------------\n";
+  }
+
+  int pragmaNumber = 1;
   // iterate over all pragmas with a start
   for (auto data : pragmaData) {
 
@@ -466,8 +568,8 @@ void PipelineDuplicationPass::runOnOperation() {
     // restructure the blocks
     mlir::Block *originalRemainderBlock = targetBlock->splitBlock(startOp);
 
-    // DFS starting from the result of startop to find all ops that have to be
-    // duplicated
+    // DFS starting from the result of startop to find all ops that have to
+    // be duplicated
     llvm::DenseSet<mlir::Operation *> visitedOps;
     visitedOps.insert(startOp);
 
@@ -476,7 +578,7 @@ void PipelineDuplicationPass::runOnOperation() {
     if (data.endOps.empty() ||
         (!data.endOps.empty() && startOp != data.endOps[0])) {
       for (auto op : startOp->getResults()) {
-        LLVM_DEBUG(llvm::errs() << "start dfs \n");
+        llvm::errs() << "start dfs \n";
         if (failed(collectOpsDFS(op, data.endOps, originalRemainderBlock,
                                  visitedOps))) {
           llvm::errs()
@@ -488,8 +590,13 @@ void PipelineDuplicationPass::runOnOperation() {
       LLVM_DEBUG(llvm::errs() << "dfs succeeded\n");
     }
 
-    // check whether the duplicated graph is well-defined and save the blocks
-    // that have to be replaced in a set
+    for (auto op : visitedOps) {
+      op->print(llvm::errs());
+      llvm::errs() << '\n';
+    }
+
+    // check whether the duplicated graph is well-defined and save the
+    // blocks that have to be replaced in a set
     auto result = validateDuplicationStructure(visitedOps, data.endOps);
     if (failed(result)) {
       llvm::errs() << "The graph to duplicate has an invalid structure.\n";
@@ -498,8 +605,8 @@ void PipelineDuplicationPass::runOnOperation() {
     auto &involvedBlocks = result->first;
     auto &terminationBlocks = result->second;
 
-    // iterate through the function to sort as the operations collected during
-    // the DFS might not be in the correct order
+    // iterate through the function to sort as the operations collected
+    // during the DFS might not be in the correct order
     llvm::SmallVector<mlir::Operation *> opsToMove;
     for (mlir::Block *block : involvedBlocks) {
       for (mlir::Operation &blockOp : *block) {
@@ -509,19 +616,21 @@ void PipelineDuplicationPass::runOnOperation() {
       }
     }
 
-    // DenseMap to track outside drivers per block, which have to be given to
-    // the next block as block args
+    // DenseMap to track outside drivers per block, which have to be given
+    // to the next block as block args
     llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Value>>
         blockOutsideDrivers;
     for (mlir::Operation *user : data.endOps) {
       mlir::Block *parentBlock = user->getBlock();
-      // the results of this operation are added to the specific block's vector
+      // the results of this operation are added to the specific block's
+      // vector
       for (mlir::Value res : user->getResults()) {
         blockOutsideDrivers[parentBlock].push_back(res);
       }
     }
 
-    // map to keep track of the newly created block arguments per original block
+    // map to keep track of the newly created block arguments per original
+    // block
     llvm::DenseMap<mlir::Block *, llvm::SmallVector<mlir::Value>>
         blockToArgsMap;
 
@@ -539,11 +648,11 @@ void PipelineDuplicationPass::runOnOperation() {
       }
     }
 
-    // create the last block that will contain the original operations that are
-    // not cloned
+    // create the last block that will contain the original operations that
+    // are not cloned
     mlir::Block *lastPath;
-    // if we only duplicate operations inside of one block we need a new block
-    // for the original operations
+    // if we only duplicate operations inside of one block we need a new
+    // block for the original operations
     if (*terminationBlocks.begin() == originalRemainderBlock) {
       lastPath = funcOp.addBlock();
     } else {
@@ -553,6 +662,8 @@ void PipelineDuplicationPass::runOnOperation() {
     // keep track of the newly created blocks
     llvm::DenseSet<mlir::Block *> trueBlocksSet;
 
+    // iterator for the new names
+    int i = 1;
     // PREDICTED PATHS
     for (mlir::Attribute attr : data.values) {
       // create branch condition
@@ -575,7 +686,7 @@ void PipelineDuplicationPass::runOnOperation() {
 
       mlir::Block *trueEntryBlock = funcOp.addBlock(); // true path
       mlir::Block *nextElseBlock;                      // false path
-      if (i + 1 < (int)data.values.size())
+      if (i < (int)data.values.size())
         nextElseBlock = funcOp.addBlock();
       else
         nextElseBlock = lastPath;
@@ -638,8 +749,9 @@ void PipelineDuplicationPass::runOnOperation() {
           }
 
           mlir::Operation *cloned = builder.clone(*origOp, mapper);
-          std::string newName =
-              namer.getName(origOp).str() + "_dup" + std::to_string(i);
+          std::string newName = namer.getName(origOp).str() + "_dup" +
+                                std::to_string(i * pragmaNumber);
+          llvm::errs() << "newName: " << newName << '\n';
           cloned->setAttr("handshake.name", builder.getStringAttr(newName));
 
           for (unsigned j = 0; j < cloned->getNumResults(); j++) {
@@ -661,8 +773,8 @@ void PipelineDuplicationPass::runOnOperation() {
             }
           }
 
-          // branch back to the original block, passing only its specific exit
-          // arguments
+          // branch back to the original block, passing only its specific
+          // exit arguments
           builder.create<mlir::cf::BranchOp>(loc, origBlock,
                                              trueBranchOperands);
         }
@@ -723,9 +835,9 @@ void PipelineDuplicationPass::runOnOperation() {
       llvm::SmallVector<mlir::Value> &correspondingArgs =
           blockToArgsMap[origBlock];
 
-      for (size_t i = 0; i < origOutputs.size(); i++) {
-        mlir::Value origOut = origOutputs[i];
-        mlir::Value newBlockArg = correspondingArgs[i];
+      for (size_t it = 0; it < origOutputs.size(); it++) {
+        mlir::Value origOut = origOutputs[it];
+        mlir::Value newBlockArg = correspondingArgs[it];
 
         // Loop over your vector of structs to update the struct data itself
         for (PredictionData &data : pragmaData) {
@@ -736,27 +848,29 @@ void PipelineDuplicationPass::runOnOperation() {
 
         origOut.replaceUsesWithIf(newBlockArg, [&](OpOperand &operand) {
           mlir::Block *userBlock = operand.getOwner()->getBlock();
-          // if the user is inside the original block itself, it should now read
-          // from the block argument
+          // if the user is inside the original block itself, it should now
+          // read from the block argument
           if (userBlock == origBlock) {
             return true;
           }
 
-          // do not replace uses inside the cloned structures we generated, the
-          // newly generated fallback blocks as well as the involvedBlocks that
-          // are not terminatingblocks (this is checked earlier)
+          // do not replace uses inside the cloned structures we generated,
+          // the newly generated fallback blocks as well as the
+          // involvedBlocks that are not terminatingblocks (this is checked
+          // earlier)
           if (trueBlocksSet.count(userBlock) ||
               fallbackBlocks.count(userBlock) ||
               involvedBlocks.count(userBlock)) {
             return false;
           }
 
-          // otherwise replace it if it's a downstream user outside our target
-          // block within the same function scope
+          // otherwise replace it if it's a downstream user outside our
+          // target block within the same function scope
           return userBlock != targetBlock && userBlock->getParentOp() == funcOp;
         });
       }
     }
+    pragmaNumber++;
   }
 
   // Automatically run push-constants pass after duplication

@@ -20,9 +20,8 @@ void divergent_paths(inout_int_t a[N], inout_int_t b[N]) {
 }
 
 int main(void) {
-  in_float_t a[N];
-  in_float_t b[N];
-  float c = 7.0f;
+  in_int_t a[N];
+  in_int_t b[N];
   for (unsigned j = 0; j < N; ++j) {
     a[j] = 10;
     b[j] = 0;

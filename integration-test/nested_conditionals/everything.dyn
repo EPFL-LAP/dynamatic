@@ -1,4 +1,4 @@
-set-src integration-test/prediction/prediction.c
+set-src integration-test/nested_conditionals/nested_conditionals.c
 compile --buffer-algorithm fpl22
 write-hdl
 simulate

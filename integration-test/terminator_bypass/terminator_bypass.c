@@ -8,7 +8,7 @@ void terminator_bypass(inout_int_t a[N], in_int_t threshold) {
                                                5 type = int
     int modified = x * 2;
     if (modified == threshold) {
-      // This introduces a conditional branch terminator inside the scope
+      // introduces a conditional branch terminator inside the scope
       a[i] = 0;
       continue;
     }
