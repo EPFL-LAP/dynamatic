@@ -129,17 +129,23 @@ constexpr std::size_t INPUT_DEPENDENCY = -1;
 
 /// Marks a dependency as weak. This is a noop for 'INPUT_DEPENDENCY' as it
 /// cannot be weak.
+/// See the 'TypeSystem' documentation for what 'weak' means.
 constexpr std::size_t weak(std::size_t dependency) {
+  // We use the top bit being set as an encoding for a dependency being weak.
+  // Since 'INPUT_DEPENDENCY' is encoded as all 1s, this operation is also a
+  // noop for 'INPUT_DEPENDENCY'.
   return dependency | (1ull << (std::numeric_limits<std::size_t>::digits - 1));
 }
 
 /// Returns true if 'dependency' is weak.
+/// See the 'TypeSystem' documentation for what 'weak' means.
 constexpr bool isWeak(std::size_t dependency) {
   return dependency != INPUT_DEPENDENCY && weak(dependency) == dependency;
 }
 
 /// If 'dependency' is weak, then it returns the original non-weak dependency.
 /// Otherwise, returns 'dependency'.
+/// See the 'TypeSystem' documentation for what 'weak' means.
 constexpr std::size_t unwrapWeak(std::size_t dependency) {
   if (dependency == INPUT_DEPENDENCY)
     return INPUT_DEPENDENCY;
@@ -159,9 +165,14 @@ constexpr std::size_t unwrapWeak(std::size_t dependency) {
 /// this instance depends on within 'ASTNode::SubElements'.
 /// The special value 'INPUT_DEPENDENCY' represents depending on the
 /// input-context of 'ASTNode'.
-/// Dependencies can additionally be marked 'weak'. In that case, the elements
-/// and contexts will be passed to the transfer function if present, but do not
-/// require them to have been generated.
+///
+/// Dependencies can additionally be marked 'weak'. In that case, the element
+/// and context will be passed to the transfer function if and only if they
+/// have been generated previously. Otherwise, empty optionals and nullptrs are
+/// passed instead. This is the big difference to normal dependencies: They do
+/// not force an AST-node to have been generated previously (i.e., do not
+/// participate in the topological sort performed by the generator). This makes
+/// it legal to have cycles involving weak dependencies.
 ///
 /// It is the user's responsibility to not create cyclic non-weak dependencies.
 template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
@@ -769,10 +780,14 @@ protected:
   }
 
   /// Returns an instance of 'TransferFn' which forwards the first present
-  /// context from the weak dependencies 'indices'.
+  /// context from the possibly-weak dependencies in 'indices'.
+  /// At least one dependency must not be weak.
   template <typename ASTNode, std::size_t... indices>
   static auto copyFirstOf() {
-    return TransferFn<ASTNode, weak(indices)...>([](auto &&...args) {
+    static_assert((!isWeak(indices) || ...),
+                  "at least one of 'indices' must not be weak");
+
+    return TransferFn<ASTNode, indices...>([](auto &&...args) {
       std::optional<TypingContext> result;
       foreachInTuples(
           [&](auto &&element) {

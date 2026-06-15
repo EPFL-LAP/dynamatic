@@ -137,10 +137,11 @@ public:
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
     return {
         /*statement list=*/copyFirstOf<ast::StatementList,
-                                       ast::StatementList::STATEMENT,
+                                       weak(ast::StatementList::STATEMENT),
                                        INPUT_DEPENDENCY>(),
         /*statement=*/
-        copyFirstOf<ast::StatementList, ast::StatementList::STATEMENT_LIST,
+        copyFirstOf<ast::StatementList,
+                    weak(ast::StatementList::STATEMENT_LIST),
                     INPUT_DEPENDENCY>(),
         /*output=*/
         OutputTransferFn<ast::StatementList>(
