@@ -700,11 +700,11 @@ static GIIDStatus isGIIDRec(
                 handshake::MinUIOp, handshake::MaximumFOp,
                 handshake::MinimumFOp, handshake::AddFOp, handshake::CmpFOp,
                 handshake::DivFOp, handshake::MulFOp, handshake::SubFOp,
-                handshake::NegFOp, handshake::AbsFOp, handshake::ExtFOp>(
-              [&](auto) {
-                // At least one operand must depend on the predecessor
-                return foldGIIDStatusOr(recurse, defOp->getOperands());
-              })
+                handshake::NegFOp, handshake::AbsFOp, handshake::ExtFOp,
+                handshake::TruncFOp>([&](auto) {
+            // At least one operand must depend on the predecessor
+            return foldGIIDStatusOr(recurse, defOp->getOperands());
+          })
           .Default([&](auto) {
             // To err on the conservative side, produce the most terminating
             // kind of failure on encoutering an unsupported operation
