@@ -1352,8 +1352,7 @@ void BufferPlacementMILP::addBackedgeConstraints(
 
 void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-    ArrayRef<CFDFC *> cfdfcs,
-    llvm::MapVector<Value, CPVar> &channelOccupancy) {
+    ArrayRef<CFDFC *> cfdfcs, llvm::MapVector<Value, CPVar> &channelOccupancy) {
 
   // Collect all operations that belong to at least one CFDFC.
   DenseSet<Operation *> cfdfcUnits;
@@ -1409,8 +1408,7 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
       auto &[vars0, const0] = pathOccupancies[0];
       auto &[varsI, constI] = pathOccupancies[i];
 
-      std::string name =
-          llvm::formatv("pathOccEq_{0}_{1}", pathIdx, i).str();
+      std::string name = llvm::formatv("pathOccEq_{0}_{1}", pathIdx, i).str();
       model->addConstr(vars0 + const0 == varsI + constI, name);
     }
   }
