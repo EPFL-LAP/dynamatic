@@ -40,7 +40,7 @@ Experiment 11: Bloom filters
 - git revision: ${GIT_REVISION}
 EOF
 
-for SEQUENTIAL in 0 1; do
+for SEQUENTIAL in 1; do
 	if [[ "$SEQUENTIAL" -eq 1 ]]; then
 		SEQ_COMB="sequential"
 	else

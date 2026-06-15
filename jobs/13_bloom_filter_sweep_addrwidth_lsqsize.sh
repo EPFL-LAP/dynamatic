@@ -55,10 +55,8 @@ PIPELINE_CONFIGS=(
 # k, log2(m)
 BLOOM_FILTER_HASH_COUNTS_WIDTHS=(
 	"baseline"
-	"1 3"
 	"2 4"
-	"3 5"
-	"4 6"
+	"3 6"
 )
 
 # fixed parameters
