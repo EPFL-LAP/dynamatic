@@ -284,34 +284,21 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
 
   F_HANDSHAKE=$F_HANDSHAKE_SQ
-  F_HANDSHAKE_MEM=$F_HANDSHAKE_SQ
-  
+
+  # handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-remove-unused-memrefs \
+    --handshake-optimize-bitwidths \
+    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
+    > "$F_HANDSHAKE_TRANSFORMED"
+  exit_on_fail "Failed to apply transformations to handshake" \
+    "Applied transformations to handshake"
+
 else
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
-    > "$F_HANDSHAKE_MEM"
-  exit_on_fail "Failed to apply LSQ transformations" "Applied LSQ transformations"
-fi
-
-if [[ $OPTIMIZE_STEERING_REWRITES -ne 0 ]]; then
-
-  echo_info "Optimize steering rewrites enabled"
-
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_MEM" \
-    --handshake-remove-unused-memrefs \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-rewrite-terms \
-    --handshake-combine-steering-logic \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    --handshake-rewrite-terms \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
-else #  --handshake-combine-steering-logic ???????TODO
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_MEM" \
+    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
