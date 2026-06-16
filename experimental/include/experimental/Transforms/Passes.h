@@ -18,6 +18,8 @@
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Pass/Pass.h"
 
+#include "experimental/Transforms/HandshakeRewriteTerms.h"
+
 namespace dynamatic {
 namespace experimental {
 /// Generate the code for registering passes.

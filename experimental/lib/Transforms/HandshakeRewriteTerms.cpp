@@ -13,11 +13,11 @@
 // circuit.
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeRewriteTerms.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
+#include "experimental/Transforms/HandshakeRewriteTerms.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
@@ -2139,7 +2139,7 @@ struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
 /// Simple driver for the Handshake Rewrite Terms pass, based on a greedy
 /// pattern rewriter.
 struct HandshakeRewriteTermsPass
-    : public dynamatic::impl::HandshakeRewriteTermsBase<
+    : public dynamatic::experimental::impl::HandshakeRewriteTermsBase<
           HandshakeRewriteTermsPass> {
 
   void runDynamaticPass() override {
@@ -2172,6 +2172,7 @@ struct HandshakeRewriteTermsPass
 };
 }; // namespace
 
-std::unique_ptr<dynamatic::DynamaticPass> dynamatic::rewriteHandshakeTerms() {
+std::unique_ptr<dynamatic::DynamaticPass>
+dynamatic::experimental::rewriteHandshakeTerms() {
   return std::make_unique<HandshakeRewriteTermsPass>();
 }

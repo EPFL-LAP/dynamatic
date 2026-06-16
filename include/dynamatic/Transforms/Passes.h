@@ -20,8 +20,6 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
 
-#include "dynamatic/Transforms/HandshakeRewriteTerms.h"
-
 namespace dynamatic {
 
 /// Generate the code for registering passes.

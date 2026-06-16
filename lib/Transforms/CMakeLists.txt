@@ -9,7 +9,6 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeCanonicalize.cpp
   HandshakeDeactivateMemDependencies.cpp
   HandshakeHoistExtInstances.cpp
-  HandshakeRewriteTerms.cpp
   HandshakeMaterialize.cpp
   HandshakeOptimizeBitwidths.cpp
   HandshakeInferBasicBlocks.cpp

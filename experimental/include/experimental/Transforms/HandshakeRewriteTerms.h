@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef DYNAMATIC_TRANSFORMS_HANDSHAKEREWRITETERMS_H
-#define DYNAMATIC_TRANSFORMS_HANDSHAKEREWRITETERMS_H
+#ifndef EXPERIMENTAL_TRANSFORMS_HANDSHAKEREWRITETERMS_H
+#define EXPERIMENTAL_TRANSFORMS_HANDSHAKEREWRITETERMS_H
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
@@ -21,13 +21,15 @@
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {
+namespace experimental {
 
 #define GEN_PASS_DECL_HANDSHAKEREWRITETERMS
 #define GEN_PASS_DEF_HANDSHAKEREWRITETERMS
-#include "dynamatic/Transforms/Passes.h.inc"
+#include "experimental/Transforms/Passes.h.inc"
 
 std::unique_ptr<dynamatic::DynamaticPass> rewriteHandshakeTerms();
 
+} // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_HANDSHAKEREWRITETERMS_H
+#endif // EXPERIMENTAL_TRANSFORMS_HANDSHAKEREWRITETERMS_H

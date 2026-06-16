@@ -105,19 +105,6 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 //===----------------------------------------------------------------------===//
 
 
-
-def HandshakeRewriteTerms : DynamaticPass< "handshake-rewrite-terms">  {
-  let summary = "Rewrite terms in Handshake operation sequences.";
-  let description = [{
-      Removes redundant operations and simplifies the IR by applying a series
-      of optimizations. The pass uses a greedy pattern rewriter to apply the
-      optimizations, which are based on the specific semantics of Handshake
-      operations. The pass is conservative and does not perform any aggressive
-      transformations that could potentially change the behavior of the circuit.
-  }];
-  let constructor = "dynamatic::rewriteHandshakeTerms()";
-}
-
 def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependencies", "mlir::ModuleOp"> {
   let summary = "Deactivates memory dependences that do not need to be enforced";
   let description = [{
