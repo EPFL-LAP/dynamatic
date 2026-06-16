@@ -356,16 +356,15 @@ public:
                 if constexpr (index == INPUT_DEPENDENCY) {
                   // Input context.
                   return std::forward_as_tuple(*contexts.back());
+                } else if constexpr (isWeak(index)) {
+                  // Subelement context + ASTNode.
+                  return std::make_tuple(
+                      std::get<unwrapWeak(index)>(contexts),
+                      std::cref(std::get<unwrapWeak(index)>(subElements)));
                 } else {
-                  if constexpr (isWeak(index)) {
-                // Subelement context + ASTNode.
-                return std::make_tuple(
-                    reinterpret_cast<const TypingContext *>(
-                        std::get<unwrapWeak(index)>(contexts)),
-                    std::cref(std::get<unwrapWeak(index)>(subElements)));
-              } else {// Subelement context + ASTNode.
+                  // Subelement context + ASTNode.
                   return std::forward_as_tuple(*std::get<index>(contexts),
-                                               *std::get<index>(subElements));}
+                                               *std::get<index>(subElements));
                 }
               }(std::integral_constant<std::size_t, inputIndices>{})...);
 
