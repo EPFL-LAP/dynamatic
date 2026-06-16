@@ -161,14 +161,6 @@ public:
                       double targetPeriod, Algorithm algorithm,
                       llvm::StringRef writeTo = "");
 
-  /// Re-run the MILP with the buffering decisions locked-in,
-  /// in order to calculate the actual delays the MILP sees
-  /// from the characterization approach
-  ///
-  /// What buffering decisions to fix is algorithm dependent.
-  /// Currently only implemented for FPGA'20 and FPL'22.
-  LogicalResult calculatePathDelays();
-
   /// Creates, optimizes, and extract results from an MILP in one go. Fails and
   /// displays an error message to stderr if any step along the process fails.
   /// Otherwise succeeds and stores the MILP's results in the first function
@@ -514,6 +506,14 @@ private:
   /// properties mapping and defines a large constant used for elasticity
   /// constraints.
   void initialize();
+
+  /// Re-run the MILP with the buffering decisions locked-in,
+  /// in order to calculate the actual delays the MILP sees
+  /// from the characterization approach
+  ///
+  /// What buffering decisions to fix is algorithm dependent.
+  /// Currently only implemented for FPGA'20 and FPL'22.
+  LogicalResult calculatePathDelays();
 };
 
 } // namespace buffer
