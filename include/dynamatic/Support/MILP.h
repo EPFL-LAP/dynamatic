@@ -158,14 +158,6 @@ public:
   /// Marks the MILP as initial state.
   void resetMILPState() { state = State::FAILED_TO_SETUP; }
 
-  /// Re-run the MILP with the buffering decisions locked-in,
-  /// in order to calculate the actual delays the MILP sees
-  /// from the characterization approach
-  ///
-  /// What buffering decisions to fix is algorithm dependent.
-  /// Currently only implemented for FPGA'20 and FPL'22.
-  virtual LogicalResult calculatePathDelays() { return success(); }
-
   /// Determines whether the MILP is in a valid state to be optimized. If this
   /// returns true, `MILP::optimize` can be called to solve the MILP.
   /// Conversely, if this returns false then a call to optimize will necessarily
@@ -229,27 +221,6 @@ private:
     }
   }
 };
-
-/// Creates, optimizes, and extract results from an MILP in one go. Fails and
-/// displays an error message to stderr if any step along the process fails.
-/// Otherwise succeeds and stores the MILP's results in the first function
-/// argument.
-///
-/// if calculatePathDelays is true,
-/// it asks the MILP to lock in the buffering decisions, and re-run to
-/// calculate only the path delays. Useful for evaluation of modelling accuracy.
-template <typename MILP, typename MILPRes, typename... Args>
-LogicalResult solveMILP(MILPRes &milpResult, bool calculatePathDelays,
-                        Args &&...args) {
-  MILP milp = MILP(std::forward<Args>(args)...);
-  if (failed(milp.optimize()))
-    return failure();
-  if (calculatePathDelays && failed(milp.calculatePathDelays()))
-    return failure();
-  if (failed(milp.getResult(milpResult)))
-    return failure();
-  return success();
-}
 
 } // namespace dynamatic
 

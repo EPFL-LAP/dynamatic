@@ -161,11 +161,13 @@ public:
                       double targetPeriod, Algorithm algorithm,
                       llvm::StringRef writeTo = "");
 
-  /// Locks all buffer-decision variables to their currently-solved values,
-  /// replaces the objective with `min Σ(t_*)`, re-optimises, and rewrites the
-  /// sol log. Lets the dumped values reflect the true min-feasible arrival on
-  /// each channel signal instead of being packed to the period bound.
-  LogicalResult calculatePathDelays() override;
+  /// Re-run the MILP with the buffering decisions locked-in,
+  /// in order to calculate the actual delays the MILP sees
+  /// from the characterization approach
+  ///
+  /// What buffering decisions to fix is algorithm dependent.
+  /// Currently only implemented for FPGA'20 and FPL'22.
+  LogicalResult calculatePathDelays();
 
 protected:
   /// Represents a list of signals that are buffered together by a single
