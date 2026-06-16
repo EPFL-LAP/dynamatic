@@ -36,6 +36,7 @@
 - [Testing & CI]()
   - [Introduction](DeveloperGuide/TestingCI/Introduction.md)
   - [Integration Tests](DeveloperGuide/TestingCI/IntegrationTests.md)
+  - [Fuzzer](DeveloperGuide/TestingCI/Fuzzer.md)
   - [Formatting Checks](DeveloperGuide/TestingCI/Formatting.md)
   - [GitHub Actions](DeveloperGuide/TestingCI/Actions.md)
   
