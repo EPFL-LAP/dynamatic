@@ -480,26 +480,6 @@ static void logCFDFCUnions(FuncInfo &info,
   }
 }
 
-/// Creates, optimizes, and extract results from an MILP in one go. Fails and
-/// displays an error message to stderr if any step along the process fails.
-/// Otherwise succeeds and stores the MILP's results in the first function
-/// argument.
-///
-/// if calculatePathDelays is true,
-/// it asks the MILP to lock in the buffering decisions, and re-run to
-/// calculate only the path delays. Useful for evaluation of modelling accuracy.
-static LogicalResult solveMILP(BufferPlacement &placement,
-                               BufferPlacementMILP &milp,
-                               bool calculatePathDelays) {
-  if (failed(milp.optimize()))
-    return failure();
-  if (calculatePathDelays && failed(milp.calculatePathDelays()))
-    return failure();
-  if (failed(milp.getResult(placement)))
-    return failure();
-  return success();
-}
-
 LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     FuncInfo &info, TimingDatabase &timingDB, BufferPlacement &placement) {
 
@@ -527,7 +507,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     }
     fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
                                writeTo);
-    return solveMILP(placement, milp, polishPaths);
+    return milp.solve(placement, calculatePathDelays);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -548,7 +528,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
       }
       fpl22::CFDFCUnionBuffers milp(solverKind, timeout, info, timingDB,
                                     targetCP, cfUnion, writeTo);
-      if (failed(solveMILP(placement, milp, polishPaths)))
+      if (failed(milp.solve(placement, calculatePathDelays)))
         return failure();
     }
 
@@ -559,7 +539,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     // Solve last MILP on channels/units that are not part of any CFDFC
     fpl22::OutOfCycleBuffers milp(solverKind, timeout, info, timingDB, targetCP,
                                   writeTo);
-    return solveMILP(placement, milp, polishPaths);
+    return milp.solve(placement, calculatePathDelays);
   }
 
   if (algorithm == FPGA24) {
@@ -574,7 +554,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     // Create and solve the MILP
     costaware::CostAwareBuffers milp(solverKind, timeout, info, timingDB,
                                      targetCP, writeTo);
-    return solveMILP(placement, milp, polishPaths);
+    return milp.solve(placement, calculatePathDelays);
   }
 
   if (algorithm == MAPBUF) {
@@ -585,7 +565,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     mapbuf::MAPBUFBuffers milp(solverKind, timeout, info, timingDB, targetCP,
                                blifFiles, lutDelay, lutSize, acyclicType,
                                writeTo);
-    return solveMILP(placement, milp, polishPaths);
+    return milp.solve(placement, calculatePathDelays);
   }
 
   llvm_unreachable("unknown algorithm");

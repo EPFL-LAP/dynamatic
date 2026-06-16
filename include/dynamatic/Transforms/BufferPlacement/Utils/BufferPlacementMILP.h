@@ -169,6 +169,17 @@ public:
   /// Currently only implemented for FPGA'20 and FPL'22.
   LogicalResult calculatePathDelays();
 
+  /// Creates, optimizes, and extract results from an MILP in one go. Fails and
+  /// displays an error message to stderr if any step along the process fails.
+  /// Otherwise succeeds and stores the MILP's results in the first function
+  /// argument.
+  ///
+  /// if calculatePathDelays is true,
+  /// it asks the MILP to lock in the buffering decisions, and re-run to
+  /// calculate only the path delays. Useful for evaluation of modelling
+  /// accuracy.
+  LogicalResult solve(BufferPlacement &placement, bool calculatePathDelays);
+
 protected:
   /// Represents a list of signals that are buffered together by a single
   /// buffer type, which is denoted by its (potentially null) timing model.

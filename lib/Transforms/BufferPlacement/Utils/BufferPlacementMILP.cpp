@@ -244,6 +244,17 @@ BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
   initialize();
 }
 
+LogicalResult BufferPlacementMILP::solve(BufferPlacement &placement,
+                                         bool calculatePathDelays) {
+  if (failed(optimize()))
+    return failure();
+  if (calculatePathDelays && failed(this->calculatePathDelays()))
+    return failure();
+  if (failed(getResult(placement)))
+    return failure();
+  return success();
+}
+
 void BufferPlacementMILP::addChannelVars(Value channel,
                                          ArrayRef<SignalType> signalTypes) {
 
