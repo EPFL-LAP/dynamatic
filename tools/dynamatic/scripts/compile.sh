@@ -301,6 +301,10 @@ else
     --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
+    --handshake-rewrite-terms \
+    --handshake-combine-steering-logic \
+    --handshake-materialize --handshake-infer-basic-blocks \
+    --handshake-rewrite-terms \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
