@@ -120,8 +120,7 @@ public:
         /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
         /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
         /*output=*/
-        OutputTransferFn<ast::ArrayAssignmentStatement>(
-            std::index_sequence<INPUT_DEPENDENCY>{},
+        OutputTransferFn<ast::ArrayAssignmentStatement, INPUT_DEPENDENCY>(
             [](const ast::ArrayAssignmentStatement &,
                LimitTypingContext context) {
               context.totalNumberOfStatements++;
@@ -144,10 +143,9 @@ public:
                     weak(ast::StatementList::STATEMENT_LIST),
                     INPUT_DEPENDENCY>(),
         /*output=*/
-        OutputTransferFn<ast::StatementList>(
-            std::index_sequence<ast::StatementList::STATEMENT,
-                                ast::StatementList::STATEMENT_LIST>{},
-            [](const ast::StatementList &, LimitTypingContext statement,
+        OutputTransferFn<ast::StatementList, ast::StatementList::STATEMENT,
+                         ast::StatementList::STATEMENT_LIST>(
+            [](const auto &, LimitTypingContext statement,
                const LimitTypingContext &statementList) {
               // Regardless of which of the two was generated first, we can
               // extract the total number of statements by taking their maximum.

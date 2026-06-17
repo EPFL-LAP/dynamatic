@@ -167,7 +167,7 @@ private:
             OpaqueContext &&)>... generators,
         llvm::function_ref<std::optional<ASTNode>(SubElements &&...)>
             constructor) const {
-      typename OpaqueTransferFn<ASTNode>::SubElementsTuple subElements;
+      SubElementsTuple<ASTNode> subElements;
 
       std::array<OpaqueContext,
                  std::tuple_size_v<typename ASTNode::SubElements> + 1>
@@ -296,7 +296,7 @@ private:
 
       // Calculate the output context.
       OpaqueContext outputContext =
-          std::get<OutputTransferFn<ASTNode>>(transferFunctions)(
+          std::get<OpaqueOutputTransferFn<ASTNode>>(transferFunctions)(
               *astNode,
               mapTuplesIntoArray(
                   [](const OpaqueContext &context) { return context.data(); },
