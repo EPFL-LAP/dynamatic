@@ -6,4 +6,4 @@ typedef float inout_float_t;
 typedef int in_int_t;
 typedef int out_int_t;
 typedef int inout_int_t;
-void terminator_bypass(inout_int_t a[N], in_int_t threshold);
+void terminator_bypass(inout_int_t a[N], in_int_t c);
