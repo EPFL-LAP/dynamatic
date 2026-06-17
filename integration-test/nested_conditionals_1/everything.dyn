@@ -1,0 +1,6 @@
+set-src integration-test/nested_conditionals_1/nested_conditionals_1.c
+compile --buffer-algorithm fpl22
+write-hdl
+simulate
+visualize
+exit
