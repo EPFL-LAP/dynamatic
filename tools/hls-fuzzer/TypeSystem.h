@@ -372,28 +372,30 @@ public:
             }) {}
 
   /// Low-level type safe constructor.
+  /// This assumes that all contexts passed by the generator are of type
+  /// 'TypingContext' and enforces that 'f' returns a 'TypingContext'.
+  /// This constructor is low-level as it operates on the raw-calling convention
+  /// and allows passing arbitrary indices.
+  /// Users are encouraged to use 'TransferFn' whenever possible.
+  ///
   /// The first parameter is used to deduce 'TypingContext'.
   /// The callable 'f' is expected to have the signature:
   ///   TypingContext(const SubElementsTuple<ASTNode> &,
   ///                 const TypedContextTuple<ASTNode, TypingContext> &)
-  template <typename TypingContext, typename F>
+  template <typename TypingContext, typename ConcreteTransferFn>
   explicit OpaqueTransferFn(
       llvm::identity<TypingContext>,
       std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
           inputIndices,
-      F &&f)
-      : computationFn([f = std::forward<F>(f)](
+      ConcreteTransferFn &&f)
+      : computationFn([f = std::forward<ConcreteTransferFn>(f)](
                           const SubElementsTuple<ASTNode> &nonTerminals,
                           const ContextTuple<ASTNode> &tuple) -> OpaqueContext {
           TypedContextTuple<ASTNode, TypingContext> unwrapped{};
           for (auto &&[unwrappedEl, wrappedEl] :
-               llvm::zip_equal(unwrapped, tuple)) {
-            if (!wrappedEl) {
-              unwrappedEl = nullptr;
-              continue;
-            }
+               llvm::zip_equal(unwrapped, tuple))
             unwrappedEl = reinterpret_cast<const TypingContext *>(wrappedEl);
-          }
+
           TypingContext result = f(nonTerminals, unwrapped);
           return OpaqueContext(std::move(result));
         }),
@@ -514,14 +516,20 @@ public:
             }) {}
 
   /// Low-level type safe constructor.
+  /// This assumes that all contexts passed by the generator are of type
+  /// 'TypingContext' and enforces that 'f' returns a 'TypingContext'.
+  /// This constructor is low-level as it operates on the raw-calling convention
+  /// and allows passing arbitrary indices.
+  /// Users are encouraged to use 'OutputTransferFn' whenever possible.
+  ///
   /// The first parameter is used to deduce 'TypingContext'.
   /// The callable 'f' is expected to have the signature:
   ///   TypingContext(const ASTNode &,
   ///                 const TypedContextTuple<ASTNode, TypingContext> &)
-  template <typename TypingContext, typename F>
-  OpaqueOutputTransferFn(llvm::identity<TypingContext>, F &&f)
+  template <typename TypingContext, typename ConcreteTransferFn>
+  OpaqueOutputTransferFn(llvm::identity<TypingContext>, ConcreteTransferFn &&f)
       : computationFn(
-            [f = std::forward<F>(f)](
+            [f = std::forward<ConcreteTransferFn>(f)](
                 const ASTNode &astNode,
                 const ContextTuple<ASTNode> &contexts) -> OpaqueContext {
               TypedContextTuple<ASTNode, TypingContext> unwrapped{};
