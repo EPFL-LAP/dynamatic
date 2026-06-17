@@ -270,6 +270,9 @@ else
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
+MEMORY_INTERFACE_ARGS=()
+MATERIALIZE_ARGS=(--handshake-materialize)
+
 if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   echo_info "Using FPGA'23 for LSQ connection"
@@ -283,32 +286,33 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
 
   F_HANDSHAKE=$F_HANDSHAKE_SQ
-
-  # handshake transformations
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-remove-unused-memrefs \
-    --handshake-optimize-bitwidths \
-    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
-
+  MATERIALIZE_ARGS=("--handshake-materialize=replicate-constant=true")
 else
-
-  # handshake transformations
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
-    --handshake-remove-unused-memrefs \
-    --handshake-optimize-bitwidths \
-    --handshake-rewrite-terms \
-    --handshake-combine-steering-logic \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    --handshake-rewrite-terms \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
+  MEMORY_INTERFACE_ARGS=(
+    --handshake-deactivate-mem-dependencies
+    --handshake-replace-memory-interfaces
+  )
 fi
+
+STEERING_REWRITE_ARGS=()
+if [[ $OPTIMIZE_STEERING_REWRITES -ne 0 ]]; then
+  echo_info "Applying steering-term rewrites"
+  STEERING_REWRITE_ARGS=(
+    --handshake-rewrite-terms
+    --handshake-combine-steering-logic
+  )
+fi
+
+# handshake transformations
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+  "${MEMORY_INTERFACE_ARGS[@]}" \
+  --handshake-remove-unused-memrefs \
+  --handshake-optimize-bitwidths \
+  "${STEERING_REWRITE_ARGS[@]}" \
+  "${MATERIALIZE_ARGS[@]}" --handshake-infer-basic-blocks \
+  > "$F_HANDSHAKE_TRANSFORMED"
+exit_on_fail "Failed to apply transformations to handshake" \
+  "Applied transformations to handshake"
 
 # Speculation (pre-buffer): place speculative units and then materialize.
 if [[ "$SPECULATION" == "1" ]]; then
