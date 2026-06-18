@@ -272,6 +272,9 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"timingModels", "timing-models", "std::string", "",
     "Path to JSON-formatted file containing timing models for dataflow "
     "components.">,
+    Option<"specTimingModels", "spec-timing-models", "std::string", "",
+    "Path to JSON-formatted file containing per-port timing models for "
+    "speculative units.">,
     Option<"firstCFDFC", "first-cfdfc", "bool", "false",
     "If true, only extract the first CFDFC from the input file">,
     Option<"targetCP", "target-period", "double", "4.0",

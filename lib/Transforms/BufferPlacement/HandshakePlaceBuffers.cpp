@@ -213,11 +213,8 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
-  // Optional per-port-pair timing for ops like SpeculatorOp /
-  // SpecSaveCommitOp; missing file is OK and leaves spec models empty.
-  std::string specTimingPath =
-      llvm::sys::path::parent_path(timingModels).str() + "/spec-timing.json";
-  if (failed(TimingDatabase::readSpecTimingFromJSON(specTimingPath, timingDB)))
+  if (failed(
+          TimingDatabase::readSpecTimingFromJSON(specTimingModels, timingDB)))
     return failure();
 
   auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();

@@ -318,7 +318,7 @@ void FPL22BuffersBase::addSpecUnitPathConstraints(Operation *op,
   // store mapping from operand/result name to operand/result
   // since we don't have a native function to go name -> value
   // only operand/result index -> name
-  std::map<StringRef, Value> portNameToValue;
+  std::map<std::string, Value> portNameToValue;
   for (unsigned i = 0, e = op->getNumOperands(); i < e; ++i)
     portNameToValue[namedIO.getOperandName(i)] = op->getOperand(i);
   for (unsigned i = 0, e = op->getNumResults(); i < e; ++i)
