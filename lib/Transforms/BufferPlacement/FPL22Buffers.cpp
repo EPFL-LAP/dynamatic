@@ -303,140 +303,6 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
   }
 }
 
-void FPL22BuffersBase::addSpecUnitPathConstraints(Operation *op,
-                                                  ChannelFilter filter) {
-  // get the timing model for this operation
-  const SpecTimingModel *specModel = timingDB.getSpecModel(op);
-  assert(specModel &&
-         "addSpecUnitPathConstraints: no spec timing model loaded for op");
-
-  // get the operand/result names of this operation
-  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
-  assert(namedIO && "addSpecUnitPathConstraints: op does not implement "
-                    "NamedIOInterface");
-
-  // store mapping from operand/result name to operand/result
-  // since we don't have a native function to go name -> value
-  // only operand/result index -> name
-  std::map<std::string, Value> portNameToValue;
-  for (unsigned i = 0, e = op->getNumOperands(); i < e; ++i)
-    portNameToValue[namedIO.getOperandName(i)] = op->getOperand(i);
-  for (unsigned i = 0, e = op->getNumResults(); i < e; ++i)
-    portNameToValue[namedIO.getResultName(i)] = op->getResult(i);
-
-  // we need specific op objects to get bitwidths
-  // this is a bit hacky, probably an interface/trait would be better
-  // if there were more ops
-  Value bitwidthChannel =
-      llvm::TypeSwitch<Operation *, Value>(op)
-          .Case<handshake::SpeculatorOp>(
-              [](handshake::SpeculatorOp op) { return op.getDataIn(); })
-          .Case<handshake::SpecSaveCommitOp>(
-              [](handshake::SpecSaveCommitOp op) { return op.getDataIn(); })
-          .Default([](Operation *) -> Value {
-            llvm_unreachable("addSpecUnitPathConstraints called on op type "
-                             "with no bitwidth accessor registered");
-          });
-  // get the bitwidth of the operation
-  unsigned currentBitwidth = 0;
-  if (auto chTy = dyn_cast<handshake::ChannelType>(bitwidthChannel.getType()))
-    currentBitwidth = chTy.getDataBitWidth();
-
-  // get the name of the operation
-  StringRef opName = getUniqueName(op);
-  // index to make constraint names unique
-  unsigned idx = 0;
-  for (const SpecTimingPort2Port &edgeDelay : specModel->port2port) {
-
-    // beginning of path
-    Value fromVal = portNameToValue.at(edgeDelay.from.name);
-    // end of path
-    Value toVal = portNameToValue.at(edgeDelay.to.name);
-
-    // only adding delays for channels that pass the filter
-    if (!filter(fromVal) || !filter(toVal))
-      continue;
-
-    // we need to have real channel variables for these values
-    assert(vars.channelVars.find(fromVal) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-    assert(vars.channelVars.find(toVal) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-
-    // get the delay based on the bitwidth
-    double delay = edgeDelay.delayList.selectDelay(currentBitwidth);
-
-    // get the actual CPVars
-    CPVar &tFrom =
-        vars.channelVars[fromVal].signalVars[edgeDelay.from.signal].path.tOut;
-    CPVar &tTo =
-        vars.channelVars[toVal].signalVars[edgeDelay.to.signal].path.tIn;
-
-    // make constraint name
-    std::string consName =
-        "path_spec_p2p_" + opName.str() + "_" + std::to_string(idx++);
-
-    // add constraint
-    model->addConstr(tFrom + delay <= tTo, consName);
-  }
-
-  for (const SpecTimingPort2Reg &portDelay : specModel->port2reg) {
-
-    // the port of this delay
-    Value v = portNameToValue.at(portDelay.port.name);
-
-    // only adding delays for channels that pass the filter
-    if (!filter(v))
-      continue;
-
-    // we need to have a real channel variable for this value
-    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-
-    // get the delay based on the bitwidth
-    double delay = portDelay.delayList.selectDelay(currentBitwidth);
-
-    // make constraint name
-    std::string consName =
-        "path_spec_p2r_" + opName.str() + "_" + std::to_string(idx++);
-
-    // get the actual CPVar
-    CPVar &tInPort =
-        vars.channelVars[v].signalVars[portDelay.port.signal].path.tOut;
-
-    // add constraint
-    model->addConstr(tInPort + delay <= targetPeriod, consName);
-  }
-
-  for (const SpecTimingReg2Port &portDelay : specModel->reg2port) {
-
-    // the port of this delay
-    Value v = portNameToValue.at(portDelay.port.name);
-
-    // only adding delays for channels that pass the filter
-    if (!filter(v))
-      continue;
-
-    // we need to have a real channel variable for this value
-    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-
-    // get the delay based on the bitwidth
-    double delay = portDelay.delayList.selectDelay(currentBitwidth);
-
-    // make constraint name
-    std::string consName =
-        "path_spec_r2p_" + opName.str() + "_" + std::to_string(idx++);
-
-    // get the actual CPVar
-    CPVar &tOutPort =
-        vars.channelVars[v].signalVars[portDelay.port.signal].path.tIn;
-
-    // add constraint
-    model->addConstr(tOutPort >= delay, consName);
-  }
-}
-
 CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
                                      int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
@@ -506,7 +372,9 @@ void CFDFCUnionBuffers::setup() {
   // constraints over all units in the CFDFC union
   for (Operation *unit : cfUnion.units) {
     if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(unit)) {
-      addSpecUnitPathConstraints(unit, channelFilter);
+      addSpecUnitConstraints(
+          unit, {SignalType::DATA, SignalType::VALID, SignalType::READY},
+          channelFilter);
       continue;
     }
     addUnitTimingConstraints(unit, SignalType::DATA, channelFilter);
@@ -624,7 +492,9 @@ void OutOfCycleBuffers::setup() {
       continue;
 
     if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(&unit)) {
-      addSpecUnitPathConstraints(&unit, channelFilter);
+      addSpecUnitConstraints(
+          &unit, {SignalType::DATA, SignalType::VALID, SignalType::READY},
+          channelFilter);
       continue;
     }
     addUnitTimingConstraints(&unit, SignalType::DATA, channelFilter);

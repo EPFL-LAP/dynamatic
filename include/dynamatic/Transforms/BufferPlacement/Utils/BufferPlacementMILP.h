@@ -269,6 +269,16 @@ protected:
   void addUnitTimingConstraints(Operation *unit, SignalType signalType,
                                 ChannelFilter filter = nullFilter);
 
+  /// Adds combinational delay constraints for a unit whose timing comes from a
+  /// `SpecTimingModel` in the spec-timing JSON (per-port-pair edges). Only
+  /// edges whose endpoint signal(s) are all contained in `signals` are added,
+  /// so an algorithm that models a subset of signals (e.g. FPGA'20: data only)
+  /// passes just those. A `filter` can exclude ports on channels for which it
+  /// returns false. Replaces the per-signal `addUnitTimingConstraints` and
+  /// mixed-domain `addUnitMixedPathConstraints` calls for that unit.
+  void addSpecUnitConstraints(Operation *unit, ArrayRef<SignalType> signals,
+                              ChannelFilter filter = nullFilter);
+
   /// This function models the facts that:
   /// - Signal buffer presence -> buffer presence
   /// - Num slots > 1 -> buffer presence

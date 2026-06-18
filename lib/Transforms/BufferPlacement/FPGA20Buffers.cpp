@@ -41,138 +41,6 @@ FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
     setup();
 }
 
-void FPGA20Buffers::addSpecUnitDataPathConstraints(Operation *op) {
-  // get the timing model for this operation
-  const SpecTimingModel *specModel = timingDB.getSpecModel(op);
-  assert(specModel &&
-         "addSpecUnitDataPathConstraints: no spec timing model loaded for op");
-
-  // get the operand/result names of this operation
-  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
-  assert(namedIO && "addSpecUnitDataPathConstraints: op does not implement "
-                    "NamedIOInterface");
-
-  // store mapping from operand/result name to operand/result
-  // since we don't have a native function to go name -> value
-  // only operand/result index -> name
-  std::map<StringRef, Value> portNameToValue;
-  for (unsigned i = 0, e = op->getNumOperands(); i < e; ++i)
-    portNameToValue[namedIO.getOperandName(i)] = op->getOperand(i);
-  for (unsigned i = 0, e = op->getNumResults(); i < e; ++i)
-    portNameToValue[namedIO.getResultName(i)] = op->getResult(i);
-
-  // we need specific op objects to get bitwidths
-  // this is a bit hacky, probably an interface/trait would be better
-  // if there were more ops
-  Value bitwidthChannel =
-      llvm::TypeSwitch<Operation *, Value>(op)
-          .Case<handshake::SpeculatorOp>(
-              [](handshake::SpeculatorOp op) { return op.getDataIn(); })
-          .Case<handshake::SpecSaveCommitOp>(
-              [](handshake::SpecSaveCommitOp op) { return op.getDataIn(); })
-          .Default([](Operation *) -> Value {
-            llvm_unreachable("addSpecUnitDataPathConstraints called on op type "
-                             "with no bitwidth accessor registered");
-          });
-
-  // get the bitwidth of the operation
-  unsigned currentBitwidth = 0;
-  if (auto chTy = dyn_cast<handshake::ChannelType>(bitwidthChannel.getType()))
-    currentBitwidth = chTy.getDataBitWidth();
-
-  // get the name of the operation
-  StringRef opName = getUniqueName(op);
-  // index to make constraint names unique
-  unsigned idx = 0;
-  for (const SpecTimingPort2Port &edgeDelay : specModel->port2port) {
-
-    // only adding data to data delays
-    if (edgeDelay.from.signal != SignalType::DATA ||
-        edgeDelay.to.signal != SignalType::DATA)
-      continue;
-
-    // beginning of path
-    Value fromVal = portNameToValue.at(edgeDelay.from.name);
-    // end of path
-    Value toVal = portNameToValue.at(edgeDelay.to.name);
-
-    // we need to have real channel variables for these values
-    assert(vars.channelVars.find(fromVal) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-    assert(vars.channelVars.find(toVal) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-
-    // get the delay based on the bitwidth
-    double delay = edgeDelay.delayList.selectDelay(currentBitwidth);
-
-    // get the actual CPVars
-    CPVar &tFrom =
-        vars.channelVars[fromVal].signalVars[SignalType::DATA].path.tOut;
-    CPVar &tTo = vars.channelVars[toVal].signalVars[SignalType::DATA].path.tIn;
-
-    // make constraint name
-    std::string consName =
-        "path_spec_p2p_" + opName.str() + "_" + std::to_string(idx++);
-
-    // add constraint
-    model->addConstr(tFrom + delay <= tTo, consName);
-  }
-
-  for (const SpecTimingPort2Reg &portDelay : specModel->port2reg) {
-
-    // only adding data signal delays
-    if (portDelay.port.signal != SignalType::DATA)
-      continue;
-
-    // the port of this delay
-    Value v = portNameToValue.at(portDelay.port.name);
-
-    // we need to have a real channel variable for this value
-    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-
-    // get the delay based on the bitwidth
-    double delay = portDelay.delayList.selectDelay(currentBitwidth);
-
-    // get the actual CPVar
-    CPVar &tArr = vars.channelVars[v].signalVars[SignalType::DATA].path.tOut;
-
-    // make constraint name
-    std::string consName =
-        "path_spec_p2r_" + opName.str() + "_" + std::to_string(idx++);
-
-    // add constraint
-    model->addConstr(tArr + delay <= targetPeriod, consName);
-  }
-
-  for (const SpecTimingReg2Port &portDelay : specModel->reg2port) {
-
-    // only adding data signal delays
-    if (portDelay.port.signal != SignalType::DATA)
-      continue;
-
-    // the port of this delay
-    Value v = portNameToValue.at(portDelay.port.name);
-
-    // we need to have a real channel variable for this value
-    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
-           "value has no corresponding channel variable");
-
-    // get the delay based on the bitwidth
-    double delay = portDelay.delayList.selectDelay(currentBitwidth);
-
-    // get the actual CPVar
-    CPVar &tDep = vars.channelVars[v].signalVars[SignalType::DATA].path.tIn;
-
-    // make constraint name
-    std::string consName =
-        "path_spec_r2p_" + opName.str() + "_" + std::to_string(idx++);
-
-    // add constraint
-    model->addConstr(tDep >= delay, consName);
-  }
-}
-
 void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   // Iterate over all channels in the circuit
   for (auto &[channel, chVars] : vars.channelVars) {
@@ -317,7 +185,7 @@ void FPGA20Buffers::setup() {
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
     if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(&op)) {
-      addSpecUnitDataPathConstraints(&op);
+      addSpecUnitConstraints(&op, {SignalType::DATA});
       continue;
     }
     addUnitTimingConstraints(&op, SignalType::DATA);

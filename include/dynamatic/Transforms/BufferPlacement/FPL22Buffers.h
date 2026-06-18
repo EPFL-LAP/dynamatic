@@ -69,14 +69,6 @@ protected:
   /// `filter` function.
   void addUnitMixedPathConstraints(Operation *unit,
                                    ChannelFilter filter = nullFilter);
-
-  /// Adds all combinational delay constraints for a unit whose timing comes
-  /// from a `SpecTimingModel` in the spec-timing JSON (per-port-pair edges).
-  /// Replaces the per-signal `addUnitTimingConstraints` + mixed-domain
-  /// `addUnitMixedPathConstraints` calls for that unit. The sample with the
-  /// closest sweep-parameter match to the unit's instance is used.
-  void addSpecUnitPathConstraints(Operation *unit,
-                                  ChannelFilter filter = nullFilter);
 };
 
 /// This MILP operates on the channels and units from a single CFDFC union
