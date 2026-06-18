@@ -21,7 +21,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
 #include <limits>
-#include <map>
 #include <optional>
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when

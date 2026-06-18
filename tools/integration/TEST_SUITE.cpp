@@ -380,7 +380,7 @@ TEST_P(SpecFixture, spec) {
       .useSpeculation = true,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpl22",
-      .clockPeriod = 8,
+      .clockPeriod = 20,
       .simTime = -1
       // clang-format on
   };

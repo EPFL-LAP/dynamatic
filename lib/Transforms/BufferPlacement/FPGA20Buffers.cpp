@@ -17,9 +17,6 @@
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/IR/Value.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include <map>
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
 // - Dynamatic is built in debug mode
