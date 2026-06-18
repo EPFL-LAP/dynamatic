@@ -125,6 +125,22 @@ void foreachInTuples(F &&f, First &&first, Others &&...others) {
                 std::forward<First>(first), std::forward<Others>(others)...);
 }
 
+/// Applies the function 'f' to all elements in the tuples 'first' and 'others'
+/// at the same time with an index as leading argument.
+/// 'first' and 'others' are required to be of the same length.
+/// 'f' is not expected to return any value.
+template <typename First, typename... Others, typename F>
+void foreachEnumerate(F &&f, First &&first, Others &&...others) {
+  // Discard any results of 'f' and make the constructor a noop.
+  enumerateTuplesInto([](auto &&...) { return 0; },
+                      [&](auto &&...args) {
+                        f(std::forward<decltype(args)>(args)...);
+                        return 0;
+                      },
+                      std::forward<First>(first),
+                      std::forward<Others>(others)...);
+}
+
 } // namespace dynamatic
 
 #endif

@@ -356,7 +356,7 @@ private:
     auto transferFnsPerTypeSystem = mapTuples(transferFnsCallback, typeSystems);
     auto outputTransferFns = mapTuplesIntoArray(
         [](auto &&dep) {
-          return std::move(std::get<OutputTransferFn<ASTNode>>(dep));
+          return std::move(std::get<OpaqueOutputTransferFn<ASTNode>>(dep));
         },
         transferFnsPerTypeSystem);
 
@@ -400,19 +400,15 @@ private:
     std::sort(indices.begin(), indices.end());
     indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
 
-    using DepT = std::decay_t<decltype(transferFnPerTypeSystem)>;
     return OpaqueTransferFn<ASTNode>(
-        std::move(indices), std::move(transferFnPerTypeSystem),
-        +[](const std::any &any,
-            const typename OpaqueTransferFn<ASTNode>::SubElementsTuple
-                &subElements,
-            const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts)
-            -> OpaqueContext {
-          const auto &transferFns = std::any_cast<DepT>(any);
-
+        llvm::identity<Context>{}, std::move(indices),
+        [transferFnPerTypeSystem = std::move(transferFnPerTypeSystem)](
+            const SubElementsTuple<ASTNode> &subElements,
+            const TypedContextTuple<ASTNode, Context> &contexts) -> Context {
           // Call all sub-transfer functions with their respective contexts.
-          return OpaqueContext(enumerateTuples(
-              [&](auto &&typeSystemIndexT, auto &&transferFn) {
+          return enumerateTuples(
+              [&](auto &&typeSystemIndexT,
+                  const OpaqueTransferFn<ASTNode> &transferFn) {
                 constexpr std::size_t typeSystemIndex =
                     decltype(typeSystemIndexT){};
 
@@ -424,24 +420,25 @@ private:
                     .template cast<
                         std::tuple_element_t<typeSystemIndex, Context>>();
               },
-              transferFns));
+              transferFnPerTypeSystem);
         });
   }
 
   /// Combines all 'OutputTransferFn' in 'outputTransferFnPerTypeSystem' into a
   /// single 'OutputTransferFn'.
   template <typename ASTNode>
-  static OutputTransferFn<ASTNode> combineOutputTransferFns(
-      std::array<OutputTransferFn<ASTNode>, sizeof...(SubTypeSystems)>
+  static OpaqueOutputTransferFn<ASTNode> combineOutputTransferFns(
+      std::array<OpaqueOutputTransferFn<ASTNode>, sizeof...(SubTypeSystems)>
           &&outputTransferFnPerTypeSystem) {
-    return OutputTransferFn<ASTNode>(
+    return OpaqueOutputTransferFn<ASTNode>(
+        llvm::identity<Context>{},
         [outputTransferFnPerTypeSystem =
              std::move(outputTransferFnPerTypeSystem)](
             const ASTNode &astNode,
-            const typename OpaqueTransferFn<ASTNode>::ContextTuple
-                &contextTuple) -> OpaqueContext {
-          return OpaqueContext(enumerateTuples(
-              [&](auto typeSystemIndexT, auto &&transferFn) {
+            const TypedContextTuple<ASTNode, Context> &contextTuple) {
+          return enumerateTuples(
+              [&](auto typeSystemIndexT,
+                  const OpaqueOutputTransferFn<ASTNode> &transferFn) {
                 constexpr std::size_t typeSystemIndex =
                     decltype(typeSystemIndexT){};
 
@@ -453,20 +450,19 @@ private:
                     .template cast<
                         std::tuple_element_t<typeSystemIndex, Context>>();
               },
-              outputTransferFnPerTypeSystem));
+              outputTransferFnPerTypeSystem);
         });
   }
 
   template <typename ASTNode, std::size_t index>
   static auto contextTupleToSubContextTuple(
-      const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts) {
+      const TypedContextTuple<ASTNode, Context> &contexts) {
     return mapTuplesIntoArray(
-        [&](auto &&context) -> std::optional<OpaqueContext> {
+        [&](const Context *context) -> const void * {
           if (!context)
-            return std::nullopt;
+            return nullptr;
 
-          return OpaqueContext(
-              std::get<index>(context->template cast<Context>()));
+          return &std::get<index>(*context);
         },
         contexts);
   }
