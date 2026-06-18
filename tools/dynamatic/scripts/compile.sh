@@ -50,6 +50,7 @@ F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
 F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
@@ -241,32 +242,30 @@ exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
 # duplicate parts of the operations specified by pragmas
-# consume all pragmas
 if [[ "$ENABLE_DUPLICATION" == "1" ]]; then
 $DYNAMATIC_OPT_BIN \
   --allow-unregistered-dialect \
   "$F_CF_TRANSFORMED" \
   --pipeline-duplication \
   --canonicalize \
-  --consume-producer-output-attr-marker \
   > "$F_CF_DUPLICATED"
 exit_on_fail "Failed to apply CF duplication" \
-  "Applied CF duplication!"
+  "Applied CF duplication"
+F_CF_TRANSFORMED="$F_CF_DUPLICATED"
+fi
 
-else
-# only consume the markers
+# consume the markers
 $DYNAMATIC_OPT_BIN \
   --allow-unregistered-dialect \
   "$F_CF_TRANSFORMED" \
   --consume-producer-output-attr-marker \
-  > "$F_CF_DUPLICATED"
+  > "$F_CF_CONSUMED_PRAGMARKERS"
 exit_on_fail "Failed to consume markers" \
   "Consumed markers successfully"
-fi
 
 
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DUPLICATED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
