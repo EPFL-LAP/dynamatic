@@ -1,6 +1,0 @@
-set-src integration-test/nested_conditionals/nested_conditionals.c
-compile --buffer-algorithm fpl22
-write-hdl
-simulate
-visualize
-exit

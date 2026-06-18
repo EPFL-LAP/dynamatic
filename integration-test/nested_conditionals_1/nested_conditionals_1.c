@@ -1,5 +1,5 @@
-#include "dynamatic/Integration.h"
 #include "nested_conditionals_1.h"
+#include "dynamatic/Integration.h"
 
 void nested_conditionals_1(inout_int_t a[N], in_int_t c) {
   for (unsigned i = 0; i < N; ++i) {

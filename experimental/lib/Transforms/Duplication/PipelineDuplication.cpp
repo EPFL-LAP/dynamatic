@@ -197,16 +197,19 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
 
           // Structurally sweep the operations of the side-tracked block
           for (mlir::Operation &op : otherSuccessor->getOperations()) {
+            // if the end operation was inserted during a dfs below, we still
+            // need to stop
+            if (llvm::is_contained(endOps, &op) ||
+                isa<mlir::memref::StoreOp>(&op)) {
+              visitedOps.insert(&op);
+              break;
+            }
+
             if (visitedOps.count(&op))
               continue;
 
             visitedOps.insert(&op);
             collectDependenciesUpstream(&op, otherSuccessor, visitedOps);
-
-            if (llvm::is_contained(endOps, &op) ||
-                isa<mlir::memref::StoreOp>(&op)) {
-              break;
-            }
 
             for (mlir::Value result : op.getResults()) {
               if (failed(collectOpsDFS(result, endOps, otherSuccessor,
@@ -267,16 +270,19 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
         if (!followedBlockArg && !successor->empty()) {
           // Structurally sweep the operations of the side-tracked block
           for (mlir::Operation &op : successor->getOperations()) {
+            // if a marker termination was inserted during a dfs below, we still
+            // need to stop
+            if (llvm::is_contained(endOps, &op) ||
+                isa<mlir::memref::StoreOp>(&op)) {
+              visitedOps.insert(&op);
+              break;
+            }
+
             if (visitedOps.count(&op))
               continue;
 
             visitedOps.insert(&op);
             collectDependenciesUpstream(&op, successor, visitedOps);
-
-            if (llvm::is_contained(endOps, &op) ||
-                isa<mlir::memref::StoreOp>(&op)) {
-              break;
-            }
 
             for (mlir::Value result : op.getResults()) {
               if (failed(
@@ -827,8 +833,7 @@ void PipelineDuplicationPass::runOnOperation() {
           origOp->moveBefore(fallbackBlock, fallbackBlock->end());
 
           // remap operands of the moved operation
-          for (unsigned int opIdx = 0; opIdx < origOp->getNumOperands();
-               ++opIdx) {
+          for (unsigned opIdx = 0; opIdx < origOp->getNumOperands(); ++opIdx) {
             mlir::Value currentOperand = origOp->getOperand(opIdx);
             if (fallbackMapper.contains(currentOperand)) {
               origOp->setOperand(opIdx, fallbackMapper.lookup(currentOperand));
