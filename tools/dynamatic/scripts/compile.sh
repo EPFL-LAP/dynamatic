@@ -271,7 +271,7 @@ if [[ $DISABLE_LSQ -ne 0 ]]; then
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DUPLICATED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
