@@ -19,6 +19,7 @@
 #include "mlir/IR/Value.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <map>
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
 // - Dynamatic is built in debug mode
@@ -40,159 +41,134 @@ FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
     setup();
 }
 
-void FPGA20Buffers::addSpecUnitDataPathConstraints(Operation *unit) {
-  const SpecTimingModel *specModel = timingDB.getSpecModel(unit);
-  if (!specModel) {
-    unit->emitError() << "addSpecUnitDataPathConstraints: no spec timing model "
-                      << "loaded for op '" << unit->getName().getStringRef()
-                      << "'";
-    return;
-  }
+void FPGA20Buffers::addSpecUnitDataPathConstraints(Operation *op) {
+  // get the timing model for this operation
+  const SpecTimingModel *specModel = timingDB.getSpecModel(op);
+  assert(specModel &&
+         "addSpecUnitDataPathConstraints: no spec timing model loaded for op");
 
-  auto namedIO = dyn_cast<handshake::NamedIOInterface>(unit);
-  if (!namedIO) {
-    unit->emitError() << "addSpecUnitDataPathConstraints: op does not "
-                      << "implement NamedIOInterface";
-    return;
-  }
+  // get the operand/result names of this operation
+  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
+  assert(namedIO && "addSpecUnitDataPathConstraints: op does not implement "
+                    "NamedIOInterface");
 
-  llvm::StringMap<Value> portToValue;
-  for (unsigned i = 0, e = unit->getNumOperands(); i < e; ++i)
-    portToValue[namedIO.getOperandName(i)] = unit->getOperand(i);
-  for (unsigned i = 0, e = unit->getNumResults(); i < e; ++i)
-    portToValue[namedIO.getResultName(i)] = unit->getResult(i);
+  // store mapping from operand/result name to operand/result
+  // since we don't have a native function to go name -> value
+  // only operand/result index -> name
+  std::map<StringRef, Value> portNameToValue;
+  for (unsigned i = 0, e = op->getNumOperands(); i < e; ++i)
+    portNameToValue[namedIO.getOperandName(i)] = op->getOperand(i);
+  for (unsigned i = 0, e = op->getNumResults(); i < e; ++i)
+    portNameToValue[namedIO.getResultName(i)] = op->getResult(i);
 
+  // we need specific op objects to get bitwidths
+  // this is a bit hacky, probably an interface/trait would be better
+  // if there were more ops
   Value bitwidthChannel =
-      llvm::TypeSwitch<Operation *, Value>(unit)
+      llvm::TypeSwitch<Operation *, Value>(op)
           .Case<handshake::SpeculatorOp>(
               [](handshake::SpeculatorOp op) { return op.getDataIn(); })
           .Case<handshake::SpecSaveCommitOp>(
               [](handshake::SpecSaveCommitOp op) { return op.getDataIn(); })
-          .Default([&](Operation *op) {
-            op->emitError() << "addSpecUnitDataPathConstraints called on op "
-                            << "type with no bitwidth accessor registered";
-            return Value();
+          .Default([](Operation *) -> Value {
+            llvm_unreachable("addSpecUnitDataPathConstraints called on op type "
+                             "with no bitwidth accessor registered");
           });
-  if (!bitwidthChannel)
-    return;
 
-  llvm::StringMap<int64_t> currentParams;
+  // get the bitwidth of the operation
+  unsigned currentBitwidth = 0;
   if (auto chTy = dyn_cast<handshake::ChannelType>(bitwidthChannel.getType()))
-    currentParams["BITWIDTH"] = chTy.getDataBitWidth();
-  else
-    currentParams["BITWIDTH"] = 0;
+    currentBitwidth = chTy.getDataBitWidth();
 
-  auto pickClosest =
-      [&](const std::vector<SpecTimingSample> &samples) -> double {
-    assert(!samples.empty() && "spec timing edge has no samples");
-    const SpecTimingSample *best = &samples.front();
-    int64_t bestDist = std::numeric_limits<int64_t>::max();
-    for (const auto &s : samples) {
-      int64_t dist = 0;
-      for (const auto &targetKV : currentParams) {
-        auto it = s.params.find(targetKV.first());
-        if (it == s.params.end())
-          continue;
-        int64_t d = it->second - targetKV.second;
-        dist += d * d;
-      }
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = &s;
-      }
-    }
-    return best->delay;
-  };
-
-  StringRef unitName = getUniqueName(unit);
+  // get the name of the operation
+  StringRef opName = getUniqueName(op);
+  // index to make constraint names unique
   unsigned idx = 0;
-  for (const SpecTimingEdge &edge : specModel->pin2pin) {
-    if (edge.from.signal != "data" || edge.to.signal != "data")
+  for (const SpecTimingPort2Port &edgeDelay : specModel->port2port) {
+
+    // only adding data to data delays
+    if (edgeDelay.from.signal != SignalType::DATA ||
+        edgeDelay.to.signal != SignalType::DATA)
       continue;
-    auto fromIt = portToValue.find(edge.from.port);
-    auto toIt = portToValue.find(edge.to.port);
-    if (fromIt == portToValue.end()) {
-      unit->emitError() << "spec timing edge references unknown port '"
-                        << edge.from.port << "'";
-      return;
-    }
-    if (toIt == portToValue.end()) {
-      unit->emitError() << "spec timing edge references unknown port '"
-                        << edge.to.port << "'";
-      return;
-    }
-    Value fromVal = fromIt->second;
-    Value toVal = toIt->second;
-    if (vars.channelVars.find(fromVal) == vars.channelVars.end() ||
-        vars.channelVars.find(toVal) == vars.channelVars.end())
-      continue;
-    if (edge.samples.empty()) {
-      unit->emitError() << "spec timing edge " << edge.from.port << "."
-                        << edge.from.signal << " -> " << edge.to.port << "."
-                        << edge.to.signal << " has no samples";
-      return;
-    }
-    double delay = pickClosest(edge.samples);
+
+    // beginning of path
+    Value fromVal = portNameToValue.at(edgeDelay.from.name);
+    // end of path
+    Value toVal = portNameToValue.at(edgeDelay.to.name);
+
+    // we need to have real channel variables for these values
+    assert(vars.channelVars.find(fromVal) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+    assert(vars.channelVars.find(toVal) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+
+    // get the delay based on the bitwidth
+    double delay = edgeDelay.delayList.selectDelay(currentBitwidth);
+
+    // get the actual CPVars
     CPVar &tFrom =
         vars.channelVars[fromVal].signalVars[SignalType::DATA].path.tOut;
     CPVar &tTo = vars.channelVars[toVal].signalVars[SignalType::DATA].path.tIn;
+
+    // make constraint name
     std::string consName =
-        "path_spec_p2p_" + unitName.str() + "_" + std::to_string(idx++);
+        "path_spec_p2p_" + opName.str() + "_" + std::to_string(idx++);
+
+    // add constraint
     model->addConstr(tFrom + delay <= tTo, consName);
   }
 
-  auto unitSideDataVar = [&](Value v) -> CPVar & {
-    bool unitIsProducer = (v.getDefiningOp() == unit);
-    if (unitIsProducer)
-      return vars.channelVars[v].signalVars[SignalType::DATA].path.tIn;
-    return vars.channelVars[v].signalVars[SignalType::DATA].path.tOut;
-  };
+  for (const SpecTimingPort2Reg &portDelay : specModel->port2reg) {
 
-  for (const SpecTimingPortDelay &pd : specModel->pin2reg) {
-    if (pd.port.signal != "data")
+    // only adding data signal delays
+    if (portDelay.port.signal != SignalType::DATA)
       continue;
-    auto it = portToValue.find(pd.port.port);
-    if (it == portToValue.end()) {
-      unit->emitError() << "spec pin2reg references unknown port '"
-                        << pd.port.port << "'";
-      return;
-    }
-    Value v = it->second;
-    if (vars.channelVars.find(v) == vars.channelVars.end())
-      continue;
-    if (pd.samples.empty()) {
-      unit->emitError() << "spec pin2reg " << pd.port.port << "."
-                        << pd.port.signal << " has no samples";
-      return;
-    }
-    double delay = pickClosest(pd.samples);
-    CPVar &tArr = unitSideDataVar(v);
+
+    // the port of this delay
+    Value v = portNameToValue.at(portDelay.port.name);
+
+    // we need to have a real channel variable for this value
+    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+
+    // get the delay based on the bitwidth
+    double delay = portDelay.delayList.selectDelay(currentBitwidth);
+
+    // get the actual CPVar
+    CPVar &tArr = vars.channelVars[v].signalVars[SignalType::DATA].path.tOut;
+
+    // make constraint name
     std::string consName =
-        "path_spec_p2r_" + unitName.str() + "_" + std::to_string(idx++);
+        "path_spec_p2r_" + opName.str() + "_" + std::to_string(idx++);
+
+    // add constraint
     model->addConstr(tArr + delay <= targetPeriod, consName);
   }
 
-  for (const SpecTimingPortDelay &pd : specModel->reg2pin) {
-    if (pd.port.signal != "data")
+  for (const SpecTimingReg2Port &portDelay : specModel->reg2port) {
+
+    // only adding data signal delays
+    if (portDelay.port.signal != SignalType::DATA)
       continue;
-    auto it = portToValue.find(pd.port.port);
-    if (it == portToValue.end()) {
-      unit->emitError() << "spec reg2pin references unknown port '"
-                        << pd.port.port << "'";
-      return;
-    }
-    Value v = it->second;
-    if (vars.channelVars.find(v) == vars.channelVars.end())
-      continue;
-    if (pd.samples.empty()) {
-      unit->emitError() << "spec reg2pin " << pd.port.port << "."
-                        << pd.port.signal << " has no samples";
-      return;
-    }
-    double delay = pickClosest(pd.samples);
-    CPVar &tDep = unitSideDataVar(v);
+
+    // the port of this delay
+    Value v = portNameToValue.at(portDelay.port.name);
+
+    // we need to have a real channel variable for this value
+    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+
+    // get the delay based on the bitwidth
+    double delay = portDelay.delayList.selectDelay(currentBitwidth);
+
+    // get the actual CPVar
+    CPVar &tDep = vars.channelVars[v].signalVars[SignalType::DATA].path.tIn;
+
+    // make constraint name
     std::string consName =
-        "path_spec_r2p_" + unitName.str() + "_" + std::to_string(idx++);
+        "path_spec_r2p_" + opName.str() + "_" + std::to_string(idx++);
+
+    // add constraint
     model->addConstr(tDep >= delay, consName);
   }
 }

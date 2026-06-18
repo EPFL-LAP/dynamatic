@@ -284,8 +284,202 @@ const SpecTimingModel *TimingDatabase::getSpecModel(Operation *op) const {
   return getSpecModel(op->getName().getStringRef());
 }
 
+static FailureOr<SignalType> signalTypeFromString(StringRef s) {
+  if (s == "data")
+    return SignalType::DATA;
+  if (s == "valid")
+    return SignalType::VALID;
+  if (s == "ready")
+    return SignalType::READY;
+  llvm::errs() << "spec timing port has unrecognised signal kind \"" << s
+               << "\"\n";
+  return failure();
+}
+
+// reads an array of delays into a delay list, or fails
+// the delay of the path is a function of its bitwidth
+static FailureOr<SpecTimingDelayList>
+parseDelayList(const ljson::Array *delays) {
+  // check array of delays exists
+  if (!delays) {
+    llvm::errs() << "spec timing object has no array of delays\n";
+    return failure();
+  }
+
+  // struct to store parsed info in
+  SpecTimingDelayList delayList;
+
+  // for each delay
+  for (const ljson::Value &delayVal : *delays) {
+    // get as json object
+    const ljson::Object *delayObj = delayVal.getAsObject();
+    if (!delayObj) {
+      llvm::errs() << "spec timing delay is not a JSON object\n";
+      return failure();
+    }
+
+    // declare the delay struct
+    SpecTimingDelay delay;
+
+    // read the delay
+    std::optional<double> d = delayObj->getNumber("delay");
+    if (!d) {
+      llvm::errs() << "spec timing delay has no delay\n";
+      return failure();
+    }
+    // store in struct
+    delay.delay = *d;
+
+    // read the bitwidth
+    std::optional<int64_t> bw = delayObj->getInteger("bitwidth");
+    if (!bw) {
+      llvm::errs() << "spec timing delay has no bitwidth\n";
+      return failure();
+    }
+    // store bitwidth in struct
+    delay.bitwidth = *bw;
+
+    // move into the delay list
+    delayList.addDelay(std::move(delay));
+  }
+  return delayList;
+}
+
+// reads a port name and signal kind into a port, or fails
+static FailureOr<SpecTimingPort> parsePort(const ljson::Object *portObj) {
+  // check port exists
+  if (!portObj) {
+    llvm::errs() << "spec timing port is not a JSON object\n";
+    return failure();
+  }
+
+  // struct to save the info in
+  SpecTimingPort port;
+
+  // read the port name (whether input or output)
+  std::optional<StringRef> portName = portObj->getString("port");
+  if (!portName) {
+    llvm::errs() << "spec timing port has no name\n";
+    return failure();
+  }
+  // save in struct
+  port.name = portName->str();
+
+  // read the signal kind as a string
+  std::optional<StringRef> signalName = portObj->getString("signal");
+  if (!signalName) {
+    llvm::errs() << "spec timing port has no signal\n";
+    return failure();
+  }
+
+  // convert the signal string to a SignalType enum
+  FailureOr<SignalType> signalType = signalTypeFromString(*signalName);
+  if (failed(signalType))
+    // signalTypeFromString prints the error message if failed
+    return failure();
+
+  // save in struct
+  port.signal = *signalType;
+
+  return port;
+}
+
+// reads a port2port edge [from port, to port, delay list] or fails
+static FailureOr<SpecTimingPort2Port>
+parsePort2Port(const ljson::Object *edgeObj) {
+  // struct to store info in
+  SpecTimingPort2Port edge;
+
+  // read the 'from' port
+  FailureOr<SpecTimingPort> from = parsePort(edgeObj->getObject("from"));
+  if (failed(from))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store in struct
+  edge.from = *from;
+
+  // read the 'to' port
+  FailureOr<SpecTimingPort> to = parsePort(edgeObj->getObject("to"));
+  if (failed(to))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store in struct
+  edge.to = *to;
+
+  // read the list of delays
+  FailureOr<SpecTimingDelayList> delayList =
+      parseDelayList(edgeObj->getArray("delayList"));
+  if (failed(delayList))
+    // parseDelayList prints the error message if failed
+    return failure();
+
+  // store in struct
+  edge.delayList = std::move(*delayList);
+
+  return edge;
+}
+
+// reads a port2reg port delay [port, delay list] or fails
+static FailureOr<SpecTimingPort2Reg>
+parsePort2Reg(const ljson::Object *portDelayObj) {
+  // struct to store info
+  SpecTimingPort2Reg portDelay;
+
+  // read the port
+  FailureOr<SpecTimingPort> port = parsePort(portDelayObj);
+  if (failed(port))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store in struct
+  portDelay.port = *port;
+
+  // read the list of delays
+  FailureOr<SpecTimingDelayList> delayList =
+      parseDelayList(portDelayObj->getArray("delayList"));
+  if (failed(delayList))
+    // parseDelayList prints the error message if failed
+    return failure();
+
+  // store in struct
+  portDelay.delayList = std::move(*delayList);
+
+  return portDelay;
+}
+
+// reads a reg2port port delay [port, delay list] or fails
+static FailureOr<SpecTimingReg2Port>
+parseReg2Port(const ljson::Object *portDelayObj) {
+  // struct to save into
+  SpecTimingReg2Port portDelay;
+
+  // read the port
+  FailureOr<SpecTimingPort> port = parsePort(portDelayObj);
+  if (failed(port))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store tos truct
+  portDelay.port = *port;
+
+  // read the list of delays
+  FailureOr<SpecTimingDelayList> delayList =
+      parseDelayList(portDelayObj->getArray("delayList"));
+  if (failed(delayList))
+    // parseDelayList prints the error message if failed
+    return failure();
+
+  // store to struct
+  portDelay.delayList = std::move(*delayList);
+
+  return portDelay;
+}
+
 LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
                                                      TimingDatabase &timingDB) {
+  // open the file
   std::ifstream inputFile(jsonpath);
   if (!inputFile.is_open()) {
     llvm::errs() << "Failed to open spec timing JSON at \"" << jsonpath
@@ -293,11 +487,13 @@ LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
     return failure();
   }
 
+  // read the file into a string
   std::string jsonString;
   std::string line;
   while (std::getline(inputFile, line))
     jsonString += line;
 
+  // parse the string as JSON
   llvm::Expected<ljson::Value> value = ljson::parse(jsonString);
   if (!value) {
     llvm::errs() << "Failed to parse spec timing JSON in \"" << jsonpath
@@ -305,84 +501,96 @@ LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
     return failure();
   }
 
+  // get as an object
   const ljson::Object *root = value->getAsObject();
   if (!root) {
     llvm::errs() << "Spec timing JSON root must be an object\n";
     return failure();
   }
 
+  // read one timing model per type of unit
   for (const auto &unitEntry : *root) {
+    // key is the operation type this info is for
     StringRef unitKey = unitEntry.first;
-    const ljson::Object *unitObj = unitEntry.second.getAsObject();
-    if (!unitObj)
-      continue;
-    SpecTimingModel model;
 
-    auto parseSamples = [](const ljson::Array *samplesArr,
-                           std::vector<SpecTimingSample> &out) {
-      if (!samplesArr)
-        return;
-      for (const ljson::Value &sampleVal : *samplesArr) {
-        const ljson::Object *sampleObj = sampleVal.getAsObject();
-        if (!sampleObj)
-          continue;
-        SpecTimingSample sample;
-        if (auto d = sampleObj->getNumber("delay"))
-          sample.delay = *d;
-        else
-          continue;
-        if (const ljson::Object *paramObj = sampleObj->getObject("params")) {
-          for (const auto &paramEntry : *paramObj) {
-            if (auto pv = paramEntry.second.getAsInteger())
-              sample.params[paramEntry.first] = *pv;
-          }
-        }
-        out.push_back(std::move(sample));
-      }
-    };
-
-    if (const ljson::Array *pin2pinArr = unitObj->getArray("pin2pin")) {
-      for (const ljson::Value &edgeVal : *pin2pinArr) {
-        const ljson::Object *edgeObj = edgeVal.getAsObject();
-        if (!edgeObj)
-          continue;
-        SpecTimingEdge edge;
-        for (const auto &which : {std::make_pair("from", &edge.from),
-                                  std::make_pair("to", &edge.to)}) {
-          const ljson::Object *endObj = edgeObj->getObject(which.first);
-          if (!endObj)
-            continue;
-          if (auto p = endObj->getString("port"))
-            which.second->port = p->str();
-          if (auto s = endObj->getString("signal"))
-            which.second->signal = s->str();
-        }
-        parseSamples(edgeObj->getArray("samples"), edge.samples);
-        model.pin2pin.push_back(std::move(edge));
-      }
+    // get characterization info as object
+    const ljson::Object *timingModelInfo = unitEntry.second.getAsObject();
+    if (!timingModelInfo) {
+      llvm::errs() << "spec timing model is not a JSON object\n";
+      return failure();
     }
 
-    auto parsePortDelayArr = [&](const char *key,
-                                 std::vector<SpecTimingPortDelay> &out) {
-      const ljson::Array *arr = unitObj->getArray(key);
-      if (!arr)
-        return;
-      for (const ljson::Value &v : *arr) {
-        const ljson::Object *o = v.getAsObject();
-        if (!o)
-          continue;
-        SpecTimingPortDelay pd;
-        if (auto p = o->getString("port"))
-          pd.port.port = p->str();
-        if (auto s = o->getString("signal"))
-          pd.port.signal = s->str();
-        parseSamples(o->getArray("samples"), pd.samples);
-        out.push_back(std::move(pd));
-      }
-    };
-    parsePortDelayArr("pin2reg", model.pin2reg);
-    parsePortDelayArr("reg2pin", model.reg2pin);
+    // declare the model we will fill in
+    SpecTimingModel model;
 
+    // read the port2port edges as an arry
+    const ljson::Array *port2portArr = timingModelInfo->getArray("port2port");
+    if (!port2portArr) {
+      llvm::errs() << "spec timing unit has no port2port array\n";
+      return failure();
+    }
+
+    // for each port2port edge
+    for (const ljson::Value &edgeVal : *port2portArr) {
+      const ljson::Object *edgeObj = edgeVal.getAsObject();
+      if (!edgeObj) {
+        llvm::errs() << "port2port delay is not a JSON object\n";
+        return failure();
+      }
+      FailureOr<SpecTimingPort2Port> edge = parsePort2Port(edgeObj);
+      if (failed(edge))
+        // parsePort2Port prints the error message if failed
+        return failure();
+      model.port2port.push_back(std::move(*edge));
+    }
+
+    // read the port2reg port delays as an array
+    const ljson::Array *port2regArr = timingModelInfo->getArray("port2reg");
+    if (!port2regArr) {
+      llvm::errs() << "spec timing unit has no port2reg array\n";
+      return failure();
+    }
+
+    // for each port2reg port delay
+    for (const ljson::Value &portDelayVal : *port2regArr) {
+      const ljson::Object *portDelayObj = portDelayVal.getAsObject();
+      if (!portDelayObj) {
+        llvm::errs() << "spec timing port delay is not a JSON object\n";
+        return failure();
+      }
+      FailureOr<SpecTimingPort2Reg> portDelay = parsePort2Reg(portDelayObj);
+      if (failed(portDelay))
+        // parsePort2Reg prints the error message if failed
+        return failure();
+      model.port2reg.push_back(std::move(*portDelay));
+    }
+
+    // read the reg2port port delays as an array
+    // TODO: this loop is identical to the port2reg loop except the key, type,
+    // and parse function; kept explicit per the one-struct-per-JSON-key
+    // decision claude: iterates the reg2port array and parses each element into
+    // the model
+    const ljson::Array *reg2portArr = timingModelInfo->getArray("reg2port");
+    if (!reg2portArr) {
+      llvm::errs() << "spec timing unit has no reg2port array\n";
+      return failure();
+    }
+
+    // for each reg2port port delay
+    for (const ljson::Value &portDelayVal : *reg2portArr) {
+      const ljson::Object *portDelayObj = portDelayVal.getAsObject();
+      if (!portDelayObj) {
+        llvm::errs() << "spec timing port delay is not a JSON object\n";
+        return failure();
+      }
+      FailureOr<SpecTimingReg2Port> portDelay = parseReg2Port(portDelayObj);
+      if (failed(portDelay))
+        // parseReg2Port prints the error message if failed
+        return failure();
+      model.reg2port.push_back(std::move(*portDelay));
+    }
+
+    // store the unit's model under its key
     timingDB.specModels[unitKey] = std::move(model);
   }
   return success();

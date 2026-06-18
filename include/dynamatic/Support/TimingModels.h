@@ -282,43 +282,97 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
 
 /// Input or output of a unit.
-/// signal is stored separately from the rest of the port name
-/// since it affects which CPVar the delay applies to
-struct SpecTimingEndpoint {
-  std::string port;
-  std::string signal;
+/// signal is used to select which CPVar the delay applies to
+struct SpecTimingPort {
+  std::string name;
+  SignalType signal;
 };
 
 /// One measurement of an internal delay at one combination of unit parameters
-/// (e.g., BITWIDTH=16, FIFO_DEPTH=4).
-struct SpecTimingSample {
-  llvm::StringMap<int64_t> params;
+/// currently hardcoded to select only by bitwidth
+/// since that's what we actually do
+struct SpecTimingDelay {
+  unsigned bitwidth;
   double delay;
 };
 
-/// One characterised combinational path between two pins of an op,
-/// loaded from the spec-timing JSON.
-/// Used for ops whose internal timing requires more expressivity
-struct SpecTimingEdge {
-  /// input to the unit
-  SpecTimingEndpoint from;
+struct SpecTimingDelayList {
+  // add a delay
+  void addDelay(SpecTimingDelay delay) { delays.push_back(std::move(delay)); }
 
-  /// output of the unit
-  SpecTimingEndpoint to;
+  // choose delay from list of delays based on bitwidth
+  double selectDelay(unsigned bitwidth) const {
+    // there must be at least one delay to choose a delay from
+    assert(!delays.empty() && "spec timing delays are empty");
 
-  /// List of sampled parameters + delay
-  /// present from the JSON file
-  std::vector<SpecTimingSample> samples;
+    // largest bitwidth and its delay, used as a fallback
+    unsigned widthMax = 0;
+    double maxDelay = 0.0;
+
+    // delay bitwidth closest
+    // that is also larger
+    std::optional<unsigned> widthCeil;
+    double ceilDelay;
+
+    // single pass over the delays computing both the ceiling and the maximum
+    for (const SpecTimingDelay &s : delays) {
+      unsigned delayBitwidth = s.bitwidth;
+
+      // check if we have found a closer bitwidth
+      // that is also larger
+      if (delayBitwidth >= bitwidth &&
+          (!widthCeil.has_value() || delayBitwidth < *widthCeil)) {
+        widthCeil = delayBitwidth;
+        ceilDelay = s.delay;
+      }
+
+      // largest bitwidth overall
+      if (delayBitwidth >= widthMax) {
+        widthMax = delayBitwidth;
+        maxDelay = s.delay;
+      }
+    }
+
+    // use the best bitwidth if one exists, otherwise fall back to the largest
+    // delay
+    if (widthCeil.has_value())
+      return ceilDelay;
+    return maxDelay;
+  }
+
+private:
+  std::vector<SpecTimingDelay> delays;
 };
 
-/// Per-port boundary delay
-/// (input pin -> register or register -> output pin).
-struct SpecTimingPortDelay {
-  SpecTimingEndpoint port;
+/// One characterised combinational path between two ports of an op,
+/// loaded from the spec-timing JSON.
+/// Used for ops whose internal timing requires more expressivity
+struct SpecTimingPort2Port {
+  /// input to the unit
+  SpecTimingPort from;
 
-  /// List of sampled parameters + delay
-  /// present from the JSON file
-  std::vector<SpecTimingSample> samples;
+  /// output of the unit
+  SpecTimingPort to;
+
+  /// delays by bitwidth
+  SpecTimingDelayList delayList;
+};
+
+/// port to register delay characterized by bitwidth
+struct SpecTimingPort2Reg {
+  /// input port
+  SpecTimingPort port;
+
+  SpecTimingDelayList delayList;
+};
+
+/// register to port delay characterized by bitwidth
+struct SpecTimingReg2Port {
+  /// output port
+  SpecTimingPort port;
+
+  /// delays by bitwidth
+  SpecTimingDelayList delayList;
 };
 
 /// A full timing model for an operation
@@ -326,9 +380,9 @@ struct SpecTimingPortDelay {
 /// internal, input, and output delay
 /// for parameterized units
 struct SpecTimingModel {
-  std::vector<SpecTimingEdge> pin2pin;
-  std::vector<SpecTimingPortDelay> pin2reg;
-  std::vector<SpecTimingPortDelay> reg2pin;
+  std::vector<SpecTimingPort2Port> port2port;
+  std::vector<SpecTimingPort2Reg> port2reg;
+  std::vector<SpecTimingReg2Port> reg2port;
 };
 
 /// Holds the timing models for a set of operations (internally identified by

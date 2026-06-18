@@ -1685,7 +1685,7 @@ LogicalResult BufferPlacementMILP::calculatePathDelays() {
 
   // Pin all buffer-decision variables to their currently-solved values so the
   // re-solve cannot move them.
-  // Pin only the variables used by FPGA'20 and FPL'22
+  // Currently pins only the variables used by FPGA'20 and FPL'22
   auto pinVar = [&](CPVar &v) {
     model->addConstr(v == model->getValue(v), "pin_buffers");
   };

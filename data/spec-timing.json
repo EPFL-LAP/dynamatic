@@ -1,6 +1,6 @@
 {
   "handshake.speculator": {
-    "pin2pin": [
+    "port2port": [
       {
         "from": {
           "port": "ins",
@@ -10,54 +10,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.338
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.338
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.338
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.338
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.622
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.216
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.216
           }
         ]
@@ -71,54 +50,33 @@
           "port": "trigger",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.79
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.79
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.79
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.918
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.297
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.531
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.609
           }
         ]
@@ -132,54 +90,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.688
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.688
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.307
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.858
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.961
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 4.168
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 4.168
           }
         ]
@@ -193,54 +130,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.686
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.968
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.497
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.747
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.301
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.301
           }
         ]
@@ -254,54 +170,33 @@
           "port": "ctrl_issue",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.847
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.97
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.996
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.289
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.289
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.152
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.152
           }
         ]
@@ -315,54 +210,33 @@
           "port": "ctrl_history",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.413
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.413
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.413
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.413
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.417
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.704
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.704
           }
         ]
@@ -376,54 +250,33 @@
           "port": "ctrl_commit",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.407
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.952
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.952
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.604
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.73
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.908
           }
         ]
@@ -437,54 +290,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.377
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.377
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.377
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.377
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.377
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.377
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.377
           }
         ]
@@ -498,54 +330,33 @@
           "port": "trigger",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.861
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.906
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.231
           }
         ]
@@ -559,54 +370,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.046
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.046
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.307
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.357
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.514
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.418
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.418
           }
         ]
@@ -620,54 +410,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.044
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.166
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.299
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.551
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.603
           }
         ]
@@ -681,54 +450,33 @@
           "port": "ctrl_issue",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.633
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.633
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.25
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.25
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.25
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.25
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.25
           }
         ]
@@ -742,54 +490,33 @@
           "port": "ctrl_issue",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.205
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.205
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.205
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.205
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.205
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.403
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.403
           }
         ]
@@ -803,54 +530,33 @@
           "port": "ctrl_history",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.844
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.844
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.117
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.117
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.117
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.123
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.123
           }
         ]
@@ -864,54 +570,33 @@
           "port": "ctrl_history",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.451
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.451
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.451
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.451
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.451
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.451
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.451
           }
         ]
@@ -925,54 +610,33 @@
           "port": "ctrl_commit",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.407
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.54
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.54
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.54
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.97
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.97
           }
         ]
@@ -986,54 +650,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.374
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.374
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.374
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.374
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.374
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.374
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.374
           }
         ]
@@ -1047,54 +690,33 @@
           "port": "trigger",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.877
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.906
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.231
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.231
           }
         ]
@@ -1108,54 +730,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.043
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.043
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.185
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.304
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.514
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.009
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.009
           }
         ]
@@ -1169,54 +770,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.041
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.166
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.166
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.166
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.299
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.299
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.398
           }
         ]
@@ -1230,54 +810,33 @@
           "port": "ctrl_issue",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.63
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.63
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.047
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.047
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.047
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.047
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.047
           }
         ]
@@ -1291,54 +850,33 @@
           "port": "ctrl_issue",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.202
           }
         ]
@@ -1352,54 +890,33 @@
           "port": "ctrl_history",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.841
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.841
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.913
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.913
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.913
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.968
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.968
           }
         ]
@@ -1413,54 +930,33 @@
           "port": "ctrl_history",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.448
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.448
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.448
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.448
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.448
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.448
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.448
           }
         ]
@@ -1474,54 +970,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.661
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.661
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.71
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.71
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.002
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.002
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.285
           }
         ]
@@ -1535,54 +1010,33 @@
           "port": "trigger",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.706
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.706
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.199
           }
         ]
@@ -1596,54 +1050,33 @@
           "port": "ctrl_issue",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.121
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.121
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.121
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.276
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.276
           }
         ]
@@ -1657,54 +1090,33 @@
           "port": "ctrl_issue",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.532
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.532
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.532
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.701
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.701
           }
         ]
@@ -1718,54 +1130,33 @@
           "port": "ctrl_history",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.53
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.53
           }
         ]
@@ -1779,54 +1170,33 @@
           "port": "ctrl_history",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.736
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.736
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.736
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.736
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.736
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.736
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.736
           }
         ]
@@ -1840,54 +1210,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.66
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.66
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.71
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.71
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.002
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.002
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.285
           }
         ]
@@ -1901,54 +1250,33 @@
           "port": "trigger",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.706
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.706
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.199
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.199
           }
         ]
@@ -1962,54 +1290,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.413
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.185
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.185
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.185
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.707
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.707
           }
         ]
@@ -2023,54 +1330,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.078
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.078
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.078
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.078
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.078
           }
         ]
@@ -2084,54 +1370,33 @@
           "port": "ctrl_history",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.126
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.126
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.126
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.53
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.53
           }
         ]
@@ -2145,54 +1410,33 @@
           "port": "ctrl_history",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.735
           }
         ]
@@ -2206,54 +1450,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.482
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.717
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.717
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.717
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.135
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.135
           }
         ]
@@ -2267,54 +1490,33 @@
           "port": "trigger",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.392
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.485
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.604
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.61
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.61
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.61
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.61
           }
         ]
@@ -2328,54 +1530,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.62
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.62
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.62
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.799
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.945
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.711
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.711
           }
         ]
@@ -2389,54 +1570,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.622
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.622
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.622
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.622
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.622
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.622
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.622
           }
         ]
@@ -2450,54 +1610,33 @@
           "port": "ctrl_issue",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.125
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.276
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.276
           }
         ]
@@ -2511,54 +1650,33 @@
           "port": "ctrl_issue",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.621
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.621
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.621
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.626
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.769
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.769
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.769
           }
         ]
@@ -2572,54 +1690,33 @@
           "port": "ctrl_commit",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.427
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.427
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.427
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.427
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.427
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.427
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.427
           }
         ]
@@ -2633,54 +1730,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.66
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.66
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.717
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.717
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.717
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.135
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.135
           }
         ]
@@ -2694,54 +1770,33 @@
           "port": "ctrl_history",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.735
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.735
           }
         ]
@@ -2755,54 +1810,33 @@
           "port": "ctrl_issue",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.202
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.727
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.727
           }
         ]
@@ -2816,111 +1850,69 @@
           "port": "ctrl_history",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.069
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.069
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.069
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.069
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.069
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.873
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.873
           }
         ]
       }
     ],
-    "pin2reg": [
+    "port2reg": [
       {
         "port": "ins",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.832
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.832
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.832
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.855
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.932
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.478
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.478
           }
         ]
@@ -2928,54 +1920,33 @@
       {
         "port": "ins",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.882
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.882
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.932
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.932
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.932
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.932
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.932
           }
         ]
@@ -2983,54 +1954,33 @@
       {
         "port": "trigger",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.879
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.879
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.879
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.879
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.879
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.879
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.913
           }
         ]
@@ -3038,54 +1988,33 @@
       {
         "port": "outs",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.724
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.724
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.984
           }
         ]
@@ -3093,54 +2022,33 @@
       {
         "port": "ctrl_issue",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.724
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.724
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.773
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.984
           }
         ]
@@ -3148,54 +2056,33 @@
       {
         "port": "ctrl_history",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 0.997
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 0.997
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.243
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.243
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.243
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.397
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.397
           }
         ]
@@ -3203,111 +2090,69 @@
       {
         "port": "ctrl_commit",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.09
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.09
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.353
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.353
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.353
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.397
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.397
           }
         ]
       }
     ],
-    "reg2pin": [
+    "reg2port": [
       {
         "port": "ins",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 3.029
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 3.029
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 3.232
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 3.232
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.688
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 4.123
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 4.123
           }
         ]
@@ -3315,54 +2160,33 @@
       {
         "port": "trigger",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.582
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.582
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.611
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.706
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.437
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.539
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.634
           }
         ]
@@ -3370,54 +2194,33 @@
       {
         "port": "outs",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.382
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.382
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 3.205
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 3.646
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 4.101
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 5.176
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 5.176
           }
         ]
@@ -3425,54 +2228,33 @@
       {
         "port": "outs",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.38
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.742
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 3.098
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 3.286
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.887
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 4.309
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 4.309
           }
         ]
@@ -3480,54 +2262,33 @@
       {
         "port": "ctrl_issue",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.783
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.783
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 3.136
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 3.136
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.136
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.735
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.735
           }
         ]
@@ -3535,54 +2296,33 @@
       {
         "port": "ctrl_issue",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.541
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.744
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.93
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 3.078
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.422
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 4.16
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 4.16
           }
         ]
@@ -3590,54 +2330,33 @@
       {
         "port": "ctrl_history",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.994
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.994
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 3.003
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 3.003
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.003
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.881
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.881
           }
         ]
@@ -3645,54 +2364,33 @@
       {
         "port": "ctrl_history",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 3.103
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 3.103
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 3.103
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 3.103
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.483
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.712
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.712
           }
         ]
@@ -3700,54 +2398,33 @@
       {
         "port": "ctrl_commit",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.533
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.533
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.533
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.533
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.533
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.533
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.533
           }
         ]
@@ -3755,54 +2432,33 @@
       {
         "port": "ctrl_commit",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.83
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.184
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.886
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.886
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 3.67
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.727
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.922
           }
         ]
@@ -3810,7 +2466,7 @@
     ]
   },
   "handshake.spec_save_commit": {
-    "pin2pin": [
+    "port2port": [
       {
         "from": {
           "port": "ins",
@@ -3820,54 +2476,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.259
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.614
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.597
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.31
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.31
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.117
           }
         ]
@@ -3881,54 +2516,33 @@
           "port": "ctrl_issue",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.045
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.294
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.036
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.349
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.082
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.566
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.875
           }
         ]
@@ -3942,54 +2556,33 @@
           "port": "ctrl_history",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.224
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.092
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.33
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.813
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.586
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.036
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.723
           }
         ]
@@ -4003,54 +2596,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.638
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.113
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.185
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.558
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.667
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.36
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.348
           }
         ]
@@ -4064,54 +2636,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.172
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.3
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.7
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.361
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.57
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.624
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.514
           }
         ]
@@ -4125,54 +2676,33 @@
           "port": "ctrl_issue",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.045
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.294
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.036
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.349
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.277
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.41
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.219
           }
         ]
@@ -4186,54 +2716,33 @@
           "port": "ctrl_history",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.876
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.982
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.289
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.875
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.219
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.975
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.232
           }
         ]
@@ -4247,54 +2756,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.584
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.296
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.185
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.518
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.668
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.098
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.436
           }
         ]
@@ -4308,54 +2796,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.172
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.3
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.169
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.361
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.896
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.361
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.995
           }
         ]
@@ -4369,54 +2836,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.56
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.702
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.546
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.322
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.626
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.487
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.613
           }
         ]
@@ -4430,54 +2876,33 @@
           "port": "ctrl_issue",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.045
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.294
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.036
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.349
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.277
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.566
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.032
           }
         ]
@@ -4491,54 +2916,33 @@
           "port": "ctrl_history",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.876
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.982
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.289
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.875
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.804
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.036
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.973
           }
         ]
@@ -4552,54 +2956,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.713
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.296
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.185
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.518
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.383
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.36
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.435
           }
         ]
@@ -4613,54 +2996,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.172
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.3
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.169
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.361
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.485
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.624
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.995
           }
         ]
@@ -4674,54 +3036,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.56
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.702
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.546
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.322
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.487
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.613
           }
         ]
@@ -4735,54 +3076,33 @@
           "port": "ctrl_issue",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.661
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.094
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.997
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.617
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.186
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.303
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.463
           }
         ]
@@ -4796,54 +3116,33 @@
           "port": "ctrl_history",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.113
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.092
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.289
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.875
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.504
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.975
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.404
           }
         ]
@@ -4857,54 +3156,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.316
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.296
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.137
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.518
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.711
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.098
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.348
           }
         ]
@@ -4918,54 +3196,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.704
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.1
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.169
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.615
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.896
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.361
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.995
           }
         ]
@@ -4979,54 +3236,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.56
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.702
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.546
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.322
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.117
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.487
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.117
           }
         ]
@@ -5040,54 +3276,33 @@
           "port": "ctrl_issue",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.819
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.094
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.997
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.754
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.183
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.303
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.463
           }
         ]
@@ -5101,54 +3316,33 @@
           "port": "ctrl_history",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.113
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.092
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.289
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.875
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.504
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.975
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.404
           }
         ]
@@ -5162,54 +3356,33 @@
           "port": "outs",
           "signal": "data"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.713
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.296
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.137
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.518
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.711
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.098
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.348
           }
         ]
@@ -5223,54 +3396,33 @@
           "port": "outs",
           "signal": "valid"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.102
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.1
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.169
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.758
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.896
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.361
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.995
           }
         ]
@@ -5284,54 +3436,33 @@
           "port": "ins",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.56
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.702
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.546
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.322
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.117
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.487
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.117
           }
         ]
@@ -5345,54 +3476,33 @@
           "port": "ctrl_issue",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.117
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.277
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.633
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.032
           }
         ]
@@ -5406,111 +3516,69 @@
           "port": "ctrl_history",
           "signal": "ready"
         },
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.639
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.52
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.737
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.416
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.805
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.614
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.973
           }
         ]
       }
     ],
-    "pin2reg": [
+    "port2reg": [
       {
         "port": "ins",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 0.537
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 0.537
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 0.537
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 0.537
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 0.537
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 0.537
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 0.537
           }
         ]
@@ -5518,54 +3586,33 @@
       {
         "port": "ins",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.676
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.55
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.597
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.592
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.573
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.82
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.533
           }
         ]
@@ -5573,54 +3620,33 @@
       {
         "port": "ctrl_issue",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.748
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.052
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.894
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.744
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.992
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.942
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.106
           }
         ]
@@ -5628,54 +3654,33 @@
       {
         "port": "ctrl_issue",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.748
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.052
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.894
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.744
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.769
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.942
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.051
           }
         ]
@@ -5683,54 +3688,33 @@
       {
         "port": "ctrl_history",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.748
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.052
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.894
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.744
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.216
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.942
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.959
           }
         ]
@@ -5738,54 +3722,33 @@
       {
         "port": "ctrl_history",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.748
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.052
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.894
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.744
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.216
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.942
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.959
           }
         ]
@@ -5793,111 +3756,69 @@
       {
         "port": "outs",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.092
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.248
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.172
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.167
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.769
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.184
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.618
           }
         ]
       }
     ],
-    "reg2pin": [
+    "reg2port": [
       {
         "port": "ctrl_issue",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.276
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.401
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.08
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.78
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.349
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.773
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.973
           }
         ]
@@ -5905,54 +3826,33 @@
       {
         "port": "ctrl_history",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.509
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.195
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.551
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.936
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.57
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.243
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.915
           }
         ]
@@ -5960,54 +3860,33 @@
       {
         "port": "outs",
         "signal": "data",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.998
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.616
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 2.672
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.837
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 2.965
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 3.567
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 3.684
           }
         ]
@@ -6015,54 +3894,33 @@
       {
         "port": "outs",
         "signal": "valid",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 2.403
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 2.407
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.906
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 2.792
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.66
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 2.831
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 2.2
           }
         ]
@@ -6070,54 +3928,33 @@
       {
         "port": "ins",
         "signal": "ready",
-        "samples": [
+        "delayList": [
           {
-            "params": {
-              "BITWIDTH": 1,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 1,
             "delay": 1.308
           },
           {
-            "params": {
-              "BITWIDTH": 2,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 2,
             "delay": 1.208
           },
           {
-            "params": {
-              "BITWIDTH": 4,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 4,
             "delay": 1.257
           },
           {
-            "params": {
-              "BITWIDTH": 8,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 8,
             "delay": 1.628
           },
           {
-            "params": {
-              "BITWIDTH": 16,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 16,
             "delay": 1.296
           },
           {
-            "params": {
-              "BITWIDTH": 32,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 32,
             "delay": 1.316
           },
           {
-            "params": {
-              "BITWIDTH": 64,
-              "FIFO_DEPTH": 4
-            },
+            "bitwidth": 64,
             "delay": 1.831
           }
         ]
