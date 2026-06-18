@@ -3,11 +3,11 @@
     "port2port": [
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -43,11 +43,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "ready"
         },
         "delayList": [
@@ -83,11 +83,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -123,11 +123,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -163,11 +163,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "delayList": [
@@ -203,11 +203,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "delayList": [
@@ -243,11 +243,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_commit",
+          "name": "ctrl_commit",
           "signal": "valid"
         },
         "delayList": [
@@ -283,11 +283,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -323,11 +323,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "ready"
         },
         "delayList": [
@@ -363,11 +363,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -403,11 +403,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -443,11 +443,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "delayList": [
@@ -483,11 +483,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "delayList": [
@@ -523,11 +523,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "delayList": [
@@ -563,11 +563,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "delayList": [
@@ -603,11 +603,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_commit",
+          "name": "ctrl_commit",
           "signal": "valid"
         },
         "delayList": [
@@ -643,11 +643,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -683,11 +683,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "ready"
         },
         "delayList": [
@@ -723,11 +723,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -763,11 +763,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -803,11 +803,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "delayList": [
@@ -843,11 +843,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "delayList": [
@@ -883,11 +883,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "delayList": [
@@ -923,11 +923,11 @@
       },
       {
         "from": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "delayList": [
@@ -963,11 +963,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -1003,11 +1003,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "ready"
         },
         "delayList": [
@@ -1043,11 +1043,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "delayList": [
@@ -1083,11 +1083,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "delayList": [
@@ -1123,11 +1123,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "delayList": [
@@ -1163,11 +1163,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "delayList": [
@@ -1203,11 +1203,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -1243,11 +1243,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "to": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "ready"
         },
         "delayList": [
@@ -1283,11 +1283,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -1323,11 +1323,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -1363,11 +1363,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "delayList": [
@@ -1403,11 +1403,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "delayList": [
@@ -1443,11 +1443,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -1483,11 +1483,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "to": {
-          "port": "trigger",
+          "name": "trigger",
           "signal": "ready"
         },
         "delayList": [
@@ -1523,11 +1523,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -1563,11 +1563,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -1603,11 +1603,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "delayList": [
@@ -1643,11 +1643,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "delayList": [
@@ -1683,11 +1683,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_commit",
+          "name": "ctrl_commit",
           "signal": "valid"
         },
         "delayList": [
@@ -1723,11 +1723,11 @@
       },
       {
         "from": {
-          "port": "ctrl_commit",
+          "name": "ctrl_commit",
           "signal": "ready"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -1763,11 +1763,11 @@
       },
       {
         "from": {
-          "port": "ctrl_commit",
+          "name": "ctrl_commit",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "delayList": [
@@ -1803,11 +1803,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "delayList": [
@@ -1843,11 +1843,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "delayList": [
@@ -1884,7 +1884,7 @@
     ],
     "port2reg": [
       {
-        "port": "ins",
+        "name": "ins",
         "signal": "data",
         "delayList": [
           {
@@ -1918,7 +1918,7 @@
         ]
       },
       {
-        "port": "ins",
+        "name": "ins",
         "signal": "valid",
         "delayList": [
           {
@@ -1952,7 +1952,7 @@
         ]
       },
       {
-        "port": "trigger",
+        "name": "trigger",
         "signal": "valid",
         "delayList": [
           {
@@ -1986,7 +1986,7 @@
         ]
       },
       {
-        "port": "outs",
+        "name": "outs",
         "signal": "ready",
         "delayList": [
           {
@@ -2020,7 +2020,7 @@
         ]
       },
       {
-        "port": "ctrl_issue",
+        "name": "ctrl_issue",
         "signal": "ready",
         "delayList": [
           {
@@ -2054,7 +2054,7 @@
         ]
       },
       {
-        "port": "ctrl_history",
+        "name": "ctrl_history",
         "signal": "ready",
         "delayList": [
           {
@@ -2088,7 +2088,7 @@
         ]
       },
       {
-        "port": "ctrl_commit",
+        "name": "ctrl_commit",
         "signal": "ready",
         "delayList": [
           {
@@ -2124,7 +2124,7 @@
     ],
     "reg2port": [
       {
-        "port": "ins",
+        "name": "ins",
         "signal": "ready",
         "delayList": [
           {
@@ -2158,7 +2158,7 @@
         ]
       },
       {
-        "port": "trigger",
+        "name": "trigger",
         "signal": "ready",
         "delayList": [
           {
@@ -2192,7 +2192,7 @@
         ]
       },
       {
-        "port": "outs",
+        "name": "outs",
         "signal": "data",
         "delayList": [
           {
@@ -2226,7 +2226,7 @@
         ]
       },
       {
-        "port": "outs",
+        "name": "outs",
         "signal": "valid",
         "delayList": [
           {
@@ -2260,7 +2260,7 @@
         ]
       },
       {
-        "port": "ctrl_issue",
+        "name": "ctrl_issue",
         "signal": "data",
         "delayList": [
           {
@@ -2294,7 +2294,7 @@
         ]
       },
       {
-        "port": "ctrl_issue",
+        "name": "ctrl_issue",
         "signal": "valid",
         "delayList": [
           {
@@ -2328,7 +2328,7 @@
         ]
       },
       {
-        "port": "ctrl_history",
+        "name": "ctrl_history",
         "signal": "data",
         "delayList": [
           {
@@ -2362,7 +2362,7 @@
         ]
       },
       {
-        "port": "ctrl_history",
+        "name": "ctrl_history",
         "signal": "valid",
         "delayList": [
           {
@@ -2396,7 +2396,7 @@
         ]
       },
       {
-        "port": "ctrl_commit",
+        "name": "ctrl_commit",
         "signal": "data",
         "delayList": [
           {
@@ -2430,7 +2430,7 @@
         ]
       },
       {
-        "port": "ctrl_commit",
+        "name": "ctrl_commit",
         "signal": "valid",
         "delayList": [
           {
@@ -2469,11 +2469,11 @@
     "port2port": [
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "data"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -2509,11 +2509,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "delayList": [
@@ -2549,11 +2549,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "delayList": [
@@ -2589,11 +2589,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -2629,11 +2629,11 @@
       },
       {
         "from": {
-          "port": "ins",
+          "name": "ins",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -2669,11 +2669,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "delayList": [
@@ -2709,11 +2709,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "delayList": [
@@ -2749,11 +2749,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -2789,11 +2789,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -2829,11 +2829,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "data"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -2869,11 +2869,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "delayList": [
@@ -2909,11 +2909,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "delayList": [
@@ -2949,11 +2949,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -2989,11 +2989,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -3029,11 +3029,11 @@
       },
       {
         "from": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "valid"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -3069,11 +3069,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "delayList": [
@@ -3109,11 +3109,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "delayList": [
@@ -3149,11 +3149,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -3189,11 +3189,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -3229,11 +3229,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "data"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -3269,11 +3269,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "delayList": [
@@ -3309,11 +3309,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "delayList": [
@@ -3349,11 +3349,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "data"
         },
         "delayList": [
@@ -3389,11 +3389,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "to": {
-          "port": "outs",
+          "name": "outs",
           "signal": "valid"
         },
         "delayList": [
@@ -3429,11 +3429,11 @@
       },
       {
         "from": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "valid"
         },
         "to": {
-          "port": "ins",
+          "name": "ins",
           "signal": "ready"
         },
         "delayList": [
@@ -3469,11 +3469,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_issue",
+          "name": "ctrl_issue",
           "signal": "ready"
         },
         "delayList": [
@@ -3509,11 +3509,11 @@
       },
       {
         "from": {
-          "port": "outs",
+          "name": "outs",
           "signal": "ready"
         },
         "to": {
-          "port": "ctrl_history",
+          "name": "ctrl_history",
           "signal": "ready"
         },
         "delayList": [
@@ -3550,7 +3550,7 @@
     ],
     "port2reg": [
       {
-        "port": "ins",
+        "name": "ins",
         "signal": "data",
         "delayList": [
           {
@@ -3584,7 +3584,7 @@
         ]
       },
       {
-        "port": "ins",
+        "name": "ins",
         "signal": "valid",
         "delayList": [
           {
@@ -3618,7 +3618,7 @@
         ]
       },
       {
-        "port": "ctrl_issue",
+        "name": "ctrl_issue",
         "signal": "data",
         "delayList": [
           {
@@ -3652,7 +3652,7 @@
         ]
       },
       {
-        "port": "ctrl_issue",
+        "name": "ctrl_issue",
         "signal": "valid",
         "delayList": [
           {
@@ -3686,7 +3686,7 @@
         ]
       },
       {
-        "port": "ctrl_history",
+        "name": "ctrl_history",
         "signal": "data",
         "delayList": [
           {
@@ -3720,7 +3720,7 @@
         ]
       },
       {
-        "port": "ctrl_history",
+        "name": "ctrl_history",
         "signal": "valid",
         "delayList": [
           {
@@ -3754,7 +3754,7 @@
         ]
       },
       {
-        "port": "outs",
+        "name": "outs",
         "signal": "ready",
         "delayList": [
           {
@@ -3790,7 +3790,7 @@
     ],
     "reg2port": [
       {
-        "port": "ctrl_issue",
+        "name": "ctrl_issue",
         "signal": "ready",
         "delayList": [
           {
@@ -3824,7 +3824,7 @@
         ]
       },
       {
-        "port": "ctrl_history",
+        "name": "ctrl_history",
         "signal": "ready",
         "delayList": [
           {
@@ -3858,7 +3858,7 @@
         ]
       },
       {
-        "port": "outs",
+        "name": "outs",
         "signal": "data",
         "delayList": [
           {
@@ -3892,7 +3892,7 @@
         ]
       },
       {
-        "port": "outs",
+        "name": "outs",
         "signal": "valid",
         "delayList": [
           {
@@ -3926,7 +3926,7 @@
         ]
       },
       {
-        "port": "ins",
+        "name": "ins",
         "signal": "ready",
         "delayList": [
           {

@@ -357,7 +357,7 @@ static FailureOr<SpecTimingPort> parsePort(const ljson::Object *portObj) {
   SpecTimingPort port;
 
   // read the port name (whether input or output)
-  std::optional<StringRef> portName = portObj->getString("port");
+  std::optional<StringRef> portName = portObj->getString("name");
   if (!portName) {
     llvm::errs() << "spec timing port has no name\n";
     return failure();
