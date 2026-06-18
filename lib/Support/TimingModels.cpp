@@ -531,20 +531,26 @@ LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
     }
 
     // for each port2port edge
-    for (const ljson::Value &edgeVal : *port2portArr) {
-      const ljson::Object *edgeObj = edgeVal.getAsObject();
-      if (!edgeObj) {
+    for (const ljson::Value &port2portVal : *port2portArr) {
+
+      // get as json object
+      const ljson::Object *port2portObj = port2portVal.getAsObject();
+      if (!port2portObj) {
         llvm::errs() << "port2port delay is not a JSON object\n";
         return failure();
       }
-      FailureOr<SpecTimingPort2Port> edge = parsePort2Port(edgeObj);
-      if (failed(edge))
+
+      // parse into struct
+      FailureOr<SpecTimingPort2Port> port2port = parsePort2Port(port2portObj);
+      if (failed(port2port))
         // parsePort2Port prints the error message if failed
         return failure();
-      model.port2port.push_back(std::move(*edge));
+
+      // store in model
+      model.port2port.push_back(std::move(*port2port));
     }
 
-    // read the port2reg port delays as an array
+    // read the port2reg delays as an array
     const ljson::Array *port2regArr = timingModelInfo->getArray("port2reg");
     if (!port2regArr) {
       llvm::errs() << "spec timing unit has no port2reg array\n";
@@ -552,24 +558,27 @@ LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
     }
 
     // for each port2reg port delay
-    for (const ljson::Value &portDelayVal : *port2regArr) {
-      const ljson::Object *portDelayObj = portDelayVal.getAsObject();
-      if (!portDelayObj) {
-        llvm::errs() << "spec timing port delay is not a JSON object\n";
+    for (const ljson::Value &port2regVal : *port2regArr) {
+
+      // get as json object
+      const ljson::Object *port2regObj = port2regVal.getAsObject();
+      if (!port2regObj) {
+        llvm::errs() << "port2reg delay is not a JSON object\n";
         return failure();
       }
-      FailureOr<SpecTimingPort2Reg> portDelay = parsePort2Reg(portDelayObj);
-      if (failed(portDelay))
+
+      // parse into struct
+      FailureOr<SpecTimingPort2Reg> port2reg = parsePort2Reg(port2regObj);
+
+      if (failed(port2reg))
         // parsePort2Reg prints the error message if failed
         return failure();
-      model.port2reg.push_back(std::move(*portDelay));
+
+      // store in model
+      model.port2reg.push_back(std::move(*port2reg));
     }
 
-    // read the reg2port port delays as an array
-    // TODO: this loop is identical to the port2reg loop except the key, type,
-    // and parse function; kept explicit per the one-struct-per-JSON-key
-    // decision claude: iterates the reg2port array and parses each element into
-    // the model
+    // read the reg2port delays as an array
     const ljson::Array *reg2portArr = timingModelInfo->getArray("reg2port");
     if (!reg2portArr) {
       llvm::errs() << "spec timing unit has no reg2port array\n";
@@ -577,17 +586,23 @@ LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
     }
 
     // for each reg2port port delay
-    for (const ljson::Value &portDelayVal : *reg2portArr) {
-      const ljson::Object *portDelayObj = portDelayVal.getAsObject();
-      if (!portDelayObj) {
-        llvm::errs() << "spec timing port delay is not a JSON object\n";
+    for (const ljson::Value &reg2portVal : *reg2portArr) {
+
+      // get as json object
+      const ljson::Object *reg2portObj = reg2portVal.getAsObject();
+      if (!reg2portObj) {
+        llvm::errs() << "reg2port delay is not a JSON object\n";
         return failure();
       }
-      FailureOr<SpecTimingReg2Port> portDelay = parseReg2Port(portDelayObj);
-      if (failed(portDelay))
+
+      // parse into struct
+      FailureOr<SpecTimingReg2Port> reg2port = parseReg2Port(reg2portObj);
+      if (failed(reg2port))
         // parseReg2Port prints the error message if failed
         return failure();
-      model.reg2port.push_back(std::move(*portDelay));
+
+      // store in model
+      model.reg2port.push_back(std::move(*reg2port));
     }
 
     // store the unit's model under its key
