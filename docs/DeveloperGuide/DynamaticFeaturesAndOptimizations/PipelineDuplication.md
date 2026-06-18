@@ -34,8 +34,11 @@ If the pass encounters a branch that escapes the duplicated region without reach
 
 This strict boundary is necessary because the compiler operates on an SSA (Static Single Assignment) graph. If an operation branches off from the middle of the duplicated region to an external destination, it creates an ambiguity: the external graph cannot determine which of the two duplicated pipelines it should connect to. Because SSA rules prohibit an operation from having multiple definitions, connecting to both pipelines simultaneously is impossible without breaking the dataflow validity of the program. Enforcing a well-defined boundary ensures all duplicated paths are safely encapsulated or properly merged.
 
+### Duplicating Multiple Regions
+You can duplicate multiple independent, non-connected regions within the same file by leveraging unique `marker` IDs. Every start and end pragma belonging to a specific region must share the exact same marker ID to isolate them from other transformations. These regions must remain entirely distinct meaning that having overlapping or interleaving pragmas from different regions is strictly prohibited and will cause the pass to fail.
+
 ### Example
-In this example, we have a start marker predicting that the variable y (loaded from `a[i]`) will frequently take the values `5.5` or `7.5`. To optimize for these values, the compiler must duplicate the operations downstream from this variable. Specifically, the pass duplicates all operations starting from the addition `x = y + c` until every path terminates at either an operation with an end marker or a store operation. Here, the multiplication `z = 12.0f * x` is followed by an end marker, while the other path termiantes at the store operation `b[i] = x - 3.0f`. Because both paths are properly bounded, all intermediate operations can be safely duplicated. The operations that have to be duplicated are highlighted in green in the diagram below. The for loop is not shown for simplification.
+In this example, we have a start marker predicting that the variable y (loaded from `a[i]`) will frequently take the values `5.5` or `7.5`. To optimize for these values, the compiler must duplicate the operations downstream from this variable. Specifically, the pass duplicates all operations starting from the addition `x = y + c` until every path terminates at either an operation with an end marker or a store operation. Here, the multiplication `z = 12.0f * x` is followed by an end marker, while the other path terminates at the store operation `b[i] = x - 3.0f`. Because both paths are properly bounded, all intermediate operations can be safely duplicated. The operations that have to be duplicated are highlighted in green in the diagram below. The for loop is not shown for simplification.
 
 ```c++
 void prediction(inout_float_t a[N], inout_float_t b[N], in_float_t c) {
@@ -60,7 +63,7 @@ The pass adds checks to see if the variable matches any of the predicted values.
 
 ## Pass Implementation
 
-The transformation starts by reading the prediction markers inserted by pragmas in the C++ code, then it identifies all operations downstream a the specific predictive value with a DFS and clones them into isolated conditional blocks. Within each cloned path, the predictive value is replaced by a hardcoded constant.
+The transformation starts by reading the prediction markers inserted by pragmas in the C++ code, then it identifies all operations downstream a the specific predictive value with a DFS and duplicates them into isolated conditional blocks. Within each duplicated path, the predictive value is replaced by a hardcoded constant.
 
 ### Data Structure
 The pass stores all configuration details extracted from a group of prediction markers inside a single struct.
@@ -85,29 +88,28 @@ The pass begins by calling `readPredictMarker`, which scans the function IR for 
 To isolate the entry point of the duplication region, the basic block containing `startOp` (`targetBlock`) is split right before `startOp`. The operations following it are placed into a separate block named `originalRemainderBlock`.
 
 #### 3. DFS & Validation
-The pass then runs a Depth-First Search (DFS) via `collectOpsDFS` starting from the results of `startOp`. This tracks all operations directly impacted by the predictive value. The search stops along a path whenever it reaches a user-defined endOp or a `mlir::memref::StoreOp`. If a path hits a dead-end branch (an operation with zero results that is neither a valid terminator nor a store) before reaching an end operation, the pass fails.
+The pass then runs a Depth-First Search (DFS) via `collectOpsDFS` starting from the results of `startOp`. This tracks all operations directly impacted by the predictive value. The search stops along a path whenever it reaches a operation with an end marker or a `mlir::memref::StoreOp`, which terminate the duplicated region. If the DFS finishes before reaching one of these operations, the pass fails.
 
 To guarantee the graph is really well-defined, as the DFS does not catch everything, `validateDuplicationStructure` inspects the collected subgraph to guarantee it forms a valid, single-exit region. It ensures that no execution paths escape the termination blocks into other duplicated blocks, and verifies that all exit blocks converge back to a single external successor block.
 
-To safely reconnect the duplicated blocks later, the pass also tracks the "outside drivers", which are the values generated inside the duplicated graph that are needed by operations outside of it. For every termination block producing these drivers, new block arguments are appended to the original block interface to serve as the new entry points for those values.
-
-#### 4. Path Generation, Cloning, & Reconverging
+#### 4. Path Generation, Duplication, & Reconverging
 The pass loops through each constant saved in the `values` array to build the duplicated paths one by one:
 
 - Conditional Branching: In the `targetBlock`, the pass generates a comparison operation (arith::CmpIOp or arith::CmpFOp, depending on whether floats or ints are used) between the original `predictInput` and the current constant. It creates a `cf::CondBranchOp` to route execution into a newly created `trueEntryBlock` if they match, or into a `nextElseBlock` if they do not.
 
-- Block Reconstruction: For regions that span multiple blocks, a matching set of cloned blocks is generated and placed inside the function block list. Original block arguments are duplicated onto these new structures.
+- Block Reconstruction: For regions that span multiple blocks, a matching set of duplicated blocks is generated and placed inside the function block list. Original block arguments are duplicated onto these new structures.
 
-- Operation Cloning: Operations are cloned into their respective new blocks using an `mlir::IRMapping`. The mapper substitutes the original `predictInput` with the literal constant, allowing the path to be optimized with a concrete value. Cloned operations are renamed with a  `_dup` suffix.
+- Operation Duplication: Operations are duplicated into their respective new blocks using an `mlir::IRMapping`. The mapper substitutes the original `predictInput` with the literal constant, allowing the path to be optimized with a concrete value. Duplicated operations are renamed with a  `_dup` suffix.
 
-- Exiting the Path: At the end of each cloned termination block, a `cf::BranchOp` routes control flow back to the original block, passing the cloned equivalents of the outside drivers.
+- Exiting the Path: At the end of each duplicated termination block, a `cf::BranchOp` routes control flow back to the original block, passing the duplicated equivalents of the outputs of the duplicated region.
 
 #### 5. Fallback Path Creation
-After all constant paths are created, the final false path redirects to `lastPath`. The original operations identified by the DFS are moved completely out of the original blocks, that are terminating the duplicated region, into newly created fallback blocks. These fallback blocks run the original logic when none of the predictive constants match, jumping back to the original termination blocks with the original outside driver values.
+After the pass creates a duplicated path for each value specified in the pragma's list, it modifies only the basic blocks that terminate the duplicated region. Within these specific basic blocks, the original operations identified by the DFS are moved out into newly created fallback blocks. The preceding original blocks remain entirely unchanged. As shown in the diagram below, these new fallback blocks, along with the terminating blocks from the speculative paths, then route back to connect with the remainder of the original basic block.
 
-Finally, the pass updates all downstream users of the outside drivers across the entire function scope to read from the newly introduced block arguments instead of the original operation results.
+Finally, the pass updates all downstream users of the outputs of the duplicated region across the entire function scope to read from the newly introduced block arguments instead of the original operation results.
 
-
+![Def](Figures/PipelineDuplication/fallback_creation.png)
+*On the left the original graph, and on the right the graph after duplication.*
 
 ### Helper Functions
 
@@ -136,7 +138,7 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
     llvm::DenseSet<mlir::Operation *> &visitedOps);
 ```
 
-Traces the downstream data flow using a Depth-first Search. The recursion records all operations that it passes through and should be duplicated in `visitedOps`. To prevent unsafe duplication, the search stops along a path if it encounters either an `endOp` or a store operation. Values escaping this subgraph are appended to `outsideDrivers` to identify which results must be added as arguments to the next block.
+Traces the downstream data flow using a Depth-first Search. The recursion records all operations that it passes through and should be duplicated in `visitedOps`. To prevent unsafe duplication, the search stops along a path if it encounters either an operation with an end marker or a store operation. Values escaping this subgraph are appended to `outsideDrivers` to identify which results must be added as arguments to the next block.
 
 `collectDependenciesUpstream`
 ```c++
