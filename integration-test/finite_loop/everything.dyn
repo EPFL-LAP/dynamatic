@@ -1,6 +1,0 @@
-set-src integration-test/finite_loop/finite_loop.c
-compile
-write-hdl
-simulate
-visualize
-exit

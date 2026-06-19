@@ -278,7 +278,6 @@ else
     "Marked memory accesses with the corresponding interfaces in cf"
 fi
 
-
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   echo_info "Running FTD algorithm for handshake conversion"

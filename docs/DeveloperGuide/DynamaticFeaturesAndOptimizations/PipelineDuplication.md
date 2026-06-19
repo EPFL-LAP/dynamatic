@@ -27,10 +27,10 @@ Place this after the last operation you wish to duplicate.
 
 ### Constraints & "Well-Defined" Paths
 For the duplication to succeed, the graph (the operations that will be duplicated) between the start and end must be well-defined. The pass performs a DFS traversal from the start operation; every path encountered must eventually terminate at:
-- A designated **end** pragma
+- A designated operation marked by an **end** marker pragma
 - A **store** operation
 
-If the pass encounters a branch that escapes the duplicated region without reaching one of these valid "sinks," the transformation will fail and the compiler will exit with an error.
+If the pass encounters a branch that escapes the duplicated region without reaching one of these two operations, the transformation will fail and the compiler will exit with an error.
 
 This strict boundary is necessary because the compiler operates on an SSA (Static Single Assignment) graph. If an operation branches off from the middle of the duplicated region to an external destination, it creates an ambiguity: the external graph cannot determine which of the two duplicated pipelines it should connect to. Because SSA rules prohibit an operation from having multiple definitions, connecting to both pipelines simultaneously is impossible without breaking the dataflow validity of the program. Enforcing a well-defined boundary ensures all duplicated paths are safely encapsulated or properly merged.
 
@@ -72,7 +72,7 @@ The pass stores all configuration details extracted from a group of prediction m
 struct PipelineDuplicationPass::PredictionData {
   mlir::Operation *startOp; // Duplication begins here (including this operation)
   mlir::Value predInput;    // Value that will be replaced on duplicated paths
-  std::vector<mlir::Operation *> endOps;  // all end operations
+  std::vector<mlir::Operation *> endMarkerOps;  // all end operations
   mlir::ArrayAttr values;   // MLIR array with the constants
   std::string dataType;     // String representation of the type (e.g. "int")
 };
@@ -85,12 +85,14 @@ The core pass driver (`runOnOperation`) executes the transformation in four phas
 The pass begins by calling `readPredictMarker`, which scans the function IR for `dynamatic.prediction_marker` operations. To ensure a clean slate before modifying the Control Flow Graph (CFG), the inputs of these markers are forwarded straight to their users, and the marker operations themselves are deleted from the IR.
 
 #### 2. CFG Splitting
-To isolate the entry point of the duplication region, the basic block containing `startOp` (`targetBlock`) is split right before `startOp`. The operations following it are placed into a separate block named `originalRemainderBlock`.
+To isolate the entry point of the duplication region, the basic block containing `startOp` (`targetBlock`) is split right before `startOp`. This operation and the operations following it are placed into a separate block named `originalRemainderBlock`.
 
 #### 3. DFS & Validation
 The pass then runs a Depth-First Search (DFS) via `collectOpsDFS` starting from the results of `startOp`. This tracks all operations directly impacted by the predictive value. The search stops along a path whenever it reaches a operation with an end marker or a `mlir::memref::StoreOp`, which terminate the duplicated region. If the DFS finishes before reaching one of these operations, the pass fails.
 
-To guarantee the graph is really well-defined, as the DFS does not catch everything, `validateDuplicationStructure` inspects the collected subgraph to guarantee it forms a valid, single-exit region. It ensures that no execution paths escape the termination blocks into other duplicated blocks, and verifies that all exit blocks converge back to a single external successor block.
+To ensure we can duplicate over multiple blocks, we also have to collect the branch operations. If we hit a branch (only possible for conditional branches), we either follow the block args, or duplicate all operations of both following blocks if there are no block args. To collect all other branches, we check whether the current value is in a new block, and if yes, collect the branch of the previous block.
+
+To guarantee the graph is really well-defined, as the DFS does not catch everything, `validateDuplicationStructure` inspects the collected subgraph to guarantee it forms a valid, single-exit region. It ensures that no execution paths escape the termination blocks into other duplicated blocks.
 
 #### 4. Path Generation, Duplication, & Reconverging
 The pass loops through each constant saved in the `values` array to build the duplicated paths one by one:
@@ -114,44 +116,16 @@ Finally, the pass updates all downstream users of the outputs of the duplicated 
 ### Helper Functions
 
 `readPredictMarker`
-```c++
-LogicalResult PipelineDuplicationPass::readPredictMarker(
-    mlir::ModuleOp modOp, std::vector<PredictionData> &pragmaData);
-```
-
 Scans the function IR for `dynamatic.prediction_marker` operations generated by the pragmas. It maps markers with identical numerical IDs into the `PredictionData` struct. The value list is parsed with an additional function (`parseValuesList`) to match them to the correct target data type. Once all of the data has been read out, the prediction markers are erased from the module.
 
 `parseValuesList`
-```c++
-FailureOr<mlir::ArrayAttr> parseValuesList(mlir::ModuleOp modOp,
-    llvm::StringRef valuesStr,
-    std::string &dataType);
-```
 A parsing helper that strips brackets and splits the comma-separated string into its values. It converts individual values into their intended types (float, double, int32_t, int64_t) and returns them inside an `mlir::ArrayAttr`.
 
 `collectOpsDFS`
-```c++
-LogicalResult PipelineDuplicationPass::collectOpsDFS(
-    mlir::Value currentVal,
-    const std::vector<mlir::Operation *> &endOps,
-    mlir::Block *currentBlock,
-    llvm::DenseSet<mlir::Operation *> &visitedOps);
-```
-
-Traces the downstream data flow using a Depth-first Search. The recursion records all operations that it passes through and should be duplicated in `visitedOps`. To prevent unsafe duplication, the search stops along a path if it encounters either an operation with an end marker or a store operation. Values escaping this subgraph are appended to `outsideDrivers` to identify which results must be added as arguments to the next block.
+Traces the downstream data flow using a Depth-first Search. The recursion records all operations that it passes through and should be duplicated in `visitedOps`. To prevent unsafe duplication, the search stops along a path if it encounters either an operation with an end marker or a store operation. It additionally collects branch operations, when the values are used in other blocks.
 
 `collectDependenciesUpstream`
-```c++
-void collectDependenciesUpstream(mlir::Operation *op, mlir::Block *targetBlock,
-    llvm::DenseSet<mlir::Operation *> &visitedOps);
-```
 A backward-traversal helper called during the DFS phase. It walks backward through operand definition chains within a single basic block to collect all upstream calculations (like index and address arithmetic for stores) needed by a tracked operation.
 
 `validateDuplicationStructure`
-```c++
-FailureOr<std::pair<llvm::DenseSet<mlir::Block *>, llvm::DenseSet<mlir::Block *>>>
-  validateDuplicationStructure(
-      const llvm::DenseSet<mlir::Operation *> &visitedOps,
-      const std::vector<mlir::Operation *> &endOps);
-```
-Performs structural checks on the CFG region before duplication. It maps out involved blocks and termination blocks, verifying that there are no escaping paths and that all duplicated paths converge smoothly back into a single downstream block.
+Performs structural checks on the CFG region before duplication. It maps out involved blocks and termination blocks, verifying that there are no escaping paths to ensure that the region can safely be duplicated.
