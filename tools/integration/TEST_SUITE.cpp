@@ -393,9 +393,8 @@ TEST_P(SpecFixture, spec) {
 }
 
 TEST_P(DuplicationFixture, basic) {
-  TEST_P(SpecFixture, spec) {
-    IntegrationTest config{
-        // clang-format off
+  IntegrationTest config{
+      // clang-format off
       .name = GetParam(),
       .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
@@ -405,12 +404,11 @@ TEST_P(DuplicationFixture, basic) {
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
       .simTime = -1
-        // clang-format on
-    };
-    EXPECT_EQ(config.run(), 0);
-    RecordProperty("cycles", std::to_string(config.simTime));
-    logPerformance(config.simTime);
-  }
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
 }
 
 // clang-format off
