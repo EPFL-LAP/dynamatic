@@ -120,8 +120,7 @@ public:
         /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
         /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
         /*output=*/
-        OutputTransferFn<ast::ArrayAssignmentStatement>(
-            std::index_sequence<INPUT_DEPENDENCY>{},
+        OutputTransferFn<ast::ArrayAssignmentStatement, INPUT_DEPENDENCY>(
             [](const ast::ArrayAssignmentStatement &,
                LimitTypingContext context) {
               context.totalNumberOfStatements++;
@@ -135,17 +134,26 @@ public:
   }
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
-    // TODO: This needlessly forces in which order statements are to be
-    //       generated!
-    //       In reality, the type system does not care whether the statement
-    //       gets generated first or the rest of the statement list, just that
-    //       their respective statement number is propagated to the other.
-    //       This is a missing feature!
     return {
-        copyFrom<ast::StatementList, ast::StatementList::STATEMENT>(),
-        copyFromInput<ast::StatementList>(),
+        /*statement list=*/copyFirstOf<ast::StatementList,
+                                       weak(ast::StatementList::STATEMENT),
+                                       INPUT_DEPENDENCY>(),
+        /*statement=*/
+        copyFirstOf<ast::StatementList,
+                    weak(ast::StatementList::STATEMENT_LIST),
+                    INPUT_DEPENDENCY>(),
         /*output=*/
-        copyToOutput<ast::StatementList, ast::StatementList::STATEMENT_LIST>(),
+        OutputTransferFn<ast::StatementList, ast::StatementList::STATEMENT,
+                         ast::StatementList::STATEMENT_LIST>(
+            [](const auto &, LimitTypingContext statement,
+               const LimitTypingContext &statementList) {
+              // Regardless of which of the two was generated first, we can
+              // extract the total number of statements by taking their maximum.
+              statement.totalNumberOfStatements =
+                  std::max(statement.totalNumberOfStatements,
+                           statementList.totalNumberOfStatements);
+              return statement;
+            }),
     };
   }
 
