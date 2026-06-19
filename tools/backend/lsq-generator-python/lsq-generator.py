@@ -12,7 +12,7 @@ import argparse
 import os
 import sys
 
-from vhdl_gen import *
+from core_gen import *
 
 # ===----------------------------------------------------------------------===#
 # Parser Definition

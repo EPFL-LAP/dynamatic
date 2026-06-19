@@ -1,8 +1,8 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
-from vhdl_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
-from vhdl_gen.utils import MaskLess
-from vhdl_gen.configs import Configs
+from core_gen.context import VHDLContext
+from core_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
+from core_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
+from core_gen.utils import MaskLess
+from core_gen.configs import Configs
 
 
 class GroupAllocator:

@@ -1,9 +1,9 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.signals import *
-from vhdl_gen.operators import *
-from vhdl_gen.configs import Configs
+from core_gen.context import VHDLContext
+from core_gen.signals import *
+from core_gen.operators import *
+from core_gen.configs import Configs
 
-import vhdl_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
+import core_gen.generators.lsq_submodule_wrapper as lsq_submodule_wrapper
 
 
 class LSQ:

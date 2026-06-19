@@ -89,7 +89,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
 - **lsq-generator.py**  
   Runs the tool.
 
-- **vhdl_gen/**
+- **core_gen/**
   - **\_\_init__.py**  
     Re-exports a curated list of public API symbols (e.g. `main`, `generate`, `Logic`, `LSQ`).
 

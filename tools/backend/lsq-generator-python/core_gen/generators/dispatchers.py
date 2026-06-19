@@ -1,6 +1,6 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.signals import *
-from vhdl_gen.operators import *
+from core_gen.context import VHDLContext
+from core_gen.signals import *
+from core_gen.operators import *
 
 
 class PortToQueueDispatcher:
