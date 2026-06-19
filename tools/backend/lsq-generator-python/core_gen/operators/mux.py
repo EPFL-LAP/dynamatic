@@ -9,7 +9,7 @@ from core_gen.operators import *
 # ===----------------------------------------------------------------------===#
 # Mux1H    : One-hot select elements of `din` using `sel`
 # Mux1HROM : Special multiplexer for the Group Allocator ROM.
-# MuxIndex : Generate a VHDL array-index expression for selecting an element.
+# MuxIndex : Generate a array-index expression for selecting an element.
 # MuxLookUp: Generate a conditional "when/else" lookup multiplexer in VHDL.
 
 def Mux1H(ctx: VHDLContext, dout, din, sel, j=None) -> str:
@@ -31,7 +31,7 @@ def Mux1H(ctx: VHDLContext, dout, din, sel, j=None) -> str:
             When "sel" is LogicVecArray, select the j-th "sel" signal.
 
     Returns:
-        str: A VHDL code snippet for multiplexing.
+        str: A code snippet for multiplexing.
 
     Example:
         type(din) = LogicVecArray:
@@ -165,7 +165,7 @@ def Mux1HROM(ctx: VHDLContext, dout, din, sel, func=IntToBits) -> str:
 
 def MuxIndex(din, sel) -> str:
     """
-    Generate a VHDL array-index expression for selecting an element
+    Generate a array-index expression for selecting an element
     """
     return f'{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))'
 

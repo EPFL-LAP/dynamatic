@@ -61,7 +61,7 @@ def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
 
 def OHToBits(ctx: VHDLContext, dout, din) -> str:
     """
-    Generate VHDL code to convert a one-hot vector into its binary index.
+    Generate code to convert a one-hot vector into its binary index.
 
     Example:
         din  = "0010"

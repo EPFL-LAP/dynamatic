@@ -103,7 +103,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     Defines the `Configs` class.
 
   - **context.py**  
-    Defines the `VHDLContext` class. It substitutes the previous `global` VHDL context variables.
+    Defines the `VHDLContext` class. It substitutes the previous `global` context variables.
 
   - **utils.py**  
     - Defines `VHDLLogicType`, `VHDLLogicVecType`, `VHDLLogicTypeArray`, `VHDLLogicVecTypeArray`, `OpTab`.
@@ -114,7 +114,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
 
   - **vhdlgen/operators/**  
-    Low-level functions that generate VHDL snippets:  
+    Low-level functions that generate snippets:  
     - `assign.py`: `Op`  
     - `arithmetic.py`: `WrapAdd`, `WrapAddConst`, `WrapSub`
     - `conversions.py`: `VecToArray`, `BitsToOH`, `BitsToOHSub1`, `OHToBits`

@@ -31,7 +31,7 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
         should always start at "2**(log2Ceil(din.size) - 1)".
 
     Returns:
-        str_ret (str): A VHDL code snippet implementing the LogicVec reduction.
+        str_ret (str): A code snippet implementing the LogicVec reduction.
 
     Usage:
         (Called only internally by Reduce)
@@ -72,7 +72,7 @@ def ReduceLogicArray(ctx: VHDLContext, dout, din, operator, length) -> str:
     """
     Recursively perform reduction of LogicArray "din" by "operator".
 
-    Identical in behavior to ReduceLogicVec, but operates on multiple VHDL single-bit std_logic
+    Identical in behavior to ReduceLogicVec, but operates on multiple single-bit std_logic
     instead of std_logic_vector.
     """
 
@@ -106,7 +106,7 @@ def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
         should always start at "2**(log2Ceil(din.size) - 1)".
 
     Returns:
-        str_ret (str): A VHDL code snippet implementing the LogicVecArray reduction.
+        str_ret (str): A code snippet implementing the LogicVecArray reduction.
 
     Usage:
         (Called only internally by Reduce)
@@ -157,10 +157,10 @@ def Reduce(ctx: VHDLContext, dout, din, operator, comment: bool = True) -> str:
         dout    : Destination signal to receive the reduced data.
         din     : Source data to be reduced.
         operator: types of operator for the reduction
-        comment : Turn on/off adding VHDL comment lines.
+        comment : Turn on/off adding comment lines.
 
     Returns:
-        str_ret : A VHDL code snippet (with indentation) implementing the reduction.
+        str_ret : A code snippet (with indentation) implementing the reduction.
     """
 
     str_ret = ''

@@ -5,7 +5,7 @@ from core_gen.signals import *
 
 def Op(ctx: VHDLContext, out, *list_in) -> str:
     """
-    Generates a proper VHDL assignment statement.
+    Generates a proper assignment statement.
 
     Args:
         out: LHS of the assignment

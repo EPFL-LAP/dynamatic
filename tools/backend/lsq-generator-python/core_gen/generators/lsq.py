@@ -19,13 +19,13 @@ class LSQ:
         Models the top-level Load-Store Queue (LSQ) module.
 
         This class integrates all necessary sub-components to form a complete LSQ.
-        It is responsible for generating the top-level VHDL entity that wires
+        It is responsible for generating the top-level entity that wires
         together the Group Allocator, various Port/Queue Dispatchers, and the core
         queue logic with dependency checking.
 
         Parameters:
             name    : Base name of the LSQ. "<name saved in configs>_core"
-            suffix  : Suffix appended to the name to form the VHDL entity name.
+            suffix  : Suffix appended to the name to form the entity name.
                       Since LSQ is the top module, you do not need to add any suffix.
             configs : configuration generated from JSON
 
@@ -37,7 +37,7 @@ class LSQ:
         Example:
             lsq_core = LSQ("config_0_core", '', configs)
 
-            # You can later generate VHDL entity and architecture by
+            # You can later generate entity and architecture by
             #     lsq_core.generate(...)
 
             # Instantiation of the LSQ module does not use this class.
@@ -51,7 +51,7 @@ class LSQ:
 
     def generate(self, lsq_submodules, path_rtl) -> None:
         """
-        Generates the VHDL 'entity' and 'architecture' sections for an LSQ.
+        Generates the 'entity' and 'architecture' sections for an LSQ.
 
         This function appends the following to the file '<path_rtl>/<self.name>.vhd:
             1. 'entity <self.module_name>' declaration
@@ -68,10 +68,10 @@ class LSQ:
                 - (Optionally) Store Backward Port Dispatcher
 
         Parameters:
-            lsq_submodules  : A collection of objects representing submodules whose VHDL entity
+            lsq_submodules  : A collection of objects representing submodules whose entity
                               definitions are already generated. This parameter is used to
                               generate their port map instantiations.
-            path_rtl        : Output directory for VHDL files.
+            path_rtl        : Output directory for files.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
