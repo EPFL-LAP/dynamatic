@@ -71,6 +71,7 @@ struct IntegrationTest {
   bool verifyInvariants = false;
   // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
+  bool useDuplication = false;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
   unsigned clockPeriod = 5;
@@ -110,6 +111,7 @@ int IntegrationTest::run() {
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
              << (this->useSpeculation ? " --speculation" : "")
+             << (this->useDuplication ? " --enable-duplication" : "")
              << " --milp-solver " << this->milpSolver << std::endl;
   // clang-format on
 
@@ -210,6 +212,7 @@ class MemoryFixture : public BaseFixture {};
 class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
+class DuplicationFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
@@ -389,6 +392,27 @@ TEST_P(SpecFixture, spec) {
   logPerformance(config.simTime);
 }
 
+TEST_P(DuplicationFixture, basic) {
+  TEST_P(SpecFixture, spec) {
+    IntegrationTest config{
+        // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useDuplication = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+        // clang-format on
+    };
+    EXPECT_EQ(config.run(), 0);
+    RecordProperty("cycles", std::to_string(config.simTime));
+    logPerformance(config.simTime);
+  }
+}
+
 // clang-format off
 INSTANTIATE_TEST_SUITE_P(
     MiscBenchmarks, BasicFixture,
@@ -441,7 +465,6 @@ INSTANTIATE_TEST_SUITE_P(
       "mvt_float",
       "pivot",
       "polyn_mult",
-      "prediction",
       "simple_example_1",
       "sobel",
       "spmv",
@@ -562,6 +585,17 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       "subdiag_fast"
       ),
     [](const auto &info) { return "spec_" + info.param; });
+
+INSTANTIATE_TEST_SUITE_P(DuplicationBenchmarks, DuplicationFixture,
+    testing::Values(
+      "divergent_paths",
+      "nested_conditionals_1",
+      "nested_conditionals_2",
+      "prediction",
+      "sparse",
+      "wrap_if"
+    ),
+    [](const auto &info) { return "dup_" + info.param; });
 
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 // clang-format on
