@@ -113,7 +113,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
   - **signals.py**  
     Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
 
-  - **vhdlgen/operators/**  
+  - **core_gen/operators/**  
     Low-level functions that generate snippets:  
     - `assign.py`: `Op`  
     - `arithmetic.py`: `WrapAdd`, `WrapAddConst`, `WrapSub`
@@ -123,7 +123,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     - `reduction.py`: `ReduceLogicVec`, `ReduceLogicArray`, `ReduceLogicVecArray`, `Reduce`
     - `shifts.py`: `RotateLogicVec`, `RotateLogicArray`, `RotateLogicVecArray`, `CyclicLeftShift`
 
-  - **vhdlgen/generators/**  
+  - **core_gen/generators/**  
     High-level modules that build complete entities/architectures:  
     - `dispatchers.py` : `PortToQueueDispatcher`, `QueueToPortDispatcher`, `PortToQueueDispatcherInit`, `QueueToPortDispatcherInit`
     - `group_allocator.py` : `GroupAllocator`, `GroupAllocatorInit`
