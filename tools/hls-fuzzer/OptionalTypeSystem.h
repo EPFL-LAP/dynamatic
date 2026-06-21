@@ -40,6 +40,8 @@ public:
   static TransferFnArray<ASTNode>
   enableTypeSystemFor(TransferFnArray<ASTNode> transferFnArray,
                       const SubContext &entryContext) {
+    // For the given sub-elements that should be enabled, overwrite their
+    // transfer functions such that they now return the given 'entryContext'.
     ((std::get<subElementsToEnable>(transferFnArray) =
           typename Base::template TransferFn<ASTNode>(entryContext)),
      ...);
@@ -266,13 +268,17 @@ public:
   }
 
 private:
-  /// Implements the wrapping logic for enabling or disabling the sub type
-  /// system.
+  /// Wraps around the existing transfer functions in 'array' to add the ability
+  /// of enabling and disabling the sub type system.
   template <typename ASTNode>
   static TransferFnArray<ASTNode>
   wrapTransferFns(TransferFnArray<ASTNode> &&array) {
     return mapTuples(
+        /*mappingFunction=*/
         [](auto &&element) {
+          // If enabled, unwraps the 'std::optional<typename
+          // SubTypeSystem::Context>' and returns the contained
+          // 'SubTypeSystem::Context'.
           auto unwrapFn =
               [originalTransferFn = std::forward<decltype(element)>(element)](
                   const auto &arg,
@@ -311,7 +317,7 @@ private:
                                                    std::move(unwrapFn));
           }
         },
-        std::move(array));
+        /*tuple=*/std::move(array));
   }
 
   SubTypeSystem subTypeSystem;
