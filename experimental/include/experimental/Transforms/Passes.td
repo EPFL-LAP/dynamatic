@@ -128,4 +128,12 @@ def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir:
 
 
 
+def PreEagerlyElastic : DynamaticPass<"pre-eagerly-elastic"> {
+  let summary = "Prepares the IR for eagerly elastic";
+  let description = [{
+    This pass identifies the suppressors and converts branches consisting of two suppressors 
+    back into two different branches.
+  }];
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
