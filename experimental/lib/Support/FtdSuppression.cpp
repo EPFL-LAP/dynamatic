@@ -2337,57 +2337,122 @@ void ftd::insertDirectSuppression(
   BoolExpression *fSup = fCons->boolNegate();
   fSup = fSup->boolMinimize();
 
-  // The start block can be above the producer, so the producer does not fire
-  // on every path that reaches it. fSupDP is the suppression condition for the
-  // start-block-to-producer stretch; it is used to drop the parts of the main
-  // condition where the producer never fires. Zero when the start block is the
-  // producer itself.
-  BoolExpression *fSupDP = BoolExpression::boolZero();
-  DenseMap<Block *, unsigned> rankDP;  // pre-computed rank for this sub-graph
+  // Build a level-0 suppression-select circuit for a `start`->`target` delivery
+  // and return its Value (null when the condition is constant true, i.e. no
+  // branch is needed). This is the same pipeline as the DC main path, but it is
+  // always reduced to level 0:
+  //
+  //  - The decision graph for start->target may itself contain cycles, so we cut
+  //    its back edges via extractLayeredCFG(top scope), exactly as DC does, to
+  //    obtain a level-0 ROBDD.
+  //  - Every condition token the circuit consumes is taken at level 0. We pull
+  //    the demoted level-0 values through the shared demotionHelper, so a
+  //    variable already demoted for DC is reused (the demotion cache returns the
+  //    same SSA wire, forked here), and DP introduces no level>0 tokens.
+  //  - Distribution is rebuilt into a private registry. Distribution branches
+  //    consume the condition tokens, so they cannot share DC's physical
+  //    branches; only the demoted condition *wire* is shared (via fork).
+  auto buildLevel0SuppressionSelect = [&](Block *start, Block *target) -> Value {
+    if (!start || !target || start == target)
+      return Value();
 
-  if (dominatorBlock != producerBlock) {
-    OpBuilder tmpBuilder2(funcOp.getContext());
-    auto locGraphDP = buildLocalCFGRegion(tmpBuilder2, dominatorBlock,
-                                          producerBlock, bi);
-
-    if (locGraphDP->newCons) {
-      ControlDependenceAnalysis dpLocCDA(*locGraphDP->region);
-      DenseSet<Block *> dpDepsTmp =
-          dpLocCDA.getAllBlockDeps()[locGraphDP->newCons].allControlDeps;
-      auto dpFullDG = buildDecisionGraph(*locGraphDP, dpDepsTmp);
-
-      ControlDependenceAnalysis finalDpCDA(*dpFullDG->region);
-      DenseSet<Block *> dpDeps =
-          finalDpCDA.getAllBlockDeps()[dpFullDG->newCons].allControlDeps;
-
-      BoolExpression *fConsDP = enumeratePaths(*dpFullDG, bi, dpDeps);
-      fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
-
-      // Pre-compute DP rank before erasing
-      rankDP = computeTopoRank(*dpFullDG);
-
-      dpFullDG->containerOp->erase();
+    OpBuilder cfgBuilder(funcOp.getContext());
+    auto locG = buildLocalCFGRegion(cfgBuilder, start, target, bi);
+    if (!locG->newCons) {
+      locG->containerOp->erase();
+      return Value();
     }
 
-    // Pre-compute DP rank from locGraphDP as fallback if dpFullDG was not built
-    if (rankDP.empty())
-      rankDP = computeTopoRank(*locGraphDP);
+    // Cyclic decision graph, then its level-0 (acyclic) reduction.
+    ControlDependenceAnalysis locCDAlocal(*locG->region);
+    DenseSet<Block *> depsTmp =
+        locCDAlocal.getAllBlockDeps()[locG->newCons].allControlDeps;
+    auto fullDG = buildDecisionGraph(*locG, depsTmp);
 
-    locGraphDP->containerOp->erase();
-  }
+    CyclicGraphManager cyc(*fullDG);
+    OpBuilder l0Builder(funcOp.getContext());
+    auto level0CFGlocal = cyc.extractLayeredCFG(cyc.getTopLevelScope(), l0Builder);
+
+    ControlDependenceAnalysis l0CDA(*level0CFGlocal->region);
+    DenseSet<Block *> l0Deps =
+        l0CDA.getAllBlockDeps()[level0CFGlocal->newCons].allControlDeps;
+    auto level0DG = buildDecisionGraph(*level0CFGlocal, l0Deps);
+
+    ControlDependenceAnalysis dgCDA(*level0DG->region);
+    DenseSet<Block *> dgDeps =
+        dgCDA.getAllBlockDeps()[level0DG->newCons].allControlDeps;
+
+    // Private registry: reuse DC's demoted level-0 condition wires (shared via
+    // the demotion cache in demotionHelper), then build this delivery's own
+    // distribution branches into it.
+    SignalRegistry localRegistry;
+    demotionHelper.preRegisterDemotedValues(level0DG, localRegistry);
+    buildDistributionNetwork(builder, *level0DG, bi, localRegistry, nullptr,
+                             &shadow);
+
+    BoolExpression *fConsLocal = enumeratePaths(*level0DG, bi, dgDeps);
+    BoolExpression *fSupLocal =
+        fConsLocal->boolMinimize()->boolNegate()->boolMinimize();
+
+    Value result;
+    if (fSupLocal->type != experimental::boolean::ExpressionType::Zero) {
+      DenseMap<Block *, unsigned> rk = computeTopoRank(*level0DG);
+      result = expressionToCircuit(builder, fSupLocal, rk, producerIRBlock,
+                                   localRegistry, bi, nullptr, &shadow,
+                                   targetBBAttr);
+    }
+
+    level0DG->containerOp->erase();
+    level0CFGlocal->containerOp->erase();
+    fullDG->containerOp->erase();
+    locG->containerOp->erase();
+    return result;
+  };
+
+  // fDP: the dominator-to-producer suppression select. The dominator can sit
+  // above the producer, so the producer does not fire on every path that
+  // reaches the dominator; fDP discards the parts of the main condition where
+  // the producer never fires. It is built at level 0 and reuses DC's demoted
+  // condition values, so it never injects level>0 tokens into the cascade
+  // below. Null when the dominator is the producer or the producer is always
+  // reached (the fDP branch is then optimized away, as in the thesis).
+  Value dpBranchCond;
+  if (dominatorBlock != producerBlock)
+    dpBranchCond = buildLevel0SuppressionSelect(dominatorBlock, producerBlock);
 
   Value supData = connection;
 
   level0CFG->containerOp->erase();
   level0FullDG->containerOp->erase();
   level0ConstrainedDG->containerOp->erase();
-  fullDecisionGraph->containerOp->erase();
+  // NOTE: fullDecisionGraph is intentionally NOT erased here. The loop-filter /
+  // demotion stage below reuses cyclicMgr and demotionHelper, both of which
+  // analyze fullDecisionGraph's region. It is erased after that stage instead.
 
-  // Loop filter: when the producer sits in a deeper loop than dominatorBlock,
-  // it can fire several times per delivery, producing extra tokens the branch
-  // below cannot match. Keep only the token of the iteration that reaches the
-  // loop exit — the block at dominatorBlock's loop depth that post-dominates
-  // the producer — and discard the rest.
+  // Loop filter + value demotion.
+  //
+  // When the producer sits in a deeper loop than the dominator block, it fires
+  // several times per delivery and produces extra tokens that the main
+  // suppression branch below cannot match. The thesis (Section 5.7, second
+  // situation) resolves this with the demotion mechanism of Section 5.6 applied
+  // to the producer's value, not with a single ad-hoc reaching-condition branch.
+  //
+  // We still use the original loop-depth test to decide whether the producer is
+  // in a loop deeper than the dominator. If it is, two cases arise depending on
+  // whether the producer block appears as a node of the decision graph built for
+  // this dominator->consumer delivery (origToFullDG):
+  //
+  //  (A) Producer IS a decision-graph node. The producer value is demoted level
+  //      by level using that node's loop nesting, and the demoted value then
+  //      enters the normal suppression branch below.
+  //
+  //  (B) Producer is NOT a decision-graph node. It lies between two nodes, on a
+  //      deeper simple loop that is post-dominated by some decision-graph node.
+  //      We first run a simple producer->postdominator suppression (which never
+  //      involves a gamma tree or a cyclic decision graph — either a simple loop
+  //      or a straight pass-through whose condition is constant true) to filter
+  //      that simple loop, reusing the ordinary suppression flow. The filtered
+  //      value is then demoted using that postdominator node's nesting.
   if (producerBlock && dominatorBlock) {
     DominanceInfo lfDom;
     mlir::CFGLoopInfo lfLoopInfo(lfDom.getDomTree(&shadowRegion));
@@ -2401,63 +2466,94 @@ void ftd::insertDirectSuppression(
     unsigned prodLevel = loopDepth(producerBlock);
 
     if (prodLevel > domLevel) {
-      // Walk up the post-dominator tree from the producer to the nearest
-      // block that sits at the dominator's loop level: that block is the
-      // loop exit whose iteration token we want to keep.
-      mlir::PostDominanceInfo lfPostDom;
-      auto &pdt = lfPostDom.getDomTree(&shadowRegion);
-      Block *filterBB = nullptr;
-      if (auto *node = pdt.getNode(producerBlock)) {
-        for (node = node->getIDom(); node && node->getBlock();
-             node = node->getIDom()) {
-          if (loopDepth(node->getBlock()) == domLevel) {
-            filterBB = node->getBlock();
-            break;
+      // Original IR block whose decision-graph node drives the demotion
+      // cascade, and the block the demotion is anchored on.
+      Block *demoteBlock = nullptr;
+
+      if (origToFullDG.count(producerBlock)) {
+        // Case (A): the producer is itself a decision-graph node.
+        demoteBlock = producerBlock;
+      } else {
+        // Case (B): the producer is not a decision-graph node. Find the nearest
+        // node that post-dominates it.
+        mlir::PostDominanceInfo lfPostDom;
+        auto &pdt = lfPostDom.getDomTree(&shadowRegion);
+        Block *pdNode = nullptr;
+        if (auto *node = pdt.getNode(producerBlock)) {
+          for (node = node->getIDom(); node && node->getBlock();
+               node = node->getIDom()) {
+            if (origToFullDG.count(node->getBlock())) {
+              pdNode = node->getBlock();
+              break;
+            }
           }
+        }
+
+        if (pdNode && pdNode != producerBlock) {
+          // Simple suppression from the producer to the postdominator node. This
+          // never involves a gamma tree or a cyclic decision graph, so the plain
+          // enumeratePaths -> expressionToCircuit flow is sufficient. When the
+          // producer reaches the node unconditionally, lfSup is constant zero and
+          // the filter is optimized away.
+          OpBuilder lfBuilder(funcOp.getContext());
+          auto lfLoc = buildLocalCFGRegion(lfBuilder, producerBlock, pdNode, bi);
+          if (lfLoc->newCons) {
+            ControlDependenceAnalysis lfLocCDA(*lfLoc->region);
+            DenseSet<Block *> lfDepsTmp =
+                lfLocCDA.getAllBlockDeps()[lfLoc->newCons].allControlDeps;
+            auto lfDG = buildDecisionGraph(*lfLoc, lfDepsTmp);
+
+            ControlDependenceAnalysis lfDGCDA(*lfDG->region);
+            DenseSet<Block *> lfDeps =
+                lfDGCDA.getAllBlockDeps()[lfDG->newCons].allControlDeps;
+
+            BoolExpression *lfCons = enumeratePaths(*lfDG, bi, lfDeps);
+            BoolExpression *lfSup =
+                lfCons->boolMinimize()->boolNegate()->boolMinimize();
+
+            if (lfSup->type != experimental::boolean::ExpressionType::Zero) {
+              DenseMap<Block *, unsigned> lfRank = computeTopoRank(*lfDG);
+              // The filter operates on the producer's token, so its circuit
+              // belongs to the producer's basic block.
+              Value lfCond =
+                  expressionToCircuit(builder, lfSup, lfRank, producerIRBlock,
+                                      registry, bi, nullptr, &shadow, prodBBAttr);
+              auto lfBranch = builder.create<handshake::ConditionalBranchOp>(
+                  consumer->getLoc(), ftd::getListTypes(supData.getType()),
+                  lfCond, supData);
+              lfBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+              lfBranch->setAttr("handshake.bb", prodBBAttr);
+              // Pass the token through only when the node is reached (the
+              // suppression select is false on the final iteration).
+              supData = lfBranch.getFalseResult();
+            }
+            lfDG->containerOp->erase();
+          }
+          lfLoc->containerOp->erase();
+
+          // The filtered value is demoted from the postdominator node onward.
+          demoteBlock = pdNode;
         }
       }
 
-      if (filterBB && filterBB != producerBlock) {
-        // Compute the condition for the producer reaching that exit and use it
-        // to discard every producer token except the exit-reaching one.
-        OpBuilder lfBuilder(funcOp.getContext());
-        auto lfLoc = buildLocalCFGRegion(lfBuilder, producerBlock, filterBB, bi);
-        if (lfLoc->newCons) {
-          ControlDependenceAnalysis lfLocCDA(*lfLoc->region);
-          DenseSet<Block *> lfDepsTmp =
-              lfLocCDA.getAllBlockDeps()[lfLoc->newCons].allControlDeps;
-          auto lfDG = buildDecisionGraph(*lfLoc, lfDepsTmp);
-
-          ControlDependenceAnalysis lfDGCDA(*lfDG->region);
-          DenseSet<Block *> lfDeps =
-              lfDGCDA.getAllBlockDeps()[lfDG->newCons].allControlDeps;
-
-          BoolExpression *lfCons = enumeratePaths(*lfDG, bi, lfDeps);
-          BoolExpression *lfSup =
-              lfCons->boolMinimize()->boolNegate()->boolMinimize();
-
-          if (lfSup->type != experimental::boolean::ExpressionType::Zero) {
-            DenseMap<Block *, unsigned> lfRank = computeTopoRank(*lfDG);
-            // The filter operates on the producer's token, so its circuit
-            // belongs to the producer's basic block.
-            Value lfCond =
-                expressionToCircuit(builder, lfSup, lfRank, producerIRBlock,
-                                    registry, bi, nullptr, &shadow, prodBBAttr);
-            auto lfBranch = builder.create<handshake::ConditionalBranchOp>(
-                consumer->getLoc(), ftd::getListTypes(supData.getType()),
-                lfCond, supData);
-            lfBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-            lfBranch->setAttr("handshake.bb", prodBBAttr);
-            // Pass the token through only when the exit is reached (the
-            // suppression select is false on the final iteration).
-            supData = lfBranch.getFalseResult();
-          }
-          lfDG->containerOp->erase();
-        }
-        lfLoc->containerOp->erase();
+      // Demote the (possibly simple-filtered) producer value level by level,
+      // using the decision-graph nesting of demoteBlock. demoteOneLevel keeps,
+      // at each level, only the token of the iteration on which that level's
+      // loop exits (and on which demoteBlock is reached), so after the cascade
+      // the value is valid at the dominator-to-consumer level and pairs
+      // one-to-one with the main suppression branch below.
+      if (demoteBlock && origToFullDG.count(demoteBlock)) {
+        unsigned demoteLevel =
+            cyclicMgr.getNestingLevel(origToFullDG[demoteBlock]);
+        for (unsigned lvl = demoteLevel; lvl >= 1; --lvl)
+          supData = demotionHelper.demoteOneLevel(supData, demoteBlock, lvl);
       }
     }
   }
+
+  // The decision graph (and the cyclic machinery built on top of it) had to stay
+  // alive for the demotion cascade above; erase it now.
+  fullDecisionGraph->containerOp->erase();
 
   // If the activation function is not zero, then a suppress block is to be
   // inserted
@@ -2469,15 +2565,11 @@ void ftd::insertDirectSuppression(
                             registry, bi, nullptr, &shadow, connectionBBAttr);
 
     // Cascaded Upstream Filter
-    if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
-      Value dpBranchCond =
-          expressionToCircuit(builder, fSupDP, rankDP, producerIRBlock,
-                              registry, bi, nullptr, &shadow, connectionBBAttr);
-
+    if (dpBranchCond) {
       // Upstream logic filters the SUPPRESSION SIGNAL.
       // Create an Intermediate Branch on the 'branchCond' wire.
       // Data Input: branchCond (The Downstream suppression signal)
-      // Condition: dpBranchCond (from Upstream logic)
+      // Condition: dpBranchCond (from the level-0 dominator->producer circuit)
       auto dpBranchOp = builder.create<handshake::ConditionalBranchOp>(
           consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
           dpBranchCond, branchCond);
