@@ -37,6 +37,8 @@ void PreEagerlyElasticPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  SmallVector<Operation *> branchesToErase;
+
   // iterate over all basic blocks
   for (Block &block : funcOp.getBody()) {
     // iterate over all operations inside the current bb
@@ -46,6 +48,43 @@ void PreEagerlyElasticPass::runOnOperation() {
       if (!branchOp || !branchOp->hasAttr("ftd.skip"))
         continue;
 
+      // skip suppressors with a sink
+      bool trueRes = branchOp.getTrueResult().use_empty();
+      bool falseRes = branchOp.getFalseResult().use_empty();
+      if (trueRes || falseRes)
+        continue;
+
+      // convert suppressors without sinks into two suppressors
+      // set up the insertion point right before the original branch
+      OpBuilder builder(branchOp);
+
+      Value condition = branchOp.getConditionOperand();
+      Value data = branchOp.getDataOperand();
+      Location loc = branchOp.getLoc();
+
+      // create suppressor for true path
+      auto suppressorA =
+          builder.create<handshake::ConditionalBranchOp>(loc, condition, data);
+      suppressorA->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
+      if (auto bbAttr = branchOp->getAttr("handshake.bb"))
+        suppressorA->setAttr("handshake.bb", bbAttr);
+
+      // create suppressor for false path
+      auto suppressorB =
+          builder.create<handshake::ConditionalBranchOp>(loc, condition, data);
+      suppressorB->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
+      if (auto bbAttr = branchOp->getAttr("handshake.bb"))
+        suppressorB->setAttr("handshake.bb", bbAttr);
+
+      // rewire the downstream consumers to point to our new split branches
+      branchOp.getTrueResult().replaceAllUsesWith(suppressorA.getTrueResult());
+      branchOp.getFalseResult().replaceAllUsesWith(
+          suppressorB.getFalseResult());
+
+      // erase the original combined branch
+      branchesToErase.push_back(branchOp);
+
+      /*
       // print the name of the branch as well as to where it goes
       std::string branchName = "unnamed_branch";
       if (auto nameAttr = branchOp->getAttrOfType<StringAttr>("handshake.name"))
@@ -77,6 +116,11 @@ void PreEagerlyElasticPass::runOnOperation() {
                        << " (" << userName << ")\n";
         }
       }
+      */
     }
+  }
+  // safely erase after loop is done
+  for (Operation *deadOp : branchesToErase) {
+    deadOp->erase();
   }
 }
