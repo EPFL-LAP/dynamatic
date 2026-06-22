@@ -115,7 +115,7 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
-def PreEagerlyElastic : DynamaticPass<"pre-eagerly-elastic"> {
+def PreEagerlyElastic : Pass<"pre-eagerly-elastic", "mlir::ModuleOp"> {
   let summary = "Prepares the IR for eagerly elastic";
   let description = [{
     This pass identifies the suppressors and converts branches consisting of two suppressors 
