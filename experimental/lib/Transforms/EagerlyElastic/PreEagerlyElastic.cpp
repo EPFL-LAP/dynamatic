@@ -11,7 +11,7 @@ using namespace mlir;
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 namespace experimental {
-#define GEN_PASS_DEF_HANDSHAKESIZELSQS
+#define GEN_PASS_DEF_PREEAGERLYELASTIC
 #include "experimental/Transforms/Passes.h.inc"
 } // namespace experimental
 } // namespace dynamatic
@@ -28,7 +28,14 @@ struct PreEagerlyElasticPass
 };
 
 void PreEagerlyElasticPass::runOnOperation() {
-  handshake::FuncOp funcOp = getOperation();
+  ModuleOp modOp = getOperation();
+
+  handshake::FuncOp funcOp =
+      cast<handshake::FuncOp>(&modOp.getBodyRegion().front().front());
+  if (!funcOp) {
+    llvm::errs() << "No funcOp found!\n";
+    return signalPassFailure();
+  }
 
   // iterate over all basic blocks
   for (Block &block : funcOp.getBody()) {
@@ -53,7 +60,7 @@ void PreEagerlyElasticPass::runOnOperation() {
               user->getAttrOfType<StringAttr>("handshake.name")
                   .getValue()
                   .str();
-          llvm::outs() << "    True Result: " << user->getName().getStringRef()
+          llvm::errs() << "    True Result: " << user->getName().getStringRef()
                        << " (" << userName << ")\n";
         }
       }
@@ -66,7 +73,7 @@ void PreEagerlyElasticPass::runOnOperation() {
               user->getAttrOfType<StringAttr>("handshake.name")
                   .getValue()
                   .str();
-          llvm::outs() << "    False Result: " << user->getName().getStringRef()
+          llvm::errs() << "    False Result: " << user->getName().getStringRef()
                        << " (" << userName << ")\n";
         }
       }

@@ -25,6 +25,7 @@ SPECULATION=${15}
 ENABLE_SHORT_CIRCUIT=${16}
 ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
+EAGERLYELASTIC=${19}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -295,14 +296,18 @@ else
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
-# eagerly elastic - TODO: eagerlyelastic if condition
-if [[ $FAST_TOKEN_DELIVERY -ne 0]]; then
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --ftd-lower-cf-to-handshake \
-    --handshake-combine-steering-logic \
-    > "$F_EAGERLYELASTIC"
-  exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
-  F_HANDSHAKE="$F_EAGERLYELASTIC"
+# do eager execution
+if [[ $EAGERLYELASTIC -ne 0 ]]; then
+  # error out immediately if FTD is disabled but eagerlyelastic was requested
+  if [[ $FAST_TOKEN_DELIVERY -eq 0 ]]; then
+    echo_error "Error: Eager execution requires Fast Token Delivery enabled"
+  else
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --pre-eagerly-elastic \
+      > "$F_EAGERLYELASTIC"
+    exit_on_fail "Failed to apply eager execution" "Applied eager execution"
+    F_HANDSHAKE="$F_EAGERLYELASTIC"
+  fi
 fi
 
 if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
