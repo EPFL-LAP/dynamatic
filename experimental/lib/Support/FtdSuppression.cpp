@@ -1935,10 +1935,12 @@ collectSuppressionConditionBlocks(Block *producerBlock, Block *consumerBlock,
 // ===--------------------------------------------------------------------=== //
 
 /// Builds the suppression circuit for a single producer value consumed by
-/// `consumer`. In outline: pick the block the analysis starts from, reconstruct
-/// the control flow down to the consumer, derive the condition under which the
-/// token must be discarded, emit the mux-tree circuit for that condition, and
-/// branch the producer token on it so the unused token is dropped.
+/// `consumer`. In outline: pick the block the analysis starts from (for a gamma
+/// consumer, the condition that effectively controls the delivery); reconstruct
+/// the control flow from there down to the consumer; derive the condition under
+/// which the token must be discarded (for a gamma, the token is kept only on
+/// paths that select this input); then emit the mux-tree circuit for the 
+/// condition and branch the producer token on it so the unused token is dropped.
 void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
                                   handshake::FuncOp &funcOp,
                                   Operation *consumer, Value connection,
