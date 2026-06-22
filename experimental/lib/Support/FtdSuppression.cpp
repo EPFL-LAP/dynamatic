@@ -1968,10 +1968,12 @@ void ftd::insertDirectSuppression(
   if (IntegerAttr loopExitBBAttr = getFirstLoopExitBBAttrIfHeaderConsumer(
           builder, shadowRegion, producerBlock, consumerBlock, bi, shadow))
     targetBBAttr = loopExitBBAttr;
+  // The block the suppression analysis starts from. It dominates the producer
+  // and every condition block the suppression will depend on.
   Block *dominatorBlock = producerBlock;
 
   // Account for the condition of a Mux only if it corresponds to a GAMMA GSA
-  // gate and the producer is one of its data inputs
+  // gate
   bool deliverToGamma = llvm::isa<handshake::MuxOp>(consumer) &&
                         consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
                         (producerBlock != consumerBlock ||
@@ -1983,13 +1985,16 @@ void ftd::insertDirectSuppression(
     return;
   }
 
+  // Reads an operation's basic-block index from its handshake.bb attribute.
   auto getBB = [](Operation *op) -> unsigned {
     auto attr = op->getAttrOfType<IntegerAttr>("handshake.bb");
     return attr ? attr.getUInt() : 0;
   };
 
-  // If deliverToGamma is true, we need to trace down the mux chain to find the
-  // condition block that effectively controls the delivery.
+  // When the consumer is a gamma mux tree, the producer feeds only one input
+  // on it. Walk the tree to find the highest branch that can still route to
+  // the producer block on both of its sides, which indicates it effectively
+  // controls the delivery.
   if (deliverToGamma) {
     Operation *currentMuxOp = consumer;
     Value currentConnection = connection;
@@ -2017,13 +2022,17 @@ void ftd::insertDirectSuppression(
       return false;
     };
     while (true) {
-      // If the connection enters as operand(0) (condition input),
-      // skip the reachability check and just trace to the next Mux.
+      // The value reaches this mux either as its select (operand 0) or as a data
+      // input (operand 1/2). If it is a data input, this mux's condition must be
+      // taken into account; if it is the select, there is nothing to take into
+      // account and we move on to the next mux.
       if (currentMuxOp->getOperand(0) != currentConnection) {
         // Connection is a data input — check this Mux's condition block
         Value condition = currentMuxOp->getOperand(0);
         Block *condBlock = returnMuxConditionBlock(condition, shadow);
 
+        // condBlock is a candidate only if the producer is reachable
+        // from both of its successors (following forward edges only).
         bool bothReach = condBlock &&
                          condBlock->getNumSuccessors() >= 2 &&
                          isReachableAcyclic(condBlock->getSuccessor(0), producerBlock) &&
@@ -2037,7 +2046,8 @@ void ftd::insertDirectSuppression(
         }
       }
 
-      // Trace down to the next Gamma Mux in the same block
+      // Move on to the next mux of the same gamma tree (its muxes share one
+      // basic-block) that this mux's output feeds into.
       Operation *nextMuxOp = nullptr;
       Value currentResult = currentMuxOp->getResult(0);
       for (auto *user : currentResult.getUsers()) {
@@ -2080,27 +2090,36 @@ void ftd::insertDirectSuppression(
     }
   }
 
-  // Create a temporary builder to isolate the LocalCFG creation from the
-  // main OpBuilder. This prevents the OpBuilder from tracking the
-  // temporary operations which are later erased manually.
+  // buildLocalCFGRegion builds a throwaway region used only for analysis; give it
+  // its own builder so those temporary operations stay separate from the IR we
+  // are actually editing (they are erased manually later).
   OpBuilder tmpBuilder(funcOp.getContext());
+  // The local CFG only captures the part between the dominator block (functions as 
+  // a producer block) and the consumer block.
   auto locGraph =
       buildLocalCFGRegion(tmpBuilder, dominatorBlock, consumerBlock, bi);
 
-
   ControlDependenceAnalysis locCDA(*locGraph->region);
-  // Full Set: contains consumer dependences, Mux Conditions and their
-  // dependences.
+  // The condition blocks the consumer's reachability depends on, from the dominator
+  // block; the suppression condition is built over exactly these. Comprised of the
+  // consumer's own control dependences, and (for a gamma) extended below with the
+  // condition blocks driving the gamma's selects and their dependences.
   DenseSet<Block *> locConsControlDepsFull =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
-  // The set containing Mux Conditions
+  // The condition blocks driving the gamma's selects along the consumer input's path —
+  // the conditions under which the consumer input is the one selected.
   DenseSet<Block *> muxConditionSet;
 
-  // Map to store specific constraints for Mux Conditions (LocalBlock ->
-  // RequiredValue)
+  // For each such condition block, the value its condition must take for the
+  // consumer input to be selected. Used below to prune the decision graph so
+  // the token is kept only on paths that actually route to the producer.
   DenseMap<Block *, bool> muxConstraints;
 
-  // Logic specific to Gamma delivery to identify Mux dependencies
+  // Walk the gamma tree again, now that the dominator block and local CFG are known,
+  // recording for every mux the producer flows through the condition driving that
+  // mux and the value it must take to select the input to be consumed. This fills
+  // muxConditionSet and muxConstraints and extends locConsControlDepsFull,
+  // capturing that the producer is consumed only under this combination of selects.
   if (deliverToGamma) {
     Operation *currentMuxOp = consumer;
     Value currentConnection = connection;
@@ -2211,10 +2230,12 @@ void ftd::insertDirectSuppression(
     }
   }
 
-  // No branch decision affects delivery here.
+  // Early exit: no condition affects this delivery, so there is nothing to build a
+  // suppression from. Either the consumer is never reached on a kept path (discard
+  // the token unconditionally, below) or it is always reached (nothing to do).
   if (locConsControlDepsFull.empty()) {
-    // The consumer is never reached on any kept path: discard the token on
-    // every execution with an always-true suppression select.
+    // The consumer is never reached on any kept path: discard the token on every
+    // execution by holding the suppress branch's select permanently true.
     if (locGraph->newCons == locGraph->sinkBB) {
       builder.setInsertionPointToStart(consumer->getBlock());
       auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
@@ -2245,21 +2266,26 @@ void ftd::insertDirectSuppression(
     return;
   }
 
-  // Common Logic for Building Suppression.
-  // If deliverToGamma is true, we use the empty constraints to build the
-  // distribution network (so it covers all paths), but we use the
-  // muxConstraints to calculate the specific suppression condition for this
-  // path. If deliverToGamma is false, muxConstraints will be empty, so both
-  // graphs are identical.
+  // From here we build the actual suppression: keep the producer's token only
+  // when the consumer would really use it, and discard it otherwise. (For a gamma
+  // consumer the full set of conditions routes the select signals, while
+  // muxConstraints narrows the kept-token condition down to this specific input;
+  // for a non-gamma consumer muxConstraints is empty and the two coincide.)
+  //
+  // registry caches the condition signals we materialize, so each is built once
+  // and reused. The decision graph (built just below) is a view of when
+  // the consumer is reached, derived from the local CFG and the condition blocks
+  // it depends on.
   SignalRegistry registry;
   builder.setInsertionPointToStart(consumer->getBlock());
   auto fullDecisionGraph =
       buildDecisionGraph(*locGraph, locConsControlDepsFull);
 
-  // Cycle Analysis Integration
+  // The decision graph may contain loops; this discovers their nesting so the
+  // graph can later be peeled into acyclic, per-loop-level views.
   ftd::CyclicGraphManager cyclicMgr(*fullDecisionGraph);
 
-  // Reverse map: original IR block -> fullDecisionGraph block
+  // Lookup from an original IR block to its node in the decision graph.
   DenseMap<Block *, Block *> origToFullDG;
   for (auto [dgBlock, origBlock] : fullDecisionGraph->origMap)
     if (origBlock)
@@ -2272,7 +2298,7 @@ void ftd::insertDirectSuppression(
 
   // Level 0: Extract acyclic layered CFG from the full decision graph.
   // This cuts all back-edges, giving a DAG where CDA produces correct
-  // forward dependencies without the findNearest-through-backedge problem.
+  // forward dependencies.
   OpBuilder level0Builder(funcOp.getContext());
   auto level0CFG = cyclicMgr.extractLayeredCFG(
       cyclicMgr.getTopLevelScope(), level0Builder);
@@ -2284,7 +2310,7 @@ void ftd::insertDirectSuppression(
       level0CDA.getAllBlockDeps()[level0CFG->newCons].allControlDeps;
 
   // Translate mux condition blocks (original IR) into level0CFG and insert
-  // them into the dependency set — mirrors locConsAcyclicDeps.insert(condBlockLocal).
+  // them into the dependency set.
   for (Block *muxCondOrigIR : muxConditionSet) {
     for (auto &[l0Block, l0Orig] : level0CFG->origMap) {
       if (l0Orig == muxCondOrigIR) {
@@ -2311,16 +2337,23 @@ void ftd::insertDirectSuppression(
     }
   }
 
-  // Level 0: distribution graph (unconstrained, covers all paths)
+  // The decision graph at loop-nesting level 0 (all back edges cut), left
+  // unconstrained. The distribution logic must run on this full graph to
+  // keep the right semantics; the mux-constraint trimming is applied only
+  // afterwards, on the separate constrained graph.
   auto level0FullDG = buildDecisionGraph(*level0CFG, level0Deps);
 
-  // Pre-register demoted values for high-level variables in level 0
+  // Variables produced inside loops live at a deeper loop-nesting level; demote
+  // them down to level 0 ahead of time and cache them, so the routing and the
+  // expression below consume the level-0 wires.
   demotionHelper.preRegisterDemotedValues(level0FullDG, registry);
 
   // Build distribution on level 0
   buildDistributionNetwork(builder, *level0FullDG, bi, registry, nullptr, &shadow);
 
-  // Level 0: constrained graph (for suppression expression)
+  // The same level-0 graph, now pruned by muxConstraints so it keeps only the
+  // paths that actually select the input to be consumed. The suppression condition
+  // is read from this constrained graph.
   auto level0ConstrainedDG =
       buildDecisionGraph(*level0CFG, level0Deps, level0MuxConstraints);
 
@@ -2337,21 +2370,20 @@ void ftd::insertDirectSuppression(
   BoolExpression *fSup = fCons->boolNegate();
   fSup = fSup->boolMinimize();
 
-  // Build a level-0 suppression-select circuit for a `start`->`target` delivery
-  // and return its Value (null when the condition is constant true, i.e. no
-  // branch is needed). This is the same pipeline as the DC main path, but it is
-  // always reduced to level 0:
+  // Build the circuit that computes, for a `start`->`target` stretch, the
+  // expression under which the token must be discarded because it does not
+  // reach `target`, and return that expression wire. Returns null when the
+  // token is never discarded.
   //
-  //  - The decision graph for start->target may itself contain cycles, so we cut
-  //    its back edges via extractLayeredCFG(top scope), exactly as DC does, to
-  //    obtain a level-0 ROBDD.
-  //  - Every condition token the circuit consumes is taken at level 0. We pull
-  //    the demoted level-0 values through the shared demotionHelper, so a
-  //    variable already demoted for DC is reused (the demotion cache returns the
-  //    same SSA wire, forked here), and DP introduces no level>0 tokens.
-  //  - Distribution is rebuilt into a private registry. Distribution branches
-  //    consume the condition tokens, so they cannot share DC's physical
-  //    branches; only the demoted condition *wire* is shared (via fork).
+  // The result is always reduced to loop-nesting level 0:
+  //  - The start->target decision graph may contain loops, so its back edges are
+  //    cut (extractLayeredCFG on the top scope) to get an acyclic level-0 graph.
+  //  - Every condition signal it consumes is taken at level 0: the demoted
+  //    level-0 wires are pulled through the shared demotionHelper, so a condition
+  //    already demoted elsewhere is reused (the cache returns the same wire,
+  //    forked here) and no deeper-level token leaks in.
+  //  - Distribution is rebuilt into a separate registry and cannot be
+  //    shared; only the demoted condition wire is shared.
   auto buildLevel0SuppressionSelect = [&](Block *start, Block *target) -> Value {
     if (!start || !target || start == target)
       return Value();
@@ -2382,8 +2414,8 @@ void ftd::insertDirectSuppression(
     DenseSet<Block *> dgDeps =
         dgCDA.getAllBlockDeps()[level0DG->newCons].allControlDeps;
 
-    // Private registry: reuse DC's demoted level-0 condition wires (shared via
-    // the demotion cache in demotionHelper), then build this delivery's own
+    // Private registry: reuse the already-demoted level-0 condition wires (shared
+    // via the demotion cache in demotionHelper), then build this delivery's own
     // distribution branches into it.
     SignalRegistry localRegistry;
     demotionHelper.preRegisterDemotedValues(level0DG, localRegistry);
@@ -2409,13 +2441,14 @@ void ftd::insertDirectSuppression(
     return result;
   };
 
-  // fDP: the dominator-to-producer suppression select. The dominator can sit
-  // above the producer, so the producer does not fire on every path that
-  // reaches the dominator; fDP discards the parts of the main condition where
-  // the producer never fires. It is built at level 0 and reuses DC's demoted
-  // condition values, so it never injects level>0 tokens into the cascade
-  // below. Null when the dominator is the producer or the producer is always
-  // reached (the fDP branch is then optimized away, as in the thesis).
+  // The producer-reaching filter. The dominator can sit above the producer, so
+  // the producer does not fire on every path that reaches the dominator; this
+  // computes the condition for exactly those dominator iterations on which the
+  // producer never fires, so the main condition can be trimmed by it. It is built
+  // at level 0 and reuses the already-demoted condition wires, so it injects no
+  // deeper-level tokens into the cascade below. Null when the dominator is the
+  // producer, or the producer is always reached (the filter is then optimized
+  // away).
   Value dpBranchCond;
   if (dominatorBlock != producerBlock)
     dpBranchCond = buildLevel0SuppressionSelect(dominatorBlock, producerBlock);
@@ -2425,34 +2458,29 @@ void ftd::insertDirectSuppression(
   level0CFG->containerOp->erase();
   level0FullDG->containerOp->erase();
   level0ConstrainedDG->containerOp->erase();
-  // NOTE: fullDecisionGraph is intentionally NOT erased here. The loop-filter /
-  // demotion stage below reuses cyclicMgr and demotionHelper, both of which
-  // analyze fullDecisionGraph's region. It is erased after that stage instead.
 
   // Loop filter + value demotion.
   //
   // When the producer sits in a deeper loop than the dominator block, it fires
   // several times per delivery and produces extra tokens that the main
-  // suppression branch below cannot match. The thesis (Section 5.7, second
-  // situation) resolves this with the demotion mechanism of Section 5.6 applied
-  // to the producer's value, not with a single ad-hoc reaching-condition branch.
+  // suppression branch below cannot match. This is resolved with the demotion
+  // mechanism applied to the producer's value.
   //
-  // We still use the original loop-depth test to decide whether the producer is
-  // in a loop deeper than the dominator. If it is, two cases arise depending on
-  // whether the producer block appears as a node of the decision graph built for
-  // this dominator->consumer delivery (origToFullDG):
+  // We decide whether the producer is in a loop deeper than the dominator. If it
+  // is, two cases arise depending on whether the producer block appears as a node
+  // of the decision graph built for this dominator->consumer delivery:
   //
   //  (A) Producer IS a decision-graph node. The producer value is demoted level
-  //      by level using that node's loop nesting, and the demoted value then
+  //      by level using that node's demotion logic, and the demoted value then
   //      enters the normal suppression branch below.
   //
-  //  (B) Producer is NOT a decision-graph node. It lies between two nodes, on a
-  //      deeper simple loop that is post-dominated by some decision-graph node.
+  //  (B) Producer is NOT a decision-graph node. It may lie on
+  //      deeper simple loops that are post-dominated by some decision-graph node.
   //      We first run a simple producer->postdominator suppression (which never
-  //      involves a gamma tree or a cyclic decision graph — either a simple loop
+  //      involves a gamma tree or a cyclic decision graph — either simple loops
   //      or a straight pass-through whose condition is constant true) to filter
-  //      that simple loop, reusing the ordinary suppression flow. The filtered
-  //      value is then demoted using that postdominator node's nesting.
+  //      the simple loops, reusing the ordinary suppression flow. The filtered
+  //      value is then demoted using that postdominator node's demotion logic.
   if (producerBlock && dominatorBlock) {
     DominanceInfo lfDom;
     mlir::CFGLoopInfo lfLoopInfo(lfDom.getDomTree(&shadowRegion));
