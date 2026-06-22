@@ -1939,9 +1939,10 @@ collectSuppressionConditionBlocks(Block *producerBlock, Block *consumerBlock,
 /// the control flow down to the consumer, derive the condition under which the
 /// token must be discarded, emit the mux-tree circuit for that condition, and
 /// branch the producer token on it so the unused token is dropped.
-void ftd::insertDirectSuppression(
-    mlir::OpBuilder &builder, handshake::FuncOp &funcOp, Operation *consumer,
-    Value connection, ftd::ShadowCFG &shadow) {
+void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
+                                  handshake::FuncOp &funcOp,
+                                  Operation *consumer, Value connection,
+                                  ftd::ShadowCFG &shadow) {
   Region &shadowRegion = shadow.getRegion();
   ftd::BlockIndexing bi(shadowRegion);
 
@@ -1953,14 +1954,13 @@ void ftd::insertDirectSuppression(
   unsigned consBBIdx = 0;
   if (auto attr = consumer->getAttrOfType<IntegerAttr>("handshake.bb"))
     consBBIdx = attr.getUInt();
-  IntegerAttr prodBBAttr =
-      ftd::getBBIndexAttr(builder.getContext(), prodBBIdx);
+  IntegerAttr prodBBAttr = ftd::getBBIndexAttr(builder.getContext(), prodBBIdx);
   // Suppression ops are tagged to the producer's block by default; if the
   // consumer is an enclosing loop header, place them at the loop exit instead.
   IntegerAttr targetBBAttr = prodBBAttr;
-  Block *producerIRBlock =
-      connection.getDefiningOp() ? connection.getDefiningOp()->getBlock()
-                                 : consumer->getBlock();
+  Block *producerIRBlock = connection.getDefiningOp()
+                               ? connection.getDefiningOp()->getBlock()
+                               : consumer->getBlock();
 
   Block *entryBlock = shadow.getBlock(0);
   Block *producerBlock = shadow.getBlock(prodBBIdx);
@@ -1978,7 +1978,6 @@ void ftd::insertDirectSuppression(
                         consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
                         (producerBlock != consumerBlock ||
                          connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_MU));
-
 
   // If producer is unreachable, the suppression is not needed.
   if (!isReachable(entryBlock, producerBlock)) {
@@ -2022,10 +2021,10 @@ void ftd::insertDirectSuppression(
       return false;
     };
     while (true) {
-      // The value reaches this mux either as its select (operand 0) or as a data
-      // input (operand 1/2). If it is a data input, this mux's condition must be
-      // taken into account; if it is the select, there is nothing to take into
-      // account and we move on to the next mux.
+      // The value reaches this mux either as its select (operand 0) or as a
+      // data input (operand 1/2). If it is a data input, this mux's condition
+      // must be taken into account; if it is the select, there is nothing to
+      // take into account and we move on to the next mux.
       if (currentMuxOp->getOperand(0) != currentConnection) {
         // Connection is a data input — check this Mux's condition block
         Value condition = currentMuxOp->getOperand(0);
@@ -2033,10 +2032,10 @@ void ftd::insertDirectSuppression(
 
         // condBlock is a candidate only if the producer is reachable
         // from both of its successors (following forward edges only).
-        bool bothReach = condBlock &&
-                         condBlock->getNumSuccessors() >= 2 &&
-                         isReachableAcyclic(condBlock->getSuccessor(0), producerBlock) &&
-                         isReachableAcyclic(condBlock->getSuccessor(1), producerBlock);
+        bool bothReach =
+            condBlock && condBlock->getNumSuccessors() >= 2 &&
+            isReachableAcyclic(condBlock->getSuccessor(0), producerBlock) &&
+            isReachableAcyclic(condBlock->getSuccessor(1), producerBlock);
 
         // Of the qualifying condition blocks, keep the one earliest in block
         // order: it dominates the others and reaches the producer on both of
@@ -2055,8 +2054,10 @@ void ftd::insertDirectSuppression(
             user->hasAttr(FTD_EXPLICIT_GAMMA) &&
             getBB(user) == getBB(currentMuxOp)) {
           unsigned cnt = 0;
-          if (user->getOperand(1) == currentResult) cnt++;
-          if (user->getOperand(2) == currentResult) cnt++;
+          if (user->getOperand(1) == currentResult)
+            cnt++;
+          if (user->getOperand(2) == currentResult)
+            cnt++;
           if (cnt != 2) {
             nextMuxOp = user;
             break;
@@ -2090,24 +2091,25 @@ void ftd::insertDirectSuppression(
     }
   }
 
-  // buildLocalCFGRegion builds a throwaway region used only for analysis; give it
-  // its own builder so those temporary operations stay separate from the IR we
-  // are actually editing (they are erased manually later).
+  // buildLocalCFGRegion builds a throwaway region used only for analysis; give
+  // it its own builder so those temporary operations stay separate from the IR
+  // we are actually editing (they are erased manually later).
   OpBuilder tmpBuilder(funcOp.getContext());
-  // The local CFG only captures the part between the dominator block (functions as 
-  // a producer block) and the consumer block.
+  // The local CFG only captures the part between the dominator block (functions
+  // as a producer block) and the consumer block.
   auto locGraph =
       buildLocalCFGRegion(tmpBuilder, dominatorBlock, consumerBlock, bi);
 
   ControlDependenceAnalysis locCDA(*locGraph->region);
-  // The condition blocks the consumer's reachability depends on, from the dominator
-  // block; the suppression condition is built over exactly these. Comprised of the
-  // consumer's own control dependences, and (for a gamma) extended below with the
-  // condition blocks driving the gamma's selects and their dependences.
+  // The condition blocks the consumer's reachability depends on, from the
+  // dominator block; the suppression condition is built over exactly these.
+  // Comprised of the consumer's own control dependences, and (for a gamma)
+  // extended below with the condition blocks driving the gamma's selects and
+  // their dependences.
   DenseSet<Block *> locConsControlDepsFull =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
-  // The condition blocks driving the gamma's selects along the consumer input's path —
-  // the conditions under which the consumer input is the one selected.
+  // The condition blocks driving the gamma's selects along the consumer input's
+  // path — the conditions under which the consumer input is the one selected.
   DenseSet<Block *> muxConditionSet;
 
   // For each such condition block, the value its condition must take for the
@@ -2115,11 +2117,12 @@ void ftd::insertDirectSuppression(
   // the token is kept only on paths that actually route to the producer.
   DenseMap<Block *, bool> muxConstraints;
 
-  // Walk the gamma tree again, now that the dominator block and local CFG are known,
-  // recording for every mux the producer flows through the condition driving that
-  // mux and the value it must take to select the input to be consumed. This fills
-  // muxConditionSet and muxConstraints and extends locConsControlDepsFull,
-  // capturing that the producer is consumed only under this combination of selects.
+  // Walk the gamma tree again, now that the dominator block and local CFG are
+  // known, recording for every mux the producer flows through the condition
+  // driving that mux and the value it must take to select the input to be
+  // consumed. This fills muxConditionSet and muxConstraints and extends
+  // locConsControlDepsFull, capturing that the producer is consumed only under
+  // this combination of selects.
   if (deliverToGamma) {
     Operation *currentMuxOp = consumer;
     Value currentConnection = connection;
@@ -2163,7 +2166,8 @@ void ftd::insertDirectSuppression(
 
         // 2. Identify the Original Block defining this condition variable
         // (Using the provided helper function)
-        Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, shadow);
+        Block *muxConditionBlock =
+            returnMuxConditionBlock(muxCondition, shadow);
         muxConditionSet.insert(muxConditionBlock);
 
         // 3. Find the corresponding Block in the Local CFG
@@ -2230,12 +2234,13 @@ void ftd::insertDirectSuppression(
     }
   }
 
-  // Early exit: no condition affects this delivery, so there is nothing to build a
-  // suppression from. Either the consumer is never reached on a kept path (discard
-  // the token unconditionally, below) or it is always reached (nothing to do).
+  // Early exit: no condition affects this delivery, so there is nothing to
+  // build a suppression from. Either the consumer is never reached on a kept
+  // path (discard the token unconditionally, below) or it is always reached
+  // (nothing to do).
   if (locConsControlDepsFull.empty()) {
-    // The consumer is never reached on any kept path: discard the token on every
-    // execution by holding the suppress branch's select permanently true.
+    // The consumer is never reached on any kept path: discard the token on
+    // every execution by holding the suppress branch's select permanently true.
     if (locGraph->newCons == locGraph->sinkBB) {
       builder.setInsertionPointToStart(consumer->getBlock());
       auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
@@ -2267,15 +2272,16 @@ void ftd::insertDirectSuppression(
   }
 
   // From here we build the actual suppression: keep the producer's token only
-  // when the consumer would really use it, and discard it otherwise. (For a gamma
-  // consumer the full set of conditions routes the select signals, while
-  // muxConstraints narrows the kept-token condition down to this specific input;
-  // for a non-gamma consumer muxConstraints is empty and the two coincide.)
+  // when the consumer would really use it, and discard it otherwise. (For a
+  // gamma consumer the full set of conditions routes the select signals, while
+  // muxConstraints narrows the kept-token condition down to this specific
+  // input; for a non-gamma consumer muxConstraints is empty and the two
+  // coincide.)
   //
   // registry caches the condition signals we materialize, so each is built once
   // and reused. The decision graph (built just below) is a view of when
-  // the consumer is reached, derived from the local CFG and the condition blocks
-  // it depends on.
+  // the consumer is reached, derived from the local CFG and the condition
+  // blocks it depends on.
   SignalRegistry registry;
   builder.setInsertionPointToStart(consumer->getBlock());
   auto fullDecisionGraph =
@@ -2292,16 +2298,16 @@ void ftd::insertDirectSuppression(
       origToFullDG[origBlock] = dgBlock;
 
   // Create the cyclic demotion helper
-  CyclicDemotionHelper demotionHelper(builder, funcOp.getContext(), bi, cyclicMgr,
-                                       origToFullDG, consumer->getLoc(),
-                                       consumer->getBlock(), nullptr, &shadow);
+  CyclicDemotionHelper demotionHelper(
+      builder, funcOp.getContext(), bi, cyclicMgr, origToFullDG,
+      consumer->getLoc(), consumer->getBlock(), nullptr, &shadow);
 
   // Level 0: Extract acyclic layered CFG from the full decision graph.
   // This cuts all back-edges, giving a DAG where CDA produces correct
   // forward dependencies.
   OpBuilder level0Builder(funcOp.getContext());
-  auto level0CFG = cyclicMgr.extractLayeredCFG(
-      cyclicMgr.getTopLevelScope(), level0Builder);
+  auto level0CFG =
+      cyclicMgr.extractLayeredCFG(cyclicMgr.getTopLevelScope(), level0Builder);
 
   // CDA on the acyclic level 0 CFG — allControlDeps == forwardControlDeps
   // because the graph is a DAG.
@@ -2315,8 +2321,7 @@ void ftd::insertDirectSuppression(
     for (auto &[l0Block, l0Orig] : level0CFG->origMap) {
       if (l0Orig == muxCondOrigIR) {
         level0Deps.insert(l0Block);
-        for (Block *dep :
-             level0CDA.getAllBlockDeps()[l0Block].allControlDeps)
+        for (Block *dep : level0CDA.getAllBlockDeps()[l0Block].allControlDeps)
           level0Deps.insert(dep);
         break;
       }
@@ -2349,11 +2354,12 @@ void ftd::insertDirectSuppression(
   demotionHelper.preRegisterDemotedValues(level0FullDG, registry);
 
   // Build distribution on level 0
-  buildDistributionNetwork(builder, *level0FullDG, bi, registry, nullptr, &shadow);
+  buildDistributionNetwork(builder, *level0FullDG, bi, registry, nullptr,
+                           &shadow);
 
   // The same level-0 graph, now pruned by muxConstraints so it keeps only the
-  // paths that actually select the input to be consumed. The suppression condition
-  // is read from this constrained graph.
+  // paths that actually select the input to be consumed. The suppression
+  // condition is read from this constrained graph.
   auto level0ConstrainedDG =
       buildDecisionGraph(*level0CFG, level0Deps, level0MuxConstraints);
 
@@ -2376,15 +2382,18 @@ void ftd::insertDirectSuppression(
   // token is never discarded.
   //
   // The result is always reduced to loop-nesting level 0:
-  //  - The start->target decision graph may contain loops, so its back edges are
-  //    cut (extractLayeredCFG on the top scope) to get an acyclic level-0 graph.
+  //  - The start->target decision graph may contain loops, so its back edges
+  //  are
+  //    cut (extractLayeredCFG on the top scope) to get an acyclic level-0
+  //    graph.
   //  - Every condition signal it consumes is taken at level 0: the demoted
-  //    level-0 wires are pulled through the shared demotionHelper, so a condition
-  //    already demoted elsewhere is reused (the cache returns the same wire,
-  //    forked here) and no deeper-level token leaks in.
+  //    level-0 wires are pulled through the shared demotionHelper, so a
+  //    condition already demoted elsewhere is reused (the cache returns the
+  //    same wire, forked here) and no deeper-level token leaks in.
   //  - Distribution is rebuilt into a separate registry and cannot be
   //    shared; only the demoted condition wire is shared.
-  auto buildLevel0SuppressionSelect = [&](Block *start, Block *target) -> Value {
+  auto buildLevel0SuppressionSelect = [&](Block *start,
+                                          Block *target) -> Value {
     if (!start || !target || start == target)
       return Value();
 
@@ -2403,7 +2412,8 @@ void ftd::insertDirectSuppression(
 
     CyclicGraphManager cyc(*fullDG);
     OpBuilder l0Builder(funcOp.getContext());
-    auto level0CFGlocal = cyc.extractLayeredCFG(cyc.getTopLevelScope(), l0Builder);
+    auto level0CFGlocal =
+        cyc.extractLayeredCFG(cyc.getTopLevelScope(), l0Builder);
 
     ControlDependenceAnalysis l0CDA(*level0CFGlocal->region);
     DenseSet<Block *> l0Deps =
@@ -2414,9 +2424,9 @@ void ftd::insertDirectSuppression(
     DenseSet<Block *> dgDeps =
         dgCDA.getAllBlockDeps()[level0DG->newCons].allControlDeps;
 
-    // Private registry: reuse the already-demoted level-0 condition wires (shared
-    // via the demotion cache in demotionHelper), then build this delivery's own
-    // distribution branches into it.
+    // Private registry: reuse the already-demoted level-0 condition wires
+    // (shared via the demotion cache in demotionHelper), then build this
+    // delivery's own distribution branches into it.
     SignalRegistry localRegistry;
     demotionHelper.preRegisterDemotedValues(level0DG, localRegistry);
     buildDistributionNetwork(builder, *level0DG, bi, localRegistry, nullptr,
@@ -2444,11 +2454,11 @@ void ftd::insertDirectSuppression(
   // The producer-reaching filter. The dominator can sit above the producer, so
   // the producer does not fire on every path that reaches the dominator; this
   // computes the condition for exactly those dominator iterations on which the
-  // producer never fires, so the main condition can be trimmed by it. It is built
-  // at level 0 and reuses the already-demoted condition wires, so it injects no
-  // deeper-level tokens into the cascade below. Null when the dominator is the
-  // producer, or the producer is always reached (the filter is then optimized
-  // away).
+  // producer never fires, so the main condition can be trimmed by it. It is
+  // built at level 0 and reuses the already-demoted condition wires, so it
+  // injects no deeper-level tokens into the cascade below. Null when the
+  // dominator is the producer, or the producer is always reached (the filter is
+  // then optimized away).
   Value dpBranchCond;
   if (dominatorBlock != producerBlock)
     dpBranchCond = buildLevel0SuppressionSelect(dominatorBlock, producerBlock);
@@ -2466,21 +2476,22 @@ void ftd::insertDirectSuppression(
   // suppression branch below cannot match. This is resolved with the demotion
   // mechanism applied to the producer's value.
   //
-  // We decide whether the producer is in a loop deeper than the dominator. If it
-  // is, two cases arise depending on whether the producer block appears as a node
-  // of the decision graph built for this dominator->consumer delivery:
+  // We decide whether the producer is in a loop deeper than the dominator. If
+  // it is, two cases arise depending on whether the producer block appears as a
+  // node of the decision graph built for this dominator->consumer delivery:
   //
   //  (A) Producer IS a decision-graph node. The producer value is demoted level
   //      by level using that node's demotion logic, and the demoted value then
   //      enters the normal suppression branch below.
   //
   //  (B) Producer is NOT a decision-graph node. It may lie on
-  //      deeper simple loops that are post-dominated by some decision-graph node.
-  //      We first run a simple producer->postdominator suppression (which never
-  //      involves a gamma tree or a cyclic decision graph — either simple loops
-  //      or a straight pass-through whose condition is constant true) to filter
-  //      the simple loops, reusing the ordinary suppression flow. The filtered
-  //      value is then demoted using that postdominator node's demotion logic.
+  //      deeper simple loops that are post-dominated by some decision-graph
+  //      node. We first run a simple producer->postdominator suppression (which
+  //      never involves a gamma tree or a cyclic decision graph — either simple
+  //      loops or a straight pass-through whose condition is constant true) to
+  //      filter the simple loops, reusing the ordinary suppression flow. The
+  //      filtered value is then demoted using that postdominator node's
+  //      demotion logic.
   if (producerBlock && dominatorBlock) {
     DominanceInfo lfDom;
     mlir::CFGLoopInfo lfLoopInfo(lfDom.getDomTree(&shadowRegion));
@@ -2518,13 +2529,14 @@ void ftd::insertDirectSuppression(
         }
 
         if (pdNode && pdNode != producerBlock) {
-          // Simple suppression from the producer to the postdominator node. This
-          // never involves a gamma tree or a cyclic decision graph, so the plain
-          // enumeratePaths -> expressionToCircuit flow is sufficient. When the
-          // producer reaches the node unconditionally, lfSup is constant zero and
-          // the filter is optimized away.
+          // Simple suppression from the producer to the postdominator node.
+          // This never involves a gamma tree or a cyclic decision graph, so the
+          // plain enumeratePaths -> expressionToCircuit flow is sufficient.
+          // When the producer reaches the node unconditionally, lfSup is
+          // constant zero and the filter is optimized away.
           OpBuilder lfBuilder(funcOp.getContext());
-          auto lfLoc = buildLocalCFGRegion(lfBuilder, producerBlock, pdNode, bi);
+          auto lfLoc =
+              buildLocalCFGRegion(lfBuilder, producerBlock, pdNode, bi);
           if (lfLoc->newCons) {
             ControlDependenceAnalysis lfLocCDA(*lfLoc->region);
             DenseSet<Block *> lfDepsTmp =
@@ -2543,9 +2555,9 @@ void ftd::insertDirectSuppression(
               DenseMap<Block *, unsigned> lfRank = computeTopoRank(*lfDG);
               // The filter operates on the producer's token, so its circuit
               // belongs to the producer's basic block.
-              Value lfCond =
-                  expressionToCircuit(builder, lfSup, lfRank, producerIRBlock,
-                                      registry, bi, nullptr, &shadow, prodBBAttr);
+              Value lfCond = expressionToCircuit(builder, lfSup, lfRank,
+                                                 producerIRBlock, registry, bi,
+                                                 nullptr, &shadow, prodBBAttr);
               auto lfBranch = builder.create<handshake::ConditionalBranchOp>(
                   consumer->getLoc(), ftd::getListTypes(supData.getType()),
                   lfCond, supData);
@@ -2579,8 +2591,8 @@ void ftd::insertDirectSuppression(
     }
   }
 
-  // The decision graph (and the cyclic machinery built on top of it) had to stay
-  // alive for the demotion cascade above; erase it now.
+  // The decision graph (and the cyclic machinery built on top of it) had to
+  // stay alive for the demotion cascade above; erase it now.
   fullDecisionGraph->containerOp->erase();
 
   // If the activation function is not zero, then a suppress block is to be
@@ -2589,8 +2601,8 @@ void ftd::insertDirectSuppression(
     IntegerAttr connectionBBAttr = targetBBAttr;
     DenseMap<Block *, unsigned> rank = computeTopoRank(*locGraph);
     Value branchCond =
-        expressionToCircuit(builder, fSup, rank, producerIRBlock,
-                            registry, bi, nullptr, &shadow, connectionBBAttr);
+        expressionToCircuit(builder, fSup, rank, producerIRBlock, registry, bi,
+                            nullptr, &shadow, connectionBBAttr);
 
     // Cascaded Upstream Filter
     if (dpBranchCond) {
