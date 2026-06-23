@@ -2521,9 +2521,12 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
         auto &pdt = lfPostDom.getDomTree(&shadowRegion);
         Block *pdNode = nullptr;
         if (auto *node = pdt.getNode(producerBlock)) {
+          // Climb the post-dominator tree to the nearest block that is a
+          // decision-graph node.
           for (node = node->getIDom(); node && node->getBlock();
                node = node->getIDom()) {
             if (origToFullDG.count(node->getBlock())) {
+              // accept only decision-graph nodes
               pdNode = node->getBlock();
               break;
             }
@@ -2555,8 +2558,7 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
 
             if (lfSup->type != experimental::boolean::ExpressionType::Zero) {
               DenseMap<Block *, unsigned> lfRank = computeTopoRank(*lfDG);
-              // The filter operates on the producer's token, so its circuit
-              // belongs to the producer's basic block.
+              // The filter circuit belongs to the producer's basic block.
               Value lfCond = expressionToCircuit(builder, lfSup, lfRank,
                                                  producerIRBlock, registry, bi,
                                                  nullptr, &shadow, prodBBAttr);
@@ -2565,8 +2567,7 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
                   lfCond, supData);
               lfBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
               lfBranch->setAttr("handshake.bb", prodBBAttr);
-              // Pass the token through only when the node is reached (the
-              // suppression select is false on the final iteration).
+              // Pass the token through only when the node is reached.
               supData = lfBranch.getFalseResult();
             }
             lfDG->containerOp->erase();
@@ -2597,8 +2598,11 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
   // stay alive for the demotion cascade above; erase it now.
   fullDecisionGraph->containerOp->erase();
 
-  // If the activation function is not zero, then a suppress block is to be
-  // inserted
+  // fSup is the condition under which the consumer does not use the token. When
+  // it can be non-zero, build its circuit (branchCond) and branch the producer
+  // token on it, dropping the token on exactly the executions where the
+  // consumer would not use it. (When fSup is constant zero the consumer always
+  // uses the token, so no suppress branch is emitted.)
   if (fSup->type != experimental::boolean::ExpressionType::Zero) {
     IntegerAttr connectionBBAttr = targetBBAttr;
     DenseMap<Block *, unsigned> rank = computeTopoRank(*locGraph);
@@ -2606,12 +2610,13 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
         expressionToCircuit(builder, fSup, rank, producerIRBlock, registry, bi,
                             nullptr, &shadow, connectionBBAttr);
 
-    // Cascaded Upstream Filter
+    // The dominator may sit above the producer, so branchCond (fSup) carries
+    // one token per dominator activation, while the producer fires only on some
+    // of them. dpBranchCond (fDP) is true exactly on the activations where the
+    // producer is not reached; branching branchCond on it and keeping the false
+    // result drops those activations, leaving branchCond paired one-to-one with
+    // the producer tokens before it drives the suppress branch below.
     if (dpBranchCond) {
-      // Upstream logic filters the SUPPRESSION SIGNAL.
-      // Create an Intermediate Branch on the 'branchCond' wire.
-      // Data Input: branchCond (The Downstream suppression signal)
-      // Condition: dpBranchCond (from the level-0 dominator->producer circuit)
       auto dpBranchOp = builder.create<handshake::ConditionalBranchOp>(
           consumer->getLoc(), ftd::getListTypes(branchCond.getType()),
           dpBranchCond, branchCond);
@@ -2620,6 +2625,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
       branchCond = dpBranchOp.getFalseResult();
     }
 
+    // Suppress branch: discard the producer token whenever branchCond holds;
+    // the consumer keeps it only via the false result.
     auto branchOp = builder.create<handshake::ConditionalBranchOp>(
         consumer->getLoc(), ftd::getListTypes(supData.getType()), branchCond,
         supData);
