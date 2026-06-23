@@ -10,6 +10,8 @@ namespace dynamatic::gen {
 /// the type system as needed.
 /// To enable the type system the 'enableTypeSystemFor' function should be
 /// used.
+/// Otherwise, if the context is an empty optional, and the type system
+/// therefore disabled, it acts identical to a 'NoopTypeSystem'.
 /// It allows enabling the type system for specific sub-elements of an
 /// 'ASTNode' by setting their input contexts to a given entryContext.
 ///
@@ -17,8 +19,6 @@ namespace dynamatic::gen {
 /// 'ConjunctionTypeSystem' or similar, where another type systems logic can
 /// enable sub-trees.
 ///
-/// Otherwise, if the context is an empty optional, and the type system
-/// therefore disabled, it acts identical to a 'NoopTypeSystem'.
 template <typename SubTypeSystem>
 class OptionalTypeSystem final
     : public TypeSystem<std::optional<typename SubTypeSystem::Context>,
@@ -33,17 +33,17 @@ public:
 
   /// Enables the sub type system for specific 'subElementsToEnable' of
   /// 'ASTNode'.
-  /// The input context given to these sub-elements is 'entryContext'.
-  /// It is the users responsibility to make sure that the given 'entryContext'
+  /// The input context given to these sub-elements is 'context'.
+  /// It is the users responsibility to make sure that the given 'context'
   /// makes sense for the sub type system.
   template <typename ASTNode, std::size_t... subElementsToEnable>
   static TransferFnArray<ASTNode>
   enableTypeSystemFor(TransferFnArray<ASTNode> transferFnArray,
-                      const SubContext &entryContext) {
+                      const SubContext &context) {
     // For the given sub-elements that should be enabled, overwrite their
-    // transfer functions such that they now return the given 'entryContext'.
+    // transfer functions such that they now return the given 'context'.
     ((std::get<subElementsToEnable>(transferFnArray) =
-          typename Base::template TransferFn<ASTNode>(entryContext)),
+          typename Base::template TransferFn<ASTNode>(context)),
      ...);
     return transferFnArray;
   }
@@ -278,6 +278,8 @@ private:
         [](auto &&element) {
           // If enabled, unwraps the 'std::optional<typename
           // SubTypeSystem::Context>' and returns the contained
+          // 'SubTypeSystem::Context'.
+          // This is needed since the sub type system only accepts instances of
           // 'SubTypeSystem::Context'.
           auto unwrapFn =
               [originalTransferFn = std::forward<decltype(element)>(element)](
