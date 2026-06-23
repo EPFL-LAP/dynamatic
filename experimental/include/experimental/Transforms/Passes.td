@@ -115,7 +115,7 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
-def PipelineDuplication : Pass<"pipeline-duplication", "mlir::ModuleOp"> {
+def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir::ModuleOp"> {
   let summary = "Value prediction from a compile-time-fixed finite list.";
   let description = [{
     The pass duplicates a sequence of operations, replacing a variable operand with a 

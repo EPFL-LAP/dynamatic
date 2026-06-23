@@ -22,7 +22,7 @@
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
 // - Dynamatic is built in debug mode
 // - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
-#define DEBUG_TYPE "pipeline-duplication"
+#define DEBUG_TYPE "predicted-constant-duplication"
 
 using namespace llvm;
 using namespace dynamatic;
@@ -31,18 +31,18 @@ using namespace dynamatic;
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 namespace experimental {
-#define GEN_PASS_DEF_PIPELINEDUPLICATION
+#define GEN_PASS_DEF_PREDICTEDCONSTANTDUPLICATION
 #include "experimental/Transforms/Passes.h.inc"
 } // namespace experimental
 } // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
 namespace {
 
-struct PipelineDuplicationPass
-    : public dynamatic::experimental::impl::PipelineDuplicationBase<
-          PipelineDuplicationPass> {
+struct PredictedConstantDuplicationPass
+    : public dynamatic::experimental::impl::PredictedConstantDuplicationBase<
+          PredictedConstantDuplicationPass> {
 
-  using PipelineDuplicationBase::PipelineDuplicationBase;
+  using PredictedConstantDuplicationBase::PredictedConstantDuplicationBase;
 
   void runOnOperation() override;
 
@@ -96,7 +96,7 @@ private:
 /// duplication stops.
 FailureOr<
     std::pair<llvm::DenseSet<mlir::Block *>, llvm::DenseSet<mlir::Block *>>>
-PipelineDuplicationPass::validateDuplicationStructure(
+PredictedConstantDuplicationPass::validateDuplicationStructure(
     const llvm::DenseSet<mlir::Operation *> &visitedOps,
     const std::vector<mlir::Operation *> &endMarkerOps) {
 
@@ -136,7 +136,7 @@ PipelineDuplicationPass::validateDuplicationStructure(
 /// Helper function for `collectOpsDFS`
 /// This function backward-traverses and collects all dependencies coming from
 /// the same basic block, for a given operation.
-void PipelineDuplicationPass::collectDependenciesUpstream(
+void PredictedConstantDuplicationPass::collectDependenciesUpstream(
     mlir::Operation *op, mlir::Block *targetBlock,
     llvm::DenseSet<mlir::Operation *> &visitedOps) {
 
@@ -165,7 +165,7 @@ void PipelineDuplicationPass::collectDependenciesUpstream(
 /// makes sure to also get the branch operation.
 /// This function returns failure if it encounters a dead-end branch before
 /// reaching an end operation, indicating an ill-defined duplication graph.
-LogicalResult PipelineDuplicationPass::collectOpsDFS(
+LogicalResult PredictedConstantDuplicationPass::collectOpsDFS(
     mlir::Value currentVal, const std::vector<mlir::Operation *> &endMarkerOps,
     mlir::Block *currentBlock, llvm::DenseSet<mlir::Operation *> &visitedOps) {
 
@@ -314,7 +314,7 @@ LogicalResult PipelineDuplicationPass::collectOpsDFS(
 
 /// Helper function for `readPredictMarker`
 /// Parse the string containing the predicted values into an ArrayAttr.
-FailureOr<mlir::ArrayAttr> PipelineDuplicationPass::parseValuesList(
+FailureOr<mlir::ArrayAttr> PredictedConstantDuplicationPass::parseValuesList(
     mlir::ModuleOp modOp, llvm::StringRef valuesStr, std::string &dataType) {
 
   // strip potential leading and trailing whitespace
@@ -372,7 +372,7 @@ FailureOr<mlir::ArrayAttr> PipelineDuplicationPass::parseValuesList(
 /// IR to populate `pragmaData`. It extracts the necessary data from each
 /// marker's attributes and identifies the exact start and end operations
 /// for each marker before erasing the physical markers from the function.
-LogicalResult PipelineDuplicationPass::readPredictMarker(
+LogicalResult PredictedConstantDuplicationPass::readPredictMarker(
     mlir::ModuleOp modOp, std::vector<PredictionData> &pragmaData) {
 
   // maps marker IDs to their corresponding data
@@ -523,7 +523,7 @@ LogicalResult PipelineDuplicationPass::readPredictMarker(
   return success();
 }
 
-void PipelineDuplicationPass::runOnOperation() {
+void PredictedConstantDuplicationPass::runOnOperation() {
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);

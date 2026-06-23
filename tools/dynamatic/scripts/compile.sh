@@ -246,7 +246,7 @@ if [[ "$ENABLE_DUPLICATION" == "1" ]]; then
 $DYNAMATIC_OPT_BIN \
   --allow-unregistered-dialect \
   "$F_CF_TRANSFORMED" \
-  --pipeline-duplication \
+  --predicted-constant-duplication \
   --canonicalize \
   > "$F_CF_DUPLICATED"
 exit_on_fail "Failed to apply CF duplication" \

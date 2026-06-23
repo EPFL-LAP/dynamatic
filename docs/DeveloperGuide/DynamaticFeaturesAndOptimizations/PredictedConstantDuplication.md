@@ -1,7 +1,7 @@
-# Pipeline Duplication
+# Predicted Constant Duplication
 
 ## Overview
-The Pipeline Duplication Pass duplicates specific program paths with hardcoded constants. By using pragmas, you can specify a variable that frequently holds a specific value (e.g., `y = 10`). The pass then generates an additional parallel path in the pipeline where that variable is treated as a constant.
+The Predicted Constant Duplication Pass duplicates specific program paths with hardcoded constants. By using pragmas, you can specify a variable that frequently holds a specific value (e.g., `y = 10`). The pass then generates an additional parallel path in the graph where that variable is treated as a constant.
 
 This duplication alone does not alter control or program correctness, but rather converts data dependencies to control flow dependencies. For a performance boost it should be combined with eager execution (eagerlyelastic). This allows the new duplicated path to run in parallel with the original logic, hiding latency by starting downstream calculation before the actual value of the variable is computed.
 
@@ -32,7 +32,7 @@ For the duplication to succeed, the graph (the operations that will be duplicate
 
 If the pass encounters a branch that escapes the duplicated region without reaching one of these two operations, the transformation will fail and the compiler will exit with an error.
 
-This strict boundary is necessary because the compiler operates on an SSA (Static Single Assignment) graph. If an operation branches off from the middle of the duplicated region to an external destination, it creates an ambiguity: the external graph cannot determine which of the two duplicated pipelines it should connect to. Because SSA rules prohibit an operation from having multiple definitions, connecting to both pipelines simultaneously is impossible without breaking the dataflow validity of the program. Enforcing a well-defined boundary ensures all duplicated paths are safely encapsulated or properly merged.
+This strict boundary is necessary because the compiler operates on an SSA (Static Single Assignment) graph. If an operation branches off from the middle of the duplicated region to an external destination, it creates an ambiguity: the external graph cannot determine which of the two duplicated paths it should connect to. Because SSA rules prohibit an operation from having multiple definitions, connecting to both paths simultaneously is impossible without breaking the dataflow validity of the program. Enforcing a well-defined boundary ensures all duplicated paths are safely encapsulated or properly merged.
 
 ### Duplicating Multiple Regions
 You can duplicate multiple independent, non-connected regions within the same file by leveraging unique `marker` IDs. Every start and end pragma belonging to a specific region must share the exact same marker ID to isolate them from other transformations. These regions must remain entirely distinct meaning that having overlapping or interleaving pragmas from different regions is strictly prohibited and will cause the pass to fail.
@@ -54,11 +54,11 @@ void prediction(inout_float_t a[N], inout_float_t b[N], in_float_t c) {
 }
 ```
 
-![Def](Figures/PipelineDuplication/example_before_duplication.png)
+![Def](Figures/PredictedConstantDuplication/example_before_duplication.png)
 
 The pass adds checks to see if the variable matches any of the predicted values. If it does, the program branches into a duplicated version of the code that has been optimized for those values, as seen in the following diagram.
 
-![Def](Figures/PipelineDuplication/example_after_duplication.png)
+![Def](Figures/PredictedConstantDuplication/example_after_duplication.png)
 
 
 ## Pass Implementation
@@ -69,7 +69,7 @@ The transformation starts by reading the prediction markers inserted by pragmas 
 The pass stores all configuration details extracted from a group of prediction markers inside a single struct.
 
 ```c++
-struct PipelineDuplicationPass::PredictionData {
+struct PredictedConstantDuplicationPass::PredictionData {
   mlir::Operation *startOp; // Duplication begins here (including this operation)
   mlir::Value predInput;    // Value that will be replaced on duplicated paths
   std::vector<mlir::Operation *> endMarkerOps;  // all end operations
@@ -110,7 +110,8 @@ After the pass creates a duplicated path for each value specified in the pragma'
 
 Finally, the pass updates all downstream users of the outputs of the duplicated region across the entire function scope to read from the newly introduced block arguments instead of the original operation results.
 
-![Def](Figures/PipelineDuplication/fallback_creation.png)
+![Def](Figures/PredictedConstantDuplication/fallback_creation.png)
+
 *On the left the original graph, and on the right the graph after duplication.*
 
 ### Helper Functions
