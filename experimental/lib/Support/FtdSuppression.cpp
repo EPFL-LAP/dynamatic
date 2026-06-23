@@ -21,19 +21,20 @@
 //   - keep only the deciding branches            (buildDecisionGraph)
 //   - analyze loops / produce an acyclic graph   (CyclicGraphManager)
 //   - enumerate paths into a Boolean condition   (enumeratePaths)
-//   - turn a condition into a mux-tree circuit   (bddToCircuit / expressionToCircuit)
+//   - turn a condition into a mux-tree circuit   (bddToCircuit /
+//   expressionToCircuit)
 //   - route condition tokens to the muxes        (buildDistributionNetwork)
 //   - move condition tokens across loop levels   (CyclicDemotionHelper)
 //   - drive the whole thing                      (insertDirectSuppression)
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Support/FtdSuppression.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/FtdSuppression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -47,17 +48,20 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::ftd;
 using namespace dynamatic::experimental::boolean;
 
-
 // ===--------------------------------------------------------------------=== //
 // CyclicGraphManager implementation
 // ===--------------------------------------------------------------------=== //
 
+/// Analyzes the loop structure of `cfg`: discovers the loop-nesting scopes and
+/// records each block's nesting level, so the graph can later be peeled level
+/// by level.
 CyclicGraphManager::CyclicGraphManager(LocalCFG &cfg)
     : lcfg(cfg), domInfo(cfg.containerOp),
       loopInfo(domInfo.getDomTree(cfg.region)) {
   analyzeTopology();
 }
 
+/// Returns the loop-nesting level recorded for `bb` (0 if it is not in a loop).
 unsigned CyclicGraphManager::getNestingLevel(Block *bb) const {
   auto it = blockLevelMap.find(bb);
   if (it != blockLevelMap.end())
@@ -65,6 +69,9 @@ unsigned CyclicGraphManager::getNestingLevel(Block *bb) const {
   return 0;
 }
 
+/// Builds the LoopScope for `loop` at nesting level `level`: records its
+/// blocks, latches, and back edges, then recurses into nested loops at the next
+/// level.
 std::unique_ptr<LoopScope>
 CyclicGraphManager::buildScopeRecursive(mlir::CFGLoop *loop, unsigned level) {
   auto scope = std::make_unique<LoopScope>();
@@ -100,6 +107,8 @@ CyclicGraphManager::buildScopeRecursive(mlir::CFGLoop *loop, unsigned level) {
   return scope;
 }
 
+/// Builds the scope tree: a level-0 top scope covering every block, plus one
+/// nested scope per loop, and assigns each block its loop-nesting level.
 void CyclicGraphManager::analyzeTopology() {
   blockLevelMap.clear();
   // Level 0 is the acyclic top-level scope; its header stands for the entry.
@@ -108,7 +117,8 @@ void CyclicGraphManager::analyzeTopology() {
   topLevelScope->header = lcfg.newProd;
   topLevelScope->loopInfo = nullptr;
 
-  // Start every block at level 0; loop members are raised while building scopes.
+  // Start every block at level 0; loop members are raised while building
+  // scopes.
   for (Block &b : lcfg.region->getBlocks()) {
     topLevelScope->allBlocksInclusive.insert(&b);
     blockLevelMap[&b] = 0;
@@ -126,6 +136,12 @@ void CyclicGraphManager::analyzeTopology() {
   }
 }
 
+/// Produces a fresh acyclic LocalCFG for a single loop level (`scope`). The
+/// scope's blocks are cloned with their back edges cut to the sink, leaving a
+/// DAG: at level 0 this is the whole graph with the real consumer as the exit;
+/// at a deeper level the loop header is the entry and the loop exit is the
+/// consumer. Lets the rest of the pipeline reason about one loop level at a
+/// time.
 std::unique_ptr<LocalCFG>
 CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
                                       OpBuilder &builder) {
@@ -269,8 +285,8 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
       if (keepSuccessor[0] && keepSuccessor[1]) {
         // Both paths survived; keep conditional branch.
         Value cond = builder.create<arith::ConstantIntOp>(loc, 1, 1);
-        builder.create<cf::CondBranchOp>(
-            loc, cond, validSuccessors[0], validSuccessors[1]);
+        builder.create<cf::CondBranchOp>(loc, cond, validSuccessors[0],
+                                         validSuccessors[1]);
       } else if (keepSuccessor[0] && !keepSuccessor[1]) {
         // Only the true path survived.
         builder.create<cf::BranchOp>(loc, validSuccessors[0]);
@@ -430,11 +446,14 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
 // SignalRegistry implementation
 // ===--------------------------------------------------------------------=== //
 
+/// Records `val` as the signal for `var` produced on control-flow path `path`.
 void SignalRegistry::registerSignal(StringRef var, const PathContext &path,
                                     Value val) {
   map[var.str()].push_back({path, val});
 }
 
+/// Returns the signal for `var` whose registered path is the longest prefix of
+/// `queryPath` (the closest definition on the current path), or null if none.
 Value SignalRegistry::lookup(StringRef var, const PathContext &queryPath) {
   std::string v = var.str();
   if (map.find(v) == map.end())
@@ -470,7 +489,6 @@ Value SignalRegistry::lookup(StringRef var, const PathContext &queryPath) {
   }
   return bestMatch;
 }
-
 
 // ===--------------------------------------------------------------------=== //
 // Static helpers (internal to this TU)
@@ -512,8 +530,9 @@ static Block *returnMuxConditionBlock(Value muxCondition,
 /// Returns the handshake.bb attribute of that first exit block, or an empty
 /// attribute when this situation does not apply.
 static IntegerAttr getFirstLoopExitBBAttrIfHeaderConsumer(
-    OpBuilder &builder, Region &region, Block *producerBlock, Block *consumerBlock,
-    const ftd::BlockIndexing &bi, ftd::ShadowCFG &shadow) {
+    OpBuilder &builder, Region &region, Block *producerBlock,
+    Block *consumerBlock, const ftd::BlockIndexing &bi,
+    ftd::ShadowCFG &shadow) {
   if (!producerBlock || !consumerBlock || producerBlock == consumerBlock)
     return {};
 
@@ -529,9 +548,8 @@ static IntegerAttr getFirstLoopExitBBAttrIfHeaderConsumer(
   if (exitBlocks.empty())
     return {};
 
-  llvm::sort(exitBlocks, [&](Block *lhs, Block *rhs) {
-    return bi.isLess(lhs, rhs);
-  });
+  llvm::sort(exitBlocks,
+             [&](Block *lhs, Block *rhs) { return bi.isLess(lhs, rhs); });
 
   unsigned exitBBIdx = shadow.getBlockIndex(exitBlocks.front());
   return ftd::getBBIndexAttr(builder.getContext(), exitBBIdx);
@@ -600,9 +618,12 @@ getHybridPathExpression(const std::vector<Block *> &localPath,
 // Path enumeration on LocalCFG
 // ===--------------------------------------------------------------------=== //
 
+/// Enumerates every producer-to-consumer path in `lcfg` and ORs their path
+/// conditions into one expression: the condition under which the consumer is
+/// reached.
 BoolExpression *ftd::enumeratePaths(const ftd::LocalCFG &lcfg,
-                                      const ftd::BlockIndexing &bi,
-                                      const DenseSet<Block *> &controlDeps) {
+                                    const ftd::BlockIndexing &bi,
+                                    const DenseSet<Block *> &controlDeps) {
 
   // 1. Path Finding using Iterative DFS (on Local CFG)
   std::vector<std::vector<Block *>> allPaths;
@@ -681,16 +702,16 @@ BoolExpression *ftd::enumeratePaths(const ftd::LocalCFG &lcfg,
   return sop->boolMinimizeSop();
 }
 
-
 // ===--------------------------------------------------------------------=== //
 // BDD → Circuit conversion
 // ===--------------------------------------------------------------------=== //
 
 /// Retrieves the initial value from BlockIndexing.
-static Value getOriginalValue(mlir::OpBuilder &builder, StringRef varName,
-                              const ftd::BlockIndexing &bi,
-                              DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                              ftd::ShadowCFG *shadow = nullptr) {
+static Value
+getOriginalValue(mlir::OpBuilder &builder, StringRef varName,
+                 const ftd::BlockIndexing &bi,
+                 DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+                 ftd::ShadowCFG *shadow = nullptr) {
   StringRef lookupName = varName;
   if (lookupName.startswith("~")) {
     llvm::errs() << "[FTD Error] Negated variable '" << varName << "'.\n";
@@ -779,12 +800,11 @@ static Value boolExpressionToCircuit(
 }
 
 /// Recursively converts a BDD to a Mux Tree.
-Value ftd::bddToCircuit(mlir::OpBuilder &builder, BDD *bdd, Block *block,
-                          SignalRegistry &registry, PathContext currentPath,
-                          const ftd::BlockIndexing &bi,
-                          DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                          ftd::ShadowCFG *shadow,
-                          IntegerAttr forcedBBAttr) {
+Value ftd::bddToCircuit(
+    mlir::OpBuilder &builder, BDD *bdd, Block *block, SignalRegistry &registry,
+    PathContext currentPath, const ftd::BlockIndexing &bi,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    ftd::ShadowCFG *shadow, IntegerAttr forcedBBAttr) {
   using namespace experimental::boolean;
 
   // 1. Leaf Node
@@ -799,7 +819,8 @@ Value ftd::bddToCircuit(mlir::OpBuilder &builder, BDD *bdd, Block *block,
 
   Value muxCond = registry.lookup(varName, currentPath);
   if (!muxCond) {
-    muxCond = getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
+    muxCond =
+        getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
     assert(muxCond && "Mux condition not found");
     if (!muxCond.getType().isa<handshake::ChannelType>())
       muxCond.setType(ftd::channelifyType(muxCond.getType()));
@@ -813,15 +834,13 @@ Value ftd::bddToCircuit(mlir::OpBuilder &builder, BDD *bdd, Block *block,
   falsePath.push_back({varName, false});
   muxOperands.push_back(bddToCircuit(builder, bdd->successors.value().first,
                                      block, registry, falsePath, bi,
-                                     pendingMuxOperands, shadow,
-                                     forcedBBAttr));
+                                     pendingMuxOperands, shadow, forcedBBAttr));
 
   PathContext truePath = currentPath;
   truePath.push_back({varName, true});
   muxOperands.push_back(bddToCircuit(builder, bdd->successors.value().second,
                                      block, registry, truePath, bi,
-                                     pendingMuxOperands, shadow,
-                                     forcedBBAttr));
+                                     pendingMuxOperands, shadow, forcedBBAttr));
 
   auto muxOp = builder.create<handshake::MuxOp>(
       muxCond.getLoc(), muxOperands[0].getType(), muxCond, muxOperands);
@@ -831,7 +850,6 @@ Value ftd::bddToCircuit(mlir::OpBuilder &builder, BDD *bdd, Block *block,
   return muxOp.getResult();
 }
 
-
 // ===--------------------------------------------------------------------=== //
 // Token distribution
 // ===--------------------------------------------------------------------=== //
@@ -839,14 +857,13 @@ Value ftd::bddToCircuit(mlir::OpBuilder &builder, BDD *bdd, Block *block,
 /// Generates the Suppression Logic (Mux Tree) for a branch's select signal.
 /// It constructs the logic for the "UNREACHABLE" condition.
 /// F_suppress = NOT( OR( All Valid Paths ) )
-static Value
-generateReachabilityLogic(mlir::OpBuilder &builder, Block *block,
-                          const std::vector<VariableRequirement> &requirements,
-                          const PathContext &currentPath,
-                          SignalRegistry &registry,
-                          const ftd::BlockIndexing &bi, size_t startIndex,
-                          DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                          ftd::ShadowCFG *shadow = nullptr) {
+static Value generateReachabilityLogic(
+    mlir::OpBuilder &builder, Block *block,
+    const std::vector<VariableRequirement> &requirements,
+    const PathContext &currentPath, SignalRegistry &registry,
+    const ftd::BlockIndexing &bi, size_t startIndex,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    ftd::ShadowCFG *shadow = nullptr) {
 
   using namespace experimental::boolean;
 
@@ -891,17 +908,17 @@ generateReachabilityLogic(mlir::OpBuilder &builder, Block *block,
 
   // Note: bddToCircuit uses registry.lookup. If the suppression logic involves
   // variables distributed earlier (like c3a), it will correctly find them.
-  return bddToCircuit(builder, bdd, block, registry, currentPath, bi, pendingMuxOperands, shadow);
+  return bddToCircuit(builder, bdd, block, registry, currentPath, bi,
+                      pendingMuxOperands, shadow);
 }
 
 /// Recursively builds the Branch Tree.
-static void
-buildBranchTreeRecursive(mlir::OpBuilder &builder, StringRef currentVar,
-                         std::vector<VariableRequirement> &requirements,
-                         PathContext currentPath, SignalRegistry &registry,
-                         const ftd::BlockIndexing &bi,
-                         DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                         ftd::ShadowCFG *shadow = nullptr) {
+static void buildBranchTreeRecursive(
+    mlir::OpBuilder &builder, StringRef currentVar,
+    std::vector<VariableRequirement> &requirements, PathContext currentPath,
+    SignalRegistry &registry, const ftd::BlockIndexing &bi,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    ftd::ShadowCFG *shadow = nullptr) {
 
   // 1. Retrieve Data Signal
   // Look up the current data signal to be distributed from the registry using
@@ -953,7 +970,8 @@ buildBranchTreeRecursive(mlir::OpBuilder &builder, StringRef currentVar,
   if (!conditionVal) {
     // Fallback: If not in registry, get the original value from the IR
     // (BlockIndexing).
-    conditionVal = getOriginalValue(builder, splitVar, bi, pendingMuxOperands, shadow);
+    conditionVal =
+        getOriginalValue(builder, splitVar, bi, pendingMuxOperands, shadow);
   }
   assert(conditionVal && "Splitter condition value not found");
 
@@ -985,8 +1003,8 @@ buildBranchTreeRecursive(mlir::OpBuilder &builder, StringRef currentVar,
   // Step 2 (which are implicitly valid). The logic checks the entire future
   // path to ensure reachability.
   Value suppressCondition = generateReachabilityLogic(
-      builder, sourceVal.getParentBlock(), requirements, baseNextPath,
-      registry, bi, scanDepth, pendingMuxOperands, shadow);
+      builder, sourceVal.getParentBlock(), requirements, baseNextPath, registry,
+      bi, scanDepth, pendingMuxOperands, shadow);
 
   if (!suppressCondition.getType().isa<handshake::ChannelType>())
     suppressCondition.setType(ftd::channelifyType(suppressCondition.getType()));
@@ -1025,7 +1043,8 @@ buildBranchTreeRecursive(mlir::OpBuilder &builder, StringRef currentVar,
     truePath.push_back({splitVar, true});
     registry.registerSignal(currentVar, truePath, trueResult);
     buildBranchTreeRecursive(builder, currentVar, groups[{splitVar, true}],
-                             truePath, registry, bi, pendingMuxOperands, shadow);
+                             truePath, registry, bi, pendingMuxOperands,
+                             shadow);
   }
 
   // Handle the False branch recursion
@@ -1034,17 +1053,17 @@ buildBranchTreeRecursive(mlir::OpBuilder &builder, StringRef currentVar,
     falsePath.push_back({splitVar, false});
     registry.registerSignal(currentVar, falsePath, falseResult);
     buildBranchTreeRecursive(builder, currentVar, groups[{splitVar, false}],
-                             falsePath, registry, bi, pendingMuxOperands, shadow);
+                             falsePath, registry, bi, pendingMuxOperands,
+                             shadow);
   }
 }
 
 /// Main entry point of distribution logic.
-void ftd::buildDistributionNetwork(mlir::OpBuilder &builder,
-                                     const ftd::LocalCFG &lcfg,
-                                     const ftd::BlockIndexing &bi,
-                                     SignalRegistry &registry,
-                                     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                                     ftd::ShadowCFG *shadow) {
+void ftd::buildDistributionNetwork(
+    mlir::OpBuilder &builder, const ftd::LocalCFG &lcfg,
+    const ftd::BlockIndexing &bi, SignalRegistry &registry,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    ftd::ShadowCFG *shadow) {
   using namespace experimental::boolean;
 
   // 1. Collect Variable Requirements
@@ -1139,8 +1158,8 @@ void ftd::buildDistributionNetwork(mlir::OpBuilder &builder,
       registry.registerSignal(var, {}, rawVal);
     }
     if (varNeeds[var].size() > 1) {
-      buildBranchTreeRecursive(builder, var, varNeeds[var], {}, registry,
-                               bi, pendingMuxOperands, shadow);
+      buildBranchTreeRecursive(builder, var, varNeeds[var], {}, registry, bi,
+                               pendingMuxOperands, shadow);
     }
   }
 }
@@ -1149,6 +1168,8 @@ void ftd::buildDistributionNetwork(mlir::OpBuilder &builder,
 // expressionToCircuit — unified BDD pipeline
 // ===--------------------------------------------------------------------=== //
 
+/// Numbers each original block by its position in `lcfg`'s topological order,
+/// giving the variable order used when lowering an expression to a mux tree.
 DenseMap<Block *, unsigned> ftd::computeTopoRank(const LocalCFG &lcfg) {
   DenseMap<Block *, unsigned> rank;
   unsigned i = 0;
@@ -1159,10 +1180,12 @@ DenseMap<Block *, unsigned> ftd::computeTopoRank(const LocalCFG &lcfg) {
   return rank;
 }
 
+/// Lowers a Boolean expression to a mux-tree circuit: minimize it, order its
+/// variables by `varRank`, build the BDD, and emit the muxes.
 Value ftd::expressionToCircuit(
     OpBuilder &builder, BoolExpression *expr,
-    const DenseMap<Block *, unsigned> &varRank,
-    Block *insertBlock, SignalRegistry &registry, const BlockIndexing &bi,
+    const DenseMap<Block *, unsigned> &varRank, Block *insertBlock,
+    SignalRegistry &registry, const BlockIndexing &bi,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
     ShadowCFG *shadow, IntegerAttr forcedBBAttr) {
 
@@ -1190,9 +1213,9 @@ Value ftd::expressionToCircuit(
                       pendingMuxOperands, shadow, forcedBBAttr);
 }
 
+/// Same as above, deriving the variable order from `rankSource`'s topology.
 Value ftd::expressionToCircuit(
-    OpBuilder &builder, BoolExpression *expr,
-    const LocalCFG &rankSource,
+    OpBuilder &builder, BoolExpression *expr, const LocalCFG &rankSource,
     Block *insertBlock, SignalRegistry &registry, const BlockIndexing &bi,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
     ShadowCFG *shadow, IntegerAttr forcedBBAttr) {
@@ -1205,6 +1228,10 @@ Value ftd::expressionToCircuit(
 // computeLoopBackedgeCondition — shared MU/regen pipeline
 // ===--------------------------------------------------------------------=== //
 
+/// Computes the condition under which the loop at `loopHeader` re-enters the
+/// header (takes its back edge). Builds a self-loop local CFG (producer =
+/// consumer = header), reduces it to level 0, routes the condition tokens, and
+/// lowers the resulting expression to a circuit. Used by the MU/regen path.
 Value ftd::computeLoopBackedgeCondition(
     OpBuilder &builder, Block *loopHeader, Block *insertBlock,
     const BlockIndexing &bi,
@@ -1255,10 +1282,11 @@ Value ftd::computeLoopBackedgeCondition(
       locCDA.getAllBlockDeps()[acyclicDG->newCons].allControlDeps;
 
   // 10. Enumerate paths → expression → circuit
-  BoolExpression *fBackedge = enumeratePaths(*acyclicDG, bi, locConsControlDeps);
+  BoolExpression *fBackedge =
+      enumeratePaths(*acyclicDG, bi, locConsControlDeps);
   Value conditionValue =
-      expressionToCircuit(builder, fBackedge, *acyclicDG, insertBlock,
-                          registry, bi, pendingMuxOperands, shadow);
+      expressionToCircuit(builder, fBackedge, *acyclicDG, insertBlock, registry,
+                          bi, pendingMuxOperands, shadow);
 
   // 11. Clean up temporary graphs
   acyclicDG->containerOp->erase();
@@ -1267,7 +1295,6 @@ Value ftd::computeLoopBackedgeCondition(
 
   return conditionValue;
 }
-
 
 // ===--------------------------------------------------------------------=== //
 // LocalCFG and Decision Graph construction
@@ -1287,7 +1314,7 @@ Value ftd::computeLoopBackedgeCondition(
 /// the consumer, and `sinkBB` is the shared exit.
 std::unique_ptr<LocalCFG>
 ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
-                    const ftd::BlockIndexing &bi) {
+                         const ftd::BlockIndexing &bi) {
   auto L = std::make_unique<ftd::LocalCFG>();
   Location loc = builder.getUnknownLoc();
 
@@ -1350,7 +1377,8 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
       // on purpose. An edge to a block we have already cloned reuses that
       // clone, which keeps a loop as a real cycle here (later loop handling
       // relies on it). Only edges to not-yet-cloned blocks that run backwards
-      // in block order are treated as region-leaving back edges and cut to sink.
+      // in block order are treated as region-leaving back edges and cut to
+      // sink.
 
       // Edge reaches the consumer: deliver the token here.
       if (succOrig == origCons) {
@@ -1495,9 +1523,10 @@ ftd::buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
 /// \param muxConstraints A map {Block* -> bool} enforcing specific values for
 /// blocks. If a block is in this map, the branch corresponding to !value is
 /// wired to Sink.
-std::unique_ptr<LocalCFG> ftd::buildDecisionGraph(
-    const ftd::LocalCFG &rawGraph, const DenseSet<Block *> &dependencies,
-    const DenseMap<Block *, bool> &muxConstraints) {
+std::unique_ptr<LocalCFG>
+ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
+                        const DenseSet<Block *> &dependencies,
+                        const DenseMap<Block *, bool> &muxConstraints) {
 
   if (!rawGraph.newCons)
     return nullptr;
@@ -1684,216 +1713,227 @@ std::unique_ptr<LocalCFG> ftd::buildDecisionGraph(
   return newL;
 }
 
-
 // ===--------------------------------------------------------------------=== //
 // CyclicDemotionHelper implementation
 // ===--------------------------------------------------------------------=== //
 
 CyclicDemotionHelper::CyclicDemotionHelper(
-    mlir::OpBuilder &builder, MLIRContext *ctx,
-    const BlockIndexing &bi, CyclicGraphManager &cyclicMgr,
-    DenseMap<Block *, Block *> &origToFullDG,
+    mlir::OpBuilder &builder, MLIRContext *ctx, const BlockIndexing &bi,
+    CyclicGraphManager &cyclicMgr, DenseMap<Block *, Block *> &origToFullDG,
     Location loc, Block *insertBlock,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
     ShadowCFG *shadow)
-    : builder(builder), ctx(ctx), bi(bi),
-      cyclicMgr(cyclicMgr), origToFullDG(origToFullDG),
-      loc(loc), insertBlock(insertBlock),
-      pendingMuxOperands(pendingMuxOperands),
-      shadow(shadow) {}
+    : builder(builder), ctx(ctx), bi(bi), cyclicMgr(cyclicMgr),
+      origToFullDG(origToFullDG), loc(loc), insertBlock(insertBlock),
+      pendingMuxOperands(pendingMuxOperands), shadow(shadow) {}
 
+/// Returns the loop-nesting level at which condition variable `var` is
+/// produced.
 unsigned CyclicDemotionHelper::getVarNativeLevel(const std::string &var) {
-    // Map the condition variable to its block, then to the decision-graph
-    // block, and read that block's loop-nesting level.
-    auto opt = bi.getBlockFromCondition(var);
-    if (!opt)
-      return 0;
-    auto it = origToFullDG.find(opt.value());
-    if (it == origToFullDG.end())
-      return 0;
-    return cyclicMgr.getNestingLevel(it->second);
+  // Map the condition variable to its block, then to the decision-graph
+  // block, and read that block's loop-nesting level.
+  auto opt = bi.getBlockFromCondition(var);
+  if (!opt)
+    return 0;
+  auto it = origToFullDG.find(opt.value());
+  if (it == origToFullDG.end())
+    return 0;
+  return cyclicMgr.getNestingLevel(it->second);
 }
 
+/// Finds the loop scope at nesting level `level` that contains `origIRBlock`'s
+/// decision-graph node, or null if there is none.
 LoopScope *CyclicDemotionHelper::findScopeForBlock(Block *origIRBlock,
-                                                    unsigned level) {
-    auto it = origToFullDG.find(origIRBlock);
-    if (it == origToFullDG.end())
-      return nullptr;
-    Block *dgBlock = it->second;
-    // Walk the scope tree for the scope at `level` that contains the block.
-    std::function<ftd::LoopScope *(ftd::LoopScope *)> search;
-    search = [&](ftd::LoopScope *s) -> ftd::LoopScope * {
-      if (s->level == level && s->allBlocksInclusive.contains(dgBlock))
-        return s;
-      for (auto &sub : s->subLoops)
-        if (auto *f = search(sub.get()))
-          return f;
-      return nullptr;
-    };
-    return search(cyclicMgr.getTopLevelScope());
+                                                   unsigned level) {
+  auto it = origToFullDG.find(origIRBlock);
+  if (it == origToFullDG.end())
+    return nullptr;
+  Block *dgBlock = it->second;
+  // Walk the scope tree for the scope at `level` that contains the block.
+  std::function<ftd::LoopScope *(ftd::LoopScope *)> search;
+  search = [&](ftd::LoopScope *s) -> ftd::LoopScope * {
+    if (s->level == level && s->allBlocksInclusive.contains(dgBlock))
+      return s;
+    for (auto &sub : s->subLoops)
+      if (auto *f = search(sub.get()))
+        return f;
+    return nullptr;
+  };
+  return search(cyclicMgr.getTopLevelScope());
+}
+
+/// Demotes `currentValue` (a token produced at loop-nesting level `fromLevel`,
+/// anchored at `origBlock`) down one level, so it ends up at the rate of the
+/// enclosing level. Builds that level's acyclic CFG, derives the condition that
+/// keeps only the token of the iteration on which the loop exits (and on which
+/// `origBlock` is reached), and branches the value on it; the kept false result
+/// is the demoted value.
+Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
+                                           unsigned fromLevel) {
+  ftd::LoopScope *scope = findScopeForBlock(origBlock, fromLevel);
+  if (!scope) {
+    llvm::errs() << "[FTD Warning] No LoopScope found at level " << fromLevel
+                 << " for demotion.\n";
+    return currentValue;
   }
 
-Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
-                                            unsigned fromLevel) {
-    ftd::LoopScope *scope = findScopeForBlock(origBlock, fromLevel);
-    if (!scope) {
-      llvm::errs() << "[FTD Warning] No LoopScope found at level " << fromLevel
-                   << " for demotion.\n";
-      return currentValue;
+  // 1. Extract acyclic layered CFG for this loop scope
+  OpBuilder layerBuilder(ctx);
+  auto levelCFG = cyclicMgr.extractLayeredCFG(scope, layerBuilder);
+
+  // 2. CDA on levelCFG (main suppression: header -> loop exit)
+  ControlDependenceAnalysis levelCDA(*levelCFG->region);
+  DenseSet<Block *> levelDeps =
+      levelCDA.getAllBlockDeps()[levelCFG->newCons].allControlDeps;
+
+  // 3. Create level-local registry and pre-register all dep variables
+  //    at their correct level (demoting higher-level ones recursively)
+  SignalRegistry levelRegistry;
+  for (Block *depBlock : levelDeps) {
+    Block *depOrigBlock = levelCFG->origMap.lookup(depBlock);
+    if (!depOrigBlock)
+      continue;
+    std::string depVar = bi.getBlockCondition(depOrigBlock);
+    if (depVar.empty())
+      continue;
+
+    unsigned depNative = getVarNativeLevel(depVar);
+    Value depValue;
+    if (depNative <= fromLevel) {
+      // Variable is at this level or outer — use original value
+      depValue =
+          getOriginalValue(builder, depVar, bi, pendingMuxOperands, shadow);
+    } else {
+      // Variable is from a deeper loop — demote to this level
+      depValue = getValueAtLevel(depVar, fromLevel);
     }
-
-    // 1. Extract acyclic layered CFG for this loop scope
-    OpBuilder layerBuilder(ctx);
-    auto levelCFG = cyclicMgr.extractLayeredCFG(scope, layerBuilder);
-
-    // 2. CDA on levelCFG (main suppression: header -> loop exit)
-    ControlDependenceAnalysis levelCDA(*levelCFG->region);
-    DenseSet<Block *> levelDeps =
-        levelCDA.getAllBlockDeps()[levelCFG->newCons].allControlDeps;
-
-    // 3. Create level-local registry and pre-register all dep variables
-    //    at their correct level (demoting higher-level ones recursively)
-    SignalRegistry levelRegistry;
-    for (Block *depBlock : levelDeps) {
-      Block *depOrigBlock = levelCFG->origMap.lookup(depBlock);
-      if (!depOrigBlock)
-        continue;
-      std::string depVar = bi.getBlockCondition(depOrigBlock);
-      if (depVar.empty())
-        continue;
-
-      unsigned depNative = getVarNativeLevel(depVar);
-      Value depValue;
-      if (depNative <= fromLevel) {
-        // Variable is at this level or outer — use original value
-        depValue = getOriginalValue(builder, depVar, bi, pendingMuxOperands, shadow);
-      } else {
-        // Variable is from a deeper loop — demote to this level
-        depValue = getValueAtLevel(depVar, fromLevel);
-      }
-      if (depValue) {
-        if (!depValue.getType().isa<handshake::ChannelType>())
-          depValue.setType(ftd::channelifyType(depValue.getType()));
-        levelRegistry.registerSignal(depVar, {}, depValue);
-      }
+    if (depValue) {
+      if (!depValue.getType().isa<handshake::ChannelType>())
+        depValue.setType(ftd::channelifyType(depValue.getType()));
+      levelRegistry.registerSignal(depVar, {}, depValue);
     }
+  }
 
-    // 4. Distribution on levelCFG
-    buildDistributionNetwork(builder, *levelCFG, bi, levelRegistry, pendingMuxOperands, shadow);
+  // 4. Distribution on levelCFG
+  buildDistributionNetwork(builder, *levelCFG, bi, levelRegistry,
+                           pendingMuxOperands, shadow);
 
-    // 5. Main suppression expression: header -> loop exit
-    BoolExpression *fCons = enumeratePaths(*levelCFG, bi, levelDeps);
-    fCons = fCons->boolMinimize();
-    BoolExpression *fSup = fCons->boolNegate()->boolMinimize();
+  // 5. Main suppression expression: header -> loop exit
+  BoolExpression *fCons = enumeratePaths(*levelCFG, bi, levelDeps);
+  fCons = fCons->boolMinimize();
+  BoolExpression *fSup = fCons->boolNegate()->boolMinimize();
 
-    // 6. DP suppression: header -> value's block
-    BoolExpression *fSupDP = BoolExpression::boolZero();
-    DenseMap<Block *, unsigned> rankDP;  // pre-computed rank for DP graph
-    Block *origHeader = levelCFG->origMap.lookup(levelCFG->newProd);
+  // 6. DP suppression: header -> value's block
+  BoolExpression *fSupDP = BoolExpression::boolZero();
+  DenseMap<Block *, unsigned> rankDP; // pre-computed rank for DP graph
+  Block *origHeader = levelCFG->origMap.lookup(levelCFG->newProd);
 
-    if (origHeader && origHeader != origBlock) {
-      OpBuilder dpBuilder(ctx);
-      auto dpLocGraph =
-          buildLocalCFGRegion(dpBuilder, origHeader, origBlock, bi);
-      if (dpLocGraph->newCons) {
-        ControlDependenceAnalysis dpCDA(*dpLocGraph->region);
-        auto dpDepsTmp =
-            dpCDA.getAllBlockDeps()[dpLocGraph->newCons].allControlDeps;
-        auto dpDG = buildDecisionGraph(*dpLocGraph, dpDepsTmp);
-        ControlDependenceAnalysis dpDGCDA(*dpDG->region);
-        auto dpDeps =
-            dpDGCDA.getAllBlockDeps()[dpDG->newCons].allControlDeps;
-        BoolExpression *fConsDP = enumeratePaths(*dpDG, bi, dpDeps);
-        fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
+  if (origHeader && origHeader != origBlock) {
+    OpBuilder dpBuilder(ctx);
+    auto dpLocGraph = buildLocalCFGRegion(dpBuilder, origHeader, origBlock, bi);
+    if (dpLocGraph->newCons) {
+      ControlDependenceAnalysis dpCDA(*dpLocGraph->region);
+      auto dpDepsTmp =
+          dpCDA.getAllBlockDeps()[dpLocGraph->newCons].allControlDeps;
+      auto dpDG = buildDecisionGraph(*dpLocGraph, dpDepsTmp);
+      ControlDependenceAnalysis dpDGCDA(*dpDG->region);
+      auto dpDeps = dpDGCDA.getAllBlockDeps()[dpDG->newCons].allControlDeps;
+      BoolExpression *fConsDP = enumeratePaths(*dpDG, bi, dpDeps);
+      fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
 
-        // Ensure all DP expression variables are in the level registry
-        std::set<std::string> dpVars = fSupDP->getVariables();
-        for (const auto &v : dpVars) {
-          if (!levelRegistry.lookup(v, {})) {
-            unsigned vNative = getVarNativeLevel(v);
-            Value vVal;
-            if (vNative <= fromLevel)
-              vVal = getOriginalValue(builder, v, bi, pendingMuxOperands, shadow);
-            else
-              vVal = getValueAtLevel(v, fromLevel);
-            if (vVal) {
-              if (!vVal.getType().isa<handshake::ChannelType>())
-                vVal.setType(ftd::channelifyType(vVal.getType()));
-              levelRegistry.registerSignal(v, {}, vVal);
-            }
+      // Ensure all DP expression variables are in the level registry
+      std::set<std::string> dpVars = fSupDP->getVariables();
+      for (const auto &v : dpVars) {
+        if (!levelRegistry.lookup(v, {})) {
+          unsigned vNative = getVarNativeLevel(v);
+          Value vVal;
+          if (vNative <= fromLevel)
+            vVal = getOriginalValue(builder, v, bi, pendingMuxOperands, shadow);
+          else
+            vVal = getValueAtLevel(v, fromLevel);
+          if (vVal) {
+            if (!vVal.getType().isa<handshake::ChannelType>())
+              vVal.setType(ftd::channelifyType(vVal.getType()));
+            levelRegistry.registerSignal(v, {}, vVal);
           }
         }
-
-        // Pre-compute DP rank before erasing
-        rankDP = computeTopoRank(*dpDG);
-
-        dpDG->containerOp->erase();
-      }
-      dpLocGraph->containerOp->erase();
-    }
-
-    // 7. Build suppression circuit
-    Value result = currentValue;
-    if (!currentValue.getType().isa<handshake::ChannelType>())
-      currentValue.setType(ftd::channelifyType(currentValue.getType()));
-
-    if (fSup->type != experimental::boolean::ExpressionType::Zero) {
-      DenseMap<Block *, unsigned> rank = computeTopoRank(*levelCFG);
-      Value branchCond = expressionToCircuit(builder, fSup, rank, insertBlock,
-                                             levelRegistry, bi,
-                                             pendingMuxOperands, shadow);
-
-      // Cascaded DP filter
-      if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
-        Value dpCond = expressionToCircuit(builder, fSupDP, rankDP, insertBlock,
-                                           levelRegistry, bi,
-                                           pendingMuxOperands, shadow);
-        auto dpBranch = builder.create<handshake::ConditionalBranchOp>(
-            loc, ftd::getListTypes(branchCond.getType()),
-            dpCond, branchCond);
-        dpBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-        setBBAttr(dpBranch, insertBlock, builder);
-        branchCond = dpBranch.getFalseResult();
       }
 
-      auto branchOp = builder.create<handshake::ConditionalBranchOp>(
-          loc, ftd::getListTypes(currentValue.getType()),
-          branchCond, currentValue);
-      branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
-      setBBAttr(branchOp, insertBlock, builder);
-      result = branchOp.getFalseResult();
-    }
+      // Pre-compute DP rank before erasing
+      rankDP = computeTopoRank(*dpDG);
 
-    levelCFG->containerOp->erase();
-    return result;
+      dpDG->containerOp->erase();
+    }
+    dpLocGraph->containerOp->erase();
   }
 
+  // 7. Build suppression circuit
+  Value result = currentValue;
+  if (!currentValue.getType().isa<handshake::ChannelType>())
+    currentValue.setType(ftd::channelifyType(currentValue.getType()));
+
+  if (fSup->type != experimental::boolean::ExpressionType::Zero) {
+    DenseMap<Block *, unsigned> rank = computeTopoRank(*levelCFG);
+    Value branchCond =
+        expressionToCircuit(builder, fSup, rank, insertBlock, levelRegistry, bi,
+                            pendingMuxOperands, shadow);
+
+    // Cascaded DP filter
+    if (fSupDP->type != experimental::boolean::ExpressionType::Zero) {
+      Value dpCond =
+          expressionToCircuit(builder, fSupDP, rankDP, insertBlock,
+                              levelRegistry, bi, pendingMuxOperands, shadow);
+      auto dpBranch = builder.create<handshake::ConditionalBranchOp>(
+          loc, ftd::getListTypes(branchCond.getType()), dpCond, branchCond);
+      dpBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+      setBBAttr(dpBranch, insertBlock, builder);
+      branchCond = dpBranch.getFalseResult();
+    }
+
+    auto branchOp = builder.create<handshake::ConditionalBranchOp>(
+        loc, ftd::getListTypes(currentValue.getType()), branchCond,
+        currentValue);
+    branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
+    setBBAttr(branchOp, insertBlock, builder);
+    result = branchOp.getFalseResult();
+  }
+
+  levelCFG->containerOp->erase();
+  return result;
+}
+
+/// Returns the wire carrying condition variable `varName` valid at loop-nesting
+/// level `targetLevel`, building and caching it on demand. If the variable is
+/// already produced at or below `targetLevel`, its original wire is used as is;
+/// otherwise the value is taken one level up and demoted down a single level,
+/// recursing until the variable's native level is reached. Results are
+/// memorized in demotionCache, so each (variable, level) wire is built once and
+/// shared.
 Value CyclicDemotionHelper::getValueAtLevel(const std::string &varName,
-                                             unsigned targetLevel) {
-    auto key = std::make_pair(varName, targetLevel);
-    auto it = demotionCache.find(key);
-    if (it != demotionCache.end())
-      return it->second;
+                                            unsigned targetLevel) {
+  auto key = std::make_pair(varName, targetLevel);
+  auto it = demotionCache.find(key);
+  if (it != demotionCache.end())
+    return it->second;
 
-    unsigned native = getVarNativeLevel(varName);
-    Value val;
-    if (native <= targetLevel) {
-      // Variable is at or below target level — use original value
-      val = getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
-      if (val && !val.getType().isa<handshake::ChannelType>())
-        val.setType(ftd::channelifyType(val.getType()));
-    } else {
-      // Recursively get value one level above, then demote
-      Value higher = getValueAtLevel(varName, targetLevel + 1);
-      auto blockOpt = bi.getBlockFromCondition(varName);
-      assert(blockOpt.has_value() && "Variable block not found");
-      val = demoteOneLevel(higher, blockOpt.value(), targetLevel + 1);
-    }
-
-    demotionCache[key] = val;
-    return val;
+  unsigned native = getVarNativeLevel(varName);
+  Value val;
+  if (native <= targetLevel) {
+    // Variable is at or below target level — use original value
+    val = getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
+    if (val && !val.getType().isa<handshake::ChannelType>())
+      val.setType(ftd::channelifyType(val.getType()));
+  } else {
+    // Recursively get value one level above, then demote
+    Value higher = getValueAtLevel(varName, targetLevel + 1);
+    auto blockOpt = bi.getBlockFromCondition(varName);
+    assert(blockOpt.has_value() && "Variable block not found");
+    val = demoteOneLevel(higher, blockOpt.value(), targetLevel + 1);
   }
 
+  demotionCache[key] = val;
+  return val;
+}
 
 /// Computes the suppression condition for a value flowing from
 /// `producerBlock` to `consumerBlock` and returns the basic blocks of the
@@ -1939,8 +1979,9 @@ collectSuppressionConditionBlocks(Block *producerBlock, Block *consumerBlock,
 /// consumer, the condition that effectively controls the delivery); reconstruct
 /// the control flow from there down to the consumer; derive the condition under
 /// which the token must be discarded (for a gamma, the token is kept only on
-/// paths that select this input); then emit the mux-tree circuit for the 
-/// condition and branch the producer token on it so the unused token is dropped.
+/// paths that select this input); then emit the mux-tree circuit for the
+/// condition and branch the producer token on it so the unused token is
+/// dropped.
 void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
                                   handshake::FuncOp &funcOp,
                                   Operation *consumer, Value connection,
