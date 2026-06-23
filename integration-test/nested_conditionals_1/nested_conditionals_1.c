@@ -17,7 +17,7 @@ void nested_conditionals_1(inout_int_t a[N], in_int_t c) {
       if (c == 0) {
         y = y - 3;
       } else {
-        y = y / c;
+        y = y * c;
       }
     }
     int z = y + 3;

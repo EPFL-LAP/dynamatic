@@ -122,7 +122,7 @@ def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir:
     predicted constant value. It identifies the exact operations to duplicate by using 
     custom pragmas, which also specify the target variable and give a finite list for its 
     predicted constant values. This makes it possible to convert data dependencies to control
-    flow dependencies.
+    flow dependencies. It can be run with compile and the flag "--enable-duplication".
   }];
 }
 
