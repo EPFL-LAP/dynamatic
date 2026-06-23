@@ -42,11 +42,6 @@ static void inheritBB(Operation *from, Operation *to) {
     to->setAttr("handshake.bb", bbAttr);
 }
 
-static void inheritFtdAttrs(Operation *from, Operation *to) {
-  if (auto ftdSkip = from->getAttr("ftd.skip"))
-    to->setAttr("ftd.skip", ftdSkip);
-}
-
 static Location getConditionLocOrFallback(Value condition,
                                           Operation *fallback) {
   if (Operation *defOp = condition.getDefiningOp())
@@ -477,8 +472,6 @@ struct CombineEquivalentBranches
       return failure();
 
     for (auto br : redundant) {
-      inheritFtdAttrs(br, condBranchOp);
-
       rewriter.replaceAllUsesWith(br.getTrueResult(),
                                   condBranchOp.getTrueResult());
       rewriter.replaceAllUsesWith(br.getFalseResult(),
@@ -562,7 +555,6 @@ struct CombineBranchesOppositeSign
 
     // Erase the redundant branch
     for (auto br : redundantBranches) {
-      inheritFtdAttrs(br, condBranchOp);
       rewriter.replaceAllUsesWith(br.getFalseResult(),
                                   condBranchOp.getTrueResult());
       rewriter.replaceAllUsesWith(br.getTrueResult(),
@@ -603,7 +595,6 @@ struct RemoveNotCondition
                                 newBranch.getTrueResult());
 
     refreshBranchAttrsFromCondition(newBranch, condBranchOp);
-    inheritFtdAttrs(condBranchOp, newBranch);
     rewriter.eraseOp(condBranchOp);
 
     return success();
@@ -855,8 +846,6 @@ struct SplitBranchWithMuxCondition
         getConditionLocOrFallback(nestedCond, condBranchOp), nestedCond,
         outerToInner);
     inheritConditionBBOrFallback(nestedCond, condBranchOp, innerBranch);
-
-    inheritFtdAttrs(condBranchOp, innerBranch);
 
     rewriter.replaceOp(condBranchOp, {innerBranch.getTrueResult(),
                                       innerBranch.getFalseResult()});

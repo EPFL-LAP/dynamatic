@@ -300,7 +300,7 @@ fi
 if [[ $EAGERLYELASTIC -ne 0 ]]; then
   # error out immediately if FTD is disabled but eagerlyelastic was requested
   if [[ $FAST_TOKEN_DELIVERY -eq 0 ]]; then
-    echo_error "Error: Eager execution requires Fast Token Delivery enabled"
+    echo "Error: Eager execution requires Fast Token Delivery enabled"
   else
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
       --pre-eagerly-elastic \

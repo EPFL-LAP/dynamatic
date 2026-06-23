@@ -25,17 +25,19 @@ struct PreEagerlyElasticPass
   void runOnOperation() override;
 
 private:
-  SmallVector<Operation *> prepareSuppressors(handshake::FuncOp funcOp);
+  SmallVector<handshake::ConditionalBranchOp> prepareSuppressors(handshake::FuncOp funcOp);
 
   bool isEligibleForSuppressorMotion(handshake::ConditionalBranchOp branchOp);
+
+  SmallVector<handshake::ConditionalBranchOp> performSuppressorMotion(
+    handshake::ConditionalBranchOp branchOp);
 };
 
 /// TODO: function description
-// TODO: change from Operation to specific condbranchop
-SmallVector<Operation *>
+SmallVector<handshake::ConditionalBranchOp>
 PreEagerlyElasticPass::prepareSuppressors(handshake::FuncOp funcOp) {
-  SmallVector<Operation *> branchesToErase;
-  SmallVector<Operation *> suppressors;
+  SmallVector<handshake::ConditionalBranchOp> branchesToErase;
+  SmallVector<handshake::ConditionalBranchOp> suppressors;
 
   // iterate over all basic blocks
   for (Block &block : funcOp.getBody()) {
@@ -104,7 +106,7 @@ PreEagerlyElasticPass::prepareSuppressors(handshake::FuncOp funcOp) {
     }
   }
   // safely erase after loop is done
-  for (Operation *deadOp : branchesToErase) {
+  for (handshake::ConditionalBranchOp deadOp : branchesToErase) {
     deadOp->erase();
   }
 
@@ -126,7 +128,7 @@ bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
 
   // verify the targetOp is a PM unit
   // TODO: what about loads and LSQs?
-  if (!isa<arith::ArithOpInterface, handshake::NotIOp, handshake::ForkOp,
+  if (!isa<handshake::ArithOpInterface, handshake::NotIOp, handshake::ForkOp,
            handshake::LazyForkOp, handshake::BufferOp, handshake::LoadOp,
            handshake::BranchOp>(
           targetOp) ||
@@ -184,7 +186,6 @@ PreEagerlyElasticPass::performSuppressorMotion(
 
     // copy the attributes
     newBranch->setAttr(builder.getStringAttr("handshake.bb"), bbAttr);
-    // newBranch->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
 
     // reroute downstream consumers to look at the new branch's FalseResult
     result.replaceAllUsesExcept(newBranch.getFalseResult(), newBranch);
@@ -200,13 +201,10 @@ void PreEagerlyElasticPass::runOnOperation() {
 
   handshake::FuncOp funcOp =
       cast<handshake::FuncOp>(&modOp.getBodyRegion().front().front());
-  if (!funcOp) {
-    llvm::errs() << "No funcOp found!\n";
-    return signalPassFailure();
-  }
+  assert(funcOp && "No funcOp found!");
 
   // identify and prepare suppressors and return a list of all of them
-  SmallVector<Operation *> suppressors = prepareSuppressors(funcOp);
+  SmallVector<handshake::ConditionalBranchOp> suppressors = prepareSuppressors(funcOp);
 
   // Rewrite A:
   // Loop over all suppressors
@@ -217,11 +215,13 @@ void PreEagerlyElasticPass::runOnOperation() {
     auto branchOp = frontier.pop_back_val();
 
     // if it cannot be moved further down, stop
-    if (!isEligibleForSuppressorMotion(branchOp))
+    if (!isEligibleForSuppressorMotion(branchOp)) {
+      llvm::errs() << "not eligible...\n";
       continue;
-
+    }
+    llvm::errs() << "eligible!\n";
     SmallVector<handshake::ConditionalBranchOp> newSuppressors =
-        performMotion(branchOp);
+        performSuppressorMotion(branchOp);
 
     // append new supps to frontier to be processed later
     frontier.append(newSuppressors.begin(), newSuppressors.end());
