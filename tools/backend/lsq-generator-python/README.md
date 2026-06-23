@@ -89,7 +89,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
 - **lsq-generator.py**  
   Runs the tool.
 
-- **vhdl_gen/**
+- **core_gen/**
   - **\_\_init__.py**  
     Re-exports a curated list of public API symbols (e.g. `main`, `generate`, `Logic`, `LSQ`).
 
@@ -103,7 +103,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     Defines the `Configs` class.
 
   - **context.py**  
-    Defines the `VHDLContext` class. It substitutes the previous `global` VHDL context variables.
+    Defines the `VHDLContext` class. It substitutes the previous `global` context variables.
 
   - **utils.py**  
     - Defines `VHDLLogicType`, `VHDLLogicVecType`, `VHDLLogicTypeArray`, `VHDLLogicVecTypeArray`, `OpTab`.
@@ -113,8 +113,8 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
   - **signals.py**  
     Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
 
-  - **vhdlgen/operators/**  
-    Low-level functions that generate VHDL snippets:  
+  - **core_gen/operators/**  
+    Low-level functions that generate snippets:  
     - `assign.py`: `Op`  
     - `arithmetic.py`: `WrapAdd`, `WrapAddConst`, `WrapSub`
     - `conversions.py`: `VecToArray`, `BitsToOH`, `BitsToOHSub1`, `OHToBits`
@@ -123,7 +123,7 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     - `reduction.py`: `ReduceLogicVec`, `ReduceLogicArray`, `ReduceLogicVecArray`, `Reduce`
     - `shifts.py`: `RotateLogicVec`, `RotateLogicArray`, `RotateLogicVecArray`, `CyclicLeftShift`
 
-  - **vhdlgen/generators/**  
+  - **core_gen/generators/**  
     High-level modules that build complete entities/architectures:  
     - `dispatchers.py` : `PortToQueueDispatcher`, `QueueToPortDispatcher`, `PortToQueueDispatcherInit`, `QueueToPortDispatcherInit`
     - `group_allocator.py` : `GroupAllocator`, `GroupAllocatorInit`
