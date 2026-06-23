@@ -217,7 +217,8 @@ struct CyclicDemotionHelper {
   MLIRContext *ctx;
   const BlockIndexing &bi;
   CyclicGraphManager &cyclicMgr; // source of loop scopes and layered CFGs
-  DenseMap<Block *, Block *> &origToFullDG; // original block -> decision-graph block
+  DenseMap<Block *, Block *>
+      &origToFullDG; // original block -> decision-graph block
   Location loc;
   Block *insertBlock; // basic block the emitted ops are tagged to
   DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands;
@@ -226,13 +227,12 @@ struct CyclicDemotionHelper {
   // same demotion circuit is not built twice.
   std::map<std::pair<std::string, unsigned>, Value> demotionCache;
 
-  CyclicDemotionHelper(mlir::OpBuilder &builder, MLIRContext *ctx,
-                        const BlockIndexing &bi,
-                        CyclicGraphManager &cyclicMgr,
-                        DenseMap<Block *, Block *> &origToFullDG,
-                        Location loc, Block *insertBlock,
-                        DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                        ShadowCFG *shadow = nullptr);
+  CyclicDemotionHelper(
+      mlir::OpBuilder &builder, MLIRContext *ctx, const BlockIndexing &bi,
+      CyclicGraphManager &cyclicMgr, DenseMap<Block *, Block *> &origToFullDG,
+      Location loc, Block *insertBlock,
+      DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+      ShadowCFG *shadow = nullptr);
 
   /// Get the nesting level of a condition variable.
   unsigned getVarNativeLevel(const std::string &var);
@@ -242,7 +242,8 @@ struct CyclicDemotionHelper {
 
   /// Demotes a value from fromLevel to fromLevel-1 using the layered CFG
   /// of the LoopScope at fromLevel that contains origBlock.
-  Value demoteOneLevel(Value currentValue, Block *origBlock, unsigned fromLevel);
+  Value demoteOneLevel(Value currentValue, Block *origBlock,
+                       unsigned fromLevel);
 
   /// Returns the value of a condition variable demoted to the target level.
   /// Uses caching to avoid duplicate circuits.
@@ -276,16 +277,16 @@ struct CyclicDemotionHelper {
 /// Build a local control-flow subgraph (LocalCFG) between a producer and
 /// consumer. The subgraph is reconstructed as a region with unique entry
 /// (producer) and exit (sink).
-std::unique_ptr<LocalCFG>
-buildLocalCFGRegion(OpBuilder &builder, Block *origProd, Block *origCons,
-                    const BlockIndexing &bi);
+std::unique_ptr<LocalCFG> buildLocalCFGRegion(OpBuilder &builder,
+                                              Block *origProd, Block *origCons,
+                                              const BlockIndexing &bi);
 
 /// Constructs a NEW LocalCFG that represents the Decision Graph from a
 /// raw LocalCFG, retaining only the blocks in `dependencies` plus the
 /// consumer and sink.
-std::unique_ptr<LocalCFG>
-buildDecisionGraph(const LocalCFG &rawGraph, const DenseSet<Block *> &dependencies,
-                   const DenseMap<Block *, bool> &muxConstraints = DenseMap<Block *, bool>());
+std::unique_ptr<LocalCFG> buildDecisionGraph(
+    const LocalCFG &rawGraph, const DenseSet<Block *> &dependencies,
+    const DenseMap<Block *, bool> &muxConstraints = DenseMap<Block *, bool>());
 
 // ===--------------------------------------------------------------------=== //
 // Path enumeration and expression generation
@@ -293,29 +294,27 @@ buildDecisionGraph(const LocalCFG &rawGraph, const DenseSet<Block *> &dependenci
 
 /// Enumerates all paths from producer to consumer in a LocalCFG and returns
 /// the minimized SOP boolean expression representing the reaching condition.
-boolean::BoolExpression *
-enumeratePaths(const LocalCFG &lcfg, const BlockIndexing &bi,
-               const DenseSet<Block *> &controlDeps);
+boolean::BoolExpression *enumeratePaths(const LocalCFG &lcfg,
+                                        const BlockIndexing &bi,
+                                        const DenseSet<Block *> &controlDeps);
 
 // ===--------------------------------------------------------------------=== //
 // Circuit construction (BDD → hardware)
 // ===--------------------------------------------------------------------=== //
 
 /// Recursively converts a BDD to a Mux Tree circuit.
-Value bddToCircuit(mlir::OpBuilder &builder, boolean::BDD *bdd, Block *block,
-                   SignalRegistry &registry, PathContext currentPath,
-                   const BlockIndexing &bi,
-                   DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                   ShadowCFG *shadow = nullptr,
-                   IntegerAttr forcedBBAttr = {});
+Value bddToCircuit(
+    mlir::OpBuilder &builder, boolean::BDD *bdd, Block *block,
+    SignalRegistry &registry, PathContext currentPath, const BlockIndexing &bi,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    ShadowCFG *shadow = nullptr, IntegerAttr forcedBBAttr = {});
 
 /// Main entry point of the token distribution logic.
-void buildDistributionNetwork(mlir::OpBuilder &builder,
-                              const LocalCFG &lcfg,
-                              const BlockIndexing &bi,
-                              SignalRegistry &registry,
-                              DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
-                              ShadowCFG *shadow = nullptr);
+void buildDistributionNetwork(
+    mlir::OpBuilder &builder, const LocalCFG &lcfg, const BlockIndexing &bi,
+    SignalRegistry &registry,
+    DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
+    ShadowCFG *shadow = nullptr);
 
 /// Compute the topological rank of original blocks from a LocalCFG.
 /// Maps each original block (via origMap) to its index in topoOrder.
@@ -327,16 +326,16 @@ DenseMap<Block *, unsigned> computeTopoRank(const LocalCFG &lcfg);
 /// (determines BDD variable ordering).
 Value expressionToCircuit(
     OpBuilder &builder, boolean::BoolExpression *expr,
-    const DenseMap<Block *, unsigned> &varRank,
-    Block *insertBlock, SignalRegistry &registry, const BlockIndexing &bi,
+    const DenseMap<Block *, unsigned> &varRank, Block *insertBlock,
+    SignalRegistry &registry, const BlockIndexing &bi,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
     ShadowCFG *shadow = nullptr, IntegerAttr forcedBBAttr = {});
 
 /// Convenience overload: computes varRank from a LocalCFG's topoOrder.
 Value expressionToCircuit(
     OpBuilder &builder, boolean::BoolExpression *expr,
-    const LocalCFG &rankSource,
-    Block *insertBlock, SignalRegistry &registry, const BlockIndexing &bi,
+    const LocalCFG &rankSource, Block *insertBlock, SignalRegistry &registry,
+    const BlockIndexing &bi,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
     ShadowCFG *shadow = nullptr, IntegerAttr forcedBBAttr = {});
 
@@ -358,9 +357,8 @@ Value computeLoopBackedgeCondition(
 /// Apply the suppression algorithm for a non-loop producer-consumer pair.
 /// This is the main entry point for building suppression circuits.
 void insertDirectSuppression(mlir::OpBuilder &builder,
-                             handshake::FuncOp &funcOp,
-                             Operation *consumer, Value connection,
-                             ShadowCFG &shadow);
+                             handshake::FuncOp &funcOp, Operation *consumer,
+                             Value connection, ShadowCFG &shadow);
 
 } // namespace ftd
 } // namespace experimental

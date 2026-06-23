@@ -29,12 +29,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/Support/FtdSuppression.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
-#include "experimental/Support/FtdSuppression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"

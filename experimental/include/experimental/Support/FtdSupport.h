@@ -200,8 +200,8 @@ void setBBAttr(Operation *op, IntegerAttr bbAttr);
 
 /// Set the handshake.bb attribute on `op`, preferring `bbAttr` if available,
 /// otherwise computing from `block`.
-void setBBAttrWithFallback(Operation *op, IntegerAttr bbAttr,
-                           Block *block, OpBuilder &builder);
+void setBBAttrWithFallback(Operation *op, IntegerAttr bbAttr, Block *block,
+                           OpBuilder &builder);
 
 /// Build a `handshake.bb` IntegerAttr (32-bit unsigned) for `bbIdx`.
 IntegerAttr getBBIndexAttr(MLIRContext *ctx, unsigned bbIdx);

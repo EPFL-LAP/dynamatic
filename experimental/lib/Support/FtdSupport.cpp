@@ -314,8 +314,8 @@ SmallVector<Type> ftd::getListTypes(Type inputType, unsigned size) {
 // ===--------------------------------------------------------------------=== //
 
 IntegerAttr ftd::getBBIndexAttr(MLIRContext *ctx, unsigned bbIdx) {
-  return IntegerAttr::get(
-      IntegerType::get(ctx, 32, IntegerType::Unsigned), bbIdx);
+  return IntegerAttr::get(IntegerType::get(ctx, 32, IntegerType::Unsigned),
+                          bbIdx);
 }
 
 void ftd::setBBAttr(Operation *op, Block *block, OpBuilder &builder) {
@@ -333,8 +333,8 @@ void ftd::setBBAttr(Operation *op, IntegerAttr bbAttr) {
     op->setAttr("handshake.bb", bbAttr);
 }
 
-void ftd::setBBAttrWithFallback(Operation *op, IntegerAttr bbAttr,
-                                Block *block, OpBuilder &builder) {
+void ftd::setBBAttrWithFallback(Operation *op, IntegerAttr bbAttr, Block *block,
+                                OpBuilder &builder) {
   if (bbAttr)
     return setBBAttr(op, bbAttr);
   setBBAttr(op, block, builder);
@@ -355,8 +355,7 @@ Value ftd::getOrCreateCondPlaceholder(Block *condBlock, OpBuilder &builder) {
   // both ops carry FTD_OP_TO_SKIP so the FTD passes leave them alone.
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToStart(condBlock);
-  auto sourceOp =
-      builder.create<handshake::SourceOp>(builder.getUnknownLoc());
+  auto sourceOp = builder.create<handshake::SourceOp>(builder.getUnknownLoc());
   sourceOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttr(sourceOp, condBlock, builder);
 

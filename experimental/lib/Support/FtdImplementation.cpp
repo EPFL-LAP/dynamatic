@@ -17,8 +17,8 @@
 #include "dynamatic/Support/Backedge.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
-#include "experimental/Support/FtdSuppression.h"
 #include "experimental/Support/FtdSupport.h"
+#include "experimental/Support/FtdSuppression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -29,7 +29,6 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::ftd;
 using namespace dynamatic::experimental::boolean;
-
 
 // ===--------------------------------------------------------------------=== //
 // Condition placeholder management
@@ -44,8 +43,7 @@ void ftd::createAllCondPlaceholders(Region &region, OpBuilder &builder) {
 
 /// Resolves all SourceOp condition placeholders into NotIOp pass-throughs
 /// connected to the real handshake condition values from ShadowCFG.
-void ftd::resolveCondPlaceholders(handshake::FuncOp funcOp,
-                                  OpBuilder &builder,
+void ftd::resolveCondPlaceholders(handshake::FuncOp funcOp, OpBuilder &builder,
                                   ftd::ShadowCFG &shadow) {
   Block &entryBlock = funcOp.getBody().front();
 
@@ -77,8 +75,7 @@ void ftd::resolveCondPlaceholders(handshake::FuncOp funcOp,
 
     // Forward the real condition through a NotIOp that keeps the placeholder
     // tag, so finalizeCondPlaceholders can later short-circuit and remove it.
-    auto notOp = builder.create<handshake::NotIOp>(
-        loc, chanI1, realCond);
+    auto notOp = builder.create<handshake::NotIOp>(loc, chanI1, realCond);
     notOp->setAttr(FTD_COND_VAR, builder.getUnitAttr());
     notOp->setAttr("handshake.bb", bbAttr);
 
@@ -104,7 +101,6 @@ void ftd::finalizeCondPlaceholders(handshake::FuncOp funcOp) {
     notOp->erase();
   }
 }
-
 
 // ===--------------------------------------------------------------------=== //
 // Static CFG helpers (used only by phi network functions)
@@ -244,7 +240,6 @@ runCrytonAlgorithm(Region &funcRegion, DenseMap<Block *, Value> &inputBlocks) {
 
   return result;
 }
-
 
 // ===--------------------------------------------------------------------=== //
 // Phi Network
@@ -469,7 +464,6 @@ LogicalResult ftd::createPhiNetworkDeps(
   return success();
 }
 
-
 // ===--------------------------------------------------------------------=== //
 // Regeneration
 // ===--------------------------------------------------------------------=== //
@@ -532,8 +526,8 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
 
   // Get all the loops for which we need to regenerate the
   // corresponding value
-  SmallVector<CFGLoop *> loops = getLoopsConsNotInProd(
-      consBlock, prodBlock, loopInfo);
+  SmallVector<CFGLoop *> loops =
+      getLoopsConsNotInProd(consBlock, prodBlock, loopInfo);
   unsigned numberOfLoops = loops.size();
 
   if (numberOfLoops == 0)
@@ -562,13 +556,13 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
 
     // Create the false constant to feed `init`
     auto constOp = builder.create<handshake::ConstantOp>(consumerOp->getLoc(),
-                                                          cstAttr, startValue);
+                                                         cstAttr, startValue);
     constOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
     constOp->setAttr("handshake.bb", headerBBAttr);
 
     Operation *initOp;
-    initOp = builder.create<handshake::InitOp>(consumerOp->getLoc(),
-                                                conditionValue);
+    initOp =
+        builder.create<handshake::InitOp>(consumerOp->getLoc(), conditionValue);
 
     initOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
     initOp->setAttr("handshake.bb", headerBBAttr);
@@ -580,13 +574,13 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
 
     SmallVector<Value> muxOperands = {regeneratedValue, regeneratedValue};
     auto muxOp = builder.create<handshake::MuxOp>(regeneratedValue.getLoc(),
-                                                   regeneratedValue.getType(),
-                                                   selectSignal, muxOperands);
+                                                  regeneratedValue.getType(),
+                                                  selectSignal, muxOperands);
 
     muxOp->setOperand(2, muxOp->getResult(0));
     muxOp->setAttr(FTD_REGEN, builder.getUnitAttr());
     muxOp->setAttr("handshake.bb", headerBBAttr);
-  
+
     return muxOp;
   };
 
@@ -606,7 +600,6 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
   // the last regen multiplexer created.
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
 }
-
 
 // ===--------------------------------------------------------------------=== //
 // Suppression dispatch
@@ -645,8 +638,8 @@ void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
   // If the consumer and the producer are in the same block without the
   // consumer being a multiplexer skip because no delivery is needed
   if (consumerBlock == producerBlock &&
-      (!llvm::isa<handshake::MuxOp>(consumerOp) || 
-      operand.getDefiningOp()->hasAttr(FTD_EXPLICIT_GAMMA))) {
+      (!llvm::isa<handshake::MuxOp>(consumerOp) ||
+       operand.getDefiningOp()->hasAttr(FTD_EXPLICIT_GAMMA))) {
     return;
   }
 
@@ -721,7 +714,6 @@ void ftd::addRegen(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
       addRegenOperandConsumer(builder, funcOp, consumerOp, operand, shadow);
   }
 }
-
 
 // ===--------------------------------------------------------------------=== //
 // GSA Gates
@@ -860,8 +852,9 @@ LogicalResult experimental::ftd::addGsaGates(
           // We pass an empty registry, since this is not an expression for
           // suppression and does not require distribution.
           SignalRegistry emptyRegistry;
-          conditionValue = bddToCircuit(rewriter, bdd, gate->getBlock(),
-                                        emptyRegistry, {}, bi, pendingMuxOperands);
+          conditionValue =
+              bddToCircuit(rewriter, bdd, gate->getBlock(), emptyRegistry, {},
+                           bi, pendingMuxOperands);
         } else {
           // Use a SourceOp placeholder for the condition value, which will be
           // replaced with the actual condition input after every suppression
@@ -901,8 +894,8 @@ LogicalResult experimental::ftd::addGsaGates(
 
       // Create the multiplexer
       auto mux = rewriter.create<handshake::MuxOp>(
-        loc, ftd::channelifyType(gate->result.getType()),
-        conditionValue, operands);
+          loc, ftd::channelifyType(gate->result.getType()), conditionValue,
+          operands);
 
       // The one input gamma is marked as an operation to skip in the IR and
       // later removed
@@ -944,9 +937,10 @@ LogicalResult experimental::ftd::addGsaGates(
                            ? 1
                            : 2;
     op->getResult(0).replaceAllUsesWith(op->getOperand(operandToUse));
-    
+
     for (auto &[idx, mappedOp] : gsaList) {
-      if (mappedOp == op) mappedOp = nullptr;
+      if (mappedOp == op)
+        mappedOp = nullptr;
     }
     rewriter.eraseOp(op);
   }
@@ -954,7 +948,8 @@ LogicalResult experimental::ftd::addGsaGates(
   // Simplify the generated GSA Mux tree by applying common subexpression
   // elimination and reduction rules from the bottom up. A reverse mapping
   // resolves temporary backedge placeholders to their original CFG values
-  // ensuring equivalent inputs are correctly identified across different branches.
+  // ensuring equivalent inputs are correctly identified across different
+  // branches.
   DenseMap<Value, Value> backedgeToOriginal;
   if (pendingMuxOperands) {
     for (auto &[orig, bes] : *pendingMuxOperands) {
@@ -969,16 +964,20 @@ LogicalResult experimental::ftd::addGsaGates(
   // equivalent iff they are the same SSA wire. Backedge placeholders are
   // resolved to their original CF values first.
   auto getEffectiveValue = [&](Value v) -> Value {
-    if (!v) return v;
+    if (!v)
+      return v;
     auto it = backedgeToOriginal.find(v);
-    if (it != backedgeToOriginal.end()) return it->second;
+    if (it != backedgeToOriginal.end())
+      return it->second;
     return v;
   };
 
   auto areEquivalentValues = [&](Value a, Value b) {
-    if (a == b) return true;
-    if (!a || !b) return false;
-    
+    if (a == b)
+      return true;
+    if (!a || !b)
+      return false;
+
     Value effA = getEffectiveValue(a);
     Value effB = getEffectiveValue(b);
     return effA == effB;
@@ -993,24 +992,31 @@ LogicalResult experimental::ftd::addGsaGates(
   bool changed = true;
   while (changed) {
     changed = false;
-    
+
     for (auto it1 = gsaList.begin(); it1 != gsaList.end(); ++it1) {
-      if (!it1->second) continue;
+      if (!it1->second)
+        continue;
       auto mux1 = dyn_cast<handshake::MuxOp>(it1->second);
-      if (!mux1 || mux1.getNumOperands() != 3) continue;
-      
+      if (!mux1 || mux1.getNumOperands() != 3)
+        continue;
+
       for (auto it2 = std::next(it1); it2 != gsaList.end(); ++it2) {
-        if (!it2->second) continue;
+        if (!it2->second)
+          continue;
         auto mux2 = dyn_cast<handshake::MuxOp>(it2->second);
-        if (!mux2 || mux2.getNumOperands() != 3) continue;
-        
-        if (areEquivalentValues(mux1.getSelectOperand(), mux2.getSelectOperand()) &&
-            areEquivalentValues(mux1.getDataOperands()[0], mux2.getDataOperands()[0]) &&
-            areEquivalentValues(mux1.getDataOperands()[1], mux2.getDataOperands()[1])) {
-          
+        if (!mux2 || mux2.getNumOperands() != 3)
+          continue;
+
+        if (areEquivalentValues(mux1.getSelectOperand(),
+                                mux2.getSelectOperand()) &&
+            areEquivalentValues(mux1.getDataOperands()[0],
+                                mux2.getDataOperands()[0]) &&
+            areEquivalentValues(mux1.getDataOperands()[1],
+                                mux2.getDataOperands()[1])) {
+
           mux2.getResult().replaceAllUsesWith(mux1.getResult());
           rewriter.eraseOp(mux2);
-          it2->second = nullptr; 
+          it2->second = nullptr;
           changed = true;
         }
       }
@@ -1021,11 +1027,14 @@ LogicalResult experimental::ftd::addGsaGates(
     // resolve to the same underlying value is fundamentally redundant and
     // is bypassed entirely by routing its data input directly to its users.
     for (auto &[idx, op] : gsaList) {
-      if (!op) continue;
+      if (!op)
+        continue;
       auto mux = dyn_cast<handshake::MuxOp>(op);
-      if (!mux || mux.getNumOperands() != 3) continue;
-      
-      if (areEquivalentValues(mux.getDataOperands()[0], mux.getDataOperands()[1])) {
+      if (!mux || mux.getNumOperands() != 3)
+        continue;
+
+      if (areEquivalentValues(mux.getDataOperands()[0],
+                              mux.getDataOperands()[1])) {
         mux.getResult().replaceAllUsesWith(mux.getDataOperands()[0]);
         rewriter.eraseOp(mux);
         op = nullptr;

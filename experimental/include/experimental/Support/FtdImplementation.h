@@ -8,7 +8,7 @@
 //
 // Declares the top-level steps of the Fast Token Delivery (FTD) algorithm:
 // converting phi functions to GSA gates, regeneration, suppression dispatch,
-// and condition placeholders. The suppression circuit construction itself 
+// and condition placeholders. The suppression circuit construction itself
 // lives in FtdSuppression.h.
 //
 //===----------------------------------------------------------------------===//
@@ -60,7 +60,7 @@ void addSuppOperandConsumer(mlir::OpBuilder &builder, handshake::FuncOp &funcOp,
 /// adding some merges to the network, so that this can be done. The new
 /// merge is moved inside of the loop, and it works like a reassignment.
 void addRegen(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
-                 ShadowCFG &shadow);
+              ShadowCFG &shadow);
 
 /// Given each pairs of producers and consumers within the circuit, the
 /// producer might create a token which is never used by the corresponding
