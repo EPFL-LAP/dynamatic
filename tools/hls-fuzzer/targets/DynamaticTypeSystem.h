@@ -182,9 +182,21 @@ public:
     };
   }
 
-  static bool discardStructuredForStatement(const DynamaticTypingContext &) {
-    // TODO: Figure out how we want to handle non-termination.
-    return true;
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override {
+    return {
+        /*start=*/TransferFn<ast::StructuredForStatement>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*end=*/
+        TransferFn<ast::StructuredForStatement>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*step=*/
+        TransferFn<ast::StructuredForStatement>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*statements=*/
+        copyFromInput<ast::StructuredForStatement>(),
+        /*output=*/copyInputToOutput<ast::StructuredForStatement>(),
+    };
   }
 
 private:

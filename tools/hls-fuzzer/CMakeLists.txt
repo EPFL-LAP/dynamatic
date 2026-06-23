@@ -31,6 +31,7 @@ add_llvm_executable(hls-fuzzer
         targets/BitwidthTypeSystem.cpp
         targets/DynamaticTypeSystem.cpp
         targets/RandomCTarget.cpp
+        targets/RandomCTypeSystem.cpp
         targets/TargetUtils.cpp
 )
 llvm_update_compile_flags(hls-fuzzer)

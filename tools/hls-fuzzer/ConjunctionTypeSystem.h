@@ -304,7 +304,7 @@ public:
         context);
   }
 
-private:
+protected:
   /// Calls 'discardCallback' for every typesystem and corresponding context.
   /// Returns true if any of the typesystems discarded the AST node.
   template <typename F>
@@ -384,6 +384,7 @@ private:
                           std::tuple_size_v<typename ASTNode::SubElements>>{}));
   }
 
+private:
   /// Combines all 'OpaqueTransferFn' in 'transferFnPerTypeSystem' into a single
   /// 'OpaqueTransferFn'.
   template <typename ASTNode>
@@ -416,9 +417,9 @@ private:
                     contextTupleToSubContextTuple<ASTNode, typeSystemIndex>(
                         contexts);
 
-                return transferFn(subElements, subContexts)
-                    .template cast<
-                        std::tuple_element_t<typeSystemIndex, Context>>();
+                return transferFn.template call<
+                    std::tuple_element_t<typeSystemIndex, Context>>(
+                    subElements, subContexts);
               },
               transferFnPerTypeSystem);
         });
@@ -446,9 +447,9 @@ private:
                     contextTupleToSubContextTuple<ASTNode, typeSystemIndex>(
                         contextTuple);
 
-                return transferFn(astNode, subContexts)
-                    .template cast<
-                        std::tuple_element_t<typeSystemIndex, Context>>();
+                return transferFn.template call<
+                    std::tuple_element_t<typeSystemIndex, Context>>(
+                    astNode, subContexts);
               },
               outputTransferFnPerTypeSystem);
         });
@@ -458,7 +459,8 @@ private:
   static auto contextTupleToSubContextTuple(
       const TypedContextTuple<ASTNode, Context> &contexts) {
     return mapTuplesIntoArray(
-        [&](const Context *context) -> const void * {
+        [&](const Context *context)
+            -> const std::tuple_element_t<index, Context> * {
           if (!context)
             return nullptr;
 
