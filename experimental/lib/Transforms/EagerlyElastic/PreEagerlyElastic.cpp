@@ -24,8 +24,176 @@ struct PreEagerlyElasticPass
 
   void runOnOperation() override;
 
-  // private:
+private:
+  SmallVector<Operation *> prepareSuppressors(handshake::FuncOp funcOp);
+
+  bool isEligibleForSuppressorMotion(handshake::ConditionalBranchOp branchOp);
 };
+
+/// TODO: function description
+// TODO: change from Operation to specific condbranchop
+SmallVector<Operation *>
+PreEagerlyElasticPass::prepareSuppressors(handshake::FuncOp funcOp) {
+  SmallVector<Operation *> branchesToErase;
+  SmallVector<Operation *> suppressors;
+
+  // iterate over all basic blocks
+  for (Block &block : funcOp.getBody()) {
+    // iterate over all operations inside the current bb
+    for (Operation &op : block) {
+      // check if the operation is a conditional branch
+      auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(&op);
+      if (!branchOp || !branchOp->hasAttr("ftd.skip"))
+        continue;
+
+      // a suppressor has to eliminate the token on a true signal
+      // if the true result has no uses it is a sink, as desired
+      if (branchOp.getTrueResult().use_empty()) {
+        suppressors.push_back(branchOp);
+        continue;
+      }
+
+      OpBuilder builder(branchOp);
+      builder.setInsertionPoint(branchOp); // TODO: necessary?
+
+      // create inverted condition
+      Value condition = branchOp.getConditionOperand();
+      Location loc = branchOp.getLoc();
+      auto invertedCondition =
+          builder.create<handshake::NotIOp>(loc, condition);
+
+      // add bb attribute
+      auto bbAttr = branchOp->getAttr("handshake.bb");
+      invertedCondition->setAttr(builder.getStringAttr("handshake.bb"), bbAttr);
+
+      // the false result is a sink -> switch results with inverted condition
+      if (branchOp.getFalseResult().use_empty()) {
+        // update the branch condition and all downstream uses
+        branchOp.getConditionOperandMutable().assign(invertedCondition);
+        branchOp.getTrueResult().replaceAllUsesWith(branchOp.getFalseResult());
+
+        suppressors.push_back(branchOp);
+        continue;
+      }
+
+      // convert suppressors without sinks into two suppressors
+      Value data = branchOp.getDataOperand();
+
+      // create suppressor for true path with inverted condition
+      auto suppressorA = builder.create<handshake::ConditionalBranchOp>(
+          loc, invertedCondition, data);
+      suppressorA->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
+      suppressorA->setAttr("handshake.bb", bbAttr);
+
+      // create suppressor for false path with normal condition
+      auto suppressorB =
+          builder.create<handshake::ConditionalBranchOp>(loc, condition, data);
+      suppressorB->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
+      suppressorB->setAttr("handshake.bb", bbAttr);
+
+      // rewire the downstream consumers to point to our new split branches
+      branchOp.getTrueResult().replaceAllUsesWith(suppressorA.getFalseResult());
+      branchOp.getFalseResult().replaceAllUsesWith(
+          suppressorB.getFalseResult());
+
+      suppressors.push_back(suppressorA);
+      suppressors.push_back(suppressorB);
+
+      // erase the original combined branch
+      branchesToErase.push_back(branchOp);
+    }
+  }
+  // safely erase after loop is done
+  for (Operation *deadOp : branchesToErase) {
+    deadOp->erase();
+  }
+
+  return suppressors;
+}
+
+/// Checks if a suppressor (BranchOp) can be pushed past its downstream
+/// operation in Rewrite A from the paper
+bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
+    handshake::ConditionalBranchOp branchOp) {
+  // get the non-suppressed data path (false result)
+  Value dataPath = branchOp.getFalseResult();
+
+  // data path must have exactly one consumer to move past it cleanly
+  if (!dataPath.hasOneUse())
+    return false;
+
+  Operation *targetOp = *dataPath.user_begin();
+
+  // verify the targetOp is a PM unit
+  // TODO: what about loads and LSQs?
+  if (!isa<arith::ArithOpInterface, handshake::NotIOp, handshake::ForkOp,
+           handshake::LazyForkOp, handshake::BufferOp, handshake::LoadOp,
+           handshake::BranchOp>(
+          targetOp) ||
+      ((isa<handshake::MergeOp, handshake::ControlMergeOp>(targetOp)) &&
+       targetOp->getNumOperands() != 1)) {
+    return false; // reject anything that isn't a PM unit or a 1-input merge
+  }
+
+  // ensure all other inputs to the target op match this suppressor's condition
+  // because otherwise we cannot push the branch past the operation due to
+  // synchronization issues
+  Value currentCond = branchOp.getConditionOperand();
+  for (Value operand : targetOp->getOperands()) {
+    if (operand == dataPath)
+      continue;
+
+    if (auto siblingBranch = dyn_cast_or_null<handshake::ConditionalBranchOp>(
+            operand.getDefiningOp())) {
+      if (siblingBranch.getConditionOperand() != currentCond)
+        return false;
+    } else {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/// actually moves the suppressors TODO: better description
+SmallVector<handshake::ConditionalBranchOp>
+PreEagerlyElasticPass::performSuppressorMotion(
+    handshake::ConditionalBranchOp branchOp) {
+
+  // identify the operation we want to move past
+  Value dataPath = branchOp.getFalseResult();
+  Operation *targetOp = *dataPath.user_begin();
+
+  OpBuilder builder(targetOp);
+  Location loc = targetOp->getLoc();
+  auto bbAttr = targetOp->getAttr("handshake.bb");
+
+  // bypass this branch
+  targetOp->replaceUsesOfWith(dataPath, branchOp.getDataOperand());
+
+  // cleanup: save condition and delete the old branch
+  Value condition = branchOp.getConditionOperand();
+  branchOp->erase();
+
+  // place the new suppressors after the targetOp
+  builder.setInsertionPointAfter(targetOp);
+  SmallVector<handshake::ConditionalBranchOp> newSuppressors;
+  for (Value result : targetOp->getResults()) {
+    auto newBranch =
+        builder.create<handshake::ConditionalBranchOp>(loc, condition, result);
+
+    // copy the attributes
+    newBranch->setAttr(builder.getStringAttr("handshake.bb"), bbAttr);
+    // newBranch->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
+
+    // reroute downstream consumers to look at the new branch's FalseResult
+    result.replaceAllUsesExcept(newBranch.getFalseResult(), newBranch);
+    newSuppressors.push_back(newBranch);
+  }
+
+  // return the newly created downstream branches
+  return newSuppressors;
+}
 
 void PreEagerlyElasticPass::runOnOperation() {
   ModuleOp modOp = getOperation();
@@ -37,90 +205,25 @@ void PreEagerlyElasticPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  SmallVector<Operation *> branchesToErase;
+  // identify and prepare suppressors and return a list of all of them
+  SmallVector<Operation *> suppressors = prepareSuppressors(funcOp);
 
-  // iterate over all basic blocks
-  for (Block &block : funcOp.getBody()) {
-    // iterate over all operations inside the current bb
-    for (Operation &op : block) {
-      // check if the operation is a conditional branch
-      auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(&op);
-      if (!branchOp || !branchOp->hasAttr("ftd.skip"))
-        continue;
+  // Rewrite A:
+  // Loop over all suppressors
+  // Move them as far down as possible:
+  // Stop at stores, loads with LSQs, and Muxes (anything else?)
+  SmallVector<handshake::ConditionalBranchOp> frontier = suppressors;
+  while (!frontier.empty()) {
+    auto branchOp = frontier.pop_back_val();
 
-      // skip suppressors with a sink
-      bool trueRes = branchOp.getTrueResult().use_empty();
-      bool falseRes = branchOp.getFalseResult().use_empty();
-      if (trueRes || falseRes)
-        continue;
+    // if it cannot be moved further down, stop
+    if (!isEligibleForSuppressorMotion(branchOp))
+      continue;
 
-      // convert suppressors without sinks into two suppressors
-      // set up the insertion point right before the original branch
-      OpBuilder builder(branchOp);
+    SmallVector<handshake::ConditionalBranchOp> newSuppressors =
+        performMotion(branchOp);
 
-      Value condition = branchOp.getConditionOperand();
-      Value data = branchOp.getDataOperand();
-      Location loc = branchOp.getLoc();
-
-      // create suppressor for true path
-      auto suppressorA =
-          builder.create<handshake::ConditionalBranchOp>(loc, condition, data);
-      suppressorA->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
-      if (auto bbAttr = branchOp->getAttr("handshake.bb"))
-        suppressorA->setAttr("handshake.bb", bbAttr);
-
-      // create suppressor for false path
-      auto suppressorB =
-          builder.create<handshake::ConditionalBranchOp>(loc, condition, data);
-      suppressorB->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
-      if (auto bbAttr = branchOp->getAttr("handshake.bb"))
-        suppressorB->setAttr("handshake.bb", bbAttr);
-
-      // rewire the downstream consumers to point to our new split branches
-      branchOp.getTrueResult().replaceAllUsesWith(suppressorA.getTrueResult());
-      branchOp.getFalseResult().replaceAllUsesWith(
-          suppressorB.getFalseResult());
-
-      // erase the original combined branch
-      branchesToErase.push_back(branchOp);
-
-      /*
-      // print the name of the branch as well as to where it goes
-      std::string branchName = "unnamed_branch";
-      if (auto nameAttr = branchOp->getAttrOfType<StringAttr>("handshake.name"))
-        branchName = nameAttr.getValue().str();
-      llvm::errs() << "Suppressor Branch: " << branchName << '\n';
-
-      if (branchOp.getTrueResult().use_empty()) {
-        llvm::errs() << "     True Result: SINK\n";
-      } else {
-        for (Operation *user : branchOp.getTrueResult().getUsers()) {
-          std::string userName =
-              user->getAttrOfType<StringAttr>("handshake.name")
-                  .getValue()
-                  .str();
-          llvm::errs() << "    True Result: " << user->getName().getStringRef()
-                       << " (" << userName << ")\n";
-        }
-      }
-
-      if (branchOp.getFalseResult().use_empty()) {
-        llvm::errs() << "     False Result: SINK\n";
-      } else {
-        for (Operation *user : branchOp.getFalseResult().getUsers()) {
-          std::string userName =
-              user->getAttrOfType<StringAttr>("handshake.name")
-                  .getValue()
-                  .str();
-          llvm::errs() << "    False Result: " << user->getName().getStringRef()
-                       << " (" << userName << ")\n";
-        }
-      }
-      */
-    }
-  }
-  // safely erase after loop is done
-  for (Operation *deadOp : branchesToErase) {
-    deadOp->erase();
+    // append new supps to frontier to be processed later
+    frontier.append(newSuppressors.begin(), newSuppressors.end());
   }
 }
