@@ -81,6 +81,9 @@ private:
   generateArrayParameter(OpaqueContext &&context);
 
   std::optional<std::pair<ast::Variable, OpaqueContext>>
+  generateVariable(OpaqueContext &&context);
+
+  std::optional<std::pair<ast::ScalarParameter, OpaqueContext>>
   generateScalarParameter(OpaqueContext &&context);
 
   /// Generates a scalar type or none if it was impossible to generate a scalar
@@ -103,6 +106,9 @@ private:
 
   std::optional<std::pair<ast::ArrayAssignmentStatement, OpaqueContext>>
   generateArrayAssignmentStatement(OpaqueContext &&context);
+
+  std::optional<std::pair<ast::ScalarAssignmentStatement, OpaqueContext>>
+  generateScalarAssignmentStatement(OpaqueContext &&context);
 
   std::optional<std::pair<ast::StructuredForStatement, OpaqueContext>>
   generateStructuredForStatement(OpaqueContext &&context);

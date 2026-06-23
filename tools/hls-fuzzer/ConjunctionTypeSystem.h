@@ -256,6 +256,22 @@ public:
         });
   }
 
+  bool discardScalarAssignmentStatement(const Context &context) {
+    return combineDiscard(
+        [&](auto &&typeSystem, auto &&context) {
+          return typeSystem.discardScalarAssignmentStatement(context);
+        },
+        context);
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return combineGetTransferFns<ast::ScalarAssignmentStatement>(
+        [&](auto &&typeSystem) {
+          return typeSystem.getScalarAssignmentStatementTransferFns();
+        });
+  }
+
   bool discardStatementList(const Context &context) {
     return combineDiscard(
         [&](auto &&typeSystem, auto &&context) {
