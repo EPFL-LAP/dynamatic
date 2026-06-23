@@ -227,8 +227,7 @@ public:
   getFreshScalarParameterTransferFns() override {
     return {
         copyFromInput<ast::ScalarParameter>(),
-        OutputTransferFn<ast::ScalarParameter>(
-            std::index_sequence<INPUT_DEPENDENCY>{},
+        OutputTransferFn<ast::ScalarParameter, INPUT_DEPENDENCY>(
             [](const ast::ScalarParameter &, ParamTypingContext context) {
               context.numScalarParam++;
               return context;
@@ -245,8 +244,7 @@ public:
   getFreshArrayParameterTransferFns() override {
     return {
         copyFromInput<ast::ArrayParameter>(),
-        OutputTransferFn<ast::ArrayParameter>(
-            std::index_sequence<INPUT_DEPENDENCY>{},
+        OutputTransferFn<ast::ArrayParameter, INPUT_DEPENDENCY>(
             [](const ast::ArrayParameter &, ParamTypingContext context) {
               context.numArrayParam++;
               return context;

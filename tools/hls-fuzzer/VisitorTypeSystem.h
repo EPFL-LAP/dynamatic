@@ -60,11 +60,10 @@ protected:
   /// 'indices' and the input context.
   template <typename ASTNode, std::size_t... indices>
   static auto getMergingOutputTransferFn(std::index_sequence<indices...>) {
-    return OutputTransferFn<ASTNode>(
-        std::index_sequence<INPUT_DEPENDENCY, indices...>{},
+    return OutputTransferFn<TypingContext, ASTNode, INPUT_DEPENDENCY,
+                            indices...>(
         [](const ASTNode &, TypingContext result,
-           const std::conditional_t<static_cast<bool>(indices), TypingContext,
-                                    TypingContext> &...args) -> TypingContext {
+           const auto &...args) -> TypingContext {
           foreachInTuples(
               [&](const auto &element) {
                 if constexpr (std::is_same_v<std::decay_t<decltype(element)>,
