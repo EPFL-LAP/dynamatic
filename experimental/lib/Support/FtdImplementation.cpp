@@ -490,11 +490,15 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
       consumerOp->hasAttr(FTD_OP_TO_SKIP))
     return;
 
-  // Skip if the consumer has to do with memory operations, cmerge networks or
-  // if it is a conditional branch.
+  // Skip if the consumer has to do with memory operations or cmerge networks.
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
-      llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
-      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp))
+      llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp))
+    return;
+
+  // For conditional branches, only regenerate the condition input.
+  // The data input should not be handled by regeneration here.
+  if (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
+      consumerOp->getOperand(0) != operand)
     return;
 
   mlir::Operation *producerOp = operand.getDefiningOp();
