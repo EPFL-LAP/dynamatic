@@ -25,12 +25,17 @@ struct PreEagerlyElasticPass
   void runOnOperation() override;
 
 private:
-  SmallVector<handshake::ConditionalBranchOp> prepareSuppressors(handshake::FuncOp funcOp);
+  SmallVector<handshake::ConditionalBranchOp>
+  prepareSuppressors(handshake::FuncOp funcOp);
 
   bool isEligibleForSuppressorMotion(handshake::ConditionalBranchOp branchOp);
 
-  SmallVector<handshake::ConditionalBranchOp> performSuppressorMotion(
-    handshake::ConditionalBranchOp branchOp);
+  void
+  performSuppressorMotion(handshake::ConditionalBranchOp branchOp,
+                          DenseSet<handshake::ConditionalBranchOp> &frontier);
+
+  Value getForkTop(Value value, bool &isInverted);
+  bool isSourced(Value value);
 };
 
 /// TODO: function description
@@ -45,7 +50,7 @@ PreEagerlyElasticPass::prepareSuppressors(handshake::FuncOp funcOp) {
     for (Operation &op : block) {
       // check if the operation is a conditional branch
       auto branchOp = dyn_cast<handshake::ConditionalBranchOp>(&op);
-      if (!branchOp || !branchOp->hasAttr("ftd.skip"))
+      if (!branchOp)
         continue;
 
       // a suppressor has to eliminate the token on a true signal
@@ -84,13 +89,11 @@ PreEagerlyElasticPass::prepareSuppressors(handshake::FuncOp funcOp) {
       // create suppressor for true path with inverted condition
       auto suppressorA = builder.create<handshake::ConditionalBranchOp>(
           loc, invertedCondition, data);
-      suppressorA->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
       suppressorA->setAttr("handshake.bb", bbAttr);
 
       // create suppressor for false path with normal condition
       auto suppressorB =
           builder.create<handshake::ConditionalBranchOp>(loc, condition, data);
-      suppressorB->setAttr("ftd.skip", branchOp->getAttr("ftd.skip"));
       suppressorB->setAttr("handshake.bb", bbAttr);
 
       // rewire the downstream consumers to point to our new split branches
@@ -113,6 +116,43 @@ PreEagerlyElasticPass::prepareSuppressors(handshake::FuncOp funcOp) {
   return suppressors;
 }
 
+// TODO: write description
+Value PreEagerlyElasticPass::getForkTop(Value value, bool &isInverted) {
+  Operation *defOp = value.getDefiningOp();
+  // look through logical inversions
+  if (auto notOp = dyn_cast<handshake::NotIOp>(defOp)) {
+    isInverted = !isInverted;
+    return getForkTop(notOp.getOperand(), isInverted);
+  }
+  // look through standard handshake forks
+  if (auto fork = dyn_cast<handshake::ForkOp>(defOp)) {
+    return getForkTop(fork.getOperand(), isInverted);
+  }
+  // look through handshake buffers
+  if (auto buf = dyn_cast<handshake::BufferOp>(defOp)) {
+    return getForkTop(buf.getOperand(), isInverted);
+  }
+  return value;
+}
+
+bool PreEagerlyElasticPass::isSourced(Value value) {
+  Operation *definingOp = value.getDefiningOp();
+  if (!definingOp)
+    return false;
+
+  // Heuristic to stop the traversal earlier.
+  if (isa<handshake::MuxOp>(definingOp))
+    return false;
+
+  if (isa<handshake::SourceOp>(value.getDefiningOp()))
+    return true;
+
+  // If all operands of the defining operation are sourced, the value is also
+  // sourced.
+  return llvm::all_of(value.getDefiningOp()->getOperands(),
+                      [this](Value v) { return isSourced(v); });
+}
+
 /// Checks if a suppressor (BranchOp) can be pushed past its downstream
 /// operation in Rewrite A from the paper
 bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
@@ -127,11 +167,9 @@ bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
   Operation *targetOp = *dataPath.user_begin();
 
   // verify the targetOp is a PM unit
-  // TODO: what about loads and LSQs?
   if (!isa<handshake::ArithOpInterface, handshake::NotIOp, handshake::ForkOp,
            handshake::LazyForkOp, handshake::BufferOp, handshake::LoadOp,
-           handshake::BranchOp>(
-          targetOp) ||
+           handshake::BranchOp>(targetOp) ||
       ((isa<handshake::MergeOp, handshake::ControlMergeOp>(targetOp)) &&
        targetOp->getNumOperands() != 1)) {
     return false; // reject anything that isn't a PM unit or a 1-input merge
@@ -142,14 +180,25 @@ bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
   // synchronization issues
   Value currentCond = branchOp.getConditionOperand();
   for (Value operand : targetOp->getOperands()) {
-    if (operand == dataPath)
-      continue;
+    if (auto siblingBranch =
+            dyn_cast<handshake::ConditionalBranchOp>(operand.getDefiningOp())) {
+      // Check condition matching indirectly (accounting for
+      // forks/buffer/notops)
+      bool currentInverted = false, siblingInverted = false;
+      Value currentRoot = getForkTop(currentCond, currentInverted);
+      Value siblingRoot =
+          getForkTop(siblingBranch.getConditionOperand(), siblingInverted);
 
-    if (auto siblingBranch = dyn_cast_or_null<handshake::ConditionalBranchOp>(
-            operand.getDefiningOp())) {
-      if (siblingBranch.getConditionOperand() != currentCond)
+      // They must originate from the same wire AND have the exact same polarity
+      if (currentRoot != siblingRoot || currentInverted != siblingInverted) {
+        llvm::errs() << "Passer ctrl mismatch\n";
+        llvm::errs() << "For branchop: " << branchOp->getAttr("handshake.name")
+                     << '\n';
         return false;
-    } else {
+      }
+
+    } else if (!isSourced(operand)) {
+      llvm::errs() << "Operand not from passer or source\n";
       return false;
     }
   }
@@ -158,42 +207,44 @@ bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
 }
 
 /// actually moves the suppressors TODO: better description
-SmallVector<handshake::ConditionalBranchOp>
-PreEagerlyElasticPass::performSuppressorMotion(
-    handshake::ConditionalBranchOp branchOp) {
+void PreEagerlyElasticPass::performSuppressorMotion(
+    handshake::ConditionalBranchOp branchOp,
+    DenseSet<handshake::ConditionalBranchOp> &frontier) {
 
   // identify the operation we want to move past
   Value dataPath = branchOp.getFalseResult();
   Operation *targetOp = *dataPath.user_begin();
 
-  OpBuilder builder(targetOp);
   Location loc = targetOp->getLoc();
   auto bbAttr = targetOp->getAttr("handshake.bb");
-
-  // bypass this branch
-  targetOp->replaceUsesOfWith(dataPath, branchOp.getDataOperand());
-
-  // cleanup: save condition and delete the old branch
   Value condition = branchOp.getConditionOperand();
-  branchOp->erase();
+
+  // erase all old suppressors feeding into the target operation
+  for (Value operand : targetOp->getOperands()) {
+    if (auto incomingBranch =
+            dyn_cast<handshake::ConditionalBranchOp>(operand.getDefiningOp())) {
+      frontier.erase(incomingBranch);
+      targetOp->replaceUsesOfWith(operand, incomingBranch.getDataOperand());
+      incomingBranch->erase();
+    }
+  }
 
   // place the new suppressors after the targetOp
-  builder.setInsertionPointAfter(targetOp);
-  SmallVector<handshake::ConditionalBranchOp> newSuppressors;
+  OpBuilder builder(targetOp);
+  builder.setInsertionPointAfter(targetOp); // necessary?
+
+  // place the new suppressors after the targetOp
   for (Value result : targetOp->getResults()) {
     auto newBranch =
         builder.create<handshake::ConditionalBranchOp>(loc, condition, result);
 
-    // copy the attributes
+    // copy the bb attribute
     newBranch->setAttr(builder.getStringAttr("handshake.bb"), bbAttr);
 
     // reroute downstream consumers to look at the new branch's FalseResult
     result.replaceAllUsesExcept(newBranch.getFalseResult(), newBranch);
-    newSuppressors.push_back(newBranch);
+    frontier.insert(newBranch);
   }
-
-  // return the newly created downstream branches
-  return newSuppressors;
 }
 
 void PreEagerlyElasticPass::runOnOperation() {
@@ -204,26 +255,30 @@ void PreEagerlyElasticPass::runOnOperation() {
   assert(funcOp && "No funcOp found!");
 
   // identify and prepare suppressors and return a list of all of them
-  SmallVector<handshake::ConditionalBranchOp> suppressors = prepareSuppressors(funcOp);
+  llvm::errs() << "start prepareSuppressors\n";
+  SmallVector<handshake::ConditionalBranchOp> suppressors =
+      prepareSuppressors(funcOp);
+  llvm::errs() << "end prepareSuppressors\n";
 
-  // Rewrite A:
-  // Loop over all suppressors
-  // Move them as far down as possible:
-  // Stop at stores, loads with LSQs, and Muxes (anything else?)
-  SmallVector<handshake::ConditionalBranchOp> frontier = suppressors;
-  while (!frontier.empty()) {
-    auto branchOp = frontier.pop_back_val();
+  // Rewrite A
+  DenseSet<handshake::ConditionalBranchOp> frontier;
+  frontier.insert(suppressors.begin(), suppressors.end());
 
-    // if it cannot be moved further down, stop
-    if (!isEligibleForSuppressorMotion(branchOp)) {
-      llvm::errs() << "not eligible...\n";
-      continue;
+  bool frontierUpdated;
+  do {
+    frontierUpdated = false;
+
+    for (auto branchOp : frontier) {
+      if (isEligibleForSuppressorMotion(branchOp)) {
+        llvm::errs() << "is eligible\n";
+
+        performSuppressorMotion(branchOp, frontier);
+
+        frontierUpdated = true;
+        // frontier was mutated, break and restart the loop
+        break;
+      }
+      llvm::errs() << "not eligible\n";
     }
-    llvm::errs() << "eligible!\n";
-    SmallVector<handshake::ConditionalBranchOp> newSuppressors =
-        performSuppressorMotion(branchOp);
-
-    // append new supps to frontier to be processed later
-    frontier.append(newSuppressors.begin(), newSuppressors.end());
-  }
+  } while (frontierUpdated);
 }
