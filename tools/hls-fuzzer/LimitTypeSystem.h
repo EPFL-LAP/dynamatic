@@ -8,10 +8,14 @@
 
 namespace dynamatic::gen {
 
+// Internal implementation details. Users should use the LimitTypeSystem
+// instead.
 namespace details {
 
 struct DepthTypingContext {
+  /// The current expression depth.
   std::size_t expressionDepth{};
+  /// The current number of statements in the program.
   std::size_t totalNumberOfStatements{};
 };
 
@@ -140,7 +144,7 @@ public:
         /*output=*/
         OutputTransferFn<ast::ScalarAssignmentStatement, INPUT_DEPENDENCY>(
             [](const ast::ScalarAssignmentStatement &,
-               LimitTypingContext context) {
+               DepthTypingContext context) {
               context.totalNumberOfStatements++;
               return context;
             }),
