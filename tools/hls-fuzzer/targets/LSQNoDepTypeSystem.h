@@ -16,6 +16,20 @@ struct LSQNoDepContext {
   /// True iff the context is within the sub-tree of the indexing expression of
   /// an array read expression.
   bool inArrayReadIndexExpression = false;
+
+  /// Returns true if the context indicates that we are currently generating an
+  /// array index. This is either within an array-assignment statement or an
+  /// array-read expression.
+  ///
+  /// Note that this is only accurate when generating an expression.
+  bool generatingArrayIndex() const {
+    // Note: !indexVariable is sufficient to tell we are in the index of an
+    // array-assignment statement, merely because there is just one
+    // array-assignment statement in the program at the moment,
+    // the array parameter is not an expression and that the index variable
+    // will be set when generating the value statement.
+    return inArrayReadIndexExpression || !indexVariable;
+  }
 };
 
 namespace detail {
@@ -31,8 +45,9 @@ public:
   }
 
   static bool discardArrayReadExpression(const LSQNoDepContext &context) {
-    return !context.arrayWritten || !context.indexVariable ||
-           context.inArrayReadIndexExpression;
+    // Anything but the index variable must be discarded when generating the
+    // index.
+    return context.generatingArrayIndex();
   }
 
   TransferFnArray<ast::ArrayReadExpression>
@@ -48,12 +63,16 @@ public:
 
   static bool discardBinaryExpression(ast::BinaryExpression::Op,
                                       const LSQNoDepContext &context) {
-    return context.inArrayReadIndexExpression || !context.indexVariable;
+    // Anything but the index variable must be discarded when generating the
+    // index.
+    return context.generatingArrayIndex();
   }
 
   static bool discardUnaryExpression(ast::UnaryExpression::Op,
                                      const LSQNoDepContext &context) {
-    return context.inArrayReadIndexExpression || !context.indexVariable;
+    // Anything but the index variable must be discarded when generating the
+    // index.
+    return context.generatingArrayIndex();
   }
 
   static bool
@@ -85,16 +104,20 @@ public:
   }
 
   static bool discardCastExpression(const LSQNoDepContext &context) {
-    return context.inArrayReadIndexExpression || !context.indexVariable;
+    // Anything but the index variable must be discarded when generating the
+    // index.
+    return context.generatingArrayIndex();
   }
 
   static bool discardConditionalExpression(const LSQNoDepContext &context) {
-    return context.inArrayReadIndexExpression || !context.indexVariable;
+    // Anything but the index variable must be discarded when generating the
+    // index.
+    return context.generatingArrayIndex();
   }
 
   std::optional<ast::Constant> discardConstant(const ast::Constant &constant,
                                                const LSQNoDepContext &context) {
-    if (context.inArrayReadIndexExpression || !context.indexVariable)
+    if (context.generatingArrayIndex())
       return std::nullopt;
 
     return TypeSystem::discardConstant(constant, context);
