@@ -377,70 +377,77 @@ gen::BasicCGenerator::generateArrayParameter(OpaqueContext &&context) {
 }
 
 std::optional<std::pair<ast::Variable, gen::OpaqueContext>>
-gen::BasicCGenerator::generateScalarParameter(OpaqueContext &&context) {
+gen::BasicCGenerator::generateVariable(OpaqueContext &&context) {
   if (typeSystem.discardVariableOpaque(context))
     return std::nullopt;
 
   return generateWithDependencies<ast::Variable>(
       std::move(context), typeSystem.getVariableTransferFns(),
       /*parameter=*/
-      [&](OpaqueContext &&context)
-          -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
-        std::array<std::function<std::optional<
-                       std::pair<ast::ScalarParameter, OpaqueContext>>()>,
-                   2>
-            generators;
-        generators[0] = [&]()
-            -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
-          // Randomly shuffle the parameter ordering and find the first
-          // parameter that passes type checking.
-          std::vector<ast::ScalarParameter> copy = scalarParameters;
-          for (auto &iter : localVariableStack)
-            llvm::append_range(copy, iter);
-          random.shuffle(copy);
-
-          for (const ast::ScalarParameter &iter : copy)
-            if (!typeSystem.discardExistingScalarParameterOpaque(iter, context))
-              return generateWithDependencies<ast::ExistingScalarParameter>(
-                  std::move(context),
-                  typeSystem.getExistingScalarParameterTransferFns(), iter);
-
-          return std::nullopt;
-        };
-        generators[1] = [&]()
-            -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
-          if (typeSystem.discardFreshScalarParameterOpaque(context))
-            return std::nullopt;
-
-          return generateWithDependencies<ast::ScalarParameter>(
-              std::move(context),
-              typeSystem.getFreshScalarParameterTransferFns(),
-              /*datatype=*/
-              [&](OpaqueContext &&context) {
-                return generateScalarType(std::move(context));
-              },
-              /*constructor=*/
-              [&](ast::ScalarType &&datatype) {
-                return scalarParameters.emplace_back(std::move(datatype),
-                                                     generateFreshVarName());
-              });
-        };
-
-        if (random.getRatherLowProbabilityBool())
-          std::swap(generators[0], generators[1]);
-
-        for (auto &iter : generators)
-          if (std::optional<std::pair<ast::ScalarParameter, OpaqueContext>>
-                  result = iter())
-            return result;
-
-        return std::nullopt;
+      [&](OpaqueContext &&context) {
+        return generateScalarParameter(std::move(context));
       },
       /*constructor=*/
       [&](ast::ScalarParameter &&parameter) {
         return ast::Variable{parameter.getDataType(),
                              parameter.getName().str()};
       });
+}
+
+std::optional<std::pair<ast::ScalarParameter, gen::OpaqueContext>>
+gen::BasicCGenerator::generateScalarParameter(OpaqueContext &&context) {
+  std::array<std::function<std::optional<
+                 std::pair<ast::ScalarParameter, OpaqueContext>>()>,
+             2>
+      generators;
+
+  // Existing scalar parameter.
+  generators[0] =
+      [&]() -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
+    // Randomly shuffle the parameter ordering and find the first
+    // parameter that passes type checking.
+    std::vector<ast::ScalarParameter> copy = scalarParameters;
+    for (auto &iter : localVariableStack)
+      llvm::append_range(copy, iter);
+    random.shuffle(copy);
+
+    for (const ast::ScalarParameter &iter : copy)
+      if (!typeSystem.discardExistingScalarParameterOpaque(iter, context))
+        return generateWithDependencies<ast::ExistingScalarParameter>(
+            std::move(context),
+            typeSystem.getExistingScalarParameterTransferFns(), iter);
+
+    return std::nullopt;
+  };
+
+  // Fresh scalar parameter.
+  generators[1] =
+      [&]() -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
+    if (typeSystem.discardFreshScalarParameterOpaque(context))
+      return std::nullopt;
+
+    return generateWithDependencies<ast::ScalarParameter>(
+        std::move(context), typeSystem.getFreshScalarParameterTransferFns(),
+        /*datatype=*/
+        [&](OpaqueContext &&context) {
+          return generateScalarType(std::move(context));
+        },
+        /*constructor=*/
+        [&](ast::ScalarType &&datatype) {
+          return scalarParameters.emplace_back(std::move(datatype),
+                                               generateFreshVarName());
+        });
+  };
+
+  if (random.getRatherLowProbabilityBool())
+    std::swap(generators[0], generators[1]);
+
+  for (auto &iter : generators)
+    if (std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> result =
+            iter())
+      return result;
+
+  return std::nullopt;
 }
 
 std::optional<std::pair<ast::ScalarType, gen::OpaqueContext>>
@@ -557,6 +564,32 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
       });
 }
 
+std::optional<std::pair<ast::ScalarAssignmentStatement, gen::OpaqueContext>>
+gen::BasicCGenerator::generateScalarAssignmentStatement(
+    OpaqueContext &&context) {
+  if (typeSystem.discardScalarAssignmentStatementOpaque(context))
+    return std::nullopt;
+
+  return generateWithDependencies<ast::ScalarAssignmentStatement>(
+      std::move(context), typeSystem.getScalarAssignmentStatementTransferFns(),
+      /*target=*/
+      [&](OpaqueContext &&context) {
+        return generateScalarParameter(std::move(context));
+      },
+      /*value=*/
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
+      /*constructor=*/
+      [&](ast::ScalarParameter &&target, ast::Expression &&value) {
+        // Ensure the assigned value matches the variable's type without
+        // triggering undefined behavior.
+        value = safeCastAsNeeded(target.getDataType(), std::move(value));
+        return ast::ScalarAssignmentStatement{target.getName().str(),
+                                              std::move(value)};
+      });
+}
+
 std::optional<std::pair<ast::StructuredForStatement, gen::OpaqueContext>>
 gen::BasicCGenerator::generateStructuredForStatement(OpaqueContext &&context) {
   if (typeSystem.discardStructuredForStatementOpaque(context))
@@ -593,7 +626,7 @@ gen::BasicCGenerator::generateStructuredForStatement(OpaqueContext &&context) {
 void gen::BasicCGenerator::initGenerators() {
   expressionGenerators.emplace_back(&BasicCGenerator::generateConstant,
                                     ast::Constant::Tag{});
-  expressionGenerators.emplace_back(&BasicCGenerator::generateScalarParameter,
+  expressionGenerators.emplace_back(&BasicCGenerator::generateVariable,
                                     ast::Variable::Tag{});
   for (auto op : enumRange<ast::BinaryExpression::Op>()) {
     expressionGenerators.emplace_back(
@@ -624,6 +657,9 @@ void gen::BasicCGenerator::initGenerators() {
   statementGenerators.emplace_back(
       &BasicCGenerator::generateStructuredForStatement,
       ast::StructuredForStatement::Tag{});
+  statementGenerators.emplace_back(
+      &BasicCGenerator::generateScalarAssignmentStatement,
+      ast::ScalarAssignmentStatement::Tag{});
 }
 
 void gen::BasicCGenerator::generate(llvm::raw_ostream &os,

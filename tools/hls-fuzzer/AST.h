@@ -551,11 +551,44 @@ llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
            const ArrayAssignmentStatement &arrayAssignmentStatement);
 
+/// AST-Node representing an assignment to a scalar parameter or local variable.
+/// Note that we model this as a top-level statement despite this being an
+/// expression in C.
+class ScalarAssignmentStatement {
+public:
+  ScalarAssignmentStatement(std::string variable, Expression valueExpression)
+      : variable(std::move(variable)),
+        valueExpression(std::move(valueExpression)) {}
+
+  /// Returns the name of the scalar parameter (or local variable) being
+  /// assigned to.
+  llvm::StringRef getVariable() const { return variable; }
+
+  /// Returns the value that will be assigned to the variable.
+  const Expression &getValueExpression() const { return valueExpression; }
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
+  using SubElements = std::tuple<ScalarParameter, Expression>;
+  constexpr static std::size_t TARGET = 0;
+  constexpr static std::size_t VALUE = 1;
+
+private:
+  std::string variable;
+  Expression valueExpression;
+};
+
+llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const ScalarAssignmentStatement &scalarAssignmentStatement);
+
 class StructuredForStatement;
 
 class Statement {
-  using Variant =
-      std::variant<ArrayAssignmentStatement, StructuredForStatement>;
+  using Variant = std::variant<ArrayAssignmentStatement, StructuredForStatement,
+                               ScalarAssignmentStatement>;
 
 public:
   Statement() = default;

@@ -129,6 +129,21 @@ public:
     };
   }
 
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ScalarAssignmentStatement>{
+        /*target=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*output=*/
+        OutputTransferFn<ast::ScalarAssignmentStatement, INPUT_DEPENDENCY>(
+            [](const ast::ScalarAssignmentStatement &,
+               LimitTypingContext context) {
+              context.totalNumberOfStatements++;
+              return context;
+            }),
+    };
+  }
+
   bool discardStatementList(const LimitTypingContext &context) const {
     return context.totalNumberOfStatements >= maxTotalStatements;
   }

@@ -734,6 +734,12 @@ public:
   virtual TransferFnArray<ast::ArrayAssignmentStatement>
   getArrayAssignmentStatementTransferFns() = 0;
 
+  virtual bool
+  discardScalarAssignmentStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() = 0;
+
   virtual bool discardStatementListOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::StatementList> getStatementListTransferFns() = 0;
@@ -759,7 +765,8 @@ public:
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
 
   using StatementKey = std::variant<ast::StructuredForStatement::Tag,
-                                    ast::ArrayAssignmentStatement::Tag>;
+                                    ast::ArrayAssignmentStatement::Tag,
+                                    ast::ScalarAssignmentStatement::Tag>;
 
   /// Returns the probability table for a given statement, represented by their
   /// tag, to be selected.
@@ -1096,6 +1103,19 @@ public:
     };
   }
 
+  static bool discardScalarAssignmentStatement(const TypingContext &) {
+    return false;
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ScalarAssignmentStatement>{
+        /*target=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*output=*/copyInputToOutput<ast::ScalarAssignmentStatement>(),
+    };
+  }
+
   static bool discardStatementList(const TypingContext &) { return false; }
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
@@ -1205,6 +1225,12 @@ public:
         context.cast<TypingContext>());
   }
 
+  bool
+  discardScalarAssignmentStatementOpaque(const OpaqueContext &context) final {
+    return self().discardScalarAssignmentStatement(
+        context.cast<TypingContext>());
+  }
+
   bool discardStatementListOpaque(const OpaqueContext &context) final {
     return self().discardStatementList(context.cast<TypingContext>());
   }
@@ -1294,6 +1320,10 @@ public:
   static bool discardFreshArrayParameter(const TypingContext &) { return true; }
 
   static bool discardArrayAssignmentStatement(const TypingContext &) {
+    return true;
+  }
+
+  static bool discardScalarAssignmentStatement(const TypingContext &) {
     return true;
   }
 
