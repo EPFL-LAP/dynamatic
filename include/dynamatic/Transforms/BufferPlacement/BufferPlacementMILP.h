@@ -120,14 +120,15 @@ public:
   /// some buffering properties become unsatisfiable following this step, the
   /// constructor sets the `unsatisfiable` flag to true.
   BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
-                      const TimingDatabase &timingDB, double targetPeriod);
+                      const TimingDatabase &timingDB, double targetPeriod,
+                      bool bufPenalty = true);
 
   /// Follows the same pre-processing step as the other constructor; in
   /// addition, dumps the MILP model and solution under the provided name in the
   /// logger's directory.
   BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
                       const TimingDatabase &timingDB, double targetPeriod,
-                      Logger &logger, StringRef milpName);
+                      bool bufPenalty, Logger &logger, StringRef milpName);
 
 protected:
   /// Represents a list of signals that are buffered together by a single
@@ -184,6 +185,8 @@ protected:
 
   /// Whether the MILP was determined to be unsatisfiable during construction.
   bool unsatisfiable = false;
+  /// Whether to add buffer and slot penalty terms to the MILP objective.
+  bool bufPenalty;
   /// Large constant strictly greater than the number of units in the Handshake
   /// function under consideration.
   unsigned largeCst;

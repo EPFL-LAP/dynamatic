@@ -295,7 +295,12 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "'buffer-placement' at the binary's location.">,
     Option<"seed", "seed", "unsigned", "0",
     "Seed for the Gurobi MILP solver (controls random tie-breaking; "
-    "use the same value across runs for reproducibility).">];
+    "use the same value across runs for reproducibility).">,
+    Option<"bufPenalty", "buf-penalty", "bool", "true",
+    "If true (default), add penalty terms to the MILP objective that "
+    "discourage placing buffers and extra slots, producing minimal placements. "
+    "Set to false to disable the penalty and allow the solver to place buffers "
+    "freely.">];
 }
 
 //===----------------------------------------------------------------------===//

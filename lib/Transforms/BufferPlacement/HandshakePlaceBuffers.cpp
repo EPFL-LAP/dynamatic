@@ -96,7 +96,7 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
 HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
-    unsigned seed) {
+    unsigned seed, bool bufPenalty) {
   this->algorithm = algorithm.str();
   this->frequencies = frequencies.str();
   this->timingModels = timingModels.str();
@@ -105,6 +105,7 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->timeout = timeout;
   this->dumpLogs = dumpLogs;
   this->seed = seed;
+  this->bufPenalty = bufPenalty;
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
@@ -445,7 +446,7 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
     // Create and solve the MILP
     return checkLoggerAndSolve<fpga20::FPGA20Buffers>(
         logger, "placement", placement, env, info, timingDB, targetCP,
-        algorithm != FPGA20);
+        algorithm != FPGA20, bufPenalty);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -464,13 +465,14 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
       if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
               logger, milpName, placement, env, info, timingDB, targetCP,
-              cfUnion)))
+              cfUnion, bufPenalty)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-        logger, "out_of_cycle", placement, env, info, timingDB, targetCP);
+        logger, "out_of_cycle", placement, env, info, timingDB, targetCP,
+        bufPenalty);
   }
 
   llvm_unreachable("unknown algorithm");
@@ -570,8 +572,8 @@ std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::buffer::createHandshakePlaceBuffers(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
-    unsigned seed) {
+    unsigned seed, bool bufPenalty) {
   return std::make_unique<HandshakePlaceBuffersPass>(
       algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs, seed);
+      dumpLogs, seed, bufPenalty);
 }

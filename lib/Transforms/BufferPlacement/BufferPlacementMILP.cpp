@@ -92,21 +92,22 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
 
 BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
-                                         double targetPeriod)
+                                         double targetPeriod, bool bufPenalty)
     : MILP<BufferPlacement>(env), timingDB(timingDB),
-      targetPeriod(targetPeriod), funcInfo(funcInfo), logger(nullptr) {
+      targetPeriod(targetPeriod), funcInfo(funcInfo), logger(nullptr),
+      bufPenalty(bufPenalty) {
   initialize();
 }
 
 BufferPlacementMILP::BufferPlacementMILP(GRBEnv &env, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
-                                         double targetPeriod, Logger &logger,
-                                         StringRef milpName)
+                                         double targetPeriod, bool bufPenalty,
+                                         Logger &logger, StringRef milpName)
     : MILP<BufferPlacement>(env, logger.getLogDir() +
                                      llvm::sys::path::get_separator() +
                                      milpName),
       timingDB(timingDB), targetPeriod(targetPeriod), funcInfo(funcInfo),
-      logger(&logger) {
+      logger(&logger), bufPenalty(bufPenalty) {
   initialize();
 }
 
@@ -496,13 +497,15 @@ void BufferPlacementMILP::addObjective(ValueRange channels,
 
   // For each channel, add a "penalty" in case a buffer is added to the channel,
   // and another penalty that depends on the number of slots
-  // double bufPenaltyMul = 1e-4;
-  // double slotPenaltyMul = 1e-5;
-  // for (Value channel : channels) {
-  //   ChannelVars &channelVars = vars.channelVars[channel];
-  //   objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
-  //   objective -= maxCoefCFDFC * slotPenaltyMul * channelVars.bufNumSlots;
-  // }
+  if (bufPenalty) {
+    double bufPenaltyMul = 1e-4;
+    double slotPenaltyMul = 1e-5;
+    for (Value channel : channels) {
+      ChannelVars &channelVars = vars.channelVars[channel];
+      objective -= maxCoefCFDFC * bufPenaltyMul * channelVars.bufPresent;
+      objective -= maxCoefCFDFC * slotPenaltyMul * channelVars.bufNumSlots;
+    }
+  }
 
   // Finally, set the MILP objective
   model.setObjective(objective, GRB_MAXIMIZE);

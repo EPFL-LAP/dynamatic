@@ -27,8 +27,9 @@ using namespace dynamatic::buffer::fpga20;
 
 FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
-                             double targetPeriod, bool legacyPlacement)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod),
+                             double targetPeriod, bool legacyPlacement,
+                             bool bufPenalty)
+    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, bufPenalty),
       legacyPlacement(legacyPlacement) {
   if (!unsatisfiable)
     setup();
@@ -37,9 +38,10 @@ FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
 FPGA20Buffers::FPGA20Buffers(GRBEnv &env, FuncInfo &funcInfo,
                              const TimingDatabase &timingDB,
                              double targetPeriod, bool legacyPlacement,
-                             Logger &logger, StringRef milpName)
-    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, logger,
-                          milpName),
+                             bool bufPenalty, Logger &logger,
+                             StringRef milpName)
+    : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, bufPenalty,
+                          logger, milpName),
       legacyPlacement(legacyPlacement) {
   if (!unsatisfiable)
     setup();
