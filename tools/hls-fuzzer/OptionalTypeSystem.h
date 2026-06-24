@@ -229,6 +229,18 @@ public:
         subTypeSystem.getArrayAssignmentStatementTransferFns());
   }
 
+  bool discardScalarAssignmentStatement(const Context &context) {
+    if (!context)
+      return false;
+    return subTypeSystem.discardScalarAssignmentStatement(*context);
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return wrapTransferFns<ast::ScalarAssignmentStatement>(
+        subTypeSystem.getScalarAssignmentStatementTransferFns());
+  }
+
   bool discardStatementList(const Context &context) {
     if (!context)
       return false;

@@ -199,6 +199,24 @@ public:
     };
   }
 
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    // The assigned value must match the target's type to avoid an int<->float
+    // cast. We use weak dependencies between the target and the value
+    // so that neither is forced to be generated before the other.
+    return {
+        /*target=*/
+        copyFirstOf<ast::ScalarAssignmentStatement,
+                    weak(ast::ScalarAssignmentStatement::VALUE),
+                    INPUT_DEPENDENCY>(),
+        /*value=*/
+        copyFirstOf<ast::ScalarAssignmentStatement,
+                    weak(ast::ScalarAssignmentStatement::TARGET),
+                    INPUT_DEPENDENCY>(),
+        /*output=*/copyInputToOutput<ast::ScalarAssignmentStatement>(),
+    };
+  }
+
 private:
   /// Returns the given type constraint that matches the given 'scalarType'.
   static DynamaticTypingContext
