@@ -169,7 +169,7 @@ public:
                        double targetPeriod, bool legacyPlacement,
                        Logger &logger, StringRef milpName)
       : FPGA20Buffers(env, funcInfo, timingDB, targetPeriod, legacyPlacement,
-                      logger, milpName),
+                      /*bufPenalty=*/true, logger, milpName),
         sharingInfo(sharingInfo) {};
   FPGA20BuffersWrapper(SharingInfo &sharingInfo, GRBEnv &env,
                        FuncInfo &funcInfo, const TimingDatabase &timingDB,
@@ -197,7 +197,7 @@ public:
                      const TimingDatabase &timingDB, double targetPeriod,
                      CFDFCUnion &cfUnion, Logger &logger, StringRef milpName)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion,
-                          logger, milpName),
+                          /*bufPenalty=*/true, logger, milpName),
         sharingInfo(sharingInfo) {};
   FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
                      const TimingDatabase &timingDB, double targetPeriod,
@@ -331,7 +331,8 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
 
       // Solve last MILP on channels/units that are not part of any CFDFC
       return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
-          logger, "out_of_cycle", placement, env, funcInfo, timingDB, targetCP);
+          logger, "out_of_cycle", placement, env, funcInfo, timingDB, targetCP,
+          /*bufPenalty=*/true);
     }
 
     llvm_unreachable("unknown algorithm");
