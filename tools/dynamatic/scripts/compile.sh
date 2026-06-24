@@ -62,6 +62,8 @@ F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
+F_HANDSHAKE_PRE_MATERIALIZE="$COMP_DIR/handshake_pre_materialize.mlir"
+F_HANDSHAKE_REWRITTEN="$COMP_DIR/handshake_rewritten.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
@@ -270,9 +272,7 @@ else
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
-MEMORY_INTERFACE_ARGS=()
-MATERIALIZE_ARGS=(--handshake-materialize)
-
+MATERIALIZE_PASS="--handshake-materialize"
 if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   echo_info "Using FPGA'23 for LSQ connection"
@@ -286,30 +286,39 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
 
   F_HANDSHAKE=$F_HANDSHAKE_SQ
-  MATERIALIZE_ARGS=("--handshake-materialize=replicate-constant=true")
+  MATERIALIZE_PASS="--handshake-materialize=replicate-constant=true"
+
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-remove-unused-memrefs \
+    --handshake-optimize-bitwidths \
+    > "$F_HANDSHAKE_PRE_MATERIALIZE"
+  exit_on_fail "Failed to apply pre-materialization transformations to handshake" \
+    "Applied pre-materialization transformations to handshake"
 else
-  MEMORY_INTERFACE_ARGS=(
-    --handshake-deactivate-mem-dependencies
-    --handshake-replace-memory-interfaces
-  )
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+    --handshake-remove-unused-memrefs \
+    --handshake-optimize-bitwidths \
+    > "$F_HANDSHAKE_PRE_MATERIALIZE"
+  exit_on_fail "Failed to apply pre-materialization transformations to handshake" \
+    "Applied pre-materialization transformations to handshake"
 fi
 
-STEERING_REWRITE_ARGS=()
+F_HANDSHAKE_TO_MATERIALIZE="$F_HANDSHAKE_PRE_MATERIALIZE"
 if [[ $OPTIMIZE_STEERING_REWRITES -ne 0 ]]; then
   echo_info "Applying steering-term rewrites"
-  STEERING_REWRITE_ARGS=(
-    --handshake-rewrite-terms
-    --handshake-combine-steering-logic
-  )
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TO_MATERIALIZE" \
+    --handshake-rewrite-terms \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE_REWRITTEN"
+  exit_on_fail "Failed to apply steering-term rewrites" \
+    "Applied steering-term rewrites"
+  F_HANDSHAKE_TO_MATERIALIZE="$F_HANDSHAKE_REWRITTEN"
 fi
 
-# handshake transformations
-"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-  "${MEMORY_INTERFACE_ARGS[@]}" \
-  --handshake-remove-unused-memrefs \
-  --handshake-optimize-bitwidths \
-  "${STEERING_REWRITE_ARGS[@]}" \
-  "${MATERIALIZE_ARGS[@]}" --handshake-infer-basic-blocks \
+# Final materialization before speculation and buffer placement.
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TO_MATERIALIZE" \
+  "$MATERIALIZE_PASS" --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
