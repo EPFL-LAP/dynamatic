@@ -61,6 +61,11 @@ public:
     return true;
   }
 
+  static bool discardScalarAssignmentStatement(const LSQNoDepContext &) {
+    // Only array assignment statements should be allowed.
+    return true;
+  }
+
   static bool discardBinaryExpression(ast::BinaryExpression::Op,
                                       const LSQNoDepContext &context) {
     // Anything but the index variable must be discarded when generating the
