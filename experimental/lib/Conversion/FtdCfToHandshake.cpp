@@ -379,6 +379,28 @@ struct FtdCfToHandshakePass
       // Build the shadow CFG — one struct, everything inside.
       ftd::ShadowCFG shadow = buildShadowCFG(builder, funcOp, info);
 
+      // Route the select of every conditional block's terminator branch
+      // through that block's condition placeholder.
+      DenseMap<unsigned, Value> condPlaceholderByBB;
+      for (auto cstOp : funcOp.getOps<handshake::ConstantOp>()) {
+        if (!cstOp->hasAttr("ftd.cvar"))
+          continue;
+        if (auto bbAttr = cstOp->getAttrOfType<IntegerAttr>("handshake.bb"))
+          condPlaceholderByBB[bbAttr.getUInt()] = cstOp.getResult();
+      }
+      for (auto brOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
+        if (brOp->hasAttr("ftd.skip"))
+          continue;
+        auto bbAttr = brOp->getAttrOfType<IntegerAttr>("handshake.bb");
+        if (!bbAttr)
+          continue;
+        auto it = condPlaceholderByBB.find(bbAttr.getUInt());
+        if (it == condPlaceholderByBB.end())
+          continue;
+        // operand 0 of a ConditionalBranchOp is the condition (select).
+        brOp->setOperand(0, it->second);
+      }
+
       ftd::resolveCondPlaceholders(funcOp, builder, shadow);
 
       // Populate conditionMap from NotIOp placeholders
