@@ -34,8 +34,8 @@ class DepthTypeSystem : public TypeSystem<DepthTypingContext, DepthTypeSystem> {
   }
 
 public:
-  explicit DepthTypeSystem(std::size_t maxExpressionDepth = 4,
-                           std::size_t maxTotalStatements = 10)
+  explicit DepthTypeSystem(std::size_t maxExpressionDepth,
+                           std::size_t maxTotalStatements)
       : maxExpressionDepth(maxExpressionDepth),
         maxTotalStatements(maxTotalStatements) {}
 
@@ -216,9 +216,8 @@ struct ParamTypingContext {
 class ParamTypeSystem
     : public CounterTypeSystem<ParamTypingContext, ParamTypeSystem> {
 public:
-  explicit ParamTypeSystem(std::size_t maxScalarParam = 16,
-                           std::size_t maxArrayParam = 8,
-                           std::size_t maxParams = 256)
+  explicit ParamTypeSystem(std::size_t maxScalarParam,
+                           std::size_t maxArrayParam, std::size_t maxParams)
       : maxScalarParam(maxScalarParam), maxArrayParam(maxArrayParam),
         maxParams(maxParams) {}
 
@@ -269,6 +268,26 @@ private:
 class LimitTypeSystem final
     : public ConjunctionTypeSystemBase<
           LimitTypeSystem, details::DepthTypeSystem, details::ParamTypeSystem> {
+public:
+  struct Options {
+    Options() = default;
+
+    std::size_t maxExpressionDepth = 4;
+    std::size_t maxTotalStatements = 10;
+    std::size_t maxScalarParam = 16;
+    std::size_t maxArrayParam = 8;
+    std::size_t maxParams = 256;
+  };
+
+  LimitTypeSystem() : LimitTypeSystem(Options()) {}
+
+  explicit LimitTypeSystem(const Options &options)
+      : ConjunctionTypeSystemBase(
+            details::DepthTypeSystem(options.maxExpressionDepth,
+                                     options.maxTotalStatements),
+            details::ParamTypeSystem(options.maxScalarParam,
+                                     options.maxArrayParam,
+                                     options.maxParams)) {}
 };
 } // namespace dynamatic::gen
 

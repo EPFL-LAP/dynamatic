@@ -19,8 +19,7 @@ class RandomCTypeSystem final
                                        OptionalTypeSystem<BitwidthTypeSystem>> {
 public:
   explicit RandomCTypeSystem(Randomly &random)
-      : ConjunctionTypeSystemBase(DynamaticTypeSystem(random),
-                                  LimitTypeSystem(),
+      : ConjunctionTypeSystemBase(DynamaticTypeSystem(), LimitTypeSystem(),
                                   // Upper bound on what bitwidth can be
                                   // generated in unrestricted contexts.
                                   BitwidthTypeSystem(64, random)) {}

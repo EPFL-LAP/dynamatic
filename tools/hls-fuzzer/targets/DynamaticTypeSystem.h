@@ -15,7 +15,7 @@ struct DynamaticTypingContext {
     /// Expression must be of an integer type.
     IntegerRequired,
     MAX_VALUE = IntegerRequired,
-  } constraint;
+  } constraint = Unconstrained;
 };
 
 /// Custom type system that avoids expressions that dynamatic is known not to
@@ -27,8 +27,6 @@ struct DynamaticTypingContext {
 class DynamaticTypeSystem final
     : public TypeSystem<DynamaticTypingContext, DynamaticTypeSystem> {
 public:
-  explicit DynamaticTypeSystem(Randomly &) {}
-
   TransferFnArray<ast::Function> getFunctionTransferFns() override {
     return {
         /*return type=*/copyFromInput<ast::Function>(),

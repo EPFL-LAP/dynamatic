@@ -298,6 +298,9 @@ public:
   /// Returns the type of the given expression.
   ScalarType getType() const;
 
+  template <typename From>
+  friend struct llvm::simplify_type;
+
 private:
   std::shared_ptr<const Variant> expression;
 };
@@ -913,6 +916,16 @@ struct llvm::simplify_type<dynamatic::ast::ReturnType> {
   static SimpleType &
   getSimplifiedValue(const dynamatic::ast::ReturnType &datatype) {
     return datatype.variant;
+  }
+};
+
+template <>
+struct llvm::simplify_type<dynamatic::ast::Expression> {
+  using SimpleType = const dynamatic::ast::Expression::Variant;
+
+  static SimpleType &
+  getSimplifiedValue(const dynamatic::ast::Expression &expression) {
+    return *expression.expression;
   }
 };
 
