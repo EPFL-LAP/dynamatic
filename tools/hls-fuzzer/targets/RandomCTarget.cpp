@@ -6,6 +6,9 @@
 #include "hls-fuzzer/ConjunctionTypeSystem.h"
 #include "hls-fuzzer/LimitTypeSystem.h"
 #include "hls-fuzzer/TargetRegistry.h"
+#include "hls-fuzzer/statistics/ASTStatistic.h"
+
+#include <mutex>
 
 REGISTER_TARGET("random-c", dynamatic::RandomCTarget);
 
@@ -21,6 +24,18 @@ public:
 
   VerificationResult
   verify(const std::filesystem::path &sourceFile) const override;
+
+  std::vector<Statistic> getStatistics() const override {
+    if (!isStatisticEnabled(ASTStatistic::CATEGORY))
+      return {};
+
+    std::lock_guard<std::mutex> guard{statisticMutex};
+    return {Statistic(ASTStatistic::CATEGORY.str(), astStatistic)};
+  }
+
+private:
+  mutable std::mutex statisticMutex;
+  ASTStatistic astStatistic;
 };
 
 } // namespace
@@ -34,7 +49,12 @@ void RandomCWorker::generate(llvm::raw_ostream &os,
                              llvm::StringRef functionName) {
   gen::RandomCTypeSystem dynamaticTypeSystem(random);
   gen::BasicCGenerator generator(random, dynamaticTypeSystem);
-  generator.generate(os, functionName);
+  ast::Function function = generator.generate(os, functionName);
+
+  if (isStatisticEnabled(ASTStatistic::CATEGORY)) {
+    std::lock_guard<std::mutex> guard{statisticMutex};
+    astStatistic.update(function);
+  }
 }
 
 AbstractWorker::VerificationResult

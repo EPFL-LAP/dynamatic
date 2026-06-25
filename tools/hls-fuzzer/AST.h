@@ -602,6 +602,9 @@ public:
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                        const Statement &statement);
 
+  template <typename From>
+  friend struct llvm::simplify_type;
+
 private:
   std::shared_ptr<const Variant> statement;
 };
@@ -919,6 +922,9 @@ struct llvm::simplify_type<dynamatic::ast::ReturnType> {
   }
 };
 
+// Enable 'dyn_cast' and friends on 'Expression' by delegating to 'dyn_cast' on
+// the underlying variant of concrete expression nodes.
+// E.g. 'ast::BinaryExpression* bin = dyn_cast<ast::BinaryExpression>(expr);'
 template <>
 struct llvm::simplify_type<dynamatic::ast::Expression> {
   using SimpleType = const dynamatic::ast::Expression::Variant;
@@ -926,6 +932,18 @@ struct llvm::simplify_type<dynamatic::ast::Expression> {
   static SimpleType &
   getSimplifiedValue(const dynamatic::ast::Expression &expression) {
     return *expression.expression;
+  }
+};
+
+// Enable 'dyn_cast' and friends on 'Statement' by delegating to 'dyn_cast' on
+// the underlying variant of concrete statement nodes.
+template <>
+struct llvm::simplify_type<dynamatic::ast::Statement> {
+  using SimpleType = const dynamatic::ast::Statement::Variant;
+
+  static SimpleType &
+  getSimplifiedValue(const dynamatic::ast::Statement &statement) {
+    return *statement.statement;
   }
 };
 
