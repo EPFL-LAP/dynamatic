@@ -182,6 +182,11 @@ public:
   getStructuredForStatementTransferFns() override {
     return getMergingTransferFnArray<ast::StructuredForStatement>();
   }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return getMergingTransferFnArray<ast::ScalarAssignmentStatement>();
+  }
 };
 
 } // namespace dynamatic::gen
