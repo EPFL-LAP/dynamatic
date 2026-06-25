@@ -225,11 +225,13 @@ void PreEagerlyElasticPass::performSuppressorMotion(
 
   // erase all old suppressors feeding into the target operation
   for (Value operand : targetOp->getOperands()) {
-    if (auto incomingBranch =
-            dyn_cast<handshake::ConditionalBranchOp>(operand.getDefiningOp())) {
-      frontier.erase(incomingBranch);
-      targetOp->replaceUsesOfWith(operand, incomingBranch.getDataOperand());
-      incomingBranch->erase();
+    if (Operation *defOp = operand.getDefiningOp()) {
+      if (auto incomingBranch =
+              dyn_cast<handshake::ConditionalBranchOp>(defOp)) {
+        frontier.erase(incomingBranch);
+        targetOp->replaceUsesOfWith(operand, incomingBranch.getDataOperand());
+        incomingBranch->erase();
+      }
     }
   }
 
@@ -313,33 +315,15 @@ void PreEagerlyElasticPass::rewriteD(
   existingInitOp.getOperandMutable().assign(controlFork.getResults()[1]);
   llvm::errs() << "fork generated\n";
 
-  // move suppressor to past the mux
-  frontier.erase(branchOp);
-  branchOp.getFalseResult().replaceAllUsesWith(branchOp.getDataOperand());
-  branchOp->erase();
-  llvm::errs() << "erase successful!\n";
-  builder.setInsertionPointAfter(dataMux);
-  auto suppInverter =
-      builder.create<handshake::NotIOp>(loc, controlFork.getResults()[2]);
-  auto newSupp = builder.create<handshake::ConditionalBranchOp>(
-      loc, suppInverter.getResult(), dataMux.getResult());
-
   // assign the basic block attributes from the dataMux to all other ops
   trueSrc->setAttr("handshake.bb", bbAttr);
   trueCst->setAttr("handshake.bb", bbAttr);
   condMux->setAttr("handshake.bb", bbAttr);
   controlFork->setAttr("handshake.bb", bbAttr);
   loopInitF->setAttr("handshake.bb", bbAttr);
-  suppInverter->setAttr("handshake.bb", bbAttr);
-  newSupp->setAttr("handshake.bb", bbAttr);
-  llvm::errs() << "attributes set\n";
 
-  // reroute all downstream consumers to look at the false result of the new
-  // supp
-  dataMux.getResult().replaceAllUsesExcept(newSupp.getFalseResult(), newSupp);
-
-  // insert the new supp into frontiers
-  frontier.insert(newSupp);
+  // move suppressor past the mux
+  performSuppressorMotion(branchOp, frontier);
 }
 
 void PreEagerlyElasticPass::runOnOperation() {
@@ -378,6 +362,10 @@ void PreEagerlyElasticPass::runOnOperation() {
   } while (frontierUpdated);
 
   llvm::errs() << "finish rewrite A!\n";
+
+  /* llvm::errs() << "=== IR AFTER REWRITE A ===\n";
+  modOp.dump();
+  llvm::errs() << "==============================================\n"; */
 
   // Do Rewrite D exactly once on the first MuxOp you find
   // this needs to be fixed, as rewrite D can only be done on loop entries
