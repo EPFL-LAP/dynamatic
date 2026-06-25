@@ -2,8 +2,8 @@
 #define DYNAMATIC_HLS_FUZZER_LIMITTYPESYSTEM
 
 #include "ConjunctionTypeSystem.h"
+#include "CounterTypeSystem.h"
 #include "TypeSystem.h"
-#include "VisitorTypeSystem.h"
 #include <cstddef>
 
 namespace dynamatic::gen {
@@ -214,7 +214,7 @@ struct ParamTypingContext {
 /// Type system that caps the maximum amount of scalar parameters, array
 /// parameters and parameters in general.
 class ParamTypeSystem
-    : public VisitorTypeSystem<ParamTypingContext, ParamTypeSystem> {
+    : public CounterTypeSystem<ParamTypingContext, ParamTypeSystem> {
 public:
   explicit ParamTypeSystem(std::size_t maxScalarParam = 16,
                            std::size_t maxArrayParam = 8,

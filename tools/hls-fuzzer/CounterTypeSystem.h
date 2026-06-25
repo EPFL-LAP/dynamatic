@@ -5,7 +5,7 @@
 
 namespace dynamatic::gen {
 
-/// Convenient base class for any type systems that are "pure" visitors.
+/// Convenient base class for any type systems that are just "counters".
 /// These type systems:
 /// * Do not care about the order that AST nodes are generated.
 /// * Have a monotonic 'TypingContext' which only ever increases/decreases.
@@ -20,7 +20,7 @@ namespace dynamatic::gen {
 /// 'TypingContext merge(const TypingContext& rhs) const' which can be used
 /// to calculate the current maximum/minimum of all contexts generated so far.
 template <typename TypingContext, typename Self>
-class VisitorTypeSystem : public TypeSystem<TypingContext, Self> {
+class CounterTypeSystem : public TypeSystem<TypingContext, Self> {
 
 public:
   using Base = TypeSystem<TypingContext, Self>;
@@ -35,6 +35,8 @@ protected:
         [](TypingContext result, auto &&...args) -> TypingContext {
           foreachInTuples(
               [&](const auto &element) {
+                // Skip over the arguments that aren't the typing context such
+                // as the ASTNodes passed alongside the contexts.
                 if constexpr (std::is_same_v<std::decay_t<decltype(element)>,
                                              const TypingContext *>) {
                   if (!element)
