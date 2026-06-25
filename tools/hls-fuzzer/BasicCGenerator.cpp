@@ -662,8 +662,8 @@ void gen::BasicCGenerator::initGenerators() {
       ast::ScalarAssignmentStatement::Tag{});
 }
 
-void gen::BasicCGenerator::generate(llvm::raw_ostream &os,
-                                    std::string_view functionName) {
+ast::Function gen::BasicCGenerator::generate(llvm::raw_ostream &os,
+                                             std::string_view functionName) {
   ast::Function function = generateFunction(functionName);
   os << R"(
 #include <stdint.h>
@@ -676,6 +676,7 @@ constexpr
 )";
   os << function << '\n';
   os << generateTestBench(function);
+  return function;
 }
 
 ast::Function
