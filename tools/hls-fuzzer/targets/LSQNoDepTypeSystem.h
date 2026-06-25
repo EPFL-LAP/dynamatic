@@ -149,9 +149,12 @@ class LSQNoDepTypeSystem final
 public:
   explicit LSQNoDepTypeSystem()
       : ConjunctionTypeSystemBase(detail::LSQNoDepTypeSystemInner(),
-                                  DynamaticTypeSystem(),
-                                  LimitTypeSystem(/*maxExpressionDepth=*/8,
-                                                  /*maxTotalStatements=*/1)) {}
+                                  DynamaticTypeSystem(), LimitTypeSystem([] {
+                                    LimitTypeSystem::Options options{};
+                                    options.maxExpressionDepth = 8;
+                                    options.maxTotalStatements = 1;
+                                    return options;
+                                  }())) {}
 };
 
 } // namespace dynamatic::gen
