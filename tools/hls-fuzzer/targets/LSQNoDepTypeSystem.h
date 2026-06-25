@@ -25,9 +25,10 @@ struct LSQNoDepContext {
   bool generatingArrayIndex() const {
     // Note: !indexVariable is sufficient to tell we are in the index of an
     // array-assignment statement, merely because there is just one
-    // array-assignment statement in the program at the moment,
-    // the array parameter is not an expression and that the index variable
-    // will be set when generating the value statement.
+    // array-assignment statement in the program at the moment, no other
+    // statements like scalar assignments, the array parameter is not an
+    // expression and that the index variable will be set when generating the
+    // value statement.
     return inArrayReadIndexExpression || !indexVariable;
   }
 };
