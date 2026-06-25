@@ -36,6 +36,10 @@ private:
 
   Value getForkTop(Value value, bool &isInverted);
   bool isSourced(Value value);
+
+  void rewriteD(handshake::MuxOp dataMux,
+                handshake::ConditionalBranchOp branchOp,
+                DenseSet<handshake::ConditionalBranchOp> &frontier);
 };
 
 /// TODO: function description
@@ -247,6 +251,97 @@ void PreEagerlyElasticPass::performSuppressorMotion(
   }
 }
 
+void PreEagerlyElasticPass::rewriteD(
+    handshake::MuxOp dataMux, handshake::ConditionalBranchOp branchOp,
+    DenseSet<handshake::ConditionalBranchOp> &frontier) {
+
+  Location loc = dataMux->getLoc();
+  auto bbAttr = dataMux->getAttr("handshake.bb");
+
+  llvm::errs() << dataMux->getAttr("handshake.name") << '\n';
+
+  // check whether pathA actually connects to my suppressor
+  Value pathA = dataMux.getDataOperands()[0];
+  if (pathA != branchOp.getFalseResult()) {
+    llvm::errs() << "the passed branch does not connect to pathA of the mux\n";
+  }
+
+  // find the condition signal C
+  Value conditionC = branchOp.getConditionOperand();
+  if (auto notOp = dyn_cast<handshake::NotIOp>(conditionC.getDefiningOp())) {
+    // if it was converted, we want it before the Not
+    // should we always go into this if?
+    conditionC = notOp.getOperand();
+  }
+
+  // find the original InitOp already attached to the Mux's select operand
+  Value originalSelect = dataMux.getSelectOperand();
+  auto existingInitOp =
+      dyn_cast<handshake::InitOp>(originalSelect.getDefiningOp());
+  if (!existingInitOp) {
+    // this should never happen?
+    llvm::errs() << "Error: Expected an existing InitOp attached to the Mux "
+                    "select lines.\n";
+    return;
+  }
+
+  // build the top speculative loop control structure
+  OpBuilder builder(dataMux);
+  builder.setInsertionPoint(dataMux); // is this done automatically?
+
+  // create the constant true generator
+  auto trueSrc = builder.create<handshake::SourceOp>(loc);
+  auto trueCst = builder.create<handshake::ConstantOp>(
+      loc, conditionC.getType(), builder.getBoolAttr(true),
+      trueSrc.getResult());
+  llvm::errs() << "constant true generator generated\n";
+
+  // create the new condition-generating mux
+  // takes condition C on true and constant TRUE on false
+  SmallVector<Value> condMuxInputs = {conditionC, trueCst.getResult()};
+  auto condMux = builder.create<handshake::MuxOp>(loc, conditionC.getType(),
+                                                  conditionC, condMuxInputs);
+  llvm::errs() << "mux generation successful\n";
+
+  // create the fork and wire output 0 back to the condition mmux via an init
+  // and output 1 to the original data mux via the already existing init
+  auto controlFork =
+      builder.create<handshake::ForkOp>(loc, condMux.getResult(), 3);
+  auto loopInitF = builder.create<handshake::InitOp>(
+      loc, controlFork.getResults()[0].getType(), controlFork.getResults()[0]);
+  condMux.getSelectOperandMutable()[0].set(loopInitF.getResult());
+  existingInitOp.getOperandMutable().assign(controlFork.getResults()[1]);
+  llvm::errs() << "fork generated\n";
+
+  // move suppressor to past the mux
+  frontier.erase(branchOp);
+  branchOp.getFalseResult().replaceAllUsesWith(branchOp.getDataOperand());
+  branchOp->erase();
+  llvm::errs() << "erase successful!\n";
+  builder.setInsertionPointAfter(dataMux);
+  auto suppInverter =
+      builder.create<handshake::NotIOp>(loc, controlFork.getResults()[2]);
+  auto newSupp = builder.create<handshake::ConditionalBranchOp>(
+      loc, suppInverter.getResult(), dataMux.getResult());
+
+  // assign the basic block attributes from the dataMux to all other ops
+  trueSrc->setAttr("handshake.bb", bbAttr);
+  trueCst->setAttr("handshake.bb", bbAttr);
+  condMux->setAttr("handshake.bb", bbAttr);
+  controlFork->setAttr("handshake.bb", bbAttr);
+  loopInitF->setAttr("handshake.bb", bbAttr);
+  suppInverter->setAttr("handshake.bb", bbAttr);
+  newSupp->setAttr("handshake.bb", bbAttr);
+  llvm::errs() << "attributes set\n";
+
+  // reroute all downstream consumers to look at the false result of the new
+  // supp
+  dataMux.getResult().replaceAllUsesExcept(newSupp.getFalseResult(), newSupp);
+
+  // insert the new supp into frontiers
+  frontier.insert(newSupp);
+}
+
 void PreEagerlyElasticPass::runOnOperation() {
   ModuleOp modOp = getOperation();
 
@@ -281,4 +376,18 @@ void PreEagerlyElasticPass::runOnOperation() {
       llvm::errs() << "not eligible\n";
     }
   } while (frontierUpdated);
+
+  llvm::errs() << "finish rewrite A!\n";
+
+  // Do Rewrite D exactly once on the first MuxOp you find
+  // this needs to be fixed, as rewrite D can only be done on loop entries
+  for (auto branchOp : frontier) {
+    if (auto mux = dyn_cast<handshake::MuxOp>(
+            *branchOp.getFalseResult().user_begin())) {
+      llvm::errs() << "branchOp for rewrite D: "
+                   << branchOp->getAttr("handshake.name") << '\n';
+      rewriteD(mux, branchOp, frontier);
+      break;
+    }
+  }
 }
