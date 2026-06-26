@@ -15,7 +15,7 @@ Dynamatic's IR is in SSA form, and the first step of FTD converts it to **gated-
 Control flow is resolved at run time, so there is no guarantee that control reaches the producer's block, the consumer's block, or both. The matching can fail in two ways. FTD inserts one control component on the producer→consumer channel for each of them:
 
 - **Suppression.** The producer emits a token that the consumer will not consume, so the token must be discarded. This happens when the consumer's block is not reached at all. It also happens when the producer is inside a loop and the consumer is outside it. In that case every iteration produces a token but only the last one is consumed, and the rest are suppressed. The component is a BRANCH whose discard output feeds a SINK. Its select carries the *suppression condition* `f_supp`. When `f_supp` is true the token is discarded, and when it is false the token is delivered. The circuit can equally compute the *consumption condition* `f_cons = ¬f_supp` with the two outputs swapped. The two conditions are always negations of each other, and the code and figures use whichever one reads better at a given point. In the IR this component is a `handshake::ConditionalBranchOp`, with the fixed convention that the false output delivers and the true output is sunk.
-- **Regeneration.** The consumer needs the value more often than the single producer emits it. GSA guarantees that a use never lacks a reaching definition, so this is never a case of a missing producer. The only case is a producer outside a loop feeding a consumer inside it, where the one token has to be reproduced on each iteration. The component is a MUX at the loop header. Its select is the loop's back-edge condition (true while the loop iterates), fed through an INIT that emits one initial token ahead of the condition stream. On the first iteration the MUX selects the value from outside the loop, and on every later iteration it selects the value fed back from inside, until the loop exits. In the IR this component is a `handshake::MuxOp` together with a `handshake::InitOp`.
+- **Regeneration.** The consumer needs the value more often than the producer emits it. GSA guarantees that a use never lacks a reaching definition, so this is never a case of a missing producer. The only case is a producer outside a loop feeding a consumer inside it, where the one token has to be reproduced on each iteration. The component is a MUX at the loop header. Its select is the loop's back-edge condition (true while the loop iterates), fed through an INIT that emits one initial token ahead of the condition stream. On the first iteration the MUX selects the value from outside the loop, and on every later iteration it selects the value fed back from inside, until the loop exits. In the IR this is a `handshake::MuxOp` whose select comes from the back-edge-condition circuit through a `handshake::InitOp`. When the consumer sits inside several enclosing loops, one such mux is chained per loop, outer feeding inner.
 
 The hard part is not writing down `f_supp`. As a Boolean over the branch conditions `cN`, that is straightforward. The hard part is evaluating it with tokens. Each conditional block emits one **condition token** per execution, so the token for a given literal may never arrive. Suppose block 0's condition `c0` guards block 1, which has condition `c1`. Whenever `c0` is true, block 1 never executes, so no `c1` token is ever produced. A naive elastic logic gate computing `f_supp = ¬c0·¬c1` would wait forever for the missing `c1` token, and the circuit would deadlock. The fix is to evaluate the expression as a tree of MUXes through successive Shannon expansion. A MUX never consumes its deselected input, so it never waits for a missing token. This is why every Boolean condition in FTD is lowered through a BDD into a mux tree (§3.5). Building those trees so that they stay correct across loops and shared condition tokens is the job of the rest of the suppression pipeline (§3.6 and §3.7).
 
@@ -298,7 +298,7 @@ auto muxOp = builder.create<handshake::MuxOp>(loc, type, muxCond, muxOperands);
 muxOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
 ```
 
-Three details matter here. First, the select is fetched from the `SignalRegistry` keyed by the **current path context**. The recursion extends the path with `{var, value}` before descending, so a deeper lookup finds the copy of a signal that was split for exactly this path. Second, the fallback `getOriginalValue` is where the shadow CFG is consulted. It maps `cN` to a block and returns the real condition `Value` (or, pre-flattening, a condition placeholder via a `Backedge`). Third, every emitted operation is tagged `FTD_OP_TO_SKIP` and given a `handshake.bb` attribute (`setBBAttrWithFallback` honors a `forcedBBAttr` when the driver wants the circuit tagged to a block other than the insertion block, e.g. a loop exit).
+Three details matter here. First, the select is fetched from the `SignalRegistry` keyed by the **current path context**. The recursion extends the path with `{var, value}` before descending, so a deeper lookup finds the copy of a signal that was split for exactly this path. Second, the fallback `getOriginalValue` is where the shadow CFG is consulted. It maps `cN` to a block and returns the real condition `Value` (or, pre-flattening, a condition placeholder from `getOrCreateCondPlaceholder`). Third, every emitted operation is tagged `FTD_OP_TO_SKIP` and given a `handshake.bb` attribute (`setBBAttrWithFallback` honors a `forcedBBAttr` when the driver wants the circuit tagged to a block other than the insertion block, e.g. a loop exit).
 
 <img src="./Figures/ch2_bddmux.png" width="540"/>
 
@@ -402,7 +402,8 @@ struct CyclicDemotionHelper {
 1. `findScopeForBlock(block, fromLevel)`, then `extractLayeredCFG(scope)`, which is the per-iteration question of §3.3 for this loop.
 2. Find the control dependence of the layer's `newCons` (the loop exit), the branches that decide whether control flows from *header → exit*.
 3. Build a **level-local registry** for those dependence variables. Each one is resolved at the right level first. A variable native to `fromLevel` or shallower uses its original signal, while a variable from a *deeper* loop is itself demoted to `fromLevel` recursively (`getValueAtLevel`). Every resolved value is registered under the empty path.
-4. Run `buildDistributionNetwork` on the layered CFG with that registry, evaluate the header→exit suppression condition, and gate `value` with a branch on it. **Only the token of the iteration that reaches the exit survives.** The surviving token is valid one level out.
+4. Run `buildDistributionNetwork` on the layered CFG with that registry, evaluate the header→exit suppression condition, and gate `value` with a branch on it. **Only the token of the iteration that reaches the exit survives.**
+5. When the value's anchor block is not the loop header itself, a header→anchor-block suppression condition is also computed and cascaded as an upstream filter on the gate's select (the same idea as `f_supDP` in §3.8), so the select pairs one-to-one with the value tokens. The surviving token is valid one level out.
 
 ```
 getValueAtLevel(var, target):
@@ -477,12 +478,18 @@ insertDirectSuppression(consumer, connection):
     if dominatorBlock ≠ producerBlock:
         f_supDP ← suppression condition of (dominatorBlock → producerBlock)   # own mini-pipeline
 
-    # ---- loop filter on the producer token ----
+    # ---- loop filter: reconcile token counts when the producer is in a deeper loop ----
     supData ← connection
     if loopDepth(producerBlock) > loopDepth(dominatorBlock):
-        filterBB ← first post-dominator of the producer at the dominator's loop depth
-        lfSup ← suppression condition of (producerBlock → filterBB)
-        supData ← Branch(select = circuit(lfSup), data = supData).falseResult
+        if producerBlock is a decision-graph node:
+            demoteBlock ← producerBlock
+        else:
+            pdNode ← nearest decision-graph node post-dominating producerBlock
+            lfSup  ← suppression condition of (producerBlock → pdNode)   # filters deeper simple loops
+            supData ← Branch(select = circuit(lfSup), data = supData).falseResult
+            demoteBlock ← pdNode
+        for lvl from demoteBlock's nesting level down to 1:
+            supData ← demoteOneLevel(supData, demoteBlock, lvl)
 
     # ---- emit ----
     if f_sup ≠ 0:
@@ -512,7 +519,7 @@ The fix has two parts, both keyed on `deliverToGamma`:
 
 **The upstream filter `f_supDP`.** When `dominatorBlock` sits above the producer, the producer does not fire on every path that reaches the start block, so the main condition alone would emit suppression-select tokens for executions in which there is no producer token to suppress. `f_supDP` is the suppression condition of the `dominatorBlock → producerBlock` stretch, computed by its own LocalCFG → decision graph → `enumeratePaths` run. Crucially it filters the **suppression signal**, not the data. An intermediate branch takes `branchCond` as data and the `f_supDP` circuit as select, and its false result becomes the final select. It is identically zero when the start block *is* the producer.
 
-**The loop filter.** When the producer is nested in a deeper loop than `dominatorBlock`, it fires several times per delivery and the main branch would see more data tokens than select tokens. The driver computes the producer's and the dominator's loop depths from `CFGLoopInfo` over the shadow region, and if the producer is deeper, walks up the **post-dominator tree** from the producer to the nearest block at the dominator's depth, the loop exit every producer execution funnels through. The suppression condition of `producerBlock → filterBB` (again its own mini-pipeline) gates the producer token so only the exit-reaching iteration's token survives. The filter circuit is tagged to the producer's block, since that is whose token it consumes.
+**The loop filter and producer demotion.** When the producer is nested in a deeper loop than `dominatorBlock`, it fires several times per delivery and the main branch would see more data tokens than select tokens. The driver compares the producer's and the dominator's loop depths from `CFGLoopInfo` over the shadow region, and if the producer is deeper it reconciles the counts by demoting the producer's value to the dominator's level with the same `demoteOneLevel` machinery as §3.7. Two cases arise. When the producer block is itself a node of the decision graph, its value is demoted level by level, anchored on the producer block. When it is not, the driver walks up the **post-dominator tree** from the producer to the nearest decision-graph node, runs a plain producer-to-that-node suppression to filter out the deeper simple loops in between (that filter branch is tagged to the producer's block, and its false output carries the surviving token), and then demotes the filtered value from that node. After the cascade the producer token is valid at the dominator-to-consumer level and pairs one-to-one with the main suppression branch.
 
 **Emission.** All three conditions are realized with `expressionToCircuit` against the shared registry and composed with `ConditionalBranchOp`s, every op tagged `FTD_OP_TO_SKIP` and `handshake.bb = targetBB`:
 
