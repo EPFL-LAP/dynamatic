@@ -37,9 +37,9 @@ private:
   Value getForkTop(Value value, bool &isInverted);
   bool isSourced(Value value);
 
-  void rewriteD_suppOnA(handshake::MuxOp dataMux,
-                        handshake::ConditionalBranchOp branchOp,
-                        DenseSet<handshake::ConditionalBranchOp> &frontier);
+  void rewriteD(handshake::MuxOp dataMux,
+                handshake::ConditionalBranchOp branchOp,
+                DenseSet<handshake::ConditionalBranchOp> &frontier);
 };
 
 /// TODO: function description
@@ -65,7 +65,6 @@ PreEagerlyElasticPass::prepareSuppressors(handshake::FuncOp funcOp) {
       }
 
       OpBuilder builder(branchOp);
-      builder.setInsertionPoint(branchOp); // TODO: necessary?
 
       // create inverted condition
       Value condition = branchOp.getConditionOperand();
@@ -237,7 +236,7 @@ void PreEagerlyElasticPass::performSuppressorMotion(
 
   // place the new suppressors after the targetOp
   OpBuilder builder(targetOp);
-  builder.setInsertionPointAfter(targetOp); // necessary?
+  builder.setInsertionPointAfter(targetOp);
 
   // place the new suppressors after the targetOp
   for (Value result : targetOp->getResults()) {
@@ -253,7 +252,7 @@ void PreEagerlyElasticPass::performSuppressorMotion(
   }
 }
 
-void PreEagerlyElasticPass::rewriteD_suppOnA(
+void PreEagerlyElasticPass::rewriteD(
     handshake::MuxOp dataMux, handshake::ConditionalBranchOp branchOp,
     DenseSet<handshake::ConditionalBranchOp> &frontier) {
 
@@ -282,7 +281,6 @@ void PreEagerlyElasticPass::rewriteD_suppOnA(
 
   // build the top speculative loop control structure
   OpBuilder builder(dataMux);
-  builder.setInsertionPoint(dataMux); // is this done automatically?
 
   // create the constant true generator
   auto trueSrc = builder.create<handshake::SourceOp>(loc);
@@ -293,7 +291,7 @@ void PreEagerlyElasticPass::rewriteD_suppOnA(
 
   // create the new condition-generating mux
   // takes condition C on true and constant TRUE on false
-  SmallVector<Value> condMuxInputs = {conditionC, trueCst.getResult()};
+  SmallVector<Value> condMuxInputs = {trueCst.getResult(), conditionC};
   auto condMux = builder.create<handshake::MuxOp>(loc, conditionC.getType(),
                                                   conditionC, condMuxInputs);
   llvm::errs() << "mux generation successful\n";
@@ -334,10 +332,8 @@ void PreEagerlyElasticPass::runOnOperation() {
   assert(funcOp && "No funcOp found!");
 
   // identify and prepare suppressors and return a list of all of them
-  llvm::errs() << "start prepareSuppressors\n";
   SmallVector<handshake::ConditionalBranchOp> suppressors =
       prepareSuppressors(funcOp);
-  llvm::errs() << "end prepareSuppressors\n";
 
   // Rewrite A
   DenseSet<handshake::ConditionalBranchOp> frontier;
@@ -375,14 +371,14 @@ void PreEagerlyElasticPass::runOnOperation() {
       llvm::errs() << "branchOp for rewrite D: "
                    << branchOp->getAttr("handshake.name") << '\n';
       // check which path the suppressor is connected to
-      Value pathA = mux.getDataOperands()[0];
-      Value pathB = mux.getDataOperands()[1];
+      Value pathA = mux.getDataOperands()[1];
+      Value pathB = mux.getDataOperands()[0];
       if (pathA == branchOp.getFalseResult()) {
         llvm::errs() << "supp connected to path A\n";
-        rewriteD_suppOnA(mux, branchOp, frontier);
+        rewriteD(mux, branchOp, frontier);
       } else if (pathB == branchOp.getFalseResult()) {
-        llvm::errs() << "supp connected to path B\n";
-        // rewriteD_suppOnB(mux, branchOp, frontier);
+        llvm::errs()
+            << "supp connected to path B, there should be a lot more nots...\n";
       }
       break;
     }
