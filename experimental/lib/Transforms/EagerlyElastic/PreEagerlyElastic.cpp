@@ -37,9 +37,9 @@ private:
   Value getForkTop(Value value, bool &isInverted);
   bool isSourced(Value value);
 
-  void rewriteD(handshake::MuxOp dataMux,
-                handshake::ConditionalBranchOp branchOp,
-                DenseSet<handshake::ConditionalBranchOp> &frontier);
+  void rewriteD_suppOnA(handshake::MuxOp dataMux,
+                        handshake::ConditionalBranchOp branchOp,
+                        DenseSet<handshake::ConditionalBranchOp> &frontier);
 };
 
 /// TODO: function description
@@ -253,20 +253,13 @@ void PreEagerlyElasticPass::performSuppressorMotion(
   }
 }
 
-void PreEagerlyElasticPass::rewriteD(
+void PreEagerlyElasticPass::rewriteD_suppOnA(
     handshake::MuxOp dataMux, handshake::ConditionalBranchOp branchOp,
     DenseSet<handshake::ConditionalBranchOp> &frontier) {
 
   Location loc = dataMux->getLoc();
   auto bbAttr = dataMux->getAttr("handshake.bb");
-
   llvm::errs() << dataMux->getAttr("handshake.name") << '\n';
-
-  // check whether pathA actually connects to my suppressor
-  Value pathA = dataMux.getDataOperands()[0];
-  if (pathA != branchOp.getFalseResult()) {
-    llvm::errs() << "the passed branch does not connect to pathA of the mux\n";
-  }
 
   // find the condition signal C
   Value conditionC = branchOp.getConditionOperand();
@@ -322,6 +315,13 @@ void PreEagerlyElasticPass::rewriteD(
   controlFork->setAttr("handshake.bb", bbAttr);
   loopInitF->setAttr("handshake.bb", bbAttr);
 
+  // rewire the NotIOp's input to the new control fork result
+  Value branchCond = branchOp.getConditionOperand();
+  if (auto notOp = dyn_cast<handshake::NotIOp>(branchCond.getDefiningOp())) {
+    notOp.getOperandMutable().assign(controlFork.getResults()[2]);
+  } else {
+    llvm::errs() << "There was no NOT connected to the suppressor\n";
+  }
   // move suppressor past the mux
   performSuppressorMotion(branchOp, frontier);
 }
@@ -374,7 +374,16 @@ void PreEagerlyElasticPass::runOnOperation() {
             *branchOp.getFalseResult().user_begin())) {
       llvm::errs() << "branchOp for rewrite D: "
                    << branchOp->getAttr("handshake.name") << '\n';
-      rewriteD(mux, branchOp, frontier);
+      // check which path the suppressor is connected to
+      Value pathA = mux.getDataOperands()[0];
+      Value pathB = mux.getDataOperands()[1];
+      if (pathA == branchOp.getFalseResult()) {
+        llvm::errs() << "supp connected to path A\n";
+        rewriteD_suppOnA(mux, branchOp, frontier);
+      } else if (pathB == branchOp.getFalseResult()) {
+        llvm::errs() << "supp connected to path B\n";
+        // rewriteD_suppOnB(mux, branchOp, frontier);
+      }
       break;
     }
   }
