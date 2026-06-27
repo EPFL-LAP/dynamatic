@@ -169,7 +169,7 @@ Property 4 is the key one. It reduces "should this token be discarded?" to a rea
 
 ### The decision graph
 
-Most blocks in the local CFG have a single successor and cannot affect whether `newCons` is reached. `buildDecisionGraph(lcfg, deps, muxConstraints?)` compresses them away. It keeps exactly the node set
+Most blocks in the local CFG cannot affect whether `newCons` is reached. `buildDecisionGraph(lcfg, deps, muxConstraints?)` compresses them away. It keeps exactly the node set
 
 ```
 { newCons, sinkBB } ∪ deps        // deps = control dependences of newCons
@@ -178,10 +178,10 @@ Most blocks in the local CFG have a single successor and cannot affect whether `
 and rewires everything else out of the way:
 
 - a helper `findNearest` follows a removed block's edges forward until it lands on a kept block, so a deleted chain `A → x → y → B` becomes a direct `A → B`;
-- a synthetic `dummyStart` is prepended so the entry never carries a back edge (the control-dependence analysis assumes this);
-- kept conditional blocks are rebuilt as `cf.cond_br` with a constant placeholder condition; kept one-way blocks forward to the nearest kept successor or, if none exists, to the sink.
+- a synthetic `dummyStart` is prepended so the entry block never carries a back edge;
+- each kept conditional block is rebuilt with a `cf.cond_br` terminator whose condition is a constant placeholder.
 
-The optional `muxConstraints` map (`Block* → bool`) forces a kept block's branch to a fixed value by wiring the *opposite* successor straight to the sink:
+The optional `muxConstraints` map (`Block* → bool`) constrains consumer reachability at a kept conditional block. The selected successor is kept as the meaningful path, while the opposite successor is wired directly to the sink:
 
 ```cpp
 // FtdSuppression.cpp — buildDecisionGraph, constrained rebuild
