@@ -266,7 +266,7 @@ For level 0 the two terminals are the actual consumer and sink. For deeper level
 
 Stitching values *across* levels is the job of demotion (see [Token demotion across loop levels](#token-demotion-across-loop-levels)).
 
-### Paths to a Boolean condition
+### From Paths to a Boolean condition
 
 On an acyclic decision graph, `enumeratePaths(lcfg, bi, deps)` walks every path from `newProd` to `newCons` (an iterative DFS that stops at the sink and refuses to revisit a block already on the current path) and converts each path to one product term with `getHybridPathExpression`:
 
@@ -288,13 +288,15 @@ f_cons = boolMinimize( OR over delivering paths of (AND of edge literals) )
 f_supp = boolMinimize( ¬f_cons )
 ```
 
-For a single `if` whose then-branch contains the producer and whose join contains the consumer, the only delivering path takes block 0's true edge, so `f_cons = c0` and `f_supp = ¬c0`. Two delivering paths `c0·c3` and `c0·¬c3` minimize to `f_cons = c0`, again `f_supp = ¬c0`.
+As a simple example, assume that block 0 branches on condition `c0`. The producer is reached only on the true branch. Then the only delivering path uses block 0's true edge, so `f_cons = c0` and `f_supp = ¬c0`. If there are two delivering paths with terms `c0·c3` and `c0·¬c3`, their disjunction minimizes to `f_cons = c0`, so the suppression condition is again `f_supp = ¬c0`.
 
-### Boolean to a mux tree
+### Lowering a Boolean condition to a mux tree
 
-`expressionToCircuit` lowers a Boolean to hardware. It minimizes the expression and orders the variables by topological rank, where `computeTopoRank(lcfg)` numbers each original block by its position in the graph's topological order. It then builds a BDD with that variable order and lowers it with `bddToCircuit`. Fixing the BDD variable order from the topology makes the mux tree mirror the dependency order of the blocks, so the root mux is selected by the earliest deciding condition.
+`expressionToCircuit` turns a Boolean expression into hardware. It first minimizes the expression, then chooses an order for the Boolean variables. The order comes from the CFG topology: `computeTopoRank(lcfg)` assigns each original block a rank according to its position in the topological order of the local graph.
 
-`bddToCircuit` is a direct recursion over the BDD:
+The expression is then converted into a BDD using this variable order, and the BDD is lowered by `bddToCircuit`. Because the variable order follows the CFG order, the generated mux tree also follows the order of decisions in the graph. In other words, earlier control decisions appear closer to the root of the mux tree.
+
+`bddToCircuit` recursively lowers each BDD node:
 
 ```cpp
 // FtdSuppression.cpp — bddToCircuit (abridged)
@@ -314,23 +316,37 @@ auto muxOp = builder.create<handshake::MuxOp>(loc, type, muxCond, muxOperands);
 muxOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
 ```
 
-Three details matter here. First, the select is fetched from the `SignalRegistry` keyed by the **current path context**. The recursion extends the path with `{var, value}` before descending, so a deeper lookup finds the copy of a signal that was split for exactly this path. Second, the fallback `getOriginalValue` is where the shadow CFG is consulted. It maps `cN` to a block and returns the real condition `Value` (or, pre-flattening, a condition placeholder from `getOrCreateCondPlaceholder`). Third, every emitted operation is tagged `FTD_OP_TO_SKIP` and given a `handshake.bb` attribute (`setBBAttrWithFallback` honors a `forcedBBAttr` when the driver wants the circuit tagged to a block other than the insertion block, e.g. a loop exit).
+For an internal BDD node, the variable of that node becomes the select signal of a `handshake::MuxOp`. The false child becomes the false input, and the true child becomes the true input. For a leaf node, the recursion emits either a constant or a condition value, possibly with a `NotIOp`.
+
+There are three implementation details worth noting.
+
+First, the select signal is not always the original condition value. `bddToCircuit` first asks the `SignalRegistry` for the copy of the condition that belongs to the current BDD path. Before descending into a child, the recursion extends the path with either `{var, false}` or `{var, true}`. This lets a deeper lookup find the condition token copy that was routed specifically for that path.
+
+Second, if the registry has no such copy, `bddToCircuit` falls back to `getOriginalValue`. This function uses the shadow CFG to map a name such as `cN` back to the corresponding block and then returns the real condition `Value`. Before the CFG is flattened, this value may be a condition placeholder created by `getOrCreateCondPlaceholder`.
+
+Third, every operation emitted for this circuit is marked with `FTD_OP_TO_SKIP`, so later FTD passes do not process it again. The operations also receive a `handshake.bb` attribute, which is assigned by `setBBAttrWithFallback`.
 
 <img src="./Figures/ch2_bddmux.png" width="540"/>
 
-*Figure 5: What `bddToCircuit` produces. (a) A BDD over c1, c2, c3 (dashed = false edges, T/F terminals). (b) The lowered circuit. Each internal vertex becomes a Mux selected by its variable's condition token, and each terminal becomes a constant. The root variable ends up at the output mux because the variable order follows the blocks' topological order.*
+*Figure 5: Lowering a BDD to a mux tree. (a) A BDD over `c1`, `c2`, and `c3`, where dashed edges are false edges and `T`/`F` are terminals. (b) The generated circuit. Each internal BDD node becomes a mux selected by that node's condition variable. Each terminal becomes a constant. Because the BDD variable order follows the CFG topological order, earlier control decisions appear closer to the root.*
 
-### Token distribution
+### Distributing condition tokens for the mux tree
 
-This stage is what makes the suppression circuit itself satisfy the token-matching invariants, and it is the reason the algorithm is more than "build a BDD."
+The Boolean expression tells us which value the suppression circuit should compute. However, it does not by itself guarantee that the generated circuit has valid token behavior. This is why the algorithm also needs a token-distribution step.
 
-**The problem.** A BDD-derived mux tree is generally **not read-once**. A BDD vertex can be reachable from the root along several distinct paths, so the same condition variable labels several mux inputs. A condition token, however, is produced *once* per execution of its block, and a MUX consumes a token on its selected input only. A token forked to a deselected input is left waiting and would be paired with a *later* execution's selection. The token-matching of the mux tree therefore requires the **read-once property**, meaning every variable labels at most one mux input. The Boolean is correct either way, but the token behavior is not.
+The issue comes from sharing in the BDD. A BDD node can be reached from the root through more than one path. If we lower such a BDD directly, the same condition variable may be used by several muxes in the generated tree.
+
+This is valid as Boolean logic, but it is not valid as a handshake circuit. A condition token is produced once when its block executes. If the same token is forked to several mux selects, some of those muxes may not consume it in the current execution, because a mux only consumes the token on the selected input. A token left on an unselected path can then be incorrectly paired with a later execution.
+
+Therefore, the mux tree must be read-once at the token level. Here, read-once means that each concrete condition token is used by at most one mux input.
 
 <img src="./Figures/ch5_4_l0bddmux.png" width="620"/>
 
-*Figure 6: The read-once problem and its fix, on the level-0 layer of Figure 4. (a) The ROBDD: vertex c6 is reachable from the root by two distinct paths and c7 by three. (b) The mux tree lowered directly from it: the single c6 token would have to drive two selects and c7 three. (c) The ROBDD after splitting: c6 becomes c6,1/c6,2 and c7 becomes c7,1 to c7,3, every vertex reachable by a unique path. (d) The resulting mux tree is read-once: each split copy drives exactly one select.*
+*Figure 6: Why token distribution is needed. (a) The ROBDD for the level-0 layer of Figure 4. The node `c6` is reachable by two paths from the root, and `c7` by three paths. (b) If the ROBDD is lowered directly, the single `c6` token would have to drive two mux selects, and the single `c7` token would have to drive three. (c) The algorithm therefore splits them into path-specific copies, `c6,1` and `c6,2`, and `c7,1` to `c7,3`. After this split, each BDD node is reached by a unique path. (d) The resulting mux tree is read-once: each condition-token copy drives exactly one mux input.*
 
-**The fix** is to split each shared condition variable into per-path copies, produced by routing the original condition token down a branch tree that follows the control flow and dropping it on the sub-paths where no copy is needed. Three data structures carry the bookkeeping:
+**The fix** is to split shared condition tokens into path-specific copies. These copies are produced by routing the original condition token through a branch tree that follows the relevant control-flow paths. Copies that are needed are delivered to the corresponding mux selects. Copies that are not needed on a path are dropped.
+
+Three data structures keep track of this routing:
 
 ```cpp
 // FtdSuppression.h
