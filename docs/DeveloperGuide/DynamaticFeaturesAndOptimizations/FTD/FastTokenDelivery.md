@@ -257,9 +257,8 @@ The last step is important. When we later extract the CFG for one loop level, we
 - a back edge to **this scope's own header** is redirected to the **false terminal** (`sinkBB`), meaning "iterate again", since the path did *not* exit this iteration;
 - a back edge belonging to an **inner loop** is cut (that loop's own layer represents it);
 - an edge **leaving this scope** is redirected to the **true terminal** (`newCons`), representing the loop exit;
-- a **residual back edge** that `CFGLoopInfo` did not classify (an irreducible cycle) is detected from the input's topological order (`bi.isLess`) and also cut to the false terminal.
 
-For level 0 the two terminals are the actual consumer and sink. For deeper levels they mean "exit" and "stay". Level 0 only drops dead blocks. Deeper levels are fully canonicalized so every non-terminal block ends in a conditional branch, which is exactly what the BDD builder expects. A level-`k` layer thus answers one question: on this iteration of this loop, does control flow exit or return to the header?
+For level 0 the two terminals are the actual consumer and sink. For deeper levels they mean "exit" and "stay". A level-`k` layer thus answers one question: on this iteration of this loop, does control flow exit or return to the header?
 
 <img src="./Figures/ch5_3_big_ex.png" width="720"/>
 
