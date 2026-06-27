@@ -177,9 +177,9 @@ Most blocks in the local CFG cannot affect whether `newCons` is reached. `buildD
 
 All other blocks are rewired out of the way:
 
-- The helper `findNearest` follows outgoing edges through removed blocks until it reaches a kept block, so a deleted chain `A → x → y → B` is collapsed into a direct edge `A → B`.
-- A synthetic `dummyStart` is prepended so the entry block never carries a back edge.
-- Each kept conditional block is rebuilt with a `cf.cond_br` terminator whose condition is a constant placeholder.
+- the helper `findNearest` follows outgoing edges through removed blocks until it reaches a kept block, so a deleted chain `A → x → y → B` is collapsed into a direct edge `A → B`.
+- a synthetic `dummyStart` is prepended so the entry block never carries a back edge.
+- each kept conditional block is rebuilt with a `cf.cond_br` terminator whose condition is a constant placeholder.
 
 The optional `muxConstraints` map (`Block* → bool`) constrains consumer reachability at a kept conditional block. The selected successor is kept as the meaningful path, while the opposite successor is wired directly to the sink:
 
@@ -211,7 +211,7 @@ public:
   unsigned getNestingLevel(Block *bb) const;    // 0 = top level
   LoopScope *getTopLevelScope() const;          // root of the scope tree
 
-  /// Extracts a normalized, acyclic LocalCFG for one LoopScope:
+  /// Extracts a normalized, acyclic decision graph for one LoopScope:
   /// clone the scope's blocks, redirect own back edges to Sink (False),
   /// prune deeper back edges, redirect loop exits to a True terminal.
   std::unique_ptr<LocalCFG> extractLayeredCFG(const LoopScope *scope,
@@ -241,9 +241,18 @@ struct LoopScope {
 };
 ```
 
-`analyzeTopology` starts every block at level 0, then walks `CFGLoopInfo`'s top-level loops with `buildScopeRecursive`, which raises the level of each loop's blocks, records latches as back edges, recurses into sub-loops at `level + 1`, and **bubbles every nested back edge up** into the parent's `allBackEdges`. This is what lets a level's extraction know which back edges belong to deeper levels and must be pruned rather than redirected.
+`analyzeTopology` first assigns level 0 to every block. It then visits the top-level loops reported by `CFGLoopInfo` and processes each loop with `buildScopeRecursive`.
 
-`extractLayeredCFG(scope)` then clones `scope`'s blocks into a fresh `LocalCFG` and rewrites edges so the result is a DAG:
+For each loop, `buildScopeRecursive` does four things:
+
+1. It increases the level of all blocks in the loop.
+2. It records the loop latches as this loop's own back edges.
+3. It recursively processes nested loops at `level + 1`.
+4. It also collects the back edges from all nested loops into the current loop's `allBackEdges`.
+
+The last step is important. When we later extract the CFG for one loop level, we need to know not only the back edges of this level, but also the back edges that belong to deeper nested loops. Those deeper back edges should be pruned from the current extraction, rather than redirected as if they were back edges of the current level.
+
+`extractLayeredCFG(scope)` then clones `scope`'s blocks into a fresh `LocalCFG` (decision graph) and rewrites edges so the result is a DAG:
 
 - a back edge to **this scope's own header** is redirected to the **false terminal** (`sinkBB`), meaning "iterate again", since the path did *not* exit this iteration;
 - a back edge belonging to an **inner loop** is cut (that loop's own layer represents it);
