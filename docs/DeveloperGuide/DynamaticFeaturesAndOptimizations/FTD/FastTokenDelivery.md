@@ -198,7 +198,7 @@ Figure 3(c, d) shows the unconstrained step on the running example. The control-
 
 ### Decomposing loops into acyclic layers
 
-Control-dependence analysis, path enumeration, and BDD construction all assume an acyclic graph, but a decision graph may contain loops (Figure 3b would, had the loop been on the delivery path; Figure 4b does). `CyclicGraphManager` analyzes the loop structure and flattens any single nesting level into a DAG.
+Path enumeration and BDD construction assume an acyclic graph, but a decision graph may contain loops (Figure 4b does). `CyclicGraphManager` analyzes the loop structure and flattens the loops at each nesting level into DAGs.
 
 ```cpp
 // FtdSuppression.h
