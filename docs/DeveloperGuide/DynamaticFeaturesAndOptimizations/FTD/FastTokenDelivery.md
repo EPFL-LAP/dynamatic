@@ -19,7 +19,7 @@ Control flow is resolved at run time, so there is no guarantee that control reac
 
 After `f_supp` is derived as a Boolean expression over the block conditions `cN`, where `cN` denotes the condition of block `N`, the remaining issue is how to evaluate it with tokens. A condition token is produced only when the corresponding block executes. If control bypasses that block, the token is absent. For example, suppose block 0 decides whether block 1 executes, and block 1 contains condition `c1`. On a path that skips block 1, no `c1` token is produced. A naive elastic circuit for `f_supp = ¬c0 · ¬c1` would still wait for both inputs, so it could deadlock.
 
-FTD avoids this by lowering Boolean expressions to MUX trees through Shannon expansion. A MUX consumes only the selected input, so it does not wait for an input that is not selected. This is why every Boolean condition in FTD is lowered through a BDD into a MUX tree (§3.5). The later suppression stages keep these trees correct across loops and shared condition tokens (§3.6 and §3.7).
+FTD avoids this by lowering Boolean expressions to MUX trees through Shannon expansion. A MUX consumes only the selected input, so it does not wait for an input that is not selected. This is why every Boolean condition in FTD is lowered through a BDD into a MUX tree (see [Boolean to a mux tree](#boolean-to-a-mux-tree)). The later suppression stages keep these trees correct across loops and shared condition tokens (see [Token distribution](#token-distribution) and [Token demotion](#token-demotion-across-loop-levels)).
 
 ### Block indexing and condition variables
 
@@ -104,9 +104,9 @@ Given a producer value (`connection`) and a consumer operation, suppression comp
 - the producer is a `ConditionalBranchOp`, or is FTD-generated (`FTD_OP_TO_SKIP` / `FTD_INIT_MERGE`);
 - either side is a memory operation (`MemoryControllerOp`, `LSQOp`, raw `memref` loads/stores, `MemRefType` operands) or a `ControlMergeOp`, or the consumer is a `cf::BranchOp`.
 
-Everything that survives goes into `insertDirectSuppression` (§3.8).
+Everything that survives goes into [`insertDirectSuppression`](#the-driver-insertdirectsuppression).
 
-### 3.1 The local CFG
+### The local CFG
 
 FTD does not analyze the whole function. It analyzes only the slice of the CFG that a token can traverse from the producer block to the consumer block. `buildLocalCFGRegion` reconstructs that slice as a fresh, standalone region and returns it as a `LocalCFG`:
 
@@ -132,7 +132,7 @@ The producer and consumer can sit in several positions relative to the loops of 
 
 <img src="./Figures/ch5_loop_classification.png" width="820"/>
 
-*Figure 2: The delivery shapes (back edges in blue, producer `x = ...`, consumer `... = x`). (a) Same loop, forward delivery within an iteration. (b) Same loop, with the consumer before the producer, so the delivery crosses the back edge into the next iteration. (c) Producer inside the loop, consumer after it. (d, e) A loop between producer and consumer. In (d) every path to the consumer goes through the loop, since the consumer post-dominates it. In (e) a bypass edge exists, so the loop may be skipped. Case (d/e) is the one that leaves a real cycle inside the local CFG.*
+*Figure 2: The delivery shapes (back edges in blue, producer `x = ...`, consumer `... = x`). (a) Producer and consumer are in the same loop with the producer first, so the token is delivered within one iteration. (b) Producer and consumer are in the same loop, but the consumer block runs before the producer block, so the value a producer makes on one iteration is read by the consumer only on the next iteration. This is a loop-carried dependency, delivered around the loop's back edge. (c) The producer is inside a loop and the consumer is after it, so the producer fires every iteration but only the final token is delivered. (d, e) A loop sits on the path between producer and consumer. In (d) the loop is unavoidable, since every path from producer to consumer passes through it; in (e) a bypass edge lets it be skipped. This last shape is the only one that leaves a real cycle inside the local CFG, because the loop lies on a producer-to-consumer path and is kept as a cycle. The other shapes reduce to acyclic local CFGs.*
 
 Construction is a DFS from the producer block. The destination of each outgoing edge is decided by a fixed sequence of checks, and the order of these checks matters:
 
@@ -146,7 +146,7 @@ else if (bi.isLess(succOrig, curr))  nextLocal = sinkBB;                        
 else                                 nextLocal = clone(succOrig); recurse;          // new forward edge
 ```
 
-Two-way branches are emitted as `cf.cond_br` with a placeholder constant condition. (The symbolic variable is what matters here; real signals are attached only when circuits are built.) One-way branches are emitted as `cf.br`, and the sink is closed with `func.return`. The reuse-already-cloned-block check is placed before the back-edge check on purpose. It is what keeps a loop that lies on a producer→consumer path (Figure 2 d/e) as a real cycle in the local graph, which the loop machinery in §3.3 depends on. When the producer and consumer are the same block, which is the configuration `computeLoopBackedgeCondition` uses, a dedicated `secondVisitBB` represents reaching the consumer on the second visit.
+Two-way branches are emitted as `cf.cond_br` with a placeholder constant condition. (The symbolic variable is what matters here; real signals are attached only when circuits are built.) One-way branches are emitted as `cf.br`, and the sink is closed with `func.return`. The reuse-already-cloned-block check is placed before the back-edge check on purpose. It is what keeps a loop that lies on a producer→consumer path (Figure 2 d/e) as a real cycle in the local graph, which the loop machinery in [decomposing loops into acyclic layers](#decomposing-loops-into-acyclic-layers) depends on. When the producer and consumer are the same block, which is the configuration `computeLoopBackedgeCondition` uses, a dedicated `secondVisitBB` represents reaching the consumer on the second visit.
 
 After the DFS, the region is given a topological order, dead blocks are erased (terminators first, so their block-operand references are dropped), and the blocks are physically reordered so that `region.front() == newProd`. This reordering is a correctness requirement, not a cosmetic one, because the downstream `ControlDependenceAnalysis` starts its traversal from the region's first block.
 
@@ -163,7 +163,7 @@ Property 4 is the key one. It reduces "should this token be discarded?" to a rea
 
 *Figure 3: From the original CFG to the decision graph. (a) The original CFG, back edges in blue; the producer B_p is block 2 and the consumer B_c is block 1, so the delivery crosses a back edge (the shape of Figure 2b). (b) The local CFG: block 2 re-enters as the entry B_p′, the consumer is reached as B_c′, every non-delivering edge is cut to the sink S_k, and the on-path loop 5↔6 survives as a real cycle. (c) The control-dependence graph of the local CFG (S_t is the entry node). (d) The decision graph: of all the branches, only c7 and c8 decide whether B_c′ is reached; dashed edges are false edges.*
 
-### 3.2 The decision graph
+### The decision graph
 
 Most blocks in the local CFG have a single successor and cannot affect whether `newCons` is reached. `buildDecisionGraph(lcfg, deps, muxConstraints?)` compresses them away. It keeps exactly the node set
 
@@ -188,9 +188,9 @@ if (muxConstraints.count(oldBlock)) {
 }
 ```
 
-This is how "the γ-mux only selects the producer's input when its condition is X" is encoded into the graph itself (§3.8). With the other branch cut to the sink, path enumeration automatically produces a condition that includes the select requirement. Figure 3(c, d) shows the unconstrained step on the running example, where the control-dependence analysis singles out c7 and c8, and the decision graph keeps just those two branches plus the terminals.
+This is how "the γ-mux only selects the producer's input when its condition is X" is encoded into the graph itself (see [The driver `insertDirectSuppression`](#the-driver-insertdirectsuppression)). With the other branch cut to the sink, path enumeration automatically produces a condition that includes the select requirement. Figure 3(c, d) shows the unconstrained step on the running example, where the control-dependence analysis singles out c7 and c8, and the decision graph keeps just those two branches plus the terminals.
 
-### 3.3 Decomposing loops into acyclic layers
+### Decomposing loops into acyclic layers
 
 Control-dependence analysis, path enumeration, and BDD construction all assume an acyclic graph, but a decision graph may contain loops (Figure 3b would, had the loop been on the delivery path; Figure 4b does). `CyclicGraphManager` analyzes the loop structure and flattens any single nesting level into a DAG.
 
@@ -250,9 +250,9 @@ For level 0 the two terminals are the actual consumer and sink. For deeper level
 
 *Figure 4: Layered decomposition. (a) A CFG with two nested loops (back edges in blue): the outer loop is headed by block 1 with latch 4, the inner by block 3 with latch 5; the producer is in block 0 and the consumer in block 8. (b) The cyclic decision graph (dashed = false edges, u1/u0 = the true/false terminals). (c) The level-0 layer: both loops collapsed, leaving the acyclic decision over c1, c3, c6, c7. (d) The level-1 layer for the outer loop: its own back edge becomes the false terminal ("iterate again"), its exits the true terminal, the inner loop's back edge is pruned. (e) The level-2 layer for the inner loop.*
 
-Stitching values *across* levels is the job of demotion (§3.7).
+Stitching values *across* levels is the job of demotion (see [Token demotion across loop levels](#token-demotion-across-loop-levels)).
 
-### 3.4 Paths to a Boolean condition
+### Paths to a Boolean condition
 
 On an acyclic decision graph, `enumeratePaths(lcfg, bi, deps)` walks every path from `newProd` to `newCons` (an iterative DFS that stops at the sink and refuses to revisit a block already on the current path) and converts each path to one product term with `getHybridPathExpression`:
 
@@ -276,7 +276,7 @@ f_supp = boolMinimize( ¬f_cons )
 
 For a single `if` whose then-branch contains the producer and whose join contains the consumer, the only delivering path takes block 0's true edge, so `f_cons = c0` and `f_supp = ¬c0`. Two delivering paths `c0·c3` and `c0·¬c3` minimize to `f_cons = c0`, again `f_supp = ¬c0`.
 
-### 3.5 Boolean to a mux tree
+### Boolean to a mux tree
 
 `expressionToCircuit` lowers a Boolean to hardware. It minimizes the expression and orders the variables by topological rank, where `computeTopoRank(lcfg)` numbers each original block by its position in the graph's topological order. It then builds a BDD with that variable order and lowers it with `bddToCircuit`. Fixing the BDD variable order from the topology makes the mux tree mirror the dependency order of the blocks, so the root mux is selected by the earliest deciding condition.
 
@@ -288,7 +288,7 @@ if (!bdd->successors.has_value())            // leaf: constant or (negated) lite
   return boolExpressionToCircuit(...);       //   SourceOp+ConstantOp, or signal (+ NotIOp)
 
 std::string varName = bdd->boolVariable->toString();
-Value muxCond = registry.lookup(varName, currentPath);          // the right copy (§3.6)
+Value muxCond = registry.lookup(varName, currentPath);          // the right copy
 if (!muxCond)
   muxCond = getOriginalValue(builder, varName, bi, ..., shadow); // fallback: real signal
 
@@ -306,7 +306,7 @@ Three details matter here. First, the select is fetched from the `SignalRegistry
 
 *Figure 5: What `bddToCircuit` produces. (a) A BDD over c1, c2, c3 (dashed = false edges, T/F terminals). (b) The lowered circuit. Each internal vertex becomes a Mux selected by its variable's condition token, and each terminal becomes a constant. The root variable ends up at the output mux because the variable order follows the blocks' topological order.*
 
-### 3.6 Token distribution
+### Token distribution
 
 This stage is what makes the suppression circuit itself satisfy the token-matching invariants, and it is the reason the algorithm is more than "build a BDD."
 
@@ -345,7 +345,7 @@ for (auto &[regPath, val] : map[var]) {
 }
 ```
 
-An entry registered under the empty path `{}` is the global fallback, either the original signal or a demoted one (§3.7). A copy registered under `{c1:T}` beats it for any query starting with `{c1:T}`.
+An entry registered under the empty path `{}` is the global fallback, either the original signal or a demoted one (see [Token demotion across loop levels](#token-demotion-across-loop-levels)). A copy registered under `{c1:T}` beats it for any query starting with `{c1:T}`.
 
 **`buildDistributionNetwork(builder, lcfg, bi, registry, ...)`** drives the stage in three phases:
 
@@ -368,7 +368,7 @@ An entry registered under the empty path `{}` is the global fallback, either the
 
 When `bddToCircuit` later asks for a variable along some path, the longest-prefix lookup returns the copy produced for exactly that path, and the mux tree of Figure 6(d) is read-once by construction.
 
-### 3.7 Token demotion across loop levels
+### Token demotion across loop levels
 
 A condition variable defined inside a loop produces one token *per iteration*. A mux at an outer level needs a single representative token per loop *execution*. Before such a variable can be distributed at the outer level, the token counts must be reconciled, and that is demotion.
 
@@ -401,11 +401,11 @@ struct CyclicDemotionHelper {
 
 **`demoteOneLevel(value, block, fromLevel)`** lowers one value one level:
 
-1. `findScopeForBlock(block, fromLevel)`, then `extractLayeredCFG(scope)`, which is the per-iteration question of §3.3 for this loop.
+1. `findScopeForBlock(block, fromLevel)`, then `extractLayeredCFG(scope)`, which is the per-iteration question from [decomposing loops into acyclic layers](#decomposing-loops-into-acyclic-layers) for this loop.
 2. Find the control dependence of the layer's `newCons` (the loop exit), the branches that decide whether control flows from *header → exit*.
 3. Build a **level-local registry** for those dependence variables. Each one is resolved at the right level first. A variable native to `fromLevel` or shallower uses its original signal, while a variable from a *deeper* loop is itself demoted to `fromLevel` recursively (`getValueAtLevel`). Every resolved value is registered under the empty path.
 4. Run `buildDistributionNetwork` on the layered CFG with that registry, evaluate the header→exit suppression condition, and gate `value` with a branch on it. **Only the token of the iteration that reaches the exit survives.**
-5. When the value's anchor block is not the loop header itself, a header→anchor-block suppression condition is also computed and cascaded as an upstream filter on the gate's select (the same idea as `f_supDP` in §3.8), so the select pairs one-to-one with the value tokens. The surviving token is valid one level out.
+5. When the value's anchor block is not the loop header itself, a header→anchor-block suppression condition is also computed and cascaded as an upstream filter on the gate's select (the same idea as `f_supDP` in [the driver `insertDirectSuppression`](#the-driver-insertdirectsuppression)), so the select pairs one-to-one with the value tokens. The surviving token is valid one level out.
 
 ```
 getValueAtLevel(var, target):
@@ -430,7 +430,7 @@ Demotion and distribution are deliberately independent. Each level's ROBDD has i
 
 *Figure 9: The separation, for a condition variable c_B native to nesting level k. At each level the token is forked. One copy enters that level's distribution circuit, producing the split copies c_B,1…c_B,n for that level's mux tree, and the other copy is demoted and repeats one level down. Distribution never feeds demotion and vice versa.*
 
-### 3.8 The driver `insertDirectSuppression`
+### The driver `insertDirectSuppression`
 
 This function assembles every stage above for one producer value (`connection`) consumed by one operation (`consumer`), and emits the final circuit. Its overall shape:
 
@@ -506,7 +506,7 @@ The pieces that deserve explanation:
 
 **Placement** (`getFirstLoopExitBBAttrIfHeaderConsumer`). Suppression ops are tagged `handshake.bb = producer's block` by default. When the consumer is the *header of a loop that contains the producer*, which is the back-edge delivery of Figure 2(b), the circuitry conceptually belongs to the moment the loop decides to iterate, so it is tagged to the loop's first exit block instead (exits sorted by block order, the earliest taken).
 
-**Conditional consumption.** All of §3.1 through §3.7 silently relies on one fact. The producer dominates every block whose condition appears in the suppression expression, so a condition token is available whenever a producer token is. That fact follows from GSA *as long as the consumer consumes a token whenever its block is reached*. When the consumer is an input of a **γ-tree**, that assumption breaks. The consumer block can be reached and the mux still select a *different* input, so the producer no longer needs to dominate the consumer, and the suppression expression can involve condition blocks the producer does not dominate. A condition token could then arrive at the expression circuit with no matching producer token at the branch, which is a token-matching violation inside the suppression circuit itself.
+**Conditional consumption.** Everything from [the local CFG](#the-local-cfg) through [token demotion](#token-demotion-across-loop-levels) silently relies on one fact. The producer dominates every block whose condition appears in the suppression expression, so a condition token is available whenever a producer token is. That fact follows from GSA *as long as the consumer consumes a token whenever its block is reached*. When the consumer is an input of a **γ-tree**, that assumption breaks. The consumer block can be reached and the mux still select a *different* input, so the producer no longer needs to dominate the consumer, and the suppression expression can involve condition blocks the producer does not dominate. A condition token could then arrive at the expression circuit with no matching producer token at the branch, which is a token-matching violation inside the suppression circuit itself.
 
 <img src="./Figures/ch5_7_gamma.png" width="780"/>
 
@@ -515,13 +515,13 @@ The pieces that deserve explanation:
 The fix has two parts, both keyed on `deliverToGamma`:
 
 - *Move the start of the analysis up.* The first chain walk descends the γ-muxes (following same-block `FTD_EXPLICIT_GAMMA` users of each mux's result; a user with *both* data inputs fed by the current mux is a temporary placeholder and is skipped). For each mux where the connection enters as a **data** input, the block defining the select is recovered with `returnMuxConditionBlock` (which traces the value backward through FTD-generated suppression branches to the `FTD_COND_VAR` placeholder and reads its `handshake.bb`), and it qualifies if both of its successors reach the producer along forward edges only (`isReachableAcyclic`, which skips edges going backward in block order). The earliest qualifying block dominates the rest. The nearest common dominator with the producer and with every condition block appearing in the plain producer→consumer suppression expression (computed by `collectSuppressionConditionBlocks`, a self-contained mini-pipeline that runs LocalCFG → decision graph → `enumeratePaths` → `f_sup` and returns the blocks behind `f_sup`'s variables) becomes `dominatorBlock`. By construction it dominates everything the expression will mention.
-- *Encode the selects into the condition.* The second chain walk, over the freshly built `locGraph`, records for each mux which select value passes the producer's input (operand 1 is the **false** input, operand 2 the **true** input) into `muxConstraints`, and injects each select's block (plus that block's own control dependences) into the dependence set so path enumeration observes them. A select block lying *above* `dominatorBlock` is skipped, since it is outside the analyzed region. The constrained decision graph then wires the non-selecting branch of each such block to the sink (§3.2), so `f_cons` automatically means "the consumer block is reached *and* every mux on the chain selects this input."
+- *Encode the selects into the condition.* The second chain walk, over the freshly built `locGraph`, records for each mux which select value passes the producer's input (operand 1 is the **false** input, operand 2 the **true** input) into `muxConstraints`, and injects each select's block (plus that block's own control dependences) into the dependence set so path enumeration observes them. A select block lying *above* `dominatorBlock` is skipped, since it is outside the analyzed region. The constrained decision graph then wires the non-selecting branch of each such block to the sink (see [The decision graph](#the-decision-graph)), so `f_cons` automatically means "the consumer block is reached *and* every mux on the chain selects this input."
 
 **Why two decision graphs.** Distribution must cover *all* paths, because every copy of every condition token must exist regardless of which paths end up delivering, so the network is built on the **unconstrained** level-0 graph. The Boolean, by contrast, must respect the constraints, so `enumeratePaths` runs on the **constrained** level-0 graph. The two graphs share variables, and the registry built on the former serves the circuit of the latter.
 
 **The upstream filter `f_supDP`.** When `dominatorBlock` sits above the producer, the producer does not fire on every path that reaches the start block, so the main condition alone would emit suppression-select tokens for executions in which there is no producer token to suppress. `f_supDP` is the suppression condition of the `dominatorBlock → producerBlock` stretch, computed by its own LocalCFG → decision graph → `enumeratePaths` run. Crucially it filters the **suppression signal**, not the data. An intermediate branch takes `branchCond` as data and the `f_supDP` circuit as select, and its false result becomes the final select. It is identically zero when the start block *is* the producer.
 
-**The loop filter and producer demotion.** When the producer is nested in a deeper loop than `dominatorBlock`, it fires several times per delivery and the main branch would see more data tokens than select tokens. The driver compares the producer's and the dominator's loop depths from `CFGLoopInfo` over the shadow region, and if the producer is deeper it reconciles the counts by demoting the producer's value to the dominator's level with the same `demoteOneLevel` machinery as §3.7. Two cases arise. When the producer block is itself a node of the decision graph, its value is demoted level by level, anchored on the producer block. When it is not, the driver walks up the **post-dominator tree** from the producer to the nearest decision-graph node, runs a plain producer-to-that-node suppression to filter out the deeper simple loops in between (that filter branch is tagged to the producer's block, and its false output carries the surviving token), and then demotes the filtered value from that node. After the cascade the producer token is valid at the dominator-to-consumer level and pairs one-to-one with the main suppression branch.
+**The loop filter and producer demotion.** When the producer is nested in a deeper loop than `dominatorBlock`, it fires several times per delivery and the main branch would see more data tokens than select tokens. The driver compares the producer's and the dominator's loop depths from `CFGLoopInfo` over the shadow region, and if the producer is deeper it reconciles the counts by demoting the producer's value to the dominator's level with the same `demoteOneLevel` machinery as [token demotion across loop levels](#token-demotion-across-loop-levels). Two cases arise. When the producer block is itself a node of the decision graph, its value is demoted level by level, anchored on the producer block. When it is not, the driver walks up the **post-dominator tree** from the producer to the nearest decision-graph node, runs a plain producer-to-that-node suppression to filter out the deeper simple loops in between (that filter branch is tagged to the producer's block, and its false output carries the surviving token), and then demotes the filtered value from that node. After the cascade the producer token is valid at the dominator-to-consumer level and pairs one-to-one with the main suppression branch.
 
 **Emission.** All three conditions are realized with `expressionToCircuit` against the shared registry and composed with `ConditionalBranchOp`s, every op tagged `FTD_OP_TO_SKIP` and `handshake.bb = targetBB`:
 
@@ -544,7 +544,7 @@ A final micro-optimization applies when a mux consumes its *own select* as a dat
 
 *Figure 11: The assembled circuit, drawn in consumption form. The dominator→consumer expression (f_DC = ¬f_sup) is filtered by the dominator→producer branch (f_DP) to discard activations where the producer never fired. The producer's token is filtered by the loop filter to keep only the final-iteration token, and the main branch joins the two filtered streams. In the emitted IR the equivalent negated form is used, where the select is the suppression condition and `getFalseResult()` is wired to the consumer, but the structure is identical.*
 
-### 3.9 Reuse for `computeLoopBackedgeCondition`
+### Reuse for `computeLoopBackedgeCondition`
 
 The select of a μ-gate and the select of a regeneration mux are both the loop's **back-edge condition**, the condition under which control re-enters the header through the back edge. It is the consumption condition of the self-loop from the header to its own second visit, with producer = consumer = the header. `computeLoopBackedgeCondition(builder, loopHeader, insertBlock, bi, pendingMuxOperands, shadow)` therefore runs the same pipeline with producer = consumer = the header, returning the condition `Value` directly (no final branch). Its steps are a compact summary of the whole machinery and are worth listing as they appear in the code:
 
@@ -639,7 +639,7 @@ FTD tags the IR to recognize its own operations and to drive block-level decisio
 
 - **Temporary regions are scaffolding.** Local CFGs, decision graphs, and layered CFGs live in throwaway `func.func` regions, are built with a *separate* `OpBuilder` so the main builder never tracks them, and are erased with `containerOp->erase()` once consumed. Keep every allocation paired with its erase.
 - **`handshake.bb` must be correct on every FTD-created op.** `setBBAttr` / `setBBAttrWithFallback` / `getBBIndexAttr` exist to keep it consistent. A wrong index silently corrupts placement and loop-depth decisions.
-- **Preserve the local-CFG property** (§3.1, property 4). Reaching `newCons` means deliver, reaching `sinkBB` means discard. Most subtle suppression bugs trace back to violating it.
+- **Preserve the local-CFG property** (see [The local CFG](#the-local-cfg), property 4). Reaching `newCons` means deliver, reaching `sinkBB` means discard. Most subtle suppression bugs trace back to violating it.
 - **The branch convention is fixed.** Suppression and filter branches deliver on their false output and discard on their true output. Expect `getFalseResult()` wherever a surviving token is rewired. Figures drawn in consumption form are the same circuit with the select negated.
 - **Read-once is the correctness criterion for the expression circuit.** If a change lets one condition variable drive two mux inputs on the same path, distribution has been bypassed and the token-matching invariants are violated at run time even though the Boolean is correct.
 - **Distribution before constraints.** The network is always built on the unconstrained graph and the Boolean on the constrained one. Building the network on the constrained graph drops copies that other paths still need.
