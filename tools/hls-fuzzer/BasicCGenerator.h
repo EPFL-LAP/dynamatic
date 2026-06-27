@@ -35,7 +35,7 @@ public:
   }
 
   /// Generates an entire C program that can compile and run.
-  void generate(llvm::raw_ostream &os, std::string_view functionName);
+  ast::Function generate(llvm::raw_ostream &os, std::string_view functionName);
 
   /// Returns a new function with the given function name.
   ast::Function generateFunction(llvm::StringRef functionName);
@@ -81,6 +81,9 @@ private:
   generateArrayParameter(OpaqueContext &&context);
 
   std::optional<std::pair<ast::Variable, OpaqueContext>>
+  generateVariable(OpaqueContext &&context);
+
+  std::optional<std::pair<ast::ScalarParameter, OpaqueContext>>
   generateScalarParameter(OpaqueContext &&context);
 
   /// Generates a scalar type or none if it was impossible to generate a scalar
@@ -103,6 +106,9 @@ private:
 
   std::optional<std::pair<ast::ArrayAssignmentStatement, OpaqueContext>>
   generateArrayAssignmentStatement(OpaqueContext &&context);
+
+  std::optional<std::pair<ast::ScalarAssignmentStatement, OpaqueContext>>
+  generateScalarAssignmentStatement(OpaqueContext &&context);
 
   std::optional<std::pair<ast::StructuredForStatement, OpaqueContext>>
   generateStructuredForStatement(OpaqueContext &&context);
@@ -167,7 +173,7 @@ private:
             OpaqueContext &&)>... generators,
         llvm::function_ref<std::optional<ASTNode>(SubElements &&...)>
             constructor) const {
-      typename OpaqueTransferFn<ASTNode>::SubElementsTuple subElements;
+      SubElementsTuple<ASTNode> subElements;
 
       std::array<OpaqueContext,
                  std::tuple_size_v<typename ASTNode::SubElements> + 1>
@@ -296,7 +302,7 @@ private:
 
       // Calculate the output context.
       OpaqueContext outputContext =
-          std::get<OutputTransferFn<ASTNode>>(transferFunctions)(
+          std::get<OpaqueOutputTransferFn<ASTNode>>(transferFunctions)(
               *astNode,
               mapTuplesIntoArray(
                   [](const OpaqueContext &context) { return context.data(); },

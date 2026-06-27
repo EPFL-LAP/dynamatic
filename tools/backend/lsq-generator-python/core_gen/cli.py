@@ -1,6 +1,6 @@
 import argparse
-import vhdl_gen.configs as configs
-import vhdl_gen.codegen as code_gen
+import core_gen.configs as configs
+import core_gen.codegen as code_gen
 
 
 def parse_args():

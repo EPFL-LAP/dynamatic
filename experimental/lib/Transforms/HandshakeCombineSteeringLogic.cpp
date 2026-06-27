@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the pass which simplify the resulting FTD circuit by
-// merging units which have the smae inputs and the same outputs.
+// This file implements the pass which simplifies the resulting FTD circuit by
+// merging units which have the same inputs and the same outputs.
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,10 +21,8 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
 #include <cassert>
-#include <fstream>
+#include <optional>
 
 // [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
@@ -38,13 +36,6 @@ namespace experimental {
 
 using namespace mlir;
 using namespace dynamatic;
-
-static void logLine(const char *msg) {
-  std::ofstream f("/home/yuqin/dynamatic-scripts/TempOutputs/"
-                  "HandshakeCombineSteeringLogic.txt",
-                  std::ios::app);
-  f << msg << "\n";
-}
 
 static void inheritBB(Operation *from, Operation *to) {
   if (auto bbAttr = from->getAttr("handshake.bb"))
@@ -75,6 +66,58 @@ refreshBranchAttrsFromCondition(handshake::ConditionalBranchOp branchOp,
   Value condition = branchOp.getConditionOperand();
   branchOp->setLoc(getConditionLocOrFallback(condition, fallback));
   inheritConditionBBOrFallback(condition, fallback, branchOp);
+}
+
+static std::optional<unsigned> getHandshakeBB(Operation *op) {
+  if (auto bbAttr = op->getAttrOfType<IntegerAttr>("handshake.bb"))
+    return bbAttr.getUInt();
+  return std::nullopt;
+}
+
+/// Returns true when `op` is assigned to a BB whose CFG edge exits a loop. In
+/// the serialized CFG annotation, such a BB is a conditional source with one
+/// successor going back to an earlier/same BB and the other going forward.
+static bool isInLoopExitBB(Operation *op) {
+  std::optional<unsigned> bb = getHandshakeBB(op);
+  if (!bb)
+    return false;
+
+  auto funcOp = op->getParentOfType<handshake::FuncOp>();
+  if (!funcOp)
+    return false;
+
+  auto edgesAttr = funcOp->getAttrOfType<StringAttr>("cfg.edges");
+  if (!edgesAttr)
+    return false;
+
+  SmallVector<StringRef> edges;
+  edgesAttr.getValue().split(edges, ']');
+  for (StringRef edge : edges) {
+    size_t openBracket = edge.find('[');
+    if (openBracket == StringRef::npos)
+      continue;
+
+    StringRef edgeBody = edge.drop_front(openBracket + 1);
+    SmallVector<StringRef> fields;
+    edgeBody.split(fields, ',');
+    if (fields.size() != 4)
+      continue;
+
+    unsigned source, trueSucc, falseSucc;
+    if (fields[0].getAsInteger(10, source) ||
+        fields[1].getAsInteger(10, trueSucc) ||
+        fields[2].getAsInteger(10, falseSucc))
+      continue;
+
+    if (source != *bb)
+      continue;
+
+    bool trueIsBackedge = trueSucc <= source;
+    bool falseIsBackedge = falseSucc <= source;
+    return trueIsBackedge != falseIsBackedge;
+  }
+
+  return false;
 }
 
 namespace {
@@ -202,12 +245,26 @@ struct CombineEquivalentNotIOps : public OpRewritePattern<handshake::NotIOp> {
     if (redundant.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineEquivalentNotIOps applied");
     for (auto notUser : redundant) {
       rewriter.replaceAllUsesWith(notUser.getResult(), notOp.getResult());
       rewriter.eraseOp(notUser);
     }
 
+    return success();
+  }
+};
+
+/// Remove back-to-back NotIOps.
+struct RemoveDoubleNotIOp : public OpRewritePattern<handshake::NotIOp> {
+  using OpRewritePattern<handshake::NotIOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(handshake::NotIOp notOp,
+                                PatternRewriter &rewriter) const override {
+    auto innerNot =
+        dyn_cast_or_null<handshake::NotIOp>(notOp.getOperand().getDefiningOp());
+    if (!innerNot)
+      return failure();
+
+    rewriter.replaceOp(notOp, innerNot.getOperand());
     return success();
   }
 };
@@ -231,7 +288,6 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
   // cycle
   bool foundCycle = false;
   int operIdx = 0;
-  handshake::ConditionalBranchOp condBranchOp;
 
   for (auto muxOperand : muxOp.getDataOperands()) {
     auto *op = muxOperand.getDefiningOp();
@@ -240,7 +296,6 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
       if (branches.contains(br)) {
         foundCycle = true;
         muxCycleInputIdx = operIdx;
-        condBranchOp = br;
         break;
       }
     }
@@ -286,8 +341,8 @@ Operation *returnMuxAtSameDepth(Operation *op,
 // conventions about the index of the input coming from outside the loop and
 // that coming from inside through a cycle
 // This pattern combines all Muxes that are used to regenerate the same value
-// but to different consumers.. It searches for a Mux that has a bwd edge
-// (cyclic input) and searches for all Muxes using the some condition and also
+// but to different consumers. It searches for a Mux that has a bwd edge
+// (cyclic input) and searches for all Muxes using the same condition and also
 // having a bwd edge
 struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
   using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
@@ -312,7 +367,7 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
     // traversal and return its produced value
     Value valProducedByNonMux = returnNonMuxProducerVal(muxOp, muxOutIdx);
 
-    // Get users of the non-Mux operation at the muxOuterInputIdx
+    // Get users of the non-Mux operation at muxOutIdx
     for (auto *dataUser : valProducedByNonMux.getUsers()) {
       Operation *returnedMux = returnMuxAtSameDepth(dataUser, muxOp);
       if (returnedMux != nullptr) {
@@ -384,7 +439,6 @@ struct CombineEquivalentMuxes : public OpRewritePattern<handshake::MuxOp> {
     if (redundant.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineEquivalentMuxes applied\n");
     for (auto mux : redundant) {
       rewriter.replaceAllUsesWith(mux.getResult(), muxOp.getResult());
       rewriter.eraseOp(mux);
@@ -419,8 +473,6 @@ struct CombineEquivalentBranches
     if (redundant.empty())
       return failure();
 
-    logLine(
-        "[HandshakeCombineSteeringLogic] CombineEquivalentBranches applied\n");
     for (auto br : redundant) {
       rewriter.replaceAllUsesWith(br.getTrueResult(),
                                   condBranchOp.getTrueResult());
@@ -429,42 +481,6 @@ struct CombineEquivalentBranches
       rewriter.eraseOp(br);
     }
 
-    return success();
-  }
-};
-
-/// Remove a lazy fork that only forwards its input into another lazy fork.
-/// This matches the S2Q shape where output #1 was meant for the LSQ but ended
-/// up unused, while output #0 only feeds a successor lazy fork.
-struct BypassRedundantLazyFork
-    : public OpRewritePattern<handshake::LazyForkOp> {
-  using OpRewritePattern<handshake::LazyForkOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(handshake::LazyForkOp forkOp,
-                                PatternRewriter &rewriter) const override {
-
-    if (forkOp->getNumResults() != 2)
-      return failure();
-
-    Value forwarded = forkOp->getResult(0);
-    Value lsqOutput = forkOp->getResult(1);
-
-    if (!lsqOutput.use_empty())
-      return failure();
-
-    if (!forwarded.hasOneUse())
-      return failure();
-
-    auto *user = *forwarded.getUsers().begin();
-    auto succFork = dyn_cast<handshake::LazyForkOp>(user);
-    if (!succFork)
-      return failure();
-
-    if (succFork.getOperand() != forwarded)
-      return failure();
-
-    logLine("[HandshakeCombineSteeringLogic] BypassRedundantLazyFork applied");
-    succFork->setOperand(0, forkOp.getOperand());
-    rewriter.eraseOp(forkOp);
     return success();
   }
 };
@@ -481,9 +497,6 @@ struct RemoveUnusedOp : public OpRewritePattern<OpTy> {
         return failure();
     }
 
-    logLine(("[HandshakeCombineSteeringLogic] RemoveUnusedOp<" +
-             std::string(OpTy::getOperationName()) + "> applied")
-                .c_str());
     rewriter.eraseOp(op);
     return success();
   }
@@ -557,7 +570,9 @@ struct CombineBranchesOppositeSign
   }
 };
 
-/// Remove branches with same data operands and same conditional operand
+/// If a branch's condition is a NotIOp, rewrite it into an equivalent branch
+/// driven directly by the NOT's input, with the true/false outputs swapped.
+/// This drops the NOT from the condition path.
 struct RemoveNotCondition
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   using OpRewritePattern<handshake::ConditionalBranchOp>::OpRewritePattern;
@@ -686,9 +701,6 @@ struct SimplifyKnownConditionBranch
     replaceDownstreamCond(condBranchOp.getFalseResult(),
                           /*outputIsTrue=*/false);
 
-    if (changed)
-      logLine("[HandshakeCombineSteeringLogic] SimplifyKnownConditionBranch "
-              "applied\n");
     return changed ? success() : failure();
   }
 };
@@ -723,8 +735,6 @@ struct EliminateConstantCondBranch
     if (!notTakenResult.use_empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] EliminateConstantCondBranch "
-            "applied\n");
     // Short-circuit the always-taken side
     rewriter.replaceAllUsesWith(takenResult, condBranchOp.getDataOperand());
 
@@ -803,10 +813,11 @@ struct SplitBranchWithMuxCondition
     Value dataOperand = condBranchOp.getDataOperand();
 
     // Keep the rewrite profitable: the outer branch should be mergeable with an
-    // already existing branch on the same data and condition.
-    auto redundantBranches =
-        findRedundantBranches(baseCond, dataOperand, condBranchOp);
-    if (redundantBranches.empty())
+    // already existing branch on the same data and condition. For loop-exit
+    // BBs, split anyway to expose the simple exit condition.
+    bool loopExitBB = isInLoopExitBB(condBranchOp);
+    if (!loopExitBB &&
+        findRedundantBranches(baseCond, dataOperand, condBranchOp).empty())
       return failure();
 
     bool trueEmpty = condBranchOp.getTrueResult().use_empty();
@@ -841,15 +852,32 @@ struct SplitBranchWithMuxCondition
         outerToInner);
     inheritConditionBBOrFallback(nestedCond, condBranchOp, innerBranch);
 
-    logLine("[HandshakeCombineSteeringLogic] SplitBranchWithMuxCondition "
-            "applied\n");
     rewriter.replaceOp(condBranchOp, {innerBranch.getTrueResult(),
                                       innerBranch.getFalseResult()});
     return success();
   }
 };
 
-/// Simple driver for the Handshake Combine Branches Merges pass, based on a
+struct EliminateMuxWithIdenticalInputs
+    : public OpRewritePattern<handshake::MuxOp> {
+  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
+                                PatternRewriter &rewriter) const override {
+    ValueRange dataOperands = muxOp.getDataOperands();
+    if (dataOperands.size() != 2)
+      return failure();
+
+    if (dataOperands[0] != dataOperands[1])
+      return failure();
+
+    rewriter.replaceOp(muxOp, dataOperands[0]);
+
+    return success();
+  }
+};
+
+/// Simple driver for the Handshake Combine Steering Logic pass, based on a
 /// greedy pattern rewriter.
 struct HandshakeCombineSteeringLogicPass
     : public dynamatic::experimental::impl::HandshakeCombineSteeringLogicBase<
@@ -861,15 +889,17 @@ struct HandshakeCombineSteeringLogicPass
     config.useTopDownTraversal = true;
     config.enableRegionSimplification = false;
     RewritePatternSet patterns(ctx);
-    patterns.add</*BypassRedundantLazyFork, */ RemoveUnusedOp<handshake::MuxOp>,
+    patterns.add<RemoveUnusedOp<handshake::MuxOp>,
                  RemoveUnusedOp<handshake::ConditionalBranchOp>,
                  RemoveUnusedOp<handshake::ConstantOp>,
                  RemoveUnusedOp<handshake::SourceOp>,
                  RemoveUnusedOp<handshake::NotIOp>, SplitBranchWithMuxCondition,
-                 CombineBranchesOppositeSign, CombineEquivalentNotIOps,
-                 CombineInits, CombineMuxes, RemoveNotCondition,
-                 SimplifyKnownConditionBranch, EliminateConstantCondBranch,
-                 CombineEquivalentMuxes, CombineEquivalentBranches>(ctx);
+                 CombineBranchesOppositeSign, RemoveDoubleNotIOp,
+                 CombineEquivalentNotIOps, CombineInits, CombineMuxes,
+                 RemoveNotCondition, SimplifyKnownConditionBranch,
+                 EliminateConstantCondBranch, CombineEquivalentMuxes,
+                 CombineEquivalentBranches, EliminateMuxWithIdenticalInputs>(
+        ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
   };
