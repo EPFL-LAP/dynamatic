@@ -175,10 +175,10 @@ Most blocks in the local CFG cannot affect whether `newCons` is reached. `buildD
 { newCons, sinkBB } ∪ deps        // deps = control dependences of newCons
 ```
 
-and rewires everything else out of the way:
+All other blocks are rewired out of the way:
 
 - The helper `findNearest` follows outgoing edges through removed blocks until it reaches a kept block, so a deleted chain `A → x → y → B` is collapsed into a direct edge `A → B`.
-- A synthetic `dummyStart` is prepended so the entry block never carries a back edge;
+- A synthetic `dummyStart` is prepended so the entry block never carries a back edge.
 - Each kept conditional block is rebuilt with a `cf.cond_br` terminator whose condition is a constant placeholder.
 
 The optional `muxConstraints` map (`Block* → bool`) constrains consumer reachability at a kept conditional block. The selected successor is kept as the meaningful path, while the opposite successor is wired directly to the sink:
@@ -192,7 +192,9 @@ if (muxConstraints.count(oldBlock)) {
 }
 ```
 
-This is how "the γ-mux only selects the producer's input when its condition is X" is encoded into the graph itself (see [The driver `insertDirectSuppression`](#the-driver-insertdirectsuppression)). With the other branch cut to the sink, path enumeration automatically produces a condition that includes the select requirement. Figure 3(c, d) shows the unconstrained step on the running example, where the control-dependence analysis singles out c7 and c8, and the decision graph keeps just those two branches plus the terminals.
+This is how "the γ-mux only selects the producer's input when its condition is X" is encoded into the graph itself. With the opposite branch wired to the sink, path enumeration automatically produces a condition that includes the select requirement.
+
+Figure 3(c, d) shows the unconstrained step on the running example. The control-dependence analysis singles out `c7` and `c8`, so the decision graph keeps just those two branches plus the two terminal outcomes. In the implementation, these terminals are represented by `newCons` for the true outcome and `sinkBB` for the false outcome.
 
 ### Decomposing loops into acyclic layers
 
