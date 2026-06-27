@@ -134,7 +134,7 @@ The producer and consumer can sit in several positions relative to the loops of 
 
 *Figure 2: The five delivery shapes (back edges in blue, producer `x = ...`, consumer `... = x`). (a) Same loop, producer before consumer. (b) Same loop, consumer before producer, where the consumer is the loop header. (c) Producer inside a loop, consumer outside it. (d, e) Producer and consumer both outside a loop that lies between them: in (d) the consumer post-dominates the loop header, in (e) it does not.*
 
-When the producer and consumer are in the **same loop**, their relative order decides the shape. If the producer comes first (a), the value is delivered along a forward path within a single iteration. If the consumer comes first (b), the consumer is the loop header and the value is loop-carried, reaching the consumer only by going around the back edge. This is the delivery to the internal input of a μ-gate or a regeneration mux, and it is the producer-equals-consumer configuration that `computeLoopBackedgeCondition` analyzes; the local CFG represents that second arrival at the header with a dedicated `secondVisitBB`.
+When the producer and consumer are in the **same loop**, their relative order decides the shape. If the producer comes first (a), the value is delivered along a forward path within a single iteration. If the consumer comes first (b), the consumer is the loop header and the value is loop-carried, reaching the consumer only by going around the back edge. This is the delivery to the internal input of a μ-gate or a regeneration mux; the local CFG represents that second arrival at the header with a dedicated `secondVisitBB`.
 
 When the **producer is inside a loop and the consumer is outside it** (c), the value is delivered only on the iteration that exits the loop. On every iteration that stays in the loop, the producer fires again and that token is suppressed.
 
@@ -152,9 +152,7 @@ else if (bi.isLess(succOrig, curr))  nextLocal = sinkBB;                        
 else                                 nextLocal = clone(succOrig); recurse;          // new forward edge
 ```
 
-Two-way branches are emitted as `cf.cond_br` with a placeholder constant condition. (The symbolic variable is what matters here; real signals are attached only when circuits are built.) One-way branches are emitted as `cf.br`, and the sink is closed with `func.return`. The reuse-already-cloned-block check is placed before the back-edge check on purpose. It is what keeps a loop that lies on a producer→consumer path (Figure 2 d/e) as a real cycle in the local graph, which the loop machinery in [decomposing loops into acyclic layers](#decomposing-loops-into-acyclic-layers) depends on. When the producer and consumer are the same block, which is the configuration `computeLoopBackedgeCondition` uses, a dedicated `secondVisitBB` represents reaching the consumer on the second visit.
-
-After the DFS, the region is given a topological order, dead blocks are erased (terminators first, so their block-operand references are dropped), and the blocks are physically reordered so that `region.front() == newProd`. This reordering is a correctness requirement, not a cosmetic one, because the downstream `ControlDependenceAnalysis` starts its traversal from the region's first block.
+Two-way branches are emitted as `cf.cond_br` with a placeholder constant condition. (The symbolic variable is what matters here; real signals are attached only when circuits are built.) One-way branches are emitted as `cf.br`, and the sink is closed with `func.return`. The reuse-already-cloned-block check is placed before the back-edge check on purpose. It is what keeps a loop that lies on a producer→consumer path (Figure 2 d/e) as a real cycle in the local graph, which the loop machinery in [decomposing loops into acyclic layers](#decomposing-loops-into-acyclic-layers) depends on. When the producer and consumer are the same block, a dedicated `secondVisitBB` represents reaching the consumer on the second visit.
 
 The resulting graph has four properties everything downstream relies on:
 
@@ -167,7 +165,7 @@ Property 4 is the key one. It reduces "should this token be discarded?" to a rea
 
 <img src="./Figures/ch5_local_CFG.png" width="780"/>
 
-*Figure 3: From the original CFG to the decision graph. (a) The original CFG, back edges in blue; the producer B_p is block 2 and the consumer B_c is block 1, so the delivery crosses a back edge (the shape of Figure 2b). (b) The local CFG: block 2 re-enters as the entry B_p′, the consumer is reached as B_c′, every non-delivering edge is cut to the sink S_k, and the on-path loop 5↔6 survives as a real cycle. (c) The control-dependence graph of the local CFG (S_t is the entry node). (d) The decision graph: of all the branches, only c7 and c8 decide whether B_c′ is reached; dashed edges are false edges.*
+*Figure 3: From the original CFG to the decision graph. (a) The original CFG, back edges in blue; the producer B_p is block 2 and the consumer B_c is block 1, so the delivery crosses a back edge (the shape of Figure 2b). (b) The local CFG: block 2 is the entry B_p′, the consumer is reached as B_c′, every non-delivering edge is cut to the sink S_k, and the on-path loop 5↔6 survives as a real cycle. (c) The control-dependence graph of the local CFG. (d) The decision graph: of all the branches, only c7 and c8 decide whether B_c′ is reached; dashed edges are false edges.*
 
 ### The decision graph
 
