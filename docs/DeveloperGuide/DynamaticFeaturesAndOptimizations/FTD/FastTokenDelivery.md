@@ -177,9 +177,9 @@ Most blocks in the local CFG cannot affect whether `newCons` is reached. `buildD
 
 and rewires everything else out of the way:
 
-- a helper `findNearest` follows a removed block's edges forward until it lands on a kept block, so a deleted chain `A → x → y → B` becomes a direct `A → B`;
-- a synthetic `dummyStart` is prepended so the entry block never carries a back edge;
-- each kept conditional block is rebuilt with a `cf.cond_br` terminator whose condition is a constant placeholder.
+- The helper `findNearest` follows outgoing edges through removed blocks until it reaches a kept block, so a deleted chain `A → x → y → B` is collapsed into a direct edge `A → B`.
+- A synthetic `dummyStart` is prepended so the entry block never carries a back edge;
+- Each kept conditional block is rebuilt with a `cf.cond_br` terminator whose condition is a constant placeholder.
 
 The optional `muxConstraints` map (`Block* → bool`) constrains consumer reachability at a kept conditional block. The selected successor is kept as the meaningful path, while the opposite successor is wired directly to the sink:
 
