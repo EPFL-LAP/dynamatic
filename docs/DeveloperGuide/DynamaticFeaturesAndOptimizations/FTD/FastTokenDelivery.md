@@ -630,7 +630,7 @@ else
   conditionValue = /* condition placeholder */;
 ```
 
-Gate inputs that are themselves not-yet-built gates are filled with backedge placeholders and reconnected afterward (`missingGsaList`). Single-input γ-gates are built through a throwaway placeholder mux removed at the end. A final cleanup pass eliminates duplicate and degenerate muxes. The SSA helper feeding this conversion (`createPhiNetwork`, a standard dominance-frontier merge placement) leaves merges tagged `NEW_PHI`, which `replaceMergeToGSA` converts into gates through the same machinery.
+Gate inputs that are themselves not-yet-built gates are filled with backedge placeholders and reconnected afterward (`missingGsaList`). Single-input γ-gates are built through a throwaway placeholder mux removed at the end. A final cleanup pass (`HandshakeCombineSteeringLogic.cpp`) eliminates duplicate and degenerate muxes. The SSA helper feeding this conversion (`createPhiNetwork`, a standard dominance-frontier merge placement) leaves merges tagged `NEW_PHI`, which `replaceMergeToGSA` converts into gates through the same machinery.
 
 <img src="./Figures/ch4_gamma_tree.png" width="560"/>
 
@@ -642,13 +642,13 @@ Gate inputs that are themselves not-yet-built gates are filled with backedge pla
 
 ## Condition placeholders
 
-The real condition wire of a block may not exist when the algorithm first needs it, and connecting it too early creates dangling backedges. FTD therefore works against stable stand-ins and substitutes the real signals once, at the end:
+FTD treats the condition of a conditional block as a token produced when that block is reached. In the original IR, however, the condition value may be produced elsewhere, and its delivery to the conditional block must itself go through regeneration and suppression. Directly using the original producer would give the wrong token semantics. FTD therefore inserts placeholders for condition variables and resolves them after all condition deliveries have been processed:
 
 1. `createAllCondPlaceholders` puts a `SourceOp → ConstantOp` tagged `FTD_COND_VAR` (with the block's `handshake.bb`) in each conditional block. Anything needing "the condition of block N" connects here, including `returnMuxConditionBlock`, which identifies a select's block by finding this placeholder.
 2. `resolveCondPlaceholders` replaces each placeholder with a tagged forwarding node fed by the real condition value from the shadow CFG's `conditionMap`.
 3. `finalizeCondPlaceholders` short-circuits the forwarding nodes and erases them.
 
-The net effect is that the whole algorithm runs against placeholders, decoupling the construction order from the order in which real condition values become available.
+The net effect is that all uses of a block condition see the same logical token source, while the actual delivery of that condition is constructed later through the normal regeneration and suppression phases.
 
 ## Annotation attributes
 
@@ -660,9 +660,9 @@ FTD tags the IR to recognize its own operations and to drive block-level decisio
 | `FTD_EXPLICIT_GAMMA` | `ftd.GAMMA` | mux from a γ-gate; triggers conditional-consumption handling when it is a consumer |
 | `FTD_EXPLICIT_MU` | `ftd.MU` | mux from a μ-gate |
 | `FTD_REGEN` | `ftd.regen` | regeneration mux |
-| `FTD_INIT_MERGE` | `ftd.imerge` | init merges and their initial constants |
+| `FTD_INIT_MERGE` | `ftd.imerge` | init ops: merges and their initial constants |
 | `FTD_COND_VAR` | `ftd.cvar` | condition-variable placeholder; the anchor `returnMuxConditionBlock` traces to |
-| `NEW_PHI` | `nphi` | temporary merge from the SSA helper; later converted to a gate |
+| `NEW_PHI` | `nphi` | temporary merge from the SSA helper; later converted to a GSA gate |
 | `handshake.bb` | — | the block index an operation belongs to; placement, loop classification, and condition lookup all key off it |
 
 ## Maintenance notes
