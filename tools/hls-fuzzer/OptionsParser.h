@@ -26,6 +26,12 @@ public:
   /// Returns the name of the target fuzzer.
   std::string getTargetName() const;
 
+  /// Returns the statistics selection requested on the command line.
+  /// Returns 'std::nullopt' if '--statistics' was not specified, an empty
+  /// vector if it was specified without an explicit list (i.e. report all
+  /// statistics), or the list of requested statistic names otherwise.
+  std::optional<std::vector<std::string>> getStatistics() const;
+
   /// Returns the positional arguments.
   std::vector<std::string> getPositionalArguments() const;
 

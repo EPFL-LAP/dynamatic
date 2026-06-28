@@ -2,8 +2,11 @@
 #include <csignal>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <random>
 #include <thread>
 #include <vector>
@@ -20,7 +23,7 @@ static std::mutex errorMutex;
 static std::atomic_uint64_t testCaseCounter = 0;
 static std::atomic_uint64_t bugCounter = 0;
 
-static void threadWork(const std::unique_ptr<dynamatic::AbstractWorker> &target,
+static void threadWork(dynamatic::AbstractWorker &target,
                        const std::filesystem::path &workingDirectory,
                        const std::string &functionName) {
   while (!quit) {
@@ -30,12 +33,12 @@ static void threadWork(const std::unique_ptr<dynamatic::AbstractWorker> &target,
 
     llvm::cantFail(
         llvm::writeToOutput(sourceFile.string(), [&](llvm::raw_ostream &os) {
-          target->generate(os, functionName);
+          target.generate(os, functionName);
           return llvm::Error::success();
         }));
 
     dynamatic::AbstractWorker::VerificationResult result =
-        target->verify(sourceFile);
+        target.verify(sourceFile);
     ++testCaseCounter;
     switch (result) {
     case dynamatic::AbstractWorker::Success:
@@ -63,6 +66,27 @@ static void threadWork(const std::unique_ptr<dynamatic::AbstractWorker> &target,
       break;
     }
   }
+}
+
+/// Collects the statistics of all 'workers', combining objects of the same
+/// category into a single one, and prints them to 'llvm::errs()'.
+static void dumpStatistics(
+    const std::vector<std::unique_ptr<dynamatic::AbstractWorker>> &workers) {
+  std::map<std::string, dynamatic::Statistic> merged;
+  for (const std::unique_ptr<dynamatic::AbstractWorker> &worker : workers) {
+    for (dynamatic::Statistic &workerStats : worker->getStatistics()) {
+      auto [iter, inserted] = merged.try_emplace(
+          workerStats.getCategory().str(), std::move(workerStats));
+      // Initial insertion into the map, nothing to do.
+      if (inserted)
+        continue;
+
+      iter->second.merge(workerStats);
+    }
+  }
+
+  for (auto &&[name, stats] : merged)
+    stats.print(llvm::errs());
 }
 
 int main(int argc, char **argv) {
@@ -113,6 +137,7 @@ int main(int argc, char **argv) {
   if (!numThreads)
     return -1;
 
+  std::vector<std::unique_ptr<dynamatic::AbstractWorker>> workers(*numThreads);
   std::vector<std::thread> threads(*numThreads);
   for (size_t i = 0; i < threads.size(); i++) {
     size_t seed = std::random_device()();
@@ -123,9 +148,10 @@ int main(int argc, char **argv) {
 
     std::filesystem::path workingDirectory =
         std::filesystem::current_path() / ("thread" + std::to_string(i));
-    threads[i] = std::thread(
-        threadWork, target->createWorker(options, dynamatic::Randomly(seed)),
-        std::move(workingDirectory), "test" + std::to_string(i));
+    workers[i] = target->createWorker(options, dynamatic::Randomly(seed));
+    threads[i] =
+        std::thread(threadWork, std::ref(*workers[i]),
+                    std::move(workingDirectory), "test" + std::to_string(i));
   }
 
   auto startTime = std::chrono::high_resolution_clock::now();
@@ -142,6 +168,9 @@ int main(int argc, char **argv) {
       std::cerr << "Current test rate: " << rate << " tests per second ["
                 << testCaseCounter << '/' << seconds << "s]; "
                 << bugCounter.load() << " bugs found" << std::endl;
+      // Continuously report the merged statistics alongside the heartbeat.
+      if (options.statistics)
+        dumpStatistics(workers);
     }
   }
 

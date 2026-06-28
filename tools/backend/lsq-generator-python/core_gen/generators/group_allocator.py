@@ -1,8 +1,8 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
-from vhdl_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
-from vhdl_gen.utils import MaskLess
-from vhdl_gen.configs import Configs
+from core_gen.context import VHDLContext
+from core_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
+from core_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
+from core_gen.utils import MaskLess
+from core_gen.configs import Configs
 
 
 class GroupAllocator:
@@ -17,7 +17,7 @@ class GroupAllocator:
 
         Models a group allocator for a Load-Store Queue (LSQ) system.
 
-        This class encapsulates the logic for generating a VHDL module that allocates
+        This class encapsulates the logic for generating a module that allocates
         space for groups of memory operations (loads and stores) in the load queue and 
         the store queue.
 
@@ -36,9 +36,9 @@ class GroupAllocator:
                     configs=configs
                 )
 
-            # You can later generate VHDL entity and architecture by
+            # You can later generate entity and architecture by
             #     ga.generate(...)
-            # You can later instantiate VHDL entity by
+            # You can later instantiate entity by
             #     ga.instantiate(...)
         """
 
@@ -48,10 +48,10 @@ class GroupAllocator:
 
     def generate(self, path_rtl) -> None:
         """
-        Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
+        Generates the 'entity' and 'architecture' sections for a group allocator.
 
         Parameters:
-            path_rtl    : Output directory for VHDL files.
+            path_rtl    : Output directory for files.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
@@ -80,9 +80,9 @@ class GroupAllocator:
         """
 
         # ctx: VHDLContext for code generation state.
-        # When we generate VHDL entity and architecture, we can use this context as a local variable.
+        # When we generate entity and architecture, we can use this context as a local variable.
         # We only need to get the context as a parameter when we instantiate the module.
-        # It saves all information we need when we generate VHDL entity and architecture code.
+        # It saves all information we need when we generate entity and architecture code.
         ctx = VHDLContext()
 
         ctx.tabLevel = 1
@@ -277,7 +277,7 @@ class GroupAllocator:
         """
         Group Allocator Instantiation
 
-        Creates the VHDL port mapping for the group allocator entity.
+        Creates the port mapping for the group allocator entity.
 
         Parameters:
             ctx                  : VHDLContext for code generation state.
@@ -298,7 +298,7 @@ class GroupAllocator:
             ga_ls_order_o        : Group Allocator load-store order matrix
 
         Returns:
-            VHDL instantiation string for inclusion in the architecture body.
+            instantiation string for inclusion in the architecture body.
 
         Example:
             arch += ga.instantiate(
