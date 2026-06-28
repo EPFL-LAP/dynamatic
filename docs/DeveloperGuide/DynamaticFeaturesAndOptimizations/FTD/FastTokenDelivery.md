@@ -379,30 +379,30 @@ An entry registered under the empty path `{}` is the global fallback, either the
 
 **`buildDistributionNetwork(builder, lcfg, bi, registry, ...)`** drives the stage in three phases:
 
-1. **Collect requirements.** A DFS from `newProd` (with an on-stack set for cycle detection, stopping at `newCons`/`sinkBB`) accumulates, for every condition variable, the list of path contexts under which its token is consumed, one `VariableRequirement` per (variable, path). The path grows by `{var, true/false}` as the DFS takes a conditional edge.
+1. **Collect requirements.** A DFS from `newProd` accumulates, for every condition variable, the list of path contexts under which its token is consumed, one `VariableRequirement` per (variable, path). The path grows by `{var, true/false}` as the DFS takes a conditional edge.
 2. **Topologically sort the variables** by their blocks' order (`bi.isLess`), so producers of earlier decisions are distributed before the variables whose routing depends on them.
-3. **Register and split.** For each variable, look up a pre-registered version under `{}` (a demoted value may already be there). Otherwise fetch the original signal, channelify its type, and register it under `{}`. If the variable has **more than one** requirement, call `buildBranchTreeRecursive`. A variable needed on a single path needs no copies at all.
+3. **Register and split.** Each variable needs one base token that its copies are made from. If a default version of the variable is already registered (the one under the empty path `{}`, used whenever no more specific copy applies), the algorithm reuses it. Otherwise it takes the variable's original condition signal, gives it a channel type, and registers that as the default. After that, a variable consumed on more than one path is split into per-path copies by `buildBranchTreeRecursive`. A variable consumed on a single path needs no split.
 
 **`buildBranchTreeRecursive(currentVar, requirements, currentPath, registry, ...)`** builds the routing tree for one variable:
 
 1. **Source.** `registry.lookup(currentVar, currentPath)` gives the signal version valid at this point of the tree.
 2. **Split point.** Scan the requirement paths forward from `currentPath.size()` to the first depth where they disagree on a step's value; that step's variable is `splitVar`. If no divergence exists the requirements are compatible and nothing is built.
-3. **Select signal.** `registry.lookup(splitVar, currentPath)`, falling back to the original signal. This is where the topological sort of phase 2 pays off, because `splitVar` was distributed before `currentVar`, so the correct copy is already registered.
+3. **Select signal.** `registry.lookup(splitVar, currentPath)`, falling back to the original signal. This is where the topological sort pays off, because `splitVar` was distributed before `currentVar`, so the correct copy is already registered.
 4. **Context backfilling.** The scan may have skipped several common-prefix steps; they are appended to `currentPath` (taking any requirement as the template) so the recursion's path indices stay aligned with the requirement paths.
-5. **Filter.** `generateReachabilityLogic` builds the condition under which the *remaining* sub-paths are invalid. For each requirement it ANDs the path-suffix literals from the split index on, ORs them into `f_valid`, and lowers `f_supp = ¬f_valid` through the same BDD machinery (its mux selects are themselves looked up through the registry, so previously split copies are reused). A suppression branch on this condition drops the select token where no copy is needed. In the IR **the false output carries on** (`suppBranch.getFalseResult()` is the filtered select).
-6. **Split, register, recurse.** A `ConditionalBranchOp` splits the source token on the filtered select. The true result is registered under `currentPath + {splitVar, true}` and the false result under `currentPath + {splitVar, false}`, and the procedure recurses into each non-empty group.
+5. **Filter.** `generateReachabilityLogic` builds the condition under which the *remaining* sub-paths are invalid. For each requirement it ANDs the path-suffix literals from the split index on, ORs them into `f_valid`, and lowers `f_supp = ¬f_valid` through the same BDD machinery (its mux selects are themselves looked up through the registry, so previously split copies are reused). A suppression branch on this condition drops the select token where no copy is needed. Different from the figure, in the IR **the false output carries on** (`suppBranch.getFalseResult()` is the filtered select).
+6. **Split, register, recurse.** A `ConditionalBranchOp` splits the source token on the filtered select. The true result is registered under `currentPath + {splitVar, true}` and the false result under `currentPath + {splitVar, false}`, and the procedure recurses.
 
 <img src="./Figures/ch5_5_distribution.png" width="760"/>
 
-*Figure 7: The distribution circuits that produce the split copies of Figure 6 (Distribute and Suppress are both ConditionalBranchOps; Suppress sinks one output). (a) The two copies of c6: the c1 select token is first passed through a filter branch whose condition encodes whether the remaining sub-paths are valid, then splits the c6 stream into c6,1 and c6,2. (b) The three copies of c7: the filtered c1 token splits the c7 stream once, and the false side is split again by the filtered c3 token, yielding c7,1 to c7,3. Every select that feeds a Distribute is filtered first, which is exactly steps 5 and 6 of the recursion. (The figure draws the filter in consumption form; in the emitted IR the equivalent negated form is used and the false output continues.)*
+*Figure 7: The distribution circuits that produce the split copies of Figure 6 (Distribute and Suppress are both ConditionalBranchOps; Suppress sinks one output). (a) The two copies of c6: the c1 select token is first passed through a filter branch whose condition encodes whether the remaining sub-paths are valid, then splits the c6 stream into c6,1 and c6,2. (b) The three copies of c7: the filtered c1 token splits the c7 stream once, and the false side is split again by the filtered c3 token, yielding c7,1 to c7,3. Every select that feeds a Distribute is filtered first. (The figure draws the filter in consumption form instead of suppression form; in the emitted IR the equivalent negated form is used and the false output continues.)*
 
-When `bddToCircuit` later asks for a variable along some path, the longest-prefix lookup returns the copy produced for exactly that path, and the mux tree of Figure 6(d) is read-once by construction.
+For example, when `bddToCircuit` later lowers the mux tree and needs the select `c6` on one of its two paths, the longest-prefix lookup returns the copy that distribution produced for exactly that path, `c6,1`, rather than the shared `c6`. The other path gets `c6,2`. Each copy drives a single mux input, so the mux tree of Figure 6(d) is read-once by construction.
 
 ### Token demotion across loop levels
 
-A condition variable defined inside a loop produces one token *per iteration*. A mux at an outer level needs a single representative token per loop *execution*. Before such a variable can be distributed at the outer level, the token counts must be reconciled, and that is demotion.
+A condition variable defined inside a loop produces one token *per iteration*. A consumer at an outer level needs a single representative token per loop *execution*. Before such a variable can be distributed at the outer level, the token counts must be reconciled, and that is demotion.
 
-`CyclicDemotionHelper` packages the machinery so it can be reused by both the suppression driver and the loop-condition computation:
+`CyclicDemotionHelper` packages the machinery:
 
 ```cpp
 // FtdSuppression.h
