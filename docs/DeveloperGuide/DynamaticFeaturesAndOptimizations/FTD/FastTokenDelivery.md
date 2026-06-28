@@ -458,7 +458,7 @@ Demotion and distribution are deliberately independent. Each level's ROBDD has i
 
 <img src="./Figures/ch5_6_semantic_separation.png" width="800"/>
 
-*Figure 9: The separation, for a condition variable c_B native to nesting level k. At each level the token is forked. One copy enters that level's distribution circuit, producing the split copies c_B,1…c_B,n for that level's mux tree, and the other copy is demoted and repeats one level down. Distribution never feeds demotion and vice versa.*
+*Figure 9: The separation, for a condition variable c_B native to nesting level k. At each level the token is forked. One copy enters that level's distribution circuit, producing the split copies c_B,1…c_B,n for that level's mux tree, and the other copy is demoted and repeats one level down. Distribution never feeds demotion.*
 
 ### The driver `insertDirectSuppression`
 
@@ -496,11 +496,11 @@ insertDirectSuppression(consumer, connection):
             muxConstraints[condBlock] ← select value that passes the producer's input
                                         # operand 1 = False input, operand 2 = True input
     if deps is empty or locGraph.newCons == locGraph.sinkBB:
-        suppress unconditionally (always-true select); return
+        suppress unconditionally; return
 
     fullDG ← buildDecisionGraph(locGraph, deps)               # unconstrained
     consDG ← buildDecisionGraph(locGraph, deps, muxConstraints)
-    level-0 layers of both via CyclicGraphManager(fullDG)
+    level-0 layers of both via CyclicGraphManager
 
     # ---- condition tokens, then the Boolean ----
     registry ← SignalRegistry
@@ -534,7 +534,7 @@ insertDirectSuppression(consumer, connection):
 
 The pieces that deserve explanation:
 
-**Placement** (`getFirstLoopExitBBAttrIfHeaderConsumer`). Suppression ops are tagged `handshake.bb = producer's block` by default. When the consumer is the *header of a loop that contains the producer*, which is the back-edge delivery of Figure 2(b), the circuitry conceptually belongs to the moment the loop decides to iterate, so it is tagged to the loop's first exit block instead (exits sorted by block order, the earliest taken).
+**Placement** (`getFirstLoopExitBBAttrIfHeaderConsumer`). Suppression ops are tagged with `handshake.bb = producer's block` by default. When the consumer is the header of a loop that contains the producer, the circuitry is tagged to the loop's first exit block instead. The exits are sorted by block order, and the earliest one is chosen. This placement is chosen to reduce the synthesized circuit area.
 
 **Conditional consumption.** Everything from [the local CFG](#the-local-cfg) through [token demotion](#token-demotion-across-loop-levels) silently relies on one fact. The producer dominates every block whose condition appears in the suppression expression, so a condition token is available whenever a producer token is. That fact follows from GSA *as long as the consumer consumes a token whenever its block is reached*. When the consumer is an input of a **γ-tree**, that assumption breaks. The consumer block can be reached and the mux still select a *different* input, so the producer no longer needs to dominate the consumer, and the suppression expression can involve condition blocks the producer does not dominate. A condition token could then arrive at the expression circuit with no matching producer token at the branch, which is a token-matching violation inside the suppression circuit itself.
 
