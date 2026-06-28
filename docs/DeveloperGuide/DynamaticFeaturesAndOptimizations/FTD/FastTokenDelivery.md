@@ -668,9 +668,8 @@ FTD tags the IR to recognize its own operations and to drive block-level decisio
 ## Maintenance notes
 
 - **Temporary regions are scaffolding.** Local CFGs, decision graphs, and layered CFGs live in throwaway `func.func` regions, are built with a *separate* `OpBuilder` so the main builder never tracks them, and are erased with `containerOp->erase()` once consumed. Keep every allocation paired with its erase.
-- **`handshake.bb` must be correct on every FTD-created op.** `setBBAttr` / `setBBAttrWithFallback` / `getBBIndexAttr` exist to keep it consistent. A wrong index silently corrupts placement and loop-depth decisions.
-- **Preserve the local-CFG property** (see [The local CFG](#the-local-cfg), property 4). Reaching `newCons` means deliver, reaching `sinkBB` means discard. Most subtle suppression bugs trace back to violating it.
-- **The branch convention is fixed.** Suppression and filter branches deliver on their false output and discard on their true output. Expect `getFalseResult()` wherever a surviving token is rewired. Figures drawn in consumption form are the same circuit with the select negated.
-- **Read-once is the correctness criterion for the expression circuit.** If a change lets one condition variable drive two mux inputs on the same path, distribution has been bypassed and the token-matching invariants are violated at run time even though the Boolean is correct.
-- **Distribution before constraints.** The network is always built on the unconstrained graph and the Boolean on the constrained one. Building the network on the constrained graph drops copies that other paths still need.
-- **Irreducible loops** are handled by the residual-back-edge check in `extractLayeredCFG` (topological-order test), not by `CFGLoopInfo` alone.
+- **`handshake.bb` must be assigned on every FTD-created op.** `setBBAttr` / `setBBAttrWithFallback` / `getBBIndexAttr` exist to keep it consistent.
+- **Preserve the local-CFG property** (see [The local CFG](#the-local-cfg), property 4). Reaching `newCons` means deliver, reaching `sinkBB` means discard.
+- **The branch convention is fixed.** Suppression and filter branches deliver on their false output and discard on their true output. Expect `getFalseResult()` wherever a surviving token is rewired. Contrarily, figures in this document are drawn in consumption form.
+- **Read-once is the correctness criterion for the expression circuit.** If a change lets one condition value drive two mux inputs on the same mux tree, distribution has been bypassed and the token-matching invariants are violated at run time even though the Boolean is correct.
+- **Distribution before constraints.** The distribution network is always built on the unconstrained decision graph and the Boolean on the constrained one. Building the distribution network on the constrained decision graph leads to wrong semantics.
