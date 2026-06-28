@@ -359,6 +359,7 @@ public:
 class WriteHDL : public Command {
 public:
   static constexpr llvm::StringLiteral HDL = "hdl";
+  static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
 
   WriteHDL(FrontendState &state)
       : Command(
@@ -367,6 +368,10 @@ public:
             "export-dot tool",
             state) {
     addOption({HDL, "HDL to use for design's top-level"});
+    addFlag({INSTRUMENT_II,
+             "Instrument the generated RTL so that the average initiation "
+             "interval (II) of each innermost loop is reported during "
+             "simulation"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -830,8 +835,10 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     }
   }
 
+  std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
+
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl);
+                 state.getKernelName(), hdl, instrumentII);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {
