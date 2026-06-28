@@ -427,15 +427,15 @@ struct CyclicDemotionHelper {
 };
 ```
 
-`getVarNativeLevel` maps a variable to its block (via `bi.getBlockFromCondition`), that block to its decision-graph clone (via `origToFullDG`), and reads the clone's nesting level from `cyclicMgr`. This is why the helper is constructed against the *full* decision graph, since nesting levels are a property of that graph, not of the original CFG slice. `findScopeForBlock` walks the scope tree for the scope at a given level that contains the block.
+`getVarNativeLevel` maps a variable to its block (via `bi.getBlockFromCondition`), and maps that block to its decision-graph clone (via `origToFullDG`), and reads the clone's nesting level **in this decision graph** from `cyclicMgr`. The helper is constructed against the decision graph, since nesting levels are a property of that graph, not of the original CFG or the local CFG. `findScopeForBlock` walks the scope tree for the scope at a given level that contains the block.
 
 **`demoteOneLevel(value, block, fromLevel)`** lowers one value one level:
 
 1. `findScopeForBlock(block, fromLevel)`, then `extractLayeredCFG(scope)`, which is the per-iteration question from [decomposing loops into acyclic layers](#decomposing-loops-into-acyclic-layers) for this loop.
-2. Find the control dependence of the layer's `newCons` (the loop exit), the branches that decide whether control flows from *header → exit*.
-3. Build a **level-local registry** for those dependence variables. Each one is resolved at the right level first. A variable native to `fromLevel` or shallower uses its original signal, while a variable from a *deeper* loop is itself demoted to `fromLevel` recursively (`getValueAtLevel`). Every resolved value is registered under the empty path.
+2. Find the control dependence of the layer's `newCons` (the loop exit), the block conditions that decide whether control flows from * loop header → loop exit*.
+3. Build a **level-local registry** for distribution within this level. Each variable is resolved at the right level first. A variable native to `fromLevel` uses its original signal, while a variable from a *deeper* loop is itself demoted to `fromLevel` recursively (`getValueAtLevel`). Every resolved value is registered under the empty path (as the start of the distribution).
 4. Run `buildDistributionNetwork` on the layered CFG with that registry, evaluate the header→exit suppression condition, and gate `value` with a branch on it. **Only the token of the iteration that reaches the exit survives.**
-5. When the value's anchor block is not the loop header itself, a header→anchor-block suppression condition is also computed and cascaded as an upstream filter on the gate's select (the same idea as `f_supDP` in [the driver `insertDirectSuppression`](#the-driver-insertdirectsuppression)), so the select pairs one-to-one with the value tokens. The surviving token is valid one level out.
+5. If the value's anchor block is not the loop header itself, an additional header-to-anchor filter is needed for the branch's select token. The exit condition is computed from the loop header, so it can produce a select token even on iterations where control never reaches the value's anchor block. In such iterations there is no token for the value, so the select token must be dropped. We therefore compute the header-to-anchor reachability condition and use it to filter the select token before it controls the gate. This follows the same principle as the distribution network. After this filter, the surviving value token is valid one level out.
 
 ```
 getValueAtLevel(var, target):
@@ -450,7 +450,7 @@ getValueAtLevel(var, target):
 
 <img src="./Figures/ch5_6_demotion.png" width="540"/>
 
-*Figure 8: One demotion step, drawn for c3 native to level 1. The header→exit reachability condition (Reach(c1 ⇝ c3)) is evaluated by the level-1 mux tree and gates a Suppress branch. Its surviving token drives the Demote branch, which lets through exactly one c3 token per loop execution, the one belonging to the exiting iteration. A per-iteration stream (valid at level 1) emerges as a per-execution stream (valid at level 0).*
+*Figure 8: One demotion step, drawn for `c3` native to level 1. The level-1 mux tree computes the header-to-exit condition, which selects the iteration that reaches the loop exit. If `c3` is not produced at the loop header, this select token is first passed through a Suppress branch controlled by the header-to-`c3` reachability condition. This removes select tokens from iterations where no `c3` token exists. The filtered select then drives the Demote branch on the `c3` stream. The Demote branch keeps exactly the `c3` token from the exiting iteration and drops the others. Thus a per-iteration stream, valid at level 1, becomes a per-execution stream, valid at level 0.*
 
 `preRegisterDemotedValues(dg, registry)` runs before distribution at level 0. Every variable in the decision graph whose native level is deeper than 0 is demoted down to level 0 and the result is registered under the empty path, so the distribution phase finds it as the "original" to split.
 
