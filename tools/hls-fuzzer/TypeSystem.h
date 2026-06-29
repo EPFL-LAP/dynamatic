@@ -22,31 +22,146 @@ namespace dynamatic::gen {
 /// For an explanation of contexts, see the doc string for 'TypeSystem'.
 class OpaqueContext {
 public:
-  template <
-      typename TypingContext,
-      std::enable_if_t<
-          !std::is_same_v<OpaqueContext, std::decay_t<TypingContext>> &&
-          !std::is_same_v<std::any, std::decay_t<TypingContext>>> * = nullptr>
-  explicit OpaqueContext(TypingContext &&context)
-      : container(std::forward<TypingContext>(context)) {}
+  /// Constructs an empty opaque context.
+  /// 'data()' is guaranteed to return nullptr in this case.
+  OpaqueContext() = default;
+
+  template <typename TypingContext,
+            std::enable_if_t<!std::is_same_v<
+                OpaqueContext, std::decay_t<TypingContext>>> * = nullptr>
+  explicit OpaqueContext(TypingContext &&context) {
+    if constexpr (sizeof(Derived<std::decay_t<TypingContext>>) <=
+                  SMALL_BUFFER_OPT_BYTES) {
+      // Small object optimization.
+      auto &container = storage.emplace<Container>();
+      new (container.storage.data()) Derived<std::decay_t<TypingContext>>(
+          std::forward<TypingContext>(context));
+    } else {
+      storage.emplace<0>(std::make_unique<Derived<std::decay_t<TypingContext>>>(
+          std::forward<TypingContext>(context)));
+    }
+  }
+
+  /// Casts this 'OpaqueContext' to 'TypingContext'.
+  /// It is undefined behaviour if this wasn't constructed with an instance of
+  /// 'TypingContext'.
+  template <typename TypingContext>
+  const TypingContext &cast() const & {
+    assert(data() != nullptr);
+    return *reinterpret_cast<const TypingContext *>(data());
+  }
 
   template <typename TypingContext>
-  const TypingContext &cast() const {
-    return *std::any_cast<TypingContext>(&container);
+  TypingContext &&cast() && {
+    assert(data() != nullptr);
+    return std::move(*reinterpret_cast<TypingContext *>(data()));
   }
 
   // Enable noop casts to 'OpaqueContext'.
   template <>
-  const OpaqueContext &cast<OpaqueContext>() const {
+  const OpaqueContext &cast<OpaqueContext>() const & {
     return *this;
   }
 
+  /// Returns an opaque internal pointer to the storage.
+  /// The pointer can be 'reinterpret_cast'ed to the correct object type that
+  /// the 'OpaqueContext' was constructed with.
+  const void *data() const {
+    return std::visit(
+        [](auto &&arg) -> const void * {
+          const Base *base = arg.get();
+          if (!base)
+            return nullptr;
+
+          return base->pointer();
+        },
+        storage);
+  }
+
+  void *data() {
+    return const_cast<void *>(static_cast<const OpaqueContext *>(this)->data());
+  }
+
 private:
-  std::any container;
+  struct Base {
+    virtual ~Base() = default;
+
+    virtual void moveInto(void *destination) const = 0;
+
+    virtual const void *pointer() const = 0;
+  };
+
+  template <typename T>
+  struct Derived final : Base {
+    T data;
+
+    explicit Derived(T &&data) : data(std::move(data)) {}
+    explicit Derived(const T &data) : data(data) {}
+
+    void moveInto(void *destination) const override {
+      new (destination) Derived(std::move(data));
+    }
+
+    const void *pointer() const override {
+      return reinterpret_cast<const void *>(&data);
+    }
+  };
+
+  constexpr static std::size_t SMALL_BUFFER_OPT_BYTES = 24;
+
+  /// Container object for small object optimization.
+  struct Container {
+    alignas(std::max_align_t)
+        std::array<std::byte, SMALL_BUFFER_OPT_BYTES> storage{};
+
+    const Base *get() const {
+      return reinterpret_cast<const Base *>(storage.data());
+    }
+
+    Container() = default;
+
+    ~Container() { get()->~Base(); }
+
+    Container(Container &&rhs) noexcept { rhs.get()->moveInto(storage.data()); }
+
+    Container &operator=(Container &&rhs) noexcept {
+      get()->~Base();
+      rhs.get()->moveInto(storage.data());
+      return *this;
+    }
+  };
+
+  std::variant<std::unique_ptr<Base>, Container> storage;
 };
 
 /// Sentinel value representing a dependency on the input context.
 constexpr std::size_t INPUT_DEPENDENCY = -1;
+
+/// Marks a dependency as weak. This is a noop for 'INPUT_DEPENDENCY' as it
+/// cannot be weak.
+/// See the 'TypeSystem' documentation for what 'weak' means.
+constexpr std::size_t weak(std::size_t dependency) {
+  // We use the top bit being set as an encoding for a dependency being weak.
+  // Since 'INPUT_DEPENDENCY' is encoded as all 1s, this operation is also a
+  // noop for 'INPUT_DEPENDENCY'.
+  return dependency | (1ull << (std::numeric_limits<std::size_t>::digits - 1));
+}
+
+/// Returns true if 'dependency' is weak.
+/// See the 'TypeSystem' documentation for what 'weak' means.
+constexpr bool isWeak(std::size_t dependency) {
+  return dependency != INPUT_DEPENDENCY && weak(dependency) == dependency;
+}
+
+/// If 'dependency' is weak, then it returns the original non-weak dependency.
+/// Otherwise, returns 'dependency'.
+/// See the 'TypeSystem' documentation for what 'weak' means.
+constexpr std::size_t unwrapWeak(std::size_t dependency) {
+  if (dependency == INPUT_DEPENDENCY)
+    return INPUT_DEPENDENCY;
+
+  return dependency & ~weak(0);
+}
 
 /// Class responsible for telling the generator how to calculate the input
 /// 'TypingContext' for a given subelement of 'ASTNode'.
@@ -60,12 +175,28 @@ constexpr std::size_t INPUT_DEPENDENCY = -1;
 /// this instance depends on within 'ASTNode::SubElements'.
 /// The special value 'INPUT_DEPENDENCY' represents depending on the
 /// input-context of 'ASTNode'.
-/// It is the user's responsibility to not create cyclic dependencies.
+///
+/// Dependencies can additionally be marked 'weak'. In that case, the element
+/// and context will be passed to the transfer function if and only if they
+/// have been generated previously. Otherwise, an empty optional and nullptr
+/// are passed for the AST-node and context of that dependency instead.
+///
+/// This is the big difference to normal dependencies: They do not force an
+/// AST-node to have been generated previously (i.e., do not participate in the
+/// topological sort performed by the generator). This makes it legal to have
+/// cycles involving weak dependencies.
+///
+/// It is the user's responsibility to not create cyclic non-weak dependencies.
 template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
 class TransferFn {
 
   template <typename Tuple, std::size_t current, std::size_t... remaining>
   struct CalcCompFn {
+    using SubElementType = std::tuple_element_t<
+        std::min(unwrapWeak(current),
+                 std::tuple_size_v<typename ASTNode::SubElements> - 1),
+        typename ASTNode::SubElements>;
+
     // Recursive case.
     using type = typename CalcCompFn<
         decltype(std::tuple_cat(
@@ -76,12 +207,11 @@ class TransferFn {
                 std::tuple<const TypingContext &>,
                 // Add both the context and the ASTNode to the arguments.
                 std::tuple<
-                    const TypingContext &,
-                    const std::tuple_element_t<
-                        std::min(current, std::tuple_size_v<
-                                              typename ASTNode::SubElements> -
-                                              1),
-                        typename ASTNode::SubElements> &>>>())),
+                    std::conditional_t<isWeak(current), const TypingContext *,
+                                       const TypingContext &>,
+                    const std::conditional_t<isWeak(current),
+                                             std::optional<SubElementType>,
+                                             SubElementType> &>>>())),
         remaining...>::type;
   };
 
@@ -112,13 +242,24 @@ public:
   /// Specifically, for every element of 'inputIndices' and in the order as
   /// given in 'inputIndices', the arguments are:
   /// * The input 'TypingContext' if the value is 'INPUT_DEPENDENCY'
-  /// * The output 'TypingContext' of the 'i'th subelement of 'ASTNode' followed
+  /// * If 'i' is not weak, the output 'TypingContext' of the 'i'th subelement
+  /// of 'ASTNode' followed
   ///   by the subelement's AST node itself.
+  /// * If 'i' is weak, a pointer to the output 'TypingContext' of the 'i'th
+  ///   subelement of 'ASTNode' or null if not present, followed by an optional
+  ///   of the subelement's AST node itself if already generated.
   ///
   /// Example:
   /// Dependency<Context, ast::BinaryExpression,
-  ///   /*rhs=*/ast::BINARY_EXPRESSION::RHS, INPUT_DEPENDENCY>(
+  ///   ast::BINARY_EXPRESSION::RHS, INPUT_DEPENDENCY>(
   ///   [](const Context& rhsContext, const ast::Expression& rhs,
+  ///      const Context& inputContext) -> Context {
+  ///     ...
+  ///   }
+  /// )
+  /// Dependency<Context, ast::BinaryExpression,
+  ///   weak(ast::BINARY_EXPRESSION::RHS), INPUT_DEPENDENCY>(
+  ///   [](const Context* rhsContext, const std::optional<ast::Expression>& rhs,
   ///      const Context& inputContext) -> Context {
   ///     ...
   ///   }
@@ -141,7 +282,7 @@ public:
   }
 
 private:
-  static_assert(((inputIndices <
+  static_assert(((unwrapWeak(inputIndices) <
                       std::tuple_size_v<typename ASTNode::SubElements> ||
                   inputIndices == INPUT_DEPENDENCY) &&
                  ...),
@@ -149,6 +290,40 @@ private:
 
   std::function<ContextComputationFn> computationFn;
 };
+
+namespace detail {
+
+template <typename Tuple>
+struct NonTerminalsTupleImpl;
+
+template <typename... NonTerminals>
+struct NonTerminalsTupleImpl<std::tuple<NonTerminals...>> {
+  using type = std::tuple<std::optional<NonTerminals>...>;
+};
+
+} // namespace detail
+
+/// Tuple of optionals of all subelements of this ASTNode.
+/// This is used to have one consistent API with which to call an
+/// 'OpaqueTransferFn' to calculate a context.
+/// Elements are optional, since they may not yet have been constructed.
+template <typename ASTNode>
+using SubElementsTuple =
+    typename detail::NonTerminalsTupleImpl<typename ASTNode::SubElements>::type;
+
+/// Tuple of possibly null pointers of all contexts of this ASTNode.
+/// This is used to have one consistent API with which to call an
+/// 'OpaqueTransferFn' and 'OpaqueOutputTransferFn' to calculate a context.
+/// Elements may be null, since they may not yet have been calculated.
+template <typename ASTNode>
+using ContextTuple =
+    std::array<const void *,
+               std::tuple_size_v<typename ASTNode::SubElements> + 1>;
+/// Same as 'ContextTuple', but the elements are known to be 'TypingContext's.
+template <typename ASTNode, typename TypingContext>
+using TypedContextTuple =
+    std::array<const TypingContext *,
+               std::tuple_size_v<typename ASTNode::SubElements> + 1>;
 
 /// Opaque-wrapper over 'TransferFn' that can be constructed from any instance
 /// of 'TransferFn' with the same 'ASTNode'.
@@ -159,82 +334,81 @@ private:
 template <typename ASTNode>
 class OpaqueTransferFn {
 
-  template <typename Tuple>
-  struct NonTerminalsTupleImpl;
-
-  template <typename... NonTerminals>
-  struct NonTerminalsTupleImpl<std::tuple<NonTerminals...>> {
-    using type = std::tuple<std::optional<NonTerminals>...>;
-  };
-
 public:
-  /// Tuple of optionals of all subelements of this ASTNode.
-  /// This is used to have one consistent API with which to call an
-  /// 'OpaqueDependency' to calculate a context.
-  /// Elements are optional, since they may not yet have been constructed.
-  using SubElementsTuple =
-      typename NonTerminalsTupleImpl<typename ASTNode::SubElements>::type;
-
-  /// Tuple of optionals of all contexts of this ASTNode.
-  /// This is used to have one consistent API with which to call an
-  /// 'OpaqueDependency' to calculate a context.
-  /// Elements are optional, since they may not yet have been calculated.
-  using ContextTuple =
-      std::array<std::optional<OpaqueContext>,
-                 std::tuple_size_v<typename ASTNode::SubElements> + 1>;
-
-  /// Constructs an 'OpaqueDependency' from a 'Dependency'.
+  /// Constructs an 'OpaqueTransferFn' from a 'Dependency'.
   template <typename TypingContext, std::size_t... inputIndices>
   /*implicit*/ OpaqueTransferFn(
-      TransferFn<TypingContext, ASTNode, inputIndices...> &&dep)
-      : dep(std::move(dep)),
-        computationFn(+[](const std::any &dep,
-                          const SubElementsTuple &subElements,
-                          const ContextTuple &contexts) -> OpaqueContext {
-          // Construct a tuple of all arguments that 'dep' should be called
-          // with.
-          // This mainly uses 'inputIndices' to index into 'subElements' and
-          // 'contexts'.
-          // The logic here simply unwraps the optionals: It assumes that the
-          // required contexts and subelements have already been generated.
-          auto argTuple = std::tuple_cat([&](auto &&integral) {
-            constexpr std::size_t index = decltype(integral){};
-            if constexpr (index == INPUT_DEPENDENCY) {
-              // Input context.
-              return std::forward_as_tuple(
-                  std::get<std::tuple_size_v<ContextTuple> - 1>(contexts)
-                      ->template cast<TypingContext>());
-            } else {
-              // Subelement context + ASTNode.
-              return std::forward_as_tuple(
-                  std::get<index>(contexts)->template cast<TypingContext>(),
-                  *std::get<index>(subElements));
-            }
-          }(std::integral_constant<std::size_t, inputIndices>{})...);
+      TransferFn<TypingContext, ASTNode, inputIndices...> dep)
+      : OpaqueTransferFn(
+            llvm::identity<TypingContext>{},
+            []() -> llvm::ArrayRef<std::size_t> {
+              // Since the number (and values) of input indices are known at
+              // compile time we can define and reference a statically allocated
+              // array in an 'ArrayRef' without lifetime issues. A unique array
+              // is created for every template instantiation.
+              constexpr static std::array<std::size_t, sizeof...(inputIndices)>
+                  storage{inputIndices...};
+              return storage;
+            }(),
+            [dep = std::move(dep)](
+                const SubElementsTuple<ASTNode> &subElements,
+                const TypedContextTuple<ASTNode, TypingContext> &contexts)
+                -> TypingContext {
+              // Construct a tuple of all arguments that 'dep' should be called
+              // with.
+              // This mainly uses 'inputIndices' to index into 'subElements' and
+              // 'contexts'.
+              // The logic here simply unwraps the optionals: It assumes that
+              // the required contexts and subelements have already been
+              // generated.
+              auto argTuple = std::tuple_cat([&](auto &&integral) {
+                constexpr std::size_t index = decltype(integral){};
+                if constexpr (index == INPUT_DEPENDENCY) {
+                  // Input context.
+                  return std::forward_as_tuple(*contexts.back());
+                } else if constexpr (isWeak(index)) {
+                  // Subelement context + ASTNode.
+                  return std::make_tuple(
+                      std::get<unwrapWeak(index)>(contexts),
+                      std::cref(std::get<unwrapWeak(index)>(subElements)));
+                } else {
+                  // Subelement context + ASTNode.
+                  return std::forward_as_tuple(*std::get<index>(contexts),
+                                               *std::get<index>(subElements));
+                }
+              }(std::integral_constant<std::size_t, inputIndices>{})...);
 
-          return OpaqueContext(std::apply(
-              *std::any_cast<
-                  TransferFn<TypingContext, ASTNode, inputIndices...>>(&dep),
-              std::move(argTuple)));
-        }) {
+              return std::apply(dep, std::move(argTuple));
+            }) {}
 
-    // Since the number (and values) of input indices are known at compile time
-    // we can define and reference a statically allocated array in an 'ArrayRef'
-    // without lifetime issues.
-    // A unique array is created for every template instantiation.
-    constexpr static std::array<std::size_t, sizeof...(inputIndices)> storage{
-        inputIndices...};
-    this->inputIndices = storage;
-  }
-
+  /// Low-level type safe constructor.
+  /// This assumes that all contexts passed by the generator are of type
+  /// 'TypingContext' and enforces that 'f' returns a 'TypingContext'.
+  /// This constructor is low-level as it operates on the raw-calling convention
+  /// and allows passing arbitrary indices.
+  /// Users are encouraged to use 'TransferFn' whenever possible.
+  ///
+  /// The first parameter is used to deduce 'TypingContext'.
+  /// The callable 'f' is expected to have the signature:
+  ///   TypingContext(const SubElementsTuple<ASTNode> &,
+  ///                 const TypedContextTuple<ASTNode, TypingContext> &)
+  template <typename TypingContext, typename ConcreteTransferFn>
   explicit OpaqueTransferFn(
+      llvm::identity<TypingContext>,
       std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
           inputIndices,
-      std::any dep,
-      OpaqueContext (*computationFn)(const std::any &dep,
-                                     const SubElementsTuple &nonTerminals,
-                                     const ContextTuple &tuple))
-      : dep(std::move(dep)), computationFn(computationFn),
+      ConcreteTransferFn &&f)
+      : computationFn([f = std::forward<ConcreteTransferFn>(f)](
+                          const SubElementsTuple<ASTNode> &nonTerminals,
+                          const ContextTuple<ASTNode> &tuple) -> OpaqueContext {
+          TypedContextTuple<ASTNode, TypingContext> unwrapped{};
+          for (auto &&[unwrappedEl, wrappedEl] :
+               llvm::zip_equal(unwrapped, tuple))
+            unwrappedEl = reinterpret_cast<const TypingContext *>(wrappedEl);
+
+          TypingContext result = f(nonTerminals, unwrapped);
+          return OpaqueContext(std::move(result));
+        }),
         inputIndices(std::move(inputIndices)) {}
 
   /// Returns the indices of the subelements (or input) that this dependency
@@ -247,16 +421,30 @@ public:
 
   /// Calculates the context from the currently calculated subelements and
   /// contexts. Internal API that should only be used by the generator.
-  OpaqueContext operator()(const SubElementsTuple &subElements,
-                           const ContextTuple &contexts) const {
-    return computationFn(dep, subElements, contexts);
+  OpaqueContext operator()(const SubElementsTuple<ASTNode> &subElements,
+                           const ContextTuple<ASTNode> &contexts) const {
+    return computationFn(subElements, contexts);
+  }
+
+  /// More type-safe variant of the call operator that accepts and returns
+  /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
+  /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
+  /// was originally constructed with.
+  template <typename TypingContext>
+  TypingContext
+  call(const SubElementsTuple<ASTNode> &subElements,
+       const TypedContextTuple<ASTNode, TypingContext> &contexts) const {
+    return (*this)(subElements,
+                   mapTuplesIntoArray([](const TypingContext *context)
+                                          -> const void * { return context; },
+                                      contexts))
+        .template cast<TypingContext>();
   }
 
 private:
-  std::any dep;
-  OpaqueContext (*computationFn)(const std::any &dep,
-                                 const SubElementsTuple &nonTerminals,
-                                 const ContextTuple &tuple);
+  std::function<OpaqueContext(const SubElementsTuple<ASTNode> &nonTerminals,
+                              const ContextTuple<ASTNode> &tuple)>
+      computationFn;
   std::variant<llvm::ArrayRef<std::size_t>, std::vector<std::size_t>>
       inputIndices;
 };
@@ -289,11 +477,16 @@ private:
 /// (const ArrayAssignmentStatement& node,
 ///  const TypingContext& arrayContext, const TypingContext& indexContext,
 ///  const TypingContext& inputContext) -> TypingContext
-template <typename ASTNode>
+template <typename TypingContext, typename ASTNode, std::size_t... inputIndices>
 class OutputTransferFn {
+
+  using ContextComputationFn = TypingContext(
+      const ASTNode &,
+      const std::conditional_t<static_cast<bool>(inputIndices), TypingContext,
+                               TypingContext> &...);
+
 public:
-  /// Constructs a 'OutputTransferFn' from a function object and
-  /// 'inputDependencies'.
+  /// Constructs a 'OutputTransferFn' from a function object
   /// Like in 'TransferFn', the 'inputDependencies' specify the output contexts
   /// of the corresponding subelements that should be passed into the function
   /// object.
@@ -305,91 +498,104 @@ public:
   /// contexts of the subelements.
   /// Note that unlike 'TransferFn', no subelement AST nodes are passed.
   /// Instead the fully constructed 'ASTNode' is passed as the first parameter.
-  template <std::size_t... inputDependencies, class F>
-  explicit OutputTransferFn(std::index_sequence<inputDependencies...>, F &&f)
-      : computationFn([f = std::forward<F>(f)](
-                          const ASTNode &astNode,
-                          const typename OpaqueTransferFn<ASTNode>::ContextTuple
-                              &contexts) {
-          // Using the values in 'inputDependencies', construct a tuple of all
-          // the requested contexts and unbox them out of the 'OpaqueContext'.
-          auto castedContexts = enumerateTuplesInto(
-              [](auto &&...args) {
-                return std::forward_as_tuple(
-                    std::forward<decltype(args)>(args)...);
-              },
-              [&](auto indexT, auto inputDependencyT) -> decltype(auto) {
-                constexpr std::size_t index = decltype(indexT){};
-                constexpr std::size_t inputDependency =
-                    decltype(inputDependencyT){};
-
-                // Input dependencies map to the last element within
-                // 'contexts'.
-                constexpr std::size_t indexInContext =
-                    inputDependency == INPUT_DEPENDENCY
-                        ? std::tuple_size_v<std::decay_t<decltype(contexts)>> -
-                              1
-                        : inputDependency;
-
-                // Cast the 'OpaqueContext' to whatever parameter type
-                // the function object accepts.
-                constexpr std::size_t astNodeParamOffset = 1;
-
-                using FunctionTrait =
-                    llvm::function_traits<std::decay_t<decltype(f)>>;
-                using TypingContext =
-                    std::decay_t<typename FunctionTrait::template arg_t<
-                        astNodeParamOffset + index>>;
-
-                return std::get<indexInContext>(contexts)
-                    ->template cast<TypingContext>();
-              },
-              getTupleOfIndices(std::index_sequence<inputDependencies...>{}));
-
-          // Now call the given function object using the 'ASTNode' and the
-          // contexts.
-          return std::apply(
-              [&](auto &&...args) {
-                return OpaqueContext(
-                    f(astNode, std::forward<decltype(args)>(args)...));
-              },
-              std::move(castedContexts));
-        }) {}
-
-  explicit OutputTransferFn(
-      std::function<OpaqueContext(
-          const ASTNode &,
-          const typename OpaqueTransferFn<ASTNode>::ContextTuple &)>
-          computationFn)
+  explicit OutputTransferFn(std::function<ContextComputationFn> computationFn)
       : computationFn(std::move(computationFn)) {}
 
-  /// Convenience overload for 'OutputTransferFn' that do not have any input
+  /// Convenience constructor from a constant 'TypingContext' without any
   /// dependencies.
-  template <class F, std::enable_if_t<std::is_invocable_v<F, const ASTNode &>>
-                         * = nullptr>
-  explicit OutputTransferFn(F &&f)
-      : OutputTransferFn(std::index_sequence<>{}, std::forward<F>(f)) {}
+  explicit OutputTransferFn(TypingContext context)
+      : OutputTransferFn(
+            [context = std::move(context)](auto &&...) { return context; }) {}
 
-  /// Convenience method for 'OutputTransferFn' that always return the same
-  /// value.
-  template <class T>
-  static OutputTransferFn outputConstant(T &&value) {
-    return OutputTransferFn(
-        [value = std::forward<T>(value)](const ASTNode &) { return value; });
-  }
-
-  /// Calculates the context from the new ASTNode and the contexts.
-  /// Internal API that should only be used by the generator.
-  OpaqueContext operator()(
-      const ASTNode &astNode,
-      const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts) const {
-    return computationFn(astNode, contexts);
+  template <typename... Args>
+  TypingContext operator()(Args &&...args) const {
+    return computationFn(std::forward<Args>(args)...);
   }
 
 private:
-  std::function<OpaqueContext(
-      const ASTNode &astNode,
-      const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts)>
+  std::function<ContextComputationFn> computationFn;
+};
+
+/// Opaque-wrapper over 'OutputTransferFn' that can be constructed from any
+/// instance of 'OutputTransferFn' with the same 'ASTNode'. Users should
+/// construct 'OutputTransferFn' instances instead.
+///
+/// Mainly used as a return type in 'AbstractTypeSystem' where templates cannot
+/// or shouldn't be used.
+template <typename ASTNode>
+class OpaqueOutputTransferFn {
+public:
+  /// Constructs an 'OpaqueOutputTransferFn' from a 'OutputTransferFn'.
+  template <typename TypingContext, std::size_t... inputIndices>
+  /*implicit*/ OpaqueOutputTransferFn(
+      OutputTransferFn<TypingContext, ASTNode, inputIndices...> &&dep)
+      : OpaqueOutputTransferFn(
+            llvm::identity<TypingContext>{},
+            [dep = std::move(dep)](
+                const ASTNode &astNode,
+                const TypedContextTuple<ASTNode, TypingContext> &contexts)
+                -> TypingContext {
+              return dep(
+                  astNode,
+                  *contexts[std::min(inputIndices, contexts.size() - 1)]...);
+            }) {}
+
+  /// Low-level type safe constructor.
+  /// This assumes that all contexts passed by the generator are of type
+  /// 'TypingContext' and enforces that 'f' returns a 'TypingContext'.
+  /// This constructor is low-level as it operates on the raw-calling convention
+  /// and allows passing arbitrary indices.
+  /// Users are encouraged to use 'OutputTransferFn' whenever possible.
+  ///
+  /// The first parameter is used to deduce 'TypingContext'.
+  /// The callable 'f' is expected to have the signature:
+  ///   TypingContext(const ASTNode &,
+  ///                 const TypedContextTuple<ASTNode, TypingContext> &)
+  template <typename TypingContext, typename ConcreteTransferFn>
+  OpaqueOutputTransferFn(llvm::identity<TypingContext>, ConcreteTransferFn &&f)
+      : computationFn(
+            [f = std::forward<ConcreteTransferFn>(f)](
+                const ASTNode &astNode,
+                const ContextTuple<ASTNode> &contexts) -> OpaqueContext {
+              TypedContextTuple<ASTNode, TypingContext> unwrapped{};
+              for (auto &&[unwrappedEl, wrappedEl] :
+                   llvm::zip_equal(unwrapped, contexts)) {
+                if (!wrappedEl) {
+                  unwrappedEl = nullptr;
+                  continue;
+                }
+                unwrappedEl =
+                    reinterpret_cast<const TypingContext *>(wrappedEl);
+              }
+              TypingContext result = f(astNode, unwrapped);
+              return OpaqueContext(std::move(result));
+            }) {}
+
+  /// Calculates the context from the new ASTNode and the contexts.
+  /// Internal API that should only be used by the generator.
+  OpaqueContext operator()(const ASTNode &astNode,
+                           const ContextTuple<ASTNode> &contexts) const {
+    return computationFn(astNode, contexts);
+  }
+
+  /// More type-safe variant of the call operator that accepts and returns
+  /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
+  /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
+  /// was originally constructed with.
+  template <typename TypingContext>
+  TypingContext
+  call(const ASTNode &astNode,
+       const TypedContextTuple<ASTNode, TypingContext> &contexts) const {
+    return (*this)(astNode,
+                   mapTuplesIntoArray([](const TypingContext *context)
+                                          -> const void * { return context; },
+                                      contexts))
+        .template cast<TypingContext>();
+  }
+
+private:
+  std::function<OpaqueContext(const ASTNode &astNode,
+                              const ContextTuple<ASTNode> &contexts)>
       computationFn;
 };
 
@@ -401,7 +607,7 @@ template <typename ASTNode, typename... SubElements>
 struct CalculateDependencyArray<ASTNode, std::tuple<SubElements...>> {
   using type = std::tuple<
       std::conditional_t<true, OpaqueTransferFn<ASTNode>, SubElements>...,
-      OutputTransferFn<ASTNode>>;
+      OpaqueOutputTransferFn<ASTNode>>;
 };
 } // namespace details
 
@@ -437,71 +643,23 @@ using TransferFnArray =
 /// It also offers common and convenient default implementations of 'check*'
 /// and 'discard*' methods.
 class AbstractTypeSystem {
-protected:
-  /// Returns an instance of 'TransferFn' which simply forwards the context
-  /// from the input to the subelement.
-  template <typename ASTNode>
-  static auto copyFromInput() {
-    return copyFrom<ASTNode, INPUT_DEPENDENCY>();
-  }
-
-  /// Returns an instance of 'TransferFn' which forwards the context
-  /// from the given index to the subelement.
-  template <typename ASTNode, std::size_t index>
-  static auto copyFrom() {
-    return TransferFn<OpaqueContext, ASTNode, index>(
-        [](const OpaqueContext &context, auto &&...) { return context; });
-  }
-
-  /// Returns a noop 'OutputTransferFn' that keeps the output context
-  /// equal to the input context.
-  template <typename ASTNode>
-  static auto copyInputToOutput() {
-    return copyToOutput<ASTNode, INPUT_DEPENDENCY>();
-  }
-
-  /// Returns a 'OutputTransferFn' whose output context will be equivalent to
-  /// the output context of 'index' subelement.
-  template <typename ASTNode, std::size_t index>
-  static auto copyToOutput() {
-    return OutputTransferFn<ASTNode>(
-        std::index_sequence<index>{},
-        [](const ASTNode &, const OpaqueContext &context) { return context; });
-  }
-
 public:
   virtual ~AbstractTypeSystem();
 
-  virtual TransferFnArray<ast::Function> getFunctionTransferFns() {
-    return {
-        /*return type=*/copyFromInput<ast::Function>(),
-        /*statement list=*/copyFromInput<ast::Function>(),
-        /*return statement=*/copyFromInput<ast::Function>(),
-        /*output=*/copyInputToOutput<ast::Function>(),
-    };
-  }
+  virtual TransferFnArray<ast::Function> getFunctionTransferFns() = 0;
 
   virtual TransferFnArray<ast::ReturnStatement>
-  getReturnStatementTransferFns() {
-    return {
-        /*return value=*/copyFromInput<ast::ReturnStatement>(),
-        /*output=*/copyInputToOutput<ast::ReturnStatement>(),
-    };
-  }
+  getReturnStatementTransferFns() = 0;
 
   virtual bool discardScalarTypeOpaque(const ast::ScalarType &scalarType,
                                        const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() {
-    return /*output=*/copyInputToOutput<ast::ScalarType>();
-  }
+  virtual TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() = 0;
 
   virtual bool discardReturnTypeOpaque(const ast::ReturnType &,
                                        const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() {
-    return /*output=*/copyInputToOutput<ast::ReturnType>();
-  }
+  virtual TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() = 0;
 
   /// Returns true if the generator should discard this binary expression
   /// based on the given input context.
@@ -509,156 +667,88 @@ public:
                                              const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) {
-    // Default implementation: Simply propagates the context to the subelements.
-    return {/*lhs=*/copyFromInput<ast::BinaryExpression>(),
-            /*rhs=*/copyFromInput<ast::BinaryExpression>(),
-            /*output=*/copyInputToOutput<ast::BinaryExpression>()};
-  }
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) = 0;
 
   virtual bool discardUnaryExpressionOpaque(ast::UnaryExpression::Op op,
                                             const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::UnaryExpression>
-  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) {
-    return {
-        /*operand=*/copyFromInput<ast::UnaryExpression>(),
-        /*output=*/copyInputToOutput<ast::UnaryExpression>(),
-    };
-  }
+  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) = 0;
 
   virtual bool discardVariableOpaque(const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::Variable> getVariableTransferFns() {
-    return {
-        /*parameter=*/copyFromInput<ast::Variable>(),
-        /*output=*/copyInputToOutput<ast::Variable>(),
-    };
-  }
+  virtual TransferFnArray<ast::Variable> getVariableTransferFns() = 0;
 
   virtual bool discardCastExpressionOpaque(const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() {
-    return {
-        /*target type=*/copyFromInput<ast::CastExpression>(),
-        /*operand=*/copyFromInput<ast::CastExpression>(),
-        /*output=*/copyInputToOutput<ast::CastExpression>(),
-    };
-  }
+  virtual TransferFnArray<ast::CastExpression>
+  getCastExpressionTransferFns() = 0;
 
   virtual bool
   discardConditionalExpressionOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ConditionalExpression>
-  getConditionalExpressionTransferFns() {
-    // Default implementation: Simply propagates the context to the
-    // subelements.
-    return {
-        /*condition=*/copyFromInput<ast::ConditionalExpression>(),
-        /*true value=*/copyFromInput<ast::ConditionalExpression>(),
-        /*false value=*/copyFromInput<ast::ConditionalExpression>(),
-        /*output=*/copyInputToOutput<ast::ConditionalExpression>(),
-    };
-  }
+  getConditionalExpressionTransferFns() = 0;
 
   virtual std::optional<ast::Constant>
   discardConstantOpaque(const ast::Constant &,
                         const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::Constant> getConstantTransferFns() {
-    return /*output=*/copyInputToOutput<ast::Constant>();
-  }
+  virtual TransferFnArray<ast::Constant> getConstantTransferFns() = 0;
 
   virtual bool
   discardExistingScalarParameterOpaque(const ast::ScalarParameter &,
                                        const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ExistingScalarParameter>
-  getExistingScalarParameterTransferFns() {
-    return {
-        /*output=*/copyInputToOutput<ast::ExistingScalarParameter>(),
-    };
-  }
+  getExistingScalarParameterTransferFns() = 0;
 
   virtual bool
   discardFreshScalarParameterOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ScalarParameter>
-  getFreshScalarParameterTransferFns() {
-    return {
-        /*data type=*/copyFromInput<ast::ScalarParameter>(),
-        /*output=*/copyInputToOutput<ast::ScalarParameter>(),
-    };
-  }
+  getFreshScalarParameterTransferFns() = 0;
 
   virtual bool
   discardArrayReadExpressionOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionTransferFns() {
-    return {/*array parameter=*/copyFromInput<ast::ArrayReadExpression>(),
-            /*index=*/copyFromInput<ast::ArrayReadExpression>(),
-            /*output=*/copyInputToOutput<ast::ArrayReadExpression>()};
-  }
+  getArrayReadExpressionTransferFns() = 0;
 
   virtual bool
   discardExistingArrayParameterOpaque(const ast::ArrayParameter &,
                                       const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ExistingArrayParameter>
-  getExistingArrayParameterTransferFns() {
-    return {
-        /*output=*/copyInputToOutput<ast::ExistingArrayParameter>(),
-    };
-  }
+  getExistingArrayParameterTransferFns() = 0;
 
   virtual bool
   discardFreshArrayParameterOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ArrayParameter>
-  getFreshArrayParameterTransferFns() {
-    return {
-        /*element type=*/copyFromInput<ast::ArrayParameter>(),
-        /*output=*/copyInputToOutput<ast::ArrayParameter>(),
-    };
-  }
+  getFreshArrayParameterTransferFns() = 0;
 
   virtual bool
   discardArrayAssignmentStatementOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::ArrayAssignmentStatement>
-  getArrayAssignmentStatementTransferFns() {
-    return TransferFnArray<ast::ArrayAssignmentStatement>{
-        /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
-        /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
-        /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
-        /*output=*/copyInputToOutput<ast::ArrayAssignmentStatement>(),
-    };
-  }
+  getArrayAssignmentStatementTransferFns() = 0;
+
+  virtual bool
+  discardScalarAssignmentStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() = 0;
 
   virtual bool discardStatementListOpaque(const OpaqueContext &context) = 0;
 
-  virtual TransferFnArray<ast::StatementList> getStatementListTransferFns() {
-    return TransferFnArray<ast::StatementList>{
-        /*statement list=*/copyFromInput<ast::StatementList>(),
-        /*statement=*/copyFromInput<ast::StatementList>(),
-        /*output=*/copyInputToOutput<ast::StatementList>(),
-    };
-  }
+  virtual TransferFnArray<ast::StatementList> getStatementListTransferFns() = 0;
 
   virtual bool
   discardStructuredForStatementOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::StructuredForStatement>
-  getStructuredForStatementTransferFns() {
-    return {
-        /*start=*/copyFromInput<ast::StructuredForStatement>(),
-        /*end=*/copyFromInput<ast::StructuredForStatement>(),
-        /*step=*/copyFromInput<ast::StructuredForStatement>(),
-        /*statements=*/copyFromInput<ast::StructuredForStatement>(),
-        /*output=*/copyInputToOutput<ast::StructuredForStatement>(),
-    };
-  }
+  getStructuredForStatementTransferFns() = 0;
 
   using ExpressionKey =
       std::variant<ast::Constant::Tag, ast::CastExpression::Tag,
@@ -675,7 +765,8 @@ public:
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
 
   using StatementKey = std::variant<ast::StructuredForStatement::Tag,
-                                    ast::ArrayAssignmentStatement::Tag>;
+                                    ast::ArrayAssignmentStatement::Tag,
+                                    ast::ScalarAssignmentStatement::Tag>;
 
   /// Returns the probability table for a given statement, represented by their
   /// tag, to be selected.
@@ -747,9 +838,75 @@ public:
 ///   return type.
 template <typename TypingContext, typename Self>
 class TypeSystem : public AbstractTypeSystem {
+protected:
+  /// Returns an instance of 'TransferFn' which simply forwards the context
+  /// from the input to the subelement.
+  template <typename ASTNode>
+  static auto copyFromInput() {
+    return copyFrom<ASTNode, INPUT_DEPENDENCY>();
+  }
+
+  /// Returns an instance of 'TransferFn' which forwards the context
+  /// from the given index to the subelement.
+  template <typename ASTNode, std::size_t index>
+  static auto copyFrom() {
+    return TransferFn<ASTNode, index>(
+        [](const TypingContext &context, auto &&...) { return context; });
+  }
+
+  /// Returns an instance of 'TransferFn' which forwards the first present
+  /// context from the possibly-weak dependencies in 'indices'.
+  /// At least one dependency must not be weak.
+  template <typename ASTNode, std::size_t... indices>
+  static auto copyFirstOf() {
+    static_assert((!isWeak(indices) || ...),
+                  "at least one of 'indices' must not be weak");
+
+    return TransferFn<ASTNode, indices...>([](auto &&...args) {
+      std::optional<TypingContext> result;
+      foreachInTuples(
+          [&](auto &&element) {
+            if (result)
+              return;
+
+            if constexpr (std::is_same_v<std::decay_t<decltype(element)>,
+                                         TypingContext>) {
+              result = element;
+            }
+            if constexpr (std::is_same_v<std::decay_t<decltype(element)>,
+                                         const TypingContext *>) {
+              if (element)
+                result = *element;
+            }
+          },
+          std::forward_as_tuple(std::forward<decltype(args)>(args)...));
+
+      return std::move(*result);
+    });
+  }
+
+  /// Returns a noop 'OutputTransferFn' that keeps the output context
+  /// equal to the input context.
+  template <typename ASTNode>
+  static auto copyInputToOutput() {
+    return copyToOutput<ASTNode, INPUT_DEPENDENCY>();
+  }
+
+  /// Returns a 'OutputTransferFn' whose output context will be equivalent to
+  /// the output context of 'index' subelement.
+  template <typename ASTNode, std::size_t index>
+  static auto copyToOutput() {
+    return OutputTransferFn<ASTNode, index>(
+        [](const auto &, const TypingContext &context) { return context; });
+  }
+
 public:
   template <typename ASTNode, std::size_t... inputIndices>
   using TransferFn = TransferFn<TypingContext, ASTNode, inputIndices...>;
+
+  template <typename ASTNode, std::size_t... inputIndices>
+  using OutputTransferFn =
+      OutputTransferFn<TypingContext, ASTNode, inputIndices...>;
 
   /// Shorthand for derived classes to be able to call the default
   /// implementation of methods.
@@ -760,27 +917,30 @@ public:
   // since we use CRTP-techniques to call these. They may be but are not
   // required to be static.
 
-  static bool discardBinaryExpression(ast::BinaryExpression::Op,
-                                      const TypingContext &) {
-    return false;
+  TransferFnArray<ast::Function> getFunctionTransferFns() override {
+    return {
+        /*return type=*/copyFromInput<ast::Function>(),
+        /*statement list=*/copyFromInput<ast::Function>(),
+        /*return statement=*/copyFromInput<ast::Function>(),
+        /*output=*/copyInputToOutput<ast::Function>(),
+    };
   }
 
-  static bool discardUnaryExpression(ast::UnaryExpression::Op,
-                                     const TypingContext &) {
-    return false;
-  }
-
-  static bool discardVariable(const TypingContext &) { return false; }
-
-  static bool discardCastExpression(const TypingContext &) { return false; }
-
-  static bool discardConditionalExpression(const TypingContext &) {
-    return false;
+  TransferFnArray<ast::ReturnStatement>
+  getReturnStatementTransferFns() override {
+    return {
+        /*return value=*/copyFromInput<ast::ReturnStatement>(),
+        /*output=*/copyInputToOutput<ast::ReturnStatement>(),
+    };
   }
 
   static bool discardScalarType(const ast::ScalarType &,
                                 const TypingContext &) {
     return false;
+  }
+
+  TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() override {
+    return /*output=*/copyInputToOutput<ast::ScalarType>();
   }
 
   bool discardReturnType(const ast::ReturnType &returnType,
@@ -793,6 +953,71 @@ public:
         });
   }
 
+  TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() override {
+    return /*output=*/copyInputToOutput<ast::ReturnType>();
+  }
+
+  static bool discardBinaryExpression(ast::BinaryExpression::Op,
+                                      const TypingContext &) {
+    return false;
+  }
+
+  TransferFnArray<ast::BinaryExpression>
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
+    // Default implementation: Simply propagates the context to the subelements.
+    return {/*lhs=*/copyFromInput<ast::BinaryExpression>(),
+            /*rhs=*/copyFromInput<ast::BinaryExpression>(),
+            /*output=*/copyInputToOutput<ast::BinaryExpression>()};
+  }
+
+  static bool discardUnaryExpression(ast::UnaryExpression::Op,
+                                     const TypingContext &) {
+    return false;
+  }
+
+  TransferFnArray<ast::UnaryExpression>
+  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override {
+    return {
+        /*operand=*/copyFromInput<ast::UnaryExpression>(),
+        /*output=*/copyInputToOutput<ast::UnaryExpression>(),
+    };
+  }
+
+  static bool discardVariable(const TypingContext &) { return false; }
+
+  TransferFnArray<ast::Variable> getVariableTransferFns() override {
+    return {
+        /*parameter=*/copyFromInput<ast::Variable>(),
+        /*output=*/copyInputToOutput<ast::Variable>(),
+    };
+  }
+
+  static bool discardCastExpression(const TypingContext &) { return false; }
+
+  TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
+    return {
+        /*target type=*/copyFromInput<ast::CastExpression>(),
+        /*operand=*/copyFromInput<ast::CastExpression>(),
+        /*output=*/copyInputToOutput<ast::CastExpression>(),
+    };
+  }
+
+  static bool discardConditionalExpression(const TypingContext &) {
+    return false;
+  }
+
+  TransferFnArray<ast::ConditionalExpression>
+  getConditionalExpressionTransferFns() override {
+    // Default implementation: Simply propagates the context to the
+    // subelements.
+    return {
+        /*condition=*/copyFromInput<ast::ConditionalExpression>(),
+        /*true value=*/copyFromInput<ast::ConditionalExpression>(),
+        /*false value=*/copyFromInput<ast::ConditionalExpression>(),
+        /*output=*/copyInputToOutput<ast::ConditionalExpression>(),
+    };
+  }
+
   std::optional<ast::Constant> discardConstant(const ast::Constant &constant,
                                                const TypingContext &context) {
     if (self().discardScalarType(constant.getType(), context))
@@ -801,17 +1026,43 @@ public:
     return constant;
   }
 
+  TransferFnArray<ast::Constant> getConstantTransferFns() override {
+    return /*output=*/copyInputToOutput<ast::Constant>();
+  }
+
   bool discardExistingScalarParameter(const ast::ScalarParameter &parameter,
                                       const TypingContext &context) {
     return self().discardScalarType(parameter.getDataType(), context);
+  }
+
+  TransferFnArray<ast::ExistingScalarParameter>
+  getExistingScalarParameterTransferFns() override {
+    return {
+        /*output=*/copyInputToOutput<ast::ExistingScalarParameter>(),
+    };
   }
 
   static bool discardFreshScalarParameter(const TypingContext &) {
     return false;
   }
 
+  TransferFnArray<ast::ScalarParameter>
+  getFreshScalarParameterTransferFns() override {
+    return {
+        /*data type=*/copyFromInput<ast::ScalarParameter>(),
+        /*output=*/copyInputToOutput<ast::ScalarParameter>(),
+    };
+  }
+
   static bool discardArrayReadExpression(const TypingContext &) {
     return false;
+  }
+
+  TransferFnArray<ast::ArrayReadExpression>
+  getArrayReadExpressionTransferFns() override {
+    return {/*array parameter=*/copyFromInput<ast::ArrayReadExpression>(),
+            /*index=*/copyFromInput<ast::ArrayReadExpression>(),
+            /*output=*/copyInputToOutput<ast::ArrayReadExpression>()};
   }
 
   bool discardExistingArrayParameter(const ast::ArrayParameter &parameter,
@@ -819,18 +1070,75 @@ public:
     return self().discardScalarType(parameter.getElementType(), context);
   }
 
+  TransferFnArray<ast::ExistingArrayParameter>
+  getExistingArrayParameterTransferFns() override {
+    return {
+        /*output=*/copyInputToOutput<ast::ExistingArrayParameter>(),
+    };
+  }
+
   static bool discardFreshArrayParameter(const TypingContext &) {
     return false;
+  }
+
+  TransferFnArray<ast::ArrayParameter>
+  getFreshArrayParameterTransferFns() override {
+    return {
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*output=*/copyInputToOutput<ast::ArrayParameter>(),
+    };
   }
 
   static bool discardArrayAssignmentStatement(const TypingContext &) {
     return false;
   }
 
+  TransferFnArray<ast::ArrayAssignmentStatement>
+  getArrayAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ArrayAssignmentStatement>{
+        /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*output=*/copyInputToOutput<ast::ArrayAssignmentStatement>(),
+    };
+  }
+
+  static bool discardScalarAssignmentStatement(const TypingContext &) {
+    return false;
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ScalarAssignmentStatement>{
+        /*target=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*output=*/copyInputToOutput<ast::ScalarAssignmentStatement>(),
+    };
+  }
+
   static bool discardStatementList(const TypingContext &) { return false; }
+
+  TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
+    return TransferFnArray<ast::StatementList>{
+        /*statement list=*/copyFromInput<ast::StatementList>(),
+        /*statement=*/copyFromInput<ast::StatementList>(),
+        /*output=*/copyInputToOutput<ast::StatementList>(),
+    };
+  }
 
   static bool discardStructuredForStatement(const TypingContext &) {
     return false;
+  }
+
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override {
+    return {
+        /*start=*/copyFromInput<ast::StructuredForStatement>(),
+        /*end=*/copyFromInput<ast::StructuredForStatement>(),
+        /*step=*/copyFromInput<ast::StructuredForStatement>(),
+        /*statements=*/copyFromInput<ast::StructuredForStatement>(),
+        /*output=*/copyInputToOutput<ast::StructuredForStatement>(),
+    };
   }
 
   static ProbabilityTable<ExpressionKey>
@@ -914,6 +1222,12 @@ public:
   bool
   discardArrayAssignmentStatementOpaque(const OpaqueContext &context) final {
     return self().discardArrayAssignmentStatement(
+        context.cast<TypingContext>());
+  }
+
+  bool
+  discardScalarAssignmentStatementOpaque(const OpaqueContext &context) final {
+    return self().discardScalarAssignmentStatement(
         context.cast<TypingContext>());
   }
 
@@ -1006,6 +1320,10 @@ public:
   static bool discardFreshArrayParameter(const TypingContext &) { return true; }
 
   static bool discardArrayAssignmentStatement(const TypingContext &) {
+    return true;
+  }
+
+  static bool discardScalarAssignmentStatement(const TypingContext &) {
     return true;
   }
 

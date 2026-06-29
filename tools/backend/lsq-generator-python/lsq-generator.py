@@ -12,7 +12,7 @@ import argparse
 import os
 import sys
 
-from vhdl_gen import *
+from core_gen import *
 
 # ===----------------------------------------------------------------------===#
 # Parser Definition
@@ -127,7 +127,7 @@ class LSQWrapper:
         self.module_suffix = suffix
         self.lsq_config = configs
 
-        # Define information needed for VHDL file generation
+        # Define information needed for file generation
         # This part is inherited from the design of the original lsq_generator
         self.library_header = (
             "library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n"
@@ -146,7 +146,7 @@ class LSQWrapper:
     def genWrapper(self):
         """This function generates the desired wrapper for the LSQ"""
 
-        # PART 1: Add library information to the VHDL module
+        # PART 1: Add library information to the module
         self.lsq_wrapper_str += self.library_header
 
         # PART 2: Define the entity
@@ -636,7 +636,7 @@ class LSQWrapper:
     def genWrapperSlave(self):
         """This function generates the desired wrapper for the LSQ"""
 
-        # PART 1: Add library information to the VHDL module
+        # PART 1: Add library information to the module
         self.lsq_wrapper_str += self.library_header
 
         # PART 2: Define the entity

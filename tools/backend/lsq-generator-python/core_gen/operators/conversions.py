@@ -1,7 +1,7 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
-from vhdl_gen.signals import *
-from vhdl_gen.operators import *
+from core_gen.context import VHDLContext
+from core_gen.utils import *
+from core_gen.signals import *
+from core_gen.operators import *
 
 
 def VecToArray(ctx: VHDLContext, dout, din) -> str:
@@ -61,7 +61,7 @@ def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
 
 def OHToBits(ctx: VHDLContext, dout, din) -> str:
     """
-    Generate VHDL code to convert a one-hot vector into its binary index.
+    Generate code to convert a one-hot vector into its binary index.
 
     Example:
         din  = "0010"

@@ -3,6 +3,7 @@
 
 #include "Options.h"
 #include "Randomly.h"
+#include "Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include <filesystem>
 
@@ -42,7 +43,21 @@ public:
   virtual VerificationResult
   verify(const std::filesystem::path &sourceFile) const = 0;
 
+  /// Returns the statistics gathered by this worker over the course of its
+  /// execution, one 'Statistic' object per category. This is called
+  /// periodically to report statistics while the worker is still running on its
+  /// own thread; implementations must therefore be thread-safe with respect to
+  /// the worker's 'generate' and 'verify' methods. The default implementation
+  /// returns no statistics.
+  virtual std::vector<Statistic> getStatistics() const { return {}; }
+
 protected:
+  /// Returns whether the statistics category with the given 'name' should be
+  /// generated, according to the '--statistics' command line option. Workers
+  /// should query this to decide which statistics categories to compute and
+  /// report.
+  bool isStatisticEnabled(llvm::StringRef name) const;
+
   const Options &options;
   mutable Randomly random;
 };

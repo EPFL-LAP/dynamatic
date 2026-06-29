@@ -30,7 +30,7 @@ class Configs:
     they are one of possible default configurations.
     """
 
-    name:          str = 'test'     # Name prefix used for generated VHDL files
+    name:          str = 'test'     # Name prefix used for generated files
     dataW:         int = 16         # Data width        (Number of bits for load/store data)
     addrW:         int = 13         # Address width     (Number of bits for memory address)
     idW:           int = 2          # ID width          (Number of bits for ID in the memory interface)

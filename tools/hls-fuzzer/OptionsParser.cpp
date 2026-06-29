@@ -61,6 +61,14 @@ std::string dynamatic::OptionsParser::getTargetName() const {
   return args.getLastArgValue(OPT_target).str();
 }
 
+std::optional<std::vector<std::string>>
+dynamatic::OptionsParser::getStatistics() const {
+  if (!args.hasArg(OPT_statistics) && !args.hasArg(OPT_statistics_flag))
+    return std::nullopt;
+
+  return args.getAllArgValues(OPT_statistics);
+}
+
 std::vector<std::string>
 dynamatic::OptionsParser::getPositionalArguments() const {
   return args.getAllArgValues(OPT_INPUT);
@@ -75,5 +83,6 @@ dynamatic::Options dynamatic::OptionsParser::apply(Options defaults) {
                                defaults.kind == OracleKind::Functional)
                       ? OracleKind::Functional
                       : OracleKind::NonFunctional;
+  defaults.statistics = getStatistics();
   return defaults;
 }
