@@ -2193,7 +2193,7 @@ public:
         ConvertToHWInstance<handshake::MuxOp>,
         ConvertToHWInstance<handshake::JoinOp>,
         ConvertToHWInstance<handshake::BlockerOp>,
-         ConvertToHWInstance<handshake::InitOp>,
+        ConvertToHWInstance<handshake::InitOp>,
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,
         ConvertToHWInstance<handshake::SinkOp>,
