@@ -32,13 +32,15 @@ private:
 
   void
   performSuppressorMotion(handshake::ConditionalBranchOp branchOp,
-                          DenseSet<handshake::ConditionalBranchOp> &frontier);
+                          DenseSet<handshake::ConditionalBranchOp> &frontier,
+                          int DRewrite = 0);
 
   Value getForkTop(Value value, bool &isInverted);
   bool isSourced(Value value);
 
   void rewriteD(handshake::MuxOp dataMux,
                 handshake::ConditionalBranchOp branchOp,
+                handshake::InitOp initOp,
                 DenseSet<handshake::ConditionalBranchOp> &frontier);
 };
 
@@ -164,17 +166,20 @@ bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
   Value dataPath = branchOp.getFalseResult();
 
   // data path must have exactly one consumer to move past it cleanly
-  if (!dataPath.hasOneUse())
+  if (!dataPath.hasOneUse()) {
+    llvm::errs() << "does not have one use\n";
     return false;
+  }
 
   Operation *targetOp = *dataPath.user_begin();
-
+  StringRef opName = targetOp->getName().getStringRef();
   // verify the targetOp is a PM unit
   if (!isa<handshake::ArithOpInterface, handshake::NotIOp, handshake::ForkOp,
            handshake::LazyForkOp, handshake::BufferOp, handshake::LoadOp,
            handshake::BranchOp>(targetOp) ||
       ((isa<handshake::MergeOp, handshake::ControlMergeOp>(targetOp)) &&
        targetOp->getNumOperands() != 1)) {
+    llvm::errs() << opName << " is not a pm unit or a 1-input merge\n";
     return false; // reject anything that isn't a PM unit or a 1-input merge
   }
 
@@ -212,7 +217,7 @@ bool PreEagerlyElasticPass::isEligibleForSuppressorMotion(
 /// actually moves the suppressors TODO: better description
 void PreEagerlyElasticPass::performSuppressorMotion(
     handshake::ConditionalBranchOp branchOp,
-    DenseSet<handshake::ConditionalBranchOp> &frontier) {
+    DenseSet<handshake::ConditionalBranchOp> &frontier, int DRewrite) {
 
   // identify the operation we want to move past
   Value dataPath = branchOp.getFalseResult();
@@ -227,6 +232,11 @@ void PreEagerlyElasticPass::performSuppressorMotion(
     if (Operation *defOp = operand.getDefiningOp()) {
       if (auto incomingBranch =
               dyn_cast<handshake::ConditionalBranchOp>(defOp)) {
+        // for Rewrite D, move only the suppressor connected to A of the Mux
+        if (incomingBranch != branchOp && DRewrite) {
+          llvm::errs() << "continue\n";
+          continue;
+        }
         frontier.erase(incomingBranch);
         targetOp->replaceUsesOfWith(operand, incomingBranch.getDataOperand());
         incomingBranch->erase();
@@ -254,6 +264,7 @@ void PreEagerlyElasticPass::performSuppressorMotion(
 
 void PreEagerlyElasticPass::rewriteD(
     handshake::MuxOp dataMux, handshake::ConditionalBranchOp branchOp,
+    handshake::InitOp initOp,
     DenseSet<handshake::ConditionalBranchOp> &frontier) {
 
   Location loc = dataMux->getLoc();
@@ -268,17 +279,6 @@ void PreEagerlyElasticPass::rewriteD(
     conditionC = notOp.getOperand();
   }
 
-  // find the original InitOp already attached to the Mux's select operand
-  Value originalSelect = dataMux.getSelectOperand();
-  auto existingInitOp =
-      dyn_cast<handshake::InitOp>(originalSelect.getDefiningOp());
-  if (!existingInitOp) {
-    // this should never happen?
-    llvm::errs() << "Error: Expected an existing InitOp attached to the Mux "
-                    "select lines.\n";
-    return;
-  }
-
   // build the top speculative loop control structure
   OpBuilder builder(dataMux);
 
@@ -287,14 +287,12 @@ void PreEagerlyElasticPass::rewriteD(
   auto trueCst = builder.create<handshake::ConstantOp>(
       loc, conditionC.getType(), builder.getBoolAttr(true),
       trueSrc.getResult());
-  llvm::errs() << "constant true generator generated\n";
 
   // create the new condition-generating mux
   // takes condition C on true and constant TRUE on false
   SmallVector<Value> condMuxInputs = {trueCst.getResult(), conditionC};
   auto condMux = builder.create<handshake::MuxOp>(loc, conditionC.getType(),
                                                   conditionC, condMuxInputs);
-  llvm::errs() << "mux generation successful\n";
 
   // create the fork and wire output 0 back to the condition mmux via an init
   // and output 1 to the original data mux via the already existing init
@@ -303,7 +301,7 @@ void PreEagerlyElasticPass::rewriteD(
   auto loopInitF = builder.create<handshake::InitOp>(
       loc, controlFork.getResults()[0].getType(), controlFork.getResults()[0]);
   condMux.getSelectOperandMutable()[0].set(loopInitF.getResult());
-  existingInitOp.getOperandMutable().assign(controlFork.getResults()[1]);
+  initOp.getOperandMutable().assign(controlFork.getResults()[1]);
   llvm::errs() << "fork generated\n";
 
   // assign the basic block attributes from the dataMux to all other ops
@@ -320,8 +318,10 @@ void PreEagerlyElasticPass::rewriteD(
   } else {
     llvm::errs() << "There was no NOT connected to the suppressor\n";
   }
+
   // move suppressor past the mux
-  performSuppressorMotion(branchOp, frontier);
+  performSuppressorMotion(branchOp, frontier, 1);
+  llvm::errs() << "successfully performed Rewrite D\n";
 }
 
 void PreEagerlyElasticPass::runOnOperation() {
@@ -359,28 +359,41 @@ void PreEagerlyElasticPass::runOnOperation() {
 
   llvm::errs() << "finish rewrite A!\n";
 
-  /* llvm::errs() << "=== IR AFTER REWRITE A ===\n";
-  modOp.dump();
-  llvm::errs() << "==============================================\n"; */
+  /*   llvm::errs() << "=== IR AFTER REWRITE A ===\n";
+    modOp.dump();
+    llvm::errs() << "==============================================\n"; */
 
-  // Do Rewrite D exactly once on the first MuxOp you find
-  // this needs to be fixed, as rewrite D can only be done on loop entries
-  for (auto branchOp : frontier) {
-    if (auto mux = dyn_cast<handshake::MuxOp>(
-            *branchOp.getFalseResult().user_begin())) {
-      llvm::errs() << "branchOp for rewrite D: "
-                   << branchOp->getAttr("handshake.name") << '\n';
-      // check which path the suppressor is connected to
-      Value pathA = mux.getDataOperands()[1];
-      Value pathB = mux.getDataOperands()[0];
-      if (pathA == branchOp.getFalseResult()) {
-        llvm::errs() << "supp connected to path A\n";
-        rewriteD(mux, branchOp, frontier);
-      } else if (pathB == branchOp.getFalseResult()) {
-        llvm::errs()
-            << "supp connected to path B, there should be a lot more nots...\n";
+  // Do Rewrite D as often as possible on all Muxes
+  // However, this should only be done on loop entries!
+  do {
+    frontierUpdated = false;
+
+    for (auto branchOp : frontier) {
+      if (auto mux = dyn_cast<handshake::MuxOp>(
+              *branchOp.getFalseResult().user_begin())) {
+
+        // identify loops (mux connected to init) and make sure the suppressor
+        // connected to the mux does not go anywhere else
+        auto init =
+            dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
+        if (init && branchOp.getFalseResult().hasOneUse()) {
+          llvm::errs() << "branchOp for rewrite D: "
+                       << branchOp->getAttr("handshake.name") << '\n';
+
+          // check whether the suppressor is connected to path A of the mux and
+          // make sure there is no future fork in between
+          if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
+            rewriteD(mux, branchOp, init, frontier);
+          } else {
+            llvm::errs() << "suppressor not connected to path A of the Mux!\n";
+            continue;
+          }
+
+          frontierUpdated = true;
+          // frontier was mutated, break and restart the loop
+          break;
+        }
       }
-      break;
     }
-  }
+  } while (frontierUpdated);
 }
