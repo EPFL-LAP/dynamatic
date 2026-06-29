@@ -1,11 +1,11 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
-from vhdl_gen.signals import *
+from core_gen.context import VHDLContext
+from core_gen.utils import *
+from core_gen.signals import *
 
 
 def Op(ctx: VHDLContext, out, *list_in) -> str:
     """
-    Generates a proper VHDL assignment statement.
+    Generates a proper assignment statement.
 
     Args:
         out: LHS of the assignment

@@ -46,14 +46,20 @@ public:
   /// It is undefined behaviour if this wasn't constructed with an instance of
   /// 'TypingContext'.
   template <typename TypingContext>
-  const TypingContext &cast() const {
+  const TypingContext &cast() const & {
     assert(data() != nullptr);
     return *reinterpret_cast<const TypingContext *>(data());
   }
 
+  template <typename TypingContext>
+  TypingContext &&cast() && {
+    assert(data() != nullptr);
+    return std::move(*reinterpret_cast<TypingContext *>(data()));
+  }
+
   // Enable noop casts to 'OpaqueContext'.
   template <>
-  const OpaqueContext &cast<OpaqueContext>() const {
+  const OpaqueContext &cast<OpaqueContext>() const & {
     return *this;
   }
 
@@ -70,6 +76,10 @@ public:
           return base->pointer();
         },
         storage);
+  }
+
+  void *data() {
+    return const_cast<void *>(static_cast<const OpaqueContext *>(this)->data());
   }
 
 private:
@@ -328,7 +338,7 @@ public:
   /// Constructs an 'OpaqueTransferFn' from a 'Dependency'.
   template <typename TypingContext, std::size_t... inputIndices>
   /*implicit*/ OpaqueTransferFn(
-      TransferFn<TypingContext, ASTNode, inputIndices...> &&dep)
+      TransferFn<TypingContext, ASTNode, inputIndices...> dep)
       : OpaqueTransferFn(
             llvm::identity<TypingContext>{},
             []() -> llvm::ArrayRef<std::size_t> {
@@ -414,6 +424,21 @@ public:
   OpaqueContext operator()(const SubElementsTuple<ASTNode> &subElements,
                            const ContextTuple<ASTNode> &contexts) const {
     return computationFn(subElements, contexts);
+  }
+
+  /// More type-safe variant of the call operator that accepts and returns
+  /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
+  /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
+  /// was originally constructed with.
+  template <typename TypingContext>
+  TypingContext
+  call(const SubElementsTuple<ASTNode> &subElements,
+       const TypedContextTuple<ASTNode, TypingContext> &contexts) const {
+    return (*this)(subElements,
+                   mapTuplesIntoArray([](const TypingContext *context)
+                                          -> const void * { return context; },
+                                      contexts))
+        .template cast<TypingContext>();
   }
 
 private:
@@ -551,6 +576,21 @@ public:
   OpaqueContext operator()(const ASTNode &astNode,
                            const ContextTuple<ASTNode> &contexts) const {
     return computationFn(astNode, contexts);
+  }
+
+  /// More type-safe variant of the call operator that accepts and returns
+  /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
+  /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
+  /// was originally constructed with.
+  template <typename TypingContext>
+  TypingContext
+  call(const ASTNode &astNode,
+       const TypedContextTuple<ASTNode, TypingContext> &contexts) const {
+    return (*this)(astNode,
+                   mapTuplesIntoArray([](const TypingContext *context)
+                                          -> const void * { return context; },
+                                      contexts))
+        .template cast<TypingContext>();
   }
 
 private:
@@ -694,6 +734,12 @@ public:
   virtual TransferFnArray<ast::ArrayAssignmentStatement>
   getArrayAssignmentStatementTransferFns() = 0;
 
+  virtual bool
+  discardScalarAssignmentStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() = 0;
+
   virtual bool discardStatementListOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::StatementList> getStatementListTransferFns() = 0;
@@ -719,7 +765,8 @@ public:
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
 
   using StatementKey = std::variant<ast::StructuredForStatement::Tag,
-                                    ast::ArrayAssignmentStatement::Tag>;
+                                    ast::ArrayAssignmentStatement::Tag,
+                                    ast::ScalarAssignmentStatement::Tag>;
 
   /// Returns the probability table for a given statement, represented by their
   /// tag, to be selected.
@@ -1056,6 +1103,19 @@ public:
     };
   }
 
+  static bool discardScalarAssignmentStatement(const TypingContext &) {
+    return false;
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ScalarAssignmentStatement>{
+        /*target=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*output=*/copyInputToOutput<ast::ScalarAssignmentStatement>(),
+    };
+  }
+
   static bool discardStatementList(const TypingContext &) { return false; }
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
@@ -1165,6 +1225,12 @@ public:
         context.cast<TypingContext>());
   }
 
+  bool
+  discardScalarAssignmentStatementOpaque(const OpaqueContext &context) final {
+    return self().discardScalarAssignmentStatement(
+        context.cast<TypingContext>());
+  }
+
   bool discardStatementListOpaque(const OpaqueContext &context) final {
     return self().discardStatementList(context.cast<TypingContext>());
   }
@@ -1254,6 +1320,10 @@ public:
   static bool discardFreshArrayParameter(const TypingContext &) { return true; }
 
   static bool discardArrayAssignmentStatement(const TypingContext &) {
+    return true;
+  }
+
+  static bool discardScalarAssignmentStatement(const TypingContext &) {
     return true;
   }
 

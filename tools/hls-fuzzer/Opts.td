@@ -8,6 +8,14 @@ def num_threads : JoinedOrSeparate<["-"], "j">,
                   HelpText<"Number of threads to use">;
 def help : Flag<["--"], "help">, HelpText<"displays this help text">;
 
+// Bare '--statistics' enables reporting of all statistics, while
+// '--statistics=<a>,<b>,...' restricts reporting to the named statistics.
+def statistics_flag : Flag<["--"], "statistics">,
+                      HelpText<"Report all statistics gathered during fuzzing">;
+def statistics : CommaJoined<["--"], "statistics=">,
+                 MetaVarName<"<statistics>">,
+                 HelpText<"Report only the given comma-separated statistics">;
+
 def grp_oracle : OptionGroup<"Oracle options">;
 
 def functional : Flag<["--"], "functional">,

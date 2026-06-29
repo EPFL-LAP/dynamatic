@@ -298,6 +298,9 @@ public:
   /// Returns the type of the given expression.
   ScalarType getType() const;
 
+  template <typename From>
+  friend struct llvm::simplify_type;
+
 private:
   std::shared_ptr<const Variant> expression;
 };
@@ -548,11 +551,44 @@ llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
            const ArrayAssignmentStatement &arrayAssignmentStatement);
 
+/// AST-Node representing an assignment to a scalar parameter or local variable.
+/// Note that we model this as a top-level statement despite this being an
+/// expression in C.
+class ScalarAssignmentStatement {
+public:
+  ScalarAssignmentStatement(std::string variable, Expression valueExpression)
+      : variable(std::move(variable)),
+        valueExpression(std::move(valueExpression)) {}
+
+  /// Returns the name of the scalar parameter (or local variable) being
+  /// assigned to.
+  llvm::StringRef getVariable() const { return variable; }
+
+  /// Returns the value that will be assigned to the variable.
+  const Expression &getValueExpression() const { return valueExpression; }
+
+  struct Tag {
+    friend bool operator<(const Tag &, const Tag &) { return false; }
+  };
+
+  using SubElements = std::tuple<ScalarParameter, Expression>;
+  constexpr static std::size_t TARGET = 0;
+  constexpr static std::size_t VALUE = 1;
+
+private:
+  std::string variable;
+  Expression valueExpression;
+};
+
+llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os,
+           const ScalarAssignmentStatement &scalarAssignmentStatement);
+
 class StructuredForStatement;
 
 class Statement {
-  using Variant =
-      std::variant<ArrayAssignmentStatement, StructuredForStatement>;
+  using Variant = std::variant<ArrayAssignmentStatement, StructuredForStatement,
+                               ScalarAssignmentStatement>;
 
 public:
   Statement() = default;
@@ -565,6 +601,9 @@ public:
 
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                        const Statement &statement);
+
+  template <typename From>
+  friend struct llvm::simplify_type;
 
 private:
   std::shared_ptr<const Variant> statement;
@@ -880,6 +919,31 @@ struct llvm::simplify_type<dynamatic::ast::ReturnType> {
   static SimpleType &
   getSimplifiedValue(const dynamatic::ast::ReturnType &datatype) {
     return datatype.variant;
+  }
+};
+
+// Enable 'dyn_cast' and friends on 'Expression' by delegating to 'dyn_cast' on
+// the underlying variant of concrete expression nodes.
+// E.g. 'ast::BinaryExpression* bin = dyn_cast<ast::BinaryExpression>(expr);'
+template <>
+struct llvm::simplify_type<dynamatic::ast::Expression> {
+  using SimpleType = const dynamatic::ast::Expression::Variant;
+
+  static SimpleType &
+  getSimplifiedValue(const dynamatic::ast::Expression &expression) {
+    return *expression.expression;
+  }
+};
+
+// Enable 'dyn_cast' and friends on 'Statement' by delegating to 'dyn_cast' on
+// the underlying variant of concrete statement nodes.
+template <>
+struct llvm::simplify_type<dynamatic::ast::Statement> {
+  using SimpleType = const dynamatic::ast::Statement::Variant;
+
+  static SimpleType &
+  getSimplifiedValue(const dynamatic::ast::Statement &statement) {
+    return *statement.statement;
   }
 };
 

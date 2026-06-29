@@ -4,12 +4,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
 
-# This file redesigned the classes to represent the signals in the VHDL file
+# This file redesigned the classes to represent the signals in the file
 import re
 import math
 
 # ===----------------------------------------------------------------------===#
-# VHDL Signal Type Definition
+# Signal Type Definition
 # ===----------------------------------------------------------------------===#
 
 #

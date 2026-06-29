@@ -1,6 +1,6 @@
-from vhdl_gen.context import VHDLContext
-from vhdl_gen.utils import *
-from vhdl_gen.signals import *
+from core_gen.context import VHDLContext
+from core_gen.utils import *
+from core_gen.signals import *
 
 
 # ===----------------------------------------------------------------------===#
@@ -30,7 +30,7 @@ def RotateLogicVec(ctx: VHDLContext, dout, din, distance, layer) -> str:
         should always start at "distance.size - 1".
 
     Returns:
-        str_ret (str): A VHDL code snippet implementing the cyclic left shift.
+        str_ret (str): A code snippet implementing the cyclic left shift.
 
     Usage:
         (Called only internally by CyclicLeftShift)
@@ -67,7 +67,7 @@ def RotateLogicArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     Recursively perform a cyclic left shift of LogicArray "din" by the amount 
     specified in "distance".
 
-    Identical in behavior to RotateLogicVec, but operates on multiple VHDL single-bit std_logic
+    Identical in behavior to RotateLogicVec, but operates on multiple single-bit std_logic
     instead of std_logic_vector.
 
     """
@@ -94,7 +94,7 @@ def RotateLogicVecArray(ctx: VHDLContext, dout, din, distance, layer) -> str:
     Recursively perform a cyclic left shift of the LogicVecArray "din" by the amount 
     specified in "distance".
 
-    Identical in behavior to RotateLogicVec, but operates on multiple VHDL vectors std_logic_vector.
+    Identical in behavior to RotateLogicVec, but operates on multiple vectors std_logic_vector.
     For every LogicVec in LogicVecArray, cyclic left shift by "distance".
 
     Example:
@@ -138,7 +138,7 @@ def CyclicLeftShift(ctx: VHDLContext, dout, din, distance) -> str:
         distance: Binary vector specifying how many positions to shift.
 
     Returns:
-        str_ret : A VHDL code snippet (with indentation) implementing the cyclic left shift.
+        str_ret : A code snippet (with indentation) implementing the cyclic left shift.
     """
 
     str_ret = ctx.get_current_indent() + '-- Shifter Begin\n'
