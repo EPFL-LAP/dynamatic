@@ -460,7 +460,7 @@
   },
   {
     "name": "handshake.init",
-        "parameters": [
+    "parameters": [
       {
         "name": "INITIAL_VALUE",
         "type": "unsigned"
