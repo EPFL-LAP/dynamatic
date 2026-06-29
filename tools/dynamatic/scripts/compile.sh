@@ -25,6 +25,7 @@ SPECULATION=${15}
 ENABLE_SHORT_CIRCUIT=${16}
 ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
+INSTRUMENT_II=${19}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -415,18 +416,23 @@ exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
+LOWER_TO_HW_PASS="--lower-handshake-to-hw"
+if [[ $INSTRUMENT_II -ne 0 ]]; then
+  LOWER_TO_HW_PASS="--lower-handshake-to-hw=instrument-ii=true"
+fi
+
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
   bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED" "$USE_K_INDUCTION"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 else
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 fi

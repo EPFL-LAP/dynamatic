@@ -999,5 +999,14 @@
     ],
     "generic": "$DYNAMATIC/data/verilog/support/mem_to_bram.v",
     "hdl": "verilog"
+  },
+  {
+    "name": "ii_monitor",
+    "parameters": [
+      { "name": "INDEX_WIDTH", "type": "unsigned", "lb": 1 },
+      { "name": "LOOP_BACK_INDEX", "type": "unsigned" }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/handshake/ii_monitor.v",
+    "hdl": "verilog"
   }
 ]

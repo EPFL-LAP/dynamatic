@@ -411,7 +411,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
              handshakeOp == "handshake.extf" ||
              handshakeOp == "handshake.maximumf" ||
              handshakeOp == "handshake.minimumf" ||
-             handshakeOp == "handshake.join") {
+             handshakeOp == "handshake.join" || handshakeOp == "ii_monitor") {
     // Skip
   } else if (handshakeOp == "handshake.ram") {
     // NOTE: this port order is currently hardcoded in HandshakeToHW.cpp
@@ -515,7 +515,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "mem_to_bram" ||
       handshakeOp == "handshake.lsq" ||
       handshakeOp == "handshake.sharing_wrapper" ||
-      handshakeOp == "handshake.ram"
+      handshakeOp == "handshake.ram" ||
+      handshakeOp == "ii_monitor"
       // clang-format on
   ) {
     // Skip

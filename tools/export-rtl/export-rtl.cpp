@@ -30,9 +30,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
@@ -40,9 +38,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/GenericDomTree.h"
-#include "llvm/Support/GenericDomTreeConstruction.h"
-#include "llvm/Support/GenericLoopInfoImpl.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -93,13 +88,6 @@ static cl::opt<HDL>
 static cl::opt<bool> verifyInvariants(
     "verify-invariants", cl::Optional,
     cl::desc("generate INVARs as INVARSPEC to verify if they are correct"),
-    cl::init(false), cl::cat(mainCategory));
-
-static cl::opt<bool> instrumentII(
-    "instrument-ii", cl::Optional,
-    cl::desc("instrument the generated RTL so that, during simulation, the "
-             "average initiation interval (II) of every innermost loop is "
-             "reported (as 'II_INSTRUMENT: ...' lines)"),
     cl::init(false), cl::cat(mainCategory));
 
 static cl::list<std::string>
@@ -448,369 +436,6 @@ static std::string getInternalSignalName(StringRef baseName,
 static std::string getExtraSignalName(StringRef baseName,
                                       const ExtraSignal &extra) {
   return baseName.str() + "_" + extra.name.str();
-}
-
-//===----------------------------------------------------------------------===//
-// II instrumentation (--instrument-ii)
-//===----------------------------------------------------------------------===//
-
-/// Returns the original Handshake operation name (e.g.
-/// "handshake.control_merge") referenced by an instance, or an empty string if
-/// the instance does not refer to an external module annotated with such a
-/// name.
-static StringRef getHandshakeOpName(hw::InstanceOp instOp) {
-  hw::HWModuleLike mod = getHWModule(instOp);
-  if (auto extOp = dyn_cast<hw::HWModuleExternOp>(mod.getOperation()))
-    if (auto nameAttr = extOp->getAttrOfType<StringAttr>(RTL_NAME_ATTR_NAME))
-      return nameAttr.getValue();
-  return "";
-}
-
-/// Memory interfaces (shared by the whole function) are excluded from the
-/// control graph so that loop detection reflects only the program's control
-/// flow.
-static bool isMemoryInstance(hw::InstanceOp instOp) {
-  StringRef name = getHandshakeOpName(instOp);
-  return name == "handshake.mem_controller" || name == "handshake.lsq";
-}
-
-namespace {
-struct ControlGraph;
-
-/// Node of a module's control graph: one per non-memory instance, plus a single
-/// virtual entry node (whose 'inst' is null) that is connected to every root so
-/// that the whole graph is dominated by one entry (required to build a
-/// dominator tree over an otherwise multi-rooted graph), even in the presence
-/// of 'handshake.source'.
-struct ControlNode {
-  hw::InstanceOp inst;
-  ControlGraph *graph = nullptr;
-  SmallVector<ControlNode *> succs;
-  SmallVector<ControlNode *> preds;
-
-  /// Required by 'DomTreeNodeTraits'.
-  ControlGraph *getParent() const { return graph; }
-
-  /// Required by the dominator-tree builder (debug/verification printing).
-  void printAsOperand(raw_ostream &os, bool /*printType*/ = false) const {
-    if (hw::InstanceOp i = inst)
-      os << i.getInstanceName();
-    else
-      os << "<entry>";
-  }
-};
-
-/// A module's control graph: the sub-circuit formed by the '!handshake.control'
-/// channels between instances. Loops are detected over this control network
-/// rather than over the full dataflow graph since a loop is guaranteed to be
-/// dominated by a control merge that passes a token per iteration.
-struct ControlGraph {
-  std::vector<std::unique_ptr<ControlNode>> storage;
-  SmallVector<ControlNode *> allNodes;
-
-  /// Required by 'DomTreeNodeTraits' (entry node).
-  ControlNode &front() { return *allNodes.front(); }
-
-  /// Builds the control graph of 'modOp'.
-  explicit ControlGraph(hw::HWModuleOp modOp) {
-    auto addNode = [&](hw::InstanceOp inst) -> ControlNode * {
-      auto node = std::make_unique<ControlNode>();
-      node->inst = inst;
-      node->graph = this;
-      ControlNode *ptr = node.get();
-      allNodes.push_back(ptr);
-      storage.push_back(std::move(node));
-      return ptr;
-    };
-
-    ControlNode *entry = addNode(nullptr);
-
-    llvm::DenseMap<Operation *, ControlNode *> nodeFor;
-    for (hw::InstanceOp inst : modOp.getOps<hw::InstanceOp>())
-      if (!isMemoryInstance(inst))
-        nodeFor[inst] = addNode(inst);
-
-    // Control-only edges between instances.
-    for (hw::InstanceOp inst : modOp.getOps<hw::InstanceOp>()) {
-      auto it = nodeFor.find(inst);
-      if (it == nodeFor.end())
-        continue;
-
-      ControlNode *src = it->second;
-      for (Value res : inst->getResults()) {
-        if (!isa<ControlType>(res.getType()))
-          continue;
-
-        for (Operation *user : res.getUsers())
-          if (ControlNode *dst = nodeFor.lookup(user)) {
-            src->succs.push_back(dst);
-            dst->preds.push_back(src);
-          }
-      }
-    }
-
-    // Connected all nodes without predecessors to the virtual root node.
-    for (ControlNode *node : allNodes)
-      if (node != entry && node->preds.empty()) {
-        entry->succs.push_back(node);
-        node->preds.push_back(entry);
-      }
-  }
-};
-} // namespace
-
-namespace llvm {
-template <>
-struct GraphTraits<ControlNode *> {
-  using NodeRef = ControlNode *;
-  using ChildIteratorType = SmallVector<ControlNode *>::iterator;
-  static NodeRef getEntryNode(NodeRef node) { return node; }
-  static ChildIteratorType child_begin(NodeRef node) {
-    return node->succs.begin();
-  }
-  static ChildIteratorType child_end(NodeRef node) { return node->succs.end(); }
-};
-
-template <>
-struct GraphTraits<Inverse<ControlNode *>> {
-  using NodeRef = ControlNode *;
-  using ChildIteratorType = SmallVector<ControlNode *>::iterator;
-  static NodeRef getEntryNode(Inverse<ControlNode *> inv) { return inv.Graph; }
-  static ChildIteratorType child_begin(NodeRef node) {
-    return node->preds.begin();
-  }
-  static ChildIteratorType child_end(NodeRef node) { return node->preds.end(); }
-};
-
-template <>
-struct GraphTraits<ControlGraph *> : public GraphTraits<ControlNode *> {
-  using nodes_iterator = SmallVector<ControlNode *>::iterator;
-  static NodeRef getEntryNode(ControlGraph *graph) { return &graph->front(); }
-  static nodes_iterator nodes_begin(ControlGraph *graph) {
-    return graph->allNodes.begin();
-  }
-  static nodes_iterator nodes_end(ControlGraph *graph) {
-    return graph->allNodes.end();
-  }
-};
-
-template <>
-struct GraphTraits<DomTreeNodeBase<ControlNode> *> {
-  using NodeRef = DomTreeNodeBase<ControlNode> *;
-  using ChildIteratorType = DomTreeNodeBase<ControlNode>::const_iterator;
-  static NodeRef getEntryNode(NodeRef node) { return node; }
-  static ChildIteratorType child_begin(NodeRef node) { return node->begin(); }
-  static ChildIteratorType child_end(NodeRef node) { return node->end(); }
-};
-
-template <>
-struct GraphTraits<const DomTreeNodeBase<ControlNode> *> {
-  using NodeRef = const DomTreeNodeBase<ControlNode> *;
-  using ChildIteratorType = DomTreeNodeBase<ControlNode>::const_iterator;
-  static NodeRef getEntryNode(NodeRef node) { return node; }
-  static ChildIteratorType child_begin(NodeRef node) { return node->begin(); }
-  static ChildIteratorType child_end(NodeRef node) { return node->end(); }
-};
-} // namespace llvm
-
-namespace {
-/// Concrete loop type for 'LoopInfoBase' over the control graph.
-class ControlLoop : public llvm::LoopBase<ControlNode, ControlLoop> {
-public:
-  ControlLoop() = default;
-
-private:
-  friend class llvm::LoopBase<ControlNode, ControlLoop>;
-  friend class llvm::LoopInfoBase<ControlNode, ControlLoop>;
-  explicit ControlLoop(ControlNode *node)
-      : llvm::LoopBase<ControlNode, ControlLoop>(node) {}
-};
-
-/// A detected innermost loop. 'countChannel' is the output channel of the
-/// control merge and triggers on every loop iteration.
-/// 'exitChannels' are the control channels on which a token appears when
-/// control leaves the loop.
-/// The II is reported once when any of them exit channels produce a token.
-struct InnermostLoop {
-  hw::InstanceOp header;
-  Value countChannel;
-  SmallVector<Value> exitChannels;
-};
-} // namespace
-
-/// Returns the control channel going directly from instance
-/// 'src' to instance 'dst', or a null value if there is none.
-static Value getControlEdgeChannel(hw::InstanceOp src, hw::InstanceOp dst) {
-  for (Value res : src->getResults()) {
-    if (!isa<ControlType>(res.getType()))
-      continue;
-
-    for (Operation *user : res.getUsers())
-      if (user == dst.getOperation())
-        return res;
-  }
-  return {};
-}
-
-/// Detects the innermost loops of a module by building loop information over
-/// its control graph (see 'ControlGraph'). The header of each innermost loop is
-/// the loop's control-merge; its control output ("outs") counts iterations, and
-/// the loop's exit edge provides the channel on which to report the II once.
-static SmallVector<InnermostLoop> detectInnermostLoops(hw::HWModuleOp modOp) {
-  ControlGraph graph(modOp);
-
-  llvm::DominatorTreeBase<ControlNode, /*IsPostDom=*/false> domTree;
-  domTree.recalculate(graph);
-  llvm::LoopInfoBase<ControlNode, ControlLoop> loopInfo;
-  loopInfo.analyze(domTree);
-
-  SmallVector<InnermostLoop> innermost;
-  for (ControlLoop *loop : loopInfo.getLoopsInPreorder()) {
-    if (!loop->isInnermost())
-      continue;
-
-    // Count iterations on the header's control output ("outs"), which carries
-    // exactly one token per loop iteration.
-    hw::InstanceOp header = loop->getHeader()->inst;
-    Value countChannel;
-    for (auto [res, name] : llvm::zip_equal(
-             header->getResults(), getHWModule(header).getOutputNamesStr()))
-      if (name.getValue() == "outs") {
-        countChannel = res;
-        break;
-      }
-
-    assert(countChannel && "expected outs channel from loop header");
-
-    // Collect every distinct loop-exit channel.
-    SmallVector<Value> exitChannels;
-    SmallVector<std::pair<ControlNode *, ControlNode *>> exitEdges;
-    loop->getExitEdges(exitEdges);
-    for (auto &[inside, outside] : exitEdges)
-      // Ignore roots.
-      if (inside->inst && outside->inst)
-        if (Value edge = getControlEdgeChannel(inside->inst, outside->inst))
-          if (!llvm::is_contained(exitChannels, edge))
-            exitChannels.push_back(edge);
-
-    innermost.push_back({header, countChannel, std::move(exitChannels)});
-  }
-  return innermost;
-}
-
-/// VHDL monitor process template. Arguments: {0} loop label, {1} clock port,
-/// {2} reset port, {3} base name of the iteration-count channel's signal, {4}
-/// boolean expression that is true when control leaves the loop (any exit),
-/// upon which the average II is reported once.
-static constexpr llvm::StringLiteral VHDL_II_PROC = R"DELIM(
--- II instrumentation for innermost loop "{0}"
-ii_monitor_{0} : process({1})
-  variable cycle : integer := 0;
-  variable first_cycle : integer := 0;
-  variable last_cycle : integer := 0;
-  variable iterations : integer := 0;
-begin
-  if rising_edge({1}) then
-    if {2} = '1' then
-      cycle := 0;
-      iterations := 0;
-      first_cycle := 0;
-      last_cycle := 0;
-    else
-      cycle := cycle + 1;
-      -- Count one token per loop iteration.
-      if ({3}_valid = '1') and ({3}_ready = '1') then
-        if iterations = 0 then
-          first_cycle := cycle;
-        end if;
-        last_cycle := cycle;
-        iterations := iterations + 1;
-      end if;
-      -- Report the average II once, when control leaves the loop.
-      if {4} then
-        if iterations > 1 then
-          report "II_INSTRUMENT: loop {0} average_II=" & integer'image((last_cycle - first_cycle) / (iterations - 1)) & " iterations=" & integer'image(iterations) severity note;
-        end if;
-      end if;
-    end if;
-  end if;
-end process;
-)DELIM";
-
-/// Verilog monitor template. Arguments: {0} loop label, {1} clock port, {2}
-/// reset port, {3} base name of the iteration-count channel's signal, {4}
-/// boolean expression that is true when control leaves the loop (any exit),
-/// upon which the average II is reported once.
-static constexpr llvm::StringLiteral VERILOG_II_PROC = R"DELIM(
-// II instrumentation for innermost loop "{0}"
-integer ii_cycle_{0};
-integer ii_first_{0};
-integer ii_last_{0};
-integer ii_iters_{0};
-always @(posedge {1}) begin
-  if ({2}) begin
-    ii_cycle_{0} = 0;
-    ii_iters_{0} = 0;
-    ii_first_{0} = 0;
-    ii_last_{0} = 0;
-  end else begin
-    ii_cycle_{0} = ii_cycle_{0} + 1;
-    // Count one token per loop iteration.
-    if ({3}_valid && {3}_ready) begin
-      if (ii_iters_{0} == 0)
-        ii_first_{0} = ii_cycle_{0};
-      ii_last_{0} = ii_cycle_{0};
-      ii_iters_{0} = ii_iters_{0} + 1;
-    end
-    // Report the average II once, when control leaves the loop.
-    if ({4}) begin
-      if (ii_iters_{0} > 1)
-        $display("II_INSTRUMENT: loop {0} average_II=%0d iterations=%0d", (ii_last_{0} - ii_first_{0}) / (ii_iters_{0} - 1), ii_iters_{0});
-    end
-  end
-end
-)DELIM";
-
-/// Emits the II instrumentation (one monitor per innermost loop) for the module
-/// described by 'data', using the monitor template for the given HDL.
-static void emitIIInstrumentation(WriteModData &data, HDL hdl) {
-  llvm::StringLiteral tmpl = hdl == HDL::VHDL ? VHDL_II_PROC : VERILOG_II_PROC;
-
-  // Builds the handshake condition "(<sig>_valid and <sig>_ready)" for the HDL.
-  auto handshake = [&](StringRef sig) -> std::string {
-    return hdl == HDL::VHDL
-               ? ("(" + sig + "_valid = '1' and " + sig + "_ready = '1')").str()
-               : ("(" + sig + "_valid && " + sig + "_ready)").str();
-  };
-
-  for (const InnermostLoop &loop : detectInnermostLoops(data.modOp)) {
-    auto countIt = data.signals.find(loop.countChannel);
-    assert(countIt != data.signals.end() &&
-           "expected to find count channel in signals");
-
-    // Build the loop-exit trigger: true when control leaves the loop through
-    // any of its exits. Fall back to the iteration-count channel (i.e. report
-    // on every iteration) when no exit channel was found.
-    SmallVector<std::string> exitTerms;
-    for (Value exit : loop.exitChannels) {
-      auto it = data.signals.find(exit);
-      assert(it != data.signals.end() && "expected to find exit channels");
-
-      exitTerms.push_back(handshake(it->second));
-    }
-
-    // Skip infinite loops!
-    if (exitTerms.empty())
-      continue;
-
-    std::string exitCond =
-        llvm::join(exitTerms, hdl == HDL::VHDL ? " or " : " || ");
-
-    hw::InstanceOp header = loop.header;
-    data.os << llvm::formatv(tmpl.data(), header.getInstanceName(), CLK_PORT,
-                             RST_PORT, countIt->second, exitCond)
-                   .str();
-  }
 }
 
 void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
@@ -1248,9 +873,6 @@ LogicalResult VHDLWriter::write(hw::HWModuleOp modOp,
   os << "\n";
   writeModuleInstantiations(data);
 
-  if (instrumentII)
-    emitIIInstrumentation(data, HDL::VHDL);
-
   // Close the entity's architecture
   os.unindent();
   os << "end architecture;\n";
@@ -1395,9 +1017,6 @@ LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
   });
   os << "\n";
   writeModuleInstantiations(data);
-
-  if (instrumentII)
-    emitIIInstrumentation(data, HDL::VERILOG);
 
   os.unindent();
   os << "endmodule\n";

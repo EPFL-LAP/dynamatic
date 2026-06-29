@@ -11,7 +11,6 @@ DYNAMATIC_DIR=$1
 OUTPUT_DIR=$2
 KERNEL_NAME=$3
 HDL=$4
-INSTRUMENT_II=$5
 
 # Generated directories/files
 HDL_DIR="$OUTPUT_DIR/hdl"
@@ -40,13 +39,8 @@ elif [ "$HDL" == "verilog-beta" ]; then
   HDL="verilog"
 fi
 
-INSTRUMENT_II_FLAG=""
-if [ "$INSTRUMENT_II" == "1" ]; then
-  INSTRUMENT_II_FLAG="--instrument-ii"
-fi
-
 "$DYNAMATIC_DIR/bin/export-rtl" "$COMP_DIR/hw.mlir" "$HDL_DIR" $RTL_CONFIG \
-  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL $INSTRUMENT_II_FLAG
+  --dynamatic-path "$DYNAMATIC_DIR" --hdl $HDL
 exit_on_fail "Failed to export RTL ($HDL)" "Exported RTL ($HDL)"
 
 echo_info "HDL generation succeeded"

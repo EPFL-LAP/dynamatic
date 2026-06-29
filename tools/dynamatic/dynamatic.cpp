@@ -308,6 +308,7 @@ public:
       "enable-duplication";
   static constexpr llvm::StringLiteral CALCULATE_PATH_DELAYS =
       "calculate-path-delays";
+  static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -351,6 +352,10 @@ public:
              "After buffer placement, re-run the MILP with the buffering "
              "decisions locked in to calculate the path delays the MILP "
              "believes are present in the circuit."});
+    addFlag({INSTRUMENT_II,
+             "Instrument the generated netlist so that the average initiation "
+             "interval (II) of each innermost loop is reported during "
+             "simulation"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -359,7 +364,6 @@ public:
 class WriteHDL : public Command {
 public:
   static constexpr llvm::StringLiteral HDL = "hdl";
-  static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
 
   WriteHDL(FrontendState &state)
       : Command(
@@ -368,10 +372,6 @@ public:
             "export-dot tool",
             state) {
     addOption({HDL, "HDL to use for design's top-level"});
-    addFlag({INSTRUMENT_II,
-             "Instrument the generated RTL so that the average initiation "
-             "interval (II) of each innermost loop is reported during "
-             "simulation"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -802,13 +802,15 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(ENABLE_DUPLICATION) ? "1" : "0";
   std::string calculatePathDelays =
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
+  std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
-                 enableShortCircuit, enableDuplication, calculatePathDelays);
+                 enableShortCircuit, enableDuplication, calculatePathDelays,
+                 instrumentII);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -835,10 +837,8 @@ CommandResult WriteHDL::execute(CommandArguments &args) {
     }
   }
 
-  std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
-
   return execCmd(script, state.dynamaticPath, state.getOutputDir(),
-                 state.getKernelName(), hdl, instrumentII);
+                 state.getKernelName(), hdl);
 }
 
 CommandResult Simulate::execute(CommandArguments &args) {

@@ -38,11 +38,17 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/GraphTraits.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/GenericDomTree.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
+#include "llvm/Support/GenericLoopInfoImpl.h"
 #include <algorithm>
 #include <bitset>
 #include <cctype>
@@ -2122,6 +2128,431 @@ static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
     backedge.setValue(circuitInstOp.getResult(resIdx));
 }
 
+//===----------------------------------------------------------------------===//
+// II instrumentation (--lower-handshake-to-hw=instrument-ii)
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct ControlGraph;
+
+/// Node of a function's control graph: one per non-memory operation, plus a
+/// single virtual entry node (whose 'op' is null) connected to every root so
+/// that the whole graph is dominated by one entry (required to build a
+/// dominator tree over an otherwise multi-rooted graph).
+struct ControlNode {
+  Operation *op = nullptr;
+  ControlGraph *graph = nullptr;
+  SmallVector<ControlNode *> succs;
+  SmallVector<ControlNode *> preds;
+
+  /// Required by the dominator tree.
+  ControlGraph *getParent() const { return graph; }
+
+  /// Required by the dominator tree.
+  void printAsOperand(raw_ostream &os, bool /*printType*/ = false) const {
+    if (op)
+      os << getUniqueName(op);
+    else
+      os << "<entry>";
+  }
+};
+
+struct ControlGraph {
+  std::vector<std::unique_ptr<ControlNode>> storage;
+  SmallVector<ControlNode *> allNodes;
+  /// Maps each operation to its node.
+  DenseMap<Operation *, ControlNode *> nodeFor;
+
+  /// Required by 'DomTreeNodeTraits' (entry node).
+  ControlNode &front() { return *allNodes.front(); }
+
+  /// Builds the control graph of 'funcOp'.
+  explicit ControlGraph(handshake::FuncOp funcOp) {
+    auto addNode = [&](Operation *op) -> ControlNode * {
+      auto node = std::make_unique<ControlNode>();
+      node->op = op;
+      node->graph = this;
+      ControlNode *ptr = node.get();
+      allNodes.push_back(ptr);
+      storage.push_back(std::move(node));
+      return ptr;
+    };
+
+    ControlNode *entry = addNode(nullptr);
+
+    // Memory interfaces (shared by the whole function) are excluded from the
+    // control graph so that loop detection reflects only the program's control
+    // flow.
+    for (Operation &op : *funcOp.getBodyBlock())
+      if (!isa<handshake::MemoryOpInterface>(op))
+        nodeFor[&op] = addNode(&op);
+
+    // Control-only edges between operations.
+    for (Operation &op : *funcOp.getBodyBlock()) {
+      ControlNode *src = nodeFor.lookup(&op);
+      if (!src)
+        continue;
+
+      for (Value res : op.getResults()) {
+        if (!isa<ControlType>(res.getType()))
+          continue;
+
+        for (Operation *user : res.getUsers())
+          if (ControlNode *dst = nodeFor.lookup(user)) {
+            src->succs.push_back(dst);
+            dst->preds.push_back(src);
+          }
+      }
+    }
+
+    // Connect all nodes without predecessors to the virtual entry node.
+    for (ControlNode *node : allNodes)
+      if (node != entry && node->preds.empty()) {
+        entry->succs.push_back(node);
+        node->preds.push_back(entry);
+      }
+  }
+};
+} // namespace
+
+namespace llvm {
+template <>
+struct GraphTraits<ControlNode *> {
+  using NodeRef = ControlNode *;
+  using ChildIteratorType = SmallVector<ControlNode *>::iterator;
+  static NodeRef getEntryNode(NodeRef node) { return node; }
+  static ChildIteratorType child_begin(NodeRef node) {
+    return node->succs.begin();
+  }
+  static ChildIteratorType child_end(NodeRef node) { return node->succs.end(); }
+};
+
+template <>
+struct GraphTraits<Inverse<ControlNode *>> {
+  using NodeRef = ControlNode *;
+  using ChildIteratorType = SmallVector<ControlNode *>::iterator;
+  static NodeRef getEntryNode(Inverse<ControlNode *> inv) { return inv.Graph; }
+  static ChildIteratorType child_begin(NodeRef node) {
+    return node->preds.begin();
+  }
+  static ChildIteratorType child_end(NodeRef node) { return node->preds.end(); }
+};
+
+template <>
+struct GraphTraits<ControlGraph *> : public GraphTraits<ControlNode *> {
+  using nodes_iterator = SmallVector<ControlNode *>::iterator;
+  static NodeRef getEntryNode(ControlGraph *graph) { return &graph->front(); }
+  static nodes_iterator nodes_begin(ControlGraph *graph) {
+    return graph->allNodes.begin();
+  }
+  static nodes_iterator nodes_end(ControlGraph *graph) {
+    return graph->allNodes.end();
+  }
+};
+
+template <>
+struct GraphTraits<DomTreeNodeBase<ControlNode> *> {
+  using NodeRef = DomTreeNodeBase<ControlNode> *;
+  using ChildIteratorType = DomTreeNodeBase<ControlNode>::const_iterator;
+  static NodeRef getEntryNode(NodeRef node) { return node; }
+  static ChildIteratorType child_begin(NodeRef node) { return node->begin(); }
+  static ChildIteratorType child_end(NodeRef node) { return node->end(); }
+};
+
+template <>
+struct GraphTraits<const DomTreeNodeBase<ControlNode> *> {
+  using NodeRef = const DomTreeNodeBase<ControlNode> *;
+  using ChildIteratorType = DomTreeNodeBase<ControlNode>::const_iterator;
+  static NodeRef getEntryNode(NodeRef node) { return node; }
+  static ChildIteratorType child_begin(NodeRef node) { return node->begin(); }
+  static ChildIteratorType child_end(NodeRef node) { return node->end(); }
+};
+} // namespace llvm
+
+namespace {
+/// Concrete loop type for 'LoopInfoBase' over the control graph.
+class ControlLoop : public llvm::LoopBase<ControlNode, ControlLoop> {
+public:
+  ControlLoop() = default;
+
+private:
+  friend class llvm::LoopBase<ControlNode, ControlLoop>;
+  friend class llvm::LoopInfoBase<ControlNode, ControlLoop>;
+
+  explicit ControlLoop(ControlNode *node)
+      : llvm::LoopBase<ControlNode, ControlLoop>(node) {}
+};
+
+/// Describes the 'ii_monitor' instance to insert for one detected innermost
+/// loop. All references to the circuit are by name/index so that they remain
+/// valid after the Handshake operations have been lowered to HW instances
+/// (instance names and result orders are preserved during lowering).
+struct IIMonitorSpec {
+  /// Name of the loop header (a control merge) instance.
+  std::string headerName;
+  /// Result index of the header's index output channel.
+  unsigned indexResultIdx;
+  /// Bit-width of the index channel's data signal (INDEX_WIDTH parameter).
+  unsigned indexWidth;
+  /// Operand index of the control merge's back-edge input (LOOP_BACK_INDEX).
+  unsigned loopBackIndex;
+  /// Name of the instance producing the loop-exit channel.
+  std::string exitName;
+  /// Result index of that instance's loop-exit output channel.
+  unsigned exitResultIdx;
+};
+} // namespace
+
+/// Returns the control-typed result of 'src' that is consumed by 'dst', or a
+/// null value if there is none.
+static OpResult getControlEdgeChannel(Operation *src, Operation *dst) {
+  for (OpResult res : src->getResults()) {
+    if (!isa<handshake::ControlType>(res.getType()))
+      continue;
+
+    for (Operation *user : res.getUsers())
+      if (user == dst)
+        return res;
+  }
+  return {};
+}
+
+/// Collects the distinct control channels on which a token appears when control
+/// actually leaves 'loop'.
+///
+/// Only edges leaving the loop through a conditional branch are considered:
+/// such a branch conditionally routes its token either back into the loop or
+/// out of it, so its loop-leaving output fires exactly once per loop
+/// activation. Note that there are other exit edges that are "incorrect" such
+/// as a control signal leading to a 'handshake.constant'. These are exit edges
+/// in the control network but aren't when considering the entire dataflow.
+static SmallVector<OpResult> getLoopExitChannels(ControlLoop *loop) {
+  SmallVector<std::pair<ControlNode *, ControlNode *>> exitEdges;
+  loop->getExitEdges(exitEdges);
+
+  SmallVector<OpResult> exitChannels;
+  for (auto &[inside, outside] : exitEdges) {
+    if (!inside->op || !outside->op)
+      continue;
+
+    if (!isa<handshake::ConditionalBranchOp>(inside->op))
+      continue;
+
+    if (OpResult edge = getControlEdgeChannel(inside->op, outside->op))
+      if (!llvm::is_contained(exitChannels, edge))
+        exitChannels.push_back(edge);
+  }
+  return exitChannels;
+}
+
+/// Returns a single control channel that produces a token whenever control
+/// leaves 'loop' through any of its exits. If the loop has multiple exits, the
+/// exit channels are tapped (through forks, leaving the original consumers
+/// untouched) and combined into one channel with a freshly created
+/// 'handshake.control_merge' whose outputs are sinked. Returns a null value if
+/// the loop has no exit channel.
+static OpResult buildOuterLoopExitChannel(ControlLoop *loop, OpBuilder &builder,
+                                          NameAnalysis &namer) {
+  SmallVector<OpResult> exitChannels = getLoopExitChannels(loop);
+  if (exitChannels.empty())
+    return {};
+
+  // A single exit channel can be observed directly (the monitor passively taps
+  // its wires without becoming an extra consumer).
+  if (exitChannels.size() == 1)
+    return exitChannels.front();
+
+  // Fork each exit channel so the merge observes a copy while the original
+  // consumer keeps receiving its token.
+  SmallVector<Value> taps;
+  for (OpResult exitChannel : exitChannels) {
+    builder.setInsertionPointAfter(exitChannel.getOwner());
+    auto forkOp =
+        builder.create<handshake::ForkOp>(exitChannel.getLoc(), exitChannel, 2);
+    (void)namer.setName(forkOp, "ii_exit_fork", /*uniqueWhenTaken=*/true);
+    exitChannel.replaceAllUsesExcept(forkOp->getResult(0), forkOp);
+    taps.push_back(forkOp->getResult(1));
+  }
+
+  // Merge the tapped copies into a single channel that fires on any exit.
+  builder.setInsertionPoint(loop->getHeader()->op->getBlock()->getTerminator());
+  auto cmergeOp =
+      builder.create<handshake::ControlMergeOp>(taps.front().getLoc(), taps);
+  (void)namer.setName(cmergeOp, "ii_exit_merge", /*uniqueWhenTaken=*/true);
+
+  // The merge's outputs are not part of the circuit; consume them with sinks so
+  // the merged channel has a real consumer (the monitor only taps its wires).
+  auto resSink = builder.create<handshake::SinkOp>(cmergeOp.getLoc(),
+                                                   cmergeOp.getResult());
+  (void)namer.setName(resSink, "ii_exit_sink", /*uniqueWhenTaken=*/true);
+  auto idxSink =
+      builder.create<handshake::SinkOp>(cmergeOp.getLoc(), cmergeOp.getIndex());
+  (void)namer.setName(idxSink, "ii_exit_sink", /*uniqueWhenTaken=*/true);
+
+  return cast<OpResult>(cmergeOp.getResult());
+}
+
+/// Detects the innermost loops of 'funcOp' over its control graph and returns
+/// one monitor specification per loop whose header is a control merge. The
+/// initiation interval is measured from the innermost loop's control merge, but
+/// reported when the *outermost* enclosing loop is exited; the corresponding
+/// exit channel is built (merging multiple exits if necessary) by this
+/// function. Loops with irregular control flow (no control merge header, no
+/// exit, ...) are silently skipped.
+static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
+                                                   NameAnalysis &namer) {
+  ControlGraph graph(funcOp);
+
+  llvm::DominatorTreeBase<ControlNode, /*IsPostDom=*/false> domTree;
+  domTree.recalculate(graph);
+  llvm::LoopInfoBase<ControlNode, ControlLoop> loopInfo;
+  loopInfo.analyze(domTree);
+
+  OpBuilder builder(funcOp.getContext());
+
+  // Exit channel of each outermost loop, built lazily and shared by every
+  // innermost loop in the same nest.
+  DenseMap<ControlLoop *, OpResult> outerExitChannel;
+
+  SmallVector<IIMonitorSpec> specs;
+  for (ControlLoop *loop : loopInfo.getLoopsInPreorder()) {
+    if (!loop->isInnermost())
+      continue;
+
+    // The loop header on the control network is the control merge that passes
+    // exactly one token per iteration and reports, on its index output, whether
+    // the activation came from outside the loop or from the back-edge.
+    Operation *headerOp = loop->getHeader()->op;
+    auto cmerge = dyn_cast<handshake::ControlMergeOp>(headerOp);
+    if (!cmerge)
+      continue;
+
+    OpResult indexVal = cast<OpResult>(cmerge.getIndex());
+    auto indexType = dyn_cast<handshake::ChannelType>(indexVal.getType());
+    if (!indexType)
+      continue;
+
+    // The back-edge input is the control merge operand whose producer lies
+    // inside the loop; its operand index is the index the merge reports on the
+    // index channel for an activation from within the loop.
+    std::optional<unsigned> loopBackIndex;
+    for (auto [idx, operand] : llvm::enumerate(cmerge.getDataOperands())) {
+      Operation *defOp = operand.getDefiningOp();
+      if (!defOp)
+        continue;
+      ControlNode *defNode = graph.nodeFor.lookup(defOp);
+      if (defNode && loop->contains(defNode)) {
+        loopBackIndex = idx;
+        break;
+      }
+    }
+    if (!loopBackIndex)
+      continue;
+
+    // The II is reported once when control leaves the outermost enclosing loop,
+    // not on every exit of the innermost loop (which fires once per outer
+    // iteration and is instead handled by the "new outside activation" logic in
+    // the monitor).
+    ControlLoop *outermost = loop->getOutermostLoop();
+    auto exitIt = outerExitChannel.find(outermost);
+    if (exitIt == outerExitChannel.end())
+      exitIt =
+          outerExitChannel
+              .insert({outermost,
+                       buildOuterLoopExitChannel(outermost, builder, namer)})
+              .first;
+    OpResult exitChannel = exitIt->second;
+    // Skip infinite loops (no exit channel found).
+    if (!exitChannel)
+      continue;
+
+    specs.push_back({getUniqueName(headerOp).str(),
+                     indexVal.getResultNumber(), indexType.getDataBitWidth(),
+                     *loopBackIndex, getUniqueName(exitChannel.getOwner()).str(),
+                     exitChannel.getResultNumber()});
+  }
+  return specs;
+}
+
+/// Returns (creating it if necessary) the external HW module for an
+/// 'ii_monitor' with the given parameters. The module name encodes the
+/// parameters so that monitors with different parameters get distinct modules.
+static hw::HWModuleExternOp
+getOrCreateIIMonitorExtern(mlir::ModuleOp topModOp, OpBuilder &builder,
+                           unsigned indexWidth, unsigned loopBackIndex,
+                           Type indexType, Type exitType) {
+  std::string name =
+      ("ii_monitor_" + Twine(indexWidth) + "_" + Twine(loopBackIndex)).str();
+  if (auto extOp = topModOp.lookupSymbol<hw::HWModuleExternOp>(name))
+    return extOp;
+
+  MLIRContext *ctx = builder.getContext();
+  ModuleBuilder modBuilder(ctx);
+  modBuilder.addInput("index", indexType);
+  modBuilder.addInput("exit", exitType);
+  modBuilder.addClkAndRst();
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToEnd(topModOp.getBody());
+  auto extOp = builder.create<hw::HWModuleExternOp>(builder.getUnknownLoc(),
+                                                    builder.getStringAttr(name),
+                                                    modBuilder.getPortInfo());
+
+  // Annotate with the RTL name and parameters so the backend can instantiate
+  // the monitor through the unit-generation logic.
+  Type ui32 = IntegerType::get(ctx, 32, IntegerType::Unsigned);
+  extOp->setAttr(RTL_NAME_ATTR_NAME, builder.getStringAttr("ii_monitor"));
+  extOp->setAttr(
+      RTL_PARAMETERS_ATTR_NAME,
+      builder.getDictionaryAttr(
+          {builder.getNamedAttr("INDEX_WIDTH",
+                                IntegerAttr::get(ui32, indexWidth)),
+           builder.getNamedAttr("LOOP_BACK_INDEX",
+                                IntegerAttr::get(ui32, loopBackIndex))}));
+  return extOp;
+}
+
+/// Inserts the 'ii_monitor' instances described by 'specs' into the lowered
+/// circuit module 'hwModOp'.
+static void insertIIMonitors(hw::HWModuleOp hwModOp,
+                             ArrayRef<IIMonitorSpec> specs,
+                             OpBuilder &builder) {
+  if (specs.empty())
+    return;
+
+  // Map instance names to instances for quick lookup of the channels to
+  // observe.
+  llvm::StringMap<hw::InstanceOp> byName;
+  for (auto instOp : hwModOp.getOps<hw::InstanceOp>())
+    byName[instOp.getInstanceName()] = instOp;
+
+  auto topModOp = hwModOp->getParentOfType<mlir::ModuleOp>();
+  auto [clkVal, rstVal] = getClkAndRst(hwModOp);
+
+  // Insert the monitors right before the module's terminator.
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPoint(hwModOp.getBodyBlock()->getTerminator());
+
+  for (const IIMonitorSpec &spec : specs) {
+    auto headerIt = byName.find(spec.headerName);
+    auto exitIt = byName.find(spec.exitName);
+    if (headerIt == byName.end() || exitIt == byName.end())
+      continue;
+
+    Value indexVal = headerIt->second->getResult(spec.indexResultIdx);
+    Value exitVal = exitIt->second->getResult(spec.exitResultIdx);
+
+    hw::HWModuleExternOp extOp = getOrCreateIIMonitorExtern(
+        topModOp, builder, spec.indexWidth, spec.loopBackIndex,
+        indexVal.getType(), exitVal.getType());
+
+    SmallVector<Value> operands{indexVal, exitVal, clkVal, rstVal};
+    builder.create<hw::InstanceOp>(
+        hwModOp.getLoc(), extOp,
+        builder.getStringAttr("ii_monitor_" + spec.headerName), operands);
+  }
+}
+
 namespace {
 
 /// Conversion pass driver. The conversion only works on modules containing
@@ -2166,6 +2597,12 @@ public:
     ChannelTypeConverter typeConverter;
     if (failed(convertExternalFunctions(typeConverter)))
       return signalPassFailure();
+
+    // Detect the innermost loops to instrument while the Handshake function is
+    // still available. The monitors are materialized after lowering.
+    SmallVector<IIMonitorSpec> iiMonitorSpecs;
+    if (instrumentII && funcOp)
+      iiMonitorSpecs = detectIIMonitors(funcOp, namer);
 
     // Helper struct for lowering
     OpBuilder builder(ctx);
@@ -2256,6 +2693,12 @@ public:
 
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // Insert the II monitors into the lowered circuit module(s) before
+    // wrapping.
+    if (instrumentII)
+      for (auto &[circuitOp, _] : lowerState.modState)
+        insertIIMonitors(circuitOp, iiMonitorSpecs, builder);
 
     // Create memory wrappers around all hardware modules
     for (auto &[circuitOp, _] : lowerState.modState)
