@@ -106,7 +106,7 @@ int IntegrationTest::run() {
              << "set-output-dir " << outputDirName << std::endl;
 
   // clang-format off
-  scriptFile << "compile"
+  scriptFile << "compile --instrument-ii"
              << " --buffer-algorithm " << this->bufferAlgorithm
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
