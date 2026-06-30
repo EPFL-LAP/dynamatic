@@ -2466,9 +2466,9 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
     if (!exitChannel)
       continue;
 
-    specs.push_back({getUniqueName(headerOp).str(),
-                     indexVal.getResultNumber(), indexType.getDataBitWidth(),
-                     *loopBackIndex, getUniqueName(exitChannel.getOwner()).str(),
+    specs.push_back({getUniqueName(headerOp).str(), indexVal.getResultNumber(),
+                     indexType.getDataBitWidth(), *loopBackIndex,
+                     getUniqueName(exitChannel.getOwner()).str(),
                      exitChannel.getResultNumber()});
   }
   return specs;
