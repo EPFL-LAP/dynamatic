@@ -385,7 +385,8 @@ gen::BasicCGenerator::generateVariable(OpaqueContext &&context) {
       std::move(context), typeSystem.getVariableTransferFns(),
       /*parameter=*/
       [&](OpaqueContext &&context) {
-        return generateScalarParameter(std::move(context));
+        return generateScalarParameter(std::move(context),
+                                       /*forWriting=*/false);
       },
       /*constructor=*/
       [&](ast::ScalarParameter &&parameter) {
@@ -395,7 +396,8 @@ gen::BasicCGenerator::generateVariable(OpaqueContext &&context) {
 }
 
 std::optional<std::pair<ast::ScalarParameter, gen::OpaqueContext>>
-gen::BasicCGenerator::generateScalarParameter(OpaqueContext &&context) {
+gen::BasicCGenerator::generateScalarParameter(OpaqueContext &&context,
+                                              bool forWriting) {
   std::array<std::function<std::optional<
                  std::pair<ast::ScalarParameter, OpaqueContext>>()>,
              2>
@@ -407,8 +409,12 @@ gen::BasicCGenerator::generateScalarParameter(OpaqueContext &&context) {
     // Randomly shuffle the parameter ordering and find the first
     // parameter that passes type checking.
     std::vector<ast::ScalarParameter> copy = scalarParameters;
-    for (auto &iter : localVariableStack)
-      llvm::append_range(copy, iter);
+    for (auto &defs : localVariableStack)
+      for (auto &iter : defs)
+        // Variable may be selected if only read or it being writeable.
+        if (!forWriting || iter.writeable)
+          copy.emplace_back(iter.dataType, iter.name);
+
     random.shuffle(copy);
 
     for (const ast::ScalarParameter &iter : copy)
@@ -574,7 +580,7 @@ gen::BasicCGenerator::generateScalarAssignmentStatement(
       std::move(context), typeSystem.getScalarAssignmentStatementTransferFns(),
       /*target=*/
       [&](OpaqueContext &&context) {
-        return generateScalarParameter(std::move(context));
+        return generateScalarParameter(std::move(context), /*forWriting=*/true);
       },
       /*value=*/
       [&](OpaqueContext &&context) {
@@ -609,7 +615,7 @@ gen::BasicCGenerator::generateStructuredForStatement(OpaqueContext &&context) {
       },
       [&](OpaqueContext &&context) {
         auto scopeExit = pushNewScope();
-        addVariable(ast::PrimitiveType::UInt32, varName);
+        addVariable(ast::PrimitiveType::UInt32, varName, /*writeable=*/false);
         return generateStatementList(std::move(context));
       },
       [&](ast::Expression &&start, ast::Expression &&end,

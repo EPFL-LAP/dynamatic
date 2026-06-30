@@ -84,7 +84,7 @@ private:
   generateVariable(OpaqueContext &&context);
 
   std::optional<std::pair<ast::ScalarParameter, OpaqueContext>>
-  generateScalarParameter(OpaqueContext &&context);
+  generateScalarParameter(OpaqueContext &&context, bool forWriting);
 
   /// Generates a scalar type or none if it was impossible to generate a scalar
   /// type in the given context.
@@ -116,7 +116,14 @@ private:
   Randomly &random;
   std::optional<ast::ReturnType> maybeReturnType;
   std::vector<ast::ScalarParameter> scalarParameters;
-  std::vector<std::vector<ast::ScalarParameter>> localVariableStack;
+
+  struct VariableDefinition {
+    ast::ScalarType dataType;
+    std::string name;
+    bool writeable;
+  };
+
+  std::vector<std::vector<VariableDefinition>> localVariableStack;
   std::vector<ast::ArrayParameter> arrayParameters;
   std::size_t varCounter = 0;
   AbstractTypeSystem &typeSystem;
@@ -127,8 +134,10 @@ private:
     return llvm::make_scope_exit([&] { localVariableStack.pop_back(); });
   }
 
-  void addVariable(ast::ScalarType type, std::string name) {
-    localVariableStack.back().emplace_back(std::move(type), std::move(name));
+  void addVariable(ast::ScalarType type, std::string name,
+                   bool writeable = true) {
+    localVariableStack.back().push_back(
+        {std::move(type), std::move(name), writeable});
   }
 
   template <typename ASTNode>
