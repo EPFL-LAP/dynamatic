@@ -1,0 +1,77 @@
+# Benchmark "constant" written by ABC on Sun Jul 13 20:32:03 2025
+.model constant
+.inputs clk rst ctrl_valid outs_ready
+.outputs ctrl_ready outs[0] outs[1] outs[2] outs[3] outs[4] outs[5] outs[6] \
+ outs[7] outs[8] outs[9] outs[10] outs[11] outs[12] outs[13] outs[14] \
+ outs[15] outs[16] outs[17] outs[18] outs[19] outs[20] outs[21] outs[22] \
+ outs[23] outs[24] outs[25] outs[26] outs[27] outs[28] outs[29] outs[30] \
+ outs[31] outs_valid
+.names outs[0]
+ 1
+.names outs[1]
+ 0
+.names outs[2]
+ 0
+.names outs[3]
+ 0
+.names outs[4]
+ 0
+.names outs[5]
+ 0
+.names outs[6]
+ 0
+.names outs[7]
+ 0
+.names outs[8]
+ 0
+.names outs[9]
+ 0
+.names outs[10]
+ 0
+.names outs[11]
+ 0
+.names outs[12]
+ 0
+.names outs[13]
+ 0
+.names outs[14]
+ 0
+.names outs[15]
+ 0
+.names outs[16]
+ 0
+.names outs[17]
+ 0
+.names outs[18]
+ 0
+.names outs[19]
+ 0
+.names outs[20]
+ 0
+.names outs[21]
+ 0
+.names outs[22]
+ 0
+.names outs[23]
+ 0
+.names outs[24]
+ 0
+.names outs[25]
+ 0
+.names outs[26]
+ 0
+.names outs[27]
+ 0
+.names outs[28]
+ 0
+.names outs[29]
+ 0
+.names outs[30]
+ 0
+.names outs[31]
+ 0
+.names outs_ready ctrl_ready
+1 1
+.names ctrl_valid outs_valid
+1 1
+.end

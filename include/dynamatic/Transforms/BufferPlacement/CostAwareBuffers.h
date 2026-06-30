@@ -21,9 +21,9 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_COSTAWAREBUFFERS_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 
 namespace dynamatic {
 namespace buffer {
@@ -38,11 +38,7 @@ public:
   /// ensuring that further calls to `optimize` fail.
   CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
                    FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                   double targetPeriod);
-
-  CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
-                   FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                   double targetPeriod, Logger &logger, StringRef milpName);
+                   double targetPeriod, StringRef writeTo = "");
 
 protected:
   /// Interprets the MILP solution to derive buffer placement decisions.

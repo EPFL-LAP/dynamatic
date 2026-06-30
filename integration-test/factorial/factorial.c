@@ -1,4 +1,5 @@
 #include "factorial.h"
+#include "assert.h"
 #include "dynamatic/Integration.h"
 #include "stdlib.h"
 
@@ -19,15 +20,15 @@ int factorial(in_int_t n) {
 #elif UNROLL_FACTOR == 5
     result *= n * (n - 1) * (n - 2) * (n - 3) * (n - 4);
 #else
-    #error "Unsupported UNROLL_FACTOR. Please define it."
+#error "Unsupported UNROLL_FACTOR. Please define it."
 #endif
     n -= UNROLL_FACTOR;
   }
 
   // Handle remaining numbers
   while (n > 0) {
-      result *= n;
-      n--;
+    result *= n;
+    n--;
   }
 
   return result;
@@ -38,6 +39,7 @@ int main(void) {
 
   srand(13);
   n = rand() % 100;
+  assert(n > 1 && "No trivial test!");
 
   CALL_KERNEL(factorial, n);
   return 0;

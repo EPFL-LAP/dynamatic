@@ -16,11 +16,16 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
 #include <optional>
+
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
+#define DEBUG_TYPE "fpl22-buffers"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -78,8 +83,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     placement[channel] = result;
   }
 
-  if (logger)
-    logResults(placement);
+  LLVM_DEBUG(logResults(placement));
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
@@ -300,20 +304,10 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
 CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
                                      int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
-                                     double targetPeriod, CFDFCUnion &cfUnion)
-    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod),
-      cfUnion(cfUnion) {
-  if (!unsatisfiable)
-    setup();
-}
-
-CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
-                                     int timeout, FuncInfo &funcInfo,
-                                     const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
-                                     Logger &logger, StringRef milpName)
+                                     StringRef writeTo)
     : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                       logger, milpName),
+                       writeTo),
       cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
@@ -403,19 +397,9 @@ void CFDFCUnionBuffers::setup() {
 OutOfCycleBuffers::OutOfCycleBuffers(CPSolver::SolverKind solverKind,
                                      int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
-                                     double targetPeriod)
-    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod) {
-  if (!unsatisfiable)
-    setup();
-}
-
-OutOfCycleBuffers::OutOfCycleBuffers(CPSolver::SolverKind solverKind,
-                                     int timeout, FuncInfo &funcInfo,
-                                     const TimingDatabase &timingDB,
-                                     double targetPeriod, Logger &logger,
-                                     StringRef milpName)
+                                     double targetPeriod, StringRef writeTo)
     : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                       logger, milpName) {
+                       writeTo) {
   if (!unsatisfiable)
     setup();
 }

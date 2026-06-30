@@ -28,13 +28,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/BackAnnotate.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
@@ -46,6 +46,14 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::json;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_BACKANNOTATE
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace ljson = llvm::json;
 
@@ -134,8 +142,8 @@ static const ljson::Array *getAnnotationArray(const ljson::Value &topValue,
 static const StringLiteral MINIMUM_TRANS("minimum-trans"),
     MAXIMUM_TRANS("maximum-trans"), MINIMUM_OPAQUE("minimum-opaque"),
     MAXIMUM_OPAQUE("maximum-opaque"), MINIMUM_SLOTS("minimum-slots"),
-    INPUT_DELAY("input-delay"),
-    OUTPUT_DELAY("output-delay"), UNBUF_DELAY("unbuf-delay");
+    INPUT_DELAY("input-delay"), OUTPUT_DELAY("output-delay"),
+    UNBUF_DELAY("unbuf-delay");
 
 /// Deserializes a JSON value into a handshake::ChannelBufPropsAttr. See
 /// ::llvm::ljson::Value's documentation for a longer description of this
@@ -204,7 +212,7 @@ namespace {
 struct BackAnnotatePass
     : public dynamatic::impl::BackAnnotateBase<BackAnnotatePass> {
 
-  BackAnnotatePass(const std::string &filepath) { this->filepath = filepath; }
+  using BackAnnotateBase::BackAnnotateBase;
 
   void runDynamaticPass() override {
     // Open the back-annotation file
@@ -434,9 +442,4 @@ LogicalResult BackAnnotatePass::setOprdAttribute(OpOperand &oprd,
     return failure();
   setOperandAttr(oprd, attr);
   return success();
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createBackAnnotate(const std::string &filepath) {
-  return std::make_unique<BackAnnotatePass>(filepath);
 }

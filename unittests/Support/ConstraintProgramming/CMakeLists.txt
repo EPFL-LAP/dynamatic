@@ -12,10 +12,7 @@ target_link_libraries(
   ${GUROBI_LIBRARY}
 
   LLVMSupport
-
-  ${CBC_LIBRARIES}
-  ${CLPCORE_LIBRARIES}
-  ${OSI_LIBRARIES}
+  DynamaticConstraintProgramming
 )
 
 enable_testing()

@@ -11,7 +11,6 @@
 // necessary).
 //
 //===----------------------------------------------------------------------===//
-#include "dynamatic/Conversion/HandshakeToHW.h"
 #include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -81,9 +80,16 @@ static cl::opt<std::string> propertyFilename("property-database", cl::Optional,
 static cl::opt<HDL>
     hdl("hdl", cl::Optional, cl::desc("<hdl to use>"), cl::init(HDL::VHDL),
         cl::values(clEnumValN(HDL::VHDL, "vhdl", "VHDL"),
+                   clEnumValN(HDL::VHDL, "vhdl-beta", "VHDL Beta"),
                    clEnumValN(HDL::VERILOG, "verilog", "Verilog"),
+                   clEnumValN(HDL::VERILOG, "verilog-beta", "Verilog Beta"),
                    clEnumValN(HDL::SMV, "smv", "SMV")),
         cl::cat(mainCategory));
+
+static cl::opt<bool> verifyInvariants(
+    "verify-invariants", cl::Optional,
+    cl::desc("generate INVARs as INVARSPEC to verify if they are correct"),
+    cl::init(false), cl::cat(mainCategory));
 
 static cl::list<std::string>
     rtlConfigs(cl::Positional, cl::OneOrMore,
@@ -106,9 +112,9 @@ struct DenseMapInfo<std::pair<std::string, bool>> {
            (static_cast<unsigned>(p.second) << 1);
   }
 
-  static bool isEqual(const std::pair<std::string, bool> &LHS,
-                      const std::pair<std::string, bool> &RHS) {
-    return LHS == RHS;
+  static bool isEqual(const std::pair<std::string, bool> &lhs,
+                      const std::pair<std::string, bool> &rhs) {
+    return lhs == rhs;
   }
 };
 } // namespace llvm
@@ -135,7 +141,7 @@ struct ExportInfo {
   /// Creates export information for the given module and RTL configuration.
   ExportInfo(mlir::ModuleOp modOp, RTLConfiguration &config,
              StringRef outputPath)
-      : modOp(modOp), config(config), outputPath(outputPath){};
+      : modOp(modOp), config(config), outputPath(outputPath) {};
 
   /// Associates every external hardware module to its match according to the
   /// RTL configuration and concretizes each of them inside the output
@@ -158,7 +164,7 @@ struct FormalPropertyInfo {
   StringRef outputPath;
 
   FormalPropertyInfo(FormalPropertyTable &table, StringRef outputPath)
-      : table(table), outputPath(outputPath){};
+      : table(table), outputPath(outputPath) {};
 };
 } // namespace
 
@@ -331,7 +337,7 @@ public:
 
   /// Creates the RTL writer.
   RTLWriter(ExportInfo &exportInfo, FormalPropertyInfo &propertyInfo, HDL hdl)
-      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl){};
+      : exportInfo(exportInfo), propertyInfo(propertyInfo), hdl(hdl) {};
 
   /// Writes the RTL implementation of the module to the output stream. On
   /// failure, the RTL implementation should be considered invalid and/or
@@ -445,10 +451,8 @@ void WriteModData::writeIO(PortDeclarationWriter writeDeclaration,
   auto writePortsDir = [&](const std::vector<RTLWriter::IOPort> &io,
                            PortType dir) -> void {
     for (auto &[portName, portType] : io) {
-      const bool toPrint = hdl != HDL::SMV
-                               ? true
-                               : portName != dynamatic::hw::CLK_PORT &&
-                                     portName != dynamatic::hw::RST_PORT;
+      const bool toPrint =
+          hdl != HDL::SMV ? true : portName != CLK_PORT && portName != RST_PORT;
       if (toPrint) {
         writeDeclaration(portName, dir, portType, os);
         if (--numIOLeft != 0)
@@ -601,8 +605,8 @@ void WriteModData::writeSignalAssignments(
                           type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          if (inputPortName.str() != dynamatic::hw::CLK_PORT &&
-              inputPortName.str() != dynamatic::hw::RST_PORT)
+          if (inputPortName.str() != CLK_PORT &&
+              inputPortName.str() != RST_PORT)
             writeAssignment(internalSignalName, inputPortName, os);
         });
   }
@@ -612,7 +616,7 @@ void WriteModData::writeProperties(PropertyWriter writeProperty) {
   for (auto const &[id, property] : properties) {
     writeProperty(id, property.first, property.second, os);
   }
-};
+}
 
 RTLWriter::EntityIO::EntityIO(hw::HWModuleOp modOp) {
   auto addValidAndReady = [&](StringRef portName, std::vector<IOPort> &down,
@@ -978,6 +982,7 @@ LogicalResult VerilogWriter::write(hw::HWModuleOp modOp,
   if (failed(createInternalSignals(data)))
     return failure();
 
+  os << "`timescale 1ns / 1ps\n\n";
   os << "module " << modOp.getSymName() << "(\n";
 
   os.indent();
@@ -1026,6 +1031,7 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
     HDL hdl(dynamatic::HDL::VERILOG);
     std::string moduleName;
     SmallVector<KeyValuePair> genericParams;
+    std::string archName = "arch";
 
     llvm::TypeSwitch<Operation *, void>(getHWModule(instOp).getOperation())
         .Case<hw::HWModuleOp>(
@@ -1035,11 +1041,20 @@ void VerilogWriter::writeModuleInstantiations(WriteModData &data) const {
           hdl = match.component->getHDL();
           moduleName = match.getConcreteModuleName();
           genericParams = match.getGenericParameterValues().takeVector();
+          archName = match.getConcreteArchName();
         })
         .Default([&](auto) { llvm_unreachable("unknown module type"); });
 
     raw_indented_ostream &os = data.os;
-    os << moduleName << " ";
+    if (archName != "" && archName != "arch") {
+      // HACK: Verilog does not have the concept of architectures. Therefore, we
+      // use this parameter to specify an alternative module name when
+      // generating Verilog code, particularly when the desired module name
+      // differs from the concrete module name.
+      os << archName << " ";
+    } else {
+      os << moduleName << " ";
+    }
 
     // Write generic parameters if there are any
     if (!genericParams.empty()) {
@@ -1242,6 +1257,184 @@ LogicalResult SMVWriter::createProperties(WriteModData &data) const {
 
       data.properties[p->getId()] = {validSignal1 + " <-> " + validSignal2,
                                      propertyTag};
+    } else if (auto *p =
+                   llvm::dyn_cast<EagerForkNotAllOutputSent>(property.get())) {
+      auto sentStates = p->getSentStateNamers();
+      unsigned numOut = sentStates.size();
+      std::vector<std::string> outNames{numOut};
+      for (unsigned i = 0; i < numOut; ++i) {
+        outNames[i] = sentStates[i].getSMVName();
+      }
+      std::string propertyString =
+          llvm::formatv("count({0}) < {1}", llvm::join(outNames, ", "), numOut)
+              .str();
+      // e.g. count(fork0.sent_0, fork0.sent_1) < 2
+      // for operation "fork0" with 2 eager outputs
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<CopiedSlotsOfActiveForkAreFull>(
+                   property.get())) {
+      std::vector<std::string> forkOutNames(0);
+      for (auto [i, sentState] : llvm::enumerate(p->getSentStateNamers())) {
+        forkOutNames.push_back(sentState.getSMVName());
+      }
+      auto &copiedSlot = p->getCopiedSlot();
+      std::string bufferFull = copiedSlot.getSMVName();
+      std::string propertyString =
+          llvm::formatv("({0}) -> {1}", llvm::join(forkOutNames, " | "),
+                        bufferFull)
+              .str();
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<EagerForkPathTokenCopiedMaximumOnce>(
+                   property.get())) {
+      std::string channelName =
+          llvm::formatv("{0}.{1}_valid", p->getValidOp(), p->getValidChannel());
+      auto sentStates = p->getSentStateNamers();
+      std::vector<std::string> forkOutNames{sentStates.size()};
+      for (unsigned i = 0; i < sentStates.size(); ++i) {
+        forkOutNames[i] = sentStates[i].getSMVName();
+      }
+      std::string propertyString = llvm::formatv(
+          "({0}) -> {1}", llvm::join(forkOutNames, " | "), channelName);
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<ReconvergentPathFlow>(property.get())) {
+      std::vector<std::string> eqs{};
+      for (auto &eq : p->getEquations()) {
+        std::vector<std::string> terms;
+        for (auto &[key, value] : eq.terms) {
+          auto annotater = key.getAnnotater();
+          assert(annotater != nullptr &&
+                 "variable without annotater in final equation");
+          std::string t =
+              llvm::formatv("toint({0}) * {1}", annotater->getSMVName(), value);
+          terms.push_back(t);
+        }
+        std::string equationString =
+            llvm::formatv("({0} = 0)", llvm::join(terms, " + ")).str();
+        eqs.push_back(equationString);
+      }
+      std::string propertyString = llvm::join(eqs, " & ");
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<IOGSingleToken>(property.get())) {
+      // count(slot1, slot2, ...) = 1 + count(fork1, fork2, ...)
+      std::vector<std::string> smvSlots(0);
+      smvSlots.reserve(p->slots.size());
+      for (auto &slot : p->slots) {
+        smvSlots.push_back(slot->getSMVName());
+      }
+      // smvSlots cannot be empty, as each IOG contains at least the entry slot
+
+      std::vector<std::string> smvForks(0);
+      smvForks.reserve(p->forks.size());
+      for (auto &fork : p->forks) {
+        smvForks.push_back(fork.getSMVName());
+      }
+      std::string rhs;
+      if (smvForks.empty()) {
+        rhs = "1";
+      } else {
+        rhs = llvm::formatv("1 + count({0})", llvm::join(smvForks, ", "));
+      }
+
+      std::string propertyString =
+          llvm::formatv("count({0}) = {1}", llvm::join(smvSlots, ", "), rhs);
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<IOGConsecutiveTokens>(property.get())) {
+      // buffer1.slotted_token_count > 0 & buffer2.slotted_token_count > 0 ->
+      // fork3.outs1_sent | fork4.outs0_sent
+      std::string right;
+      if (p->sents.empty()) {
+        right = "FALSE";
+      } else {
+        std::vector<std::string> sentNames;
+        sentNames.reserve(p->sents.size());
+        for (auto &sent : p->sents) {
+          sentNames.push_back(sent.getSMVName());
+        }
+        right = llvm::join(sentNames, " | ");
+      }
+      std::string propertyString =
+          llvm::formatv("(({0} > 0) & ({1} > 0)) -> ({2})",
+                        p->slot1.getSMVName(), p->slot2.getSMVName(), right);
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<EntryTokenOrder>(property.get())) {
+      std::vector<std::string> ends{};
+      const auto &slots = p->getSlots();
+      assert(slots.size() >= 2);
+
+      for (auto start = slots.begin(); start != slots.end(); ++start) {
+        std::string entryToken = start->constrain(p->getValue())->getSMVName();
+        std::vector<std::string> laterSlots{};
+        for (auto later = start + 1; later != slots.end(); ++later) {
+          // Any later slot must not be full
+          laterSlots.emplace_back(llvm::formatv("!({0})", later->getSMVName()));
+        }
+        // if laterSlots is empty, there is nothing to annotate with this
+        // starting slot
+        if (laterSlots.empty()) {
+          continue;
+        }
+
+        ends.push_back(llvm::formatv("(({0}) -> ({1}))", entryToken,
+                                     llvm::join(laterSlots, " & ")));
+      }
+      // This holds because every EntryTokenOrder slot path contains at least
+      // two slots
+      assert(!ends.empty());
+      std::string propertyString = llvm::join(ends, " & ");
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<SingleEntryToken>(property.get())) {
+      std::vector<std::string> cmStrs;
+      for (const auto &x : p->getCmPath()) {
+        cmStrs.push_back(x.getSMVName());
+      }
+      std::vector<std::string> ecStrs;
+      for (const auto &x : p->getEcPath()) {
+        ecStrs.push_back(x.getSMVName());
+      }
+      std::string propertyString =
+          llvm::formatv("count({0}) > 0 -> count({1}) = 0",
+                        llvm::join(cmStrs, ", "), llvm::join(ecStrs, ", "));
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<ExitTokenOrder>(property.get())) {
+      // (buffer3.full & buffer3.data = exit) -> (!buffer1.full & !buffer2.full)
+      const auto &slots = p->getSlots();
+      assert(slots.size() >= 2);
+      std::vector<std::string> earlierSlots;
+      std::vector<std::string> ends{};
+      earlierSlots.push_back(
+          llvm::formatv("!({0})", slots.begin()->getSMVName()));
+      for (auto start = slots.begin() + 1; start != slots.end(); ++start) {
+        std::string exitToken = start->constrain(p->getValue())->getSMVName();
+        ends.push_back(llvm::formatv("(({0}) -> ({1}))", exitToken,
+                                     llvm::join(earlierSlots, " & ")));
+        earlierSlots.push_back(llvm::formatv("!({0})", start->getSMVName()));
+      }
+
+      std::string propertyString = llvm::join(ends, " & ");
+      data.properties[p->getId()] = {propertyString, propertyTag};
+    } else if (auto *p = llvm::dyn_cast<ExitTokenNoAncestors>(property.get())) {
+      const auto &exitSlots = p->getExitSlots();
+      int32_t exitValue = p->getValue();
+      std::vector<std::string> exitFulls;
+      exitFulls.reserve(exitSlots.size());
+      for (const auto &exitSlot : exitSlots) {
+        auto name = exitSlot->tryConstrain(exitValue)->getSMVName();
+        exitFulls.push_back(name);
+      }
+      std::string left =
+          llvm::formatv("count({0}) > 0", llvm::join(exitFulls, ", "));
+
+      const auto &ancestors = p->getAncestors();
+      std::vector<std::string> ancestorSlots;
+      ancestorSlots.reserve(ancestors.size());
+      for (const auto &slot : ancestors) {
+        auto name = slot.getSMVName();
+        ancestorSlots.push_back(name);
+      }
+      std::string right =
+          llvm::formatv("count({0}) = 0", llvm::join(ancestorSlots, ", "));
+      std::string propertyString = llvm::formatv("({0}) -> ({1})", left, right);
+      data.properties[p->getId()] = {propertyString, propertyTag};
     } else {
       llvm::errs() << "Formal property Type not known\n";
       return failure();
@@ -1307,8 +1500,8 @@ void SMVWriter::constructIOMappings(
           addExtraSignals(port, signalName, type.getExtraSignals());
         })
         .Case<IntegerType>([&](IntegerType intType) {
-          if (getSignalName(port).first != dynamatic::hw::CLK_PORT &&
-              getSignalName(port).first != dynamatic::hw::RST_PORT)
+          if (getSignalName(port).first != CLK_PORT &&
+              getSignalName(port).first != RST_PORT)
             mappings[getSignalName(port)].push_back(signalName);
         });
   };
@@ -1339,7 +1532,7 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   writeIncludes(data);
   os << "\n\n";
 
-  os << "MODULE " << modOp.getSymName() << " (";
+  os << "MODULE " << modOp.getSymName() << " (testbench, ";
 
   data.writeIO([](const llvm::Twine &name, PortType dir,
                   std::optional<unsigned> type,
@@ -1360,8 +1553,18 @@ LogicalResult SMVWriter::write(hw::HWModuleOp modOp,
   os << "\n-- properties\n";
   data.writeProperties([](const unsigned long &id, const std::string &property,
                           FormalProperty::TAG tag, raw_indented_ostream &os) {
-    if (tag == FormalProperty::TAG::OPT)
-      os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
+    if (verifyInvariants) {
+      if (tag == FormalProperty::TAG::INVAR) {
+        os << "INVARSPEC NAME invariant" << id << " := " << property << ";\n";
+      }
+    } else {
+      if (tag == FormalProperty::TAG::OPT)
+        os << "INVARSPEC NAME p" << id << " := " << property << ";\n";
+      else if (tag == FormalProperty::TAG::INVAR) {
+        os << "-- invariant" << id << "\n";
+        os << "INVAR " << property << ";\n";
+      }
+    }
   });
 
   return success();
@@ -1423,11 +1626,12 @@ void SMVWriter::writeModuleInstantiations(WriteModData &data) const {
 /// file named like the module inside the output directory. Fails if the
 /// output file cannot be created or if the module cannot be converted to
 /// RTL; succeeds otherwise.
-static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
+static LogicalResult writeModule(std::unique_ptr<RTLWriter> &writer,
+                                 hw::HWModuleOp modOp) {
   // Open the file in which we will create the module, it is named like the
   // module itself
   std::string filepath =
-      writer.exportInfo.outputPath.str() + sys::path::get_separator().str() +
+      writer->exportInfo.outputPath.str() + sys::path::get_separator().str() +
       modOp.getSymName().str() + "." + getHDLExtension(hdl).str();
 
   std::error_code ec;
@@ -1437,7 +1641,7 @@ static LogicalResult writeModule(RTLWriter &writer, hw::HWModuleOp modOp) {
                                 << filepath << "\": " << ec.message();
   }
   raw_indented_ostream os(fileStream);
-  return writer.write(modOp, os);
+  return writer->write(modOp, os);
 }
 
 int main(int argc, char **argv) {
@@ -1498,27 +1702,25 @@ int main(int argc, char **argv) {
   FormalPropertyInfo propertyInfo(table, outputPath);
 
   // Create an RTL writer
-  RTLWriter *writer;
+  std::unique_ptr<RTLWriter> writer;
   switch (hdl) {
   case HDL::VHDL:
-    writer = new VHDLWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<VHDLWriter>(info, propertyInfo, hdl);
     break;
   case HDL::VERILOG:
-    writer = new VerilogWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<VerilogWriter>(info, propertyInfo, hdl);
     break;
   case HDL::SMV:
-    writer = new SMVWriter(info, propertyInfo, hdl);
+    writer = std::make_unique<SMVWriter>(info, propertyInfo, hdl);
     break;
   }
 
   // Write each module's RTL implementation to a separate file
   for (hw::HWModuleOp hwModOp : modOp->getOps<hw::HWModuleOp>()) {
-    if (failed(writeModule(*writer, hwModOp))) {
-      delete writer;
+    if (failed(writeModule(writer, hwModOp))) {
       return 1;
     }
   }
 
-  delete writer;
   return 0;
 }

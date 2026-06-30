@@ -31,7 +31,7 @@ struct LLVMMemDependency {
 
   // A list of dest (destination op of RAW and WAW dependencies) and the loop
   // depth of the dependency (TODO: why do we care about the loop depth?).
-  std::vector<std::pair<std::string, unsigned>> destAndDepth;
+  std::vector<std::tuple<std::string, unsigned, unsigned>> destAndDepthAndDist;
 
   // Convert the stored memory dependency values into a list of memory
   // dependence attributes
@@ -40,11 +40,11 @@ struct LLVMMemDependency {
 
     llvm::SmallVector<dynamatic::handshake::MemDependenceAttr> attrs;
 
-    for (const auto &[dstName, depth] : destAndDepth) {
+    for (const auto &[dstName, depth, dist] : destAndDepthAndDist) {
 
       auto dstNameAttr = mlir::StringAttr::get(&ctx, dstName);
       auto attr = dynamatic::handshake::MemDependenceAttr::get(
-          &ctx, dstNameAttr, depth);
+          &ctx, dstNameAttr, depth, dist);
       attrs.push_back(attr);
     }
 
@@ -69,10 +69,11 @@ struct LLVMMemDependency {
   /// }
   void toLLVMMetaDataNode(llvm::LLVMContext &ctx, llvm::Instruction *inst) {
     llvm::SmallVector<llvm::Metadata *, 10> mdVals;
-    for (const auto &[dstName, depth] : this->destAndDepth) {
+    for (const auto &[dstName, depth, dist] : this->destAndDepthAndDist) {
       mdVals.push_back(llvm::MDNode::get(
           ctx, {llvm::MDString::get(ctx, dstName),
-                llvm::MDString::get(ctx, std::to_string(depth))}));
+                llvm::MDString::get(ctx, std::to_string(depth)),
+                llvm::MDString::get(ctx, std::to_string(dist))}));
     }
     inst->setMetadata(METADATA_DEPENDENCY,
                       llvm::MDNode::get(ctx, llvm::ArrayRef(mdVals)));
@@ -114,20 +115,24 @@ struct LLVMMemDependency {
     for (unsigned i = 0; i < depsMetaDataNode->getNumOperands(); i++) {
       llvm::MDNode *dep =
           llvm::dyn_cast<llvm::MDNode>(depsMetaDataNode->getOperand(i));
-      assert(dep->getNumOperands() == 2 &&
+      assert(dep->getNumOperands() == 3 &&
              "Malformed dependency metadata! It must be a destination name and "
-             "a depth!");
+             "a depth and a dist!");
 
       auto *mdDstName = llvm::dyn_cast<llvm::MDString>(dep->getOperand(0));
       assert(mdDstName &&
              "Malformed IR metadata! The first element must be a string.");
       auto *mdDepth = llvm::dyn_cast<llvm::MDString>(dep->getOperand(1));
-      assert(mdDepth);
-      assert(mdDstName &&
+      assert(mdDepth &&
              "Malformed IR metadata! The second element must be a string.");
 
-      depData.destAndDepth.emplace_back(mdDstName->getString().str(),
-                                        std::stoi(mdDepth->getString().str()));
+      auto *mdDist = llvm::dyn_cast<llvm::MDString>(dep->getOperand(2));
+      assert(mdDist &&
+             "Malformed IR metadata! The third element must be a string.");
+
+      depData.destAndDepthAndDist.emplace_back(
+          mdDstName->getString().str(), std::stoi(mdDepth->getString().str()),
+          std::stoi(mdDist->getString().str()));
     }
 
     return depData;

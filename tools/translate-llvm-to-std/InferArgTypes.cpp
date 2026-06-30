@@ -20,14 +20,19 @@
 using namespace mlir;
 using namespace dynamatic;
 
-Type ArgType::getMlirType(OpBuilder &builder) const {
+Type ArgType::getMlirType(OpBuilder &builder, bool flattenArray) const {
   Type baseMLIRElemType;
 
   if (std::holds_alternative<CXBuiltInScalarTypes>(baseElemType)) {
     switch (std::get<CXBuiltInScalarTypes>(baseElemType)) {
       // clang-format off
       case Void:       baseMLIRElemType = builder.getNoneType(); break;
-      case Bool:       baseMLIRElemType = builder.getI1Type();   break;
+      case Bool:
+        // The in-memory representation of a bool type coming from C is a full
+        // byte (See https://www.open-std.org/Jtc1/sc22/wg14/www/docs/n3220.pdf
+        // C23 6.2.6.2).
+        baseMLIRElemType = (arrayDimensions.empty() ? builder.getI1Type() : builder.getI8Type());
+        break;
       case Int8:       baseMLIRElemType = builder.getI8Type();   break;
       case Int16:      baseMLIRElemType = builder.getI16Type();  break;
       case Int32:      baseMLIRElemType = builder.getI32Type();  break;
@@ -50,6 +55,17 @@ Type ArgType::getMlirType(OpBuilder &builder) const {
   if (arrayDimensions.empty()) {
     return baseMLIRElemType;
   }
+
+  // Instead of returning memref<8 * 8 * i32> for A[8][8], we just return a
+  // flattened version memref<64 * i32>
+  if (flattenArray) {
+    int64_t flattenedSize = 1;
+    for (auto dim : arrayDimensions) {
+      flattenedSize *= dim;
+    }
+    return MemRefType::get(/* shape = */ {flattenedSize}, baseMLIRElemType);
+  }
+
   return MemRefType::get(llvm::ArrayRef<int64_t>(arrayDimensions),
                          baseMLIRElemType);
 }
@@ -120,7 +136,15 @@ static std::optional<CXScalarType> processScalarType(CXType clangType) {
     llvm_unreachable("Unhandled CXType_Unexposed type!");
     return std::nullopt;
   }
+
+  case CXType_Typedef: {
+    CXCursor typedefCursor = clang_getTypeDeclaration(clangType);
+    return processScalarType(clang_getTypedefDeclUnderlyingType(typedefCursor));
+  }
   default: {
+    LLVM_DEBUG(llvm::errs() << "Type ID of unhandled scalar type: "
+                            << clangType.kind << "\n");
+
     return std::nullopt;
   }
   }
@@ -161,6 +185,9 @@ static std::optional<ArgType> fromCXType(CXType type) {
       return ArgType{scalarType.value(), arrayDimSizes, false};
     }
   }
+
+  LLVM_DEBUG(llvm::errs() << "Unhandled compound type id: " << type.kind
+                          << "\n");
   // TODO: One important thing to handle in the future is the arguments that
   // are **passed by reference**. It is probably correct to promote them to
   // the function return values.
@@ -193,9 +220,10 @@ static CXChildVisitResult visitParamDecl(CXCursor cursor, CXCursor parent,
     if (argType.has_value()) {
       args->push_back(argType.value());
     } else {
-      llvm::errs() << "Warning - unable to parse " << getCursorSpelling(cursor)
-                   << " with type "
-                   << clang_getCString(clang_getTypeSpelling(type)) << "!\n";
+      LLVM_DEBUG(llvm::errs()
+                 << "Warning - unable to parse " << getCursorSpelling(cursor)
+                 << " with type "
+                 << clang_getCString(clang_getTypeSpelling(type)) << "!\n");
     }
     // else: Maybe instead of push nothing here, we should have a ArgType that
     // is specifically for "I don't know what it is?"
@@ -257,7 +285,7 @@ SmallVector<Type> getFuncArgTypes(const std::string &funcName,
                                   OpBuilder &builder) {
   SmallVector<Type> mlirArgTypes;
   for (const ArgType &clangType : map.at(funcName)) {
-    mlirArgTypes.push_back(clangType.getMlirType(builder));
+    mlirArgTypes.push_back(clangType.getMlirType(builder, true));
   }
 
   return mlirArgTypes;

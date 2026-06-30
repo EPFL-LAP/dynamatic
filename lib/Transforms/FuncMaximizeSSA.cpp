@@ -23,6 +23,14 @@
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_FUNCMAXIMIZESSA
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
+
 /// Determines the block to which the value belongs.
 static Block *getDefiningBlock(Value value) {
   // Value is either a block argument...
@@ -218,8 +226,3 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<func::FuncOp>>
-dynamatic::createFuncMaximizeSSA() {
-  return std::make_unique<FuncMaximizeSSAPass>();
-}

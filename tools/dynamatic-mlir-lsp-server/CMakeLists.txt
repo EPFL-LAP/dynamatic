@@ -7,6 +7,7 @@ target_link_libraries(dynamatic-mlir-lsp-server
   PRIVATE
   DynamaticHandshake
   DynamaticHW
+  DynamaticSynth
   MLIRFuncDialect
   MLIRIR
   MLIRLLVMDialect

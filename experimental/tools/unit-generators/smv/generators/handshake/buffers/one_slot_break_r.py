@@ -44,5 +44,7 @@ MODULE {name}(ins, ins_valid, outs_ready)
   outs_valid := inner_one_slot_break_r.outs_valid;
   outs := inner_one_slot_break_r.full ? data : ins;
 
+  full := inner_one_slot_break_r.full;
+
 {_generate_one_slot_break_r_dataless(f"{name}__one_slot_break_r_dataless")}
 """

@@ -159,7 +159,7 @@ static SmallVector<CFGLoop *> getLoopsConsNotInProd(Block *cons, Block *prod,
   // Reverse to the get the loops from outermost to innermost
   std::reverse(result.begin(), result.end());
   return result;
-};
+}
 
 /// Given two sets containing object of type `Block*`, remove the common
 /// entries.
@@ -581,11 +581,11 @@ static Value boolVariableToCircuit(PatternRewriter &rewriter,
   // Add a not if the condition is negated.
   if (singleCond->isNegated) {
     rewriter.setInsertionPointToStart(block);
-    auto notOp = rewriter.create<handshake::NotOp>(
+    auto notIOp = rewriter.create<handshake::NotIOp>(
         block->getOperations().front().getLoc(),
         ftd::channelifyType(condition.getType()), condition);
-    notOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
-    return notOp->getResult(0);
+    notIOp->setAttr(FTD_OP_TO_SKIP, rewriter.getUnitAttr());
+    return notIOp->getResult(0);
   }
   if (needsChannelify) {
     condition.setType(ftd::channelifyType(condition.getType()));

@@ -21,8 +21,7 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
-#include "experimental/Transforms/LSQSizing/HandshakeSizeLSQs.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 
 #include <set>
 #include <stack>
@@ -38,13 +37,11 @@ using namespace dynamatic::experimental::lsqsizing;
 /// 2. If the operation is a buffer operation, the latency is extracted from the
 /// timing attribute
 /// 3. If the operation is neither, then its latency is set to 0
-static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB,
-                              double targetCP) {
-  double latency = 0;
-
-  if (!failed(timingDB.getLatency(op, SignalType::DATA, latency, targetCP))) {
-    return latency;
-  }
+static int extractNodeLatency(mlir::Operation *op,
+                              const TimingDatabase &timingDB, double targetCP) {
+  auto latencyOrFail = timingDB.getLatency(op, SignalType::DATA, targetCP);
+  if (succeeded(latencyOrFail))
+    return *latencyOrFail;
 
   if (auto bufferOp = llvm::dyn_cast<handshake::BufferOp>(op)) {
     return bufferOp.getLatencyDV();
@@ -55,7 +52,7 @@ static int extractNodeLatency(mlir::Operation *op, TimingDatabase timingDB,
 
 CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
                        llvm::SetVector<unsigned> cfdfcBBs,
-                       TimingDatabase timingDB, unsigned II, double targetCP) {
+                       TimingDatabase timingDB, unsigned ii, double targetCP) {
 
   for (Operation &op : funcOp.getOps()) {
     // Get operation's basic block
@@ -92,7 +89,7 @@ CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
           if (srcBB == cfdfcBBs[i] && dstBB == cfdfcBBs[nextBB]) {
             addChannelEdges(res);
             if (buffer::CFDFC::isCFDFCBackedge(res))
-              addChannelBackedges(res, (II * -1));
+              addChannelBackedges(res, (ii * -1));
             break;
           }
         }
@@ -101,7 +98,7 @@ CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
         // same basic block and the CFDFC is just a block looping to itself
         addChannelEdges(res);
         if (buffer::CFDFC::isCFDFCBackedge(res))
-          addChannelBackedges(res, (II * -1));
+          addChannelBackedges(res, (ii * -1));
       } else if (!isBackedge(res)) {
         // The channel is in the CFDFC if its producer/consumer belong to the
         // same basic block and the channel is not a backedge
@@ -140,12 +137,12 @@ void CFDFCGraph::printGraph() {
     const CFDFCNode &node = pair.second;
     llvm::errs() << opName << " (lat: " << node.latency
                  << ", est: " << node.earliestStartTime << "): ";
-    for (std::string edge : node.edges)
+    for (const std::string &edge : node.edges)
       llvm::errs() << edge << ", ";
 
     if (node.backedges.size() > 0) {
       llvm::errs() << " || ";
-      for (std::string backedge : node.backedges)
+      for (const std::string &backedge : node.backedges)
         llvm::errs() << backedge << ", ";
     }
     llvm::errs() << "\n";
@@ -153,7 +150,7 @@ void CFDFCGraph::printGraph() {
 }
 
 void CFDFCGraph::printPath(std::vector<std::string> path) {
-  for (std::string node : path)
+  for (const std::string &node : path)
     llvm::errs() << node << "(" << nodes.at(node).latency << ") - ";
 
   llvm::errs() << "\n";
@@ -401,10 +398,10 @@ std::vector<mlir::Operation *> CFDFCGraph::getOperations() {
   return ops;
 }
 
-void CFDFCGraph::setNewII(unsigned II) {
+void CFDFCGraph::setNewII(unsigned ii) {
   for (auto &node : nodes)
     if (node.first.find(backedgePrefix) != std::string::npos)
-      node.second.latency = II * -1;
+      node.second.latency = ii * -1;
 }
 
 // Example of how the worst case II is calculated
@@ -514,7 +511,7 @@ bool CFDFCGraph::updateStartTimeForNode(std::string node,
   // other nodes need all of their inputs to be ready
   // Therefore the latency for mux, merge and cmerge is the minimum of all
   // incoming edges
-  if (op && isa<handshake::MergeLikeOpInterface>(op)) {
+  if (isa_and_nonnull<handshake::MergeLikeOpInterface>(op)) {
     int minLatency = INT_MAX;
     for (auto &incomgingEdge : edgeMinLatencies[node])
       if (minLatency > incomgingEdge.second)

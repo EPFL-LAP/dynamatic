@@ -1,0 +1,1665 @@
+//===- BufferPlacementMILP.cpp - MILP-based buffer placement ----*- C++ -*-===//
+//
+// Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Implements the common MILP-based buffer placement infrastructure.
+//
+//===----------------------------------------------------------------------===//
+
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/CFG.h"
+#include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
+#include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Path.h"
+#include <algorithm>
+#include <cmath>
+#include <set>
+
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
+#define DEBUG_TYPE "buffer-milp"
+
+using namespace mlir;
+using namespace dynamatic;
+using namespace dynamatic::buffer;
+using namespace dynamatic::handshake;
+
+/// Returns a textual name for a signal type.
+static StringRef getSignalName(SignalType signalType) {
+  switch (signalType) {
+  case SignalType::DATA:
+    return "data";
+  case SignalType::VALID:
+    return "valid";
+  case SignalType::READY:
+    return "ready";
+  }
+}
+
+/// Returns the input and output port delays of the model for a specific signal
+/// type. If the type is `SignalType::DATA`, the channel's bitwidth is used as a
+/// parameter to determine the delays. If the model is nullptr, delays are
+/// assumed to be 0.
+static std::pair<double, double>
+getPortDelays(Value channel, SignalType signalType, const TimingModel *model) {
+  if (!model)
+    return {0.0, 0.0};
+
+  unsigned bitwidth;
+  switch (signalType) {
+  case SignalType::DATA: {
+    bitwidth = getHandshakeTypeBitWidth(channel.getType());
+
+    // getPortDelays is not written in a way that it can fail elegantly
+    // so if our timing model crashes, we have no simple way to signal it
+    // (other than to crash)
+    //
+    // the last person who wrote this set the delays to a 0.0 default
+    // instead of fixing it to fail elegantly or to crash
+    // and had a TODO marker on it
+    double inBufDelay = 0.0, outBufDelay = 0.0;
+
+    // if the timing model doesn't crash, set in buffer delay properly
+    if (auto inBufDelayOrFail = model->inputModel.dataDelay.select(bitwidth);
+        succeeded(inBufDelayOrFail))
+      inBufDelay = inBufDelayOrFail->get();
+
+    // if the timing model doesn't crash, set out buffer delay properly
+    if (auto outBufDelayOrFail = model->outputModel.dataDelay.select(bitwidth);
+        succeeded(outBufDelayOrFail))
+      outBufDelay = outBufDelayOrFail->get();
+
+    // and return them
+    return {inBufDelay, outBufDelay};
+  }
+  case SignalType::VALID:
+    return {model->inputModel.validDelay, model->outputModel.validDelay};
+  case SignalType::READY:
+    return {model->inputModel.readyDelay, model->outputModel.readyDelay};
+  }
+}
+
+/// [FPGA24] Returns whether the unit has variable latency.
+static bool hasVariableLatencyUnit(const DataflowGraphNode &node) {
+  if (node.type != DataflowGraphNode::REGULAR)
+    return false;
+  Operation *unit = node.op;
+  if (auto loadOp = dyn_cast<handshake::LoadOp>(unit)) {
+    auto memOp = findMemInterface(loadOp.getAddress());
+    if (isa_and_present<handshake::LSQOp>(memOp))
+      return true;
+  }
+
+  if (auto storeOp = dyn_cast<handshake::StoreOp>(unit)) {
+    auto memOp = findMemInterface(storeOp.getAddress());
+    if (isa_and_present<handshake::LSQOp>(memOp))
+      return true;
+  }
+
+  return false;
+}
+
+/// [FPGA24] Returns whether any node in the path has variable latency.
+static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
+                                   const DataflowSubgraphBase &graph) {
+  return std::any_of(nodeIds.begin(), nodeIds.end(), [&](NodeIdType nodeId) {
+    return hasVariableLatencyUnit(graph.nodes[nodeId]);
+  });
+}
+
+/// [FPGA24] Computes cycle latency expression.
+static LinExpr computeCycleLatency(const SimpleCycle &cycle,
+                                   const SynchronizingCyclesFinderGraph &graph,
+                                   const MILPVars &vars,
+                                   const TimingDatabase &timingDB,
+                                   double targetPeriod) {
+  LinExpr latency;
+
+  for (NodeIdType nodeId : cycle.nodes) {
+    const DataflowGraphNode &node = graph.nodes[nodeId];
+    if (node.type != DataflowGraphNode::REGULAR)
+      continue;
+    Operation *op = node.op;
+    auto unitLatencyOrFail =
+        timingDB.getLatency(op, SignalType::DATA, targetPeriod);
+    if (succeeded(unitLatencyOrFail))
+      latency += *unitLatencyOrFail;
+  }
+
+  auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId != dst)
+        continue;
+      return graph.edges[edgeId].channel;
+    }
+    llvm_unreachable("Edge not found");
+    return Value();
+  };
+
+  for (size_t i = 0; i < cycle.nodes.size(); ++i) {
+    NodeIdType src = cycle.nodes[i];
+    NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
+    Value channel = findChannel(src, dst);
+
+    if (vars.channelVars.count(channel))
+      latency += vars.channelVars.lookup(channel).dataLatency;
+  }
+
+  return latency;
+}
+
+/// [FPGA24] Computes cycle base latency.
+static double
+computeCycleBaseLatency(const SimpleCycle &cycle,
+                        const SynchronizingCyclesFinderGraph &graph,
+                        const TimingDatabase &timingDB, double targetPeriod) {
+  double latency = 0.0;
+  for (NodeIdType nodeId : cycle.nodes) {
+    const DataflowGraphNode &node = graph.nodes[nodeId];
+    if (node.type != DataflowGraphNode::REGULAR)
+      continue;
+    Operation *op = node.op;
+    auto unitLatencyOrFail =
+        timingDB.getLatency(op, SignalType::DATA, targetPeriod);
+    if (succeeded(unitLatencyOrFail))
+      latency += *unitLatencyOrFail;
+  }
+  return latency;
+}
+
+double BufferPlacementMILP::computeCycleForcedLatencyLowerBound(
+    const SimpleCycle &cycle,
+    const SynchronizingCyclesFinderGraph &graph) const {
+  double latency =
+      computeCycleBaseLatency(cycle, graph, timingDB, targetPeriod);
+
+  auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+    for (EdgeIdType edgeId : graph.adjList[src]) {
+      if (graph.edges[edgeId].dstId != dst)
+        continue;
+      return graph.edges[edgeId].channel;
+    }
+    llvm_unreachable("Edge not found");
+    return Value();
+  };
+
+  for (size_t i = 0; i < cycle.nodes.size(); ++i) {
+    NodeIdType src = cycle.nodes[i];
+    NodeIdType dst = cycle.nodes[(i + 1) % cycle.nodes.size()];
+    Value channel = findChannel(src, dst);
+
+    const auto *propsIt = channelProps.find(channel);
+    if (propsIt != channelProps.end() && propsIt->second.minOpaque > 0)
+      latency += 1.0;
+  }
+
+  return latency;
+}
+
+double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
+    Value channel, SignalType signalType) const {
+  if (!bufModel)
+    return 0.0;
+
+  unsigned bitwidth;
+  double delay = 0.0;
+  switch (signalType) {
+  case SignalType::DATA:
+    bitwidth = getHandshakeTypeBitWidth(channel.getType());
+    /// TODO: It's bad to discard this result, needs a safer way of querying for
+    /// this delay
+    (void)bufModel->getTotalDataDelay(bitwidth, delay);
+    return delay;
+  case SignalType::VALID:
+    return bufModel->getTotalValidDelay();
+  case SignalType::READY:
+    return bufModel->getTotalReadyDelay();
+  }
+}
+
+BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
+                                         int timeout, FuncInfo &funcInfo,
+                                         const TimingDatabase &timingDB,
+                                         double targetPeriod,
+                                         llvm::StringRef writeTo)
+    : MILP<BufferPlacement>(solverKind, timeout, writeTo), timingDB(timingDB),
+      targetPeriod(targetPeriod), funcInfo(funcInfo) {
+  initialize();
+}
+
+void BufferPlacementMILP::addChannelVars(Value channel,
+                                         ArrayRef<SignalType> signalTypes) {
+
+  // Default-initialize channel variables and retrieve a reference
+  ChannelVars &chVars = vars.channelVars[channel];
+  std::string suffix = "_" + getUniqueName(*channel.getUses().begin());
+
+  // Create a CPVar variable of the given name and type for the channel
+  auto createVar = [&](const llvm::Twine &name, VarType type) {
+    return model->addVar((name + suffix).str(), type, 0, std::nullopt);
+  };
+
+  // Signal-specific variables
+  for (SignalType sig : signalTypes) {
+    ChannelSignalVars &signalVars = chVars.signalVars[sig];
+    StringRef name = getSignalName(sig);
+    signalVars.path.tIn = createVar(name + "PathIn", REAL);
+    signalVars.path.tOut = createVar(name + "PathOut", REAL);
+    signalVars.bufPresent = createVar(name + "BufPresent", BOOLEAN);
+  }
+
+  // Variables for placement information
+  chVars.bufPresent = createVar("bufPresent", BOOLEAN);
+  chVars.bufNumSlots = createVar("bufNumSlots", INTEGER);
+  chVars.dataLatency = createVar("dataLatency", INTEGER);
+  chVars.shiftReg = createVar("shiftReg", BOOLEAN);
+}
+
+void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
+  // Create a set of variables for each CFDFC
+  std::string prefix = "cfdfc" + std::to_string(vars.cfdfcVars.size()) + "_";
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+
+  auto createVar = [&](const llvm::Twine &name) {
+    return model->addVar((prefix + name).str(), REAL, 0, std::nullopt);
+  };
+
+  // Create a set of variables for each unit in the CFDFC
+  for (Operation *unit : cfdfc.units) {
+    std::string suffix = "_" + getUniqueName(unit).str();
+
+    // Construct UnitVars from the op
+    // this assigns each operand and each result
+    // to one retiming path through the unit
+    UnitVars unitVars(unit);
+
+    // Then for each path through the unit
+    for (auto [pathIdx, pathVars] : llvm::enumerate(unitVars.retPathVarList)) {
+      // we need the latency through that path
+      // (since the occupancy of that path is related
+      // to its latency)
+
+      // try get the latency from the timingDB
+      auto pathLatencyOrFail =
+          timingDB.getLatency(unit, SignalType::DATA, targetPeriod, pathIdx);
+      if (succeeded(pathLatencyOrFail))
+        pathVars.latency = *pathLatencyOrFail;
+      else
+        // assume latency 0 if the timing model fails
+        pathVars.latency = 0.0;
+
+      // and we need to create retiming variables for the unit
+      // for the MILP to move channel occupancy around
+      pathVars.retIn =
+          createVar("retIn" + suffix + "_path" + std::to_string(pathIdx));
+      // combinatorial units (zero-latency) have occupancy zero
+      // and so don't need a retiming variable for their output
+      if (pathVars.latency.has_value() && *pathVars.latency == 0.0)
+        pathVars.retOut = pathVars.retIn;
+      else
+        // otherwise, the pipelined unit will have an occupancy in steady-state
+        // so the MILP needs a retiming variable to represent this
+        pathVars.retOut =
+            createVar("retOut" + suffix + "_path" + std::to_string(pathIdx));
+    }
+
+    // and store the MILP variables for that unit using the unit as key
+    cfVars.unitVars.insert({unit, std::move(unitVars)});
+  }
+
+  // Create a variable to represent the throughput of each CFDFC channel
+  for (Value channel : cfdfc.channels) {
+    cfVars.channelThroughputs[channel] =
+        createVar("throughput_" + getUniqueName(*channel.getUses().begin()));
+  }
+
+  // Create a variable for the CFDFC's throughput
+  cfVars.throughput = createVar("throughput");
+}
+
+void BufferPlacementMILP::populateCFDFCThroughputAndOccupancy() {
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+
+    cf->throughput = model->getValue(cfVars.throughput);
+
+    // Store the channel occupancy into the CFDFC data structure.
+    for (auto &[val, var] : cfVars.channelThroughputs) {
+      double occupancy = model->getValue(var);
+      // Approximate occupancy to 0 if it is negative but bigger than
+      // -MILP_EPSILON.
+      if (occupancy < 0.0 && occupancy > -MILP_EPSILON) {
+        occupancy = 0.0;
+      }
+      assert(occupancy >= 0.0 && "Channel occupancy must be non-negative!");
+      cf->channelOccupancy[val] = occupancy;
+    }
+  }
+}
+
+void BufferPlacementMILP::addChannelTimingConstraints(
+    Value channel, SignalType signalType, const TimingModel *bufModel,
+    ArrayRef<BufferingGroup> before, ArrayRef<BufferingGroup> after) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  double bigCst = targetPeriod * 10;
+
+  // Sum up conditional delays of buffers before the one that cuts the path
+  LinExpr bufsBeforeDelay;
+  for (const BufferingGroup &group : before)
+    bufsBeforeDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
+                       group.getCombinationalDelay(channel, signalType);
+
+  // Sum up conditional delays of buffers after the one that cuts the path
+  LinExpr bufsAfterDelay;
+  for (const BufferingGroup &group : after)
+    bufsAfterDelay += chVars.signalVars[group.getRefSignal()].bufPresent *
+                      group.getCombinationalDelay(channel, signalType);
+
+  ChannelBufProps &props = channelProps[channel];
+  ChannelSignalVars &signalVars = chVars.signalVars[signalType];
+  CPVar &t1 = signalVars.path.tIn;
+  CPVar &t2 = signalVars.path.tOut;
+  CPVar &bufPresent = signalVars.bufPresent;
+  auto [inBufDelay, outBufDelay] = getPortDelays(channel, signalType, bufModel);
+
+  // Arrival time at channel's output must be lower than target clock period
+  model->addConstr(t2 <= targetPeriod, "path_period");
+
+  // If a buffer is present on the signal's path, then the arrival time at the
+  // buffer's register must be lower than the clock period. The signal must
+  // propagate on the channel through all potential buffers cutting other
+  // signals before its own, and inside its own buffer's input pin logic
+  double preBufCstDelay = props.inDelay + inBufDelay;
+  model->addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
+                       targetPeriod,
+                   "path_bufferedChannelIn");
+
+  // If a buffer is present on the signal's path, then the arrival time at the
+  // channel's output must be greater than the propagation time through its own
+  // buffer's output pin logic and all potential buffers cutting other signals
+  // after its own
+  double postBufCstDelay = outBufDelay + props.outDelay;
+  model->addConstr(bufPresent * postBufCstDelay + bufsAfterDelay <= t2,
+                   "path_bufferedChannelOut");
+
+  // If there are no buffers cutting the signal's path, arrival time at
+  // channel's output must still propagate through entire channel and all
+  // potential buffers cutting through other signals
+  LinExpr unbufChannelDelay = bufsBeforeDelay + props.delay + bufsAfterDelay;
+  model->addConstr(t1 + unbufChannelDelay - bigCst * bufPresent <= t2,
+                   "path_unbufferedChannel");
+}
+
+void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
+                                                   SignalType signalType,
+                                                   ChannelFilter filter) {
+  // Add path constraints for units
+  double latency = 0.0;
+  auto latencyOrFail = timingDB.getLatency(unit, signalType, targetPeriod);
+  if (succeeded(latencyOrFail))
+    latency = *latencyOrFail;
+
+  if (latency == 0.0) {
+    double delay;
+    if (failed(timingDB.getTotalDelay(unit, signalType, delay)))
+      delay = 0.0;
+
+    if (auto shiftOp = dyn_cast<ShiftLikeArithOpInterface>(unit)) {
+      // Check if the operation is a shift operation with a constant shift value
+      // If yes, the operation has a zero delay.
+      if (signalType == SignalType::DATA && shiftOp.isShiftByConstant()) {
+        delay = 0.0;
+      }
+    }
+
+    // The delay of the unit must be positive.
+    delay = std::max(delay, 0.001);
+
+    // The unit is not pipelined, add a path constraint for each input/output
+    // port pair in the unit
+    forEachIOPair(unit, [&](Value in, Value out) {
+      // The input/output channels must both be inside the CFDFC union
+      if (!filter(in) || !filter(out))
+        return;
+
+      // Flip channels on ready path which goes upstream
+      if (signalType == SignalType::READY)
+        std::swap(in, out);
+
+      CPVar &tInPort = vars.channelVars[in].signalVars[signalType].path.tOut;
+      CPVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
+      // Arrival time at unit's output port must be greater than arrival
+      // time at unit's input port + the unit's combinational data delay
+      model->addConstr(tOutPort >= tInPort + delay, "path_combDelay");
+    });
+
+    return;
+  }
+
+  // The unit is pipelined, add a constraint for every of the unit's inputs
+  // and every of the unit's output ports
+
+  // Input port constraints
+  for (Value in : unit->getOperands()) {
+    if (!filter(in))
+      continue;
+
+    double inPortDelay;
+    if (failed(
+            timingDB.getPortDelay(unit, signalType, PortType::IN, inPortDelay)))
+      inPortDelay = 0.0;
+
+    TimeVars &path = vars.channelVars[in].signalVars[signalType].path;
+    CPVar &tInPort = path.tOut;
+    // Arrival time at unit's input port + input port delay must be less
+    // than the target clock period
+    model->addConstr(tInPort + inPortDelay <= targetPeriod, "path_inDelay");
+  }
+
+  // Output port constraints
+  for (OpResult out : unit->getResults()) {
+    if (!filter(out))
+      continue;
+
+    double outPortDelay;
+    if (failed(timingDB.getPortDelay(unit, signalType, PortType::OUT,
+                                     outPortDelay)))
+      outPortDelay = 0.0;
+
+    TimeVars &path = vars.channelVars[out].signalVars[signalType].path;
+    CPVar &tOutPort = path.tIn;
+    // Arrival time at unit's output port is equal to the output port delay
+    model->addConstr(tOutPort == outPortDelay, "path_outDelay");
+  }
+}
+
+void BufferPlacementMILP::addBufferPresenceConstraints(Value channel) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  CPVar &bufPresent = chVars.bufPresent;
+  CPVar &bufNumSlots = chVars.bufNumSlots;
+
+  // If there is at least one slot, there must be a buffer
+  model->addConstr(bufNumSlots <= 100 * bufPresent, "buffer_presence");
+
+  for (auto &[sig, signalVars] : chVars.signalVars) {
+    // If there is a buffer present on a signal, then there is a buffer present
+    // on the channel
+    model->addConstr(signalVars.bufPresent <= bufPresent,
+                     getSignalName(sig).str() + "_Presence");
+  }
+}
+
+void BufferPlacementMILP::addBufferLatencyConstraints(Value channel) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  CPVar &bufNumSlots = chVars.bufNumSlots;
+  CPVar &dataBuf = chVars.signalVars[SignalType::DATA].bufPresent;
+  CPVar &validBuf = chVars.signalVars[SignalType::VALID].bufPresent;
+  CPVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+  CPVar &dataLatency = chVars.dataLatency;
+
+  // There is a buffer breaking data & valid iff dataLatency > 0
+  model->addConstr(dataLatency <= 100 * dataBuf, "dataBuf_if_dataLatency");
+  model->addConstr(dataLatency <= 100 * validBuf, "validBuf_if_dataLatency");
+  model->addConstr(dataLatency >= dataBuf, "dataLatency_if_dataBuf");
+  model->addConstr(dataLatency >= validBuf, "dataLatency_if_validBuf");
+
+  // The dataBuf and validBuf must be equal
+  // This constraint is not necessary, but may assist presolve.
+  model->addConstr(dataBuf == validBuf, "dataBuf_validBuf_equal");
+  // There must be enough slots for data and ready buffers.
+  model->addConstr(dataLatency + readyBuf <= bufNumSlots, "slot_sufficiency");
+}
+
+void BufferPlacementMILP::addBufferingGroupConstraints(
+    Value channel, ArrayRef<BufferingGroup> bufGroups) {
+
+  ChannelVars &chVars = vars.channelVars[channel];
+  CPVar &bufNumSlots = chVars.bufNumSlots;
+
+  // Compute the sum of the binary buffer presence over all signals that have
+  // different buffers
+  LinExpr disjointBufPresentSum;
+  for (const BufferingGroup &group : bufGroups) {
+    CPVar &groupBufPresent = chVars.signalVars[group.getRefSignal()].bufPresent;
+    disjointBufPresentSum += groupBufPresent;
+
+    // For each group, the binary buffer presence variable of different signals
+    // must be equal
+    StringRef refName = getSignalName(group.getRefSignal());
+    for (SignalType sig : group.getOtherSignals()) {
+      StringRef otherName = getSignalName(sig);
+      model->addConstr(groupBufPresent == chVars.signalVars[sig].bufPresent,
+                       "elastic_" + refName.str() + "_same_" + otherName.str());
+    }
+  }
+
+  // There must be enough slots for all disjoint buffers
+  model->addConstr(disjointBufPresentSum <= bufNumSlots, "elastic_slots");
+}
+
+void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
+
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Value channel : cfdfc.channels) {
+    // Get the operations, operand number, and result number
+    // of this channel
+    Operation *srcOp = channel.getDefiningOp();
+    Operation *dstOp = *channel.getUsers().begin();
+    unsigned dstOperandIdx = channel.use_begin()->getOperandNumber();
+    unsigned srcResultIdx = cast<OpResult>(channel).getResultNumber();
+
+    /// No throughput constraints on channels going to stores which
+    /// are not connected to the LSQ. In the legacy implementation,
+    /// MCStoreOp and LSQStoreOp were used to distinguish between
+    /// stores that are connected to the LSQ and those that are not.
+    /// In the new implementation, we use the MemInterfaceAttr to determine
+    /// whether the StoreOp is connected to the LSQ or not.
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(dstOp)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (isa<handshake::LSQOp>(memOp))
+        continue;
+    }
+
+    /// TODO: The legacy implementation does not add any constraints here for
+    /// the input channel to select operations that is less frequently
+    /// executed. Temporarily, emulate the same behavior obtained from passing
+    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// the least executed one
+    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+      if (channel == selOp.getTrueValue())
+        continue;
+
+    // Retrieve the struct storing MILP variables
+    // for the src op and dst op
+    UnitVars &srcVars = cfVars.getUnitVarsFor(srcOp);
+    UnitVars &dstVars = cfVars.getUnitVarsFor(dstOp);
+
+    // get the MILP variable for the channels throughput
+    CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
+
+    // get the MILP variable for the retiming variables
+    // for the top and bottom of the channel
+    CPVar &retSrc = srcVars.getRetOut(srcResultIdx);
+    CPVar &retDst = dstVars.getRetIn(dstOperandIdx);
+
+    // get if the channel is a backedge as an integer
+    unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+
+    // If the channel isn't a backedge, its steady-state occupancy
+    // equals the difference between the fluid retiming variables
+    // of the producer and consumer.
+    // We initially place a token in the CFDFC at the loop's backedge
+    // so if the channel is a backedge, the occupancy is 1 more
+    // than the difference
+    //
+    // occupancy of the channel places a limit on throughput
+    // if a buffer breaking data and valid is placed on the channel
+    model->addConstr(chTokenOccupancy == backedge + retDst - retSrc,
+                     "throughput_channelRetiming");
+  }
+}
+
+void BufferPlacementMILP::
+    addChannelThroughputConstraintsForBinaryLatencyChannel(CFDFC &cfdfc) {
+
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Value channel : cfdfc.channels) {
+    // Get the ports the channels connect and their retiming MILP variables
+    Operation *dstOp = *channel.getUsers().begin();
+
+    /// TODO: The legacy implementation does not add any constraints here for
+    /// the input channel to select operations that is less frequently
+    /// executed. Temporarily, emulate the same behavior obtained from passing
+    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// the least executed one
+    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+      if (channel == selOp.getTrueValue())
+        continue;
+
+    // The channel must have variables for the data signal
+    ChannelVars &chVars = vars.channelVars[channel];
+    auto dataVars = chVars.signalVars.find(SignalType::DATA);
+    bool dataFound = dataVars != chVars.signalVars.end();
+    assert(dataFound && "missing data signal variables on channel variables");
+
+    // Retrieve the MILP variables we need
+    CPVar &dataBuf = dataVars->second.bufPresent;
+    CPVar &bufNumSlots = chVars.bufNumSlots;
+    CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
+
+    // The channel's throughput cannot exceed the number of buffer slots.
+    model->addConstr(chTokenOccupancy <= bufNumSlots, "throughput_channel");
+
+    // In the FPGA'20 paper:
+    // - Buffers are assumed to break all signals simultaneously.
+    // - Therefore: dataBuf == readyBuf
+    //              R_c == dataBuf && readyBuf
+    // - If R_c holds, then:
+    //     - token occupancy >= CFDFC's throughput
+    //     - bubble occupancy >= CFDFC's throughput
+    //
+    // (#427) In this implementation, R_c is decomposed into dataBuf and
+    // readyBuf.
+    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput;
+    //    otherwise, token occupancy >= 0.
+    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput;
+    //    otherwise, bubble occupancy >= 0.
+
+    // The following constraint encodes:
+    // 1. If dataBuf holds, then token occupancy >= CFDFC's throughput;
+    //    otherwise, token occupancy >= 0 (enforced by the variable’s lower
+    //    bound).
+    model->addConstr(cfVars.throughput - chTokenOccupancy + dataBuf <= 1,
+                     "throughput_data");
+    // In terms of the constraint on readyBuf:
+    // 2. If readyBuf holds, then bubble occupancy >= CFDFC's throughput;
+    //    otherwise, bubble occupancy >= 0.
+    // This constraint can be combined with the constraint on the number of
+    // buffer slots:
+    // -  token occupancy + bubble occupancy <= numSlots
+    // Assuming that we minimize the number of buffer slots, bubble occupancy
+    // always takes the minimum feasible value. Therefore, the combined
+    // constraints are equivalent to:
+    // If dataBuf holds, then token occupancy + CFDFC's throughput <= numSlots;
+    // otherwise, token occupancy <= numSlots. (Already enforced by the earlier
+    // constraint named "throughput_channel")
+    // The following constraint encodes the case where readyBuf holds, and is
+    // trivially satisfied when readyBuf does not hold (since the earlier
+    // constraint already enforces it):
+    if (chVars.signalVars.count(SignalType::READY)) {
+      auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+      model->addConstr(
+          chTokenOccupancy + cfVars.throughput + readyBuf - bufNumSlots <= 1,
+          "throughput_ready");
+    }
+    // Note: Additional buffers may be needed to prevent combinational cycles
+    // if the model does not select all three signals (or only selects DATA).
+    // See extractResult() in FPGA20Buffers.cpp for an example.
+  }
+}
+
+void BufferPlacementMILP::
+    addChannelThroughputConstraintsForIntegerLatencyChannel(CFDFC &cfdfc) {
+
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  for (Value channel : cfdfc.channels) {
+    // Get the ports the channels connect and their retiming MILP variables
+    Operation *dstOp = *channel.getUsers().begin();
+
+    /// TODO: The legacy implementation does not add any constraints here for
+    /// the input channel to select operations that is less frequently
+    /// executed. Temporarily, emulate the same behavior obtained from passing
+    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// the least executed one
+    if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
+      if (channel == selOp.getTrueValue())
+        continue;
+
+    // The channel must have variables for the data and ready signals
+    ChannelVars &chVars = vars.channelVars[channel];
+    auto dataVars = chVars.signalVars.find(SignalType::DATA);
+    auto readyVars = chVars.signalVars.find(SignalType::READY);
+    bool dataFound = dataVars != chVars.signalVars.end();
+    bool readyFound = readyVars != chVars.signalVars.end();
+    assert(dataFound && "missing data signal variables on channel variables");
+    assert(readyFound && "missing ready signal variables on channel variables");
+
+    // Retrieve the MILP variables we need
+    CPVar &bufNumSlots = chVars.bufNumSlots;
+    CPVar &chTokenOccupancy = cfVars.channelThroughputs[channel];
+    CPVar &throughput = cfVars.throughput;
+    CPVar &dataLatency = chVars.dataLatency;
+    CPVar &readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
+    CPVar &shiftReg = chVars.shiftReg;
+
+    // Token occupancy >= data latency * CFDFC's throughput.
+    model->addQConstr(dataLatency * throughput <= chTokenOccupancy,
+                      "throughput_tokens_lb");
+    std::string channelName = getUniqueName(*channel.getUses().begin());
+    std::string shiftRegExtraBubblesName = "shiftReg_ub_" + channelName;
+    // Shift registers have more bubbles if II is higher than 1 (i.e.,
+    // throughput < 1). In a shift register, every slot forwards data
+    // simultaneously, but new tokens only arrive every II cycles. This means
+    // that among every II consecutive slots, only one contains a token while
+    // the rest are bubbles. Therefore, token occupancy is lower compared to
+    // other buffer types with the same slot number.
+    //
+    // Create an intermediate variable to represent the extra bubbles
+    // of the SHIFT_REG_BREAK_DV buffer.
+    CPVar shiftRegExtraBubbles =
+        model->addVar(shiftRegExtraBubblesName, INTEGER, 0, std::nullopt);
+
+    // The extra bubbles of SHIFT_REG_BREAK_DV buffer is at least its slot
+    // number (dataLatency) minus the ceiling of the product of data latency and
+    // CFDFC throughput.
+    // We approximate the ceiling function numerically to keep the model linear.
+    model->addQConstr(shiftRegExtraBubbles >=
+                          dataLatency - dataLatency * throughput - 0.99,
+                      shiftRegExtraBubblesName);
+
+    // Combine the following into a unified constraint:
+    // 1. If readyBuf is used, bubble occupancy limits the CFDFC's throughput,
+    //    i.e., bubble occupancy >= CFDFC's throughput;
+    //    otherwise, bubble occupancy >= 0.
+    // 2. Token occupancy + bubble occupancy <= slot number.
+    // 3. Extra bubbles if SHIFT_REG_BREAK_DV is used.
+    // Since there is no others reason to have more bubbles, the optimal
+    // (minimum value) of the bubble due to readyBuf is the same as CFDFC's
+    // throughput. Therefore, constraint 1 becomes:
+    // 1. If readyBuf is used, bubble occupancy = CFDFC's throughput;
+    //    otherwise, bubble occupancy = 0.
+    // As a result, we model bubble occupancy as 'readyBuf * throughput'. This
+    // term can be linearized, but it is not necessary because this is a
+    // quadratic constaint.
+    model->addQConstr(chTokenOccupancy + readyBuf * throughput +
+                              shiftReg * shiftRegExtraBubbles <=
+                          bufNumSlots,
+                      "throughput_tokens_ub");
+  }
+}
+
+void BufferPlacementMILP::addUnitThroughputConstraints(CFDFC &cfdfc) {
+  // get the MILP variables for the cfdfc
+  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
+  // for each unit
+  for (Operation *unit : cfdfc.units) {
+    // get the MILP variables for that unit in this cfdfc
+    UnitVars &unitVars = cfVars.getUnitVarsFor(unit);
+
+    // enforce that the variables have been initialized correctly
+    // (debug mode only)
+    unitVars.validate();
+
+    // For each retiming path through the unit
+    for (RetPathVars &retPath : unitVars.retPathVarList) {
+      double latency = *retPath.latency;
+      // zero-latency units do not require a certain occupancy
+      // to achieve a certain throughput
+      if (latency == 0.0)
+        continue;
+
+      // to achieve a certain steady-state throughput
+      // units with a latency *must* have a steady-state occupancy
+      // equal to that throughput by their latency
+      model->addConstr(cfVars.throughput * latency ==
+                           *retPath.retOut - *retPath.retIn,
+                       "through_unitRetiming");
+    }
+  }
+}
+
+void BufferPlacementMILP::addBlackboxConstraints(
+    Value channel, const std::map<unsigned int, double> &addDelays,
+    const std::map<unsigned int, double> &cmpDelays) {
+  Operation *definingOp = channel.getDefiningOp();
+  std::map<unsigned int, double> delays;
+
+  // Blackbox constraints are only added for ADDI, SUBI and CMPI operations
+  if (isa_and_present<handshake::AddIOp>(definingOp) ||
+      isa_and_present<handshake::SubIOp>(definingOp)) {
+    delays = addDelays;
+  } else if (isa_and_present<handshake::CmpIOp>(definingOp)) {
+    delays = cmpDelays;
+  } else {
+    return;
+  }
+
+  auto bitwidth =
+      handshake::getHandshakeTypeBitWidth(definingOp->getOperand(0).getType());
+
+  // Components are blackboxed only if their bitwidth is more than 4
+  if (bitwidth <= 4)
+    return;
+
+  auto getDelay = [](const std::map<unsigned int, double> &delayTable,
+                     unsigned int bitwidth) {
+    auto it = delayTable.lower_bound(bitwidth);
+    if (it == delayTable.end() || it->first != bitwidth) {
+      it = delayTable.upper_bound(bitwidth);
+    }
+    return it != delayTable.end() ? it->second : 0.0;
+  };
+
+  double delay = getDelay(delays, bitwidth);
+
+  for (unsigned int i = 0; i < definingOp->getNumOperands(); i++) {
+    // Looping over the input channels of the blackbox operation
+    Value inputChannel = definingOp->getOperand(i);
+
+    // Path In variable of the channel that comes after blackbox module (output
+    // of blackbox)
+    CPVar &outputPathIn =
+        vars.channelVars[channel].signalVars[SignalType::DATA].path.tIn;
+
+    // Path Out variable of the channel that comes before blackbox module (input
+    // of blackbox)
+    CPVar &inputPathOut =
+        vars.channelVars[inputChannel].signalVars[SignalType::DATA].path.tOut;
+
+    // Delay propagation constraint for blackbox nodes. Delay propagates through
+    // input edges to output edges, increasing by delay variable.
+    model->addConstr(inputPathOut + delay == outputPathIn,
+                     "blackbox_constraint_" + std::to_string(bitwidth));
+  }
+}
+
+void BufferPlacementMILP::addCutSelectionConstraints(
+    std::vector<experimental::Cut> &cutVector) {
+  LinExpr cutSelectionSum = 0;
+  for (size_t i = 0; i < cutVector.size(); ++i) {
+    // Loop over cuts of the node
+    auto &cut = cutVector[i];
+    // Add cut selection variable to the CPVar model
+    CPVar &cutSelection = cut.getCutSelectionVariable();
+    cutSelection = model->addVar(
+        (cut.getNode()->str() + "__CutSelection_" + std::to_string(i)), BOOLEAN,
+        0, std::nullopt);
+    cutSelectionSum += cutSelection;
+  }
+  // Cut Selection Constraint. Only a single cut of a node can be selected.
+  // This affects delay propagation, as delay will propagate through the chosen
+  // cut.
+  model->addConstr(cutSelectionSum == 1, "cut_selection_constraint");
+}
+
+void BufferPlacementMILP::addCutSelectionConflicts(
+    experimental::Node *root, experimental::Node *leaf, CPVar &cutSelectionVar,
+    experimental::LogicNetwork *blifData,
+    std::vector<experimental::Node *> &path) {
+  // Loop over edges in the path from the leaf to the root.
+  for (auto &nodePath : path) {
+    if (nodePath->nodeMLIRValue) {
+      // Add the Cut Selection Conflict Constraints. An LUT cannot cover an edge
+      // if it is cut by a buffer, as LUTs cannot cover multiple sequential
+      // stages. This constraint ensures an edge is either covered by a LUT, or
+      // a buffer is inserted on the edge.
+      model->addConstr(1 >= nodePath->subjectGraphVars->bufferVar +
+                                cutSelectionVar,
+                       "cut_selection_conflict");
+    }
+  }
+}
+
+void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
+  for (auto *node : blifData->getNodesInTopologicalOrder()) {
+    // CPVar variables of the node
+    CPVar &nodeVarIn = node->subjectGraphVars->tIn;
+    CPVar &nodeVarOut = node->subjectGraphVars->tOut;
+    CPVar &bufVarSignal = node->subjectGraphVars->bufferVar;
+
+    // If the AIG node is a channel, match the CPVar variables of the AIG
+    // node with channel variables
+    if (Value nodeChannel = node->nodeMLIRValue) {
+      std::string nodeName = node->str();
+      SignalType signalType = SignalType::DATA;
+      if (nodeName.find("ready") != std::string::npos)
+        signalType = SignalType::READY;
+      else if (nodeName.find("valid") != std::string::npos)
+        signalType = SignalType::VALID;
+
+      // Retrieve the channel variable corresponding to the AIG node
+      ChannelSignalVars &signalVars =
+          vars.channelVars[nodeChannel].signalVars[signalType];
+
+      nodeVarIn = signalVars.path.tIn;
+      nodeVarOut = signalVars.path.tOut;
+      bufVarSignal = signalVars.bufPresent;
+    } else {
+      // Create the timing variable for Subject Graph Node. These Nodes need
+      // only 1 timing variable, as no buffers can be placed between them.
+      nodeVarIn = model->addVar(node->str(), REAL, 0, std::nullopt);
+      nodeVarOut = nodeVarIn;
+    }
+  }
+}
+
+void BufferPlacementMILP::addClockPeriodConstraintsNodes(
+    experimental::LogicNetwork *blifData) {
+  for (auto *node : blifData->getNodesInTopologicalOrder()) {
+    // CPVar variables of the node
+    CPVar &nodeVarIn = node->subjectGraphVars->tIn;
+    CPVar &nodeVarOut = node->subjectGraphVars->tOut;
+    CPVar &bufVarSignal = node->subjectGraphVars->bufferVar;
+
+    // Add timing constraints for the node.
+    if (Value nodeChannel = node->nodeMLIRValue) {
+      std::string nodeName = node->str();
+
+      // Add clock period constraints
+      model->addConstr(nodeVarIn <= targetPeriod, "pathIn_period");
+      model->addConstr(nodeVarOut <= targetPeriod, "pathOut_period");
+      model->addConstr(nodeVarOut - nodeVarIn + 100 * bufVarSignal >= 0,
+                       "buf_delay");
+    } else {
+      // If the node is a Primary Input, the delay is 0.
+      model->addConstr(nodeVarIn <= (node->isPrimaryInput() ? 0 : targetPeriod),
+                       node->isPrimaryInput() ? "input_delay"
+                                              : "clock_period_constraint");
+    }
+  }
+}
+
+void BufferPlacementMILP::addDelayAndCutConflictConstraints(
+    experimental::Node *root, std::vector<experimental::Cut> &cutVector,
+    experimental::LogicNetwork *blifData, double lutDelay) {
+  // Using cuts map to loop over subject graph edges, and adds delay
+  // propagation constraints to the nodes that have cuts
+  CPVar &nodeVar = root->subjectGraphVars->tIn;
+  std::set<experimental::Node *> fanIns = root->fanins;
+
+  if (fanIns.size() == 1) {
+    // If a node has single fanin, then it is not mapped to LUT. The
+    // delay of the node is simply equal to the delay of the fanin.
+    CPVar &faninVar = (*fanIns.begin())->subjectGraphVars->tOut;
+    model->addConstr(nodeVar >= faninVar, "single_fanin_delay");
+    return;
+  }
+
+  for (auto &cut : cutVector) {
+    // Loop over the cuts of the subject graph edge
+    CPVar &cutSelectionVar = cut.getCutSelectionVariable();
+    auto addDelayPropagationConstraint = [&](experimental::Node *leaf,
+                                             const char *name) {
+      CPVar &leafVar = leaf->subjectGraphVars->tOut;
+      // Add delay propagation constraint
+      model->addConstr(
+          nodeVar + (1 - cutSelectionVar) * 100 >= leafVar + lutDelay, name);
+    };
+
+    auto &leaves = cut.getLeaves();
+
+    // Trivial cut. Delay is propagated from the fanins of the root
+    if ((leaves.size() == 1) && (*leaves.begin() == root)) {
+      for (auto &fanIn : fanIns) {
+        addDelayPropagationConstraint(fanIn, "trivial_cut_delay");
+      }
+      continue;
+    }
+
+    // Loop over leaves of the cut
+    for (auto *leaf : leaves) {
+      addDelayPropagationConstraint(leaf, "delay_propagation");
+    }
+  }
+}
+
+std::vector<Value> BufferPlacementMILP::findMinimumFeedbackArcSet() {
+  std::vector<Value> channelsToBuffer;
+
+  std::unique_ptr<CPSolver> modelFeedback;
+
+  // clang-format off
+#ifdef DYNAMATIC_ENABLE_CBC
+  if (isa<CbcSolver>(this->model)) {
+    modelFeedback = std::make_unique<CbcSolver>();
+  } else
+#endif // DYNAMATIC_ENABLE_CBC
+#ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
+  if (isa<GurobiSolver>(this->model)) {
+    modelFeedback = std::make_unique<GurobiSolver>();
+  } else
+#endif // DYNAMATIC_GUROBI_NOT_INSTALLED
+  {
+    llvm_unreachable("Aborting on unimplemented solver type!");
+  }
+  // clang-format on
+
+  // Maps operations to GRBVars that holds the topological order index of MLIR
+  // Operations
+  DenseMap<Operation *, CPVar> opToGRB;
+
+  funcInfo.funcOp.walk([&](Operation *op) {
+    // Create a CPVar variable for each operation, which will hold the order of
+    // the Operation in the topological ordering
+    StringRef uniqueName = getUniqueName(op);
+    CPVar operationVariable =
+        modelFeedback->addVar(uniqueName.str(), INTEGER, 0, std::nullopt);
+    opToGRB[op] = operationVariable;
+  });
+
+  DenseMap<std::pair<Operation *, Operation *>, CPVar> edgeToOps;
+
+  funcInfo.funcOp.walk([&](Operation *op) {
+    // Add the constraint that forces topological ordering among adjacent
+    // operations
+    for (unsigned idxResult = 0; idxResult < op->getNumResults(); idxResult++) {
+      for (auto &use : op->getResult(idxResult).getUses()) {
+        Operation *user = use.getOwner();
+        unsigned idxOperand = use.getOperandNumber();
+        CPVar currentOpVar = opToGRB[op];
+        CPVar userOpVar = opToGRB[user];
+        const std::string edgeName =
+            (getUniqueName(op) + "_out_" + std::to_string(idxResult) + "_" +
+             getUniqueName(user) + "_in_" + std::to_string(idxOperand))
+                .str();
+        CPVar edge = modelFeedback->addVar(edgeName, BOOLEAN, 0, 1);
+        edgeToOps[std::make_pair(op, user)] = edge;
+        // This constraint enforces topological order, by forcing successor
+        // operations to have a bigger larger index in the topological order
+        // than their predecessors. If such an order cannot be satisfied with
+        // the given set of nodes, "edge" variable is set to 1, which means the
+        // edge needs to be cut to have an acyclic graph.
+        modelFeedback->addConstr(userOpVar - currentOpVar + 100 * edge >= 1,
+                                 "operation_order");
+      }
+    }
+  });
+
+  // Minimize the number of edges that needs to be removed
+  LinExpr obj = 0;
+  for (const auto &entry : edgeToOps) {
+    obj += entry.second;
+  }
+
+  // Minimizing: maximizing the minus
+  modelFeedback->setMaximizeObjective(-obj);
+
+  // Solve the model
+  modelFeedback->optimize();
+
+  // Loop over CPVar Variables (edgeVar) to see which Channels are chosen
+  // to be cut with buffers.
+  for (const auto &entry : edgeToOps) {
+    auto ops = entry.first;
+    auto edgeVar = entry.second;
+    auto *inputOp = ops.first;
+    auto *outputOp = ops.second;
+
+    if (modelFeedback->getValue(edgeVar) > 0) {
+      for (Value channel : outputOp->getOperands()) {
+        // no buffers on MCs because they form self loops
+        if (!channel.getDefiningOp<handshake::MemoryOpInterface>() &&
+            !isa<handshake::MemoryOpInterface>(*channel.getUsers().begin())) {
+          if (channel.getDefiningOp() == inputOp) {
+            channelsToBuffer.emplace_back(channel);
+          }
+        }
+      }
+    }
+  }
+
+  return channelsToBuffer;
+}
+
+void BufferPlacementMILP::cutGraphEdges(Value channel) {
+  Operation *producer = channel.getDefiningOp();
+  Operation *consumer = *channel.getUsers().begin();
+  //
+  CPVar &bufVar =
+      vars.channelVars[channel].signalVars[SignalType::READY].bufPresent;
+  model->addConstr(bufVar == 1, "backedge_ready");
+
+  CPVar &bufVarData =
+      vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
+  model->addConstr(bufVarData == 1, "backedge_data");
+  // Insert buffers in the Subject Graph
+  experimental::BufferSubjectGraph::createAndInsertNewBuffer(
+      producer, consumer, "one_slot_break_dvr");
+}
+
+unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
+  Operation *srcOp = channel.getDefiningOp();
+  if (!srcOp)
+    // A channel which originates from a function argument executes only once
+    return 1;
+
+  // Iterate over all CFDFCs which contain the channel to determine its total
+  // number of executions. Backedges are executed one less time than "forward
+  // edges" since they are only taken between executions of the cycle the CFDFC
+  // represents
+  unsigned numExec = isBackedge(channel) ? 0 : 1;
+  for (auto &[cfdfc, _] : funcInfo.cfdfcs)
+    if (cfdfc->channels.contains(channel))
+      numExec += cfdfc->numExecs;
+  return numExec;
+}
+
+void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
+                                                    ArrayRef<CFDFC *> cfdfcs) {
+  // Compute the total number of executions over channels that are part of any
+  // CFDFC
+  unsigned totalExecs = 0;
+  for (Value channel : channels) {
+    totalExecs += getChannelNumExecs(channel);
+  }
+
+  // Create the expression for the MILP objective
+  LinExpr objective;
+
+  // For each CFDFC, add a throughput contribution to the objective, weighted
+  // by the "importance" of the CFDFC
+  double maxCoefCFDFC = 0.0;
+  double fTotalExecs = static_cast<double>(totalExecs);
+  if (totalExecs != 0) {
+    for (CFDFC *cfdfc : cfdfcs) {
+      double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+      objective += coef * vars.cfdfcVars[cfdfc].throughput;
+      maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
+    }
+  }
+
+  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
+  // coefficient to any positive value
+  if (maxCoefCFDFC == 0.0)
+    maxCoefCFDFC = 1.0;
+
+  // For each channel, add a "penalty" in case a buffer is added to the channel,
+  // and another penalty that depends on the number of slots
+  double bufPenaltyMul = 1e-4;
+  double slotPenaltyMul = 1e-5;
+  for (Value channel : channels) {
+    ChannelVars &chVars = vars.channelVars[channel];
+    objective -= maxCoefCFDFC * bufPenaltyMul * chVars.bufPresent;
+    objective -= maxCoefCFDFC * slotPenaltyMul * chVars.bufNumSlots;
+  }
+
+  // Finally, set the MILP objective
+  model->setMaximizeObjective(objective);
+}
+
+void BufferPlacementMILP::addBufferAreaAwareObjective(
+    ValueRange channels, ArrayRef<CFDFC *> cfdfcs) {
+  // Compute the total number of executions over channels that are part of any
+  // CFDFC
+  unsigned totalExecs = 0;
+  for (Value channel : channels) {
+    totalExecs += getChannelNumExecs(channel);
+  }
+
+  // Create the expression for the MILP objective
+  LinExpr objective = 0;
+
+  // For each CFDFC, add a throughput contribution to the objective, weighted
+  // by the "importance" of the CFDFC
+  double maxCoefCFDFC = 0.0;
+  double fTotalExecs = static_cast<double>(totalExecs);
+  if (totalExecs != 0) {
+    for (CFDFC *cfdfc : cfdfcs) {
+      double coef = (cfdfc->channels.size() * cfdfc->numExecs) / fTotalExecs;
+      objective += coef * vars.cfdfcVars[cfdfc].throughput;
+      maxCoefCFDFC = std::max(coef, maxCoefCFDFC);
+    }
+  }
+
+  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
+  // coefficient to any positive value
+  if (maxCoefCFDFC == 0.0)
+    maxCoefCFDFC = 1.0;
+
+  // The following parameters control penalties in the MILP objective. The
+  // penalty for buffer presence is an empirical value, consistent with
+  // 'addMaxThroughputObjective'. The slot penalties for each buffer type are
+  // rough estimates, based on the number of LUTs as logic observed when each
+  // buffer type was synthesized individually. To adjust these parameters during
+  // tuning, simply modify the values here.
+
+  // For each channel, add a "penalty" in case a buffer is added to the channel,
+  // and another penalty that depends on the number of slots
+  double bufPenaltyMul = 1e-4;
+  // In general, buffers that break data paths have a lower area cost per slot,
+  // while other types incur a higher cost
+  double largeSlotPenaltyMul = 1e-4;
+  double smallSlotPenaltyMul = 1e-5;
+  // For SHIFT_REG_BREAK_DV, a small area cost is incurred when the buffer
+  // exists Increasing the slot number only requires additional registers, not
+  // LUTs We assign a minimal cost only to constrain its slot number
+  double shiftRegPenaltyMul = 1e-5;
+  double shiftRegSlotPenaltyMul = 1e-7;
+  for (Value channel : channels) {
+    ChannelVars &chVars = vars.channelVars[channel];
+    CPVar &bufPresent = chVars.bufPresent;
+    CPVar &bufNumSlots = chVars.bufNumSlots;
+    CPVar &dataLatency = chVars.dataLatency;
+    CPVar &shiftReg = chVars.shiftReg;
+    objective -= maxCoefCFDFC * bufPenaltyMul * bufPresent;
+    objective -=
+        maxCoefCFDFC * largeSlotPenaltyMul * (bufNumSlots - dataLatency);
+    objective -= maxCoefCFDFC * shiftRegPenaltyMul * shiftReg;
+
+    // Linearization of dataLatency * shiftReg
+    CPVar latencyMulShiftReg =
+        model->addVar("latencyMulShiftReg", INTEGER, 0, 100);
+    model->addConstr(latencyMulShiftReg <= dataLatency);
+    model->addConstr(latencyMulShiftReg <= 100 * shiftReg);
+    model->addConstr(latencyMulShiftReg >= dataLatency - (1 - shiftReg) * 100);
+    objective -=
+        maxCoefCFDFC * smallSlotPenaltyMul * (dataLatency - latencyMulShiftReg);
+    objective -= maxCoefCFDFC * shiftRegSlotPenaltyMul * latencyMulShiftReg;
+  }
+
+  // Finally, set the MILP objective
+  model->setMaximizeObjective(objective);
+}
+
+void BufferPlacementMILP::addLatencyBalancingVars(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs) {
+  for (auto &[channel, _] : channelProps) {
+    if (isa<MemRefType>(channel.getType()))
+      continue;
+    std::string name = getUniqueName(*channel.getUses().begin());
+    ChannelVars &chVars = vars.channelVars[channel];
+
+    /// L_c: extra latency to add to the channel for balancing (integer >= 0).
+    chVars.dataLatency = model->addVar("L_" + name, INTEGER, 0, std::nullopt);
+    /// S_c: whether the channel is stalled due to imbalance (binary).
+    chVars.stalled = model->addVar("S_" + name, BOOLEAN, 0, 1);
+    /// R_c: whether the channel has L > 0, i.e., channel cut (binary).
+    chVars.bufPresent = model->addVar("R_" + name, BOOLEAN, 0, 1);
+  }
+
+  addBufferPresenceLinkConstraints();
+  addReconvergentPathVars(reconvergentPaths);
+  addSyncCycleVars(syncCyclePairs);
+}
+
+void BufferPlacementMILP::addBufferPresenceLinkConstraints() {
+  for (auto &[channel, chVars] : vars.channelVars) {
+    std::string name = getUniqueName(*channel.getUses().begin());
+    /// L_c >= R_c (if R_c=1, then L_c >= 1)
+    model->addConstr(chVars.dataLatency >= chVars.bufPresent,
+                     "R_lower_" + name);
+    /// M*R_c >= L_c (if L_c > 0, then R_c must be 1)
+    model->addConstr(fpga24::BIG_M * chVars.bufPresent >= chVars.dataLatency,
+                     "R_upper_" + name);
+  }
+}
+
+void BufferPlacementMILP::addReconvergentPathVars(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
+  vars.reconvergentPathVars.resize(reconvergentPaths.size());
+  for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
+    (void)pathWithGraph;
+    vars.reconvergentPathVars[pathIdx].imbalanced =
+        model->addVar("s_rp_" + std::to_string(pathIdx), BOOLEAN, 0, 1);
+  }
+}
+
+void BufferPlacementMILP::addSyncCycleVars(
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs) {
+  vars.syncCycleVars.resize(syncCyclePairs.size());
+  for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
+    vars.syncCycleVars[pairIdx].imbalanced =
+        model->addVar("s_sc_" + std::to_string(pairIdx), BOOLEAN, 0, 1);
+  }
+}
+
+void BufferPlacementMILP::addOccupancyVars(
+    ValueRange channels, llvm::MapVector<Value, CPVar> &channelOccupancy,
+    double maxOccupancy) {
+  for (Value channel : channels) {
+    std::string name = getUniqueName(*channel.getUses().begin());
+    channelOccupancy[channel] =
+        model->addVar("n_" + name, REAL, 0.0, maxOccupancy);
+  }
+}
+
+void BufferPlacementMILP::setOccupancyBalancingObjective(
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
+  /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c)
+  LinExpr objective;
+  for (auto &[channel, occupancy] : channelOccupancy) {
+    unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
+    // Control channels may have bitwidth 0, weight them with 1.
+    objective += (bitwidth == 0 ? 1 : bitwidth) * occupancy;
+  }
+  model->setMaximizeObjective(-objective);
+}
+
+void BufferPlacementMILP::addMinOccupancyConstraints(
+    const llvm::MapVector<Value, double> &requiredOccupancy,
+    llvm::MapVector<Value, CPVar> &channelOccupancy) {
+  for (auto const &[channel, minOccupancy] : requiredOccupancy) {
+    model->addConstr(channelOccupancy[channel] >= minOccupancy,
+                     "n_c>=(L_c/II)" +
+                         getUniqueName(*channel.getUses().begin()));
+  }
+}
+
+void BufferPlacementMILP::addBackedgeConstraints(
+    ArrayRef<CFDFC *> cfdfcs, llvm::MapVector<Value, CPVar> &channelOccupancy) {
+  size_t cycleConstraints = 0;
+  for (size_t i = 0; i < cfdfcs.size(); ++i) {
+    CFDFC *cfdfc = cfdfcs[i];
+    for (Value channel : cfdfc->backedges) {
+      if (channelOccupancy.count(channel)) {
+        model->addConstr(channelOccupancy[channel] >= 1.0,
+                         "backedge_" + std::to_string(i));
+        cycleConstraints++;
+      }
+    }
+  }
+}
+
+void BufferPlacementMILP::addReconvergentPathConstraints(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths) {
+  for (size_t pathIdx = 0; pathIdx < reconvergentPaths.size(); ++pathIdx) {
+    const fpga24::ReconvergentPathWithGraph &pathWithGraph =
+        reconvergentPaths[pathIdx];
+    const ReconvergentPath &path = pathWithGraph.path;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
+    CPVar &patternImbalanced = vars.reconvergentPathVars[pathIdx].imbalanced;
+
+    bool hasVarLatency = std::any_of(
+        path.nodeIds.begin(), path.nodeIds.end(), [&](NodeIdType id) {
+          return hasVariableLatencyUnit(graph->nodes[id]);
+        });
+
+    if (hasVarLatency) {
+      model->addConstr(patternImbalanced == 1,
+                       "varLatency_rp_" + std::to_string(pathIdx));
+      continue;
+    }
+
+    NodeIdType forkId = path.forkNodeId;
+    NodeIdType joinId = path.joinNodeId;
+    std::vector<SimplePath> allPaths =
+        enumerateSimplePaths(*graph, forkId, joinId, path.nodeIds);
+
+    std::vector<LinExpr> pathLatencies;
+    for (const auto &simplePath : allPaths) {
+      LinExpr pathLatency;
+
+      for (NodeIdType nodeId : simplePath.nodes) {
+        const DataflowGraphNode &node = graph->nodes[nodeId];
+        if (node.type != DataflowGraphNode::REGULAR)
+          continue;
+        Operation *unitOp = node.op;
+        auto unitLatOrFail =
+            timingDB.getLatency(unitOp, SignalType::DATA, targetPeriod);
+        if (succeeded(unitLatOrFail))
+          pathLatency += *unitLatOrFail;
+      }
+
+      for (EdgeIdType edgeId : simplePath.edges) {
+        Value channel = graph->edges[edgeId].channel;
+        if (vars.channelVars.count(channel))
+          pathLatency += vars.channelVars[channel].dataLatency;
+      }
+
+      pathLatencies.push_back(pathLatency);
+    }
+
+    if (pathLatencies.empty())
+      continue;
+
+    for (size_t i = 0; i < pathLatencies.size(); ++i) {
+      for (size_t j = i + 1; j < pathLatencies.size(); ++j) {
+        std::string baseName =
+            llvm::formatv("imbalance_rp_{0}_{1}_{2}", pathIdx, i, j).str();
+        model->addConstr(pathLatencies[i] - pathLatencies[j] <=
+                             fpga24::BIG_M * patternImbalanced,
+                         baseName + "_a");
+        model->addConstr(pathLatencies[j] - pathLatencies[i] <=
+                             fpga24::BIG_M * patternImbalanced,
+                         baseName + "_b");
+      }
+    }
+  }
+}
+
+void BufferPlacementMILP::addSyncCycleConstraints(
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+    const SynchronizingCyclesFinderGraph &syncGraph) {
+  for (size_t pairIdx = 0; pairIdx < syncCyclePairs.size(); ++pairIdx) {
+    const SynchronizingCyclePair &pair = syncCyclePairs[pairIdx];
+    CPVar &patternImbalanced = vars.syncCycleVars[pairIdx].imbalanced;
+
+    bool hasVarLatency =
+        hasVariableLatencyPath(pair.cycleOne.nodes, syncGraph) ||
+        hasVariableLatencyPath(pair.cycleTwo.nodes, syncGraph);
+    if (hasVarLatency) {
+      model->addConstr(patternImbalanced == 1,
+                       "varLatency_sc_" + std::to_string(pairIdx));
+      continue;
+    }
+
+    LinExpr latencyCycleOne = computeCycleLatency(pair.cycleOne, syncGraph,
+                                                  vars, timingDB, targetPeriod);
+    LinExpr latencyCycleTwo = computeCycleLatency(pair.cycleTwo, syncGraph,
+                                                  vars, timingDB, targetPeriod);
+
+    std::string baseName = "imbalance_sc_" + std::to_string(pairIdx);
+    model->addConstr(latencyCycleOne - latencyCycleTwo <=
+                         fpga24::BIG_M * patternImbalanced,
+                     baseName + "_a");
+    model->addConstr(latencyCycleTwo - latencyCycleOne <=
+                         fpga24::BIG_M * patternImbalanced,
+                     baseName + "_b");
+  }
+}
+
+/// Connects pattern-level imbalance indicators to per-channel stall variables.
+/// For each channel in a reconvergent path or sync cycle, enforces:
+///     stalled_c >= imbalanced_p   for each pattern p using channel c,
+/// so channels are marked stalled if any associated pattern is imbalanced.
+void BufferPlacementMILP::addStallPropagationConstraints(
+    ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
+    ArrayRef<SynchronizingCyclePair> syncCyclePairs,
+    const SynchronizingCyclesFinderGraph &syncGraph) {
+  DenseMap<Value, SmallVector<CPVar *>> channelToPatterns;
+  auto addPatternToChannelStallProp = [&](Value channel, CPVar *imbalanced) {
+    channelToPatterns[channel].push_back(imbalanced);
+  };
+
+  for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
+    const ReconvergentPath &path = pathWithGraph.path;
+    const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
+    for (NodeIdType nodeId : path.nodeIds) {
+      for (EdgeIdType edgeId : graph->adjList[nodeId]) {
+        const auto &edge = graph->edges[edgeId];
+        if (path.nodeIds.count(edge.dstId))
+          addPatternToChannelStallProp(
+              edge.channel, &vars.reconvergentPathVars[pathIdx].imbalanced);
+      }
+    }
+  }
+
+  for (auto [pairIdx, pair] : llvm::enumerate(syncCyclePairs)) {
+    for (const auto &edgeInfo : pair.edgesToJoins) {
+      for (EdgeIdType edgeId : edgeInfo.edgesFromCycleOne)
+        addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
+                                     &vars.syncCycleVars[pairIdx].imbalanced);
+      for (EdgeIdType edgeId : edgeInfo.edgesFromCycleTwo)
+        addPatternToChannelStallProp(syncGraph.edges[edgeId].channel,
+                                     &vars.syncCycleVars[pairIdx].imbalanced);
+    }
+  }
+
+  size_t channelIdx = 0;
+  for (auto &[channel, patterns] : channelToPatterns) {
+    if (!vars.channelVars.count(channel)) {
+      channelIdx++;
+      continue;
+    }
+
+    CPVar &stalled = vars.channelVars[channel].stalled;
+    for (size_t i = 0; i < patterns.size(); ++i) {
+      std::string cstrName =
+          llvm::formatv("stallProp_{0}_{1}", channelIdx, i).str();
+      model->addConstr(stalled >= *patterns[i], cstrName);
+    }
+    channelIdx++;
+  }
+}
+
+void BufferPlacementMILP::addCycleTimeConstraints(
+    ArrayRef<CFDFC *> cfdfcs, double &computedII,
+    llvm::MapVector<CFDFC *, double> &iiMap) {
+  if (cfdfcs.empty()) {
+    llvm::errs() << "[LatBal]   No CFDFCs, skipping cycle time constraints\n";
+    return;
+  }
+
+  for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
+    SynchronizingCyclesFinderGraph cfdfcGraph(funcInfo.funcOp, *cfdfc);
+    std::vector<SimpleCycle> cycles = cfdfcGraph.findAllCycles();
+    if (cycles.empty()) {
+      continue;
+    }
+
+    assert(!cycles.empty() && "empty cycle list should have been skipped");
+    auto maxCycleIt = std::max_element(
+        cycles.begin(), cycles.end(),
+        [&](const SimpleCycle &lhs, const SimpleCycle &rhs) {
+          return computeCycleForcedLatencyLowerBound(lhs, cfdfcGraph) <
+                 computeCycleForcedLatencyLowerBound(rhs, cfdfcGraph);
+        });
+    double maxRequiredLatency =
+        computeCycleForcedLatencyLowerBound(*maxCycleIt, cfdfcGraph);
+
+    double iiCFC = std::max(1.0, std::ceil(maxRequiredLatency));
+    computedII = std::max(computedII, iiCFC);
+    iiMap[cfdfc] = iiCFC;
+
+    for (auto [cycleIdx, cycle] : llvm::enumerate(cycles)) {
+      LinExpr cycleLatency =
+          computeCycleLatency(cycle, cfdfcGraph, vars, timingDB, targetPeriod);
+      std::string baseName =
+          llvm::formatv("cycleTime_cfdfc{0}_cycle{1}", cfdfcIdx, cycleIdx)
+              .str();
+      model->addConstr(cycleLatency >= iiCFC, baseName + "_min");
+      model->addConstr(cycleLatency <= iiCFC, baseName + "_max");
+    }
+  }
+}
+
+void BufferPlacementMILP::setLatencyBalancingObjective() {
+  LinExpr objective;
+  for (auto &[channel, chVars] : vars.channelVars) {
+    objective += fpga24::STALL_WEIGHT * chVars.stalled;
+    unsigned bitwidth = getHandshakeTypeBitWidth(channel.getType());
+    objective += fpga24::LATENCY_WEIGHT * (bitwidth * chVars.bufPresent);
+    objective += fpga24::LATENCY_WEIGHT * chVars.dataLatency;
+  }
+  model->setMaximizeObjective(-objective);
+}
+
+void BufferPlacementMILP::forEachIOPair(
+    Operation *op, const std::function<void(Value, Value)> &callback) {
+  for (Value opr : op->getOperands()) {
+    if (!isa<MemRefType>(opr.getType())) {
+      for (OpResult res : op->getResults()) {
+        if (!isa<MemRefType>(res.getType()))
+          callback(opr, res);
+      }
+    }
+  }
+}
+
+void BufferPlacementMILP::logResults(BufferPlacement &placement) {
+
+  mlir::raw_indented_ostream os(llvm::errs());
+
+  os << "# ========================== #\n";
+  os << "# Buffer Placement Decisions #\n";
+  os << "# ========================== #\n\n";
+
+  for (auto &[value, chVars] : vars.channelVars) {
+    if (model->getValue(chVars.bufPresent) == 0)
+      continue;
+
+    // Extract number and type of slots
+    unsigned numSlotsToPlace =
+        static_cast<unsigned>(model->getValue(chVars.bufNumSlots) + 0.5);
+
+    PlacementResult result = placement[value];
+    ChannelBufProps &props = channelProps[value];
+
+    // Log placement decision
+    os << getUniqueName(*value.getUses().begin()) << ":\n";
+    os.indent();
+    std::stringstream propsStr;
+    propsStr << props;
+    os << "- Buffering constraints: " << propsStr.str() << "\n";
+    os << "- MILP decision: " << numSlotsToPlace << " slot(s)\n";
+    os << "- Placement decision: \n";
+    os << result.numOneSlotDV << " OneSlotDV slot(s)\n";
+    os << result.numOneSlotR << " OneSlotR slot(s)\n";
+    os << result.numFifoDV << " FifoDV slot(s)\n";
+    os << result.numFifoNone << " FifoNone slot(s)\n";
+    os << result.numOneSlotDVR << " OneSlotDVR slot(s)\n";
+    os << result.numShiftRegDV << " ShiftRegDV slot(s)\n";
+    os.unindent();
+    os << "\n";
+  }
+
+  os << "# ================= #\n";
+  os << "# CFDFC Throughputs #\n";
+  os << "# ================= #\n\n";
+
+  // Log global CFDFC throuhgputs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    double throughput = model->getValue(cfVars.throughput);
+    os << "Throughput of CFDFC #" << idx << ": " << throughput << "\n";
+  }
+
+  os << "\n# =================== #\n";
+  os << "# Channel Throughputs #\n";
+  os << "# =================== #\n\n";
+
+  // Log throughput of all channels in all CFDFCs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    os << "Per-channel throughputs of CFDFC #" << idx << ":\n";
+    os.indent();
+    for (auto &[val, channelTh] : cfVars.channelThroughputs) {
+      os << getUniqueName(*val.getUses().begin()) << ": "
+         << model->getValue(channelTh) << "\n";
+    }
+    os.unindent();
+    os << "\n";
+  }
+
+  os << "\n# =================== #\n";
+  os << "# Unit Retimings #\n";
+  os << "# =================== #\n\n";
+
+  // Log retimings of all units in all CFDFCs
+  for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
+    auto [cf, cfVars] = cfdfcWithVars;
+    os << "Unit retimings of CFDFC #" << idx << ":\n";
+    os.indent();
+    for (Operation *op : cf->units) {
+      UnitVars &unitVars = cfVars.getUnitVarsFor(op);
+      os << getUniqueName(op) << ":\n";
+      os.indent();
+      for (auto [idx, var] : llvm::enumerate(unitVars.getInputRetimingVars()))
+        os << "in " << idx << ": " << model->getValue(var) << "\n";
+      for (auto [idx, var] : llvm::enumerate(unitVars.getOutputRetimingVars()))
+        os << "out " << idx << ": " << model->getValue(var) << "\n";
+      os.unindent();
+    }
+    os.unindent();
+    os << "\n";
+  }
+}
+
+void BufferPlacementMILP::initialize() {
+  unsatisfiable =
+      failed(mapChannelsToProperties(funcInfo.funcOp, timingDB, channelProps));
+
+  // Initialize the large constant (for elasticity constraints)
+  auto ops = funcInfo.funcOp.getOps();
+  largeCst = std::distance(ops.begin(), ops.end()) + 2;
+}

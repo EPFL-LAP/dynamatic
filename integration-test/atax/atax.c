@@ -20,7 +20,7 @@ void atax(in_int_t A[N][N], in_int_t x[N], inout_int_t y[N],
   int i, j;
 
   for (i = 0; i < NX; i++) {
-    float t = tmp[i];
+    int t = tmp[i];
     for (j = 0; j < NY; j++)
       t = t + A[i][j] * x[j];
     for (j = 0; j < NY; j++)

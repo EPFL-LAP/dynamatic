@@ -28,3 +28,15 @@ MODULE {name}(ins, ins_valid)
   DEFINE
   ins_ready  :=  TRUE;
 """
+
+
+def _generate_iog_terminating_sink_dataless(name):
+    return f"""
+MODULE {name}(ins_valid)
+
+  VAR
+  slot_full : bool;
+  -- output
+  DEFINE
+  ins_ready  :=  !slot_full;
+"""

@@ -26,7 +26,7 @@ MODULE {name}(ins_valid, outs_ready)
 def _generate_single_delay_buffer(name):
     return f"""
 MODULE {name}(ins_valid, outs_ready)
-  VAR inner_one_slot_break_dv : {name}__one_slot_break_dv_dataless(ins, ins_valid, outs_ready);
+  VAR inner_one_slot_break_dv : {name}__one_slot_break_dv_dataless(ins_valid, outs_ready);
 
   -- output
   DEFINE ins_ready := inner_one_slot_break_dv.ins_ready;
@@ -53,6 +53,8 @@ MODULE {name}(ins_valid, outs_ready)
   -- output
   DEFINE ins_ready := inner_one_slot_break_dv.ins_ready;
   DEFINE outs_valid := inner_one_slot_break_dv.outs_valid;
+
+  DEFINE v{no_one_slot_break_dv_latency} := inner_one_slot_break_dv.outs_valid_i;
 
 {generate_one_slot_break_dv(f"{name}__one_slot_break_dv_dataless", {ATTR_BITWIDTH: 0})}
 """

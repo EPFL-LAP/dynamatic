@@ -625,4 +625,17 @@ public:
 #define GET_OP_CLASSES
 #include "dynamatic/Dialect/Handshake/Handshake.h.inc"
 
+template <>
+struct llvm::PointerLikeTypeTraits<dynamatic::handshake::ConstantOp> {
+  static void *getAsVoidPointer(dynamatic::handshake::ConstantOp val) {
+    return const_cast<void *>(val.getAsOpaquePointer());
+  }
+
+  static dynamatic::handshake::ConstantOp getFromVoidPointer(void *p) {
+    return dynamatic::handshake::ConstantOp::getFromOpaquePointer(p);
+  }
+  static constexpr int NumLowBitsAvailable =
+      PointerLikeTypeTraits<mlir::Operation *>::NumLowBitsAvailable;
+};
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_H

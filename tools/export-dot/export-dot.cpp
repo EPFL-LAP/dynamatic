@@ -76,7 +76,7 @@ static cl::opt<LabelType>
                                     "type of the operation, default"),
                          clEnumValN(LabelType::UNAME, "uname",
                                     "unique name of the operation")),
-              cl::init(LabelType::TYPE), cl::cat(mainCategory));
+              cl::init(LabelType::UNAME), cl::cat(mainCategory));
 
 static constexpr StringLiteral DOTTED("dotted"), SOLID("solid"), DOT("dot"),
     NORMAL("normal");
@@ -276,13 +276,6 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   mlir::DenseMap<unsigned, DOTGraph::Subgraph *> bbSubgraphs;
   DOTGraph::Subgraph *root = &builder.getRoot();
 
-  // Collect port names for all operations and the top-level function
-  using PortNames = mlir::DenseMap<Operation *, handshake::PortNamer>;
-  PortNames portNames;
-  portNames.try_emplace(funcOp, funcOp);
-  for (Operation &op : funcOp.getOps())
-    portNames.try_emplace(&op, &op);
-
   auto addNode = [&](Operation *op,
                      DOTGraph::Subgraph &subgraph) -> LogicalResult {
     // The node's DOT "mlir_op" attribute
@@ -335,11 +328,13 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       Operation *srcOp = res.getDefiningOp();
       srcNodeName = getUniqueName(srcOp).str();
       srcIdx = res.getResultNumber();
-      srcPortName = portNames.at(srcOp).getOutputName(srcIdx);
+      srcPortName =
+          cast<handshake::NamedIOInterface>(srcOp).getResultName(srcIdx);
     } else {
       Operation *parentOp = val.getParentBlock()->getParentOp();
       srcIdx = cast<BlockArgument>(val).getArgNumber();
-      srcNodeName = srcPortName = portNames.at(parentOp).getInputName(srcIdx);
+      srcNodeName = srcPortName =
+          cast<handshake::NamedIOInterface>(parentOp).getOperandName(srcIdx);
     }
 
     // Determine the edge's destination
@@ -348,11 +343,13 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     if (isa<handshake::EndOp>(dstOp)) {
       Operation *parentOp = dstOp->getParentOp();
       dstIdx = oprd.getOperandNumber();
-      dstNodeName = dstPortName = portNames.at(parentOp).getOutputName(dstIdx);
+      dstNodeName = dstPortName =
+          cast<handshake::NamedIOInterface>(parentOp).getResultName(dstIdx);
     } else {
       dstNodeName = getUniqueName(dstOp).str();
       dstIdx = oprd.getOperandNumber();
-      dstPortName = portNames.at(dstOp).getInputName(dstIdx);
+      dstPortName =
+          cast<handshake::NamedIOInterface>(dstOp).getOperandName(dstIdx);
     }
 
     DOTGraph::Edge &edge = builder.addEdge(srcNodeName, dstNodeName, subgraph);
@@ -377,7 +374,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       continue;
 
     // Create a node for the argument
-    StringRef argName = portNames.at(funcOp).getInputName(idx);
+    StringRef argName = funcOp.getArgName(idx);
     DOTGraph::Node *node = builder.addNode(argName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;
@@ -394,7 +391,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   // Create nodes for all function results
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
   for (const auto &[idx, res] : llvm::enumerate(results)) {
-    StringRef resName = portNames.at(funcOp).getOutputName(idx);
+    StringRef resName = funcOp.getResName(idx);
     DOTGraph::Node *node = builder.addNode(resName, *root);
     if (!node)
       return funcOp.emitError() << "failed to create node for argument " << idx;
@@ -489,6 +486,13 @@ int main(int argc, char **argv) {
       return 1;
     }
     funcOp = op;
+  }
+
+  if (funcOp == nullptr) {
+    modOp->emitError()
+        << "No handshake function found in the mlir module (maybe you "
+           "specified wrong function name to synthesize)! Aborting..\n";
+    return 1;
   }
 
   // Name all operations in the IR
