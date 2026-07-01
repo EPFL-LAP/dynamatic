@@ -126,14 +126,16 @@ def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir:
   }];
 }
 
-
-
-def PreEagerlyElastic : Pass<"pre-eagerly-elastic", "mlir::ModuleOp"> {
-  let summary = "Prepares the IR for eagerly elastic";
+def EagerlyElasticAD : Pass<"eagerly-elastic-a-d", "mlir::ModuleOp"> {
+  let summary = "Applies the Rewrites A and D of the EagerlyElastic Paper";
   let description = [{
-    This pass identifies the suppressors and converts branches consisting of two suppressors 
-    back into two different branches.
+    This pass prepares the conditional branches into suppressors and then applies Rewrite A 
+    as often as possible. In the next step it applies Rewrite D and then again Rewrite A and
+    repeats this `numRewriteD` times.
   }];
+  let options =
+    [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
+            "The number of times that Rewrite D should be applied.">];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
