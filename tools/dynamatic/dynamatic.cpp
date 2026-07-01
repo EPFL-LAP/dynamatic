@@ -304,6 +304,8 @@ public:
   static constexpr llvm::StringLiteral ENABLE_SHORT_CIRCUIT =
       "enable-short-circuit";
   static constexpr llvm::StringLiteral SPECULATION = "speculation";
+  static constexpr llvm::StringLiteral CALCULATE_PATH_DELAYS =
+      "calculate-path-delays";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -340,6 +342,10 @@ public:
     addFlag({SPECULATION,
              "Enable speculation. Requires a #pragma DYN speculate "
              "`in the source code file."});
+    addFlag({CALCULATE_PATH_DELAYS,
+             "After buffer placement, re-run the MILP with the buffering "
+             "decisions locked in to calculate the path delays the MILP "
+             "believes are present in the circuit."});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -782,13 +788,15 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string enableShortCircuit =
       args.flags.contains(ENABLE_SHORT_CIRCUIT) ? "1" : "0";
   std::string speculation = args.flags.contains(SPECULATION) ? "1" : "0";
+  std::string calculatePathDelays =
+      args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
-                 enableShortCircuit);
+                 enableShortCircuit, calculatePathDelays);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

@@ -15,7 +15,7 @@ float fixed(in_float_t y) {
     c = x0 - x1;
     x0 = x1;
     loopAgain = c >= a;
-    #pragma DYN speculate variable=loopAgain max_predictions=3 style=standard
+    #pragma DYN speculate variable=loopAgain max_predictions=4 style=standard
   } while (loopAgain);
   return x1;
 }
