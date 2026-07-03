@@ -2,7 +2,12 @@
 
 module ii_monitor #(
   parameter INDEX_WIDTH     = 1,
-  parameter LOOP_BACK_INDEX = 0
+  parameter LOOP_BACK_INDEX = 0,
+  // Nesting depth of the measured loop (1 for a top-level loop) and deepest
+  // depth reachable from it through its own descendants (equal to LOOP_DEPTH
+  // when the loop is innermost).
+  parameter LOOP_DEPTH      = 1,
+  parameter LOOP_MAX_DEPTH  = 1
 ) (
   input  wire                       clk,
   input  wire                       rst,
@@ -36,7 +41,8 @@ module ii_monitor #(
         if (index != LOOP_BACK_INDEX[INDEX_WIDTH - 1 : 0]) begin
           // Activation from outside the loop (first entry or re-entry).
           if (ii_measuring && ii_iters > 1)
-            $display("II_INSTRUMENT: II=%f iterations=%0d",
+            $display("II_INSTRUMENT: loop=%m depth=%0d/%0d II=%f iterations=%0d",
+                     LOOP_DEPTH, LOOP_MAX_DEPTH,
                      (ii_last - ii_start) * 1.0 / (ii_iters - 1), ii_iters);
           ii_measuring = 1;
           ii_start     = ii_cycle;
@@ -54,7 +60,8 @@ module ii_monitor #(
       // Observe the loop exit channel.
       if (exit_valid && exit_ready) begin
         if (ii_measuring && ii_iters > 1)
-          $display("II_INSTRUMENT: II=%f iterations=%0d",
+          $display("II_INSTRUMENT: loop=%m depth=%0d/%0d II=%f iterations=%0d",
+                   LOOP_DEPTH, LOOP_MAX_DEPTH,
                    (ii_last - ii_start) * 1.0 / (ii_iters - 1), ii_iters);
         ii_measuring = 0;
       end

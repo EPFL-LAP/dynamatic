@@ -6,6 +6,11 @@ def generate_ii_monitor(name, params):
     index_width = params["index_width"]
     # Index value identifying a back-edge (loop-internal) activation.
     loop_back_index = params["loop_back_index"]
+    # Nesting depth of the measured loop (1 for a top-level loop) and deepest
+    # depth reachable from it through its own descendants (equal to
+    # loop_depth when the loop is innermost).
+    loop_depth = params["loop_depth"]
+    loop_max_depth = params["loop_max_depth"]
     # Extra signals carried by the observed index/exit channels (e.g. a "spec"
     # signal under speculation). The monitor ignores their values but must
     # declare matching ports so that its instantiation in the parent module is
@@ -14,6 +19,7 @@ def generate_ii_monitor(name, params):
     exit_extra_signals = params.get("exit_extra_signals", None) or {}
 
     return _generate_ii_monitor(name, index_width, loop_back_index,
+                                loop_depth, loop_max_depth,
                                 index_extra_signals, exit_extra_signals)
 
 
@@ -26,6 +32,7 @@ def _extra_signal_ports(channel_name: str,
 
 
 def _generate_ii_monitor(name: str, index_width: int, loop_back_index: int,
+                         loop_depth: int, loop_max_depth: int,
                          index_extra_signals: ExtraSignals,
                          exit_extra_signals: ExtraSignals) -> str:
     # Assemble the port list. All ports are inputs so the monitor never drives
@@ -51,8 +58,8 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 -- II monitor: simulation-only component that measures the initiation interval
--- (II) of an innermost loop by observing the dominating control_merge's index
--- channel.
+-- (II) of a loop at nesting depth {loop_depth} (of {loop_max_depth} in its
+-- nest) by observing its dominating control_merge's index channel.
 --
 -- All ports are inputs so that the monitor passively reads existing signals
 -- without driving any of them, avoiding multiple-driver conflicts with the
@@ -98,7 +105,8 @@ begin
           if to_integer(unsigned(index)) /= {loop_back_index} then
             -- Activation from outside the loop (first entry or re-entry).
             if measuring and iters > 1 then
-              report "II_INSTRUMENT: II=" &
+              report "II_INSTRUMENT: loop=" & {name}'path_name &
+                     " depth={loop_depth}/{loop_max_depth} II=" &
                      real'image(real(last_cyc - start_cyc) / real(iters - 1)) &
                      " iterations=" & integer'image(iters) severity note;
             end if;
@@ -118,7 +126,8 @@ begin
         -- Observe the loop exit channel.
         if exit_valid = '1' and exit_ready = '1' then
           if measuring and iters > 1 then
-            report "II_INSTRUMENT: II=" &
+            report "II_INSTRUMENT: loop=" & {name}'path_name &
+                   " depth={loop_depth}/{loop_max_depth} II=" &
                    real'image(real(last_cyc - start_cyc) / real(iters - 1)) &
                    " iterations=" & integer'image(iters) severity note;
           end if;

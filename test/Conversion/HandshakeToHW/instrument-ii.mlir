@@ -4,16 +4,16 @@
 // CHECK-LABEL:   hw.module @selfLoop
 // CHECK:           %{{.*}}, %[[INDEX:.*]] = hw.instance "control_merge0"
 // CHECK:           %{{.*}}, %[[EXIT:.*]] = hw.instance "cond_br2"
-// CHECK:           hw.instance "ii_monitor_control_merge0" @ii_monitor_1_1(
+// CHECK:           hw.instance "ii_monitor_control_merge0" @ii_monitor_1_1_1_1(
 // CHECK-SAME:        index: %[[INDEX]]
 // CHECK-SAME:        exit: %[[EXIT]]
 // CHECK-SAME:        clk:
 // CHECK-SAME:        rst:
 // CHECK-SAME:      ) -> ()
-// CHECK:         hw.module.extern @ii_monitor_1_1(
+// CHECK:         hw.module.extern @ii_monitor_1_1_1_1(
 // CHECK-SAME:      in %index : !handshake.channel<i1>
 // CHECK-SAME:      in %exit : !handshake.control<>
-// CHECK-SAME:      attributes {hw.name = "ii_monitor", hw.parameters = {INDEX_WIDTH = 1 : ui32, LOOP_BACK_INDEX = 1 : ui32}}
+// CHECK-SAME:      attributes {hw.name = "ii_monitor", hw.parameters = {INDEX_WIDTH = 1 : ui32, LOOP_BACK_INDEX = 1 : ui32, LOOP_DEPTH = 1 : ui32, LOOP_MAX_DEPTH = 1 : ui32}}
 
 // Without the option, no monitor is inserted.
 // NOINSTR-NOT: ii_monitor

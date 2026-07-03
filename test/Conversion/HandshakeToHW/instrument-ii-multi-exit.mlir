@@ -20,7 +20,7 @@
 // CHECK:         hw.instance "ii_exit_sink{{[0-9]*}}" {{.*}}(ins: %[[MERGE_IDX]]
 
 // The monitor observes the control merge's index and the merged exit channel.
-// CHECK:         hw.instance "ii_monitor_control_merge0" @ii_monitor_1_1(
+// CHECK:         hw.instance "ii_monitor_control_merge0" @ii_monitor_1_1_1_1(
 // CHECK-SAME:      index: %[[INDEX]]
 // CHECK-SAME:      exit: %[[MERGE_OUT]]
 

@@ -2283,10 +2283,10 @@ private:
       : llvm::LoopBase<ControlNode, ControlLoop>(node) {}
 };
 
-/// Describes the 'ii_monitor' instance to insert for one detected innermost
-/// loop. All references to the circuit are by name/index so that they remain
-/// valid after the Handshake operations have been lowered to HW instances
-/// (instance names and result orders are preserved during lowering).
+/// Describes the 'ii_monitor' instance to insert for one detected loop. All
+/// references to the circuit are by name/index so that they remain valid
+/// after the Handshake operations have been lowered to HW instances (instance
+/// names and result orders are preserved during lowering).
 struct IIMonitorSpec {
   /// Name of the loop header (a control merge) instance.
   std::string headerName;
@@ -2300,6 +2300,12 @@ struct IIMonitorSpec {
   std::string exitName;
   /// Result index of that instance's loop-exit output channel.
   unsigned exitResultIdx;
+  /// Nesting depth of the loop (1 for a top-level loop, 2 for a loop nested
+  /// one level deep, ...).
+  unsigned loopDepth;
+  /// Deepest nesting depth reachable from this loop through its own
+  /// descendants (equal to 'loopDepth' when the loop is innermost).
+  unsigned loopMaxDepth;
 };
 } // namespace
 
@@ -2392,13 +2398,23 @@ static OpResult buildOuterLoopExitChannel(ControlLoop *loop, OpBuilder &builder,
   return cast<OpResult>(cmergeOp.getResult());
 }
 
-/// Detects the innermost loops of 'funcOp' over its control graph and returns
-/// one monitor specification per loop whose header is a control merge. The
-/// initiation interval is measured from the innermost loop's control merge, but
-/// reported when the *outermost* enclosing loop is exited; the corresponding
-/// exit channel is built (merging multiple exits if necessary) by this
-/// function. Loops with irregular control flow (no control merge header, no
-/// exit, ...) are silently skipped.
+/// Returns the deepest nesting depth reachable from 'loop' through its own
+/// descendants (i.e. 'loop->getLoopDepth()' itself when 'loop' is innermost).
+static unsigned getMaxLoopDepth(ControlLoop *loop) {
+  unsigned maxDepth = loop->getLoopDepth();
+  for (ControlLoop *subLoop : loop->getSubLoops())
+    maxDepth = std::max(maxDepth, getMaxLoopDepth(subLoop));
+  return maxDepth;
+}
+
+/// Detects every loop of 'funcOp' over its control graph and returns one
+/// monitor specification per loop whose header is a control merge. For a given
+/// loop, the initiation interval is measured from that loop's own control
+/// merge, but reported when the *outermost* enclosing loop is exited; the
+/// corresponding exit channel is built (merging multiple exits if necessary) by
+/// this function and shared by every loop in the same nest. Loops with
+/// irregular control flow (no control merge header, no exit, ...) are silently
+/// skipped.
 static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
                                                    NameAnalysis &namer) {
   ControlGraph graph(funcOp);
@@ -2411,14 +2427,11 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
   OpBuilder builder(funcOp.getContext());
 
   // Exit channel of each outermost loop, built lazily and shared by every
-  // innermost loop in the same nest.
+  // loop in the same nest.
   DenseMap<ControlLoop *, OpResult> outerExitChannel;
 
   SmallVector<IIMonitorSpec> specs;
   for (ControlLoop *loop : loopInfo.getLoopsInPreorder()) {
-    if (!loop->isInnermost())
-      continue;
-
     // The loop header on the control network is the control merge that passes
     // exactly one token per iteration and reports, on its index output, whether
     // the activation came from outside the loop or from the back-edge.
@@ -2469,7 +2482,8 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
     specs.push_back({getUniqueName(headerOp).str(), indexVal.getResultNumber(),
                      indexType.getDataBitWidth(), *loopBackIndex,
                      getUniqueName(exitChannel.getOwner()).str(),
-                     exitChannel.getResultNumber()});
+                     exitChannel.getResultNumber(), loop->getLoopDepth(),
+                     getMaxLoopDepth(loop)});
   }
   return specs;
 }
@@ -2480,9 +2494,12 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
 static hw::HWModuleExternOp
 getOrCreateIIMonitorExtern(mlir::ModuleOp topModOp, OpBuilder &builder,
                            unsigned indexWidth, unsigned loopBackIndex,
+                           unsigned loopDepth, unsigned loopMaxDepth,
                            Type indexType, Type exitType) {
   std::string name =
-      ("ii_monitor_" + Twine(indexWidth) + "_" + Twine(loopBackIndex)).str();
+      ("ii_monitor_" + Twine(indexWidth) + "_" + Twine(loopBackIndex) + "_" +
+       Twine(loopDepth) + "_" + Twine(loopMaxDepth))
+          .str();
   if (auto extOp = topModOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return extOp;
 
@@ -2508,7 +2525,11 @@ getOrCreateIIMonitorExtern(mlir::ModuleOp topModOp, OpBuilder &builder,
           {builder.getNamedAttr("INDEX_WIDTH",
                                 IntegerAttr::get(ui32, indexWidth)),
            builder.getNamedAttr("LOOP_BACK_INDEX",
-                                IntegerAttr::get(ui32, loopBackIndex))}));
+                                IntegerAttr::get(ui32, loopBackIndex)),
+           builder.getNamedAttr("LOOP_DEPTH",
+                                IntegerAttr::get(ui32, loopDepth)),
+           builder.getNamedAttr("LOOP_MAX_DEPTH",
+                                IntegerAttr::get(ui32, loopMaxDepth))}));
   return extOp;
 }
 
@@ -2543,8 +2564,8 @@ static void insertIIMonitors(hw::HWModuleOp hwModOp,
     Value exitVal = exitIt->second->getResult(spec.exitResultIdx);
 
     hw::HWModuleExternOp extOp = getOrCreateIIMonitorExtern(
-        topModOp, builder, spec.indexWidth, spec.loopBackIndex,
-        indexVal.getType(), exitVal.getType());
+        topModOp, builder, spec.indexWidth, spec.loopBackIndex, spec.loopDepth,
+        spec.loopMaxDepth, indexVal.getType(), exitVal.getType());
 
     SmallVector<Value> operands{indexVal, exitVal, clkVal, rstVal};
     builder.create<hw::InstanceOp>(
