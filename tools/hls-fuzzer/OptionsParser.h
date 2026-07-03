@@ -23,6 +23,12 @@ public:
   /// Returns the number of generator threads that should be used for fuzzing.
   std::optional<std::size_t> getNumThreads() const;
 
+  /// Returns the number of programs that should be generated and verified
+  /// before exiting, as requested via '--num-programs'. Returns
+  /// 'std::nullopt' if the option was not specified, i.e. fuzzing should run
+  /// until interrupted.
+  std::optional<std::size_t> getNumPrograms() const;
+
   /// Returns the name of the target fuzzer.
   std::string getTargetName() const;
 

@@ -1,5 +1,6 @@
 #include <atomic>
 #include <csignal>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -23,10 +24,23 @@ static std::mutex errorMutex;
 static std::atomic_uint64_t testCaseCounter = 0;
 static std::atomic_uint64_t bugCounter = 0;
 
+static bool hasProgramLimit = false;
+// Number of programs left to generate and verify, decremented by each
+// worker thread as it claims a program to work on. Only meaningful if
+// 'hasProgramLimit' is set; may go negative once the limit has been
+// reached, since every worker that fails to claim a program still performs
+// the decrement.
+static std::atomic_int64_t remainingPrograms = 0;
+
 static void threadWork(dynamatic::AbstractWorker &target,
                        const std::filesystem::path &workingDirectory,
                        const std::string &functionName) {
   while (!quit) {
+    if (hasProgramLimit && remainingPrograms.fetch_sub(1) <= 0) {
+      quit = true;
+      break;
+    }
+
     std::filesystem::remove_all(workingDirectory);
     std::filesystem::create_directories(workingDirectory);
     std::filesystem::path sourceFile = workingDirectory / (functionName + ".c");
@@ -136,6 +150,11 @@ int main(int argc, char **argv) {
   std::optional<std::size_t> numThreads = optionsParser.getNumThreads();
   if (!numThreads)
     return -1;
+
+  if (std::optional<std::size_t> numPrograms = optionsParser.getNumPrograms()) {
+    hasProgramLimit = true;
+    remainingPrograms = static_cast<std::int64_t>(*numPrograms);
+  }
 
   std::vector<std::unique_ptr<dynamatic::AbstractWorker>> workers(*numThreads);
   std::vector<std::thread> threads(*numThreads);
