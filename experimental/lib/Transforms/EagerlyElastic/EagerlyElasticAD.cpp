@@ -192,7 +192,7 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
   StringRef opName = targetOp->getName().getStringRef();
 
   // verify the targetOp is a PM unit
-  if (!isa<handshake::ArithOpInterface, handshake::ForkOp,
+  if (!isa<handshake::ArithOpInterface, handshake::ForkOp, handshake::NotIOp,
            handshake::LazyForkOp, handshake::BufferOp, handshake::LoadOp,
            handshake::BranchOp>(targetOp) ||
       ((isa<handshake::MergeOp, handshake::ControlMergeOp>(targetOp)) &&
@@ -206,6 +206,14 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
   // we can always move past a loadOp
   if (isa<handshake::LoadOp>(targetOp)) {
     return true;
+  }
+
+  // only move past NotOps if it's not part of a suppressor condition
+  if (isa<handshake::NotIOp>(targetOp) &&
+      llvm::any_of(targetOp->getResult(0).getUsers(), [](Operation *user) {
+        return isa<handshake::ConditionalBranchOp>(user);
+      })) {
+    return false;
   }
 
   // ensure all other inputs to the target op match this suppressor's condition
@@ -462,13 +470,13 @@ void EagerlyElasticADPass::runOnOperation() {
   DenseSet<handshake::ConditionalBranchOp> frontier;
   frontier.insert(suppressors.begin(), suppressors.end());
 
-  // perform rewrites: A, (D, A)^n
+  // apply rewrites: A, (D, A)^n
   rewriteA(frontier, namer);
 
-  /* for (int i = 0; i < 1; i++) {
+  for (unsigned i = 0; i < numRewriteD; i++) {
     rewriteD(frontier, namer);
     rewriteA(frontier, namer);
-  } */
+  }
 
   /*   llvm::errs() << "=== IR AFTER REWRITES A & D ===\n";
     modOp.dump();
