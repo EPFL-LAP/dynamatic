@@ -217,7 +217,6 @@ struct CombineInits : public OpRewritePattern<handshake::MergeOp> {
     if (redundantInits.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineInits applied");
     for (auto init : redundantInits) {
       rewriter.replaceAllUsesWith(init.getResult(), mergeOp.getResult());
       rewriter.eraseOp(init);
@@ -393,7 +392,6 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
     if (redundantMuxes.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineMuxes applied");
     // Loop over redundantMuxes and replace the users of them with the output of
     // muxOp Note that the users of all redundantMuxes include the Branches
     // forming cycles with each of them, but as we erase the redundantMuxes,
@@ -555,8 +553,6 @@ struct CombineBranchesOppositeSign
     if (redundantBranches.empty())
       return failure();
 
-    logLine("[HandshakeCombineSteeringLogic] CombineBranchesOppositeSign "
-            "applied\n");
     // Erase the redundant branch
     for (auto br : redundantBranches) {
       rewriter.replaceAllUsesWith(br.getFalseResult(),
@@ -601,7 +597,6 @@ struct RemoveNotCondition
     refreshBranchAttrsFromCondition(newBranch, condBranchOp);
     rewriter.eraseOp(condBranchOp);
 
-    logLine("[HandshakeCombineSteeringLogic] RemoveNotCondition applied\n");
     return success();
   }
 };
