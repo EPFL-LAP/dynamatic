@@ -385,6 +385,15 @@ void EagerlyElasticADPass::applyRewriteD(
   // build the top speculative loop control structure
   OpBuilder builder(dataMux);
 
+  // completely replace the pink circuit with a RepeatingInitOp
+  auto repeatingInit = builder.create<RepeatingInitOp>(loc, conditionC, 1);
+  setupMetadata(bbAttr, namer, repeatingInit);
+  Value specOutput = repeatingInit.getResult();
+
+  // connect the repeatingInit to the loop init and the suppressor
+  initOp.getOperandMutable().assign(specOutput);
+
+  /*
   // create the constant true generator
   auto trueSrc = builder.create<handshake::SourceOp>(loc);
   auto trueCst = builder.create<handshake::ConstantOp>(
@@ -410,9 +419,10 @@ void EagerlyElasticADPass::applyRewriteD(
   // assign the bb attribute from the dataMux to all new ops and name them
   setupMetadata(bbAttr, namer, trueSrc, trueCst, condMux, controlFork,
                 loopInitF);
+  */
 
   // rewire the NotIOp's input to the new control fork result
-  notOp.getOperandMutable().assign(controlFork.getResults()[2]);
+  notOp.getOperandMutable().assign(specOutput);
 
   // move suppressor past the mux
   performSuppressorMotion(branchOp, frontier, namer, 1);

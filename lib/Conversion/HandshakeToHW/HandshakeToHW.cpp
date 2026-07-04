@@ -763,6 +763,21 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
         addUnsigned("SIZE", resType.getNumElements());
       })
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        auto paramsAttr =
+            initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
+        if (paramsAttr) {
+          auto initTokenAttr =
+              paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+          int initialValue =
+              (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
+          addUnsigned("INITIAL_VALUE", initialValue);
+        } else
+          addUnsigned("INITIAL_VALUE", 0);
+      })
+      .Case<handshake::RepeatingInitOp>([&](handshake::RepeatingInitOp initOp) {
+        addUnsigned("INIT_TOKEN", initOp.getInitToken());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -2187,6 +2202,7 @@ public:
         ConvertToHWInstance<handshake::ReadyRemoverOp>,
         ConvertToHWInstance<handshake::ValidMergerOp>,
         ConvertToHWInstance<handshake::SharingWrapperOp>,
+        ConvertToHWInstance<handshake::SpecV2RepeatingInitOp>,
 
         // Arith operations
         ConvertToHWInstance<handshake::AddFOp>,

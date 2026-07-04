@@ -2329,5 +2329,29 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 }
 
+def RepeatingInitOp : Handshake_Op<"repeating_init", [
+  HasClock, SameOperandsAndResultType,
+  IsIntSizedChannel<1, "operand">,
+  IsIntSizedChannel<1, "result">
+]> {
+  let summary = "repeating init operation";
+  let description = [{
+    A single-slot buffer which contains a token in its reset state.
+    Similar to a buffer, its timing behavior is configurable.
+  }];
+  
+  let arguments = (ins ChannelType:$operand, UI1Attr:$initToken);
+  let results = (outs ChannelType:$result);
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
+                                           TIMING_ATTR_NAME = "TIMING";
+  }];
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand)
+  }];
+}
+
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
