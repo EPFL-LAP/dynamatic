@@ -349,6 +349,10 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
 }
 
 bool CFDFC::isCFDFCBackedge(Value val) {
+  if (isa<handshake::InitOp, handshake::RepeatingInitOp>(
+          *val.getUsers().begin()))
+    return true;
+
   // A CFDFC backedge is a backedge
   if (!isBackedge(val))
     return false;

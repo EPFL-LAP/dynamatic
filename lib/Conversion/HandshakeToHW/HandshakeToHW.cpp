@@ -780,6 +780,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         } else
           addUnsigned("INITIAL_VALUE", 0);
       })
+      .Case<handshake::RepeatingInitOp>([&](handshake::RepeatingInitOp initOp) {
+        addUnsigned("INIT_TOKEN", initOp.getInitToken());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -2206,6 +2209,7 @@ public:
         ConvertToHWInstance<handshake::ReadyRemoverOp>,
         ConvertToHWInstance<handshake::ValidMergerOp>,
         ConvertToHWInstance<handshake::SharingWrapperOp>,
+        ConvertToHWInstance<handshake::SpecV2RepeatingInitOp>,
 
         // Arith operations
         ConvertToHWInstance<handshake::AddFOp>,
