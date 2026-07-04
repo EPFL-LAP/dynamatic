@@ -16,7 +16,7 @@ def generate_cmpf(name, params):
             raise ValueError(f"is_double was missing for generating a flopoco cmpf")
 
         signals = _get_flopoco_signals(bitwidth)
-        body = _get_flopoco_body(bitwidth, predicate)
+        body = _get_flopoco_body(bitwidth, predicate, latency)
     elif impl == VIVADO_IMPL:
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
@@ -54,8 +54,14 @@ def _get_flopoco_signals(bitwidth):
   """
 
 
-def _get_flopoco_body(bitwidth, predicate):
+def _get_flopoco_body(bitwidth, predicate, latency):
     expression = _get_flopoco_expression_from_predicate(predicate)
+    # When latency > 0 the FloPoCo comparator is internally pipelined (e.g. the
+    # 64-bit core registers its result), so its clock enable must be driven by
+    # 'valid_buffer_ready' to freeze the pipeline on downstream stalls and keep
+    # the registered result aligned with the delayed valid. For a combinational
+    # core (latency == 0) there is no valid buffer, so 'ce' is tied high.
+    clock_enable = "valid_buffer_ready" if latency > 0 else "'1'"
     return f"""
   ieee2nfloat_0: entity work.InputIEEE_{bitwidth}bit(arch)
     port map(
@@ -74,7 +80,7 @@ def _get_flopoco_body(bitwidth, predicate):
     );
   operator: entity work.FPComparator_{bitwidth}bit(arch)
   port map (clk=> clk,
-        ce=> '1',
+        ce=> {clock_enable},
         X=> ip_lhs,
         Y=> ip_rhs,
         unordered=> unordered,
