@@ -2058,6 +2058,17 @@ def RepeatingInitOp : Handshake_Op<"repeating_init", [
   let assemblyFormat = [{
     $operand attr-dict `:` type($operand)
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    RepeatingInitOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "INIT_TOKEN"),
+         getInitTokenAttr()}
+      };
+    }
+  }];
 }
 
 
