@@ -2202,7 +2202,7 @@ public:
         ConvertToHWInstance<handshake::ReadyRemoverOp>,
         ConvertToHWInstance<handshake::ValidMergerOp>,
         ConvertToHWInstance<handshake::SharingWrapperOp>,
-        ConvertToHWInstance<handshake::SpecV2RepeatingInitOp>,
+        ConvertToHWInstance<handshake::RepeatingInitOp>,
 
         // Arith operations
         ConvertToHWInstance<handshake::AddFOp>,

@@ -172,12 +172,15 @@ bool EagerlyElasticADPass::isSourced(Value value) {
     return false;
 
   // Heuristic to stop the traversal earlier.
-  if (isa<handshake::MuxOp>(definingOp))
+  if (isa<handshake::MuxOp>(definingOp) or
+      isa<handshake::RepeatingInitOp>(definingOp))
     return false;
 
   if (isa<handshake::SourceOp>(value.getDefiningOp()))
     return true;
 
+  llvm::errs() << "first part of isSourced is fine\n";
+  definingOp->dump();
   // If all operands of the defining operation are sourced, the value is also
   // sourced.
   return llvm::all_of(value.getDefiningOp()->getOperands(),
@@ -190,6 +193,7 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
     handshake::ConditionalBranchOp branchOp, Operation *targetOp) {
 
   StringRef opName = targetOp->getName().getStringRef();
+  llvm::errs() << "opname is: " << opName << '\n';
 
   // verify the targetOp is a PM unit
   if (!isa<handshake::ArithOpInterface, handshake::ForkOp, handshake::NotIOp,
@@ -221,6 +225,8 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
   // synchronization issues
   Value currentCond = branchOp.getConditionOperand();
   for (Value operand : targetOp->getOperands()) {
+    llvm::errs() << "operand of targetOp: ";
+    operand.dump();
     // if we have a branch it must have the same condition
     if (auto siblingBranch =
             dyn_cast<handshake::ConditionalBranchOp>(operand.getDefiningOp())) {
@@ -242,6 +248,7 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
       return false;
     }
   }
+  llvm::errs() << "returning true\n";
   return true;
 }
 
@@ -254,6 +261,8 @@ void EagerlyElasticADPass::performSuppressorMotion(
   // identify the operation we want to move past
   Value dataPath = branchOp.getFalseResult();
   Operation *targetOp = *dataPath.user_begin();
+  llvm::errs() << "Moving past: " << targetOp->getAttr("handshake.name")
+               << '\n';
 
   // ensure that targetOp and the new branch are in the same bb as the old
   // branch. skip for load operations due to the memory controller
@@ -324,6 +333,8 @@ void EagerlyElasticADPass::rewriteA(
     for (auto branchOp : frontier) {
       Value dataPath = branchOp.getFalseResult();
       Operation *eligibleTarget = nullptr;
+      llvm::errs() << "going into the loops works\n";
+      dataPath.dump();
 
       // search for any consumer of the suppressor that is eligible
       for (Operation *user : dataPath.getUsers()) {
@@ -332,6 +343,7 @@ void EagerlyElasticADPass::rewriteA(
           break;
         }
       }
+      llvm::errs() << "looking for consumers works\n";
 
       if (eligibleTarget) {
         llvm::errs() << branchOp->getAttr("handshake.name") << '\n';
@@ -386,7 +398,8 @@ void EagerlyElasticADPass::applyRewriteD(
   OpBuilder builder(dataMux);
 
   // completely replace the pink circuit with a RepeatingInitOp
-  auto repeatingInit = builder.create<RepeatingInitOp>(loc, conditionC, 1);
+  auto repeatingInit =
+      builder.create<handshake::RepeatingInitOp>(loc, conditionC, 1);
   setupMetadata(bbAttr, namer, repeatingInit);
   Value specOutput = repeatingInit.getResult();
 
