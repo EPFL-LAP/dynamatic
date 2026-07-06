@@ -94,6 +94,13 @@ public:
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override;
 
+  static bool discardScalarAssignmentStatement(const BitwidthTypingContext &) {
+    // TODO: Nothing currently prevents a scalar assignment to cause a loop to
+    //       run indefinitely by e.g. always assigning 0 to the iter variable.
+    //       Enable once we have a solution.
+    return true;
+  }
+
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range
   /// [1, bitWidth].

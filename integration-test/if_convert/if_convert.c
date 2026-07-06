@@ -9,7 +9,7 @@ void if_convert(in_int_t a[N], inout_int_t b[N]) {
   do {
     int tmp = a[i];
     bool ifPred = i * tmp < 10000;
-    #pragma DYN speculate variable=ifPred max_predictions=7 style=standard
+    #pragma DYN speculate variable=ifPred max_predictions=8 style=standard
     if (ifPred) {
       i++;
     }

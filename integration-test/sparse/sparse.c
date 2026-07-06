@@ -16,7 +16,7 @@ float sparse(in_float_t a[N], in_float_t x[N]) {
     #pragma DYN predict variable=sum location=end marker=0
     i++;
     loopAgain = sum >= 0.0f;
-    #pragma DYN speculate variable=loopAgain max_predictions=2 style=standard
+    #pragma DYN speculate variable=loopAgain max_predictions=3 style=standard
   } while (loopAgain);
   return sum;
 }
