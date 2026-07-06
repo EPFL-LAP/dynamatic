@@ -1,4 +1,3 @@
-#include "dynamatic/Transforms/HandshakeTreeHeightReduction.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -7,6 +6,8 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 // Boilerplate: Include this for the pass option defintitions
 namespace dynamatic {
 // import auto-generated base class definition
@@ -14,6 +15,7 @@ namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKETREEHEIGHTREDUCTION
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 

@@ -87,11 +87,21 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
 
 LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
                                              double &delay) const {
-  double unitDelay, inPortDelay, outPortDelay;
-  if (failed(dataDelay.getCeilMetric(bitwidth, unitDelay)) ||
-      failed(inputModel.dataDelay.getCeilMetric(bitwidth, inPortDelay)) ||
-      failed(outputModel.dataDelay.getCeilMetric(bitwidth, outPortDelay)))
+  auto unitDelayOrFail = dataDelay.select(bitwidth);
+  if (failed(unitDelayOrFail))
     return failure();
+  double unitDelay = unitDelayOrFail->get();
+
+  auto inPortDelayOrFail = inputModel.dataDelay.select(bitwidth);
+  if (failed(inPortDelayOrFail))
+    return failure();
+  double inPortDelay = inPortDelayOrFail->get();
+
+  auto outPortDelayOrFail = outputModel.dataDelay.select(bitwidth);
+  if (failed(outPortDelayOrFail))
+    return failure();
+  double outPortDelay = outPortDelayOrFail->get();
+
   delay = unitDelay + inPortDelay + outPortDelay;
   return success();
 }
@@ -123,31 +133,45 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   return getModel(baseName);
 }
 
-LogicalResult TimingDatabase::getLatency(
-    Operation *op, SignalType signalType, double &latency,
-    double targetPeriod) const // Our current timing model doesn't have latency
-                               // information for valid and
-// ready signals, assume it is 0
-{
-
-  if (signalType != SignalType::DATA) {
-    latency = 0.0;
-    return success();
-  }
+FailureOr<double> TimingDatabase::getLatency(Operation *op,
+                                             SignalType signalType,
+                                             double targetPeriod,
+                                             unsigned pathId) const {
+  // Our current timing model doesn't have latency information for valid and
+  // ready signals; assume it is 0.
+  if (signalType != SignalType::DATA)
+    return 0.0;
 
   const TimingModel *model = getModel(op);
-  if (!model)
+  if (!model) {
+    op->emitWarning() << "TimingDatabase::getLatency: no timing model for op";
     return failure();
+  }
 
-  // First, we extract the DelayDepMetric instance for a specific biwdidth.
-  // Then, we use its method (getDelayCeilMetric) to get the latency for the
-  // given targetPeriod.
-  DelayDepMetric<double> DelayStruct;
-
-  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+  // Walk inward through the path -> bitwidth -> clock-period nesting.
+  auto latAndMaxFreqByBitwidth = model->latAndMaxFreqByPath.select(pathId);
+  if (failed(latAndMaxFreqByBitwidth)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: no entry for retiming-path id "
+        << pathId;
     return failure();
-  if (failed(DelayStruct.getDelayCeilMetric(targetPeriod, latency)))
+  }
+  auto latAndMaxFreqByClockPeriod = latAndMaxFreqByBitwidth->get().select(op);
+  if (failed(latAndMaxFreqByClockPeriod)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: bitwidth not characterised in the "
+           "timing model";
     return failure();
+  }
+  auto latencyOrFail =
+      latAndMaxFreqByClockPeriod->get().selectLatency(targetPeriod);
+  if (failed(latencyOrFail)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: no latency data for target period "
+        << targetPeriod;
+    return failure();
+  }
+  double latency = *latencyOrFail;
 
   // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
   // of latency on loads compared to an MC here because our timing models are
@@ -159,7 +183,7 @@ LogicalResult TimingDatabase::getLatency(
     if (isa_and_present<handshake::LSQOp>(memOp))
       latency += 3;
   }
-  return success();
+  return latency;
 }
 
 LogicalResult TimingDatabase::getInternalCombinationalDelay(
@@ -172,16 +196,19 @@ LogicalResult TimingDatabase::getInternalCombinationalDelay(
   if (!model)
     return failure();
 
-  // This section now must handle the fact that all latency values are now
-  // contained inside an instance of DelayDepMetric. We therefore extract this
-  // structure, and use its method to obtain the latency value at the
-  // targetPeriod provided.
-  DelayDepMetric<double> DelayStruct;
-
-  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+  // Internal combinational delay uses retiming path 0. Walk inward through
+  // the path -> bitwidth -> clock-period nesting.
+  auto latAndMaxFreqByBitwidth = model->latAndMaxFreqByPath.select(0);
+  if (failed(latAndMaxFreqByBitwidth))
     return failure();
-  if (failed(DelayStruct.getDelayCeilValue(targetPeriod, delay)))
+  auto latAndMaxFreqByClockPeriod = latAndMaxFreqByBitwidth->get().select(op);
+  if (failed(latAndMaxFreqByClockPeriod))
     return failure();
+  auto delayOrFail =
+      latAndMaxFreqByClockPeriod->get().selectDelay(targetPeriod);
+  if (failed(delayOrFail))
+    return failure();
+  delay = *delayOrFail;
 
   return success();
 }
@@ -194,8 +221,13 @@ LogicalResult TimingDatabase::getInternalDelay(Operation *op,
     return failure();
 
   switch (signalType) {
-  case SignalType::DATA:
-    return model->dataDelay.getCeilMetric(op, delay);
+  case SignalType::DATA: {
+    auto delayOrFail = model->dataDelay.select(op);
+    if (failed(delayOrFail))
+      return failure();
+    delay = delayOrFail->get();
+    return success();
+  }
   case SignalType::VALID:
     delay = model->validDelay;
     return success();
@@ -216,8 +248,13 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
       portType == PortType::IN ? model->inputModel : model->outputModel;
 
   switch (signalType) {
-  case SignalType::DATA:
-    return portModel.dataDelay.getCeilMetric(op, delay);
+  case SignalType::DATA: {
+    auto delayOrFail = portModel.dataDelay.select(op);
+    if (failed(delayOrFail))
+      return failure();
+    delay = delayOrFail->get();
+    return success();
+  }
   case SignalType::VALID:
     delay = portModel.validDelay;
     return success();
@@ -297,6 +334,21 @@ static bool bitwidthFromJSON(const ljson::ObjectKey &value, unsigned &bitwidth,
   return true;
 }
 
+/// Parses an unsigned number representing a retiming-path id from a JSON key.
+/// Returns true and sets the second argument to the parsed number if the key
+/// represents a valid unsigned number; returns false otherwise.
+static bool pathIdFromJSON(const ljson::ObjectKey &value, unsigned &pathId,
+                           ljson::Path path) {
+  StringRef key = value;
+  if (std::any_of(key.begin(), key.end(),
+                  [](char c) { return !std::isdigit(c); })) {
+    path.report("expected unsigned integer for retiming-path id");
+    return false;
+  }
+  pathId = std::stoi(key.str());
+  return true;
+}
+
 /// Deserializes an object of type T that is nested under a list of keys inside
 /// the passed JSON object. Behaves like the fromJSON functions (See
 /// ::llvm::json::Value's documentation).
@@ -349,55 +401,75 @@ bool dynamatic::fromJSON(const ljson::Value &value,
   return true;
 }
 
-bool dynamatic::fromJSON(const ljson::Value &value,
-                         BitwidthDepMetric<DelayDepMetric<double>> &metric,
+bool dynamatic::fromJSON(const ljson::Value &value, DelayDepMetric &metric,
                          ljson::Path path) {
-
   const ljson::Object *object = value.getAsObject();
 
-  // standard empty object check
   if (!object) {
     path.report("expected JSON object");
     return false;
   }
-  // The outer loop is on the bitwidths: each is associated with a
-  // DelayDepMetric map in the JSON.
+
+  // Key-value pair of {delay : latency, delay : latency}
+  for (const auto &[delayKey, latencyValue] : *object) {
+    double delay = std::stod(delayKey.str());
+    double latency;
+    if (!fromJSON(latencyValue, latency, path.field(delayKey)))
+      return false;
+    metric.data[delay] = latency;
+  }
+
+  return true;
+}
+
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         BitwidthDepMetric<DelayDepMetric> &metric,
+                         ljson::Path path) {
+
+  const ljson::Object *object = value.getAsObject();
+
+  if (!object) {
+    path.report("expected JSON object");
+    return false;
+  }
+
+  // The outer keys are bitwidths; each maps to a delay-dependent
+  // timing metric.
   for (const auto &[bitwidthKey, metricValue] : *object) {
     unsigned bitwidth;
-    // we start by obtaining the bitwidth value associated with this key
     if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
       return false;
 
-    // We instantiate inside the loop an internalMap for this specific bitwidth.
-    std::map<double, double> internalMap;
-
-    // Validity check to ensure the presence of a map.
-    const ljson::Object *nestedMap = metricValue.getAsObject();
-    if (!nestedMap) {
-      path.field(bitwidthKey).report("expected nested map object");
+    DelayDepMetric delayDepStruct;
+    if (!fromJSON(metricValue, delayDepStruct, path.field(bitwidthKey)))
       return false;
-    }
 
-    // nested fromJSON call, which deserializes individual delay & value pairs
-    // into the internalMap
-    for (const auto &[doubleDelay, doubleValue] : *nestedMap) {
-      double key;
-      key = std::stod(doubleDelay.str());
+    metric.data[bitwidth] = delayDepStruct;
+  }
 
-      double value;
-      if (!fromJSON(doubleValue, value,
-                    path.field(bitwidthKey).field(doubleDelay)))
-        return false;
+  return true;
+}
 
-      internalMap[key] = value;
-    }
-    // We save the internal map as the data field of the DelayDepMetric.
-    DelayDepMetric<double> DelayDepStruct;
-    DelayDepStruct.data = internalMap;
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         PathDepMetric &latAndMaxFreqByPath, ljson::Path path) {
+  const ljson::Object *object = value.getAsObject();
+  if (!object) {
+    path.report("expected JSON object");
+    return false;
+  }
 
-    // Each DelayDepMetric structure is then associated with its bitwidth,
-    // completing the 2-level nested map.
-    metric.data[bitwidth] = DelayDepStruct;
+  // The outer keys are retiming-path ids; each maps to a bitwidth-dependent
+  // timing metric.
+  for (const auto &[pathKey, metricValue] : *object) {
+    unsigned pathId;
+    if (!pathIdFromJSON(pathKey, pathId, path.field(pathKey)))
+      return false;
+
+    BitwidthDepMetric<DelayDepMetric> bitwidthMetric;
+    if (!fromJSON(metricValue, bitwidthMetric, path.field(pathKey)))
+      return false;
+
+    latAndMaxFreqByPath.data[pathId] = bitwidthMetric;
   }
 
   return true;
@@ -438,8 +510,8 @@ bool dynamatic::fromJSON(const ljson::Value &value, TimingModel &model,
     return false;
   }
 
-  // Deserialize the latencies
-  FW_FALSE(deserializeNested(LATENCY, object, model.latency, path));
+  // Deserialize the latency and max frequency
+  FW_FALSE(deserializeNested(LATENCY, object, model.latAndMaxFreqByPath, path));
   // Deserialize the data delays
   FW_FALSE(deserializeNested(DELAY, object, model.dataDelay, path));
   // Deserialize the valid/ready delay

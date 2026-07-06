@@ -1,0 +1,377 @@
+# Benchmark "oehb" written by ABC on Sun Jul 13 20:24:03 2025
+.model oehb
+.inputs clk rst ins[0] ins[1] ins[2] ins[3] ins[4] ins[5] ins[6] ins[7] \
+ ins[8] ins[9] ins[10] ins[11] ins[12] ins[13] ins[14] ins[15] ins[16] \
+ ins[17] ins[18] ins[19] ins[20] ins[21] ins[22] ins[23] ins[24] ins[25] \
+ ins[26] ins[27] ins[28] ins[29] ins[30] ins[31] ins_valid outs_ready
+.outputs ins_ready outs[0] outs[1] outs[2] outs[3] outs[4] outs[5] outs[6] \
+ outs[7] outs[8] outs[9] outs[10] outs[11] outs[12] outs[13] outs[14] \
+ outs[15] outs[16] outs[17] outs[18] outs[19] outs[20] outs[21] outs[22] \
+ outs[23] outs[24] outs[25] outs[26] outs[27] outs[28] outs[29] outs[30] \
+ outs[31] outs_valid
+
+.latch       n142 dataReg[0]  0
+.latch       n147 dataReg[1]  0
+.latch       n152 dataReg[2]  0
+.latch       n157 dataReg[3]  0
+.latch       n162 dataReg[4]  0
+.latch       n167 dataReg[5]  0
+.latch       n172 dataReg[6]  0
+.latch       n177 dataReg[7]  0
+.latch       n182 dataReg[8]  0
+.latch       n187 dataReg[9]  0
+.latch       n192 dataReg[10]  0
+.latch       n197 dataReg[11]  0
+.latch       n202 dataReg[12]  0
+.latch       n207 dataReg[13]  0
+.latch       n212 dataReg[14]  0
+.latch       n217 dataReg[15]  0
+.latch       n222 dataReg[16]  0
+.latch       n227 dataReg[17]  0
+.latch       n232 dataReg[18]  0
+.latch       n237 dataReg[19]  0
+.latch       n242 dataReg[20]  0
+.latch       n247 dataReg[21]  0
+.latch       n252 dataReg[22]  0
+.latch       n257 dataReg[23]  0
+.latch       n262 dataReg[24]  0
+.latch       n267 dataReg[25]  0
+.latch       n272 dataReg[26]  0
+.latch       n277 dataReg[27]  0
+.latch       n282 dataReg[28]  0
+.latch       n287 dataReg[29]  0
+.latch       n292 dataReg[30]  0
+.latch       n297 dataReg[31]  0
+.latch       n302 control.outputValid  0
+
+.names outs_ready control.outputValid ins_ready
+01 0
+.names ins_valid ins_ready new_n171
+11 1
+.names dataReg[0] new_n171 new_n172_1
+10 1
+.names ins[0] new_n171 new_n173
+11 1
+.names new_n172_1 new_n173 new_n174
+00 1
+.names rst new_n174 n142
+00 1
+.names dataReg[1] new_n171 new_n176
+10 1
+.names ins[1] new_n171 new_n177_1
+11 1
+.names new_n176 new_n177_1 new_n178
+00 1
+.names rst new_n178 n147
+00 1
+.names dataReg[2] new_n171 new_n180
+10 1
+.names ins[2] new_n171 new_n181
+11 1
+.names new_n180 new_n181 new_n182_1
+00 1
+.names rst new_n182_1 n152
+00 1
+.names dataReg[3] new_n171 new_n184
+10 1
+.names ins[3] new_n171 new_n185
+11 1
+.names new_n184 new_n185 new_n186
+00 1
+.names rst new_n186 n157
+00 1
+.names dataReg[4] new_n171 new_n188
+10 1
+.names ins[4] new_n171 new_n189
+11 1
+.names new_n188 new_n189 new_n190
+00 1
+.names rst new_n190 n162
+00 1
+.names dataReg[5] new_n171 new_n192_1
+10 1
+.names ins[5] new_n171 new_n193
+11 1
+.names new_n192_1 new_n193 new_n194
+00 1
+.names rst new_n194 n167
+00 1
+.names dataReg[6] new_n171 new_n196
+10 1
+.names ins[6] new_n171 new_n197_1
+11 1
+.names new_n196 new_n197_1 new_n198
+00 1
+.names rst new_n198 n172
+00 1
+.names dataReg[7] new_n171 new_n200
+10 1
+.names ins[7] new_n171 new_n201
+11 1
+.names new_n200 new_n201 new_n202_1
+00 1
+.names rst new_n202_1 n177
+00 1
+.names dataReg[8] new_n171 new_n204
+10 1
+.names ins[8] new_n171 new_n205
+11 1
+.names new_n204 new_n205 new_n206
+00 1
+.names rst new_n206 n182
+00 1
+.names dataReg[9] new_n171 new_n208
+10 1
+.names ins[9] new_n171 new_n209
+11 1
+.names new_n208 new_n209 new_n210
+00 1
+.names rst new_n210 n187
+00 1
+.names dataReg[10] new_n171 new_n212_1
+10 1
+.names ins[10] new_n171 new_n213
+11 1
+.names new_n212_1 new_n213 new_n214
+00 1
+.names rst new_n214 n192
+00 1
+.names dataReg[11] new_n171 new_n216
+10 1
+.names ins[11] new_n171 new_n217_1
+11 1
+.names new_n216 new_n217_1 new_n218
+00 1
+.names rst new_n218 n197
+00 1
+.names dataReg[12] new_n171 new_n220
+10 1
+.names ins[12] new_n171 new_n221
+11 1
+.names new_n220 new_n221 new_n222_1
+00 1
+.names rst new_n222_1 n202
+00 1
+.names dataReg[13] new_n171 new_n224
+10 1
+.names ins[13] new_n171 new_n225
+11 1
+.names new_n224 new_n225 new_n226
+00 1
+.names rst new_n226 n207
+00 1
+.names dataReg[14] new_n171 new_n228
+10 1
+.names ins[14] new_n171 new_n229
+11 1
+.names new_n228 new_n229 new_n230
+00 1
+.names rst new_n230 n212
+00 1
+.names dataReg[15] new_n171 new_n232_1
+10 1
+.names ins[15] new_n171 new_n233
+11 1
+.names new_n232_1 new_n233 new_n234
+00 1
+.names rst new_n234 n217
+00 1
+.names dataReg[16] new_n171 new_n236
+10 1
+.names ins[16] new_n171 new_n237_1
+11 1
+.names new_n236 new_n237_1 new_n238
+00 1
+.names rst new_n238 n222
+00 1
+.names dataReg[17] new_n171 new_n240
+10 1
+.names ins[17] new_n171 new_n241
+11 1
+.names new_n240 new_n241 new_n242_1
+00 1
+.names rst new_n242_1 n227
+00 1
+.names dataReg[18] new_n171 new_n244
+10 1
+.names ins[18] new_n171 new_n245
+11 1
+.names new_n244 new_n245 new_n246
+00 1
+.names rst new_n246 n232
+00 1
+.names dataReg[19] new_n171 new_n248
+10 1
+.names ins[19] new_n171 new_n249
+11 1
+.names new_n248 new_n249 new_n250
+00 1
+.names rst new_n250 n237
+00 1
+.names dataReg[20] new_n171 new_n252_1
+10 1
+.names ins[20] new_n171 new_n253
+11 1
+.names new_n252_1 new_n253 new_n254
+00 1
+.names rst new_n254 n242
+00 1
+.names dataReg[21] new_n171 new_n256
+10 1
+.names ins[21] new_n171 new_n257_1
+11 1
+.names new_n256 new_n257_1 new_n258
+00 1
+.names rst new_n258 n247
+00 1
+.names dataReg[22] new_n171 new_n260
+10 1
+.names ins[22] new_n171 new_n261
+11 1
+.names new_n260 new_n261 new_n262_1
+00 1
+.names rst new_n262_1 n252
+00 1
+.names dataReg[23] new_n171 new_n264
+10 1
+.names ins[23] new_n171 new_n265
+11 1
+.names new_n264 new_n265 new_n266
+00 1
+.names rst new_n266 n257
+00 1
+.names dataReg[24] new_n171 new_n268
+10 1
+.names ins[24] new_n171 new_n269
+11 1
+.names new_n268 new_n269 new_n270
+00 1
+.names rst new_n270 n262
+00 1
+.names dataReg[25] new_n171 new_n272_1
+10 1
+.names ins[25] new_n171 new_n273
+11 1
+.names new_n272_1 new_n273 new_n274
+00 1
+.names rst new_n274 n267
+00 1
+.names dataReg[26] new_n171 new_n276
+10 1
+.names ins[26] new_n171 new_n277_1
+11 1
+.names new_n276 new_n277_1 new_n278
+00 1
+.names rst new_n278 n272
+00 1
+.names dataReg[27] new_n171 new_n280
+10 1
+.names ins[27] new_n171 new_n281
+11 1
+.names new_n280 new_n281 new_n282_1
+00 1
+.names rst new_n282_1 n277
+00 1
+.names dataReg[28] new_n171 new_n284
+10 1
+.names ins[28] new_n171 new_n285
+11 1
+.names new_n284 new_n285 new_n286
+00 1
+.names rst new_n286 n282
+00 1
+.names dataReg[29] new_n171 new_n288
+10 1
+.names ins[29] new_n171 new_n289
+11 1
+.names new_n288 new_n289 new_n290
+00 1
+.names rst new_n290 n287
+00 1
+.names dataReg[30] new_n171 new_n292_1
+10 1
+.names ins[30] new_n171 new_n293
+11 1
+.names new_n292_1 new_n293 new_n294
+00 1
+.names rst new_n294 n292
+00 1
+.names dataReg[31] new_n171 new_n296
+10 1
+.names ins[31] new_n171 new_n297_1
+11 1
+.names new_n296 new_n297_1 new_n298
+00 1
+.names rst new_n298 n297
+00 1
+.names ins_valid ins_ready new_n300
+01 1
+.names rst new_n300 n302
+00 1
+.names dataReg[0] outs[0]
+1 1
+.names dataReg[1] outs[1]
+1 1
+.names dataReg[2] outs[2]
+1 1
+.names dataReg[3] outs[3]
+1 1
+.names dataReg[4] outs[4]
+1 1
+.names dataReg[5] outs[5]
+1 1
+.names dataReg[6] outs[6]
+1 1
+.names dataReg[7] outs[7]
+1 1
+.names dataReg[8] outs[8]
+1 1
+.names dataReg[9] outs[9]
+1 1
+.names dataReg[10] outs[10]
+1 1
+.names dataReg[11] outs[11]
+1 1
+.names dataReg[12] outs[12]
+1 1
+.names dataReg[13] outs[13]
+1 1
+.names dataReg[14] outs[14]
+1 1
+.names dataReg[15] outs[15]
+1 1
+.names dataReg[16] outs[16]
+1 1
+.names dataReg[17] outs[17]
+1 1
+.names dataReg[18] outs[18]
+1 1
+.names dataReg[19] outs[19]
+1 1
+.names dataReg[20] outs[20]
+1 1
+.names dataReg[21] outs[21]
+1 1
+.names dataReg[22] outs[22]
+1 1
+.names dataReg[23] outs[23]
+1 1
+.names dataReg[24] outs[24]
+1 1
+.names dataReg[25] outs[25]
+1 1
+.names dataReg[26] outs[26]
+1 1
+.names dataReg[27] outs[27]
+1 1
+.names dataReg[28] outs[28]
+1 1
+.names dataReg[29] outs[29]
+1 1
+.names dataReg[30] outs[30]
+1 1
+.names dataReg[31] outs[31]
+1 1
+.names control.outputValid outs_valid
+1 1
+.end

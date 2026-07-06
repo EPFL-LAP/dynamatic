@@ -187,9 +187,35 @@ static unsigned getDataBitWidth(Value val) {
   return cast<handshake::ChannelType>(val.getType()).getDataBitWidth();
 }
 
+static IntegerAttr constantFoldExt(Operation *op, Attribute attr) {
+  auto integerAttr = cast<IntegerAttr>(attr);
+  if (auto extUI = dyn_cast<ExtUIOp>(op))
+    return IntegerAttr::get(
+        extUI.getType().getDataType(),
+        integerAttr.getValue().zext(extUI.getType().getDataBitWidth()));
+
+  if (auto extSI = dyn_cast<ExtSIOp>(op))
+    return IntegerAttr::get(
+        extSI.getType().getDataType(),
+        integerAttr.getValue().sext(extSI.getType().getDataBitWidth()));
+
+  llvm_unreachable("only expected extui and extsi");
+}
+
+static IntegerAttr constantFoldTruncI(Type resultType, Attribute attr) {
+  unsigned bitwidth = cast<ChannelType>(resultType).getDataBitWidth();
+  return IntegerAttr::get(IntegerType::get(resultType.getContext(), bitwidth),
+                          cast<IntegerAttr>(attr).getValue().trunc(bitwidth));
+}
+
 namespace {
 #include "lib/Dialect/Handshake/HandshakeCanonicalization.inc"
 } // namespace
+
+void handshake::HandshakeDialect::getCanonicalizationPatterns(
+    RewritePatternSet &set) const {
+  populateWithGenerated(set);
+}
 
 //===----------------------------------------------------------------------===//
 // MergeOp
@@ -401,6 +427,7 @@ LogicalResult BufferOp::verify() {
   // this is additional verification
   // so both attributes have already been verified as present
   int numSlots = getNumSlots();
+  int64_t dvLatency = getLatencyDV();
   BufferType bufferType = getBufferType();
 
   if ((bufferType == BufferType::ONE_SLOT_BREAK_DV ||
@@ -410,6 +437,48 @@ LogicalResult BufferOp::verify() {
     return emitOpError("buffer type '")
            << stringifyEnum(bufferType) << "' requires NUM_SLOTS = 1, but got "
            << numSlots;
+  }
+
+  auto emitLatencyError = [&](int64_t expectedLatency) -> LogicalResult {
+    return emitOpError("buffer type '")
+           << stringifyEnum(bufferType)
+           << "' requires DV_LATENCY = " << expectedLatency << ", but got "
+           << dvLatency;
+  };
+
+  switch (bufferType) {
+  case BufferType::ONE_SLOT_BREAK_R:
+  case BufferType::FIFO_BREAK_NONE:
+    if (dvLatency != 0)
+      return emitLatencyError(0);
+    break;
+  case BufferType::ONE_SLOT_BREAK_DV:
+  case BufferType::FIFO_BREAK_DV:
+  case BufferType::ONE_SLOT_BREAK_DVR:
+    if (dvLatency != 1)
+      return emitLatencyError(1);
+    break;
+  case BufferType::SHIFT_REG_BREAK_DV:
+    if (dvLatency != numSlots) {
+      return emitOpError("buffer type '")
+             << stringifyEnum(bufferType)
+             << "' requires DV_LATENCY = NUM_SLOTS (" << numSlots
+             << "), but got " << dvLatency;
+    }
+    break;
+  case BufferType::COUNTER_BUFFER:
+    if (numSlots != 1) {
+      return emitOpError("buffer type '")
+             << stringifyEnum(bufferType)
+             << "' stores a single token and requires NUM_SLOTS = 1, but got "
+             << numSlots;
+    }
+    if (dvLatency < 1) {
+      return emitOpError("buffer type '")
+             << stringifyEnum(bufferType)
+             << "' requires DV_LATENCY >= 1, but got " << dvLatency;
+    }
+    break;
   }
 
   return success();
@@ -585,7 +654,6 @@ LogicalResult ConstantOp::verify() {
 }
 
 bool JoinOp::isControl() { return true; }
-
 /// Based on mlir::func::CallOp::verifySymbolUses
 LogicalResult InstanceOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the module attribute was specified.
@@ -918,6 +986,49 @@ dynamatic::MCPorts MemoryControllerOp::getPorts() {
   if (failed(getMCPorts(mcPorts)))
     assert(false && "failed to identify memory ports");
   return mcPorts;
+}
+
+size_t MemoryControllerOp::getNumLoadPorts() {
+  MCPorts mcPorts = getPorts();
+  const FuncMemoryPorts &ports = mcPorts;
+  size_t numLoads = 0;
+  for (const GroupMemoryPorts &blockPorts : ports.groups) {
+    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
+        ++numLoads;
+      }
+    }
+  }
+  return numLoads;
+}
+
+std::optional<LoadPort> MemoryControllerOp::getLoadPort(size_t index) {
+  MCPorts mcPorts = getPorts();
+  const FuncMemoryPorts &ports = mcPorts;
+  size_t loadIdx = 0;
+  for (const GroupMemoryPorts &blockPorts : ports.groups) {
+    for (const MemoryPort &accessPort : blockPorts.accessPorts) {
+      if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
+        if (loadIdx == index) {
+          return loadPort;
+        }
+        ++loadIdx;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+MemoryControllerSlotNamer
+MemoryControllerOp::getLoadPortSlotNamer(size_t index) {
+  size_t nLoads = getNumLoadPorts();
+  assert(index < nLoads);
+  auto name = getOperation()->getAttrOfType<::mlir::StringAttr>(
+      NameAnalysis::ATTR_NAME);
+  assert(name && "name required for memory controller slot namer");
+  MemoryControllerSlotNamer ret(MemoryControllerSlotNamer::PortType::Load,
+                                name.str(), index);
+  return ret;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1361,7 +1472,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx,
                      unsigned doneOutputIdx)
     : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {doneOutputIdx},
-                 Kind::STORE){};
+                 Kind::STORE) {};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1394,7 +1505,8 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
+    : ctrlPort(ctrlPort) {};
 
 size_t GroupMemoryPorts::getFirstOperandIndex() const {
   if (ctrlPort)
@@ -1490,9 +1602,9 @@ ValueRange FuncMemoryPorts::getInterfacesResults() {
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)
-    : blockID(blockID), group(group){};
+    : blockID(blockID), group(group) {}
 
-MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp){};
+MCPorts::MCPorts(handshake::MemoryControllerOp mcOp) : FuncMemoryPorts(mcOp) {}
 
 handshake::MemoryControllerOp MCPorts::getMCOp() const {
   return cast<handshake::MemoryControllerOp>(memOp);
@@ -1528,7 +1640,7 @@ SmallVector<LSQGroup> LSQPorts::getGroups() {
   return lsqGroups;
 }
 
-LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp){};
+LSQPorts::LSQPorts(handshake::LSQOp lsqOp) : FuncMemoryPorts(lsqOp) {}
 
 handshake::LSQOp LSQPorts::getLSQOp() const {
   return cast<handshake::LSQOp>(memOp);
@@ -1882,6 +1994,18 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
   return success();
 }
 
+bool CmpIOp::isSignedComparison() {
+  switch (getPredicate()) {
+  case CmpIPredicate::slt:
+  case CmpIPredicate::sle:
+  case CmpIPredicate::sgt:
+  case CmpIPredicate::sge:
+    return true;
+  default:
+    return false;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // ExtSIOp
 //===----------------------------------------------------------------------===//
@@ -1901,11 +2025,6 @@ static OpFoldResult foldExtOp(Op op) {
   if (srcWidth == dstWidth)
     return op.getIn();
   return nullptr;
-}
-
-void ExtSIOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                          MLIRContext *context) {
-  results.add<ExtSIOfExtUI>(context);
 }
 
 OpFoldResult ExtSIOp::fold(FoldAdaptor adaptor) { return foldExtOp(*this); }
@@ -1939,11 +2058,6 @@ LogicalResult ExtUIOp::verify() { return verifyExtOp(*this); }
 //===----------------------------------------------------------------------===//
 // TruncIOp
 //===----------------------------------------------------------------------===//
-
-void TruncIOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                           MLIRContext *context) {
-  results.add<TruncIExtSIToExtSI, TruncIExtUIToExtUI>(context);
-}
 
 OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
   if (auto defTruncOp = getIn().getDefiningOp<TruncIOp>()) {

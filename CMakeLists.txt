@@ -45,20 +45,73 @@ if(DYNAMATIC_CCACHE_BUILD)
     endif()
 endif()
 
+# Workaround for 'HandleLLVMArgs' and LLVM_PARALLEL_LINK_JOBS not being idempotent.
+# This causes it to be applied twice (once when adding LLVM as subdirectory and
+# once when included below) which generates an invalid Ninja file.
+set(DYNAMATIC_PARALLEL_LINK_JOBS "" CACHE STRING
+        "Define the maximum number of concurrent link jobs (Ninja only).")
+if(CMAKE_GENERATOR MATCHES "Ninja")
+  if(NOT DYNAMATIC_PARALLEL_LINK_JOBS AND uppercase_LLVM_ENABLE_LTO STREQUAL "THIN")
+    message(STATUS "ThinLTO provides its own parallel linking - limiting parallel link jobs to 2.")
+    set(DYNAMATIC_PARALLEL_LINK_JOBS "2")
+  endif()
+  if(DYNAMATIC_PARALLEL_LINK_JOBS)
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS link_job_pool=${DYNAMATIC_PARALLEL_LINK_JOBS})
+    set(CMAKE_JOB_POOL_LINK link_job_pool)
+  endif()
+elseif(DYNAMATIC_PARALLEL_LINK_JOBS)
+  message(WARNING "Job pooling is only available with Ninja generators.")
+endif()
+
 #-------------------------------------------------------------------------------
 # MLIR/LLVM configuration
 #-------------------------------------------------------------------------------
 
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-message(STATUS "Using ClangConfig.cmake in: ${CLANG_DIR}")
-message(STATUS "Using PollyConfig.cmake in: ${Polly_DIR}")
+option(DYNAMATIC_BUILD_LLVM "Build LLVM as part of the Dynamatic build" OFF)
+if (DYNAMATIC_BUILD_LLVM)
+  set(LLVM_ENABLE_PROJECTS "mlir;clang;polly" CACHE STRING "" FORCE)
+  set(LLVM_TARGETS_TO_BUILD "host"  CACHE STRING "" FORCE)
+  add_subdirectory(llvm-project/llvm "llvm-project" EXCLUDE_FROM_ALL)
 
-find_package(MLIR REQUIRED CONFIG)
-set(Clang_DIR ${CLANG_DIR})
-find_package(Clang REQUIRED CONFIG)
-find_package(Polly REQUIRED CONFIG)
+  set(LLVM_CMAKE_DIR "${PROJECT_SOURCE_DIR}/llvm-project/llvm/cmake/modules")
+  list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
+  set(MLIR_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/mlir")
+  list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
+  set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang")
+  list(APPEND CMAKE_MODULE_PATH ${CLANG_CMAKE_DIR})
+  set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py" CACHE STRING "" FORCE)
+  set(LLVM_INCLUDE_DIRS
+          llvm-project/llvm/include
+          ${CMAKE_BINARY_DIR}/llvm-project/include
+  )
+  set(LLVM_TOOLS_BINARY_DIR "${CMAKE_BINARY_DIR}/llvm-project/bin")
+  set(MLIR_INCLUDE_DIRS
+          llvm-project/mlir/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/mlir/include
+  )
+  set(CLANG_INCLUDE_DIRS
+          llvm-project/clang/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/clang/include
+  )
+  set(Polly_INCLUDE_DIRS
+          llvm-project/polly/include
+          llvm-project/polly/lib/External/isl/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/polly/include
+          ${CMAKE_BINARY_DIR}/llvm-project/tools/polly/lib/External/isl/include
+  )
+else ()
+  set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py" CACHE STRING "" FORCE)
+  message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+  message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+  message(STATUS "Using ClangConfig.cmake in: ${CLANG_DIR}")
+  message(STATUS "Using PollyConfig.cmake in: ${Polly_DIR}")
+  set(Clang_DIR ${CLANG_DIR})
+  find_package(Clang REQUIRED CONFIG)
+  find_package(Polly REQUIRED CONFIG)
+  find_package(MLIR REQUIRED CONFIG)
+endif ()
 
+set(LLVM_TABLEGEN_EXE "llvm-tblgen")
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 
@@ -82,7 +135,11 @@ include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${CLANG_INCLUDE_DIRS})
 include_directories(${Polly_INCLUDE_DIRS})
+# Explicitly add the path resolved by CMake so that Boost includes are
+# found reliably everywhere.
+include_directories(${Boost_INCLUDE_DIRS})
 message(STATUS "Including from ${Polly_INCLUDE_DIRS}")
+message(STATUS "Including from ${Boost_INCLUDE_DIRS}")
 
 option(LLVM_BUILD_TOOLS "Build the LLVM tools. If OFF, just generate build targets." ON)
 
@@ -174,22 +231,45 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(DYNAMATIC_ENABLE_CBC)
-  # Find the CBC, Osi, Clp libraries
-  find_package(PkgConfig REQUIRED)
+  if (UNIX)
+    FetchContent_Declare(
+      cbc
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+      SOURCE_DIR ${CMAKE_BINARY_DIR}/cbc
+      URL https://github.com/coin-or/Cbc/releases/download/releases%2F2.10.12/Cbc-releases.2.10.12-x86_64-ubuntu22-gcc1140-static.tar.gz
+      SYSTEM
+    )
 
-  # Use pkg-config to get include dirs and libs
-  # This command sets 
-  # - *_INCLUDE_DIRS
-  # - *_LIBRARY_DIRS
-  # But these variable will not be automatically discovered by the target.
-  pkg_check_modules(CBC QUIET cbc)
-
-  if(CBC_FOUND)
-    message(STATUS "CBC available via pkg-config")
-    # This command makes the include directory of CBC discoverable
+    FetchContent_MakeAvailable(cbc)
     add_compile_definitions(DYNAMATIC_ENABLE_CBC)
   else()
-    message(STATUS "cbc is missing! Disabling the CBC-related feature in Dynamatic.")
+    message(FATAL_ERROR "Cbc integration is not tested on the OS you use!")
+  endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# ABC setup
+#-------------------------------------------------------------------------------
+
+if(DYNAMATIC_ENABLE_ABC)
+  if (UNIX)
+
+    # Disable reproducibility warning for third-party code
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=date-time -Wno-date-time")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=date-time -Wno-date-time")
+
+    FetchContent_Declare(
+      abc
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+      SOURCE_DIR ${CMAKE_BINARY_DIR}/abc
+      URL https://github.com/ETHZ-DYNAMO/abc/archive/refs/tags/v1.0.0.tar.gz
+      SYSTEM
+    )
+
+    FetchContent_MakeAvailable(abc)
+    add_compile_definitions(DYNAMATIC_ENABLE_ABC)
+  else()
+    message(FATAL_ERROR "ABC integration is not tested on the OS you use!")
   endif()
 endif()
 
@@ -200,11 +280,8 @@ endif()
 find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)
 
 set(VENV_DIR "${CMAKE_BINARY_DIR}/python3-venv")
-
-add_custom_target(python-venv ALL
-    COMMAND ${Python3_EXECUTABLE} -m venv ${VENV_DIR}
-    COMMENT "Creating Python virtual environment (Python ${Python3_VERSION})"
-)
+message(STATUS "Creating Python virtual environment (Python ${Python3_VERSION})")
+execute_process(COMMAND ${Python3_EXECUTABLE} -m venv ${VENV_DIR})
 
 #-------------------------------------------------------------------------------
 # XLS Integration (experimental)
@@ -264,6 +341,7 @@ FetchContent_Declare(
   googletest
   DOWNLOAD_EXTRACT_TIMESTAMP true
   URL https://github.com/google/googletest/archive/2ae29b52fdff88c52fef655fa0d245fc514ca35b.zip
+  SYSTEM
 )
 
 # For Windows: Prevent overriding the parent project's compiler/linker settings
@@ -271,7 +349,11 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # TODO: Use the JSON package from Boost instead.
-FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_Declare(
+  json
+  URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+  SYSTEM
+)
 FetchContent_MakeAvailable(json)
 
 #-------------------------------------------------------------------------------
@@ -279,10 +361,18 @@ FetchContent_MakeAvailable(json)
 #-------------------------------------------------------------------------------
 
 add_subdirectory(${DYNAMATIC_INCLUDE_DIR}/dynamatic)
+add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
+
+# CMake macro to add a custom new unit test to dynamatic.
+# A unit test should be a test target that does not require any special
+# environment setup beyond what is performed by CMake.
+# All unit tests are performed as part of the 'check-dynamatic' target.
+macro(add_to_unit_testing target)
+  add_dependencies(check-dynamatic ${target})
+endmacro()
+
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/experimental)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
-add_subdirectory(${DYNAMATIC_SOURCE_DIR}/test)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)
-

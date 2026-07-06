@@ -32,7 +32,9 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
          DeclareOpInterfaceMethods<NamedIOInterface>,
-         DeclareOpInterfaceMethods<ControlInterface>]> {
+         DeclareOpInterfaceMethods<ControlInterface>,
+         DeclareOpInterfaceMethods<RTLAttrInterface>,
+         DeclareOpInterfaceMethods<BLIFImplInterface>]> {
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -213,11 +215,19 @@ def InstanceOp : Handshake_Op<"instance", [
   let assemblyFormat = [{
     $module `(` $opOperands `)` attr-dict `:` functional-type($opOperands, results)
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    InstanceOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def BufferOp : Handshake_Op<"buffer", [
   HasClock, SameOperandsAndResultType,
-  BufferLikeOpInterface,
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
 ]> {
   let summary = "buffer operation";
   let description = [{
@@ -226,9 +236,9 @@ def BufferOp : Handshake_Op<"buffer", [
   }];
 
   let arguments = (ins HandshakeType:$operand,
-                        Handshake_BufferTypeAttr:$bufferType,
-                        ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots
-                        );
+                       Handshake_BufferTypeAttr:$bufferType,
+                       ConfinedAttr<I64Attr, [IntMinValue<1>]>:$numSlots,
+                       ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dvLatency);
 
   let results = (outs HandshakeType:$result);
 
@@ -240,6 +250,7 @@ def BufferOp : Handshake_Op<"buffer", [
         case BufferType::FIFO_BREAK_DV:
         case BufferType::SHIFT_REG_BREAK_DV:
         case BufferType::ONE_SLOT_BREAK_DVR:
+        case BufferType::COUNTER_BUFFER:
           return false;
         case BufferType::ONE_SLOT_BREAK_R:
         case BufferType::FIFO_BREAK_NONE:
@@ -248,19 +259,8 @@ def BufferOp : Handshake_Op<"buffer", [
       llvm_unreachable("Unknown BufferType in isBypassDV()");
     }
 
-    int getLatencyDV(){
-      switch (getBufferType()) {
-        case BufferType::ONE_SLOT_BREAK_R:
-        case BufferType::FIFO_BREAK_NONE:
-          return 0;
-        case BufferType::ONE_SLOT_BREAK_DV:
-        case BufferType::FIFO_BREAK_DV:
-        case BufferType::ONE_SLOT_BREAK_DVR:
-          return 1;
-        case BufferType::SHIFT_REG_BREAK_DV:
-          return getNumSlots();
-      }
-      llvm_unreachable("Unknown BufferType in getLatencyDV()");
+    int64_t getLatencyDV() {
+      return (*this)->getAttrOfType<IntegerAttr>("dvLatency").getInt();
     }
   }];
 
@@ -270,21 +270,63 @@ def BufferOp : Handshake_Op<"buffer", [
       ins
         "Value":$operand,
         "int":$numSlots,
-        "::dynamatic::handshake::BufferType":$bufferType
+        "::dynamatic::handshake::BufferType":$bufferType,
+        CArg<"std::optional<int64_t>", "std::nullopt">:$dvLatency
     ), [{
+      int64_t resolvedDvLatency = 0;
+      switch (bufferType) {
+        case BufferType::ONE_SLOT_BREAK_R:
+        case BufferType::FIFO_BREAK_NONE:
+          resolvedDvLatency = 0;
+          break;
+        case BufferType::ONE_SLOT_BREAK_DV:
+        case BufferType::FIFO_BREAK_DV:
+        case BufferType::ONE_SLOT_BREAK_DVR:
+          resolvedDvLatency = 1;
+          break;
+        case BufferType::SHIFT_REG_BREAK_DV:
+          resolvedDvLatency = numSlots;
+          break;
+        case BufferType::COUNTER_BUFFER:
+          // Legality of (bufferType, dvLatency) checked by BufferOp::verify()
+          resolvedDvLatency = dvLatency.value_or(0);
+          break;
+      }
+
       $_state.addOperands(operand);
       $_state.addTypes(operand.getType());
       $_state.addAttribute("bufferType", ::dynamatic::handshake::BufferTypeAttr::get($_builder.getContext(), bufferType));
       $_state.addAttribute("numSlots", $_builder.getI64IntegerAttr(numSlots));
+      $_state.addAttribute("dvLatency",
+                           $_builder.getI64IntegerAttr(resolvedDvLatency));
     }]>
   ];
 
 
   let assemblyFormat = [{
-    $operand `,` `bufferType` `=` $bufferType `,` `numSlots` `=` $numSlots attr-dict `:` custom<HandshakeType>(type($operand))
+    $operand `,` `bufferType` `=` $bufferType `,` `numSlots` `=` $numSlots `,` `dvLatency` `=` $dvLatency attr-dict `:` custom<HandshakeType>(type($operand))
   }];
 
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BufferOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ::llvm::SmallVector<::mlir::NamedAttribute> params;
+      params.push_back({::mlir::StringAttr::get(ctx, "BITWIDTH"),
+                        ::mlir::TypeAttr::get(getOperand().getType())});
+      params.push_back({::mlir::StringAttr::get(ctx, "NUM_SLOTS"),
+                        ::mlir::IntegerAttr::get(ui32, (unsigned)getNumSlots())});
+      if (getBufferType() == ::dynamatic::handshake::BufferType::COUNTER_BUFFER)
+        params.push_back({::mlir::StringAttr::get(ctx, "DV_LATENCY"),
+                          ::mlir::IntegerAttr::get(ui32, (unsigned)getLatencyDV())});
+      params.push_back({::mlir::StringAttr::get(ctx, "BUFFER_TYPE"),
+                        ::mlir::StringAttr::get(ctx, stringifyEnum(getBufferType()))});
+      return params;
+    }
+  }];
 }
 
 def InitOp : Handshake_Op<"init", [
@@ -307,6 +349,14 @@ def InitOp : Handshake_Op<"init", [
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    InitOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def NDWireOp : Handshake_Op<"ndwire", [
@@ -322,6 +372,17 @@ def NDWireOp : Handshake_Op<"ndwire", [
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    NDWireOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -343,6 +404,20 @@ class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   let assemblyFormat = [{
     custom<SingleTypedHandshakeOp>($operand, attr-dict,
                                    type($operand), type($result))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    $cppClass::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumResults())},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -406,6 +481,20 @@ def MergeOp : Handshake_Op<"merge", [
   let assemblyFormat = [{
     $dataOperands attr-dict `:` custom<HandshakeType>(type($result))
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    MergeOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumOperands())},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
+    }
+  }];
 }
 
 def MuxOp : Handshake_Op<"mux", [
@@ -444,6 +533,22 @@ def MuxOp : Handshake_Op<"mux", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    MuxOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)getDataOperands().size())},
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())},
+        {::mlir::StringAttr::get(ctx, "INDEX_BITWIDTH"),
+         ::mlir::TypeAttr::get(getSelectOperand().getType())}
+      };
+    }
+  }];
 }
 
 def ControlMergeOp : Handshake_Op<"control_merge", [
@@ -489,6 +594,22 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ControlMergeOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)getDataOperands().size())},
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())},
+        {::mlir::StringAttr::get(ctx, "INDEX_BITWIDTH"),
+         ::mlir::TypeAttr::get(getIndex().getType())}
+      };
+    }
+  }];
 }
 
 def BranchOp : Handshake_Op<"br", [
@@ -512,6 +633,17 @@ def BranchOp : Handshake_Op<"br", [
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($result))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BranchOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -551,6 +683,17 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ConditionalBranchOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getDataOperand().getType())}
+      };
+    }
+  }];
 }
 
 def SinkOp : Handshake_Op<"sink"> {
@@ -569,6 +712,50 @@ def SinkOp : Handshake_Op<"sink"> {
   let arguments = (ins HandshakeType:$operand);
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SinkOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
+  }];
+}
+
+def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
+ ]> {
+  let summary = "buffer operation without successor";
+  let description = [{
+    The dead buffer operation stores a single incoming token
+    in its slot, and then stops accepting tokens. It is not
+    supposed to be used anywhere other than formal verification.
+
+    Example:
+
+    ```mlir
+    formal.dead_buffer %data : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$operand);
+  let assemblyFormat = [{
+    $operand attr-dict `:` custom<HandshakeType>(type($operand))
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    DeadBufferOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -596,6 +783,14 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
   ];
 
   let assemblyFormat = "attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SourceOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def JoinOp : Handshake_Op<"join", [
@@ -617,6 +812,18 @@ def JoinOp : Handshake_Op<"join", [
   let arguments = (ins Variadic<ControlType>:$data);
   let results = (outs ControlType:$result);
   let assemblyFormat = "$data attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    JoinOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumOperands())}
+      };
+    }
+  }];
 }
 
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
@@ -643,6 +850,20 @@ def BlockerOp : Handshake_Op<"blocker", [
       $_state.addOperands(data);
       $_state.addTypes(data.front().getType());
   }]>];
+
+    let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BlockerOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumOperands())},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
+    }
+  }];
 }
 
 def GateOp : Handshake_Op<"gate", [
@@ -671,9 +892,28 @@ def GateOp : Handshake_Op<"gate", [
       $_state.addOperands(control);
       $_state.addTypes(data.getType());
   }]>];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BlockerOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "SIZE"),
+         ::mlir::IntegerAttr::get(ui32, (unsigned)(*this)->getNumOperands())},
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
+    }
+  }];
 }
 
-def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
+def NotIOp : Handshake_Op<"noti", [
+  Pure,
+  SameOperandsAndResultType,
+  IsIntChannel<"operand">,
+  IsIntChannel<"result">
+]> {
   let summary = "Logical negation";
   let description = [{
     Bitwise logical negation.
@@ -681,10 +921,42 @@ def NotOp : Handshake_Op<"not", [Pure, SameOperandsAndResultType]> {
     Example:
 
     ```mlir
-    %neg = not %value : !handshake.channel<i32>
+    %neg = noti %value : !handshake.channel<i32>
     ```
   }];
   let arguments = (ins ChannelType:$operand);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$operand attr-dict `:` type($result)";
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    NotIOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
+  }];
+}
+
+def AndOp : Handshake_Op<"and", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical and";
+  let description = [{
+    Bitwise logical and.
+
+  }];
+  let arguments = (ins Variadic<ChannelType>:$operand);
+  let results = (outs ChannelType:$result);
+  let assemblyFormat = "$operand attr-dict `:` type($result)";
+}
+
+def OrOp : Handshake_Op<"or", [Pure, SameOperandsAndResultType]> {
+  let summary = "Logical or";
+  let description = [{
+    Bitwise logical or.
+  }];
+  let arguments = (ins Variadic<ChannelType>:$operand);
   let results = (outs ChannelType:$result);
   let assemblyFormat = "$operand attr-dict `:` type($result)";
 }
@@ -799,6 +1071,18 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the memory controller.
     dynamatic::MCPorts getPorts();
+
+    size_t getNumLoadPorts();
+    std::optional<LoadPort> getLoadPort(size_t index);
+    MemoryControllerSlotNamer getLoadPortSlotNamer(size_t index);
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    MemoryControllerOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
   }];
 }
 
@@ -896,6 +1180,14 @@ def LSQOp : Handshake_Op<"lsq", [
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
   }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    LSQOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -967,6 +1259,11 @@ def LoadOp : Handshake_MemPortOp<"load", [
     1. address (to memory interface).
     2. data value (to successor)
 
+    This operation contains a slot for the incoming address, and also a
+    slot for the data value. These slots are identified by the literals
+    `ADDR_SLOT_LIT` and `DATA_SLOT_LIT`. The slots can be accessed
+    through the `BufferLikeOpInterface`
+
     Example:
 
     ```mlir
@@ -974,6 +1271,10 @@ def LoadOp : Handshake_MemPortOp<"load", [
     ```
   }];
 
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral ADDR_SLOT_LIT = "addr";
+    static constexpr ::llvm::StringLiteral DATA_SLOT_LIT = "data";
+  }];
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getNumOperands() && "index too high");
@@ -983,6 +1284,17 @@ def LoadOp : Handshake_MemPortOp<"load", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    LoadOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getData().getType())},
+        {::mlir::StringAttr::get(ctx, "ADDR_BITWIDTH"),
+         ::mlir::TypeAttr::get(getAddress().getType())}
+      };
     }
   }];
 
@@ -1058,6 +1370,28 @@ def StoreOp : Handshake_MemPortOp<"store", [
           return "doneOut";
       }
     }
+    
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    StoreOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getData().getType())},
+        {::mlir::StringAttr::get(ctx, "ADDR_BITWIDTH"),
+         ::mlir::TypeAttr::get(getAddress().getType())}
+      };
+    }
+    
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    StoreOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getData().getType())},
+        {::mlir::StringAttr::get(ctx, "ADDR_BITWIDTH"),
+         ::mlir::TypeAttr::get(getAddress().getType())}
+      };
+    }
   }];
 }
 
@@ -1108,6 +1442,14 @@ def RAMOp : Handshake_Op<"ram", []>  {
   }];
 
   let results = (outs AnyStaticShapeMemRef:$result);
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    RAMOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1137,6 +1479,13 @@ def EndOp : Handshake_Op<"end", [
   }];
 
   let hasVerifier = 1;
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    EndOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1148,17 +1497,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"saveCtrl">,
-  IsIntSizedChannel<1, "saveCtrl">,
+  IsSimpleHandshake<"issueCtrl">,
+  IsIntSizedChannel<2, "issueCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
-  IsSimpleHandshake<"SCSaveCtrl">,
-  IsIntSizedChannel<3, "SCSaveCtrl">,
-  IsSimpleHandshake<"SCCommitCtrl">,
-  IsIntSizedChannel<3, "SCCommitCtrl">,
-  IsSimpleHandshake<"SCIsMisspec">,
-  IsIntSizedChannel<1, "SCIsMisspec">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -1166,19 +1512,21 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
-    It needs to send control tokens to save units and commit units
-    ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while
-    $SCCommitCtrl replicates the branches that $dataOut
-    follows and might not reach a save-commit. $SCIsMisspec is needed
-    in the replicated branches to discard the latter signal.
+    It exposes three control outputs.
+    Two unconditionally go to the save-commits 
+    $issueCtrl (which affects when tokens are issued by the save-commit)
+    and $historyCtrl (which affects what the save-commit does with its
+    internal token history)
+    One to the commit units: $commitCtrl
+    which conditionally connects to the commit units, routing through 
+    the speculative region's branches to reach the correct commits).
 
     Example:
 
     ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
+    %dataOut, %issueCtrl, %historyCtrl, %commitCtrl
       = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
-        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
+        <i1>, <i1>, <i1>
     ```
   }];
 
@@ -1186,15 +1534,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                        ControlType:$trigger,
                        UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
-                      ChannelType:$saveCtrl, ChannelType:$commitCtrl,
-                      ChannelType:$SCSaveCtrl,
-                      ChannelType:$SCCommitCtrl,
-                      ChannelType:$SCIsMisspec);
+                      ChannelType:$issueCtrl,
+                      ChannelType:$historyCtrl,
+                      ChannelType:$commitCtrl);
 
   let assemblyFormat = [{
     `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
-    type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
-    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCIsMisspec)
+    type($dataOut) `,` type($issueCtrl) `,` type($historyCtrl) `,`
+    type($commitCtrl)
   }];
 
   // Infer the type of the control signals
@@ -1202,11 +1549,10 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     $_state.addOperands({dataIn, trigger});
     $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
 
-    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
-    ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
+    ChannelType issueResolveType = ChannelType::get($_builder.getIntegerType(2));
+    ChannelType commitType = ChannelType::get($_builder.getIntegerType(1));
 
-    $_state.addTypes({dataOutType, ctrlType, ctrlType, wideControlType,
-      wideControlType, ctrlType});
+    $_state.addTypes({dataOutType, issueResolveType, issueResolveType, commitType});
   }]>];
 
   let extraClassDefinition = [{
@@ -1221,16 +1567,23 @@ def SpeculatorOp : Handshake_Op<"speculator", [
       case 0:
         return "outs";
       case 1:
-        return "ctrl_save";
+        return "ctrl_issue";
       case 2:
-        return "ctrl_commit";
-      case 3:
-        return "ctrl_sc_save";
-      case 4:
-        return "ctrl_sc_commit";
+        return "ctrl_history";
       default:
-        return "ctrl_sc_branch";
+        return "ctrl_commit";
       }
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpeculatorOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getDataOut().getType())},
+        {::mlir::StringAttr::get(ctx, "FIFO_DEPTH"),
+         ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32), getFifoDepth())}
+      };
     }
   }];
 }
@@ -1277,6 +1630,15 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpecSaveOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
     }
   }];
 }
@@ -1326,6 +1688,15 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpecCommitOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())}
+      };
+    }
   }];
 }
 
@@ -1333,9 +1704,12 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"ctrl">,
-  IsIntSizedChannel<3, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  IsSimpleHandshake<"issueCtrl">,
+  IsIntSizedChannel<2, "issueCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
@@ -1344,29 +1718,49 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     speculative and non-speculative tokens pass as well as save
     a copy of them.
 
+    Two control inputs broadcast from the speculator:
+    $issueCtrl affects how tokens are issued
+    $historyCtrl affects how the internalt token history is updated
+
     Example:
 
     ```mlir
-    %dataOut = spec_save_commit[%ctrl] %dataIn : i11
+    %dataOut = spec_save_commit[%issueCtrl, %historyCtrl] %dataIn : i11
     ```
   }];
   let arguments = (ins HandshakeType:$dataIn,
-                       ChannelType:$ctrl,
+                       ChannelType:$issueCtrl,
+                       ChannelType:$historyCtrl,
                        UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+    `[` $issueCtrl `,` $historyCtrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($issueCtrl) `,` type($historyCtrl)
   }];
 
   let extraClassDefinition = [{
     std::string $cppClass::getOperandName(unsigned idx) {
       assert(idx < getOperation()->getNumOperands() && "index too high");
-      return idx == 0 ? "ins" : "ctrl";
+      switch (idx) {
+      case 0: return "ins";
+      case 1: return "ctrl_issue";
+      default: return "ctrl_history";
+      }
     }
 
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpecSaveCommitOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getResult().getType())},
+        {::mlir::StringAttr::get(ctx, "FIFO_DEPTH"),
+         ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32), getFifoDepth())}
+      };
     }
   }];
 }
@@ -1416,6 +1810,17 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       assert(idx < getNumResults() && "index too high");
       return idx == 0 ? "trueOut" : "falseOut";
     }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SpeculatingBranchOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
+         ::mlir::TypeAttr::get(getTrueResult().getType())},
+        {::mlir::StringAttr::get(ctx, "SPEC_TAG_BITWIDTH"),
+         ::mlir::TypeAttr::get(getTagFromOperand().getType())}
+      };
+    }
   }];
 }
 
@@ -1455,6 +1860,15 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getOperation()->getNumResults() && "index too high");
       return "dataOut";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    NonSpecOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
     }
   }];
 }
@@ -1513,6 +1927,24 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`
       functional-type(operands, results)
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    SharingWrapperOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand(0).getType())},
+        {::mlir::StringAttr::get(ctx, "LATENCY"),
+        ::mlir::IntegerAttr::get(ui32, (unsigned)getLatency())},
+        {::mlir::StringAttr::get(ctx, "NUM_SHARED_OPERANDS"),
+        ::mlir::IntegerAttr::get(ui32, (unsigned)getNumSharedOperands())},
+        {::mlir::StringAttr::get(ctx, "CREDITS"),
+        ::mlir::DenseI64ArrayAttr::get(ctx, getCredits())}
+      };
+    }
   }];
 }
 
@@ -1580,6 +2012,13 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BundleOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def UnbundleOp : Handshake_Op<"unbundle", [
@@ -1642,6 +2081,13 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    UnbundleOp::getRTLParameters() {
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+      };
+    }
+  }];
 }
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
@@ -1671,8 +2117,16 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
     std::string $cppClass::getResultName(unsigned idx = 0) {
       return "outs";
     }
-  }];
 
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ReadyRemoverOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
+  }];
 }
 
 def ValidMergerOp : Handshake_Op<"valid_merger",[
@@ -1706,8 +2160,18 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     assert(idx < getNumOperands() && "index too high");
     return (idx == 0) ? "lhs_outs" : "rhs_outs";
     }
-  }];
 
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    ValidMergerOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "LEFT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getLhsIn().getType())},
+        {::mlir::StringAttr::get(ctx, "RIGHT_BITWIDTH"),
+         ::mlir::TypeAttr::get(getRhsIn().getType())}
+      };
+    }
+  }];
 }
 
 

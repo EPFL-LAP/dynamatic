@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeReplaceMemoryInterfaces.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -27,9 +26,21 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 
+// Define the debug type for the LLVM_DEBUG macro
+// Allows for selective enabling of debug output related to this pass
+#define DEBUG_TYPE "handshake-replace-memory-interfaces"
+
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEREPLACEMEMORYINTERFACES
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 namespace {
 
@@ -58,6 +69,17 @@ private:
   /// memory.
   void replaceMemCompletionSignal(MemoryOpInterface masterIface, Value newDone,
                                   OpBuilder &builder) const;
+
+  /// Given a set of operations, returns a mapping from each operation to a
+  /// boolean indicating whether it is involved in at least one active
+  /// dependency with another operation.
+  static DenseMap<Operation *, bool>
+  markOpsWithActiveDependencies(DenseSet<Operation *> &accessOps);
+
+  /// Sets `handshake::MemInterfaceAttr` on each memory access port connected to
+  /// the given memref, routing ports with active dependencies to the LSQ and
+  /// the rest to the MC.
+  LogicalResult updateMemoryAccessMarks(TypedValue<mlir::MemRefType> memref);
 };
 } // namespace
 
@@ -78,7 +100,7 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
   if (res.wasInterrupted())
     return signalPassFailure();
 
-  // Check that all eligible operations within Handshake function belon to a
+  // Check that all eligible operations within Handshake function belong to a
   // basic block
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     for (Operation &op : funcOp.getOps()) {
@@ -90,6 +112,18 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
     }
   }
 
+  // Update the memory access types, as dependency edges can be
+  // disabled in passes between the marking pass and this one
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    for (BlockArgument arg : funcOp.getArguments()) {
+      if (auto memref = dyn_cast<TypedValue<mlir::MemRefType>>(arg))
+        if (failed(updateMemoryAccessMarks(memref)))
+          return signalPassFailure();
+    }
+  }
+
+  // Use the updated memory access type information to replace the memory
+  // interfaces in each function
   for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
     if (failed(replaceInFunction(funcOp)))
       return signalPassFailure();
@@ -236,7 +270,89 @@ void HandshakeReplaceMemoryInterfacesPass::replaceMemCompletionSignal(
   endOp->setOperand(idx, newDone);
 }
 
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeReplaceMemoryInterfaces() {
-  return std::make_unique<HandshakeReplaceMemoryInterfacesPass>();
+DenseMap<Operation *, bool>
+HandshakeReplaceMemoryInterfacesPass::markOpsWithActiveDependencies(
+    DenseSet<Operation *> &accessOps) {
+  DenseMap<Operation *, bool> hasActiveDep;
+
+  // needed as we need to be able to find the operations corresponding to the
+  // names in the dependencies
+  DenseMap<StringRef, Operation *> nameToOpMapping;
+  for (Operation *op : accessOps) {
+    StringRef name = getUniqueName(op);
+    nameToOpMapping[name] = op;
+  }
+
+  for (Operation *op : accessOps) {
+    if (auto deps = getDialectAttr<MemDependenceArrayAttr>(op)) {
+      for (MemDependenceAttr dependency : deps.getDependencies()) {
+        if (dependency.getIsActive()) {
+          Operation *dstOp = nameToOpMapping[dependency.getDstAccess()];
+          hasActiveDep[dstOp] = true;
+          hasActiveDep[op] = true;
+        }
+      }
+    }
+  }
+  return hasActiveDep;
+}
+
+LogicalResult HandshakeReplaceMemoryInterfacesPass::updateMemoryAccessMarks(
+    TypedValue<mlir::MemRefType> memref) {
+  MLIRContext *ctx = &getContext();
+  auto memrefUsers = memref.getUsers();
+  assert(std::distance(memrefUsers.begin(), memrefUsers.end()) <= 1 &&
+         "expected at most one memref user");
+  if (memrefUsers.empty())
+    return success();
+
+  // Identify all memory interfaces (master and potential slaves) for the region
+  Operation *memOp = *memrefUsers.begin();
+  handshake::LSQOp lsqOp;
+  if (lsqOp = dyn_cast<handshake::LSQOp>(memOp); !lsqOp) {
+    // The master memory interface must be an MC
+    auto mcOp = dyn_cast<handshake::MemoryControllerOp>(memOp);
+    if (!mcOp)
+      return memOp->emitError() << "expected memory controller or LSQ";
+    // Ports to memory controllers will always remain connected to a memory
+    // controller, mark them as such with the memory interface attribute
+    MCPorts mcPorts = mcOp.getPorts();
+    for (MCBlock &block : mcPorts.getBlocks()) {
+      for (MemoryPort &port : block->accessPorts)
+        setDialectAttr<MemInterfaceAttr>(port.portOp, ctx);
+    }
+    // Nothing else to do if the region has no LSQ
+    if (!mcPorts.connectsToLSQ()) {
+      LLVM_DEBUG(llvm::dbgs() << "\tNo LSQ interface for the region\n");
+      return success();
+    }
+    lsqOp = mcPorts.getLSQPort().getLSQOp();
+  }
+
+  DenseSet<Operation *> lsqAccessOps;
+  DenseMap<Operation *, unsigned> groupMap;
+  LSQPorts lsqPorts = lsqOp.getPorts();
+  for (LSQGroup &group : lsqPorts.getGroups()) {
+    for (MemoryPort &port : group->accessPorts) {
+      groupMap.insert({port.portOp, group.groupID});
+      lsqAccessOps.insert(port.portOp);
+    }
+  }
+
+  // process all dependencies and mark all the ports involved in a dependency as
+  // LSQ ports
+  DenseMap<Operation *, bool> isLSQPort =
+      markOpsWithActiveDependencies(lsqAccessOps);
+
+  for (Operation *accessOp : lsqAccessOps) {
+    if (isLSQPort.lookup(accessOp))
+      // mark the access op as an LSQ port by setting the attribute with the
+      // group ID
+      setDialectAttr<MemInterfaceAttr>(accessOp, ctx, groupMap.at(accessOp));
+    else
+      // mark the access op as a non-LSQ port by setting the attribute without a
+      // group ID
+      setDialectAttr<MemInterfaceAttr>(accessOp, ctx);
+  }
+  return success();
 }

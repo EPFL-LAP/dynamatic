@@ -27,7 +27,7 @@ MODULE {name}(ins_valid, {", ".join([f"outs_{n}_ready" for n in range(size)])})
   DEFINE
   ins_ready := !any_block_stop;
   {"\n  ".join([f"outs_{n}_valid := inner_reg_block_{n}.outs_valid;" for n in range(size)])}
-  {"\n  ".join([f"sent_{n} := !inner_reg_block_{n}.reg_value;" for n in range(size)])}
+  {"\n  ".join([f"outs_{n}_sent := !inner_reg_block_{n}.reg_value;" for n in range(size)])}
 
 {generate_eager_fork_register_block(f"{name}__eager_fork_register_block")}
 """
@@ -44,7 +44,7 @@ MODULE {name}(ins, ins_valid, {", ".join([f"outs_{n}_ready" for n in range(size)
   ins_ready := inner_fork.ins_ready;
   {"\n  ".join([f"outs_{n} := ins;" for n in range(size)])}
   {"\n  ".join([f"outs_{n}_valid := inner_fork.outs_{n}_valid;" for n in range(size)])}
-  {"\n  ".join([f"sent_{n} := inner_fork.sent_{n};" for n in range(size)])}
+  {"\n  ".join([f"outs_{n}_sent := inner_fork.outs_{n}_sent;" for n in range(size)])}
 
 {_generate_fork_dataless(f"{name}__fork_dataless", size)}
 """

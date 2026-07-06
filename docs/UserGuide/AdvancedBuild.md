@@ -121,10 +121,9 @@ It is also common to run out of RAM especially during linking of LLVM/MLIR. If t
 Dynamatic includes a `Dockerfile` that configures all the open-source dependencies. To build the dockerfile, run the following command in the root directory of Dynamatic:
 
 ```bash
-$ docker build -t dynamatic-image .
+$ docker build -t dynamatic-image . --build-arg UID=$(id -u) --build-arg GID=$(id -g)
 ```
 
-The docker image is has a user called "ubuntu".
 To launch the Docker container, run the following command in the root directory of dynamatic:
 
 ```bash 
@@ -164,6 +163,25 @@ If you have difficulty installing the Gurobi solver or getting a license, you ma
 sudo apt-get install coinor-cbc 
 # Build Dynamatic with Cbc enabled.
 ./build.sh --enable-cbc
+```
+
+### Enable Legacy Chisel-Based LSQ Generator
+
+Dynamatic previously uses RTL generators written in Chisel (a hardware
+construction language embedded in the high-level programming language Scala) to
+produce synthesizable RTL designs. You can install JDK and Scala using the
+recommended way with the following commands:
+
+```sh
+sudo apt-get install -y openjdk-21-jdk
+curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
+```
+
+To build dynamatic with legacy LSQ enabled, append the following flag when
+calling the `build.sh` script:
+
+```sh
+./build.sh --build-legacy-lsq
 ```
 
 ## 4. Interactive Dataflow Circuit Visualizer

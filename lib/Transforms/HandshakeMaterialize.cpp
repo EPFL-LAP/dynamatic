@@ -25,10 +25,13 @@
 using namespace mlir;
 using namespace dynamatic;
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
 #define GEN_PASS_DEF_HANDSHAKEMATERIALIZE
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 /// Determines whether the value should be concerned by materialization rules;
 /// only SSA values with dataflow semantics must have a single use.

@@ -73,7 +73,7 @@ struct ChannelBufProps {
 
 static inline std::string getMaxStr(std::optional<unsigned> optMax) {
   return optMax.has_value() ? (std::to_string(optMax.value()) + "]") : "inf]";
-};
+}
 
 /// Prints the buffering properties as two closed or semi-open intervals
 /// (depending on whether maximums are defined), one for tranparent slots and

@@ -15,7 +15,7 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "experimental/Support/StdProfiler.h"
 #include "mlir/IR/Operation.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -38,10 +38,25 @@ enum DataflowGraphEdgeType {
 };
 
 struct DataflowGraphNode {
-  mlir::Operation *op; // <-- The underlying Operation.
-  NodeIdType id; // <-- Unique id in the nodes vector to help with traversal.
+  enum NodeType {
+    REGULAR,
+    /// Analysis-only fork node (not present in IR) that fans out control starts
+    /// for latency/occupancy balancing.
+    SYNTHETIC_FORK,
+    SYNTHETIC_JOIN
+  };
 
-  DataflowGraphNode(mlir::Operation *op, NodeIdType id) : op(op), id(id) {}
+  mlir::Operation *op; // <-- The underlying Operation (null for synthetic
+                       // nodes).
+  NodeIdType id; // <-- Unique id in the nodes vector to help with traversal.
+  NodeType type;
+
+  DataflowGraphNode(mlir::Operation *op, NodeIdType id,
+                    NodeType type = NodeType::REGULAR)
+      : op(op), id(id), type(type) {
+    if (type == NodeType::REGULAR)
+      assert(op != nullptr && "REGULAR nodes must have a non-null operation");
+  }
 };
 
 struct DataflowGraphEdge {
@@ -89,9 +104,11 @@ struct DataflowSubgraphBase {
   std::vector<llvm::SmallVector<EdgeIdType, 4>> adjList;
   std::vector<llvm::SmallVector<EdgeIdType, 4>> revAdjList;
 
-  NodeIdType addNode(mlir::Operation *op) {
+  NodeIdType addNode(
+      mlir::Operation *op,
+      DataflowGraphNode::NodeType type = DataflowGraphNode::NodeType::REGULAR) {
     NodeIdType id = nodes.size();
-    nodes.emplace_back(op, id);
+    nodes.emplace_back(op, id, type);
     adjList.emplace_back();
     revAdjList.emplace_back();
     return nodes.size() - 1;
@@ -104,6 +121,19 @@ struct DataflowSubgraphBase {
     revAdjList[dstId].push_back(edges.size() - 1);
   }
 };
+
+/// [FPGA24] Represents one simple path through a dataflow subgraph.
+struct SimplePath {
+  llvm::SmallVector<EdgeIdType> edges;
+  llvm::SmallVector<NodeIdType> nodes;
+};
+
+/// [FPGA24] Enumerates all simple paths from start to end within the allowed
+/// node set.
+std::vector<SimplePath>
+enumerateSimplePaths(const DataflowSubgraphBase &graph, NodeIdType startNode,
+                     NodeIdType endNode,
+                     const std::set<NodeIdType> &allowedNodes);
 
 /// A reconvergent path is a subgraph where multiple paths diverge from a fork
 /// and reconverge at a join. This is important for latency balancing.
@@ -172,23 +202,35 @@ enumerateTransitionSequences(llvm::ArrayRef<ArchBB> transitions,
   }
 
   return result;
-};
+}
 
 /// A dataflow graph specialized for reconvergent path analysis.
 /// IMPORTANT: This class assumes the graph an ACYCLIC transition sequence.
-class ReconvergentPathFinderGraph : public DataflowSubgraphBase {
+class CFGTransitionSequenceSubgraph : public DataflowSubgraphBase {
 public:
   bool isForkNode(NodeIdType nodeId) const override {
-    return isa<handshake::ForkOp, handshake::LazyForkOp,
-               handshake::EagerForkLikeOpInterface>(nodes[nodeId].op);
+    if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
+      return true;
+    return mlir::isa_and_nonnull<handshake::ForkOp, handshake::LazyForkOp,
+                                 handshake::EagerForkLikeOpInterface>(
+        nodes[nodeId].op);
   }
 
   // The only nodes with two inputs that allow for both
   // inputs to be active at the same time. Unlike: ControlMergeOp and MergeOp.
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
+    mlir::Operation *op = nodes[nodeId].op;
+    if (!op || nodes[nodeId].type != DataflowGraphNode::REGULAR)
+      return false;
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+        return true;
+    }
+
     return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
-               handshake::ConditionalBranchOp>(nodes[nodeId].op);
+               handshake::ConditionalBranchOp>(op);
   }
 
   std::string getNodeLabel(NodeIdType nodeId) const override;
@@ -223,18 +265,19 @@ public:
 
   /// Dump multiple graphs to a single GraphViz file.
   /// Each graph is placed in its own cluster subgraph.
-  static void dumpAllGraphs(llvm::ArrayRef<ReconvergentPathFinderGraph> graphs,
-                            llvm::StringRef filename);
+  static void
+  dumpAllGraphs(llvm::ArrayRef<CFGTransitionSequenceSubgraph> graphs,
+                llvm::StringRef filename);
 
   /// Dump all reconvergent paths from multiple graphs to a single GraphViz
   /// file. Each path is placed in its own cluster subgraph with a graph index
   /// prefix. The input is a vector of GraphPathsForDumping objects. Each object
   /// contains:
-  /// - graph: Pointer to the ReconvergentPathFinderGraph for this sequence.
+  /// - graph: Pointer to the CFGTransitionSequenceSubgraph for this sequence.
   /// - paths: Vector of ReconvergentPath objects for this sequence.
 
   struct GraphPathsForDumping {
-    const ReconvergentPathFinderGraph *graph;
+    const CFGTransitionSequenceSubgraph *graph;
     std::vector<ReconvergentPath> paths;
   };
 
@@ -243,6 +286,10 @@ public:
                            llvm::StringRef filename);
 
 private:
+  /// Insert a synthetic fork that fans out all function-level control starts to
+  /// their consumers so reconvergent analysis can balance those channels.
+  void addSyntheticStartForkForBalancing();
+
   std::map<unsigned, unsigned> stepToBB;
 
   /// Maps node ID to it's step number.
@@ -286,6 +333,10 @@ struct SynchronizingCyclePair {
   SimpleCycle cycleOne;
   SimpleCycle cycleTwo;
 
+  /// The edges are grouped by the join node they reach.
+  /// We keep track of:
+  /// - The join node each edge group belongs to.
+  /// - Whether the edge group comes from cycleOne or cycleTwo.
   std::vector<EdgesToJoin> edgesToJoins;
 
   SynchronizingCyclePair(SimpleCycle one, SimpleCycle two,
@@ -296,6 +347,10 @@ struct SynchronizingCyclePair {
 
 class SynchronizingCyclesFinderGraph : public DataflowSubgraphBase {
 public:
+  SynchronizingCyclesFinderGraph() = default;
+  SynchronizingCyclesFinderGraph(handshake::FuncOp funcOp,
+                                 const buffer::CFDFC &cfdfc);
+
   /// Build the graph from a CFDFC.
   void buildFromCFDFC(handshake::FuncOp funcOp, const buffer::CFDFC &cfdfc);
 
@@ -306,14 +361,27 @@ public:
   std::vector<SynchronizingCyclePair> findSynchronizingCyclePairs();
 
   bool isForkNode(NodeIdType nodeId) const override {
-    return isa<handshake::ForkOp, handshake::LazyForkOp,
-               handshake::EagerForkLikeOpInterface>(nodes[nodeId].op);
+    if (nodes[nodeId].type == DataflowGraphNode::SYNTHETIC_FORK)
+      return true;
+    return mlir::isa_and_nonnull<handshake::ForkOp, handshake::LazyForkOp,
+                                 handshake::EagerForkLikeOpInterface>(
+        nodes[nodeId].op);
   }
 
   /// NOTE: When it belongs to a CFDFC, MuxOp behaves like a join node.
   bool isJoinNode(NodeIdType nodeId) const override {
+    mlir::Operation *op = nodes[nodeId].op;
+    if (!op || nodes[nodeId].type != DataflowGraphNode::REGULAR)
+      return false;
+
+    if (auto storeOp = dyn_cast<handshake::StoreOp>(op)) {
+      auto memOp = findMemInterface(storeOp.getAddressResult());
+      if (!mlir::isa_and_present<handshake::LSQOp>(memOp))
+        return true;
+    }
+
     return isa<handshake::MuxOp, handshake::JoinLikeOpInterface,
-               handshake::ConditionalBranchOp>(nodes[nodeId].op);
+               handshake::ConditionalBranchOp>(op);
   }
 
   std::string getNodeLabel(NodeIdType nodeId) const override;

@@ -18,12 +18,13 @@ int matching(in_int_t edges[1000], inout_float_t vertices[1000],
     float t1 = vertices[u];
     float t2 = vertices[v];
 
-    if (t1 * t2 == 1) {
-    // if ((t1 < 0) && (t2 < 0)) {
-      vertices[u] = v;
-      vertices[v] = u;
+    if (t1 < 0) {
+      if (t2 < 0) {
+        vertices[u] = v;
+        vertices[v] = u;
 
-      out = out + 1;
+        out = out + 1;
+      }
     }
 
     i = i + 1;

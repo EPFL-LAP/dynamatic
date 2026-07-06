@@ -12,11 +12,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/ForceMemoryInterface.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_FORCEMEMORYINTERFACE
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate code for the MLIR pass]
 
 using namespace mlir;
 using namespace dynamatic;
@@ -28,10 +35,7 @@ struct ForceMemoryInterfacePass
     : public dynamatic::impl::ForceMemoryInterfaceBase<
           ForceMemoryInterfacePass> {
 
-  ForceMemoryInterfacePass(bool forceLSQ, bool forceMC) {
-    this->forceLSQ = forceLSQ;
-    this->forceMC = forceMC;
-  }
+  using ForceMemoryInterfaceBase::ForceMemoryInterfaceBase;
 
   void runDynamaticPass() override {
     // Exactly one of the two pass options need to have been set
@@ -77,8 +81,3 @@ struct ForceMemoryInterfacePass
   }
 };
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-dynamatic::createForceMemoryInterface(bool forceLSQ, bool forceMC) {
-  return std::make_unique<ForceMemoryInterfacePass>(forceLSQ, forceMC);
-}
