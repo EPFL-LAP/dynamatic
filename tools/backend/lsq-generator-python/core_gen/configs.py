@@ -82,7 +82,7 @@ class Configs:
 
         self.stResp = bool(config["stResp"])
         self.gaMulti = bool(config["groupMulti"])
-        self.bypass = True
+        self.bypass = bool(config["bypassEn"])
 
         self.gaNumLoads = config["numLoads"]
         self.gaNumStores = config["numStores"]
