@@ -603,6 +603,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
     // get if the channel is a backedge as an integer
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+    unsigned fromRepInit = dyn_cast<handshake::RepeatingInitOp>(srcOp) ? 1 : 0;
 
     // If the channel isn't a backedge, its steady-state occupancy
     // equals the difference between the fluid retiming variables
@@ -613,7 +614,8 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     //
     // occupancy of the channel places a limit on throughput
     // if a buffer breaking data and valid is placed on the channel
-    model->addConstr(chTokenOccupancy == backedge + retDst - retSrc,
+    model->addConstr(chTokenOccupancy ==
+                         backedge + fromRepInit + retDst - retSrc,
                      "throughput_channelRetiming");
   }
 }
