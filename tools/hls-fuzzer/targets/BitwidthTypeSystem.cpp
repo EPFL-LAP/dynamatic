@@ -95,7 +95,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionTransferFns(
         /*lhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
         /*rhs=*/
         TransferFn<ast::BinaryExpression, INPUT_DEPENDENCY>(
-            [&](const BitwidthTypingContext &context) -> BitwidthTypingContext {
+            [=](const BitwidthTypingContext &context) -> BitwidthTypingContext {
               // Bitand is distributive: Sub-expressions can assume they are
               // truncated as well.
               std::optional<std::uint8_t> req =
@@ -185,7 +185,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getArrayReadExpressionTransferFns()
       /*index=*/
       TransferFn<ast::ArrayReadExpression,
                  ast::ArrayReadExpression::ARRAY_PARAMETER>(
-          [&](const BitwidthTypingContext &,
+          [=](const BitwidthTypingContext &,
               const ast::ArrayParameter &parameter) {
             assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
                    "implementation depends on dimensions being powers of 2");
@@ -203,7 +203,7 @@ dynamatic::gen::BitwidthTypeSystem::getArrayAssignmentStatementTransferFns() {
       /*index=*/
       TransferFn<ast::ArrayAssignmentStatement,
                  ast::ArrayAssignmentStatement::ARRAY>(
-          [&](const BitwidthTypingContext &,
+          [=](const BitwidthTypingContext &,
               const ast::ArrayParameter &parameter) {
             assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
                    "implementation depends on dimensions being powers of 2");

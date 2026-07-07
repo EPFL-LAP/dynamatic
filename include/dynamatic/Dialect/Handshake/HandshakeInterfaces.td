@@ -236,6 +236,41 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
   ];
 }
 
+
+//===----------------------------------------------------------------------===//
+// IO Naming Interfaces
+//===----------------------------------------------------------------------===//
+//
+// To generate the netlist, we need to know the names of
+// the operands (inputs) and results (outputs)
+// for each operation.
+//
+// These are already named inside of the Tablegen, 
+// but this does not generate any way to access the names as strings
+// only using the names to generate functions.
+//
+// There are 2 useful traits that represent common implementations
+// For an operation which uses the simple trait:
+// The operand names are 'ins_n', where n is the index of the operand
+// the result names are 'outs_n' where n is the idnex of the result
+//
+// If there is only 1 operand or 1 result, the name is 'ins' or 'outs',
+// respectively.
+//
+// For an operation which uses the BinaryArith trait: 
+// the operation should have 2 operands and 1 result
+// They will be named 'lhs', 'rhs', and 'result'.
+//
+// If the custom interface is used, the name uses a fully custom function
+// If the naming is easy to do, 
+// the function definition can be added to the operation declaration in tablegen
+//
+// If it is hard,
+// the function declaration can be added to the operation declaration in tablegen
+// and the definition can be written in HandshakeOps.cpp
+//
+//===----------------------------------------------------------------------===//
+
 def StoreMemPortOpInterface : OpInterface<"StoreMemPortOpInterface", [MemPortOpInterface]> {
   let cppNamespace = "::dynamatic::handshake";
   let description = [{
@@ -266,61 +301,42 @@ def StoreMemPortOpInterface : OpInterface<"StoreMemPortOpInterface", [MemPortOpI
 def NamedIOInterface : OpInterface<"NamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
-      [{"Provides detailed names for the operands and results of an operation."}];
+      [{"Provide access to string representations of operand and result names."}];
 
   let methods = [
-    StaticInterfaceMethod<
-        "Returns the default name of a specific operand.",
-        "std::string", "getDefaultOperandName", (ins "unsigned" : $idx),
-        "",
-        [{
-          return "ins_" + std::to_string(idx);
-        }]>,
-    StaticInterfaceMethod<
-        "Returns the default name of a specific result.",
-        "std::string", "getDefaultResultName", (ins "unsigned" : $idx),
-        "",
-        [{
-          return "outs_" + std::to_string(idx);
-        }]>,
     InterfaceMethod<
-        "Returns the name of a specific operand.",
-        "std::string", "getOperandName", (ins "unsigned" : $idx),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-
-          // Operations which always have a single operand get a specific port
-          // name for it
-          if (concreteOp.template hasTrait<mlir::OpTrait::OneOperand>()) {
-            assert(idx == 0 && "index too high");
-            return "ins";
-          }
-
-          // Generic input name
-          assert(idx < concreteOp->getNumOperands() && "index too high");
-          return getDefaultOperandName(idx);
-        }]>,
+      "Returns the name of a specific operand.",
+      "std::string", "getOperandName", (ins "unsigned" : $idx)>,
     InterfaceMethod<
-        "Returns the name of a specific result.",
-        "std::string", "getResultName", (ins "unsigned" : $idx),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          
-          // Operations which always have a single result get a specific port
-          // name for it
-          if (concreteOp.template hasTrait<mlir::OpTrait::OneResult>()) {
-            assert(idx == 0 && "index too high");
-            return "outs";
-          }
-
-          // Generic output name
-          assert(idx < concreteOp->getNumResults() && "index too high");
-          return getDefaultResultName(idx);
-        }]>
+      "Returns the name of a specific result.",
+      "std::string", "getResultName", (ins "unsigned" : $idx)
+    >
   ];
 }
+
+// Trait that returns operand/result names as "ins"/"ins_N" and "outs"/"outs_N"
+// based on operand/result count.
+def SimpleNamedIOTrait : NativeOpTrait<"SimpleNamedIO"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+// Bundled with NamedIOInterface so ops
+// using SimpleNamedIO get both the interface contract and the impl.
+def SimpleNamedIO : TraitList<[NamedIOInterface, SimpleNamedIOTrait]>;
+
+// Trait that returns operands as "lhs"/"rhs" and the single result as "result".
+def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+// Bundled with NamedIOInterface so ops
+// using BinaryArithNamedIO get both the interface contract and the impl.
+def BinaryArithNamedIO : TraitList<[NamedIOInterface, BinaryArithNamedIOTrait]>;
+
+// Provides helper methods for naming IOs in custom functions
+def NamedIOUtilities : NativeOpTrait<"NamedIOUtilities"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+//===----------------------------------------------------------------------===//
 
 def ControlInterface : OpInterface<"ControlInterface"> {
   let cppNamespace = "::dynamatic::handshake";

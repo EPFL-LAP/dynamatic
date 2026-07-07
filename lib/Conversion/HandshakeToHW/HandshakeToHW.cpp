@@ -177,9 +177,7 @@ struct MemLoweringState {
   /// Cache memory port information before modifying the interface, which can
   /// make them impossible to query.
   FuncMemoryPorts ports;
-  /// Generates and stores the interface's port names before starting the
-  /// conversion, when those are still queryable.
-  handshake::PortNamer portNames;
+
   /// Backedges to the containing module's `hw::OutputOp` operation, which
   /// must be set, in order, with the memory interface's results that connect
   /// to the top-level module IO.
@@ -196,7 +194,7 @@ struct MemLoweringState {
 
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
-  MemLoweringState() : ports(nullptr), portNames(nullptr) {
+  MemLoweringState() : ports(nullptr) {
     llvm_unreachable("object should never be default-constructed");
   }
 
@@ -204,7 +202,7 @@ struct MemLoweringState {
   MemLoweringState(handshake::MemoryOpInterface memOp, const Twine &name)
       : name(name.str()),
         dataType(lowerType(memOp.getMemRefType().getElementType())),
-        ports(getMemoryPorts(memOp)), portNames(memOp) {
+        ports(getMemoryPorts(memOp)) {
     assert(dataType && "unsupported memory element type");
   };
 
@@ -231,20 +229,17 @@ struct InternalMemLoweringState {
   handshake::MemoryOpInterface memInterface;
   FuncMemoryPorts ports;
 
-  handshake::PortNamer portNames;
-
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
   InternalMemLoweringState()
-      : ramOp(nullptr), memInterface(nullptr), ports(nullptr),
-        portNames(nullptr) {
+      : ramOp(nullptr), memInterface(nullptr), ports(nullptr) {
     llvm_unreachable("object should never be default-constructed");
   }
 
   InternalMemLoweringState(handshake::RAMOp ramOp,
                            handshake::MemoryOpInterface memInterface)
       : ramOp(ramOp), memInterface(memInterface),
-        ports(getMemoryPorts(memInterface)), portNames(memInterface) {};
+        ports(getMemoryPorts(memInterface)) {};
 };
 
 /// Summarizes information to convert a Handshake function into a
@@ -1238,11 +1233,10 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 static hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
                                           ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
-  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
+    modBuilder.addOutput(funcOp.getResName(idx).getValue(), lowerType(res));
 
   // Add all function inputs to the module, expanding memory references into a
   // set of individual ports for loads and stores
@@ -1252,7 +1246,7 @@ static hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
     if (TypedValue<MemRefType> memref = dyn_cast<TypedValue<MemRefType>>(arg))
       addMemIO(modBuilder, funcOp, memref, argName, state);
     else
-      modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
+      modBuilder.addInput(argName.getValue(), lowerType(type));
   }
 
   modBuilder.addClkAndRst();
@@ -1413,11 +1407,10 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
 
   StringAttr name = rewriter.getStringAttr(funcOp.getName());
   ModuleBuilder modBuilder(funcOp.getContext());
-  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
+    modBuilder.addOutput(funcOp.getResName(idx).getValue(), lowerType(res));
 
   // Add all function inputs to the module
   for (auto [idx, type] : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -1426,7 +1419,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
              << "Memory interfaces are not supported for external "
                 "functions";
     }
-    modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
+    modBuilder.addInput(funcOp.getArgName(idx).getValue(), lowerType(type));
   }
   modBuilder.addClkAndRst();
 
@@ -1501,16 +1494,18 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   auto inputModPorts = memState.getMemInputPorts(parentModOp);
   for (auto [port, arg] : llvm::zip_equal(inputModPorts, memArgs))
     converter.addInput(removePortNamePrefix(port), arg);
+  auto namedIOInterface =
+      cast<handshake::NamedIOInterface>(memOp.getOperation());
   for (auto [idx, oprd] : llvm::enumerate(operands)) {
     if (!isa<mlir::MemRefType>(oprd.getType()))
-      converter.addInput(memState.portNames.getInputName(idx), oprd);
+      converter.addInput(namedIOInterface.getOperandName(idx), oprd);
   }
   converter.addClkAndRst(parentModOp);
 
   // The HW instance will be connected to the top-level module through a
   // number of output ports, add those last after the regular interface ports
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    converter.addOutput(memState.portNames.getOutputName(idx),
+    converter.addOutput(namedIOInterface.getResultName(idx),
                         lowerType(res.getType()));
   }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
@@ -1627,17 +1622,17 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
     memInterfaceConverter.addInput("loadData", bramInstanceOp.getResult(0));
   }
 
-  // Add the ports from handshake op (here we use the port namer to name the
-  // ports that are directly converted from handshake op), except for the memref
-  // type.
+  // Add the ports from handshake op
+  auto namedIOInterface =
+      cast<handshake::NamedIOInterface>(memOp.getOperation());
   for (auto [i, oprd] : llvm::enumerate(operands)) {
     if (!isa<MemRefType>(oprd.getType()))
-      memInterfaceConverter.addInput(memState.portNames.getInputName(i), oprd);
+      memInterfaceConverter.addInput(namedIOInterface.getOperandName(i), oprd);
   }
   memInterfaceConverter.addClkAndRst(parentModOp);
 
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    memInterfaceConverter.addOutput(memState.portNames.getOutputName(idx),
+    memInterfaceConverter.addOutput(namedIOInterface.getResultName(idx),
                                     lowerType(res.getType()));
   }
 
@@ -1688,17 +1683,16 @@ template <typename T>
 LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
     T op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
   HWConverter converter(this->getContext());
-  handshake::PortNamer portNames(op);
 
   // Add all operation operands to the inputs
+  auto namedIOInterface = cast<handshake::NamedIOInterface>(op.getOperation());
   for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
-    converter.addInput(portNames.getInputName(idx), oprd);
+    converter.addInput(namedIOInterface.getOperandName(idx), oprd);
   converter.addClkAndRst(((Operation *)op)->getParentOfType<hw::HWModuleOp>());
 
   // Add all operation results to the outputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    converter.addOutput(portNames.getOutputName(idx), lowerType(type));
-
+    converter.addOutput(namedIOInterface.getResultName(idx), lowerType(type));
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
 }

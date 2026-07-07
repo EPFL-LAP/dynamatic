@@ -15,7 +15,7 @@ struct DynamaticTypingContext {
     /// Expression must be of an integer type.
     IntegerRequired,
     MAX_VALUE = IntegerRequired,
-  } constraint;
+  } constraint = Unconstrained;
 };
 
 /// Custom type system that avoids expressions that dynamatic is known not to
@@ -27,8 +27,6 @@ struct DynamaticTypingContext {
 class DynamaticTypeSystem final
     : public TypeSystem<DynamaticTypingContext, DynamaticTypeSystem> {
 public:
-  explicit DynamaticTypeSystem(Randomly &) {}
-
   TransferFnArray<ast::Function> getFunctionTransferFns() override {
     return {
         /*return type=*/copyFromInput<ast::Function>(),
@@ -182,9 +180,39 @@ public:
     };
   }
 
-  static bool discardStructuredForStatement(const DynamaticTypingContext &) {
-    // TODO: Figure out how we want to handle non-termination.
-    return true;
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override {
+    return {
+        /*start=*/TransferFn<ast::StructuredForStatement>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*end=*/
+        TransferFn<ast::StructuredForStatement>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*step=*/
+        TransferFn<ast::StructuredForStatement>(
+            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
+        /*statements=*/
+        copyFromInput<ast::StructuredForStatement>(),
+        /*output=*/copyInputToOutput<ast::StructuredForStatement>(),
+    };
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    // The assigned value must match the target's type to avoid an int<->float
+    // cast. We use weak dependencies between the target and the value
+    // so that neither is forced to be generated before the other.
+    return {
+        /*target=*/
+        copyFirstOf<ast::ScalarAssignmentStatement,
+                    weak(ast::ScalarAssignmentStatement::VALUE),
+                    INPUT_DEPENDENCY>(),
+        /*value=*/
+        copyFirstOf<ast::ScalarAssignmentStatement,
+                    weak(ast::ScalarAssignmentStatement::TARGET),
+                    INPUT_DEPENDENCY>(),
+        /*output=*/copyInputToOutput<ast::ScalarAssignmentStatement>(),
+    };
   }
 
 private:

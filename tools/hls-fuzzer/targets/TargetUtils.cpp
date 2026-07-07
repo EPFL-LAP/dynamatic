@@ -88,7 +88,8 @@ trap 'rm "$file"' EXIT
   // Add an error limit to circumvent clang bugs where it gets stuck and speed
   // up reduction.
   os << "-I" << (dynamaticSourceRoot / "include").string()
-     << " -Wno-deprecated -o /dev/null -ferror-limit=1\n";
+     << " -Wno-deprecated -o /dev/null -ferror-limit=1 2>&1 | tee >(cat - "
+        ">&5)\n";
 
   // Invoke dynamatic.
   os << dynamaticPath << " --exit-on-failure <<EOF 2>&1 | tee >(cat - >&5)\n";

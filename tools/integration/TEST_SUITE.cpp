@@ -379,8 +379,8 @@ TEST_P(SpecFixture, spec) {
       .useSharing = false,
       .useSpeculation = true,
       .milpSolver = "gurobi",
-      .bufferAlgorithm = "fpga20",
-      .clockPeriod = 7,
+      .bufferAlgorithm = "fpl22",
+      .clockPeriod = 20,
       .simTime = -1
       // clang-format on
   };

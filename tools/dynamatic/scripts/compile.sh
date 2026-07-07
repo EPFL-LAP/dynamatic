@@ -23,9 +23,10 @@ MILP_SOLVER=${13}
 STRAIGHT_TO_QUEUE=${14}
 SPECULATION=${15}
 ENABLE_SHORT_CIRCUIT=${16}
-FORK_FIFO_SIZE=${17}
+CALCULATE_PATH_DELAYS=${17}
+FORK_FIFO_SIZE=${18}
 
-for i in {1..17}; do shift; done
+for i in {1..18}; do shift; done
 
 SKIPPABLE_ACTTIVE=0
 SKIPPABLE_SEQ_N=()
@@ -127,7 +128,8 @@ export_cfg() {
 # ============================================================================ #
 
 # Reset output directory
-rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+rm -rf "$OUTPUT_DIR"/*/
+mkdir -p "$COMP_DIR"
 
 cp "$F_C_SOURCE" "$F_C_REWRITTEN"
 exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"
@@ -304,7 +306,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
-    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
+    --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
@@ -395,13 +397,18 @@ else
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
+  if [[ "$CALCULATE_PATH_DELAYS" == "1" ]]; then
+    CALCULATE_PATH_DELAYS_FLAG="calculate-path-delays"
+  else
+    CALCULATE_PATH_DELAYS_FLAG=""
+  fi
   # To enable debug information, make sure that Dynamatic is built with Debug
   # mode and add "--debug-only=<DEBUG_TYPE>" to the binary call below. Check
   # out the value of <DEBUG_TYPE> in the cpp source files.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-milp-models \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"

@@ -20,6 +20,7 @@
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
+#include <limits>
 #include <optional>
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
@@ -369,6 +370,12 @@ void CFDFCUnionBuffers::setup() {
   // Add single-domain and mixed-domain path constraints as well as elasticity
   // constraints over all units in the CFDFC union
   for (Operation *unit : cfUnion.units) {
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(unit)) {
+      addSpecUnitConstraints(
+          unit, {SignalType::DATA, SignalType::VALID, SignalType::READY},
+          channelFilter);
+      continue;
+    }
     addUnitTimingConstraints(unit, SignalType::DATA, channelFilter);
     addUnitTimingConstraints(unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(unit, SignalType::READY, channelFilter);
@@ -485,6 +492,12 @@ void OutOfCycleBuffers::setup() {
     if (cfUnion.units.contains(&unit))
       continue;
 
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(&unit)) {
+      addSpecUnitConstraints(
+          &unit, {SignalType::DATA, SignalType::VALID, SignalType::READY},
+          channelFilter);
+      continue;
+    }
     addUnitTimingConstraints(&unit, SignalType::DATA, channelFilter);
     addUnitTimingConstraints(&unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(&unit, SignalType::READY, channelFilter);
