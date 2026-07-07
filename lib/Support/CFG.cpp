@@ -244,19 +244,6 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
   if (bbs.srcBB < bbs.dstBB)
     return false;
 
-  // taken from shun's eagerly elastic code
-  if (val.hasOneUse()) {
-    Operation *user = *val.user_begin();
-    if (isa<handshake::InitOp, handshake::RepeatingInitOp>(user))
-      return true;
-    // ??? Is this correct?
-    if (auto muxOp = dyn_cast<handshake::MuxOp>(user)) {
-      if (!muxOp->hasAttr("specv2_loop_cond_mux") &&
-          val != muxOp.getSelectOperand())
-        return true;
-    }
-  }
-
   // If both source and destination blocks are identical, the edge must be
   // located between a branch-like operation and a merge-like operation
   Operation *brOp = backtrackToBranch(val.getDefiningOp());

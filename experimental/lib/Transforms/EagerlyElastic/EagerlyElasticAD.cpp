@@ -179,7 +179,6 @@ bool EagerlyElasticADPass::isSourced(Value value) {
   if (isa<handshake::SourceOp>(value.getDefiningOp()))
     return true;
 
-  llvm::errs() << "first part of isSourced is fine\n";
   definingOp->dump();
   // If all operands of the defining operation are sourced, the value is also
   // sourced.
@@ -193,7 +192,10 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
     handshake::ConditionalBranchOp branchOp, Operation *targetOp) {
 
   StringRef opName = targetOp->getName().getStringRef();
-  llvm::errs() << "opname is: " << opName << '\n';
+  // llvm::errs() << "opname is: " << opName << '\n';
+
+  if (isa<handshake::MuxOp>(targetOp))
+    return true;
 
   // verify the targetOp is a PM unit
   if (!isa<handshake::ArithOpInterface, handshake::ForkOp, handshake::NotIOp,
@@ -202,7 +204,7 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
       ((isa<handshake::MergeOp, handshake::ControlMergeOp>(targetOp)) &&
        targetOp->getNumOperands() != 1)) {
 
-    llvm::errs() << opName << " is not a pm unit or a 1-input merge\n";
+    // llvm::errs() << opName << " is not a pm unit or a 1-input merge\n";
     return false; // reject anything that isn't a PM unit or a 1-input merge
   }
 
@@ -225,8 +227,8 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
   // synchronization issues
   Value currentCond = branchOp.getConditionOperand();
   for (Value operand : targetOp->getOperands()) {
-    llvm::errs() << "operand of targetOp: ";
-    operand.dump();
+    // llvm::errs() << "operand of targetOp: ";
+    // operand.dump();
     // if we have a branch it must have the same condition
     if (auto siblingBranch =
             dyn_cast<handshake::ConditionalBranchOp>(operand.getDefiningOp())) {
@@ -238,17 +240,17 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
 
       // They must originate from the same wire AND have the exact same polarity
       if (currentRoot != siblingRoot || currentInverted != siblingInverted) {
-        llvm::errs() << "Passer ctrl mismatch\n";
-        llvm::errs() << "For branchop: " << branchOp->getAttr("handshake.name")
-                     << '\n';
+        // llvm::errs() << "Passer ctrl mismatch\n";
+        // llvm::errs() << "For branchop: " <<
+        // branchOp->getAttr("handshake.name")
+        // << '\n';
         return false;
       }
     } else if (!isSourced(operand)) {
-      llvm::errs() << "Operand not from passer or source\n";
+      // llvm::errs() << "Operand not from passer or source\n";
       return false;
     }
   }
-  llvm::errs() << "returning true\n";
   return true;
 }
 
@@ -333,8 +335,6 @@ void EagerlyElasticADPass::rewriteA(
     for (auto branchOp : frontier) {
       Value dataPath = branchOp.getFalseResult();
       Operation *eligibleTarget = nullptr;
-      llvm::errs() << "going into the loops works\n";
-      dataPath.dump();
 
       // search for any consumer of the suppressor that is eligible
       for (Operation *user : dataPath.getUsers()) {
@@ -343,10 +343,9 @@ void EagerlyElasticADPass::rewriteA(
           break;
         }
       }
-      llvm::errs() << "looking for consumers works\n";
 
       if (eligibleTarget) {
-        llvm::errs() << branchOp->getAttr("handshake.name") << '\n';
+        // llvm::errs() << branchOp->getAttr("handshake.name") << '\n';
         frontierUpdated = true;
 
         // if there are multiple uses, isolate the target by inserting a fork
@@ -360,18 +359,22 @@ void EagerlyElasticADPass::rewriteA(
 
           eligibleTarget->replaceUsesOfWith(dataPath, forkOp.getResults()[0]);
           dataPath.replaceAllUsesExcept(forkOp.getResults()[1], forkOp);
-          llvm::errs() << "added fork\n";
+          // llvm::errs() << "added fork\n";
           // break to move this branch past the fork in a later step
           break;
         }
+        if (auto mux = dyn_cast<handshake::MuxOp>(*dataPath.user_begin())) {
+          frontierUpdated = false;
+          break;
+        }
 
-        llvm::errs() << "is eligible\n";
+        // llvm::errs() << "is eligible\n";
         performSuppressorMotion(branchOp, frontier, namer);
 
         // frontier was mutated, break and restart the loop
         break;
       }
-      llvm::errs() << "not eligible\n";
+      // llvm::errs() << "not eligible\n";
     }
   } while (frontierUpdated);
   llvm::errs() << "finish rewrite A!\n";
@@ -394,48 +397,36 @@ void EagerlyElasticADPass::applyRewriteD(
     return;
   Value conditionC = notOp.getOperand();
 
+  Value oldInitInput = initOp.getOperand();
+  auto prevRepeatingInit = dyn_cast_or_null<handshake::RepeatingInitOp>(
+      oldInitInput.getDefiningOp());
+
+  Value inputOperand = prevRepeatingInit ? oldInitInput : conditionC;
+
   // build the top speculative loop control structure
   OpBuilder builder(dataMux);
 
   // completely replace the pink circuit with a RepeatingInitOp
   auto repeatingInit =
-      builder.create<handshake::RepeatingInitOp>(loc, conditionC, 1);
+      builder.create<handshake::RepeatingInitOp>(loc, inputOperand, 1);
   setupMetadata(bbAttr, namer, repeatingInit);
   Value specOutput = repeatingInit.getResult();
 
   // connect the repeatingInit to the loop init and the suppressor
   initOp.getOperandMutable().assign(specOutput);
 
-  /*
-  // create the constant true generator
-  auto trueSrc = builder.create<handshake::SourceOp>(loc);
-  auto trueCst = builder.create<handshake::ConstantOp>(
-      loc, conditionC.getType(), builder.getBoolAttr(true),
-      trueSrc.getResult());
-
-  // create the new condition-generating mux
-  // takes condition C on true and constant TRUE on false
-  SmallVector<Value> condMuxInputs = {trueCst.getResult(), conditionC};
-  auto condMux = builder.create<handshake::MuxOp>(loc, conditionC.getType(),
-                                                  conditionC, condMuxInputs);
-
-  // create the fork and wire output 0 back to the condition mux via an init
-  // and output 1 to the original data mux via the already existing init
-  auto controlFork =
-      builder.create<handshake::ForkOp>(loc, condMux.getResult(), 3);
-  auto loopInitF = builder.create<handshake::InitOp>(
-      loc, controlFork.getResults()[0].getType(), controlFork.getResults()[0]);
-  condMux.getSelectOperandMutable()[0].set(loopInitF.getResult());
-  initOp.getOperandMutable().assign(controlFork.getResults()[1]);
-  llvm::errs() << "fork generated\n";
-
-  // assign the bb attribute from the dataMux to all new ops and name them
-  setupMetadata(bbAttr, namer, trueSrc, trueCst, condMux, controlFork,
-                loopInitF);
-  */
-
   // rewire the NotIOp's input to the new control fork result
-  notOp.getOperandMutable().assign(specOutput);
+  // check if the notOp is shared among multiple operations
+  if (notOp.getResult().hasOneUse())
+    notOp.getOperandMutable().assign(specOutput);
+  else {
+    builder.setInsertionPoint(notOp);
+    auto newNotOp =
+        builder.create<handshake::NotIOp>(notOp->getLoc(), specOutput);
+    setupMetadata(notOp->getAttr("handshake.bb"), namer, newNotOp);
+    // rewire the current branchOp to use the new NotIOp's result
+    branchOp.getConditionOperandMutable().assign(newNotOp.getResult());
+  }
 
   // move suppressor past the mux
   performSuppressorMotion(branchOp, frontier, namer, 1);
@@ -450,32 +441,35 @@ void EagerlyElasticADPass::rewriteD(
     frontierUpdated = false;
 
     for (auto branchOp : frontier) {
-      if (auto mux = dyn_cast<handshake::MuxOp>(
-              *branchOp.getFalseResult().user_begin())) {
+      for (auto *nextOp : branchOp.getFalseResult().getUsers()) {
+        if (auto mux = dyn_cast<handshake::MuxOp>(nextOp)) {
 
-        // identify loops (mux connected to init) and make sure the suppressor
-        // connected to the mux does not go anywhere else
-        auto init =
-            dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
-        if (init && branchOp.getFalseResult().hasOneUse()) {
-          llvm::errs() << "branchOp for rewrite D: "
-                       << branchOp->getAttr("handshake.name") << '\n';
+          // identify loops (mux connected to init) and make sure the suppressor
+          // connected to the mux does not go anywhere else
+          auto init = dyn_cast<handshake::InitOp>(
+              mux.getSelectOperand().getDefiningOp());
+          if (init && branchOp.getFalseResult().hasOneUse()) {
+            llvm::errs() << "branchOp for rewrite D: "
+                         << branchOp->getAttr("handshake.name") << '\n';
 
-          // check whether the suppressor is connected to path A of the mux
-          // and make sure there is no future fork in between
-          if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
-            applyRewriteD(mux, branchOp, init, frontier, namer);
-          } else {
-            llvm::errs()
-                << "suppressor not connected to path A of the Mux !\n ";
-            continue;
+            // check whether the suppressor is connected to path A of the mux
+            // and make sure there is no future fork in between
+            if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
+              applyRewriteD(mux, branchOp, init, frontier, namer);
+            } else {
+              llvm::errs()
+                  << "suppressor not connected to path A of the Mux !\n ";
+              continue;
+            }
+
+            frontierUpdated = true;
+            // frontier was mutated, break and restart the loop
+            break;
           }
-
-          frontierUpdated = true;
-          // frontier was mutated, break and restart the loop
-          break;
         }
       }
+      if (frontierUpdated)
+        break;
     }
   } while (frontierUpdated);
 }
@@ -496,7 +490,8 @@ void EagerlyElasticADPass::runOnOperation() {
   // apply rewrites: A, (D, A)^n
   rewriteA(frontier, namer);
 
-  for (unsigned i = 0; i < numRewriteD; i++) {
+  // for (unsigned i = 0; i < numRewriteD; i++) {
+  for (unsigned i = 0; i < 3; i++) {
     rewriteD(frontier, namer);
     rewriteA(frontier, namer);
   }
