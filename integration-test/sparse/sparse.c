@@ -11,7 +11,9 @@ float sparse(in_float_t a[N], in_float_t x[N]) {
   bool loopAgain;
   do {
     mul = a[i] * x[i];
+    #pragma DYN predict variable=mul values=[0] location=start marker=0 type=float
     sum += mul;
+    #pragma DYN predict variable=sum location=end marker=0
     i++;
     loopAgain = sum >= 0.0f;
     #pragma DYN speculate variable=loopAgain max_predictions=3 style=standard
