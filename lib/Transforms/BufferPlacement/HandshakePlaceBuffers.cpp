@@ -29,6 +29,7 @@
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
+#include <iostream>
 #include <string>
 
 using namespace mlir;
@@ -438,8 +439,10 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
   GRBEnv env = GRBEnv(true);
   env.set(GRB_IntParam_OutputFlag, 0);
   env.set(GRB_IntParam_Seed, seed);
-  if (timeout > 0)
+  if (timeout > 0) {
     env.set(GRB_DoubleParam_TimeLimit, timeout);
+  }
+    
   env.start();
 
   if (algorithm == FPGA20 || algorithm == FPGA20_LEGACY) {

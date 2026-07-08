@@ -79,11 +79,10 @@ static size_t fixOutputPortNumber(Operation *op, size_t idx) {
         return idx;
       })
       .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
-        // Legacy Dynamatic has the memory controls before the return values
-        auto numReturnValues = endOp.getReturnValues().size();
-        auto numMemoryControls = endOp.getMemoryControls().size();
-        return (idx < numReturnValues) ? idx + numMemoryControls
-                                       : idx - numReturnValues;
+        // Since the circuit interface redesign, EndOp only carries the
+        // function's return values (no trailing memory control signals), so
+        // there is no longer anything to reorder.
+        return idx;
       })
       .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address
@@ -120,11 +119,10 @@ static size_t fixInputPortNumber(Operation *op, size_t idx) {
         return 1 - idx;
       })
       .Case<handshake::EndOp>([&](handshake::EndOp endOp) {
-        // Legacy Dynamatic has the memory controls before the return values
-        auto numReturnValues = endOp.getReturnValues().size();
-        auto numMemoryControls = endOp.getMemoryControls().size();
-        return (idx < numReturnValues) ? idx + numMemoryControls
-                                       : idx - numReturnValues;
+        // Since the circuit interface redesign, EndOp only carries the
+        // function's return values (no trailing memory control signals), so
+        // there is no longer anything to reorder.
+        return idx;
       })
       .Case<handshake::LoadOpInterface, handshake::StoreOpInterface>([&](auto) {
         // Legacy Dynamatic has the data operand/result before the address

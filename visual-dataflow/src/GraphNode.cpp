@@ -30,6 +30,8 @@ GraphNode::GraphNode(NodeId id, std::pair<int, int> position)
 
 void GraphNode::setId(NodeId id) { this->id = std::move(id); }
 
+void GraphNode::setLabel(std::string label) { this->label = std::move(label); }
+
 void GraphNode::setPosition(std::pair<float, float> position) {
   this->position = position;
 }
@@ -42,6 +44,8 @@ void GraphNode::addPort(size_t port, bool isInputPort) {
 }
 
 NodeId GraphNode::getNodeId() { return id; }
+
+std::string GraphNode::getLabel() { return label.empty() ? id : label; }
 
 std::pair<float, float> GraphNode::getPosition() { return position; }
 

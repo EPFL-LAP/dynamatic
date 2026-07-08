@@ -38,13 +38,32 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
   bool insideBBDefinition = false;
 
   while (std::getline(file, line)) {
-    if (line.find("->") == std::string::npos &&
+    // Graphviz wraps long attribute values (notably spline `pos` coordinate
+    // lists) across multiple physical lines using a trailing backslash. Splice
+    // the continuation lines back into a single logical line before parsing.
+    while (!line.empty() && line.back() == '\\') {
+      line.pop_back();
+      std::string continuation;
+      if (!std::getline(file, continuation))
+        break;
+      line += continuation;
+    }
+
+    if (!insideNodeDefinition && !insideEdgeDefinition &&
+        line.find("->") == std::string::npos &&
         line.find('[') != std::string::npos &&
         line.find("node") == std::string::npos &&
         line.find("graph") == std::string::npos) {
 
       currentNode = GraphNode();
       insideNodeDefinition = true;
+
+      // The node's unique identifier is the token preceding the '['; edges
+      // reference the node by this name.
+      std::string name = line.substr(0, line.find('['));
+      name.erase(0, name.find_first_not_of(" \t\n\r\f\v"));
+      name.erase(name.find_last_not_of(" \t\n\r\f\v") + 1);
+      currentNode.setId(name);
 
     } else if (line.find("->") != std::string::npos) {
       currentEdge = GraphEdge();
@@ -61,9 +80,13 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
 
     } else if (insideNodeDefinition &&
                line.find("label") != std::string::npos) {
-      NodeId id =
+      std::string label =
           line.substr(line.find('=') + 1, line.find(',') - line.find('=') - 1);
-      currentNode.setId(id);
+      // Strip the surrounding double quotes Graphviz adds around labels that
+      // are not bare identifiers (e.g. "LD (pixelR)").
+      if (label.size() >= 2 && label.front() == '"' && label.back() == '"')
+        label = label.substr(1, label.size() - 2);
+      currentNode.setLabel(label);
 
     } else if (insideNodeDefinition && line.find("out") != std::string::npos &&
                line.find("label") == std::string::npos) {
@@ -179,14 +202,15 @@ LogicalResult dynamatic::visual::processDOT(std::ifstream &file, Graph &graph) {
       }
     }
 
-    if (insideEdgeDefinition && line.find("from") != std::string::npos) {
-      int out = std::stoi(line.substr(line.find("out") + 3, line.find(',')));
+    // The numeric source/destination port indices live in the `from_idx`/
+    // `to_idx` attributes (the `from`/`to` attributes hold the port *names*).
+    if (insideEdgeDefinition && line.find("from_idx=") != std::string::npos) {
+      int out = std::stoi(line.substr(line.find("from_idx=") + 9));
       currentEdge.setOutPort(out);
     }
 
-    if (insideEdgeDefinition && line.find("to") != std::string::npos &&
-        line.find("->") == std::string::npos) {
-      int in = std::stoi(line.substr(line.find('n') + 1, line.find(',')));
+    if (insideEdgeDefinition && line.find("to_idx=") != std::string::npos) {
+      int in = std::stoi(line.substr(line.find("to_idx=") + 7));
       currentEdge.setInPort(in);
     }
     if (insideEdgeDefinition && line.find("arrowhead") != std::string::npos) {

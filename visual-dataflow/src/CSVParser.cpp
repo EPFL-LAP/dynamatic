@@ -107,8 +107,10 @@ LogicalResult dynamatic::visual::processCSVLine(const std::string &line,
     *currCycle = cycleNb;
   }
 
-  NodePortPair srcPort(src, ++outPort);
-  NodePortPair dstPort(dst, ++inPort);
+  // The CSV port indices are 0-based and match the DOT edges' `from_idx`/
+  // `to_idx` attributes directly, so no offset is applied here.
+  NodePortPair srcPort(src, outPort);
+  NodePortPair dstPort(dst, inPort);
   EdgePorts edgePorts(srcPort, dstPort);
   EdgeId edgeID;
   State state;

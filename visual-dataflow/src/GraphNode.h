@@ -35,12 +35,16 @@ public:
   GraphNode(NodeId id, std::pair<int, int> position);
   /// Sets the NodeId
   void setId(NodeId id);
+  /// Sets the display label of the Node
+  void setLabel(std::string label);
   /// Sets the positon of the Node
   void setPosition(std::pair<float, float> pos);
   /// Adds a port to the Node
   void addPort(size_t port, bool isInputPort);
   /// Returns the node identifier
   NodeId getNodeId();
+  /// Returns the display label of the Node
+  std::string getLabel();
   /// Return the position of the Node
   std::pair<float, float> getPosition();
   // Returns the in/out ports of the Node
@@ -63,8 +67,10 @@ public:
   bool getDashed();
 
 private:
-  /// Node identifier
+  /// Node identifier (the unique name used to reference the node in edges)
   NodeId id;
+  /// Human-readable label displayed inside the node
+  std::string label;
   /// List of all the input ports of the node
   std::vector<size_t> inPorts;
   /// List of all the output ports of the node

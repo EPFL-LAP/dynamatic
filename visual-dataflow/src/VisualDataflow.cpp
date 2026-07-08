@@ -13,7 +13,7 @@
 #include "VisualDataflow.h"
 #include "Graph.h"
 #include "GraphParser.h"
-#include "dynamatic/Support/DOTPrinter.h"
+#include "dynamatic/Support/DOT.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "godot_cpp/classes/area2d.hpp"
 #include "godot_cpp/classes/canvas_item.hpp"
@@ -109,6 +109,9 @@ void VisualDataflow::start(const godot::String &inputDOTFile,
 LogicalResult VisualDataflow::createGraph(std::string inputDOTFile,
                                           std::string inputCSVFile) {
   GraphParser parser = GraphParser(&graph);
+  
+  UtilityFunctions::printerr(godot::String(inputDOTFile.c_str()));
+  
   if (failed(parser.parse(inputDOTFile))) {
     UtilityFunctions::printerr("Failed to parse the graph");
     return failure();
@@ -257,7 +260,7 @@ void VisualDataflow::drawNodes() {
     // Set the label's content
     nodeName->push_font(get_theme_default_font(), 11);
     nodeName->push_color(OPAQUE_BLACK);
-    std::string text = "[center]" + node.getNodeId() + "[/center]";
+    std::string text = "[center]" + node.getLabel() + "[/center]";
     nodeName->append_text(text.c_str());
     nodeName->pop();
     nodeName->pop();
