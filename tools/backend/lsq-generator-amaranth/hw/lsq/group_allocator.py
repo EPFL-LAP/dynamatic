@@ -4,7 +4,7 @@ from amaranth.lib.data import ArrayLayout
 from amaranth.lib.wiring import Component, In, Out
 
 from config import LsqConfig
-from utils import MuxOneHot, RotateLeft, WrapSubtract
+from hw.utils import MuxOneHot, RotateLeft, WrapSubtract
 
 
 class GroupAllocator(Component):
