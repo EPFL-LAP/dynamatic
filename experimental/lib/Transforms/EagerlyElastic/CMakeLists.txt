@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticEagerlyElastic
   EagerlyElasticAD.cpp
+  EagerlyElasticPatternRewriting.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
