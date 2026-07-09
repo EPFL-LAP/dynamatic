@@ -6,13 +6,7 @@
 
 int subdiag_fast(in_float_t d1[N], in_float_t d2[N], in_float_t e[N]) {
   int i = 0;
-  for (i = 0; i < N_DEC; i++) {
-    float dd = d1[i] + d2[i];
-    float x = 0.001f;
-    if ((e[i]) <= x * dd)
-      break;
-  }
-  /* bool cond_break = false;
+  bool cond_break = false;
   bool loop_again = false;
   do {
     float dd = d1[i] + d2[i + 1];
