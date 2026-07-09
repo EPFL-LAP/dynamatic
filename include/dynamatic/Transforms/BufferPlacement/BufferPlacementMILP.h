@@ -98,6 +98,38 @@ struct MILPVars {
   llvm::MapVector<Value, ChannelVars> channelVars;
 };
 
+/// Identifies one arrival-time variable of the MILP: a specific endpoint
+/// (input or output) of a specific signal on a specific channel. Used to
+/// record the timing graph so that the critical path can be reconstructed
+/// after optimization.
+struct PathPin {
+  /// The channel the pin belongs to.
+  Value channel;
+  /// The pin's timing domain.
+  SignalType signal;
+  /// Whether the pin is the channel's output endpoint (`path.tOut`) as opposed
+  /// to its input endpoint (`path.tIn`).
+  bool isOut;
+
+  bool operator==(const PathPin &other) const {
+    return channel == other.channel && signal == other.signal &&
+           isOut == other.isOut;
+  }
+  bool operator!=(const PathPin &other) const { return !(*this == other); }
+};
+
+/// A directed edge of the arrival-time propagation graph, mirroring a path
+/// constraint added to the MILP: the arrival time at `dst` must be at least the
+/// arrival time at `src` plus `delay`. `kind` is a short human-readable tag
+/// ("channel", "unit", or "mixed") describing the constraint the edge came
+/// from.
+struct TimingEdge {
+  PathPin src;
+  PathPin dst;
+  double delay;
+  StringRef kind;
+};
+
 /// Abstract class holding the basic logic for the smart buffer placement pass,
 /// which expresses the buffer placement problem in dataflow circuits as an MILP
 /// (mixed-integer linear program) whose solution indicates the location and
@@ -182,6 +214,10 @@ protected:
   /// it with the `BufferPlacementMILP::addChannelVars` and
   /// `BufferPlacementMILP::addCFDFCVars` methods.
   MILPVars vars;
+  /// Records the arrival-time propagation graph as path constraints are added,
+  /// so that the critical path can be reconstructed from the solution. Only
+  /// populated when a logger is present (see `logCriticalPath`).
+  SmallVector<TimingEdge> timingEdges;
 
   /// Whether the MILP was determined to be unsatisfiable during construction.
   bool unsatisfiable = false;
@@ -284,7 +320,21 @@ protected:
   /// using an estimation of the transfer frequency over each provided channel.
   /// The objective has a negative term for each buffer placement decision and
   /// for each buffer slot placed on any of the provide channels.
-  void addObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
+  ///
+  /// If `minimizeSlack` is true, the primary objective is registered together
+  /// with a strictly lower-priority hierarchical objective that minimizes the
+  /// sum of all arrival-time variables (see `addSlackMinimizingObjective`).
+  void addObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs,
+                    bool minimizeSlack = false);
+
+  /// Registers `primaryObjective` (to be maximized) as the model's top-priority
+  /// objective and adds a strictly lower-priority hierarchical objective that
+  /// minimizes the sum of every signal's arrival-time variables. Gurobi solves
+  /// these lexicographically, so the primary objective's optimal value is
+  /// preserved exactly; the secondary objective merely pins arrival times to
+  /// their true static-timing-analysis values in the returned solution (it may,
+  /// however, break ties between otherwise equally-optimal placements).
+  void addSlackMinimizingObjective(const GRBLinExpr &primaryObjective);
 
   /// Helper method to run a callback function on each input/output port pair of
   /// the provided operation, unless one of the ports has `mlir::MemRefType`.
@@ -294,6 +344,18 @@ protected:
   /// Logs placement decisisons and achieved throughputs after MILP
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
+
+  /// Logs the `numPaths` most critical *distinct* paths after MILP
+  /// optimization. For each, reports the timing slack (`targetPeriod` minus the
+  /// signal's arrival time) and back-traces the combinational segment feeding
+  /// its endpoint using the recorded `timingEdges`. Paths are ranked by
+  /// increasing slack and de-duplicated so that no reported path's endpoint
+  /// lies on an already-reported (more critical) path. This shows how tightly
+  /// the solution meets the clock period constraint and where the bottlenecks
+  /// are. Asserts if the logger is nullptr. For the reported slacks to be
+  /// exact, arrival times must have been pinned by the slack-minimizing
+  /// secondary objective (see `addSlackMinimizingObjective`).
+  void logCriticalPath(unsigned numPaths = 10);
 
 private:
   /// Common logic for all constructors. Fills the channel to buffering

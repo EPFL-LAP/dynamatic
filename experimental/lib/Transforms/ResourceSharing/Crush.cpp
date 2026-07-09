@@ -197,7 +197,8 @@ public:
                      const TimingDatabase &timingDB, double targetPeriod,
                      CFDFCUnion &cfUnion, Logger &logger, StringRef milpName)
       : CFDFCUnionBuffers(env, funcInfo, timingDB, targetPeriod, cfUnion,
-                          /*bufPenalty=*/true, logger, milpName),
+                          /*bufPenalty=*/true, /*minimizeSlack=*/true, logger,
+                          milpName),
         sharingInfo(sharingInfo) {};
   FPL22BuffersWraper(SharingInfo &sharingInfo, GRBEnv &env, FuncInfo &funcInfo,
                      const TimingDatabase &timingDB, double targetPeriod,
@@ -332,7 +333,7 @@ struct HandshakePlaceBuffersPassWrapper : public HandshakePlaceBuffersPass {
       // Solve last MILP on channels/units that are not part of any CFDFC
       return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
           logger, "out_of_cycle", placement, env, funcInfo, timingDB, targetCP,
-          /*bufPenalty=*/true);
+          /*bufPenalty=*/true, /*minimizeSlack=*/true);
     }
 
     llvm_unreachable("unknown algorithm");

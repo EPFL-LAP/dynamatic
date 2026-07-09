@@ -97,7 +97,7 @@ BufferLogger::BufferLogger(handshake::FuncOp funcOp, bool dumpLogs,
 HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
-    unsigned seed, bool bufPenalty) {
+    unsigned seed, bool bufPenalty, bool minimizeSlack) {
   this->algorithm = algorithm.str();
   this->frequencies = frequencies.str();
   this->timingModels = timingModels.str();
@@ -107,6 +107,7 @@ HandshakePlaceBuffersPass::HandshakePlaceBuffersPass(
   this->dumpLogs = dumpLogs;
   this->seed = seed;
   this->bufPenalty = bufPenalty;
+  this->minimizeSlack = minimizeSlack;
 }
 
 void HandshakePlaceBuffersPass::runDynamaticPass() {
@@ -468,14 +469,14 @@ LogicalResult HandshakePlaceBuffersPass::getBufferPlacement(
       std::string milpName = "cfdfc_placement_" + std::to_string(idx);
       if (failed(checkLoggerAndSolve<fpl22::CFDFCUnionBuffers>(
               logger, milpName, placement, env, info, timingDB, targetCP,
-              cfUnion, bufPenalty)))
+              cfUnion, bufPenalty, minimizeSlack)))
         return failure();
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
     return checkLoggerAndSolve<fpl22::OutOfCycleBuffers>(
         logger, "out_of_cycle", placement, env, info, timingDB, targetCP,
-        bufPenalty);
+        bufPenalty, minimizeSlack);
   }
 
   llvm_unreachable("unknown algorithm");
@@ -575,8 +576,8 @@ std::unique_ptr<dynamatic::DynamaticPass>
 dynamatic::buffer::createHandshakePlaceBuffers(
     StringRef algorithm, StringRef frequencies, StringRef timingModels,
     bool firstCFDFC, double targetCP, unsigned timeout, bool dumpLogs,
-    unsigned seed, bool bufPenalty) {
+    unsigned seed, bool bufPenalty, bool minimizeSlack) {
   return std::make_unique<HandshakePlaceBuffersPass>(
       algorithm, frequencies, timingModels, firstCFDFC, targetCP, timeout,
-      dumpLogs, seed, bufPenalty);
+      dumpLogs, seed, bufPenalty, minimizeSlack);
 }

@@ -103,20 +103,24 @@ public:
   /// ensuring that further calls to `optimize` fail.
   CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
-                    CFDFCUnion &cfUnion, bool bufPenalty = true);
+                    CFDFCUnion &cfUnion, bool bufPenalty = true,
+                    bool minimizeSlack = true);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
-                    CFDFCUnion &cfUnion, bool bufPenalty, Logger &logger,
-                    StringRef milpName);
+                    CFDFCUnion &cfUnion, bool bufPenalty, bool minimizeSlack,
+                    Logger &logger, StringRef milpName);
 
 private:
   /// The CFDFC union over which the MILP is described. Constraints are only
   /// created over the channels and units that are part of this union.
   CFDFCUnion &cfUnion;
+
+  /// Whether to register the lower-priority slack-minimizing MILP objective.
+  bool minimizeSlack;
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
@@ -144,17 +148,20 @@ public:
   /// ensuring that further calls to `optimize` fail.
   OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
-                    bool bufPenalty = true);
+                    bool bufPenalty = true, bool minimizeSlack = true);
 
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                     const TimingDatabase &timingDB, double targetPeriod,
-                    bool bufPenalty, Logger &logger,
+                    bool bufPenalty, bool minimizeSlack, Logger &logger,
                     StringRef milpName = "out_of_cycle");
 
 private:
+  /// Whether to register the lower-priority slack-minimizing MILP objective.
+  bool minimizeSlack;
+
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.

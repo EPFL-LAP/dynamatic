@@ -300,7 +300,12 @@ def HandshakePlaceBuffers : DynamaticPass<"handshake-place-buffers"> {
     "If true (default), add penalty terms to the MILP objective that "
     "discourage placing buffers and extra slots, producing minimal placements. "
     "Set to false to disable the penalty and allow the solver to place buffers "
-    "freely.">];
+    "freely.">,
+    Option<"minimizeSlack", "minimize-slack", "bool", "true",
+    "If true (default), register a strictly lower-priority hierarchical MILP "
+    "objective that minimizes the sum of arrival-time variables, so reported "
+    "critical-path slack is exact (applies to both MILPs of the 'fpl22' "
+    "algorithm). Set to false for a single-objective formulation.">];
 }
 
 //===----------------------------------------------------------------------===//

@@ -32,7 +32,7 @@ std::unique_ptr<dynamatic::DynamaticPass> createHandshakePlaceBuffers(
     StringRef algorithm = "on-merges", StringRef frequencies = "",
     StringRef timingModels = "", bool firstCFDFC = false, double targetCP = 4.0,
     unsigned timeout = 180, bool dumpLogs = false, unsigned seed = 0,
-    bool bufPenalty = true);
+    bool bufPenalty = true, bool minimizeSlack = true);
 
 #define GEN_PASS_DECL_HANDSHAKEPLACEBUFFERS
 #define GEN_PASS_DEF_HANDSHAKEPLACEBUFFERS
@@ -52,7 +52,8 @@ struct HandshakePlaceBuffersPass
   HandshakePlaceBuffersPass(StringRef algorithm, StringRef frequencies,
                             StringRef timingModels, bool firstCFDFC,
                             double targetCP, unsigned timeout, bool dumpLogs,
-                            unsigned seed = 0, bool bufPenalty = true);
+                            unsigned seed = 0, bool bufPenalty = true,
+                            bool minimizeSlack = true);
 
   /// Called on the MLIR module provided as input.
   void runDynamaticPass() override;

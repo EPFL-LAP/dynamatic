@@ -65,8 +65,10 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     placement[channel] = result;
   }
 
-  if (logger)
+  if (logger) {
     logResults(placement);
+    logCriticalPath();
+  }
 }
 
 void FPL22BuffersBase::addCustomChannelConstraints(Value channel) {
@@ -261,15 +263,23 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
     std::string consName =
         "path_mixed_" + unitName.str() + "_" + std::to_string(idx++);
     model.addConstr(tPinIn + cons.internalDelay <= tPinOut, consName);
+
+    // Record the mixed-domain propagation edge for critical-path
+    // reconstruction (it crosses signal domains, e.g. data->valid).
+    if (logger)
+      timingEdges.push_back(
+          {PathPin{cons.input.channel, cons.input.type, /*isOut=*/true},
+           PathPin{cons.output.channel, cons.output.type, /*isOut=*/false},
+           cons.internalDelay, "mixed"});
   }
 }
 
 CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
-                                     bool bufPenalty)
+                                     bool bufPenalty, bool minimizeSlack)
     : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty),
-      cfUnion(cfUnion) {
+      cfUnion(cfUnion), minimizeSlack(minimizeSlack) {
   if (!unsatisfiable)
     setup();
 }
@@ -277,11 +287,11 @@ CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
 CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
-                                     bool bufPenalty, Logger &logger,
-                                     StringRef milpName)
+                                     bool bufPenalty, bool minimizeSlack,
+                                     Logger &logger, StringRef milpName)
     : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty,
                        logger, milpName),
-      cfUnion(cfUnion) {
+      cfUnion(cfUnion), minimizeSlack(minimizeSlack) {
   if (!unsatisfiable)
     setup();
 }
@@ -362,14 +372,16 @@ void CFDFCUnionBuffers::setup() {
   // Add the MILP objective and mark the MILP ready to be optimized
   std::vector<Value> allChannels;
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
-  addObjective(allChannels, cfUnion.cfdfcs);
+  addObjective(allChannels, cfUnion.cfdfcs, /*minimizeSlack=*/minimizeSlack);
   markReadyToOptimize();
 }
 
 OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
-                                     double targetPeriod, bool bufPenalty)
-    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty) {
+                                     double targetPeriod, bool bufPenalty,
+                                     bool minimizeSlack)
+    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty),
+      minimizeSlack(minimizeSlack) {
   if (!unsatisfiable)
     setup();
 }
@@ -377,9 +389,11 @@ OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
 OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, bool bufPenalty,
-                                     Logger &logger, StringRef milpName)
+                                     bool minimizeSlack, Logger &logger,
+                                     StringRef milpName)
     : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty,
-                       logger, milpName) {
+                       logger, milpName),
+      minimizeSlack(minimizeSlack) {
   if (!unsatisfiable)
     setup();
 }
@@ -469,8 +483,14 @@ void OutOfCycleBuffers::setup() {
     addUnitElasticityConstraints(&unit, channelFilter);
   }
 
-  // Set MILP objective and mark it ready to be optimized
-  model.setObjective(objective, GRB_MAXIMIZE);
+  // Set MILP objective and mark it ready to be optimized. When enabled, the
+  // slack-minimizing secondary objective pins arrival times to their true
+  // values so that the critical-path slack reported after optimization is
+  // exact; otherwise use the primary objective alone.
+  if (minimizeSlack)
+    addSlackMinimizingObjective(objective);
+  else
+    model.setObjective(objective, GRB_MAXIMIZE);
   markReadyToOptimize();
 }
 
