@@ -23,6 +23,7 @@
           packages = with pkgs; [
             (python3.withPackages (pp: [
               pp.amaranth
+              pp.autopep8
             ]))
             yosys # needs to be ordered after Python so it doesn't override the Python interpreter with its own
           ];

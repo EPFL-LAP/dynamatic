@@ -5,10 +5,6 @@ from amaranth.lib.data import ArrayLayout
 from amaranth.lib.wiring import Component, In, Out
 
 from functools import reduce
-import operator
-
-from amaranth import Module
-from amaranth.lib.wiring import In, Out
 
 
 class MuxOneHot(Component):
@@ -51,6 +47,7 @@ class MuxOneHot(Component):
 
         return m
 
+
 class RotateLeft(Component):
     """Rotate a vector left by a specified (variable) amount.
 
@@ -92,7 +89,7 @@ class RotateLeft(Component):
                 m.d.comb += self.output_o.eq(0)
 
         return m
-    
+
 
 class WrapSubtract(Component):
     def __init__(self, width: int, limit: int):

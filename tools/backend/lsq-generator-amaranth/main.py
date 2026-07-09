@@ -38,4 +38,3 @@ if __name__ == "__main__":
 
     with open("group_allocator.v", "w") as f:
         f.write(verilog.convert(ga, name=f"{config.name}_group_allocator"))
-

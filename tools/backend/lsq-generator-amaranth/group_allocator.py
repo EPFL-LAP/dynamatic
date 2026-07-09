@@ -9,11 +9,11 @@ from utils import MuxOneHot, RotateLeft, WrapSubtract
 
 class GroupAllocator(Component):
     """
-    Group Allocator for a Load-Store Queue (LSQ) system.
+    Group Allocator for the Load-Store Queue (LSQ).
 
-    Allocates space for groups of memory operations (loads and stores) in the
-    load queue and the store queue. For now this is a port-only stub; the
-    allocation logic is not yet implemented.
+    Receives group allocation requests based on the circuit's control flow.
+    Based on those, it allocates entries in the load and store queues and
+    updates the order matrix with the new load-store ordering information.
 
     Parameters
     ----------
@@ -76,7 +76,7 @@ class GroupAllocator(Component):
             m.d.comb += group_init_hs[i].eq(
                 self.group_init_valid_i[i] & self.group_init_ready_o[i]
             )
-        
+
         # ROMs
         def ga_rom(name, data, output):
             assert len(data) == config.numGroups, f"ROM data length mismatch for {name}: expected {config.numGroups}, got {len(data)}"
