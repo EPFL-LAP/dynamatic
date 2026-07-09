@@ -6,13 +6,7 @@
 
 int subdiag_fast(in_float_t d1[N], in_float_t d2[N], in_float_t e[N]) {
   int i = 0;
-  for (i = 0; i < N_DEC; i++) {
-    float dd = d1[i] + d2[i];
-    float x = 0.001f;
-    if ((e[i]) <= x * dd)
-      break;
-  }
-  /* bool cond_break = false;
+  bool cond_break = false;
   bool loop_again = false;
   do {
     float dd = d1[i] + d2[i + 1];
@@ -21,7 +15,7 @@ int subdiag_fast(in_float_t d1[N], in_float_t d2[N], in_float_t e[N]) {
     cond_break = (e[i]) <= x * dd;
     loop_again = !cond_break && i < N_DEC;
     #pragma DYN speculate variable=loop_again max_predictions=16 style=standard
-  } while (loop_again); */
+  } while (loop_again);
   return i;
 }
 
