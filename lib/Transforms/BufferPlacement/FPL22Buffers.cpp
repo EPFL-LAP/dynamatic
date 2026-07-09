@@ -67,7 +67,11 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
 
   if (logger) {
     logResults(placement);
-    logCriticalPath();
+    // Critical-path reconstruction relies on arrival times being pinned to
+    // their true values by the slack-minimizing objective, so only log it when
+    // that objective was registered.
+    if (minimizeSlack)
+      logCriticalPath();
   }
 }
 
@@ -278,8 +282,9 @@ CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
                                      bool bufPenalty, bool minimizeSlack)
-    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty),
-      cfUnion(cfUnion), minimizeSlack(minimizeSlack) {
+    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty,
+                       minimizeSlack),
+      cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
 }
@@ -290,8 +295,8 @@ CFDFCUnionBuffers::CFDFCUnionBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      bool bufPenalty, bool minimizeSlack,
                                      Logger &logger, StringRef milpName)
     : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty,
-                       logger, milpName),
-      cfUnion(cfUnion), minimizeSlack(minimizeSlack) {
+                       minimizeSlack, logger, milpName),
+      cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
 }
@@ -380,8 +385,8 @@ OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
                                      double targetPeriod, bool bufPenalty,
                                      bool minimizeSlack)
-    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty),
-      minimizeSlack(minimizeSlack) {
+    : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty,
+                       minimizeSlack) {
   if (!unsatisfiable)
     setup();
 }
@@ -392,8 +397,7 @@ OutOfCycleBuffers::OutOfCycleBuffers(GRBEnv &env, FuncInfo &funcInfo,
                                      bool minimizeSlack, Logger &logger,
                                      StringRef milpName)
     : FPL22BuffersBase(env, funcInfo, timingDB, targetPeriod, bufPenalty,
-                       logger, milpName),
-      minimizeSlack(minimizeSlack) {
+                       minimizeSlack, logger, milpName) {
   if (!unsatisfiable)
     setup();
 }

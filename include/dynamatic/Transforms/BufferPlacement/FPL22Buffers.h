@@ -37,21 +37,28 @@ namespace fpl22 {
 /// Holds common API for all MILPs involved in FPL'22 buffer placement.
 class FPL22BuffersBase : public BufferPlacementMILP {
 protected:
-  /// Just forwards its arguments to the super class constructor with the same
-  /// signature.
-  FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
-                   const TimingDatabase &timingDB, double targetPeriod,
-                   bool bufPenalty = true)
-      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod,
-                            bufPenalty){};
+  /// Whether the MILP registered the lower-priority slack-minimizing objective.
+  /// When false, arrival times are not pinned to their true values, so
+  /// critical-path reconstruction (`logCriticalPath`) is not reliable.
+  bool minimizeSlack;
 
   /// Just forwards its arguments to the super class constructor with the same
   /// signature.
   FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
                    const TimingDatabase &timingDB, double targetPeriod,
-                   bool bufPenalty, Logger &logger, StringRef milpName)
+                   bool bufPenalty = true, bool minimizeSlack = true)
+      : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, bufPenalty),
+        minimizeSlack(minimizeSlack){};
+
+  /// Just forwards its arguments to the super class constructor with the same
+  /// signature.
+  FPL22BuffersBase(GRBEnv &env, FuncInfo &funcInfo,
+                   const TimingDatabase &timingDB, double targetPeriod,
+                   bool bufPenalty, bool minimizeSlack, Logger &logger,
+                   StringRef milpName)
       : BufferPlacementMILP(env, funcInfo, timingDB, targetPeriod, bufPenalty,
-                            logger, milpName){};
+                            logger, milpName),
+        minimizeSlack(minimizeSlack){};
 
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots
@@ -119,9 +126,6 @@ private:
   /// created over the channels and units that are part of this union.
   CFDFCUnion &cfUnion;
 
-  /// Whether to register the lower-priority slack-minimizing MILP objective.
-  bool minimizeSlack;
-
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
@@ -159,9 +163,6 @@ public:
                     StringRef milpName = "out_of_cycle");
 
 private:
-  /// Whether to register the lower-priority slack-minimizing MILP objective.
-  bool minimizeSlack;
-
   /// Setups the entire MILP, creating all variables, constraints, and setting
   /// the system's objective. Called by the constructor in the absence of prior
   /// failures, after which the MILP is ready to be optimized.
