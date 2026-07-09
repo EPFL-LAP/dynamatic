@@ -345,16 +345,18 @@ protected:
   /// optimization. Asserts if the logger is nullptr.
   void logResults(BufferPlacement &placement);
 
-  /// Logs the `numPaths` most critical *distinct* paths after MILP
-  /// optimization. For each, reports the timing slack (`targetPeriod` minus the
-  /// signal's arrival time) and back-traces the combinational segment feeding
-  /// its endpoint using the recorded `timingEdges`. Paths are ranked by
-  /// increasing slack and de-duplicated so that no reported path's endpoint
-  /// lies on an already-reported (more critical) path. This shows how tightly
-  /// the solution meets the clock period constraint and where the bottlenecks
-  /// are. Asserts if the logger is nullptr. For the reported slacks to be
-  /// exact, arrival times must have been pinned by the slack-minimizing
-  /// secondary objective (see `addSlackMinimizingObjective`).
+  /// Logs the `numPaths` globally most critical paths after MILP optimization.
+  /// Using the recorded `timingEdges`, it performs a best-first enumeration of
+  /// combinational segments (from a register/input start to an output-pin
+  /// endpoint) ranked by increasing slack (`targetPeriod` minus the segment's
+  /// endpoint arrival). Unlike a single critical-path trace this also descends
+  /// into sub-critical branches, so the second-worst path of one endpoint can
+  /// outrank the worst path of another; reported paths may therefore overlap
+  /// (share pins/segments). This shows how tightly the solution meets the clock
+  /// period constraint and where the bottlenecks are. Asserts if the logger is
+  /// nullptr. For the reported slacks to be exact, arrival times must have been
+  /// pinned by the slack-minimizing secondary objective (see
+  /// `addSlackMinimizingObjective`).
   void logCriticalPath(unsigned numPaths = 10);
 
 private:

@@ -24,6 +24,7 @@
 #include "llvm/Support/Path.h"
 #include <cmath>
 #include <limits>
+#include <queue>
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -655,103 +656,79 @@ void BufferPlacementMILP::logCriticalPath(unsigned numPaths) {
            (pin.isOut ? ".out" : ".in");
   };
 
-  // Back-traces the combinational segment feeding `start` by following tight
-  // arrival-time edges (src.arrival + delay == dst.arrival) until no such edge
-  // exists, which marks the segment's start (a buffer register, a pipelined
-  // unit's output, or a circuit input). Returns the ordered list of pins from
-  // endpoint to start. Since arrival times were pinned by the slack-minimizing
-  // objective, the tight edges reliably trace the actual critical path and skip
-  // buffer-cut channels.
-  constexpr double eps = 1e-4;
-  auto backtrace = [&](PathPin start) -> SmallVector<PathPin> {
-    SmallVector<PathPin> path;
-    PathPin cur = start;
-    while (true) {
-      // Guard against cycles (should not happen since buffers break them).
-      if (llvm::is_contained(path, cur))
-        break;
-      path.push_back(cur);
-
-      double curArrival = arrivalOf(cur);
-      const TimingEdge *tight = nullptr;
-      for (const TimingEdge &edge : timingEdges) {
-        if (edge.dst != cur)
-          continue;
-        // A buffer register cuts the channel-internal edge, so never trace
-        // through it even if the arrival times happen to line up.
-        if (edge.kind == "channel" &&
-            vars.channelVars[cur.channel]
-                    .signalVars[cur.signal]
-                    .bufPresent.get(GRB_DoubleAttr_X) > 0.5)
-          continue;
-        if (std::fabs(arrivalOf(edge.src) + edge.delay - curArrival) < eps) {
-          tight = &edge;
-          break;
-        }
-      }
-      if (!tight)
-        break;
-      cur = tight->src;
-    }
-    return path;
+  // Returns whether a buffer register cuts `pin`'s channel-internal edge, which
+  // makes the pin a segment start (the register launches a fresh path).
+  auto isBufferCut = [&](const PathPin &pin) -> bool {
+    return vars.channelVars[pin.channel]
+               .signalVars[pin.signal]
+               .bufPresent.get(GRB_DoubleAttr_X) > 0.5;
   };
 
-  // 1. Collect every output pin with its slack (targetPeriod - arrival). This
-  //    is where the "tOut <= targetPeriod" constraint binds, i.e. potential
-  //    endpoints of critical register-to-register segments.
-  SmallVector<std::pair<PathPin, double>> candidates;
+  // A path grown backward from an endpoint. `pins` runs endpoint -> current
+  // frontier and `hops[i]` is the edge feeding `pins[i]` from `pins[i + 1]`.
+  // `acc` is the delay accumulated from the endpoint to the frontier pin.
+  //
+  // `bound = arrivalOf(frontier) + acc` is an upper bound on the endpoint
+  // arrival of any completion of this prefix: extending backward through an
+  // edge src->dst adds its delay to `acc` but, since the model guarantees
+  // arrivalOf(src) + delay <= arrivalOf(dst), the bound can only stay equal (a
+  // tight, exactly-critical edge) or decrease. Popping the frontier by
+  // decreasing `bound` therefore yields complete paths in exact order of
+  // decreasing endpoint arrival = increasing slack, so the first `numPaths`
+  // completed are the globally most critical ones. Unlike a pure critical-path
+  // trace this also follows slacky edges, so sub-critical branches surface once
+  // the tighter paths ahead of them are exhausted; reported paths may overlap.
+  struct PartialPath {
+    SmallVector<PathPin> pins;
+    SmallVector<const TimingEdge *> hops;
+    double acc;
+    double bound;
+  };
+
+  auto byBound = [](const PartialPath &a, const PartialPath &b) {
+    return a.bound < b.bound; // std::priority_queue pops the largest first
+  };
+  
+  std::priority_queue<PartialPath, std::vector<PartialPath>, decltype(byBound)>
+      frontier(byBound);
+
+  // Seed with every output pin as a candidate endpoint (its arrival is `tOut`,
+  // where the "arrival <= targetPeriod" constraint binds).
   for (auto &[channel, channelVars] : vars.channelVars)
-    for (auto &[signal, signalVars] : channelVars.signalVars) {
-      double slack = targetPeriod - signalVars.path.tOut.get(GRB_DoubleAttr_X);
-      candidates.push_back({PathPin{channel, signal, /*isOut=*/true}, slack});
+    for (auto &[signal, _] : channelVars.signalVars) {
+      PathPin endpoint{channel, signal, /*isOut=*/true};
+      frontier.push({{endpoint}, {}, 0.0, arrivalOf(endpoint)});
     }
 
-  if (candidates.empty()) {
+  if (frontier.empty()) {
     os << "No path variables in the model.\n";
     return;
   }
 
-  // Rank endpoints by increasing slack (most critical first).
-  llvm::sort(candidates, [](const auto &a, const auto &b) {
-    return a.second < b.second;
-  });
-
   os << "Target period : " << targetPeriod << " ns\n\n";
+  os << "Reporting up to the " << numPaths
+     << " most critical paths (overlaps allowed).\n\n";
 
-  // 2. Report the `numPaths` most critical *distinct* paths. An endpoint that
-  //    already lies on a previously-reported (more critical) path is skipped,
-  //    so each reported path is a genuinely different segment.
-  SmallVector<PathPin> covered;
-  unsigned reported = 0;
-  for (auto &[endpoint, slack] : candidates) {
-    if (reported >= numPaths)
-      break;
-    if (llvm::is_contained(covered, endpoint))
-      continue;
-
-    SmallVector<PathPin> path = backtrace(endpoint);
-
-    os << "Critical path #" << (reported + 1) << "  (slack " << slack
-       << " ns, endpoint " << nameOf(endpoint) << ", arrival "
-       << arrivalOf(endpoint) << " ns)\n";
+  auto printPath = [&](const PartialPath &path, unsigned idx) {
+    const PathPin &endpoint = path.pins.front();
+    // The endpoint arrival contributed by *this* path is exactly `bound`
+    // (= arrivalOf(start) + total delay along the path).
+    double pathArrival = path.bound;
+    os << "Critical path #" << idx << "  (slack " << (targetPeriod - pathArrival)
+       << " ns, endpoint " << nameOf(endpoint) << ", arrival " << pathArrival
+       << " ns)\n";
     os.indent();
-    for (unsigned i = 0; i < path.size(); ++i) {
-      const PathPin &pin = path[i];
-      os << nameOf(pin) << "  (arrival " << arrivalOf(pin) << " ns)\n";
-      if (i + 1 < path.size()) {
-        // Find the edge taken from path[i] to path[i + 1] to report its kind.
-        const PathPin &next = path[i + 1];
-        for (const TimingEdge &edge : timingEdges)
-          if (edge.dst == pin && edge.src == next) {
-            os << "^ via " << edge.kind << " (delay " << edge.delay
-               << " ns)\n";
-            break;
-          }
+    double cum = pathArrival; // signal arrival at pins[i] along this path
+    for (unsigned i = 0; i < path.pins.size(); ++i) {
+      const PathPin &pin = path.pins[i];
+      os << nameOf(pin) << "  (arrival " << cum << " ns)\n";
+      if (i < path.hops.size()) {
+        const TimingEdge *edge = path.hops[i];
+        os << "^ via " << edge->kind << " (delay " << edge->delay << " ns)\n";
+        cum -= edge->delay;
       } else {
         // Last pin: explain why the segment starts here.
-        ChannelSignalVars &sv =
-            vars.channelVars[pin.channel].signalVars[pin.signal];
-        if (sv.bufPresent.get(GRB_DoubleAttr_X) > 0.5)
+        if (isBufferCut(pin))
           os << "^ start: buffer register\n";
         else if (!pin.channel.getDefiningOp())
           os << "^ start: circuit input\n";
@@ -761,9 +738,49 @@ void BufferPlacementMILP::logCriticalPath(unsigned numPaths) {
     }
     os.unindent();
     os << "\n";
+  };
 
-    covered.append(path.begin(), path.end());
-    ++reported;
+  // Best-first enumeration. Cap total expansions as a safety net against
+  // pathological fan-out in large circuits.
+  constexpr unsigned maxPops = 200000;
+  unsigned reported = 0, pops = 0;
+  while (!frontier.empty() && reported < numPaths && pops < maxPops) {
+    PartialPath cur = frontier.top();
+    frontier.pop();
+    ++pops;
+    const PathPin &frontierPin = cur.pins.back();
+
+    // Collect the followable incoming edges of the frontier pin: skip
+    // buffer-cut channel edges (the register ends the segment) and edges that
+    // would revisit a pin already on the path (cycle guard).
+    SmallVector<const TimingEdge *> incoming;
+    for (const TimingEdge &edge : timingEdges) {
+      if (edge.dst != frontierPin)
+        continue;
+      if (edge.kind == "channel" && isBufferCut(frontierPin))
+        continue;
+      if (llvm::is_contained(cur.pins, edge.src))
+        continue;
+      incoming.push_back(&edge);
+    }
+
+    if (incoming.empty()) {
+      // The frontier pin is a segment start, so `cur` is a complete path. Skip
+      // degenerate single-pin "paths" (an endpoint that is itself a start).
+      if (cur.pins.size() >= 2)
+        printPath(cur, ++reported);
+      continue;
+    }
+
+    // Branch on every followable incoming edge.
+    for (const TimingEdge *edge : incoming) {
+      PartialPath next = cur;
+      next.pins.push_back(edge->src);
+      next.hops.push_back(edge);
+      next.acc += edge->delay;
+      next.bound = arrivalOf(edge->src) + next.acc;
+      frontier.push(std::move(next));
+    }
   }
 }
 
