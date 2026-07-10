@@ -272,7 +272,7 @@ In both cases, the purpose is the same: if the same logical input reaches the ϕ
 
 ## Convert ϕ Gates into μ Gates
 
-### Checks
+### Identifying μ Candidates
 A ϕ gate is classified as a μ gate if the following conditions hold:
 
 1. It is inside a loop.
@@ -281,7 +281,7 @@ A ϕ gate is classified as a μ gate if the following conditions hold:
 
 3. It is located in the loop header.
 
-### Input Grouping
+### Grouping Initial and Loop Inputs
 
 Once a candidate μ is identified, its operands (inputs) are divided into two groups:
 
@@ -289,14 +289,14 @@ Once a candidate μ is identified, its operands (inputs) are divided into two gr
 
 - **Initial inputs:** values originating from outside the loop.
 
-#### Notice: Inputs from Nested Loops <!--TODO: check if it can be describe more clearly-->
-Blocks only report their innermost loop as the one they belong to. Because of this, inputs from nested loops might be mistakenly recognized as “initial inputs” instead of loop inputs.
+#### Notice: Inputs from Nested Loops
+`CFGLoopInfo::getLoopFor(block)` returns the innermost loop containing a block. Because of this, inputs from nested loops might be mistakenly recognized as “initial inputs” instead of loop inputs if only the innermost loop is checked.
 
 *Example:* in the CFG below, an input value from block `bb3` may appear to belong to a different loop than the one containing `bb1` (the ϕ’s loop). To prevent this, the `IsBlockInLoop` function checks whether any parent loop of the input matches the ϕ’s loop.
 
 ![gemm_CFG](./Figures/gemm_CFG.png)
 
-### Creating μ Gates
+### Updating the ϕ into a μ
 
 A valid μ gate must have exactly two inputs: one from outside the loop and one from inside the loop. The grouping step above ensures we can identify these two roles.
 
@@ -304,9 +304,9 @@ A valid μ gate must have exactly two inputs: one from outside the loop and one 
 
 - If a group has exactly one member → that value becomes the corresponding μ input (loop or initial).
 
-- If a group has multiple members → an intermediate ϕ is created in the block to merge them.<!--TODO: the output of the this generated phi becomes the corresponding μ input --> This extra ϕ will later be replaced by a γ (or tree of γs) during the ϕ to γ conversion phase.
+- If a group has multiple members → an intermediate ϕ is created in the block to merge them, and the output of this generated ϕ becomes the corresponding μ input. This extra ϕ will later be replaced by a γ (or tree of γs) during the ϕ to γ conversion phase.
 
-<!--TODO: say the order of inputs which is whcih also say that we are not adding new mu gate but changing the phi into a mu, by changing the fileds(this section can be describe better and corespond better to the code) -->
+The implementation does not create a new μ gate. Instead, it updates the original ϕ gate in place by changing its type to μ and replacing its operands with exactly two inputs: the initial input first, then the loop-carried input.
 
 ### Condition of the μ Gate
 
@@ -314,23 +314,12 @@ The μ gate outputs its initial value during the first iteration of the loop. On
 
 Therefore, the condition of a μ gate is defined as the **negation of the loop exit condition**.
 
-In the later stages in FTD implementation, the μ gate is replaced by a MUX.
-Its condition comes from an INIT, implemented as a merge between a constant and the loop’s iterating condition (i.e., the negation of the loop exit condition mentioned above).
-
-This design ensures that:
-
-- During the first iteration of the first execution, the constant drives the selection, causing the initial value to be used.
-
-- In subsequent loop iterations, the iterating condition (the negated loop exit) selects the loop-carried value.
-
-- When the loop terminates and is later re-entered, the loop exit condition itself guarantees that the initial input is selected again (no constant is needed in later executions).
-
-<!--TODO: for the description of INIT : describe the functionality , then describe 2 options that we have : ask aya which one to keep-->
+Later, during FTD implementation, the μ gate is replaced by a MUX whose condition comes from an INIT. The INIT functionality can be implemented either as a merge between a constant and the loop’s iterating condition, or as a one-entry buffer preloaded with an initial value. In both cases, the INIT first drives the MUX to select the initial input. After that, it forwards the loop condition, so the MUX selects between the initial input and the loop-carried input based on whether the loop exits or continues.
 
 #### Note:
 The `getLoopExitCondition` function computes the overall exit condition by OR-ing the conditions of all loop exiting blocks. This function relies on `getBlockLoopExitCondition`, which computes the exit condition for a single block.
 
-This OR-ing occurs between operations that produce different token counts; therefore, it is implemented in the **FTDConversion** pass using **Shannon’s expansion**.
+Eventually, this OR-ing is between operations that produce different token counts; therefore, it gets implemented in the **FTDConversion** pass using **Shannon's expansion**.
 <!--TODO: check with aya if it is still the case-->
 
 ## Convert ϕ Gates into γ Gates
