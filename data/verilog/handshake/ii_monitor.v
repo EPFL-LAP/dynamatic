@@ -26,6 +26,23 @@ module ii_monitor #(
   integer ii_iters;
   reg     ii_measuring;
 
+  // Report a finished measurement window. The iteration count is always
+  // printed (including for loops that ran 0 or 1 times); the II is only
+  // printed when more than one iteration was seen (otherwise there is no
+  // interval to measure and "n/a" is printed instead).
+  task report_window(input integer iters, input integer start_c,
+                     input integer last_c);
+    begin
+      if (iters > 1)
+        $display("II_INSTRUMENT: loop=%m depth=%0d/%0d II=%f iterations=%0d",
+                 LOOP_DEPTH, LOOP_MAX_DEPTH,
+                 (last_c - start_c) * 1.0 / (iters - 1), iters);
+      else
+        $display("II_INSTRUMENT: loop=%m depth=%0d/%0d II=n/a iterations=%0d",
+                 LOOP_DEPTH, LOOP_MAX_DEPTH, iters);
+    end
+  endtask
+
   always @(posedge clk) begin : ii_monitor_proc
     if (rst) begin
       ii_cycle     = 0;
@@ -40,10 +57,8 @@ module ii_monitor #(
       if (index_valid && index_ready) begin
         if (index != LOOP_BACK_INDEX[INDEX_WIDTH - 1 : 0]) begin
           // Activation from outside the loop (first entry or re-entry).
-          if (ii_measuring && ii_iters > 1)
-            $display("II_INSTRUMENT: loop=%m depth=%0d/%0d II=%f iterations=%0d",
-                     LOOP_DEPTH, LOOP_MAX_DEPTH,
-                     (ii_last - ii_start) * 1.0 / (ii_iters - 1), ii_iters);
+          if (ii_measuring)
+            report_window(ii_iters, ii_start, ii_last);
           ii_measuring = 1;
           ii_start     = ii_cycle;
           ii_last      = ii_cycle;
@@ -59,10 +74,8 @@ module ii_monitor #(
 
       // Observe the loop exit channel.
       if (exit_valid && exit_ready) begin
-        if (ii_measuring && ii_iters > 1)
-          $display("II_INSTRUMENT: loop=%m depth=%0d/%0d II=%f iterations=%0d",
-                   LOOP_DEPTH, LOOP_MAX_DEPTH,
-                   (ii_last - ii_start) * 1.0 / (ii_iters - 1), ii_iters);
+        if (ii_measuring)
+          report_window(ii_iters, ii_start, ii_last);
         ii_measuring = 0;
       end
     end

@@ -69,12 +69,15 @@ use ieee.numeric_std.all;
 -- Measurement logic:
 --   * When the control_merge fires (index_valid and index_ready):
 --       - index /= {loop_back_index} -> activation from outside the loop (entry/re-entry):
---           report the previous window (if more than one iteration was seen)
---           and start a fresh measurement window.
+--           report the previous window (if one was open) and start a fresh
+--           measurement window.
 --       - index  = {loop_back_index} -> back-edge activation: advance the window.
 --   * When the exit channel fires (exit_valid and exit_ready):
---       report the current window (if more than one iteration was seen) and
---       stop measuring.
+--       report the current window (if one was open) and stop measuring.
+--
+-- A window's iteration count is always reported (including for loops that ran
+-- 0 or 1 times); the II is only reported when more than one iteration was seen
+-- (otherwise there is no interval to measure and "n/a" is printed instead).
 entity {name} is
   port (
     {port_decls}
@@ -89,6 +92,24 @@ begin
     variable start_cyc : integer := 0;
     variable last_cyc  : integer := 0;
     variable iters     : integer := 0;
+
+    -- Report a finished measurement window. The iteration count is always
+    -- printed; the II is only printed when more than one iteration was seen.
+    procedure report_window(iters     : integer;
+                            start_cyc : integer;
+                            last_cyc  : integer) is
+    begin
+      if iters > 1 then
+        report "II_INSTRUMENT: loop=" & {name}'path_name &
+               " depth={loop_depth}/{loop_max_depth} II=" &
+               real'image(real(last_cyc - start_cyc) / real(iters - 1)) &
+               " iterations=" & integer'image(iters) severity note;
+      else
+        report "II_INSTRUMENT: loop=" & {name}'path_name &
+               " depth={loop_depth}/{loop_max_depth} II=n/a iterations=" &
+               integer'image(iters) severity note;
+      end if;
+    end procedure;
   begin
     if rising_edge(clk) then
       if rst = '1' then
@@ -104,11 +125,8 @@ begin
         if index_valid = '1' and index_ready = '1' then
           if to_integer(unsigned(index)) /= {loop_back_index} then
             -- Activation from outside the loop (first entry or re-entry).
-            if measuring and iters > 1 then
-              report "II_INSTRUMENT: loop=" & {name}'path_name &
-                     " depth={loop_depth}/{loop_max_depth} II=" &
-                     real'image(real(last_cyc - start_cyc) / real(iters - 1)) &
-                     " iterations=" & integer'image(iters) severity note;
+            if measuring then
+              report_window(iters, start_cyc, last_cyc);
             end if;
             measuring := true;
             start_cyc := cycle;
@@ -125,11 +143,8 @@ begin
 
         -- Observe the loop exit channel.
         if exit_valid = '1' and exit_ready = '1' then
-          if measuring and iters > 1 then
-            report "II_INSTRUMENT: loop=" & {name}'path_name &
-                   " depth={loop_depth}/{loop_max_depth} II=" &
-                   real'image(real(last_cyc - start_cyc) / real(iters - 1)) &
-                   " iterations=" & integer'image(iters) severity note;
+          if measuring then
+            report_window(iters, start_cyc, last_cyc);
           end if;
           measuring := false;
         end if;
