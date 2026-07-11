@@ -277,7 +277,7 @@ if [[ $EAGERLYELASTIC -ne 0 ]]; then
     echo "Error: Eager execution requires Fast Token Delivery enabled"
   else
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-      --eagerly-elastic-a-d="num-rewrite-d=1" \
+      --eagerly-elastic-pattern-rewriting \
       > "$F_EAGERLYELASTIC"
     exit_on_fail "Failed to apply eager execution" "Applied eager execution"
     F_HANDSHAKE="$F_EAGERLYELASTIC"
