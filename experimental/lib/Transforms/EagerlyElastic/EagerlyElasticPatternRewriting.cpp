@@ -145,8 +145,10 @@ void prepareSuppressors(handshake::FuncOp funcOp, NameAnalysis &namer) {
 bool isEligibleForSuppressorMotion(handshake::ConditionalBranchOp branchOp,
                                    Operation *targetOp) {
 
-  // can be pushed past a Mux but not during rewrite A - there is an additional
-  // check in the rewriteA() function
+  llvm::errs() << "is eligible?\n";
+  targetOp->dump();
+  // can be pushed past a Mux but not during rewrite A - there is an
+  // additional check in the rewriteA() function
   if (isa<handshake::MuxOp>(targetOp))
     return true;
 
@@ -208,6 +210,63 @@ bool isEligibleForSuppressorMotion(handshake::ConditionalBranchOp branchOp,
   return true;
 }
 
+void performSuppressorMotionInPattern(handshake::ConditionalBranchOp branchOp,
+                                      Operation *eligibleTarget,
+                                      PatternRewriter &rewriter,
+                                      NameAnalysis &namer, bool isDRewrite) {
+  // ensure that targetOp and the new branch are in the same bb as the old
+  // branch. skip for load operations due to the memory controller
+  auto bbAttr = eligibleTarget->getAttr("handshake.bb");
+  if (!isa<handshake::LoadOp>(eligibleTarget) &&
+      branchOp->getAttr("handshake.bb") != bbAttr) {
+    // Move target operation to follow right behind the current branch
+    eligibleTarget->moveAfter(branchOp);
+    // Re-tag the basic block attribute safely
+    bbAttr = branchOp->getAttr("handshake.bb");
+    rewriter.updateRootInPlace(eligibleTarget, [&]() {
+      eligibleTarget->setAttr("handshake.bb", bbAttr);
+    });
+  }
+
+  Location loc = eligibleTarget->getLoc();
+  Value condition = branchOp.getConditionOperand();
+
+  // erase all old suppressors feeding into eligibletarget
+  for (Value operand : eligibleTarget->getOperands()) {
+    if (Operation *defOp = operand.getDefiningOp()) {
+      if (auto incomingBranch =
+              dyn_cast<handshake::ConditionalBranchOp>(defOp)) {
+        if (incomingBranch != branchOp && isDRewrite) {
+          continue;
+        }
+        rewriter.updateRootInPlace(eligibleTarget, [&]() {
+          eligibleTarget->replaceUsesOfWith(operand,
+                                            incomingBranch.getDataOperand());
+        });
+        rewriter.eraseOp(incomingBranch);
+      }
+    }
+  }
+
+  rewriter.setInsertionPointAfter(eligibleTarget);
+
+  // create new replacement suppressors downstream of eligibletarget
+  for (Value result : eligibleTarget->getResults()) {
+    // If this is a LoadOp, skip index 0 (the address output going to the MC)
+    if (isa<handshake::LoadOp>(eligibleTarget) &&
+        cast<OpResult>(result).getResultNumber() == 0)
+      continue;
+
+    // new branches created exactly after eligibleTarget
+    auto newBranch =
+        rewriter.create<handshake::ConditionalBranchOp>(loc, condition, result);
+    setupMetadata(bbAttr, namer, newBranch);
+    newBranch->setAttr("eagerly.suppressor", rewriter.getUnitAttr());
+
+    rewriter.replaceAllUsesExcept(result, newBranch.getFalseResult(),
+                                  newBranch);
+  }
+}
 struct RewriteAPattern
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
   NameAnalysis &namer;
@@ -219,10 +278,14 @@ struct RewriteAPattern
     Value dataPath = branchOp.getFalseResult();
     Operation *eligibleTarget = nullptr;
 
+    if (!dataPath)
+      llvm::errs() << "howw??\n";
     // search for any consumer of the suppressor that is eligible
     for (Operation *user : dataPath.getUsers()) {
+      user->dump();
       if (isEligibleForSuppressorMotion(branchOp, user)) {
         eligibleTarget = user;
+        llvm::errs() << "yes\n";
         break;
       }
     }
@@ -258,57 +321,111 @@ struct RewriteAPattern
       return failure();
     }
 
-    // ensure that targetOp and the new branch are in the same bb as the old
-    // branch. skip for load operations due to the memory controller
-    auto bbAttr = eligibleTarget->getAttr("handshake.bb");
-    if (!isa<handshake::LoadOp>(eligibleTarget) &&
-        branchOp->getAttr("handshake.bb") != bbAttr) {
-      // Move target operation to follow right behind the current branch
-      eligibleTarget->moveAfter(branchOp);
-      // Re-tag the basic block attribute safely
-      bbAttr = branchOp->getAttr("handshake.bb");
-      rewriter.updateRootInPlace(eligibleTarget, [&]() {
-        eligibleTarget->setAttr("handshake.bb", bbAttr);
-      });
-    }
+    performSuppressorMotionInPattern(branchOp, eligibleTarget, rewriter, namer,
+                                     /*isDRewrite=*/false);
+    return success();
+  }
+};
 
-    llvm::errs() << "bbattr changed to: " << bbAttr << '\n';
+struct RewriteDPattern
+    : public OpRewritePattern<handshake::ConditionalBranchOp> {
+  NameAnalysis &namer;
+  RewriteDPattern(MLIRContext *ctx, NameAnalysis &namer)
+      : OpRewritePattern<handshake::ConditionalBranchOp>(ctx), namer(namer) {}
 
-    Location loc = eligibleTarget->getLoc();
-    Value condition = branchOp.getConditionOperand();
+  LogicalResult matchAndRewrite(handshake::ConditionalBranchOp branchOp,
+                                PatternRewriter &rewriter) const override {
+    Value dataPath = branchOp.getFalseResult();
+    handshake::MuxOp targetMux = nullptr;
+    handshake::InitOp targetInit = nullptr;
 
-    // erase all old suppressors feeding into eligibletarget
-    for (Value operand : eligibleTarget->getOperands()) {
-      if (Operation *defOp = operand.getDefiningOp()) {
-        if (auto incomingBranch =
-                dyn_cast<handshake::ConditionalBranchOp>(defOp)) {
-          rewriter.updateRootInPlace(eligibleTarget, [&]() {
-            eligibleTarget->replaceUsesOfWith(operand,
-                                              incomingBranch.getDataOperand());
-          });
-          rewriter.eraseOp(incomingBranch);
+    llvm::errs() << "try rewrite D :) \n";
+
+    // check for a valid mux driven by a loop init
+    for (Operation *user : dataPath.getUsers()) {
+      if (auto mux = dyn_cast<handshake::MuxOp>(user)) {
+        if (auto init = dyn_cast_or_null<handshake::InitOp>(
+                mux.getSelectOperand().getDefiningOp())) {
+          // Check whether the suppressor is connected to path A (index 1)
+          if (mux.getDataOperands()[1] == dataPath) {
+            targetMux = mux;
+            targetInit = init;
+            break;
+          }
         }
       }
     }
 
-    rewriter.setInsertionPointAfter(eligibleTarget);
+    if (!targetMux || !targetInit)
+      return failure();
 
-    // create new replacement suppressors downstream of eligibletarget
-    for (Value result : eligibleTarget->getResults()) {
-      // If this is a LoadOp, skip index 0 (the address output going to the MC)
-      if (isa<handshake::LoadOp>(eligibleTarget) &&
-          cast<OpResult>(result).getResultNumber() == 0)
-        continue;
+    llvm::errs() << "actually start Rewrite D:\n";
+    targetMux->dump();
+    targetInit->dump();
+    branchOp->dump();
 
-      // new branches created exactly after eligibleTarget
-      auto newBranch = rewriter.create<handshake::ConditionalBranchOp>(
-          loc, condition, result);
-      setupMetadata(bbAttr, namer, newBranch);
-      newBranch->setAttr("eagerly.suppressor", rewriter.getUnitAttr());
+    Location loc = targetMux->getLoc();
+    auto bbAttr = targetMux->getAttr("handshake.bb");
 
-      rewriter.replaceAllUsesExcept(result, newBranch.getFalseResult(),
-                                    newBranch);
+    // find the condition signal C
+    auto notOp = dyn_cast<handshake::NotIOp>(
+        branchOp.getConditionOperand().getDefiningOp());
+    if (!notOp) {
+      // get the original condition signal and create two not operations to get
+      // the correct circuit necessary for the Rewrite
+      Value originalCondition = branchOp.getConditionOperand();
+      rewriter.setInsertionPoint(branchOp);
+      auto firstNot = rewriter.create<handshake::NotIOp>(branchOp.getLoc(),
+                                                         originalCondition);
+      // Create the second NotIOp consuming the result of the first
+      auto secondNot = rewriter.create<handshake::NotIOp>(branchOp.getLoc(),
+                                                          firstNot.getResult());
+      setupMetadata(bbAttr, namer, firstNot, secondNot);
+
+      // Rewire the branchOp to consume the second NotIOp's result
+      rewriter.updateRootInPlace(branchOp, [&]() {
+        branchOp.getConditionOperandMutable().assign(secondNot.getResult());
+      });
+      notOp = secondNot;
     }
+    Value conditionC = notOp.getOperand();
+
+    // if Rewrite D is applied multiple times, connect the new repeatinginitOp
+    // to
+    // the old one
+    Value oldInitInput = targetInit.getOperand();
+    auto prevRepeatingInit = dyn_cast_or_null<handshake::RepeatingInitOp>(
+        oldInitInput.getDefiningOp());
+    Value inputOperand = prevRepeatingInit ? oldInitInput : conditionC;
+
+    rewriter.setInsertionPoint(targetMux);
+    auto repeatingInit =
+        rewriter.create<handshake::RepeatingInitOp>(loc, inputOperand, 1);
+    setupMetadata(bbAttr, namer, repeatingInit);
+    Value specOutput = repeatingInit.getResult();
+
+    // Safe state updates via rewriter interfaces
+    rewriter.updateRootInPlace(targetInit, [&]() {
+      targetInit.getOperandMutable().assign(specOutput);
+    });
+
+    // rewire the NotIOp's input to the new repeating init result
+    if (notOp.getResult().hasOneUse()) {
+      rewriter.updateRootInPlace(
+          notOp, [&]() { notOp.getOperandMutable().assign(specOutput); });
+    } else {
+      rewriter.setInsertionPoint(notOp);
+      auto newNotOp =
+          rewriter.create<handshake::NotIOp>(notOp->getLoc(), specOutput);
+      setupMetadata(notOp->getAttr("handshake.bb"), namer, newNotOp);
+      rewriter.updateRootInPlace(branchOp, [&]() {
+        branchOp.getConditionOperandMutable().assign(newNotOp.getResult());
+      });
+    }
+
+    // move suppressor past the mux
+    performSuppressorMotionInPattern(branchOp, targetMux, rewriter, namer,
+                                     /*isDRewrite=*/true);
     return success();
   }
 };
@@ -325,9 +442,26 @@ void EagerlyElasticPatternRewritingPass::runOnOperation() {
   // prepare suppressors
   prepareSuppressors(funcOp, namer);
 
-  RewritePatternSet patternA(ctx);
-  patternA.add<RewriteAPattern>(ctx, namer);
+  // Allocate the pattern sets once
+  RewritePatternSet patternsA(ctx);
+  patternsA.add<RewriteAPattern>(ctx, namer);
 
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patternA))))
+  RewritePatternSet patternsD(ctx);
+  patternsD.add<RewriteDPattern>(ctx, namer);
+
+  FrozenRewritePatternSet frozenA(std::move(patternsA));
+  FrozenRewritePatternSet frozenD(std::move(patternsD));
+
+  // apply rewrite A until no longer possible
+  if (failed(applyPatternsAndFoldGreedily(funcOp, frozenA)))
     return signalPassFailure();
+
+  // apply Rewrite A and D consecutively
+  for (unsigned i = 0; i < 1; i++) {
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(frozenD))))
+      return signalPassFailure();
+
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(frozenA))))
+      return signalPassFailure();
+  }
 }
