@@ -184,7 +184,8 @@ public:
   getStructuredForStatementTransferFns() override {
     return {
         /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
-        /*start=*/TransferFn<ast::StructuredForStatement>(
+        /*start=*/
+        TransferFn<ast::StructuredForStatement>(
             DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
         /*end=*/
         TransferFn<ast::StructuredForStatement>(
