@@ -1352,8 +1352,7 @@ void BufferPlacementMILP::addBackedgeConstraints(
 
 void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
-    ArrayRef<CFDFC *> cfdfcs,
-    const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+    ArrayRef<CFDFC *> cfdfcs, const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
     llvm::MapVector<Value, CPVar> &channelOccupancy) {
 
   for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
@@ -1373,7 +1372,8 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
     if (simplePaths.size() < 2)
       continue;
 
-    // For each simple path, the sum of channel occupancies (N_c) and the total latency of the units. 
+    // For each simple path, the sum of channel occupancies (N_c) and the total
+    // latency of the units.
     std::vector<std::pair<LinExpr, double>> pathTerms;
     for (const auto &path : simplePaths) {
       LinExpr occupancySum;
