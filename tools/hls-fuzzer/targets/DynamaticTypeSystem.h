@@ -183,6 +183,7 @@ public:
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
     return {
+        /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
         /*start=*/TransferFn<ast::StructuredForStatement>(
             DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
         /*end=*/
