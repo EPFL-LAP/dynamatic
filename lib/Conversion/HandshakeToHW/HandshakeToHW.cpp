@@ -2182,7 +2182,8 @@ struct ControlGraph {
 
     // Memory interfaces (shared by the whole function) are excluded from the
     // control graph so that loop detection reflects only the program's control
-    // flow.
+    // flow. Including these could otherwise run at the risk of creating
+    // irreducible loops that are not detected.
     for (Operation &op : *funcOp.getBodyBlock())
       if (!isa<handshake::MemoryOpInterface>(op))
         nodeFor[&op] = addNode(&op);
@@ -2288,17 +2289,19 @@ private:
 /// after the Handshake operations have been lowered to HW instances (instance
 /// names and result orders are preserved during lowering).
 struct IIMonitorSpec {
-  /// Name of the loop header (a control merge) instance.
-  std::string headerName;
-  /// Result index of the header's index output channel.
-  unsigned indexResultIdx;
-  /// Bit-width of the index channel's data signal (INDEX_WIDTH parameter).
-  unsigned indexWidth;
-  /// Operand index of the control merge's back-edge input (LOOP_BACK_INDEX).
-  unsigned loopBackIndex;
-  /// Name of the instance producing the loop-exit channel.
+  /// Name of the loop header (a control merge) instance; used only to name the
+  /// monitor instance.
+  std::string loopName;
+  /// Name/result index of the instance producing the loop's entry channel (the
+  /// control merge input fed from outside the loop).
+  std::string entryName;
+  unsigned entryResultIdx;
+  /// Name/result index of the instance producing the loop's back-edge channel
+  /// (the control merge input fed from inside the loop).
+  std::string backedgeName;
+  unsigned backedgeResultIdx;
+  /// Name/result index of the instance producing the loop's own exit channel.
   std::string exitName;
-  /// Result index of that instance's loop-exit output channel.
   unsigned exitResultIdx;
   /// Nesting depth of the loop (1 for a top-level loop, 2 for a loop nested
   /// one level deep, ...).
@@ -2309,91 +2312,89 @@ struct IIMonitorSpec {
 };
 } // namespace
 
-/// Returns the control-typed result of 'src' that is consumed by 'dst', or a
-/// null value if there is none.
-static OpResult getControlEdgeChannel(Operation *src, Operation *dst) {
-  for (OpResult res : src->getResults()) {
-    if (!isa<handshake::ControlType>(res.getType()))
-      continue;
-
-    for (Operation *user : res.getUsers())
-      if (user == dst)
-        return res;
-  }
-  return {};
-}
-
 /// Collects the distinct control channels on which a token appears when control
 /// actually leaves 'loop'.
 ///
-/// Only edges leaving the loop through a conditional branch are considered:
-/// such a branch conditionally routes its token either back into the loop or
-/// out of it, so its loop-leaving output fires exactly once per loop
-/// activation. Note that there are other exit edges that are "incorrect" such
-/// as a control signal leading to a 'handshake.constant'. These are exit edges
-/// in the control network but aren't when considering the entire dataflow.
-static SmallVector<OpResult> getLoopExitChannels(ControlLoop *loop) {
-  SmallVector<std::pair<ControlNode *, ControlNode *>> exitEdges;
-  loop->getExitEdges(exitEdges);
-
+/// Only conditional branches inside the loop are considered: such a branch
+/// routes its token either back into the loop or out of it, so a control-typed
+/// branch result whose consumers all lie outside the loop fires exactly once
+/// per loop activation and marks an exit. Exits are detected from the branch
+/// results directly (rather than from control-graph exit edges) because the
+/// exit channel's only consumer may be a memory interface, which is
+/// deliberately excluded from the control graph; such an exit would otherwise
+/// be invisible and the loop wrongly treated as infinite. Note that a control
+/// signal leading to e.g. a 'handshake.constant' inside the loop is not an
+/// exit: it stays within the loop and is correctly ignored by the in-loop-user
+/// check.
+static SmallVector<OpResult> getLoopExitChannels(ControlLoop *loop,
+                                                 ControlGraph &graph) {
   SmallVector<OpResult> exitChannels;
-  for (auto &[inside, outside] : exitEdges) {
-    if (!inside->op || !outside->op)
+  for (ControlNode *node : loop->getBlocks()) {
+    if (!node->op || !isa<handshake::ConditionalBranchOp>(node->op))
       continue;
 
-    if (!isa<handshake::ConditionalBranchOp>(inside->op))
-      continue;
+    for (OpResult res : node->op->getResults()) {
+      if (!isa<handshake::ControlType>(res.getType()) || res.use_empty())
+        continue;
 
-    if (OpResult edge = getControlEdgeChannel(inside->op, outside->op))
-      if (!llvm::is_contained(exitChannels, edge))
-        exitChannels.push_back(edge);
+      // A result that feeds any in-loop node is the back-edge, not an exit.
+      bool leavesLoop = llvm::none_of(res.getUsers(), [&](Operation *user) {
+        ControlNode *userNode = graph.nodeFor.lookup(user);
+        return userNode && loop->contains(userNode);
+      });
+      if (leavesLoop && !llvm::is_contained(exitChannels, res))
+        exitChannels.push_back(res);
+    }
   }
   return exitChannels;
 }
 
-/// Returns a single control channel that produces a token whenever control
-/// leaves 'loop' through any of its exits. If the loop has multiple exits, the
-/// exit channels are tapped (through forks, leaving the original consumers
-/// untouched) and combined into one channel with a freshly created
-/// 'handshake.control_merge' whose outputs are sinked. Returns a null value if
-/// the loop has no exit channel.
-static OpResult buildOuterLoopExitChannel(ControlLoop *loop, OpBuilder &builder,
-                                          NameAnalysis &namer) {
-  SmallVector<OpResult> exitChannels = getLoopExitChannels(loop);
-  if (exitChannels.empty())
+/// Combines a set of control channels into a single channel that produces a
+/// token whenever any of them fires. A single channel is observed directly (the
+/// monitor passively taps its wires without becoming an extra consumer). If
+/// more than one channel is given, each is tapped through a fork (leaving the
+/// original consumers untouched) and the copies are combined with a freshly
+/// created 'handshake.control_merge' whose outputs are sinked. The combining
+/// hardware is inserted in the loop header's block. Returns a null value if
+/// 'channels' is empty. 'tag' seeds the names of any created operations.
+static OpResult combineChannels(SmallVector<OpResult> channels,
+                                ControlLoop *loop, OpBuilder &builder,
+                                NameAnalysis &namer, StringRef tag) {
+  if (channels.empty())
     return {};
+  if (channels.size() == 1)
+    return channels.front();
 
-  // A single exit channel can be observed directly (the monitor passively taps
-  // its wires without becoming an extra consumer).
-  if (exitChannels.size() == 1)
-    return exitChannels.front();
+  std::string forkName = (tag + "_fork").str();
+  std::string mergeName = (tag + "_merge").str();
+  std::string sinkName = (tag + "_sink").str();
 
-  // Fork each exit channel so the merge observes a copy while the original
-  // consumer keeps receiving its token.
+  // Fork each channel so the merge observes a copy while the original consumer
+  // keeps receiving its token.
   SmallVector<Value> taps;
-  for (OpResult exitChannel : exitChannels) {
-    builder.setInsertionPointAfter(exitChannel.getOwner());
+  for (OpResult channel : channels) {
+    builder.setInsertionPointAfter(channel.getOwner());
     auto forkOp =
-        builder.create<handshake::ForkOp>(exitChannel.getLoc(), exitChannel, 2);
-    (void)namer.setName(forkOp, "ii_exit_fork", /*uniqueWhenTaken=*/true);
-    exitChannel.replaceAllUsesExcept(forkOp->getResult(0), forkOp);
+        builder.create<handshake::ForkOp>(channel.getLoc(), channel, 2);
+    (void)namer.setName(forkOp, forkName, /*uniqueWhenTaken=*/true);
+    channel.replaceAllUsesExcept(forkOp->getResult(0), forkOp);
     taps.push_back(forkOp->getResult(1));
   }
 
-  // Merge the tapped copies into a single channel that fires on any exit.
+  // Merge the tapped copies into a single channel that fires on any input.
   builder.setInsertionPoint(loop->getHeader()->op->getBlock()->getTerminator());
   auto cmergeOp =
       builder.create<handshake::ControlMergeOp>(taps.front().getLoc(), taps);
-  (void)namer.setName(cmergeOp, "ii_exit_merge", /*uniqueWhenTaken=*/true);
+  (void)namer.setName(cmergeOp, mergeName, /*uniqueWhenTaken=*/true);
 
   // The merge's outputs are not part of the circuit; consume them with sinks so
   // the merged channel has a real consumer (the monitor only taps its wires).
   auto resSink = builder.create<handshake::SinkOp>(cmergeOp.getLoc(),
                                                    cmergeOp.getResult());
-  (void)namer.setName(resSink, "ii_exit_sink", /*uniqueWhenTaken=*/true);
+  (void)namer.setName(resSink, sinkName, /*uniqueWhenTaken=*/true);
   auto idxSink =
       builder.create<handshake::SinkOp>(cmergeOp.getLoc(), cmergeOp.getIndex());
-  (void)namer.setName(idxSink, "ii_exit_sink", /*uniqueWhenTaken=*/true);
+  (void)namer.setName(idxSink, sinkName, /*uniqueWhenTaken=*/true);
 
   return cast<OpResult>(cmergeOp.getResult());
 }
@@ -2408,13 +2409,35 @@ static unsigned getMaxLoopDepth(ControlLoop *loop) {
 }
 
 /// Detects every loop of 'funcOp' over its control graph and returns one
-/// monitor specification per loop whose header is a control merge. For a given
-/// loop, the initiation interval is measured from that loop's own control
-/// merge, but reported when the *outermost* enclosing loop is exited; the
-/// corresponding exit channel is built (merging multiple exits if necessary) by
-/// this function and shared by every loop in the same nest. Loops with
+/// monitor specification per loop whose header is a control merge. Loops with
 /// irregular control flow (no control merge header, no exit, ...) are silently
 /// skipped.
+///
+/// Each loop is measured entirely from its own header/exit: the monitor
+/// observes three control channels of the loop:
+///   * the entry channel -- the control merge input(s) fed from outside the
+///     loop; a token here starts a fresh measurement window;
+///   * the back-edge channel -- the control merge input(s) fed from inside the
+///     loop; each token here advances the window by one iteration;
+///   * the exit channel -- the loop's own conditional-branch result(s) leaving
+///     the loop; a token here closes and reports the window.
+///
+/// Crucially the monitor taps the merge's *input* channels, not its index
+/// *output*. The control merge is not combinational: internally it buffers
+/// (a one-slot break-ready buffer feeding an eager output fork), so under
+/// backpressure the index output handshake can lag its inputs by several
+/// cycles.
+///
+/// The input side is immune: for the merge to fire the final iteration, and
+/// thus for the branch to ever produce the exit, it must first consume that
+/// iteration's back-edge input, so the last back-edge input is always ordered
+/// before the exit by pure dataflow causality, independent of buffering. This
+/// lets every loop report its own II exactly, including the final window.
+///
+/// This also naturally handles pipelining where iterations of two activations
+/// are in flight together, e.g. for a nest
+///   for (i ...) for (j ...) // work
+/// the last iteration of (0, y-1) may be in flight with (1, 0).
 static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
                                                    NameAnalysis &namer) {
   ControlGraph graph(funcOp);
@@ -2426,61 +2449,50 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
 
   OpBuilder builder(funcOp.getContext());
 
-  // Exit channel of each outermost loop, built lazily and shared by every
-  // loop in the same nest.
-  DenseMap<ControlLoop *, OpResult> outerExitChannel;
-
   SmallVector<IIMonitorSpec> specs;
   for (ControlLoop *loop : loopInfo.getLoopsInPreorder()) {
     // The loop header on the control network is the control merge that passes
-    // exactly one token per iteration and reports, on its index output, whether
-    // the activation came from outside the loop or from the back-edge.
+    // exactly one token per iteration; its inputs distinguish an activation
+    // from outside the loop (entry) from one along the back-edge.
     Operation *headerOp = loop->getHeader()->op;
     auto cmerge = dyn_cast<handshake::ControlMergeOp>(headerOp);
     if (!cmerge)
       continue;
 
-    OpResult indexVal = cast<OpResult>(cmerge.getIndex());
-    auto indexType = dyn_cast<handshake::ChannelType>(indexVal.getType());
-    if (!indexType)
-      continue;
-
-    // The back-edge input is the control merge operand whose producer lies
-    // inside the loop; its operand index is the index the merge reports on the
-    // index channel for an activation from within the loop.
-    std::optional<unsigned> loopBackIndex;
-    for (auto [idx, operand] : llvm::enumerate(cmerge.getDataOperands())) {
-      Operation *defOp = operand.getDefiningOp();
-      if (!defOp)
+    // Partition the merge inputs into entry channels (producer outside the
+    // loop) and back-edge channels (producer inside the loop).
+    SmallVector<OpResult> entryChannels, backedgeChannels;
+    for (Value operand : cmerge.getDataOperands()) {
+      auto opRes = dyn_cast<OpResult>(operand);
+      if (!opRes)
         continue;
-      ControlNode *defNode = graph.nodeFor.lookup(defOp);
-      if (defNode && loop->contains(defNode)) {
-        loopBackIndex = idx;
-        break;
-      }
+      Operation *defOp = operand.getDefiningOp();
+      ControlNode *defNode = defOp ? graph.nodeFor.lookup(defOp) : nullptr;
+      if (defNode && loop->contains(defNode))
+        backedgeChannels.push_back(opRes);
+      else
+        entryChannels.push_back(opRes);
     }
-    if (!loopBackIndex)
+    if (entryChannels.empty() || backedgeChannels.empty())
       continue;
 
-    // The II is reported once when control leaves the outermost enclosing loop,
-    // not on every exit of the innermost loop (which fires once per outer
-    // iteration and is instead handled by the "new outside activation" logic in
-    // the monitor).
-    ControlLoop *outermost = loop->getOutermostLoop();
-    auto exitIt = outerExitChannel.find(outermost);
-    if (exitIt == outerExitChannel.end())
-      exitIt =
-          outerExitChannel
-              .insert({outermost,
-                       buildOuterLoopExitChannel(outermost, builder, namer)})
-              .first;
-    OpResult exitChannel = exitIt->second;
+    // Observe the loop's own exit; by the causality argument above this is safe
+    // even for perfect (II=1) pipelining.
+    OpResult entryChannel =
+        combineChannels(entryChannels, loop, builder, namer, "ii_entry");
+    OpResult backedgeChannel =
+        combineChannels(backedgeChannels, loop, builder, namer, "ii_backedge");
+    OpResult exitChannel = combineChannels(getLoopExitChannels(loop, graph),
+                                           loop, builder, namer, "ii_exit");
     // Skip infinite loops (no exit channel found).
     if (!exitChannel)
       continue;
 
-    specs.push_back({getUniqueName(headerOp).str(), indexVal.getResultNumber(),
-                     indexType.getDataBitWidth(), *loopBackIndex,
+    specs.push_back({getUniqueName(headerOp).str(),
+                     getUniqueName(entryChannel.getOwner()).str(),
+                     entryChannel.getResultNumber(),
+                     getUniqueName(backedgeChannel.getOwner()).str(),
+                     backedgeChannel.getResultNumber(),
                      getUniqueName(exitChannel.getOwner()).str(),
                      exitChannel.getResultNumber(), loop->getLoopDepth(),
                      getMaxLoopDepth(loop)});
@@ -2493,19 +2505,17 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
 /// parameters so that monitors with different parameters get distinct modules.
 static hw::HWModuleExternOp
 getOrCreateIIMonitorExtern(mlir::ModuleOp topModOp, OpBuilder &builder,
-                           unsigned indexWidth, unsigned loopBackIndex,
                            unsigned loopDepth, unsigned loopMaxDepth,
-                           Type indexType, Type exitType) {
+                           Type entryType, Type backedgeType, Type exitType) {
   std::string name =
-      ("ii_monitor_" + Twine(indexWidth) + "_" + Twine(loopBackIndex) + "_" +
-       Twine(loopDepth) + "_" + Twine(loopMaxDepth))
-          .str();
+      ("ii_monitor_" + Twine(loopDepth) + "_" + Twine(loopMaxDepth)).str();
   if (auto extOp = topModOp.lookupSymbol<hw::HWModuleExternOp>(name))
     return extOp;
 
   MLIRContext *ctx = builder.getContext();
   ModuleBuilder modBuilder(ctx);
-  modBuilder.addInput("index", indexType);
+  modBuilder.addInput("entry", entryType);
+  modBuilder.addInput("backedge", backedgeType);
   modBuilder.addInput("exit", exitType);
   modBuilder.addClkAndRst();
 
@@ -2522,11 +2532,7 @@ getOrCreateIIMonitorExtern(mlir::ModuleOp topModOp, OpBuilder &builder,
   extOp->setAttr(
       RTL_PARAMETERS_ATTR_NAME,
       builder.getDictionaryAttr(
-          {builder.getNamedAttr("INDEX_WIDTH",
-                                IntegerAttr::get(ui32, indexWidth)),
-           builder.getNamedAttr("LOOP_BACK_INDEX",
-                                IntegerAttr::get(ui32, loopBackIndex)),
-           builder.getNamedAttr("LOOP_DEPTH",
+          {builder.getNamedAttr("LOOP_DEPTH",
                                 IntegerAttr::get(ui32, loopDepth)),
            builder.getNamedAttr("LOOP_MAX_DEPTH",
                                 IntegerAttr::get(ui32, loopMaxDepth))}));
@@ -2555,22 +2561,25 @@ static void insertIIMonitors(hw::HWModuleOp hwModOp,
   builder.setInsertionPoint(hwModOp.getBodyBlock()->getTerminator());
 
   for (const IIMonitorSpec &spec : specs) {
-    auto headerIt = byName.find(spec.headerName);
+    auto entryIt = byName.find(spec.entryName);
+    auto backedgeIt = byName.find(spec.backedgeName);
     auto exitIt = byName.find(spec.exitName);
-    if (headerIt == byName.end() || exitIt == byName.end())
+    if (entryIt == byName.end() || backedgeIt == byName.end() ||
+        exitIt == byName.end())
       continue;
 
-    Value indexVal = headerIt->second->getResult(spec.indexResultIdx);
+    Value entryVal = entryIt->second->getResult(spec.entryResultIdx);
+    Value backedgeVal = backedgeIt->second->getResult(spec.backedgeResultIdx);
     Value exitVal = exitIt->second->getResult(spec.exitResultIdx);
 
     hw::HWModuleExternOp extOp = getOrCreateIIMonitorExtern(
-        topModOp, builder, spec.indexWidth, spec.loopBackIndex, spec.loopDepth,
-        spec.loopMaxDepth, indexVal.getType(), exitVal.getType());
+        topModOp, builder, spec.loopDepth, spec.loopMaxDepth,
+        entryVal.getType(), backedgeVal.getType(), exitVal.getType());
 
-    SmallVector<Value> operands{indexVal, exitVal, clkVal, rstVal};
+    SmallVector<Value> operands{entryVal, backedgeVal, exitVal, clkVal, rstVal};
     builder.create<hw::InstanceOp>(
         hwModOp.getLoc(), extOp,
-        builder.getStringAttr("ii_monitor_" + spec.headerName), operands);
+        builder.getStringAttr("ii_monitor_" + spec.loopName), operands);
   }
 }
 

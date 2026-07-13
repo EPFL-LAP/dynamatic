@@ -1,23 +1,23 @@
 `timescale 1ns/1ps
 
 module ii_monitor #(
-  parameter INDEX_WIDTH     = 1,
-  parameter LOOP_BACK_INDEX = 0,
   // Nesting depth of the measured loop (1 for a top-level loop) and deepest
   // depth reachable from it through its own descendants (equal to LOOP_DEPTH
   // when the loop is innermost).
   parameter LOOP_DEPTH      = 1,
   parameter LOOP_MAX_DEPTH  = 1
 ) (
-  input  wire                       clk,
-  input  wire                       rst,
-  // Index channel of the dominating control_merge (all ports read-only).
-  input  wire [INDEX_WIDTH - 1 : 0] index,
-  input  wire                       index_valid,
-  input  wire                       index_ready,
-  // An exit channel of the loop (all ports read-only).
-  input  wire                       exit_valid,
-  input  wire                       exit_ready
+  input  wire clk,
+  input  wire rst,
+  // Entry channel: a control merge input fed from outside the loop (read-only).
+  input  wire entry_valid,
+  input  wire entry_ready,
+  // Back-edge channel: a control merge input fed from inside the loop.
+  input  wire backedge_valid,
+  input  wire backedge_ready,
+  // Exit channel: a loop-exit branch result leaving the loop (read-only).
+  input  wire exit_valid,
+  input  wire exit_ready
 );
 
   integer ii_cycle;
@@ -53,30 +53,36 @@ module ii_monitor #(
     end else begin
       ii_cycle = ii_cycle + 1;
 
-      // Observe the control_merge index channel.
-      if (index_valid && index_ready) begin
-        if (index != LOOP_BACK_INDEX[INDEX_WIDTH - 1 : 0]) begin
-          // Activation from outside the loop (first entry or re-entry).
-          if (ii_measuring)
-            report_window(ii_iters, ii_start, ii_last);
-          ii_measuring = 1;
-          ii_start     = ii_cycle;
-          ii_last      = ii_cycle;
-          ii_iters     = 1;
-        end else begin
-          // Activation from the loop back-edge.
-          if (ii_measuring) begin
-            ii_last  = ii_cycle;
-            ii_iters = ii_iters + 1;
-          end
+      // The three channels are processed in the order back-edge, exit, entry so
+      // that same-cycle collisions resolve correctly: within one activation the
+      // last back-edge may coincide with the exit (count it, then close); at a
+      // seam the exit of one activation may coincide with the entry of the next
+      // (close the old window before the entry opens a new one). Entry and
+      // back-edge are the two inputs of the same merge and never fire together.
+
+      // Activation along the loop back-edge.
+      if (backedge_valid && backedge_ready) begin
+        if (ii_measuring) begin
+          ii_last  = ii_cycle;
+          ii_iters = ii_iters + 1;
         end
       end
 
-      // Observe the loop exit channel.
+      // Control leaving the loop.
       if (exit_valid && exit_ready) begin
         if (ii_measuring)
           report_window(ii_iters, ii_start, ii_last);
         ii_measuring = 0;
+      end
+
+      // Activation from outside the loop (first entry or re-entry).
+      if (entry_valid && entry_ready) begin
+        if (ii_measuring)
+          report_window(ii_iters, ii_start, ii_last);
+        ii_measuring = 1;
+        ii_start     = ii_cycle;
+        ii_last      = ii_cycle;
+        ii_iters     = 1;
       end
     end
   end

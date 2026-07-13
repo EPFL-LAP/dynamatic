@@ -510,15 +510,18 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
   } else if (handshakeOp == "ii_monitor") {
-    // The II monitor passively observes two channels: the dominating control
-    // merge's index channel (input 0) and the loop-exit channel (input 1).
-    // It does not use their extra signals, but it must still declare matching
-    // ports so the instantiation in the parent module is well-formed when the
-    // observed channels carry extra signals (e.g. under speculation).
-    serializedParams["INDEX_EXTRA_SIGNALS"] =
+    // The II monitor passively observes three control channels of a loop: the
+    // entry channel (input 0), the back-edge channel (input 1) and the loop-exit
+    // channel (input 2). It does not use their extra signals, but it must still
+    // declare matching ports so the instantiation in the parent module is
+    // well-formed when the observed channels carry extra signals (e.g. under
+    // speculation).
+    serializedParams["ENTRY_EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(0));
-    serializedParams["EXIT_EXTRA_SIGNALS"] =
+    serializedParams["BACKEDGE_EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getInputType(1));
+    serializedParams["EXIT_EXTRA_SIGNALS"] =
+        serializeExtraSignals(modType.getInputType(2));
   } else if (
       // clang-format off
       handshakeOp == "handshake.mem_controller" ||

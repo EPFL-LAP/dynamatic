@@ -1003,8 +1003,6 @@
   {
     "name": "ii_monitor",
     "parameters": [
-      { "name": "INDEX_WIDTH", "type": "unsigned", "lb": 1 },
-      { "name": "LOOP_BACK_INDEX", "type": "unsigned" },
       { "name": "LOOP_DEPTH", "type": "unsigned", "lb": 1 },
       { "name": "LOOP_MAX_DEPTH", "type": "unsigned", "lb": 1 }
     ],

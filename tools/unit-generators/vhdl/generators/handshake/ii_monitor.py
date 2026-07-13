@@ -2,25 +2,21 @@ from generators.support.utils import ExtraSignals
 
 
 def generate_ii_monitor(name, params):
-    # Bit-width of the dominating control_merge's index output data signal.
-    index_width = params["index_width"]
-    # Index value identifying a back-edge (loop-internal) activation.
-    loop_back_index = params["loop_back_index"]
     # Nesting depth of the measured loop (1 for a top-level loop) and deepest
     # depth reachable from it through its own descendants (equal to
     # loop_depth when the loop is innermost).
     loop_depth = params["loop_depth"]
     loop_max_depth = params["loop_max_depth"]
-    # Extra signals carried by the observed index/exit channels (e.g. a "spec"
-    # signal under speculation). The monitor ignores their values but must
-    # declare matching ports so that its instantiation in the parent module is
-    # well-formed.
-    index_extra_signals = params.get("index_extra_signals", None) or {}
+    # Extra signals carried by the observed channels (e.g. a "spec" signal under
+    # speculation). The monitor ignores their values but must declare matching
+    # ports so that its instantiation in the parent module is well-formed.
+    entry_extra_signals = params.get("entry_extra_signals", None) or {}
+    backedge_extra_signals = params.get("backedge_extra_signals", None) or {}
     exit_extra_signals = params.get("exit_extra_signals", None) or {}
 
-    return _generate_ii_monitor(name, index_width, loop_back_index,
-                                loop_depth, loop_max_depth,
-                                index_extra_signals, exit_extra_signals)
+    return _generate_ii_monitor(name, loop_depth, loop_max_depth,
+                                entry_extra_signals, backedge_extra_signals,
+                                exit_extra_signals)
 
 
 def _extra_signal_ports(channel_name: str,
@@ -31,23 +27,27 @@ def _extra_signal_ports(channel_name: str,
     ]
 
 
-def _generate_ii_monitor(name: str, index_width: int, loop_back_index: int,
-                         loop_depth: int, loop_max_depth: int,
-                         index_extra_signals: ExtraSignals,
+def _generate_ii_monitor(name: str, loop_depth: int, loop_max_depth: int,
+                         entry_extra_signals: ExtraSignals,
+                         backedge_extra_signals: ExtraSignals,
                          exit_extra_signals: ExtraSignals) -> str:
     # Assemble the port list. All ports are inputs so the monitor never drives
-    # the circuit (it only taps existing wires).
+    # the circuit (it only taps existing wires). The three observed channels are
+    # control channels (no data), so only their valid/ready wires are declared.
     ports = [
-        "clk         : in std_logic",
-        "rst         : in std_logic",
-        # Index channel of the dominating control_merge (read-only).
-        f"index       : in std_logic_vector({index_width} - 1 downto 0)",
-        "index_valid : in std_logic",
-        "index_ready : in std_logic",
-        *_extra_signal_ports("index", index_extra_signals),
-        # An exit channel of the loop (read-only).
-        "exit_valid  : in std_logic",
-        "exit_ready  : in std_logic",
+        "clk            : in std_logic",
+        "rst            : in std_logic",
+        # Entry channel: a control merge input fed from outside the loop.
+        "entry_valid    : in std_logic",
+        "entry_ready    : in std_logic",
+        *_extra_signal_ports("entry", entry_extra_signals),
+        # Back-edge channel: a control merge input fed from inside the loop.
+        "backedge_valid : in std_logic",
+        "backedge_ready : in std_logic",
+        *_extra_signal_ports("backedge", backedge_extra_signals),
+        # Exit channel: a loop-exit branch result leaving the loop.
+        "exit_valid     : in std_logic",
+        "exit_ready     : in std_logic",
         *_extra_signal_ports("exit", exit_extra_signals),
     ]
     port_decls = ";\n    ".join(ports)
@@ -59,7 +59,8 @@ use ieee.numeric_std.all;
 
 -- II monitor: simulation-only component that measures the initiation interval
 -- (II) of a loop at nesting depth {loop_depth} (of {loop_max_depth} in its
--- nest) by observing its dominating control_merge's index channel.
+-- nest) by observing the loop header control merge's input channels and the
+-- loop-exit channel.
 --
 -- All ports are inputs so that the monitor passively reads existing signals
 -- without driving any of them, avoiding multiple-driver conflicts with the
@@ -67,13 +68,13 @@ use ieee.numeric_std.all;
 -- the instantiation matches) but left unused.
 --
 -- Measurement logic:
---   * When the control_merge fires (index_valid and index_ready):
---       - index /= {loop_back_index} -> activation from outside the loop (entry/re-entry):
---           report the previous window (if one was open) and start a fresh
---           measurement window.
---       - index  = {loop_back_index} -> back-edge activation: advance the window.
---   * When the exit channel fires (exit_valid and exit_ready):
---       report the current window (if one was open) and stop measuring.
+--   * entry channel fires (entry_valid and entry_ready): activation from
+--     outside the loop; report the previous window (if one was open) and start
+--     a fresh measurement window.
+--   * back-edge channel fires (backedge_valid and backedge_ready): advance the
+--     window by one iteration.
+--   * exit channel fires (exit_valid and exit_ready): report the current window
+--     (if one was open) and stop measuring.
 --
 -- A window's iteration count is always reported (including for loops that ran
 -- 0 or 1 times); the II is only reported when more than one iteration was seen
@@ -121,32 +122,39 @@ begin
       else
         cycle := cycle + 1;
 
-        -- Observe the control_merge index channel.
-        if index_valid = '1' and index_ready = '1' then
-          if to_integer(unsigned(index)) /= {loop_back_index} then
-            -- Activation from outside the loop (first entry or re-entry).
-            if measuring then
-              report_window(iters, start_cyc, last_cyc);
-            end if;
-            measuring := true;
-            start_cyc := cycle;
-            last_cyc  := cycle;
-            iters     := 1;
-          else
-            -- Activation from the loop back-edge.
-            if measuring then
-              last_cyc := cycle;
-              iters    := iters + 1;
-            end if;
+        -- The three channels are processed in the order back-edge, exit, entry
+        -- so that same-cycle collisions resolve correctly. Within one activation
+        -- the last back-edge may coincide with the exit (count it, then close);
+        -- at a seam the exit of one activation may coincide with the entry of
+        -- the next (close the old window before the entry opens a new one). The
+        -- entry and back-edge are the two inputs of the same control merge, so
+        -- they can never fire in the same cycle.
+
+        -- Activation along the loop back-edge.
+        if backedge_valid = '1' and backedge_ready = '1' then
+          if measuring then
+            last_cyc := cycle;
+            iters    := iters + 1;
           end if;
         end if;
 
-        -- Observe the loop exit channel.
+        -- Control leaving the loop.
         if exit_valid = '1' and exit_ready = '1' then
           if measuring then
             report_window(iters, start_cyc, last_cyc);
           end if;
           measuring := false;
+        end if;
+
+        -- Activation from outside the loop (first entry or re-entry).
+        if entry_valid = '1' and entry_ready = '1' then
+          if measuring then
+            report_window(iters, start_cyc, last_cyc);
+          end if;
+          measuring := true;
+          start_cyc := cycle;
+          last_cyc  := cycle;
+          iters     := 1;
         end if;
       end if;
     end if;

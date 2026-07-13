@@ -1,14 +1,14 @@
 // RUN: dynamatic-opt --lower-handshake-to-hw=instrument-ii=true %s | FileCheck %s
 
 // CHECK-LABEL:   hw.module @multiExit
-// CHECK:         %{{.*}}, %[[INDEX:.*]] = hw.instance "control_merge0"
+// CHECK:         %{{.*}}, %[[ENTRY:.*]] = hw.instance "fork0"
 // CHECK:         %{{.*}}, %[[EXIT_A:.*]] = hw.instance "cond_brExtra"
 
 // Each exit channel is forked: the original consumer keeps the first output, the
 // monitor's merge observes the second.
-// CHECK:         %[[FORK_A_ORIG:[^ ,]+]], %[[FORK_A_TAP:.*]] = hw.instance "ii_exit_fork" {{.*}}(ins: %[[EXIT_A]]
+// CHECK:         %[[FORK_A_ORIG:.*]], %[[FORK_A_TAP:.*]] = hw.instance "ii_exit_fork" {{.*}}(ins: %[[EXIT_A]]
 // CHECK:         hw.instance "sinkCE" {{.*}}(ins: %[[FORK_A_ORIG]]
-// CHECK:         %{{.*}}, %[[EXIT_B:.*]] = hw.instance "cond_br2"
+// CHECK:         %[[BACKEDGE:.*]], %[[EXIT_B:.*]] = hw.instance "cond_br2"
 // CHECK:         %[[FORK_B_ORIG:.*]], %[[FORK_B_TAP:.*]] = hw.instance "ii_exit_fork0" {{.*}}(ins: %[[EXIT_B]]
 // CHECK:         hw.instance "sink3" {{.*}}(ins: %[[FORK_B_ORIG]]
 
@@ -19,9 +19,11 @@
 // CHECK:         hw.instance "ii_exit_sink{{[0-9]*}}" {{.*}}(ins: %[[MERGE_OUT]]
 // CHECK:         hw.instance "ii_exit_sink{{[0-9]*}}" {{.*}}(ins: %[[MERGE_IDX]]
 
-// The monitor observes the control merge's index and the merged exit channel.
-// CHECK:         hw.instance "ii_monitor_control_merge0" @ii_monitor_1_1_1_1(
-// CHECK-SAME:      index: %[[INDEX]]
+// The monitor observes the control merge's entry and back-edge inputs and the
+// merged exit channel.
+// CHECK:         hw.instance "ii_monitor_control_merge0" @ii_monitor_1_1(
+// CHECK-SAME:      entry: %[[ENTRY]]
+// CHECK-SAME:      backedge: %[[BACKEDGE]]
 // CHECK-SAME:      exit: %[[MERGE_OUT]]
 
 module {
