@@ -57,6 +57,20 @@ std::optional<std::size_t> dynamatic::OptionsParser::getNumThreads() const {
   return threads;
 }
 
+std::optional<std::size_t> dynamatic::OptionsParser::getNumPrograms() const {
+  if (!args.hasArg(OPT_num_programs))
+    return std::nullopt;
+
+  std::size_t numPrograms;
+  llvm::StringRef value = args.getLastArgValue(OPT_num_programs);
+  if (value.getAsInteger(10, numPrograms)) {
+    llvm::report_fatal_error("Expected integer instead of '" + value +
+                                 "' for '--num-programs'",
+                             /*gen_crash_diag=*/false);
+  }
+  return numPrograms;
+}
+
 std::string dynamatic::OptionsParser::getTargetName() const {
   return args.getLastArgValue(OPT_target).str();
 }

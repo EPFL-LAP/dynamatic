@@ -6,6 +6,13 @@ def target : Separate<["--"], "target">, MetaVarName<"<target>">;
 def num_threads : JoinedOrSeparate<["-"], "j">,
                   MetaVarName<"<num-threads>">,
                   HelpText<"Number of threads to use">;
+def num_programs : Separate<["--"], "num-programs">,
+                   MetaVarName<"<num-programs>">,
+                   HelpText<"Exit after this many programs have been generated and "
+                            "verified (default: run until interrupted)">;
+def n : JoinedOrSeparate<["-"], "n">, Alias<num_programs>,
+       MetaVarName<"<num-programs>">,
+       HelpText<"Alias for --num-programs">;
 def help : Flag<["--"], "help">, HelpText<"displays this help text">;
 
 // Bare '--statistics' enables reporting of all statistics, while
