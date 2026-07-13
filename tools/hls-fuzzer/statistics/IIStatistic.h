@@ -1,10 +1,11 @@
 #ifndef DYNAMATIC_HLS_FUZZER_STATISTICS_IISTATISTIC
 #define DYNAMATIC_HLS_FUZZER_STATISTICS_IISTATISTIC
 
+#include "Histogram.h"
+
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <cstddef>
 #include <filesystem>
 #include <map>
 
@@ -27,12 +28,21 @@ public:
   constexpr static llvm::StringRef CATEGORY = "II";
 
 private:
-  /// Histogram mapping each measured II to the number of loops that exhibited
-  /// it. Ordered so that the median can be computed directly.
-  std::map<double, std::size_t> iiCounts;
+  /// Histogram of each measured II across all loop activation windows that had
+  /// a measurable II (i.e. more than one iteration).
+  Histogram<double> iiCounts;
 
-  /// Number of loops that have been sampled.
-  std::size_t numLoops = 0;
+  /// Per-depth II histograms, keyed by the loop's depth measured from the
+  /// innermost loop of its nest outwards: 0 for an innermost loop, 1 for a loop
+  /// directly enclosing an innermost loop, and so on. This groups loops that
+  /// sit at the same distance from the innermost loop regardless of the total
+  /// nesting depth of their nest.
+  std::map<int, Histogram<double>> iiCountsByDepth;
+
+  /// Histogram of each loop's measured iteration count across all activation
+  /// windows. Includes single-iteration windows, for which no II can be
+  /// measured.
+  Histogram<unsigned> iterationCounts;
 };
 
 } // namespace dynamatic
