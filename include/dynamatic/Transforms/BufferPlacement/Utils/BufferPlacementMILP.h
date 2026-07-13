@@ -443,6 +443,7 @@ protected:
   void addPathOccupancyEqualityConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
       ArrayRef<CFDFC *> cfdfcs,
+      const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
       llvm::MapVector<Value, CPVar> &channelOccupancy);
 
   /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
