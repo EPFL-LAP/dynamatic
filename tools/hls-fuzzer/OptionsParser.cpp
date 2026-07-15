@@ -71,6 +71,18 @@ std::optional<std::size_t> dynamatic::OptionsParser::getNumPrograms() const {
   return numPrograms;
 }
 
+bool dynamatic::OptionsParser::isInplace() const {
+  return args.hasArg(OPT_inplace);
+}
+
+std::optional<std::string>
+dynamatic::OptionsParser::getSingleProgramDirectory() const {
+  if (!args.hasArg(OPT_single_program))
+    return std::nullopt;
+
+  return args.getLastArgValue(OPT_single_program).str();
+}
+
 std::string dynamatic::OptionsParser::getTargetName() const {
   return args.getLastArgValue(OPT_target).str();
 }

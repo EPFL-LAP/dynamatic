@@ -2,10 +2,12 @@
 
 #include "hls-fuzzer/ASTVisitor.h"
 
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -160,6 +162,35 @@ static std::string getName(const NodeKey &key) {
       .Case([](const StatementKey *key) { return getName(*key); });
 }
 
+/// Returns the node kind that 'getName' names 'name', or nullptr if no tracked
+/// node kind has that name. The node kinds listed here must be kept in sync
+/// with the ones counted by 'NodeCounter'.
+static const NodeKey *lookupKey(llvm::StringRef name) {
+  static const llvm::StringMap<NodeKey> keysByName = [] {
+    llvm::StringMap<NodeKey> result;
+    auto add = [&](NodeKey key) { result.try_emplace(getName(key), key); };
+
+    add(ExpressionKey(ast::Constant::Tag{}));
+    add(ExpressionKey(ast::Variable::Tag{}));
+    add(ExpressionKey(ast::CastExpression::Tag{}));
+    add(ExpressionKey(ast::ConditionalExpression::Tag{}));
+    add(ExpressionKey(ast::ArrayReadExpression::Tag{}));
+    for (ast::BinaryExpression::Op op : enumRange<ast::BinaryExpression::Op>())
+      add(ExpressionKey(op));
+    for (ast::UnaryExpression::Op op : enumRange<ast::UnaryExpression::Op>())
+      add(ExpressionKey(op));
+    add(StatementKey(ast::ArrayAssignmentStatement::Tag{}));
+    add(StatementKey(ast::StructuredForStatement::Tag{}));
+    return result;
+  }();
+
+  auto iter = keysByName.find(name);
+  if (iter == keysByName.end())
+    return nullptr;
+
+  return &iter->second;
+}
+
 void ASTStatistic::update(const ast::Function &function) {
   NodeCounter(counts).visit(function);
   numSamples++;
@@ -218,4 +249,29 @@ llvm::json::Value ASTStatistic::toJSON() const {
       {"numSamples", numSamples},
       {"averages", std::move(averages)},
   };
+}
+
+bool ASTStatistic::fromJSON(const llvm::json::Value &value,
+                            llvm::json::Path path) {
+  std::map<std::string, double> averages;
+  llvm::json::ObjectMapper mapper(value, path);
+  if (!mapper || !mapper.map("numSamples", numSamples) ||
+      !mapper.map("averages", averages))
+    return false;
+
+  counts.clear();
+  for (const auto &[name, average] : averages) {
+    const NodeKey *key = lookupKey(name);
+    if (!key) {
+      path.field("averages").field(name).report("unknown AST node kind");
+      return false;
+    }
+
+    // Recovers the count 'getAverage' divided by 'numSamples'. Both the
+    // division and this multiplication are exact to within half a count for any
+    // number of samples a fuzzing run can plausibly reach, as a double carries
+    // 53 bits of mantissa.
+    counts[*key] = std::llround(average * numSamples);
+  }
+  return true;
 }
