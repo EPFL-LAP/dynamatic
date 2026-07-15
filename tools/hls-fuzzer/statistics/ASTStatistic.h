@@ -4,6 +4,7 @@
 #include "hls-fuzzer/TypeSystem.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstddef>
@@ -26,6 +27,10 @@ public:
   void merge(const ASTStatistic &rhs);
 
   void print(llvm::raw_ostream &os) const;
+
+  /// Returns an object containing the number of sampled ASTs and the average
+  /// number of occurrences of every node kind within them.
+  llvm::json::Value toJSON() const;
 
   constexpr static llvm::StringRef CATEGORY = "AST Statistics";
 

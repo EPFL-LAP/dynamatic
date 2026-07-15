@@ -2,6 +2,7 @@
 #define DYNAMATIC_HLS_FUZZER_STATISTICS
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <string>
@@ -14,6 +15,8 @@ namespace dynamatic {
 /// * 'void merge(const ConcreteStatistic &other)' to merge multiple instances
 ///   into one.
 /// * 'void print(llvm::raw_ostream &os) const' to display it to the user.
+/// * 'llvm::json::Value toJSON() const' to serialize it for machine
+///   consumption.
 class Statistic {
 public:
   template <typename ConcreteStatistic>
@@ -59,6 +62,9 @@ public:
 
   void print(llvm::raw_ostream &os) const { value->print(os); }
 
+  /// Returns a JSON representation of the statistics.
+  llvm::json::Value toJSON() const { return value->toJSON(); }
+
 private:
   struct Base {
     virtual ~Base() = default;
@@ -70,6 +76,8 @@ private:
     virtual void merge(const Base &other) = 0;
 
     virtual void print(llvm::raw_ostream &os) const = 0;
+
+    virtual llvm::json::Value toJSON() const = 0;
   };
 
   template <typename T>
@@ -92,6 +100,8 @@ private:
     }
 
     void print(llvm::raw_ostream &os) const override { data.print(os); }
+
+    llvm::json::Value toJSON() const override { return data.toJSON(); }
   };
 
   std::string category;

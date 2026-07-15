@@ -38,6 +38,11 @@ public:
   /// statistics), or the list of requested statistic names otherwise.
   std::optional<std::vector<std::string>> getStatistics() const;
 
+  /// Returns the file that fuzzing progress and statistics should be written to
+  /// as JSON, as requested via '--json-output'. Returns 'std::nullopt' if the
+  /// option was not specified, i.e. they should be reported on the console.
+  std::optional<std::string> getJSONOutput() const;
+
   /// Returns the positional arguments.
   std::vector<std::string> getPositionalArguments() const;
 
