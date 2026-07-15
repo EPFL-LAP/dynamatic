@@ -905,6 +905,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addUnsigned("pipe1En", genInfo.pipe1En);
         addUnsigned("pipeCompEn", genInfo.pipeCompEn);
         addUnsigned("headLagEn", genInfo.headLagEn);
+        addUnsigned("bypassEn", genInfo.bypassEn);
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
