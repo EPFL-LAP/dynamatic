@@ -23,6 +23,12 @@ def statistics : CommaJoined<["--"], "statistics=">,
                  MetaVarName<"<statistics>">,
                  HelpText<"Report only the given comma-separated statistics">;
 
+def json_output : Separate<["--"], "json-output">,
+                  MetaVarName<"<file>">,
+                  HelpText<"Write the test count, bug count, testing rate and "
+                           "all requested statistics to <file> as JSON instead "
+                           "of reporting them on the console">;
+
 def grp_oracle : OptionGroup<"Oracle options">;
 
 def functional : Flag<["--"], "functional">,

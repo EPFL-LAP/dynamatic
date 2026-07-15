@@ -83,6 +83,13 @@ dynamatic::OptionsParser::getStatistics() const {
   return args.getAllArgValues(OPT_statistics);
 }
 
+std::optional<std::string> dynamatic::OptionsParser::getJSONOutput() const {
+  if (!args.hasArg(OPT_json_output))
+    return std::nullopt;
+
+  return args.getLastArgValue(OPT_json_output).str();
+}
+
 std::vector<std::string>
 dynamatic::OptionsParser::getPositionalArguments() const {
   return args.getAllArgValues(OPT_INPUT);
@@ -98,5 +105,6 @@ dynamatic::Options dynamatic::OptionsParser::apply(Options defaults) {
                       ? OracleKind::Functional
                       : OracleKind::NonFunctional;
   defaults.statistics = getStatistics();
+  defaults.jsonOutput = getJSONOutput();
   return defaults;
 }
