@@ -202,6 +202,9 @@ struct LSQGenerationInfo {
   /// Indicate whether the head pointer of the load queue is
   /// updated one cycle later than the valid bits of entries
   unsigned headLagEn = 0;
+  /// Indicate whether the bypass network is enabled, allowing store data to be
+  /// forwarded to subsequent loads targeting the same address
+  unsigned bypassEn = 1;
 
   // Configurations needed for the new lsq design
   // LdOrder indicates for each load entry in each group,

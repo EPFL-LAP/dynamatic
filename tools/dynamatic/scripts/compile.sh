@@ -23,10 +23,12 @@ MILP_SOLVER=${13}
 STRAIGHT_TO_QUEUE=${14}
 SPECULATION=${15}
 ENABLE_SHORT_CIRCUIT=${16}
-CALCULATE_PATH_DELAYS=${17}
-FORK_FIFO_SIZE=${18}
+ENABLE_DUPLICATION=${17:-0}
+CALCULATE_PATH_DELAYS=${18}
 
-for i in {1..18}; do shift; done
+FORK_FIFO_SIZE=${19}
+
+for i in {1..19}; do shift; done
 
 SKIPPABLE_ACTTIVE=0
 SKIPPABLE_SEQ_N=()
@@ -65,9 +67,10 @@ F_C_REWRITTEN="$COMP_DIR/$KERNEL_NAME.c"
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
-
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
+F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
@@ -255,19 +258,41 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
-  --consume-producer-output-attr-marker \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
+# duplicate parts of the operations specified by pragmas
+if [[ "$ENABLE_DUPLICATION" == "1" ]]; then
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --predicted-constant-duplication \
+  --canonicalize \
+  > "$F_CF_DUPLICATED"
+exit_on_fail "Failed to apply CF duplication" \
+  "Applied CF duplication"
+F_CF_TRANSFORMED="$F_CF_DUPLICATED"
+fi
+
+# consume the markers
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --consume-producer-output-attr-marker \
+  > "$F_CF_CONSUMED_PRAGMARKERS"
+exit_on_fail "Failed to consume markers" \
+  "Consumed markers successfully"
+
+
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \

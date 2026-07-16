@@ -171,6 +171,12 @@ void ASTStatistic::merge(const ASTStatistic &rhs) {
     counts[key] += count;
 }
 
+/// Returns the average number of occurrences per sample of a node kind seen
+/// 'count' times across 'numSamples' samples.
+static double getAverage(std::size_t count, std::size_t numSamples) {
+  return numSamples == 0 ? 0.0 : static_cast<double>(count) / numSamples;
+}
+
 void ASTStatistic::print(llvm::raw_ostream &os) const {
   os << CATEGORY << " (averaged over " << numSamples << " samples):\n";
 
@@ -180,8 +186,7 @@ void ASTStatistic::print(llvm::raw_ostream &os) const {
   cells.reserve(counts.size());
   std::size_t width = 0;
   for (const auto &[key, count] : counts) {
-    double average =
-        numSamples == 0 ? 0.0 : static_cast<double>(count) / numSamples;
+    double average = getAverage(count, numSamples);
     std::string &cell = cells.emplace_back();
     llvm::raw_string_ostream(cell)
         << getName(key) << ": " << llvm::format("%.2f", average);
@@ -202,4 +207,15 @@ void ASTStatistic::print(llvm::raw_ostream &os) const {
     else
       os << llvm::left_justify(cells[i], width) << "  ";
   }
+}
+
+llvm::json::Value ASTStatistic::toJSON() const {
+  llvm::json::Object averages;
+  for (const auto &[key, count] : counts)
+    averages[getName(key)] = getAverage(count, numSamples);
+
+  return llvm::json::Object{
+      {"numSamples", numSamples},
+      {"averages", std::move(averages)},
+  };
 }
