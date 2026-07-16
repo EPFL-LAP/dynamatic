@@ -15,11 +15,13 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/IR/Value.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
+
+#define DEBUG_TYPE "cpbuf-buffers"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -29,18 +31,9 @@ using namespace dynamatic::buffer::cpbuf;
 
 CPBuffers::CPBuffers(CPSolver::SolverKind solverKind, int timeout,
                      FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                     double targetPeriod)
-    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                          targetPeriod) {
-  if (!unsatisfiable)
-    setup();
-}
-
-CPBuffers::CPBuffers(CPSolver::SolverKind solverKind, int timeout,
-                     FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                     double targetPeriod, Logger &logger, StringRef milpName)
+                     double targetPeriod, StringRef writeTo)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                          logger, milpName) {
+                          Algorithm::CPBUF, writeTo) {
   if (!unsatisfiable)
     setup();
 }
@@ -92,8 +85,7 @@ void CPBuffers::extractResult(BufferPlacement &placement) {
     placement[channel] = result;
   }
 
-  if (logger)
-    logResults(placement);
+  LLVM_DEBUG(logResults(placement););
 }
 
 void CPBuffers::addCustomChannelConstraints(Value channel) {

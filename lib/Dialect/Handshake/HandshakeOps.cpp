@@ -2107,7 +2107,7 @@ LogicalResult TruncIOp::verify() {
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
-    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData"), ST_DONE("stDone");
 
 static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
   return name.str() + "_" + std::to_string(idx);
@@ -2167,13 +2167,19 @@ inline static std::string getMemOperandName(const FuncMemoryPorts &ports,
 static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   // Iterate through all memory ports to find out the type of the
   // operand
-  unsigned loadIdx = 0;
+  unsigned loadIdx = 0, storeIdx = 0;
   for (const GroupMemoryPorts &blockPorts : ports.groups) {
     for (const MemoryPort &accessPort : blockPorts.accessPorts) {
       if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
         if (loadPort->getDataOutputIndex() == idx)
           return getArrayElemName(LD_DATA, loadIdx);
         ++loadIdx;
+      }
+      if (std::optional<StorePort> storePort =
+              dyn_cast<StorePort>(accessPort)) {
+        if (storePort->getDoneOutputIndex() == idx)
+          return getArrayElemName(ST_DONE, storeIdx);
+        ++storeIdx;
       }
     }
   }
@@ -2200,6 +2206,8 @@ std::string LSQOp::getOperandName(unsigned idx) {
 }
 
 std::string LSQOp::getResultName(unsigned idx) {
+
+  llvm::errs() << "LSQOp::getResultName idx: " << idx << "\n";
   assert(idx < getOperation()->getNumResults() && "index too high");
 
   if (StringRef name = getIfControlRes(*this, idx); !name.empty())

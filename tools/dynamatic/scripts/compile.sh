@@ -313,38 +313,45 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
 else
 
-# handshake transformations
-# with skippable sequentializer
-if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
+  # handshake transformations
+  # with skippable sequentializer
+  if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
+      "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+        --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
+        --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME compDir=$COMP_DIR" \
+        --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE_ROUZBEH"
+    exit_on_fail "Failed to apply transformations to handshake with skippable sequentializer" \
+      "Applied transformations to handshake with skippable sequentializer"
+    
+    F_HANDSHAKE=$F_HANDSHAKE_ROUZBEH
+
+    # "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+    # --handshake-remove-unused-memrefs \
+    # --handshake-minimize-cst-width \
+    # > "$F_HANDSHAKE_TRANSFORMED"
+    # exit_on_fail "Failed to apply transformations to handshake" \
+    #   "Applied transformations to handshake"
+
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-      --handshake-inactivate-enforced-deps \
-      --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME compDir=$COMP_DIR" \
-      --handshake-replace-memory-interfaces \
-      --handshake-combine-steering-logic \
-   > "$F_HANDSHAKE_ROUZBEH"
-  exit_on_fail "Failed to apply transformations to handshake with skippable sequentializer" \
-    "Applied transformations to handshake with skippable sequentializer"
-  
-  F_HANDSHAKE=$F_HANDSHAKE_ROUZBEH
-
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-minimize-cst-width \
-    --handshake-optimize-bitwidths \
-    --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
-  > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
-
-# without skippable sequentializer
-else
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
-    --handshake-optimize-bitwidths \
-    --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
+      --handshake-optimize-bitwidths \
+      --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
+    exit_on_fail "Failed to apply transformations to handshake" \
+      "Applied transformations to handshake"
+
+  # without skippable sequentializer
+  else
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+      --handshake-remove-unused-memrefs \
+      --handshake-optimize-bitwidths \
+      --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
+      > "$F_HANDSHAKE_TRANSFORMED"
+    exit_on_fail "Failed to apply transformations to handshake" \
+      "Applied transformations to handshake"
+  fi
 fi
 
 # Speculation (pre-buffer): place speculative units and then materialize.

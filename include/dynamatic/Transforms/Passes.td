@@ -119,7 +119,6 @@ def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependen
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
-  let constructor = "dynamatic::createHandshakeInactivateEnforcedDeps()";
 }
 
 def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"> {
@@ -131,7 +130,6 @@ def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"
     "skip" the sequencialization logic when the accesses are prooven to be
     independent.
   }];
-  let constructor = "dynamatic::createHandshakeInsertSkippableSeq()";
   let options =
     [Option<"NStr", "NStr", "std::string", "\"3\"",
             "Number of comparators">,
@@ -199,7 +197,6 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
     (together with buffer placement) that multiple group allocations to the same
     LSQ never happen on the same cycle.   
   }];
-  let constructor = "dynamatic::createHandshakeMaterialize()";
   let options = [Option<"replicateConstants", "replicate-constant", "bool", "false",
             "If true, replicate all the source->constant per each use.">,
             Option<"forkFifoSize", "forkFifoSize", "std::string", "\"0\"",

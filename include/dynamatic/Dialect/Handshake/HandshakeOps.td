@@ -980,7 +980,8 @@ def BlockerOp : Handshake_Op<"blocker", [
 
 def GateOp : Handshake_Op<"gate", [
   IsSimpleHandshake<"data">,
-  IsSimpleHandshake<"result"> 
+  IsSimpleHandshake<"result">,
+  SimpleNamedIO
   ]> {
   let summary = "gate operation";
   let description = [{
@@ -1007,7 +1008,7 @@ def GateOp : Handshake_Op<"gate", [
 
   let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
-    BlockerOp::getRTLParameters() {
+    GateOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
       ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
       return ::llvm::SmallVector<::mlir::NamedAttribute>{
@@ -1053,47 +1054,26 @@ def NotIOp : Handshake_Op<"noti", [
   }];
 }
 
-def AndOp : Handshake_Op<"and", [Pure, SameOperandsAndResultType]> {
-  let summary = "Logical and";
-  let description = [{
-    Bitwise logical and.
+// def AndOp : Handshake_Op<"and", [Pure, SameOperandsAndResultType]> {
+//   let summary = "Logical and";
+//   let description = [{
+//     Bitwise logical and.
 
-  }];
-  let arguments = (ins Variadic<ChannelType>:$operand);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$operand attr-dict `:` type($result)";
-}
+//   }];
+//   let arguments = (ins Variadic<ChannelType>:$operand);
+//   let results = (outs ChannelType:$result);
+//   let assemblyFormat = "$operand attr-dict `:` type($result)";
+// }
 
-def OrOp : Handshake_Op<"or", [Pure, SameOperandsAndResultType]> {
-  let summary = "Logical or";
-  let description = [{
-    Bitwise logical or.
-  }];
-  let arguments = (ins Variadic<ChannelType>:$operand);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$operand attr-dict `:` type($result)";
-}
-
-def AndOp : Handshake_Op<"and", [Pure, SameOperandsAndResultType]> {
-  let summary = "Logical and";
-  let description = [{
-    Bitwise logical and.
-
-  }];
-  let arguments = (ins Variadic<ChannelType>:$operand);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$operand attr-dict `:` type($result)";
-}
-
-def OrOp : Handshake_Op<"or", [Pure, SameOperandsAndResultType]> {
-  let summary = "Logical or";
-  let description = [{
-    Bitwise logical or.
-  }];
-  let arguments = (ins Variadic<ChannelType>:$operand);
-  let results = (outs ChannelType:$result);
-  let assemblyFormat = "$operand attr-dict `:` type($result)";
-}
+// def OrOp : Handshake_Op<"or", [Pure, SameOperandsAndResultType]> {
+//   let summary = "Logical or";
+//   let description = [{
+//     Bitwise logical or.
+//   }];
+//   let arguments = (ins Variadic<ChannelType>:$operand);
+//   let results = (outs ChannelType:$result);
+//   let assemblyFormat = "$operand attr-dict `:` type($result)";
+// }
 
 //===----------------------------------------------------------------------===//
 // Memory interfaces
@@ -1527,17 +1507,7 @@ def StoreOp : Handshake_MemPortOp<"store", [
           return "doneOut";
       }
     }
-    
-    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
-    StoreOp::getRTLParameters() {
-      ::mlir::MLIRContext *ctx = (*this)->getContext();
-      return ::llvm::SmallVector<::mlir::NamedAttribute>{
-        {::mlir::StringAttr::get(ctx, "DATA_BITWIDTH"),
-         ::mlir::TypeAttr::get(getData().getType())},
-        {::mlir::StringAttr::get(ctx, "ADDR_BITWIDTH"),
-         ::mlir::TypeAttr::get(getAddress().getType())}
-      };
-    }
+  
   }];
 
   let extraClassDefinition = [{

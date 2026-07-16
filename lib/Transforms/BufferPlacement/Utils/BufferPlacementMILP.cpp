@@ -18,7 +18,6 @@
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/Johnson.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/Reconvergence.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/OperationSupport.h"
@@ -44,13 +43,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::buffer;
 using namespace dynamatic::handshake;
-
-/// Type alias for a cycle (sequence of operations forming a loop)
-using Cycle = std::vector<Operation *>;
-using CycleList = std::vector<Cycle>;
-
-using ChannelCycle = std::vector<Value>;
-using ChannelCycleList = std::vector<ChannelCycle>;
 
 /// Returns a textual name for a signal type.
 static StringRef getSignalName(SignalType signalType) {
@@ -555,7 +547,7 @@ void BufferPlacementMILP::addChannelTimingConstraints(
   // If a buffer is present on the signal's path, then the arrival time at the
   // buffer's register must be lower than the clock period. The signal must
   // propagate on the channel through all potential buffers cutting other
-  // signbuffer's input pin logic
+  // signals before its own, and inside its own buffer's input pin logic
   double preBufCstDelay = props.inDelay + inBufDelay;
   model->addConstr(t1 + bufsBeforeDelay + bufPresent * preBufCstDelay <=
                        targetPeriod,
@@ -617,17 +609,7 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
       CPVar &tOutPort = vars.channelVars[out].signalVars[signalType].path.tIn;
       // Arrival time at unit's output port must be greater than arrival
       // time at unit's input port + the unit's combinational data delay
-
-      if (isa<handshake::UnbundleOp>(unit) && !out.getType().isa<ControlType>())
-        // llvm::errs() << "skipping\n";
-        ;
-      else if (isa<handshake::MemoryControllerOp>(*out.getUsers().begin())) {
-        // llvm::errs() << "skipping mem\n";
-        ;
-      } else {
-        model->addConstr(tOutPort >= tInPort + delay, "path_combDelay");
-        // llvm::errs() << "success\n";
-      }
+      model->addConstr(tOutPort >= tInPort + delay, "path_combDelay");
     });
 
     return;
@@ -783,9 +765,6 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
     // get if the channel is a backedge as an integer
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
-    // Rouzbeh old version
-    // ChannelVars &chVars = vars.channelVars[channel];
-    // CPVar backedge = chVars.isBackedge;
 
     // If the channel isn't a backedge, its steady-state occupancy
     // equals the difference between the fluid retiming variables
@@ -798,92 +777,6 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     // if a buffer breaking data and valid is placed on the channel
     model->addConstr(chTokenOccupancy == backedge + retDst - retSrc,
                      "throughput_channelRetiming");
-  }
-}
-
-void BufferPlacementMILP::addBackedgeConstraints() {
-  CircuitGraph circuitGraph(funcInfo.funcOp);
-  ReconvergentPathList reconvergentPathList =
-      findReconvergentPaths(circuitGraph);
-
-  llvm::errs() << "&&&&&&&&&&&&&&&&\n";
-  for (auto path : reconvergentPathList) {
-
-    if (path.path1.size() > 1 || path.path2.size() > 1) {
-      for (auto op : path.path1)
-        llvm::errs() << getUniqueName(op) << " - ";
-
-      llvm::errs() << "\n";
-
-      for (auto op : path.path2)
-        llvm::errs() << getUniqueName(op) << " - ";
-      llvm::errs() << "-----\n";
-    }
-  }
-
-  return;
-
-  GraphForJohnson graph(funcInfo.funcOp);
-  ChannelCycleList channelCycles = graph.findAllChannelCycles();
-
-  for (ChannelCycle cycle : channelCycles) {
-
-    // llvm::errs() << "Found cycle: ";
-    // for (Value channel : cycle) {
-    //   llvm::errs() << channel << "\n";
-    // }
-    // llvm::errs() << "-------------------\n";
-
-    LinExpr sumOfBackedges;
-    for (Value channel : cycle) {
-      ChannelVars &chVars = vars.channelVars[channel];
-      sumOfBackedges += chVars.isBackedge;
-    }
-
-    // Exactly one channel in the cycle must be marked as a backedge
-    model->addConstr(sumOfBackedges == 1, "cycle_has_backedge");
-  }
-}
-
-void BufferPlacementMILP::addDataBufConstraint() {
-  GraphForJohnson graph(funcInfo.funcOp);
-  ChannelCycleList channelCycles = graph.findAllChannelCycles();
-
-  for (ChannelCycle cycle : channelCycles) {
-    LinExpr sumOfDataBufs;
-    for (Value channel : cycle) {
-      ChannelVars &chVars = vars.channelVars[channel];
-      auto dataVars = chVars.signalVars.find(SignalType::DATA);
-      sumOfDataBufs += dataVars->second.bufPresent;
-    }
-
-    // at least one channel in the cycle must have a data buffer
-    model->addConstr(sumOfDataBufs >= 1, "cycle_has_buffer");
-  }
-}
-
-void BufferPlacementMILP::addMuxConstraint(CFDFC &cfdfc) {
-  CFDFCVars &cfVars = vars.cfdfcVars[&cfdfc];
-  for (Value channel : cfdfc.channels) {
-    // Get the ports the channels connect and their retiming MILP variables
-    Operation *dstOp = *channel.getUsers().begin();
-
-    if (auto muxOp = dyn_cast<handshake::MuxOp>(dstOp)) {
-      llvm::errs() << "found a mux op: " << muxOp << "\n";
-      ValueRange dataOperands = muxOp.getDataOperands();
-
-      for (Value dataOp : dataOperands) {
-        llvm::errs() << "data operand: " << dataOp << "\n";
-        // check if this value is created by a source operation
-        if (isa<handshake::SourceOp>(dataOp.getDefiningOp())) {
-          // GRBVar &chTokenOccupancy =
-          //     cfVars.channelThroughputs[muxOp.getResult()];
-
-          // model.addConstr(chTokenOccupancy == 1, "rouzbeh");
-          llvm::errs() << muxOp.getResult() << "adding mux constraint\n";
-        }
-      }
-    }
   }
 }
 
@@ -948,12 +841,12 @@ void BufferPlacementMILP::
     // Assuming that we minimize the number of buffer slots, bubble occupancy
     // always takes the minimum feasible value. Therefore, the combined
     // constraints are equivalent to:
-    // If dataBuf holds, then token occupancy + CFDFC's throughput <=
-    // numSlots; otherwise, token occupancy <= numSlots. (Already enforced by
-    // the earlier constraint named "throughput_channel") The following
-    // constraint encodes the case where readyBuf holds, and is trivially
-    // satisfied when readyBuf does not hold (since the earlier constraint
-    // already enforces it):
+    // If dataBuf holds, then token occupancy + CFDFC's throughput <= numSlots;
+    // otherwise, token occupancy <= numSlots. (Already enforced by the earlier
+    // constraint named "throughput_channel")
+    // The following constraint encodes the case where readyBuf holds, and is
+    // trivially satisfied when readyBuf does not hold (since the earlier
+    // constraint already enforces it):
     if (chVars.signalVars.count(SignalType::READY)) {
       auto readyBuf = chVars.signalVars[SignalType::READY].bufPresent;
       model->addConstr(
@@ -1393,8 +1286,8 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
 
   // Iterate over all CFDFCs which contain the channel to determine its total
   // number of executions. Backedges are executed one less time than "forward
-  // edges" since they are only taken between executions of the cycle the
-  // CFDFC represents
+  // edges" since they are only taken between executions of the cycle the CFDFC
+  // represents
   unsigned numExec = isBackedge(channel) ? 0 : 1;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
     if (cfdfc->channels.contains(channel))
@@ -1431,14 +1324,16 @@ void BufferPlacementMILP::addMinBufferAreaObjective(ValueRange channels) {
 }
 
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
-                                                    ArrayRef<CFDFC *> cfdfcs,
-                                                    LinExpr objective) {
+                                                    ArrayRef<CFDFC *> cfdfcs) {
   // Compute the total number of executions over channels that are part of any
   // CFDFC
   unsigned totalExecs = 0;
   for (Value channel : channels) {
     totalExecs += getChannelNumExecs(channel);
   }
+
+  // Create the expression for the MILP objective
+  LinExpr objective;
 
   // For each CFDFC, add a throughput contribution to the objective, weighted
   // by the "importance" of the CFDFC
@@ -1452,13 +1347,13 @@ void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,
     }
   }
 
-  // In case we ran the MILP without providing any CFDFC, set the maximum
-  // CFDFC coefficient to any positive value
+  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
+  // coefficient to any positive value
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
-  // For each channel, add a "penalty" in case a buffer is added to the
-  // channel, and another penalty that depends on the number of slots
+  // For each channel, add a "penalty" in case a buffer is added to the channel,
+  // and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
   double slotPenaltyMul = 1e-5;
   for (Value channel : channels) {
@@ -1495,8 +1390,8 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
     }
   }
 
-  // In case we ran the MILP without providing any CFDFC, set the maximum
-  // CFDFC coefficient to any positive value
+  // In case we ran the MILP without providing any CFDFC, set the maximum CFDFC
+  // coefficient to any positive value
   if (maxCoefCFDFC == 0.0)
     maxCoefCFDFC = 1.0;
 
@@ -1504,14 +1399,14 @@ void BufferPlacementMILP::addBufferAreaAwareObjective(
   // penalty for buffer presence is an empirical value, consistent with
   // 'addMaxThroughputObjective'. The slot penalties for each buffer type are
   // rough estimates, based on the number of LUTs as logic observed when each
-  // buffer type was synthesized individually. To adjust these parameters
-  // during tuning, simply modify the values here.
+  // buffer type was synthesized individually. To adjust these parameters during
+  // tuning, simply modify the values here.
 
-  // For each channel, add a "penalty" in case a buffer is added to the
-  // channel, and another penalty that depends on the number of slots
+  // For each channel, add a "penalty" in case a buffer is added to the channel,
+  // and another penalty that depends on the number of slots
   double bufPenaltyMul = 1e-4;
-  // In general, buffers that break data paths have a lower area cost per
-  // slot, while other types incur a higher cost
+  // In general, buffers that break data paths have a lower area cost per slot,
+  // while other types incur a higher cost
   double largeSlotPenaltyMul = 1e-4;
   double smallSlotPenaltyMul = 1e-5;
   // For SHIFT_REG_BREAK_DV, a small area cost is incurred when the buffer
@@ -1851,14 +1746,11 @@ void BufferPlacementMILP::setLatencyBalancingObjective() {
 
 void BufferPlacementMILP::forEachIOPair(
     Operation *op, const std::function<void(Value, Value)> &callback) {
-  // llvm::errs() << "OP: " << *op << "\n";
   for (Value opr : op->getOperands()) {
     if (!isa<MemRefType>(opr.getType())) {
       for (OpResult res : op->getResults()) {
-        if (!isa<MemRefType>(res.getType())) {
-          // llvm::errs() << "OPR: " << opr << ", RES: " << res << "\n";
+        if (!isa<MemRefType>(res.getType()))
           callback(opr, res);
-        }
       }
     }
   }
@@ -1873,11 +1765,6 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
   os << "# ========================== #\n\n";
 
   for (auto &[value, chVars] : vars.channelVars) {
-    if (auto op = value.getDefiningOp(); op)
-      if (isa<handshake::UnbundleOp>(op) &&
-          !isa<handshake::ControlType>(value.getType())) {
-        continue;
-      }
     if (model->getValue(chVars.bufPresent) == 0)
       continue;
 
@@ -1943,96 +1830,18 @@ void BufferPlacementMILP::logResults(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     os << "Unit retimings of CFDFC #" << idx << ":\n";
     os.indent();
-    for (auto &[op, unitVars] : cfVars.unitVars) {
-      os << getUniqueName(op) << ": (in: " << model->getValue(unitVars.retIn)
-         << ", out: " << model->getValue(unitVars.retOut) << ")\n";
-
-      os << "\n# =================== #\n";
-      os << "# Unit Retimings #\n";
-      os << "# =================== #\n\n";
-
-      // Log retimings of all units in all CFDFCs
-      for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-        auto [cf, cfVars] = cfdfcWithVars;
-        os << "Unit retimings of CFDFC #" << idx << ":\n";
-        os.indent();
-        for (auto &[op, unitVars] : cfVars.unitVars) {
-          os << getUniqueName(op)
-             << ": (in: " << model->getValue(unitVars.retIn)
-             << ", out: " << model->getValue(unitVars.retOut) << ")\n";
-        }
-        os.unindent();
-        os << "\n";
-      }
-
-      // print backedge decisions
-      os << "# ========================= #\n";
-      os << "# Backedge Buffering Decisions #\n";
-      os << "# ========================= #\n\n";
-      for (auto &[value, chVars] : vars.channelVars) {
-        if (auto op = value.getDefiningOp(); op)
-          if (isa<handshake::UnbundleOp>(op) &&
-              !isa<handshake::ControlType>(value.getType())) {
-            continue;
-          }
-
-        if (model->getValue(chVars.isBackedge) == 0)
-          continue;
-
-        os << getUniqueName(*value.getUses().begin()) << " is a backedge\n";
-      }
-
-      // print retiming decisions where they are non-zero
-      os << "\n# ========================= #\n";
-      os << "# Retiming Decisions #\n";
-      os << "# ========================= #\n\n";
-      for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-        auto [cf, cfVars] = cfdfcWithVars;
-        for (auto &[unit, unitVars] : cfVars.unitVars) {
-          os << "CFDFC #" << idx << " unit " << getUniqueName(unit)
-             << " retiming: in " << model->getValue(unitVars.retIn) << ", out "
-             << model->getValue(unitVars.retOut) << "\n";
-        }
-      }
-
-      // print ready/data buffer decisions
-      os << "\n# ========================= #\n";
-      os << "# Ready/Data Buffering Decisions #\n";
-      os << "# ========================= #\n\n";
-      for (auto &[value, chVars] : vars.channelVars) {
-        if (auto op = value.getDefiningOp(); op)
-          if (isa<handshake::UnbundleOp>(op) &&
-              !isa<handshake::ControlType>(value.getType())) {
-            continue;
-          }
-        if (chVars.signalVars.count(SignalType::READY)) {
-          os << "Channel " << getUniqueName(*value.getUses().begin())
-             << " ready buffer present: "
-             << model->getValue(chVars.signalVars[SignalType::READY].bufPresent)
-             << "\n";
-        }
-        if (chVars.signalVars.count(SignalType::DATA)) {
-          os << "Channel " << getUniqueName(*value.getUses().begin())
-             << " data buffer present: "
-             << model->getValue(chVars.signalVars[SignalType::DATA].bufPresent)
-             << "\n";
-        }
-      }
-
-      // for (auto &[value, chVars] : vars.channelVars) {
-      //   os << "Channel " << getUniqueName(*value.getUses().begin())
-      //      << " buffer present: " << chVars.bufPresent.get(GRB_DoubleAttr_X)
-      //      << "\n";
-      // }
-
-      for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
-        auto [cf, cfVars] = cfdfcWithVars;
-        for (auto backedge : cf->backedges) {
-          os << "CFDFC #" << idx << " backedge "
-             << getUniqueName(*backedge.getUses().begin()) << "\n";
-        }
-      }
+    for (Operation *op : cf->units) {
+      UnitVars &unitVars = cfVars.getUnitVarsFor(op);
+      os << getUniqueName(op) << ":\n";
+      os.indent();
+      for (auto [idx, var] : llvm::enumerate(unitVars.getInputRetimingVars()))
+        os << "in " << idx << ": " << model->getValue(var) << "\n";
+      for (auto [idx, var] : llvm::enumerate(unitVars.getOutputRetimingVars()))
+        os << "out " << idx << ": " << model->getValue(var) << "\n";
+      os.unindent();
     }
+    os.unindent();
+    os << "\n";
   }
 }
 

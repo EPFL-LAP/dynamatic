@@ -399,7 +399,7 @@ void CFDFCUnionBuffers::setup() {
   llvm::copy(cfUnion.channels, std::back_inserter(allChannels));
   LinExpr objective = addBackedgeObjective(allChannels);
 
-  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs, objective);
+  addMaxThroughputObjective(allChannels, cfUnion.cfdfcs);
   markReadyToOptimize();
 }
 

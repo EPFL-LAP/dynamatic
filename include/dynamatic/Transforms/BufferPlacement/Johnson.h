@@ -3,7 +3,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
-#include "dynamatic/Support/Logging.h"
+// #include "dynamatic/Support/Logging.h"
 #include "mlir/IR/OperationSupport.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"

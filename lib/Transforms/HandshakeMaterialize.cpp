@@ -546,8 +546,3 @@ struct HandshakeMaterializePass
   }
 };
 } // namespace
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeMaterialize(const std::string &forkFifoSize) {
-  return std::make_unique<HandshakeMaterializePass>();
-}

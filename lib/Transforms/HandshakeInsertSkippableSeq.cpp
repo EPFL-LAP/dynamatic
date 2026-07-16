@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "dynamatic/Transforms/HandshakeInsertSkippableSeq.h"
+// #include "dynamatic/Transforms/HandshakeInsertSkippableSeq.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
@@ -32,6 +32,14 @@
 #include <fstream>
 #include <unordered_set>
 
+// [START Boilerplate code for the MLIR pass]
+#include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
+namespace dynamatic {
+#define GEN_PASS_DEF_HANDSHAKEINSERTSKIPPABLESEQ
+#include "dynamatic/Transforms/Passes.h.inc"
+} // namespace dynamatic
+// [END Boilerplate]
+
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
@@ -52,6 +60,8 @@ namespace {
 struct HandshakeInsertSkippableSeqPass
     : public dynamatic::impl::HandshakeInsertSkippableSeqBase<
           HandshakeInsertSkippableSeqPass> {
+
+  using HandshakeInsertSkippableSeqBase::HandshakeInsertSkippableSeqBase;
 
   void runDynamaticPass() override;
 
@@ -462,7 +472,7 @@ Value joinValues(SmallVector<Value> valuesToJoin, Operation *BBOp,
     return gateOp.getResult();
   } else {
     handshake::BlockerOp blockerOp = rewriter.create<handshake::BlockerOp>(
-        BBOp->getLoc(), ValueRange{valuesToJoin});
+        BBOp->getLoc(), valuesToJoin[0].getType(), ValueRange{valuesToJoin});
     inheritBB(BBOp, blockerOp);
     return blockerOp.getResult();
   }
@@ -754,11 +764,4 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
   writeDepGraphToDotFile(path);
   llvm::errs()
       << "[INFO][SKIP] Inserted Out with LSQs circuit successfully! \n";
-}
-
-std::unique_ptr<dynamatic::DynamaticPass>
-dynamatic::createHandshakeInsertSkippableSeq(const std::string &NStr,
-                                             const std::string &kernelName,
-                                             const std::string &compDir) {
-  return std::make_unique<HandshakeInsertSkippableSeqPass>();
 }

@@ -20,9 +20,9 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_CPBUFFERS_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 
 #ifndef DYNAMATIC_GUROBI_NOT_INSTALLED
 #include "gurobi_c++.h"
@@ -42,20 +42,12 @@ namespace cpbuf {
 ///    penalizes the placement of many large buffers in the circuit
 class CPBuffers : public BufferPlacementMILP {
 public:
-  /// Setups the entire MILP that buffers the input dataflow circuit for the
-  /// target clock period, after which (absent errors) it is ready for
-  /// optimization. If a channel's buffering properties are provably
-  /// unsatisfiable, the MILP will not be marked ready for optimization,
-  /// ensuring that further calls to `optimize` fail.
-  CPBuffers(CPSolver::SolverKind solverKind, int timeout, FuncInfo &funcInfo,
-            const TimingDatabase &timingDB, double targetPeriod);
-
   /// Achieves the same as the other constructor but additionally logs placement
   /// decisions and achieved throughputs using the provided logger, and dumps
   /// the MILP model and solution at the provided name next to the log file.
   CPBuffers(CPSolver::SolverKind solverKind, int timeout, FuncInfo &funcInfo,
-            const TimingDatabase &timingDB, double targetPeriod, Logger &logger,
-            StringRef milpName = "placement");
+            const TimingDatabase &timingDB, double targetPeriod,
+            StringRef writeTo = "");
 
 protected:
   /// Interprets the MILP solution to derive buffer placement decisions. Since

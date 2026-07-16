@@ -144,7 +144,7 @@ struct MILPVars {
 class BufferPlacementMILP : public MILP<BufferPlacement> {
 public:
   // Enum representation of algorithm class
-  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF };
+  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF, CPBUF };
 
   /// Contains timing characterizations for dataflow components required to
   /// create the MILP constraints.
@@ -425,8 +425,7 @@ protected:
   ///
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
-  void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs,
-                                 LinExpr objective);
+  void addMaxThroughputObjective(ValueRange channels, ArrayRef<CFDFC *> cfdfcs);
 
   /// Adds the MILP model's objective. The objective maximizes throughput while
   /// minimizing buffer area, with throughput prioritized. It has a positive

@@ -385,7 +385,7 @@ static void logFuncInfo(FuncInfo &info) {
     os << "- Number of channels: " << cf->channels.size() << "\n";
     os << "- Number of backedges: " << cf->backedges.size() << "\n\n";
     os.unindent();
-    cf->writeDot(log.getLogDir() + "/cfdfc_" + std::to_string(idx) + ".dot");
+    // cf->writeDot(log.getLogDir() + "/cfdfc_" + std::to_string(idx) + ".dot");
   }
 
   os.flush();
@@ -571,10 +571,13 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     return milp.solve(placement, calculatePathDelays);
   }
   if (algorithm == CPBUF) {
+    if (dumpMILPModels) {
+      writeTo = dumpDir + sep + funcName + "-cpbuf";
+    }
     // Create and solve the MILP
-    return checkLoggerAndSolve<cpbuf::CPBuffers>(logger, "placement", placement,
-                                                 solverKind, timeout, info,
-                                                 timingDB, targetCP);
+    cpbuf::CPBuffers milp(solverKind, timeout, info, timingDB, targetCP,
+                          writeTo);
+    return milp.solve(placement, calculatePathDelays);
   }
 
   llvm_unreachable("unknown algorithm");

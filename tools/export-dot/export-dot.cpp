@@ -330,6 +330,9 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     Value val = oprd.get();
     Operation *dstOp = oprd.getOwner();
 
+    llvm::errs() << "addEdge: val: " << val << ", dstOp: " << dstOp->getName()
+                 << "\n";
+
     // Determine the edge's source
     std::string srcNodeName, srcPortName;
     unsigned srcIdx;
@@ -346,6 +349,7 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
           cast<handshake::NamedIOInterface>(parentOp).getOperandName(srcIdx);
     }
 
+    llvm::errs() << "------------";
     // Determine the edge's destination
     std::string dstNodeName, dstPortName;
     unsigned dstIdx;

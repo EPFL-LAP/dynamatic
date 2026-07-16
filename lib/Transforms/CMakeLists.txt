@@ -6,7 +6,6 @@ add_dynamatic_library(DynamaticTransforms
   FuncMaximizeSSA.cpp
   FuncSetArgNames.cpp
   ConsumeProducerOutputAttrMarker.cpp
-  HandshakeInactivateEnforcedDeps.cpp
   HandshakeInsertSkippableSeq.cpp
   HandshakeCanonicalize.cpp
   HandshakeDeactivateMemDependencies.cpp

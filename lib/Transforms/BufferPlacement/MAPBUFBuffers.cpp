@@ -311,6 +311,6 @@ void MAPBUFBuffers::setup() {
 
   LinExpr objective = addBackedgeObjective(allChannels);
 
-  addMaxThroughputObjective(allChannels, cfdfcs, objective);
+  addMaxThroughputObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }

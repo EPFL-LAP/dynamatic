@@ -1144,7 +1144,7 @@ struct MemPortAddrOpt
     namer.replaceOp(portOp, newPortOp);
     inheritBB(portOp, newPortOp);
     Value newAddrRes = modBitWidth(
-        {newPortOp.getAddressOutput(), ExtType::LOGICAL}, addrWidth, rewriter);
+        {newPortOp.getAddressOutput(), ExtType::ZEXT}, addrWidth, rewriter);
     if (auto newStorePortOp = dyn_cast<handshake::StoreMemPortOpInterface>(
             newPortOp.getOperation())) {
       rewriter.replaceOp(portOp, {newAddrRes, newStorePortOp.getDataOutput(),
