@@ -15,6 +15,7 @@
 
 #include "Options.h"
 #include "OptionsParser.h"
+#include "Reproducer.h"
 #include "TargetRegistry.h"
 
 #include "llvm/Support/Error.h"
@@ -152,7 +153,7 @@ static void reportConsole(const Progress &progress) {
 // holding the newest of any two concurrently taken samples.
 static std::mutex progressMutex;
 static Progress totalProgress;
-static const std::chrono::high_resolution_clock::time_point startTime =
+static const std::chrono::high_resolution_clock::time_point START_TIME =
     std::chrono::high_resolution_clock::now();
 
 /// Adds the progress 'made' to the progress of this process. May be called from
@@ -167,7 +168,7 @@ static void addProgress(const Progress &made) {
 static void report(const dynamatic::Options &options) {
   std::scoped_lock<std::mutex> lock{progressMutex};
   totalProgress.duration = std::chrono::duration_cast<std::chrono::seconds>(
-      std::chrono::high_resolution_clock::now() - startTime);
+      std::chrono::high_resolution_clock::now() - START_TIME);
 
   if (options.jsonOutput)
     reportJSON(*options.jsonOutput, totalProgress);
@@ -175,20 +176,35 @@ static void report(const dynamatic::Options &options) {
     reportConsole(totalProgress);
 }
 
-/// Generates a program into 'directory' and verifies it, returning what doing
-/// so amounted to.
+/// Generates a program into 'directory' using 'seed' as its randomness source
+/// and verifies it, returning what doing so amounted to.
 ///
 /// 'directory' is wiped beforehand and serves as scratch space for the
 /// verification, leaving whatever it contains afterwards the reproducer of any
-/// bug that was found.
+/// bug that was found. A 'reproducer.json' recording 'seed' and the options is
+/// dropped in before generation so that even a crash halfway through it leaves
+/// enough behind for '--reproduce' to replay the program.
 static Progress runSingleProgram(const dynamatic::AbstractTarget &target,
                                  const dynamatic::Options &options,
-                                 const std::filesystem::path &directory) {
+                                 const std::filesystem::path &directory,
+                                 std::uint32_t seed) {
   std::unique_ptr<dynamatic::AbstractWorker> worker =
-      target.createWorker(options, dynamatic::Randomly(std::random_device()()));
+      target.createWorker(options, dynamatic::Randomly(seed));
 
   std::filesystem::remove_all(directory);
   std::filesystem::create_directories(directory);
+
+  // Record everything needed to replay this program before generating it, so
+  // that a crash halfway through generation still leaves a reproducer behind.
+  // A failure to do so only costs the ability to reproduce this one program and
+  // is therefore reported but not fatal.
+  dynamatic::ReproducerInfo info{seed, options.targetArguments};
+  if (llvm::Error error = dynamatic::writeReproducer(
+          directory / dynamatic::REPRODUCER_FILE_NAME.str(), info)) {
+    std::scoped_lock<std::mutex> lock{errorMutex};
+    llvm::errs() << "Failed to write reproducer: "
+                 << llvm::toString(std::move(error)) << '\n';
+  }
 
   const std::string functionName = "test";
   std::filesystem::path sourceFile = directory / (functionName + ".c");
@@ -200,8 +216,11 @@ static Progress runSingleProgram(const dynamatic::AbstractTarget &target,
 
   Progress progress;
   progress.numPrograms = 1;
-  progress.numBugs =
-      worker->verify(sourceFile) == dynamatic::AbstractWorker::Bug;
+  // '--no-verify' exercises only the generation, leaving the program unverified
+  // and therefore never counted as a bug.
+  if (!options.noVerify)
+    progress.numBugs =
+        worker->verify(sourceFile) == dynamatic::AbstractWorker::Bug;
   for (const dynamatic::Statistic &statistic : worker->getStatistics())
     progress.merge(statistic);
 
@@ -422,6 +441,69 @@ static void work(const dynamatic::Options &options,
   }
 }
 
+/// Replays the program described by the reproducer in 'directory' using 'seed',
+/// in this very process, so that a crash of the generation or verification can
+/// be caught in a debugger. Returns a process exit code.
+///
+/// An existing 'test.c' is never overwritten: the program is regenerated into
+/// memory and, if a 'test.c' is already present but differs from it, an error
+/// is reported and nothing is verified, since the reproducer no longer matches
+/// what would be generated (e.g. because the fuzzer changed since it was
+/// written). A matching 'test.c' is left in place and an absent one is written
+/// out, after which the program is verified as usual.
+static int reproduceProgram(const dynamatic::AbstractTarget &target,
+                            const dynamatic::Options &options,
+                            const std::filesystem::path &directory,
+                            std::uint32_t seed) {
+  std::unique_ptr<dynamatic::AbstractWorker> worker =
+      target.createWorker(options, dynamatic::Randomly(seed));
+
+  // Regenerate into memory first so it can be compared against an existing
+  // 'test.c' before anything on disk is touched.
+  std::string generated;
+  llvm::raw_string_ostream os(generated);
+  worker->generate(os, "test");
+  os.flush();
+
+  std::filesystem::path sourceFile = directory / "test.c";
+  if (std::filesystem::exists(sourceFile)) {
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> existing =
+        llvm::MemoryBuffer::getFile(sourceFile.string());
+    if (std::error_code error = existing.getError()) {
+      llvm::errs() << "Failed to read '" << sourceFile.string()
+                   << "': " << error.message() << '\n';
+      return -1;
+    }
+
+    if ((*existing)->getBuffer() != generated) {
+      llvm::errs() << "Regenerated program does not match the existing '"
+                   << sourceFile.string()
+                   << "'; refusing to overwrite it. The reproducer no longer "
+                      "describes this program, e.g. because the fuzzer changed "
+                      "since it was written\n";
+      return -1;
+    }
+    // Identical: leave the existing 'test.c' untouched.
+  } else if (llvm::Error error = llvm::writeToOutput(
+                 sourceFile.string(), [&](llvm::raw_ostream &fileOs) {
+                   fileOs << generated;
+                   return llvm::Error::success();
+                 })) {
+    llvm::errs() << "Failed to write '" << sourceFile.string()
+                 << "': " << llvm::toString(std::move(error)) << '\n';
+    return -1;
+  }
+
+  if (options.noVerify)
+    return 0;
+
+  if (worker->verify(sourceFile) == dynamatic::AbstractWorker::Bug)
+    llvm::errs() << "Bug reproduced\n";
+  else
+    llvm::errs() << "No bug found\n";
+  return 0;
+}
+
 int main(int argc, char **argv) {
   auto signalHandler = +[](int) {
     interrupted = true;
@@ -443,6 +525,55 @@ int main(int argc, char **argv) {
   dynamatic::TargetRegistry &instance =
       dynamatic::TargetRegistry::getInstance();
 
+  dynamatic::Options defaults{};
+#pragma clang diagnostic ignored "-Wmain"
+  defaults.executablePath = llvm::sys::fs::getMainExecutable(
+      argv[0], reinterpret_cast<void *>(&main));
+  defaults.dynamaticExecutablePath =
+      std::filesystem::path(defaults.executablePath).parent_path() /
+      "dynamatic";
+
+  auto options = optionsParser.apply(defaults);
+
+  // Reproduce a single program from a previously written reproducer, in this
+  // very process rather than in one of its own, so that a crash of the
+  // generation or verification can be caught in a debugger. The target options
+  // are read back from the reproducer and parsed through the very same
+  // command-line logic used for a normal run, so nothing about how they map to
+  // options is duplicated here.
+  if (std::optional<std::string> directory =
+          optionsParser.getReproduceDirectory()) {
+    std::optional<dynamatic::ReproducerInfo> info =
+        dynamatic::readReproducer(std::filesystem::path(*directory) /
+                                  dynamatic::REPRODUCER_FILE_NAME.str());
+    if (!info)
+      return -1;
+
+    llvm::SmallVector<std::string> storage;
+    storage.emplace_back(defaults.executablePath);
+    llvm::append_range(storage, info->arguments);
+    llvm::SmallVector<char *> reproArgs;
+    for (std::string &arg : storage)
+      reproArgs.emplace_back(arg.data());
+
+    dynamatic::OptionsParser reproParser(reproArgs);
+    std::string targetName = reproParser.getTargetName();
+    std::unique_ptr<dynamatic::AbstractTarget> target =
+        instance.getTarget(targetName);
+    if (!target) {
+      llvm::errs() << "Unknown target '" << targetName << "' in reproducer\n";
+      return -1;
+    }
+
+    // Build the options off this invocation's own so that flags which are not
+    // part of the reproducer, such as '--no-verify' and the dynamatic path,
+    // still take effect. The reproducer only carries the target options, hence
+    // 'noVerify' must be restored from the actual invocation afterwards.
+    dynamatic::Options reproOptions = reproParser.apply(options);
+    reproOptions.noVerify = options.noVerify;
+    return reproduceProgram(*target, reproOptions, *directory, info->seed);
+  }
+
   std::string targetName = optionsParser.getTargetName();
   if (targetName.empty()) {
     llvm::errs() << "Missing '--target' argument\n";
@@ -459,22 +590,13 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  dynamatic::Options defaults{};
-#pragma clang diagnostic ignored "-Wmain"
-  defaults.executablePath = llvm::sys::fs::getMainExecutable(
-      argv[0], reinterpret_cast<void *>(&main));
-  defaults.dynamaticExecutablePath =
-      std::filesystem::path(defaults.executablePath).parent_path() /
-      "dynamatic";
-
-  auto options = optionsParser.apply(defaults);
-
   // Work on the single program a fuzzing process asked for and report what that
   // amounted to, which is all the process learns about a program of its own
   // that crashed halfway through.
   if (std::optional<std::string> directory =
           optionsParser.getSingleProgramDirectory()) {
-    addProgress(runSingleProgram(*target, options, *directory));
+    addProgress(
+        runSingleProgram(*target, options, *directory, std::random_device()()));
     report(options);
     return 0;
   }
@@ -504,7 +626,8 @@ int main(int argc, char **argv) {
     std::function<Progress()> runProgram;
     if (singleProcess) {
       runProgram = [&target, &options, directory] {
-        return runSingleProgram(*target, options, directory);
+        return runSingleProgram(*target, options, directory,
+                                std::random_device()());
       };
     } else {
       runProgram = [&options, args = llvm::ArrayRef<char *>(args), directory,
