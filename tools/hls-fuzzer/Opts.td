@@ -21,7 +21,8 @@ def inplace : Flag<["--"], "inplace">,
 // generates and verifies, isolating it in a process of its own. Hidden from the
 // help text as it is not meant to be used directly; '--inplace' is what does
 // the same in this process.
-def single_program : Separate<["--"], "single-program">, MetaVarName<"<dir>">,
+def single_program : Separate<["--"], "single-program">,
+                     MetaVarName<"<dir>">,
                      Flags<[HelpHidden]>;
 def help : Flag<["--"], "help">, HelpText<"displays this help text">;
 

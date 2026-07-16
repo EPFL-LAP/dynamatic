@@ -399,7 +399,7 @@ static Progress runProgramProcess(
 /// doing so amounted to, either in this process or in one of its own.
 static void work(const dynamatic::Options &options,
                  const std::filesystem::path &directory,
-                 const std::function<Progress()>& runProgram) {
+                 const std::function<Progress()> &runProgram) {
   while (!quit) {
     if (hasProgramLimit && remainingPrograms.fetch_sub(1) <= 0) {
       quit = true;
