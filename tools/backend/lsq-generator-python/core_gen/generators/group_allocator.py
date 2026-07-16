@@ -191,7 +191,7 @@ class GroupAllocator:
             # to_01(...) ensures no spurious assertion failures in case of unknown values at time zero
             arch += '\n'
             arch += f'\tassert (to_01({group_init_valid_vec.getNameRead()} ' \
-                    f'and std_logic_vector(unsigned({group_init_valid_vec.getNameRead()}) - 1)) = {Zero(self.configs.numGroups)})\n'
+                f'and std_logic_vector(unsigned({group_init_valid_vec.getNameRead()}) - 1)) = {Zero(self.configs.numGroups)})\n'
             arch += '\t\treport "Assertion: At most one group allocation request at all times"\n'
             arch += '\t\tseverity failure;\n'
             arch += '\n'
