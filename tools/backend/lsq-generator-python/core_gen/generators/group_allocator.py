@@ -1,7 +1,7 @@
 from core_gen.context import VHDLContext
 from core_gen.signals import Logic, LogicArray, LogicVec, LogicVecArray
 from core_gen.operators import Op, WrapSub, Mux1HROM, CyclicLeftShift, CyclicPriorityMasking
-from core_gen.utils import MaskLess
+from core_gen.utils import MaskLess, Zero
 from core_gen.configs import Configs
 
 
@@ -177,6 +177,24 @@ class GroupAllocator:
                 arch += Op(ctx, group_init_ready_o[i], group_init_ready[i])
                 arch += Op(ctx, group_init_hs[i],
                            group_init_ready[i], 'and', group_init_valid_i[i])
+
+            # With single-group allocation, there should never be multiple group allocation requests at the same time.
+            # Otherwise, we would not know which group to allocate first. Also, the group allocator logic assumes the
+            # handshake signal is one-hot (or zero) and uses Mux1H() which relies on that assumption to work correctly.
+            # We thus add a VHDL assertion to check this is always the case.
+
+            group_init_valid_vec = LogicVec(ctx, 'group_init_valid_vec', 'w', self.configs.numGroups)
+            for i in range(self.configs.numGroups):
+                arch += Op(ctx, (group_init_valid_vec, i), (group_init_valid_i, i))
+
+            # add the assertion
+            # to_01(...) ensures no spurious assertion failures in case of unknown values at time zero
+            arch += '\n'
+            arch += f'\tassert (to_01({group_init_valid_vec.getNameRead()} ' \
+                    f'and std_logic_vector(unsigned({group_init_valid_vec.getNameRead()}) - 1)) = {Zero(self.configs.numGroups)})\n'
+            arch += '\t\treport "Assertion: At most one group allocation request at all times"\n'
+            arch += '\t\tseverity failure;\n'
+            arch += '\n'
 
         # ROM value
         if (self.configs.ldpAddrW > 0):
