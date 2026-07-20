@@ -47,6 +47,93 @@ namespace {
         // FixBranchesToSuppresses
 
 // Helper functions
+bool isFunctionStartArgument(Value value) {
+  auto blockArg = dyn_cast<BlockArgument>(value);
+  if (!blockArg || !isa<handshake::ControlType>(value.getType()))
+    return false;
+
+  auto funcOp = dyn_cast<handshake::FuncOp>(blockArg.getOwner()->getParentOp());
+  return funcOp && blockArg.getArgNumber() == funcOp.getNumArguments() - 1;
+}
+
+bool isDerivedFromFunctionStart(Value value, DenseSet<Value> &visited) {
+  if (!visited.insert(value).second)
+    return false;
+  if (isFunctionStartArgument(value))
+    return true;
+
+  Operation *defOp = value.getDefiningOp();
+  if (!defOp)
+    return false;
+
+  if (auto condBranchOp = dyn_cast<handshake::ConditionalBranchOp>(defOp)) {
+    if (condBranchOp.getTrueResult() == value ||
+        condBranchOp.getFalseResult() == value)
+      return isDerivedFromFunctionStart(condBranchOp.getDataOperand(), visited);
+  }
+
+  if (auto muxOp = dyn_cast<handshake::MuxOp>(defOp)) {
+    if (muxOp.getResult() == value) {
+      for (Value operand : muxOp.getDataOperands())
+        if (isDerivedFromFunctionStart(operand, visited))
+          return true;
+    }
+  }
+  if (isa<handshake::MergeOp, handshake::ControlMergeOp>(defOp) &&
+      defOp->getResult(0) == value) {
+    for (Value operand : defOp->getOperands())
+      if (isDerivedFromFunctionStart(operand, visited))
+        return true;
+  }
+
+  // Follow simple forwarding operations.
+  if (defOp->getNumOperands() == 1 && defOp->getNumResults() == 1 &&
+      defOp->getResult(0) == value &&
+      defOp->getOperand(0).getType() == value.getType())
+    return isDerivedFromFunctionStart(defOp->getOperand(0), visited);
+
+  return false;
+}
+
+bool isDerivedFromFunctionStart(Value value) {
+  DenseSet<Value> visited;
+  return isDerivedFromFunctionStart(value, visited);
+}
+
+bool mayReachMemoryInterface(Value value, DenseSet<Value> &visited) {
+  if (!isa<handshake::ControlType>(value.getType()))
+    return false;
+  if (!visited.insert(value).second)
+    return false;
+
+  for (Operation *user : value.getUsers()) {
+    if (isa<handshake::LSQOp, handshake::MemoryControllerOp>(user))
+      return true;
+
+    // Follow control values through routing ops so we can catch paths that
+    // eventually drive an LSQ or memory-controller control input.
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::MergeOp, handshake::MuxOp,
+            handshake::ControlMergeOp>(user)) {
+      for (Value result : user->getResults()) {
+        if (mayReachMemoryInterface(result, visited))
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+bool mayReachMemoryInterface(Value value) {
+  DenseSet<Value> visited;
+  return mayReachMemoryInterface(value, visited);
+}
+
+bool wouldReplaceMemoryControlWithStartDerived(Value oldValue, Value newValue) {
+  return mayReachMemoryInterface(oldValue) && isDerivedFromFunctionStart(newValue);
+}
+
 bool isSuppress(handshake::ConditionalBranchOp condBranchOp) {
   return (condBranchOp.getTrueResult().getUsers().empty() &&
           !condBranchOp.getFalseResult().getUsers().empty());
@@ -674,6 +761,10 @@ struct EliminateRedundantLoop : public OpRewritePattern<MuxOrMergeOp> {
       muxOrMergeOperands =
           cast<handshake::MuxOp>(muxOrMergeOp).getDataOperands();
 
+    if (wouldReplaceMemoryControlWithStartDerived(
+            exitingCondBranchOp.getFalseResult(),
+            muxOrMergeOperands[outsideInputIdx]))
+      return failure();
     rewriter.replaceAllUsesWith(exitingCondBranchOp.getFalseResult(),
                                 muxOrMergeOperands[outsideInputIdx]);
 
