@@ -57,6 +57,20 @@ std::optional<std::size_t> dynamatic::OptionsParser::getNumThreads() const {
   return threads;
 }
 
+std::optional<std::size_t> dynamatic::OptionsParser::getNumPrograms() const {
+  if (!args.hasArg(OPT_num_programs))
+    return std::nullopt;
+
+  std::size_t numPrograms;
+  llvm::StringRef value = args.getLastArgValue(OPT_num_programs);
+  if (value.getAsInteger(10, numPrograms)) {
+    llvm::report_fatal_error("Expected integer instead of '" + value +
+                                 "' for '--num-programs'",
+                             /*gen_crash_diag=*/false);
+  }
+  return numPrograms;
+}
+
 std::string dynamatic::OptionsParser::getTargetName() const {
   return args.getLastArgValue(OPT_target).str();
 }
@@ -67,6 +81,13 @@ dynamatic::OptionsParser::getStatistics() const {
     return std::nullopt;
 
   return args.getAllArgValues(OPT_statistics);
+}
+
+std::optional<std::string> dynamatic::OptionsParser::getJSONOutput() const {
+  if (!args.hasArg(OPT_json_output))
+    return std::nullopt;
+
+  return args.getLastArgValue(OPT_json_output).str();
 }
 
 std::vector<std::string>
@@ -84,5 +105,6 @@ dynamatic::Options dynamatic::OptionsParser::apply(Options defaults) {
                       ? OracleKind::Functional
                       : OracleKind::NonFunctional;
   defaults.statistics = getStatistics();
+  defaults.jsonOutput = getJSONOutput();
   return defaults;
 }
