@@ -127,4 +127,14 @@ def EagerlyElasticAD : Pass<"eagerly-elastic-a-d", "mlir::ModuleOp"> {
             "The number of times that Rewrite D should be applied.">];
 }
 
+def EagerlyElasticAll : Pass<"eagerly-elastic-all", "mlir::ModuleOp"> {
+  let summary = "Applies all Rewrites of the EagerlyElastic Paper";
+  let description = [{
+    This pass prepares the conditional branches into suppressors and then applies all rewrites.
+  }];
+  let options =
+    [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
+            "The number of times that Rewrite D should be applied.">];
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD
