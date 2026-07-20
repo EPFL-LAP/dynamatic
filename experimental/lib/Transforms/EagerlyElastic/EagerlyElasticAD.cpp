@@ -240,6 +240,7 @@ bool EagerlyElasticADPass::isEligibleForSuppressorMotion(
     // if we have a branch it must have the same condition
     if (auto siblingBranch =
             dyn_cast<handshake::ConditionalBranchOp>(operand.getDefiningOp())) {
+      if (siblingBranch == branchOp) continue;
       // if the branch has more than one use, a fork needs to be created first
       if (!siblingBranch.getFalseResult().hasOneUse()) {
         return false;
@@ -359,22 +360,33 @@ void EagerlyElasticADPass::rewriteA(
           OpBuilder builder(branchOp);
           builder.setInsertionPointAfter(branchOp);
 
-          // get all operands of the branch
-          llvm::SmallVector<OpOperand *> usesToReplace;
-          for (OpOperand &use : dataPath.getUses()) {
-            usesToReplace.push_back(&use);
-          }
-
-          unsigned numUses = usesToReplace.size();
-
           // create the fork
-          auto forkOp = builder.create<handshake::ForkOp>(branchOp.getLoc(),
-                                                          dataPath, numUses);
+          auto forkOp =
+              builder.create<handshake::ForkOp>(branchOp.getLoc(), dataPath, 2);
           setupMetadata(branchOp->getAttr("handshake.bb"), namer, forkOp);
 
-          // distribute the fork's results to the clean list of original uses
-          for (unsigned i = 0; i < numUses; ++i) {
-            usesToReplace[i]->set(forkOp.getResults()[i]);
+          // separate the single target operand from all other downstream operands
+          llvm::SmallVector<OpOperand *, 4> remainingUses;
+          OpOperand *targetUse = nullptr;
+
+          for (OpOperand &use : dataPath.getUses()) {
+            if (use.getOwner() == forkOp) {
+              continue;
+            }
+            if (use.getOwner() == eligibleTarget) {
+              targetUse = &use;
+            } else {
+              remainingUses.push_back(&use);
+            }
+          }
+
+          if (targetUse) {
+            targetUse->set(forkOp.getResults()[0]);
+          }
+
+          // Connect #1 of the fork to all other remaining downstream users
+          for (OpOperand *use : remainingUses) {
+            use->set(forkOp.getResults()[1]);
           }
 
           // break to move this branch past the fork in a later step
@@ -470,18 +482,19 @@ void EagerlyElasticADPass::rewriteD(
   SmallVector<handshake::ConditionalBranchOp> initialFrontier(frontier.begin(),
                                                               frontier.end());
   for (auto branchOp : initialFrontier) {
-    for (auto *nextOp : branchOp.getFalseResult().getUsers()) {
-      if (auto mux = dyn_cast<handshake::MuxOp>(nextOp)) {
-        // identify loops (mux connected to init)
-        auto init =
-            dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
-        if (init) {
-          // check whether the suppressor is connected to path A of the mux
-          if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
-            applyRewriteD(mux, branchOp, init, frontier, namer);
-          } else
-            continue;
-        }
+    if (auto mux = dyn_cast<handshake::MuxOp>(*branchOp.getFalseResult().user_begin())) {
+      if (llvm::isa<dynamatic::handshake::ControlType>(mux.getResult().getType()))
+        return;
+      
+      // identify loops (mux connected to init)
+      auto init =
+          dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
+      if (init) {
+        // check whether the suppressor is connected to path A of the mux
+        if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
+          applyRewriteD(mux, branchOp, init, frontier, namer);
+        } else
+          continue;
       }
     }
   }
