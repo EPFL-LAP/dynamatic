@@ -13,11 +13,11 @@
 // circuit.
 //===----------------------------------------------------------------------===//
 
+#include "experimental/Transforms/HandshakeRewriteTerms.h"
 #include "dynamatic/Dialect/Handshake/HandshakeCanonicalize.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Transforms/HandshakeRewriteTerms.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
@@ -113,8 +113,8 @@ bool mayReachMemoryInterface(Value value, DenseSet<Value> &visited) {
     // Follow control values through routing ops so we can catch paths that
     // eventually drive an LSQ or memory-controller control input.
     if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-            handshake::MergeOp, handshake::MuxOp,
-            handshake::ControlMergeOp>(user)) {
+            handshake::MergeOp, handshake::MuxOp, handshake::ControlMergeOp>(
+            user)) {
       for (Value result : user->getResults()) {
         if (mayReachMemoryInterface(result, visited))
           return true;
@@ -131,7 +131,8 @@ bool mayReachMemoryInterface(Value value) {
 }
 
 bool wouldReplaceMemoryControlWithStartDerived(Value oldValue, Value newValue) {
-  return mayReachMemoryInterface(oldValue) && isDerivedFromFunctionStart(newValue);
+  return mayReachMemoryInterface(oldValue) &&
+         isDerivedFromFunctionStart(newValue);
 }
 
 bool isSuppress(handshake::ConditionalBranchOp condBranchOp) {
