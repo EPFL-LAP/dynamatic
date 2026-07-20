@@ -297,7 +297,6 @@ else
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
-MATERIALIZE_PASS="--handshake-materialize"
 if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   echo_info "Using FPGA'23 for LSQ connection"
@@ -311,7 +310,6 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply Straight to the Queue" "Applied Straight to the Queue"
 
   F_HANDSHAKE=$F_HANDSHAKE_SQ
-  MATERIALIZE_PASS="--handshake-materialize=replicate-constant=true"
 
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
@@ -343,7 +341,7 @@ fi
 
 # Final materialization before speculation and buffer placement.
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TO_MATERIALIZE" \
-  "$MATERIALIZE_PASS" --handshake-infer-basic-blocks \
+  --handshake-materialize --handshake-infer-basic-blocks \
   > "$F_HANDSHAKE_TRANSFORMED"
 exit_on_fail "Failed to apply transformations to handshake" \
   "Applied transformations to handshake"
