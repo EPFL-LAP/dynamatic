@@ -38,8 +38,8 @@ using namespace dynamatic::handshake;
 using namespace dynamatic::buffer;
 using namespace dynamatic::experimental;
 
-#include "graphviz/cgraph.h"
-#include "graphviz/gvc.h"
+// #include "graphviz/cgraph.h"
+// #include "graphviz/gvc.h"
 
 namespace {
 /// Helper data structure to hold mappings between each arch/basic block and the
