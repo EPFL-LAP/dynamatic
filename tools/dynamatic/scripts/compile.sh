@@ -24,7 +24,8 @@ STRAIGHT_TO_QUEUE=${14}
 OPTIMIZE_STEERING_REWRITES=${15}
 SPECULATION=${16}
 ENABLE_SHORT_CIRCUIT=${17}
-
+ENABLE_DUPLICATION=${18:-0}
+CALCULATE_PATH_DELAYS=${19}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -49,9 +50,10 @@ F_C_REWRITTEN="$COMP_DIR/$KERNEL_NAME.c"
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
-
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
+F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
@@ -113,7 +115,8 @@ export_cfg() {
 # ============================================================================ #
 
 # Reset output directory
-rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+rm -rf "$OUTPUT_DIR"/*/
+mkdir -p "$COMP_DIR"
 
 cp "$F_C_SOURCE" "$F_C_REWRITTEN"
 exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"
@@ -239,19 +242,41 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
-  --consume-producer-output-attr-marker \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
+# duplicate parts of the operations specified by pragmas
+if [[ "$ENABLE_DUPLICATION" == "1" ]]; then
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --predicted-constant-duplication \
+  --canonicalize \
+  > "$F_CF_DUPLICATED"
+exit_on_fail "Failed to apply CF duplication" \
+  "Applied CF duplication"
+F_CF_TRANSFORMED="$F_CF_DUPLICATED"
+fi
+
+# consume the markers
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --consume-producer-output-attr-marker \
+  > "$F_CF_CONSUMED_PRAGMARKERS"
+exit_on_fail "Failed to consume markers" \
+  "Consumed markers successfully"
+
+
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
@@ -373,13 +398,18 @@ else
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
+  if [[ "$CALCULATE_PATH_DELAYS" == "1" ]]; then
+    CALCULATE_PATH_DELAYS_FLAG="calculate-path-delays"
+  else
+    CALCULATE_PATH_DELAYS_FLAG=""
+  fi
   # To enable debug information, make sure that Dynamatic is built with Debug
   # mode and add "--debug-only=<DEBUG_TYPE>" to the binary call below. Check
   # out the value of <DEBUG_TYPE> in the cpp source files.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-milp-models \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"

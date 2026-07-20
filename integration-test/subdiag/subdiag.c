@@ -14,7 +14,7 @@ int subdiag(in_float_t d[N], in_float_t e[N]) {
     i++;
     cond_break = (e[i]) <= x * dd;
     loop_again =  i < N_DEC && !cond_break;
-    #pragma DYN speculate variable = loop_again max_predictions = 8 style = standard
+    #pragma DYN speculate variable = loop_again max_predictions = 9 style = standard
   } while (loop_again);
   return i;
 }

@@ -15,7 +15,7 @@ void nested_loop(in_int_t a[N], in_int_t b[N], inout_int_t c[N]) {
       c[i + j * 400] = sum;
       i++;
       loopAgain = sum < bound;
-      #pragma DYN speculate variable=loopAgain max_predictions=6 style=standard
+      #pragma DYN speculate variable=loopAgain max_predictions=8 style=standard
     } while (loopAgain);
   }
 }
