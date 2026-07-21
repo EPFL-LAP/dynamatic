@@ -541,6 +541,8 @@ void applyRewriteF(handshake::ConditionalBranchOp branchOp,
                    handshake::ConditionalBranchOp topSuppRight,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer) {
+  Location loc = branchOp->getLoc();
+  OpBuilder builder(branchOp);
 
   llvm::errs() << "Applying Rewrite F!\n";
   branchOp.dump();
@@ -551,6 +553,12 @@ void applyRewriteF(handshake::ConditionalBranchOp branchOp,
   if (notOpB) {
     conditionB = notOpB.getOperand();
     llvm::errs() << "there's a not\n";
+  } else {
+    // input to the and gate for B must be inverted - add a NotIOp
+    auto newNotB = builder.create<handshake::NotIOp>(loc, conditionB);
+    setupMetadata(branchOp->getAttr("handshake.bb"), namer, newNotB);
+    conditionB = newNotB.getResult();
+    llvm::errs() << "Inserted NOT op for non-inverted condition B\n";
   }
   Value conditionC = topSuppRight.getDataOperand();
 
@@ -558,8 +566,7 @@ void applyRewriteF(handshake::ConditionalBranchOp branchOp,
   topSuppRight.getConditionOperand().dump();
   
   // create the new AND gate
-  OpBuilder builder(branchOp);
-  auto andOp = builder.create<handshake::AndIOp>(branchOp->getLoc(), conditionB,
+  auto andOp = builder.create<handshake::AndIOp>(loc, conditionB,
                                                  conditionC);
   setupMetadata(branchOp->getAttr("handshake.bb"), namer, andOp);
 
