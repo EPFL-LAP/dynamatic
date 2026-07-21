@@ -187,14 +187,43 @@ class GroupAllocator:
             for i in range(self.configs.numGroups):
                 arch += Op(ctx, (group_init_valid_vec, i), (group_init_valid_i, i))
 
-            # add the assertion
-            # to_01(...) ensures no spurious assertion failures in case of unknown values at time zero
+            assert_expr = f'({group_init_valid_vec.getNameRead()} ' + \
+                f'and std_logic_vector(unsigned({group_init_valid_vec.getNameRead()}) - 1)) ' + \
+                f'= {Zero(self.configs.numGroups)}'
+
             arch += '\n'
-            arch += f'\tassert (to_01({group_init_valid_vec.getNameRead()} ' \
-                f'and std_logic_vector(unsigned({group_init_valid_vec.getNameRead()}) - 1)) = {Zero(self.configs.numGroups)})\n'
-            arch += '\t\treport "Assertion: At most one group allocation request at all times"\n'
-            arch += '\t\tseverity failure;\n'
-            arch += '\n'
+            arch += ctx.get_current_indent() + \
+                '-- Assertion: At most one group allocation request at all times\n'
+            arch += ctx.get_current_indent() + \
+                '-- This is required for correct operation of the group allocator logic\n'
+            arch += ctx.get_current_indent() + \
+                'process (clk, rst) is\n'
+            arch += ctx.get_current_indent() + \
+                'begin\n'
+            ctx.increase_indent()
+            arch += ctx.get_current_indent() + \
+                'if (rst = \'1\') then\n'
+            ctx.increase_indent()
+            arch += ctx.get_current_indent() + \
+                'null;\n'
+            ctx.decrease_indent()
+            arch += ctx.get_current_indent() + \
+                'elsif (rising_edge(clk)) then\n'
+            ctx.increase_indent()
+            arch += ctx.get_current_indent() + \
+                f'assert ({assert_expr})\n'
+            ctx.increase_indent()
+            arch += ctx.get_current_indent() + \
+                'report "Assertion failed: At most one group allocation request at all times"\n'
+            arch += ctx.get_current_indent() + \
+                'severity failure;\n'
+            ctx.decrease_indent()
+            ctx.decrease_indent()
+            arch += ctx.get_current_indent() + \
+                'end if;\n'
+            ctx.decrease_indent()
+            arch += ctx.get_current_indent() + \
+                'end process;\n'
 
         # ROM value
         if (self.configs.ldpAddrW > 0):
