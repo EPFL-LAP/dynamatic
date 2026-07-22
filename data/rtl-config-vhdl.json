@@ -472,11 +472,11 @@
     "name": "handshake.repeating_init",
     "parameters": [
       {
-        "name": "INIT_TOKEN",
+        "name": "INITIAL_VALUE",
         "type": "unsigned"
       }
     ],
-    "generator": "python3 $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t repeating_init -p init_token=$INIT_TOKEN"
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t repeating_init -p initial_value=$INITIAL_VALUE"
   },
   {
     "name": "handshake.shrui",

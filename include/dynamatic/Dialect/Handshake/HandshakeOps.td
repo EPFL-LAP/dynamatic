@@ -2047,11 +2047,11 @@ def RepeatingInitOp : Handshake_Op<"repeating_init", [
     Similar to a buffer, its timing behavior is configurable.
   }];
   
-  let arguments = (ins ChannelType:$operand, UI1Attr:$initToken);
+  let arguments = (ins ChannelType:$operand, UI1Attr:$initialValue);
   let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
+    static constexpr ::llvm::StringLiteral INITIAL_VALUE_ATTR_NAME = "INITIAL_VALUE",
                                            TIMING_ATTR_NAME = "TIMING";
   }];
 
@@ -2064,8 +2064,8 @@ def RepeatingInitOp : Handshake_Op<"repeating_init", [
     RepeatingInitOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
       return ::llvm::SmallVector<::mlir::NamedAttribute>{
-        {::mlir::StringAttr::get(ctx, "INIT_TOKEN"),
-         getInitTokenAttr()}
+        {::mlir::StringAttr::get(ctx, "INITIAL_VALUE"),
+         getInitialValueAttr()}
       };
     }
   }];

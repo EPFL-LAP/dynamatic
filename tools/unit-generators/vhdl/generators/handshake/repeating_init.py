@@ -1,5 +1,5 @@
 def generate_repeating_init(name, params):
-    init_token = params["init_token"]
+    initial_value = params["initial_value"]
 
     return f"""
 library ieee;
@@ -36,7 +36,7 @@ begin
     end if;
   end process;
 
-  outs <= "{init_token}" when emit_init else ins;
+  outs <= "{initial_value}" when emit_init else ins;
   outs_valid <= emit_init or ins_valid;
   ins_ready <= not emit_init and outs_ready;
 end architecture;
