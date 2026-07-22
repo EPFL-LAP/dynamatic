@@ -50,17 +50,17 @@ private:
   bool checkConditionsMatch(Value valA, Value valB, bool expectSamePolarity);
   bool isSourced(Value value);
 
-  void
-  advanceSuppressorMotion(DenseSet<handshake::ConditionalBranchOp> &frontier,
-                          NameAnalysis &namer);
+  void computeEagerly(DenseSet<handshake::ConditionalBranchOp> &frontier,
+                      NameAnalysis &namer);
 
-  void applyLoopMuxSuppressorMotion(
-      handshake::MuxOp dataMux, handshake::ConditionalBranchOp branchOp,
-      handshake::InitOp initOp,
-      DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer);
+  void applyEnterLoopEagerly(handshake::MuxOp dataMux,
+                             handshake::ConditionalBranchOp branchOp,
+                             handshake::InitOp initOp,
+                             DenseSet<handshake::ConditionalBranchOp> &frontier,
+                             NameAnalysis &namer);
 
-  void checkForLoopMuxSuppressorMotion(
-      DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer);
+  void enterLoopEagerly(DenseSet<handshake::ConditionalBranchOp> &frontier,
+                        NameAnalysis &namer);
 };
 
 /// Helper function to add the bbAttr and name to new operations.
@@ -187,7 +187,7 @@ bool EagerlyElasticADPass::isSourced(Value value) {
 BypassResult EagerlyElasticADPass::isEligibleForBypass(
     handshake::ConditionalBranchOp branchOp, Operation *targetOp) {
 
-  // verify the targetOp is a PM unit
+  // verify the targetOp is an eagerly executable unit
   if (!isa<handshake::ArithOpInterface, handshake::ForkOp, handshake::NotIOp,
            handshake::LazyForkOp, handshake::BufferOp, handshake::LoadOp,
            handshake::BranchOp>(targetOp) ||
@@ -239,8 +239,8 @@ void EagerlyElasticADPass::moveSuppressorPastOp(
     DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer,
     int DRewrite) {
 
-  llvm::errs() << "Moving past: " << targetOp->getAttr("handshake.name")
-               << '\n';
+  LLVM_DEBUG(llvm::errs() << "Moving past: "
+                          << targetOp->getAttr("handshake.name") << '\n');
 
   Location loc = targetOp->getLoc();
   Value condition = branchOp.getConditionOperand();
@@ -294,7 +294,7 @@ void EagerlyElasticADPass::moveSuppressorPastOp(
 /// check whether the branch can be moved past. Because moving these branches
 /// adds and removes branches in our tracking set `frontier`, the function
 /// restarts the loop after every change.
-void EagerlyElasticADPass::advanceSuppressorMotion(
+void EagerlyElasticADPass::computeEagerly(
     DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer) {
 
   bool frontierUpdated;
@@ -325,7 +325,7 @@ void EagerlyElasticADPass::advanceSuppressorMotion(
 
 /// Apply Rewrite D from the eagerlyelastic paper once by connecting a
 /// repeatingInitOp to the circuit and then moving the suppressor past the mux.
-void EagerlyElasticADPass::applyLoopMuxSuppressorMotion(
+void EagerlyElasticADPass::applyEnterLoopEagerly(
     handshake::MuxOp dataMux, handshake::ConditionalBranchOp branchOp,
     handshake::InitOp initOp,
     DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer) {
@@ -353,7 +353,7 @@ void EagerlyElasticADPass::applyLoopMuxSuppressorMotion(
   if (notOp && notOp.getResult().hasOneUse())
     notOp.getOperandMutable().assign(specOutput);
   else { // create a new isolated NotIOp
-    builder.setInsertionPoint(notOp);
+    builder.setInsertionPoint(notOp ? notOp : branchOp);
     auto newNotOp =
         builder.create<handshake::NotIOp>(branchOp.getLoc(), specOutput);
     setHandshakeAttrs(bbAttr, namer, {newNotOp});
@@ -367,50 +367,17 @@ void EagerlyElasticADPass::applyLoopMuxSuppressorMotion(
 
 // Identify all branches before loop muxes and apply Rewrite D from the
 // eagerlyelastic paper on them.
-void EagerlyElasticADPass::checkForLoopMuxSuppressorMotion(
+void EagerlyElasticADPass::enterLoopEagerly(
     DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer) {
 
   SmallVector<handshake::ConditionalBranchOp> initialFrontier(frontier.begin(),
                                                               frontier.end());
   for (auto branchOp : initialFrontier) {
-<<<<<<< HEAD
-    if (auto mux = dyn_cast<handshake::MuxOp>(
-            *branchOp.getFalseResult().user_begin())) {
-      if (llvm::isa<dynamatic::handshake::ControlType>(
-              mux.getResult().getType()))
-        return;
-
-      // identify loops (mux connected to init)
-      auto init =
-          dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
-      if (init) {
-        // check whether the suppressor is connected to path A of the mux
-        if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
-          applyLoopMuxSuppressorMotion(mux, branchOp, init, frontier, namer);
-        } else
-          continue;
-||||||| parent of 4240f9471 (implement stuff from comments)
-    if (auto mux = dyn_cast<handshake::MuxOp>(
-            *branchOp.getFalseResult().user_begin())) {
-      if (llvm::isa<dynamatic::handshake::ControlType>(
-              mux.getResult().getType()))
-        return;
-
-      // identify loops (mux connected to init)
-      auto init =
-          dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
-      if (init) {
-        // check whether the suppressor is connected to path A of the mux
-        if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
-          applyRewriteD(mux, branchOp, init, frontier, namer);
-        } else
-          continue;
-=======
     for (auto *nextOp : branchOp.getFalseResult().getUsers()) {
       if (auto mux = dyn_cast<handshake::MuxOp>(nextOp)) {
         // identify loops (mux connected to init)
-        auto init =
-            dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
+        auto init = dyn_cast_or_null<handshake::InitOp>(
+            mux.getSelectOperand().getDefiningOp());
 
         if (init) {
           if (!checkConditionsMatch(branchOp.getConditionOperand(),
@@ -419,12 +386,11 @@ void EagerlyElasticADPass::checkForLoopMuxSuppressorMotion(
           }
           // check whether the suppressor is connected to path A of the mux
           if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
-            applyRewriteD(mux, branchOp, init, frontier, namer);
+            applyEnterLoopEagerly(mux, branchOp, init, frontier, namer);
             // break;
           } else
             continue;
         }
->>>>>>> 4240f9471 (implement stuff from comments)
       }
     }
   }
@@ -441,20 +407,10 @@ void EagerlyElasticADPass::runOnOperation() {
   // identify and prepare suppressors and return a list of all of them
   auto frontier = prepareSuppressors(funcOp, namer);
 
-  advanceSuppressorMotion(frontier, namer);
+  computeEagerly(frontier, namer);
 
-<<<<<<< HEAD
   for (unsigned i = 0; i < numRewriteD; i++) {
-    checkForLoopMuxSuppressorMotion(frontier, namer);
-    advanceSuppressorMotion(frontier, namer);
-||||||| parent of 4240f9471 (implement stuff from comments)
-  for (unsigned i = 0; i < numRewriteD; i++) {
-    rewriteD(frontier, namer);
-    rewriteA(frontier, namer);
-=======
-  for (unsigned i = 0; i < 1; i++) {
-    rewriteD(frontier, namer);
-    rewriteA(frontier, namer);
->>>>>>> 4240f9471 (implement stuff from comments)
+    enterLoopEagerly(frontier, namer);
+    computeEagerly(frontier, namer);
   }
 }
