@@ -776,7 +776,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           addUnsigned("INITIAL_VALUE", 0);
       })
       .Case<handshake::RepeatingInitOp>([&](handshake::RepeatingInitOp initOp) {
-        addUnsigned("INIT_TOKEN", initOp.getInitToken());
+        addUnsigned("INITIAL_VALUE", initOp.getInitialValue());
       })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
