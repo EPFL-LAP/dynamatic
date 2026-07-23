@@ -76,7 +76,7 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
-F_HANDSHAKE_ROUZBEH="$COMP_DIR/handshake_rouzbeh.mlir"
+F_HANDSHAKE_OUT_WITH_LSQ="$COMP_DIR/handshake_out_with_lsq.mlir"
 F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
@@ -344,12 +344,13 @@ else
       "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
         --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
         --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME compDir=$COMP_DIR" \
+        --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
         --handshake-combine-steering-logic \
-    > "$F_HANDSHAKE_ROUZBEH"
+    > "$F_HANDSHAKE_OUT_WITH_LSQ"
     exit_on_fail "Failed to apply transformations to handshake with skippable sequentializer" \
       "Applied transformations to handshake with skippable sequentializer"
     
-    F_HANDSHAKE=$F_HANDSHAKE_ROUZBEH
+    F_HANDSHAKE=$F_HANDSHAKE_OUT_WITH_LSQ
 
     # "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     # --handshake-remove-unused-memrefs \

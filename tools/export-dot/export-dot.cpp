@@ -40,6 +40,9 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 
+constexpr llvm::StringLiteral SKIP_COND_GEN("Skip.Condition_Generator");
+constexpr llvm::StringLiteral SKIP_COND_SEQ("Skip.Conditional_Sequentializer");
+
 static cl::OptionCategory mainCategory("Application options");
 
 static cl::opt<std::string> inputFileName(cl::Positional,
@@ -253,8 +256,8 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
       .Case<handshake::GateOp>([&](auto) { return "cyan"; })
+      .Case<handshake::UnbundleOp>([&](auto) { return "lightyellow"; })
       .Case<handshake::InitOp>([&](auto) { return "lightgrey"; })
       .Case<handshake::BufferOp>(
           [&](handshake::BufferOp bufferOp) -> StringRef {
@@ -330,9 +333,6 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     Value val = oprd.get();
     Operation *dstOp = oprd.getOwner();
 
-    llvm::errs() << "addEdge: val: " << val << ", dstOp: " << dstOp->getName()
-                 << "\n";
-
     // Determine the edge's source
     std::string srcNodeName, srcPortName;
     unsigned srcIdx;
@@ -349,7 +349,6 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
           cast<handshake::NamedIOInterface>(parentOp).getOperandName(srcIdx);
     }
 
-    llvm::errs() << "------------";
     // Determine the edge's destination
     std::string dstNodeName, dstPortName;
     unsigned dstIdx;
@@ -433,20 +432,18 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
         bbSubgraphs[*bb] = bbSub;
       }
 
-      // Now check if the op has a drawing attribute
-      if (auto a =
-              op.getAttrOfType<dynamatic::handshake::DrawingAttr>("drawing")) {
-        llvm::StringRef drawing = a.getName().getValue(); // the string value
-
-        // Either reuse or create the nested drawing subgraph inside this BB
-        auto key = std::make_pair(*bb, drawing);
+      if (op.hasAttr(SKIP_COND_GEN) || op.hasAttr(SKIP_COND_SEQ)) {
+        auto stringValue = op.hasAttr(SKIP_COND_GEN)
+                               ? "Condition_Generator"
+                               : "Conditional_Sequentializer";
+        auto key = std::make_pair(*bb, stringValue);
         if (auto it = nestedSubgraphs.find(key); it != nestedSubgraphs.end()) {
           bbSub = it->second;
         } else {
           std::string clusterName =
-              "clusterBB" + std::to_string(*bb) + "_" + drawing.str();
+              "clusterBB" + std::to_string(*bb) + "_" + stringValue;
           auto *nested = &builder.addSubgraph(clusterName, *bbSub);
-          nested->addAttr("label", drawing.str());
+          nested->addAttr("label", stringValue);
           nestedSubgraphs[key] = nested;
           bbSub = nested;
         }

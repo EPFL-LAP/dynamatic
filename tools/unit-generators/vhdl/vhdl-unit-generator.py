@@ -138,5 +138,6 @@ if __name__ == "__main__":
     generators.add("handshake", "sharing_wrapper")
     generators.add("handshake", "init")
     generators.add("handshake", "gate")
+    generators.add("handshake", "unbundle")
 
     main(generators)

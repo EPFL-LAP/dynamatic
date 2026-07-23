@@ -2276,7 +2276,8 @@ def BundleOp : Handshake_Op<"bundle", [Pure]> {
 }
 
 def UnbundleOp : Handshake_Op<"unbundle", [
-  Pure, DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>
+  Pure, DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
+  SimpleNamedIO
 ]> {
   let summary = [{
     Unbundles a `handshake::ChannelType` or `handshake::ControlType` into

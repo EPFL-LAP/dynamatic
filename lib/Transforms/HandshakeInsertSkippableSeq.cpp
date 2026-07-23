@@ -55,6 +55,9 @@ using IsWaitingSignalForSuccDirect = DenseMap<StringRef, SmallVector<bool>>;
 using BlockControlDepsMap = ControlDependenceAnalysis::BlockControlDepsMap;
 using delayedDict = DenseMap<Operation *, SmallVector<Value>>;
 
+constexpr llvm::StringLiteral SKIP_COND_GEN("Skip.Condition_Generator");
+constexpr llvm::StringLiteral SKIP_COND_SEQ("Skip.Conditional_Sequentializer");
+
 namespace {
 
 struct HandshakeInsertSkippableSeqPass
@@ -230,10 +233,17 @@ SmallVector<Value> insertBranches(
   return results;
 }
 
-void addDrawingAttrToList(ArrayRef<Operation *> operations, StringRef attr) {
+// void addDrawingAttrToList(ArrayRef<Operation *> operations, StringRef attr) {
+//   for (auto op : operations) {
+//     auto drawAttr = handshake::DrawingAttr::get(op->getContext(), attr);
+//     op->setAttr("drawing", drawAttr);
+//   }
+// }
+
+void addAttrToList(ArrayRef<Operation *> operations, StringRef attrName,
+                   Attribute attr) {
   for (auto op : operations) {
-    auto drawAttr = handshake::DrawingAttr::get(op->getContext(), attr);
-    op->setAttr("drawing", drawAttr);
+    op->setAttr(attrName, attr);
   }
 }
 
@@ -279,7 +289,8 @@ SmallVector<Value> createSkipConditionForPair(
     consumerOpAndOperandIndexForFTD[cmpIOp].push_back(1);
   }
 
-  addDrawingAttrToList(skipConditionGeneratorOps, "Condition_Generator");
+  addAttrToList(skipConditionGeneratorOps, SKIP_COND_GEN,
+                rewriter.getUnitAttr());
   return skipConditions;
 }
 
@@ -447,37 +458,6 @@ SmallVector<Value> insertConditionalSkips(SmallVector<Value> mainValues,
   return results;
 }
 
-Value joinValues(SmallVector<Value> valuesToJoin, Operation *BBOp,
-                 ConversionPatternRewriter &rewriter) {
-
-  if (valuesToJoin.size() == 1)
-    return valuesToJoin[0];
-
-  if (isa<ControlType>(valuesToJoin[0].getType()) &&
-      isa<ControlType>(valuesToJoin[1].getType())) {
-    handshake::JoinOp joinOp =
-        rewriter.create<handshake::JoinOp>(BBOp->getLoc(), valuesToJoin);
-    inheritBB(BBOp, joinOp);
-    return joinOp.getResult();
-  } else if (isa<ControlType>(valuesToJoin[1].getType())) {
-    // extract the values beside the first one
-    SmallVector<Value> values;
-    for (unsigned i = 1; i < valuesToJoin.size(); i++) {
-      values.push_back(valuesToJoin[i]);
-    }
-
-    handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
-        BBOp->getLoc(), valuesToJoin[0], values);
-    inheritBB(BBOp, gateOp);
-    return gateOp.getResult();
-  } else {
-    handshake::BlockerOp blockerOp = rewriter.create<handshake::BlockerOp>(
-        BBOp->getLoc(), valuesToJoin[0].getType(), ValueRange{valuesToJoin});
-    inheritBB(BBOp, blockerOp);
-    return blockerOp.getResult();
-  }
-}
-
 Value createWaitingSignalForPair(
     Value predecessorOpDoneSignal, SmallVector<Value> delayedDoneSignals,
     SmallVector<Value> conds, Operation *predecessorOp, Operation *successorOp,
@@ -503,19 +483,20 @@ Value createWaitingSignalForPair(
   inheritBB(predecessorOp, joinOp);
   conditionalSequentializerOps.push_back(joinOp);
 
-  addDrawingAttrToList(conditionalSequentializerOps,
-                       "Conditional_Sequentializer");
+  addAttrToList(conditionalSequentializerOps, SKIP_COND_SEQ,
+                rewriter.getUnitAttr());
   return joinOp.getResult();
 
   // return joinValues(conditionallySkippedDoneSignals, predecessorOp,
   // rewriter);
 }
 
-/// This function returns the inactivated version of a given dependency.
-MemDependenceAttr getInactivatedDependency(MemDependenceAttr dependency) {
+/// This function returns the deactivated version of a given dependency.
+MemDependenceAttr getDeactivatedDependency(MemDependenceAttr dependency) {
   MLIRContext *ctx = dependency.getContext();
   return MemDependenceAttr::get(ctx, dependency.getDstAccess(),
-                                dependency.getLoopDepth(), false);
+                                dependency.getLoopDepth(),
+                                dependency.getDistance(), false);
 }
 
 /// This function creates the waiting signals for all pairs of memory
@@ -554,7 +535,7 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
 
         if (std::find(handledSuccessors.begin(), handledSuccessors.end(),
                       dependency.getDstAccess()) != handledSuccessors.end()) {
-          newDeps.push_back(getInactivatedDependency(dependency));
+          newDeps.push_back(getDeactivatedDependency(dependency));
           continue;
         }
 
@@ -588,11 +569,13 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
         waitingSignalsForEachSuccessor[successorName].push_back(waitingSignal);
         isWaitingSignalForSuccDirect[successorName].push_back(N == 0);
 
-        newDeps.push_back(getInactivatedDependency(dependency));
+        newDeps.push_back(getDeactivatedDependency(dependency));
         handledSuccessors.push_back(successorName);
       }
       setDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer, ctx,
                                              newDeps);
+      // setDialectAttr<MemDependenceArrayAttr>(
+      //     predecessorOpPointer, MemDependenceArrayAttr::get(ctx, newDeps));
     }
     setDialectAttr<MemInterfaceAttr>(predecessorOpPointer, ctx);
   }

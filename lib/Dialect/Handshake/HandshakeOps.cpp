@@ -2207,7 +2207,6 @@ std::string LSQOp::getOperandName(unsigned idx) {
 
 std::string LSQOp::getResultName(unsigned idx) {
 
-  llvm::errs() << "LSQOp::getResultName idx: " << idx << "\n";
   assert(idx < getOperation()->getNumResults() && "index too high");
 
   if (StringRef name = getIfControlRes(*this, idx); !name.empty())

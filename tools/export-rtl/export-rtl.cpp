@@ -186,7 +186,6 @@ LogicalResult ExportInfo::concretizeExternalModules() {
                    << "\n";
       return failure();
     }
-    llvm::errs() << "pre - a \n";
     // If match is not external, it must be freed when function returns
     // we don't like this solution, feel free to propose a better one
     std::unique_ptr<RTLMatch> matchUniquePtr;
@@ -195,25 +194,17 @@ LogicalResult ExportInfo::concretizeExternalModules() {
     else
       matchUniquePtr.reset(match);
 
-    llvm::errs() << "a \n";
-
     // No need to do anything if a module with the same name already exists
     StringRef concreteModName = match->getConcreteModuleName();
     if (auto [_, isNew] = modules.insert(concreteModName.str()); !isNew)
       return success();
 
-    // llvm::errs() << match->component->getName() << "\n";
-
     // First generate dependencies recursively...
     for (StringRef dep : match->component->getDependencies()) {
       RTLDependencyRequest dependencyRequest(dep, request.loc);
-      if (failed(concretizeComponent(dependencyRequest, nullptr))) {
-        llvm::errs() << "going to fail \n";
+      if (failed(concretizeComponent(dependencyRequest, nullptr)))
         return failure();
-      }
     }
-
-    llvm::errs() << "b \n";
 
     // Parameter analysis
     // TODO: Do this at the HW-level analysis
@@ -225,25 +216,16 @@ LogicalResult ExportInfo::concretizeExternalModules() {
         return failure();
       }
 
-    llvm::errs() << "c \n";
-
     auto a = match->concretize(request, dynamaticPath, outputPath);
 
-    llvm::errs() << "d " << a.failed() << " \n";
     // ...then generate the component itself
     return a;
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
-    llvm::errs() << "hi\n";
     RTLRequestFromHWModule request(extOp);
-    llvm::errs() << "concretizing " << extOp.getName() << "\n";
-    if (failed(concretizeComponent(request, extOp))) {
-      llvm::errs() << extOp.getName() << "bar pedaret\n";
+    if (failed(concretizeComponent(request, extOp)))
       return failure();
-    }
-
-    llvm::errs() << "hi hi hi hi hi \n";
   }
   return success();
 }
@@ -1700,8 +1682,6 @@ int main(int argc, char **argv) {
       "JSON-formatted RTL configuration files encode the procedure to "
       "instantiate/generate external HW modules present in the input IR.");
 
-  llvm::errs() << "1 \n";
-
   // Make sure the output path does not end in a file separator
   StringRef outputPath = sys::path::removeTrailingSeparators(outputDir);
 
@@ -1716,8 +1696,6 @@ int main(int argc, char **argv) {
   MLIRContext context;
   context.loadDialect<handshake::HandshakeDialect, hw::HWDialect>();
 
-  llvm::errs() << "2 \n";
-
   // Load the MLIR module
   SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(*fileOrErr), SMLoc());
@@ -1726,16 +1704,12 @@ int main(int argc, char **argv) {
   if (!modOp)
     return 1;
 
-  llvm::errs() << "3 \n";
-
   // Parse the RTL configuration files
   RTLConfiguration config;
   for (StringRef filepath : rtlConfigs) {
     if (failed(config.addComponentsFromJSON(filepath)))
       return 1;
   }
-
-  llvm::errs() << "3-2 \n";
 
   // Create the (potentially nested) output directory
   if (auto ec = sys::fs::create_directories(outputPath); ec.value() != 0) {
@@ -1748,8 +1722,6 @@ int main(int argc, char **argv) {
   if (failed(info.concretizeExternalModules()))
     return 1;
 
-  llvm::errs() << "4 \n";
-
   // Pull all the properties from the property database
   FormalPropertyTable table;
   if (!propertyFilename.empty() &&
@@ -1757,8 +1729,6 @@ int main(int argc, char **argv) {
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
 
   FormalPropertyInfo propertyInfo(table, outputPath);
-
-  llvm::errs() << "5 \n";
 
   // Create an RTL writer
   std::unique_ptr<RTLWriter> writer;
@@ -1774,11 +1744,8 @@ int main(int argc, char **argv) {
     break;
   }
 
-  llvm::errs() << "6 \n";
-
   // Write each module's RTL implementation to a separate file
   for (hw::HWModuleOp hwModOp : modOp->getOps<hw::HWModuleOp>()) {
-    llvm::errs() << "  7-- " << hwModOp.getName();
     if (failed(writeModule(writer, hwModOp))) {
       return 1;
     }

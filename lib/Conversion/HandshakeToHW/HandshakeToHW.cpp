@@ -815,6 +815,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
                                   .cast<handshake::ChannelType>()
                                   .getDataType());
       })
+      .Case<handshake::UnbundleOp>([&](handshake::UnbundleOp unbundleOp) {
+        // No parameters needed for these operations
+        addType("DATA_WIDTH", op->getOperand(0)
+                                  .getType()
+                                  .cast<handshake::ChannelType>()
+                                  .getDataType());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";

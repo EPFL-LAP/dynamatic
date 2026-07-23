@@ -136,42 +136,25 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
   for (const RTLParameter *parameter : component.getParameters()) {
     ParamMatch paramMatch = matchParameter(*parameter);
     StringRef paramName = parameter->getName();
-    // LLVM_DEBUG({
-    //   switch (paramMatch.state) {
-    //   case ParamMatch::State::DOES_NOT_EXIST:
-    //     llvm::dbgs() << "\t-> Parameter \"" << paramName
-    //                  << "\" does not exist\n";
-    //     break;
-    //   case ParamMatch::State::FAILED_VERIFICATION:
-    //     llvm::dbgs() << "\t-> Failed constraint checking for parameter \""
-    //                  << paramName << "\"\n";
-    //     break;
-    //   case ParamMatch::State::FAILED_SERIALIZATION:
-    //     llvm::dbgs() << "\t-> Failed serialization for parameter \""
-    //                  << paramName << "\"\n";
-    //     break;
-    //   case ParamMatch::State::SUCCESS:
-    //     llvm::dbgs() << "\t-> Matched parameter \"" << paramName << "\"\n";
-    //     break;
-    //   }
-    // });
-
-    switch (paramMatch.state) {
-    case ParamMatch::State::DOES_NOT_EXIST:
-      llvm::errs() << "\t-> Parameter \"" << paramName << "\" does not exist\n";
-      break;
-    case ParamMatch::State::FAILED_VERIFICATION:
-      llvm::errs() << "\t-> Failed constraint checking for parameter \""
-                   << paramName << "\"\n";
-      break;
-    case ParamMatch::State::FAILED_SERIALIZATION:
-      llvm::errs() << "\t-> Failed serialization for parameter \"" << paramName
-                   << "\"\n";
-      break;
-    case ParamMatch::State::SUCCESS:
-      llvm::errs() << "\t-> Matched parameter \"" << paramName << "\"\n";
-      break;
-    }
+    LLVM_DEBUG({
+      switch (paramMatch.state) {
+      case ParamMatch::State::DOES_NOT_EXIST:
+        llvm::dbgs() << "\t-> Parameter \"" << paramName
+                     << "\" does not exist\n";
+        break;
+      case ParamMatch::State::FAILED_VERIFICATION:
+        llvm::dbgs() << "\t-> Failed constraint checking for parameter \""
+                     << paramName << "\"\n";
+        break;
+      case ParamMatch::State::FAILED_SERIALIZATION:
+        llvm::dbgs() << "\t-> Failed serialization for parameter \""
+                     << paramName << "\"\n";
+        break;
+      case ParamMatch::State::SUCCESS:
+        llvm::dbgs() << "\t-> Matched parameter \"" << paramName << "\"\n";
+        break;
+      }
+    });
 
     if (paramMatch.state != ParamMatch::SUCCESS)
       return failure();
@@ -349,6 +332,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.ready_remover" || 
       handshakeOp == "handshake.init" ||
       handshakeOp == "handshake.gate" ||
+      handshakeOp == "handshake.unbundle" ||
       handshakeOp == "handshake.maxsi" ||
       handshakeOp == "handshake.maxui" ||
       handshakeOp == "handshake.minsi" ||
@@ -512,6 +496,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.minui" ||
       handshakeOp == "handshake.init" ||
       handshakeOp == "handshake.gate" ||
+      handshakeOp == "handshake.unbundle" ||
       // the first input has extra signals
       handshakeOp == "handshake.load" ||
       handshakeOp == "handshake.store" ||
@@ -550,7 +535,6 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
 LogicalResult RTLMatch::concretize(const RTLRequest &request,
                                    StringRef dynamaticPath,
                                    StringRef outputDir) const {
-  llvm::errs() << "salam \n";
   // Consolidate reserved and regular parameters in a single map to perform
   // text substitutions
   ParameterMappings allParams(serializedParams);
@@ -564,30 +548,20 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
                              sys::path::get_separator().str() + moduleName +
                              "." + getHDLExtension(hdl).str();
 
-    llvm::errs() << "salam4 \n" << inputFile << " \n" << outputFile << "\n";
     // Just copy the file to the output location
     if (auto ec = sys::fs::copy_file(inputFile, outputFile); ec.value() != 0) {
-      llvm::errs() << "Failed to copy generic RTL implementation from \""
-                   << inputFile << "\" to \"" << outputFile << "\"\n"
-                   << ec.message();
       return emitError(request.loc)
              << "Failed to copy generic RTL implementation from \"" << inputFile
              << "\" to \"" << outputFile << "\"\n"
              << ec.message();
     }
-    llvm::errs() << "khalas \n";
-    llvm::errs() << "ali " << "\n";
     return success();
   }
-  llvm::errs() << "salam3 \n";
   assert(!component->generator.empty() && "generator is empty");
-
-  llvm::errs() << "salam2 \n";
 
   if (component->jsonConfig && failed(request.paramsToJSON(substituteParams(
                                    *(component->jsonConfig), allParams))))
     return failure();
-  llvm::errs() << "bye 2 \n";
 
   // The implementation needs to be generated
   std::string cmd = substituteParams(component->generator, allParams);
@@ -596,7 +570,6 @@ LogicalResult RTLMatch::concretize(const RTLRequest &request,
            << "Failed to generate component, generator failed with status "
            << ret << ": " << cmd << "\n";
   }
-  llvm::errs() << "bye \n";
   return success();
 }
 

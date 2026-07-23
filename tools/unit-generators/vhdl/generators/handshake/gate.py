@@ -3,7 +3,6 @@ from generators.handshake.top_join import generate_top_join
 
 
 def generate_gate(name, params):
-    print(f"Generating gate with name: {name} and params: {params}")
     size = params["size"]
     data_bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)

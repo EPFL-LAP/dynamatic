@@ -65,6 +65,9 @@ constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
 /// Annotation to use for regeneration multiplexers.
 constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
 
+constexpr llvm::StringLiteral SKIP_COND_GEN("Skip.Condition_Generator");
+constexpr llvm::StringLiteral SKIP_COND_SEQ("Skip.Conditional_Sequentializer");
+
 /// Identify the block that has muxCondition as its terminator condition
 /// Note that it is not necessarily the same block defining the muxCondition
 static Block *returnMuxConditionBlock(Value muxCondition) {
@@ -711,7 +714,8 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(PatternRewriter &rewriter,
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
       llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
       (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
-       !consumerOp->hasAttr("drawing")))
+       (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+        !consumerOp->hasAttr(SKIP_COND_SEQ))))
     return newUnits;
 
   mlir::Operation *producerOp = operand.getDefiningOp();
@@ -1075,7 +1079,9 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
 
   // Do not take into account conditional branch
   if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
-      !consumerOp->hasAttr("drawing") && consumerOp->getOperand(0) != operand)
+      (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+       !consumerOp->hasAttr(SKIP_COND_SEQ)) &&
+      consumerOp->getOperand(0) != operand)
     return newUnits;
 
   // The consumer block is the block which contains the consumer
@@ -1099,7 +1105,9 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
     // has the `FTD_NEW_SUPP` annotation, set in `addMoreSuppressionInLoop`. In
     // any other cases, suppressing a branch ends up with incorrect results.
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
-        !producerOp->hasAttr(FTD_NEW_SUPP) && !producerOp->hasAttr("drawing"))
+        !producerOp->hasAttr(FTD_NEW_SUPP) &&
+        (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+         !consumerOp->hasAttr(SKIP_COND_SEQ)))
       return newUnits;
 
     // Skip the prod-cons if the consumer is part of the operations
@@ -1127,7 +1135,8 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(PatternRewriter &rewriter,
       return newUnits;
 
     if (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
-        !consumerOp->hasAttr("drawing"))
+        (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+         !consumerOp->hasAttr(SKIP_COND_SEQ)))
       return newUnits;
 
     // The next step is to identify the relationship between the producer
