@@ -598,28 +598,42 @@ gen::BasicCGenerator::generateStructuredForStatement(OpaqueContext &&context) {
   std::string varName = generateFreshVarName();
   return generateWithDependencies<ast::StructuredForStatement>(
       std::move(context), typeSystem.getStructuredForStatementTransferFns(),
+      /*iteration variable=*/
+      [&](OpaqueContext &&context)
+          -> std::optional<std::pair<std::string, OpaqueContext>> {
+        // The iteration variable is a terminal whose name is made available to
+        // transfer functions (e.g., to forbid writing to it in the body). Its
+        // output context is never consumed, so simply forward the input.
+        return std::pair{varName, std::move(context)};
+      },
+      /*start=*/
       [&](OpaqueContext &&context) {
         return generateExpression(std::move(context));
       },
+      /*end=*/
       [&](OpaqueContext &&context) {
         return generateExpression(std::move(context));
       },
+      /*step=*/
       [&](OpaqueContext &&context) {
         return generateExpression(std::move(context));
       },
+      /*body=*/
       [&](OpaqueContext &&context) {
         auto scopeExit = pushNewScope();
         addVariable(ast::PrimitiveType::UInt32, varName);
         return generateStatementList(std::move(context));
       },
-      [&](ast::Expression &&start, ast::Expression &&end,
-          ast::Expression &&step, ast::StatementList &&statements) {
+      /*constructor=*/
+      [&](std::string &&iterVariable, ast::Expression &&start,
+          ast::Expression &&end, ast::Expression &&step,
+          ast::StatementList &&statements) {
         // Note: Requiring the step to be at least one to ensure termination!
         // TODO: Negative steps are currently unsupported.
         step = generateMaxExpression(step, ast::Constant{1});
-        return ast::StructuredForStatement(std::move(varName), std::move(start),
-                                           std::move(end), std::move(step),
-                                           std::move(statements));
+        return ast::StructuredForStatement(
+            std::move(iterVariable), std::move(start), std::move(end),
+            std::move(step), std::move(statements));
       });
 }
 
