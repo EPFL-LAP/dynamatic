@@ -353,7 +353,7 @@ void EagerlyElasticADPass::applyRewriteD(
   if (notOp && notOp.getResult().hasOneUse())
     notOp.getOperandMutable().assign(specOutput);
   else { // create a new isolated NotIOp
-    builder.setInsertionPoint(notOp);
+    builder.setInsertionPoint(notOp ? notOp : branchOp);
     auto newNotOp =
         builder.create<handshake::NotIOp>(branchOp.getLoc(), specOutput);
     setHandshakeAttrs(bbAttr, namer, {newNotOp});
@@ -376,7 +376,7 @@ void EagerlyElasticADPass::rewriteD(
       if (auto mux = dyn_cast<handshake::MuxOp>(nextOp)) {
         // identify loops (mux connected to init)
         auto init =
-            dyn_cast<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
+            dyn_cast_or_null<handshake::InitOp>(mux.getSelectOperand().getDefiningOp());
 
         if (init) {
           if (!checkConditionsMatch(branchOp.getConditionOperand(),

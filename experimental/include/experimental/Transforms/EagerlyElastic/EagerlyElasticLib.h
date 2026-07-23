@@ -8,33 +8,32 @@
 using namespace dynamatic;
 using namespace mlir;
 
-/// Helper function to add the bbAttr and name to new operations. You can either
-/// pass one operation or multiple ones
-template <typename... Args>
-void setupMetadata(Attribute bbAttr, NameAnalysis &namer, Args... ops) {
-  // Create a braced initializer list to unpack and process each operation
-  (..., [&]() {
-    if (ops) {
-      if (bbAttr)
-        ops->setAttr("handshake.bb", bbAttr);
-      namer.setName(ops);
-    }
-  }());
-}
-Value getForkTop(Value value, bool &isInverted);
+enum class BypassResult : bool { Ineligible = false, Eligible = true };
+
+/// Helper function to add the bbAttr and name to new operations.
+void setHandshakeAttrs(Attribute bbAttr, NameAnalysis &namer,
+                       ArrayRef<Operation *> ops);
+
+bool checkConditionsMatch(Value valA, Value valB, bool expectSamePolarity);
 
 bool isSourced(Value value);
 
-bool isEligibleForSuppressorMotion(handshake::ConditionalBranchOp branchOp,
-                                   Operation *targetOp);
+BypassResult isEligibleForBypass(handshake::ConditionalBranchOp branchOp,
+                                 Operation *targetOp);
 
-void performSuppressorMotion(handshake::ConditionalBranchOp branchOp,
-                             DenseSet<handshake::ConditionalBranchOp> &frontier,
-                             NameAnalysis &namer, int DRewrite = 0);
+void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
+                          Operation *targetOp,
+                          DenseSet<handshake::ConditionalBranchOp> &frontier,
+                          NameAnalysis &namer, int DRewrite = 0);
 
 void applyRewriteB(handshake::MuxOp dataMux,
                    handshake::ConditionalBranchOp trueBranch,
                    handshake::ConditionalBranchOp falseBranch,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer);
+
+void applyRewriteC(handshake::MuxOp dataMux,
+                   handshake::ConditionalBranchOp branchOp,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer);
 
@@ -44,16 +43,10 @@ void applyRewriteD(handshake::MuxOp dataMux,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer);
 
-void applyRewriteC(handshake::MuxOp dataMux,
-                   handshake::ConditionalBranchOp branchOp,
-                   DenseSet<handshake::ConditionalBranchOp> &frontier,
-                   NameAnalysis &namer);
-
 void applyRewriteE(handshake::MuxOp dataMux,
                    handshake::ConditionalBranchOp trueBranch,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
-                   NameAnalysis &namer,
-                   int inverted = 0);
+                   NameAnalysis &namer, int inverted = 0);
 
 void applyRewriteF(handshake::ConditionalBranchOp branchOp,
                    handshake::ConditionalBranchOp topSuppLeft,
