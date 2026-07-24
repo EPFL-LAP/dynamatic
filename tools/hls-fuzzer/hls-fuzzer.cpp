@@ -321,9 +321,9 @@ static void saveReproducer(const std::filesystem::path &directory) {
 }
 
 /// Generates and verifies a single program in 'directory' by re-executing this
-/// binary as described by 'args' in '--single-program' mode. Doing so in a
-/// process of its own keeps a crash of the generation or the verification from
-/// taking the whole fuzzer down with it.
+/// binary as described by 'args' in '--run-as-worker-subprocess' mode. Doing so
+/// in a process of its own keeps a crash of the generation or the verification
+/// from taking the whole fuzzer down with it.
 ///
 /// Returns the progress that process reported, or a bug of its own if it did
 /// not survive its program.
@@ -340,7 +340,7 @@ static Progress runProgramProcess(
 
   // All options are appended last, as the last occurrence of an option takes
   // precedence over any the user may have specified themselves.
-  storage.emplace_back("--single-program");
+  storage.emplace_back("--run-as-worker-subprocess");
   storage.emplace_back(directory.string());
   // Have the process report into the program's directory rather than wherever
   // the user asked for the report of the run as a whole to go. This process
@@ -488,11 +488,11 @@ int main(int argc, char **argv) {
     remainingPrograms = static_cast<std::int64_t>(*numPrograms);
   }
 
-  bool inplace = optionsParser.isInplace();
+  bool singleProcess = optionsParser.isSingleProcess();
   // Only ever used to parse the reports of the processes generating the
-  // programs, which '--inplace' does without.
+  // programs, which '--single-process' does without.
   std::map<std::string, dynamatic::Statistic> prototypes;
-  if (!inplace)
+  if (!singleProcess)
     prototypes = createStatisticPrototypes(*target, options);
 
   std::vector<std::thread> threads;
@@ -502,7 +502,7 @@ int main(int argc, char **argv) {
         std::filesystem::current_path() / ("thread" + std::to_string(i));
 
     std::function<Progress()> runProgram;
-    if (inplace) {
+    if (singleProcess) {
       runProgram = [&target, &options, directory] {
         return runSingleProgram(*target, options, directory);
       };

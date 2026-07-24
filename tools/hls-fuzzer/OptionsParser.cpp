@@ -71,16 +71,16 @@ std::optional<std::size_t> dynamatic::OptionsParser::getNumPrograms() const {
   return numPrograms;
 }
 
-bool dynamatic::OptionsParser::isInplace() const {
-  return args.hasArg(OPT_inplace);
+bool dynamatic::OptionsParser::isSingleProcess() const {
+  return args.hasArg(OPT_single_process);
 }
 
 std::optional<std::string>
 dynamatic::OptionsParser::getSingleProgramDirectory() const {
-  if (!args.hasArg(OPT_single_program))
+  if (!args.hasArg(OPT_run_as_worker_subprocess))
     return std::nullopt;
 
-  return args.getLastArgValue(OPT_single_program).str();
+  return args.getLastArgValue(OPT_run_as_worker_subprocess).str();
 }
 
 std::string dynamatic::OptionsParser::getTargetName() const {
