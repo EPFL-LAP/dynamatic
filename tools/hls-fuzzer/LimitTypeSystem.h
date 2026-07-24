@@ -182,6 +182,7 @@ public:
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
     return {
+        /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
         /*start=*/copyFromInput<ast::StructuredForStatement>(),
         /*end=*/copyFromInput<ast::StructuredForStatement>(),
         /*step=*/copyFromInput<ast::StructuredForStatement>(),

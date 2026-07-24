@@ -15,6 +15,7 @@ This Python-based LSQ generator generates the LSQ design outlined in Hailin Wang
 - `pipe1En`: Enables or disables the insertion of pipeline register 1 in the LSQ.
 - `pipeCompEn`: Enables or disables the insertion of the `pipeComp` pipeline register in the LSQ.
 - `headLagEn`: Determines whether the head pointer of the load queue updates one cycle later than the valid bits of its entries.
+- `bypassEn`: Enables or disables the bypass network (for forwarding store data to subsequent loads).
 
 
 ### Sampele usage
@@ -25,10 +26,12 @@ usage: lsq-generator.py [-h] [--output-dir OUTPUT_PATH] --config-file CONFIG_FIL
 
 ### Sample json configuration file (Example: Histogram)
 
+
 ```
 {
   "addrWidth":10,
   "bufferDepth":0,
+  "bypassEn": 1,
   "dataWidth":32,
   "fifoDepth":16,
   "fifoDepth_L":16,

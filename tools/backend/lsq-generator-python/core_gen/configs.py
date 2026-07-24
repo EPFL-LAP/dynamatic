@@ -82,7 +82,7 @@ class Configs:
 
         self.stResp = bool(config["stResp"])
         self.gaMulti = bool(config["groupMulti"])
-        self.bypass = True
+        self.bypass = bool(config["bypassEn"])
 
         self.gaNumLoads = config["numLoads"]
         self.gaNumStores = config["numStores"]
@@ -93,16 +93,10 @@ class Configs:
         self.ldqAddrW = math.ceil(math.log2(self.numLdqEntries))
         self.stqAddrW = math.ceil(math.log2(self.numStqEntries))
 
-        # Original empty assignment assumes the size of load or store queue to be always a multiple of 2
-        if (self.numLdqEntries & (self.numLdqEntries % 2 == 0)):
-            self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries+1))
-        else:
-            self.emptyLdAddrW = math.ceil(math.log2(self.numLdqEntries)) + 1
+        # Use one more bit to be able to represent the empty state of the queue when the number of entries is a power of 2
+        self.emptyLdAddrW = self.ldqAddrW + 1
+        self.emptyStAddrW = self.stqAddrW + 1
 
-        if (self.numStqEntries & (self.numStqEntries % 2 == 0)):
-            self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries+1))
-        else:
-            self.emptyStAddrW = math.ceil(math.log2(self.numStqEntries)) + 1
         # Check the number of ports, if num*Ports == 0, set it to 1
         self.ldpAddrW = math.ceil(math.log2(self.numLdPorts if self.numLdPorts > 0 else 1))
         self.stpAddrW = math.ceil(math.log2(self.numStPorts if self.numStPorts > 0 else 1))
@@ -120,3 +114,8 @@ class Configs:
         assert (len(self.gaLdOrder) == self.numGroups)
         assert (len(self.gaLdPortIdx) == self.numGroups)
         assert (len(self.gaStPortIdx) == self.numGroups)
+
+        # An LSQ with N load/store entries can only support up to N-1 loads/stores per group.
+        for i in range(self.numGroups):
+            assert self.gaNumLoads[i] < self.numLdqEntries, f"group {i}: too many loads ({self.gaNumLoads[i]}) for load queue with {self.numLdqEntries} entries!"
+            assert self.gaNumStores[i] < self.numStqEntries, f"group {i}: too many stores ({self.gaNumStores[i]}) for store queue with {self.numStqEntries} entries!"

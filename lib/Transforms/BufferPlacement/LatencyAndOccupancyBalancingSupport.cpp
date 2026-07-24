@@ -203,13 +203,14 @@ void CFGTransitionSequenceSubgraph::addSyntheticStartForkForBalancing() {
   LLVM_DEBUG(
       { llvm::errs() << "=== Synthetic start fork block arguments ===\n"; });
 
-  handshake::PortNamer namer(funcOp);
+  auto namedIOInterface =
+      mlir::cast<handshake::NamedIOInterface>(funcOp.getOperation());
   for (BlockArgument arg : funcOp.getBodyBlock()->getArguments()) {
     if (isa<mlir::MemRefType>(arg.getType()))
       continue;
     LLVM_DEBUG({
       llvm::errs() << "  arg #" << arg.getArgNumber() << " \""
-                   << namer.getInputName(arg.getArgNumber())
+                   << namedIOInterface.getOperandName(arg.getArgNumber())
                    << "\": " << arg.getType() << "\n";
     });
   }
