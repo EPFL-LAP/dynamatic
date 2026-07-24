@@ -32,6 +32,10 @@ public:
   /// number of occurrences of every node kind within them.
   llvm::json::Value toJSON() const;
 
+  /// Replaces the counts with the ones described by 'value', which must have
+  /// been created by 'toJSON'.
+  bool fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
   constexpr static llvm::StringRef CATEGORY = "AST Statistics";
 
 private:
