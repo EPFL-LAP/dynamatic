@@ -77,7 +77,6 @@ void addSupp(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
 /// blocks.
 LogicalResult addGsaGates(
     Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
-    Backedge startValue,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
     bool removeTerminators = true);
 

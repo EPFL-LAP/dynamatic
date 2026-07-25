@@ -557,15 +557,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // backedge is replaced with the corresponding hanshake values
   static DenseMap<Value, SmallVector<Backedge, 2>> pendingMuxOperands;
 
-  // Add the muxes as obtained by the GSA analysis pass. This requires the
-  // start value, as init merges need it as one of their output. However,
-  // the start value is not available yet here, so a backedge is adopted
-  // instead.
-  BackedgeBuilder edgeBuilderStart(rewriter, lowerFuncOp.getRegion().getLoc());
-  Backedge startValueBackedge =
-      edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
+  // Add the muxes as obtained by the GSA analysis pass.
   if (failed(addGsaGates(lowerFuncOp.getRegion(), rewriter, gsaAnalysis,
-                         startValueBackedge, &pendingMuxOperands)))
+                         &pendingMuxOperands)))
     return failure();
 
   // First lower the parent function itself, without modifying its body
@@ -575,13 +569,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   handshake::FuncOp funcOp = *funcOrFailure;
   if (funcOp.isExternal())
     return success();
-
-  // When GSA-MU functions are translated into multiplexers, an `init merge`
-  // is created to feed them. This merge requires the start value of the
-  // function as one of its data inputs. However, the start value was not
-  // present yet when `addGsaGates` is called, thus we need to reconnect
-  // it.
-  startValueBackedge.setValue((Value)funcOp.getArguments().back());
 
   for (auto &[originalValue, backedges] : pendingMuxOperands) {
     Value newVal = rewriter.getRemappedValue(originalValue);
