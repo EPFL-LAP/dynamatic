@@ -1496,13 +1496,13 @@ ConvertConstants::matchAndRewrite(arith::ConstantOp cstOp,
 
   // Determine the new constant's control input
   Value controlVal;
-  // if (isCstSourcable(cstOp)) {
-  //   auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
-  //   inheritBB(cstOp, sourceOp);
-  //   controlVal = sourceOp.getResult();
-  // } else {
-  controlVal = getBlockControl(cstOp);
-  //}
+  if (isCstSourcable(cstOp)) {
+    auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
+    inheritBB(cstOp, sourceOp);
+    controlVal = sourceOp.getResult();
+  } else {
+    controlVal = getBlockControl(cstOp);
+  }
 
   TypedAttr cstAttr = cstOp.getValue();
   // Convert IndexType'd values to equivalent signless integers
