@@ -635,12 +635,12 @@ public:
   std::vector<Statement> takeVector() { return std::move(statements); }
 
   // Recursive statement list representation.
-  // The definition is left recursive, meaning the statement is always the tail
-  // statement after the list.
-  using SubElements = std::tuple<StatementList, Statement>;
+  // The definition is right recursive, meaning the statement is always the head
+  // statement before the rest of the list.
+  using SubElements = std::tuple<Statement, StatementList>;
 
-  constexpr static std::size_t STATEMENT_LIST = 0;
-  constexpr static std::size_t STATEMENT = 1;
+  constexpr static std::size_t STATEMENT = 0;
+  constexpr static std::size_t STATEMENT_LIST = 1;
 
 private:
   std::vector<Statement> statements;
