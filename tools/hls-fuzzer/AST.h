@@ -679,12 +679,16 @@ public:
     friend bool operator<(const Tag &, const Tag &) { return false; }
   };
 
-  using SubElements =
-      std::tuple<Expression, Expression, Expression, StatementList>;
-  constexpr static std::size_t START = 0;
-  constexpr static std::size_t END = 1;
-  constexpr static std::size_t STEP = 2;
-  constexpr static std::size_t BODY = 3;
+  // The iteration variable's name is modeled as a (terminal) sub-element so
+  // that transfer functions (e.g., the one computing the body's context) can
+  // observe it.
+  using SubElements = std::tuple<std::string, Expression, Expression,
+                                 Expression, StatementList>;
+  constexpr static std::size_t ITER_VARIABLE = 0;
+  constexpr static std::size_t START = 1;
+  constexpr static std::size_t END = 2;
+  constexpr static std::size_t STEP = 3;
+  constexpr static std::size_t BODY = 4;
 
 private:
   std::string iterVariable;

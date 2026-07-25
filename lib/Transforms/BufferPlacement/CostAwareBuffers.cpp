@@ -34,7 +34,7 @@ CostAwareBuffers::CostAwareBuffers(CPSolver::SolverKind solverKind, int timeout,
                                    const TimingDatabase &timingDB,
                                    double targetPeriod, StringRef writeTo)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                          writeTo) {
+                          Algorithm::CostAware, writeTo) {
   if (!unsatisfiable)
     setup();
 }

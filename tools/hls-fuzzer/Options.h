@@ -23,6 +23,11 @@ struct Options {
   // - If present but the list is empty, all statistics are reported.
   // - Otherwise, only the named statistics are reported.
   std::optional<std::vector<std::string>> statistics;
+
+  // File the fuzzing progress and statistics should be written to as JSON, as
+  // requested via '--json-output'. If empty (nullopt), they are reported on the
+  // console instead.
+  std::optional<std::string> jsonOutput;
 };
 
 } // namespace dynamatic

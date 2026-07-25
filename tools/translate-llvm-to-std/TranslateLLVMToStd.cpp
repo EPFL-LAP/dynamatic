@@ -989,6 +989,11 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     return;
   }
 
+  if (calledFunc->getName().starts_with("__dyn_predict")) {
+    handlePredictMarker(callInst);
+    return;
+  }
+
   assert(calledFunc->isIntrinsic() &&
          "Function calls are not currently supported");
 
@@ -1124,5 +1129,71 @@ void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
   // And have any op which consumes the
   // speculator function's output use
   // the output of our edge attr op
+  valueMap[callInst] = markerOp->getResult(0);
+}
+
+void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
+
+  // try to get the string info
+  llvm::StringRef valuesStr;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(1), valuesStr))
+    llvm::report_fatal_error(
+        "__dyn_predict: values arg is not a constant C string");
+
+  // try to get the string start or end for location
+  llvm::StringRef location;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(2), location))
+    llvm::report_fatal_error(
+        "__dyn_predict: location arg is not a constant C string");
+
+  // try to get the marker value
+  auto markerValueConst =
+      llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(3));
+  if (!markerValueConst)
+    llvm::report_fatal_error("__dyn_predict: marker arg is not a ConstantInt");
+  uint64_t markerValue = markerValueConst->getValue().getLimitedValue();
+
+  llvm::StringRef typeStr;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(4), typeStr))
+    llvm::report_fatal_error(
+        "__dyn_predict: type arg is not a constant C string");
+
+  // get the value we want to predict
+  llvm::Value *predVar = callInst->getArgOperand(0);
+
+  // Warn if the value has other users besides this call.
+  // LLVM does some weird duplication stuff sometimes
+  // to do more aggressive folding
+  // TODO: now it might really be unnecessary
+  if (predVar->getNumUses() > 1)
+    llvm::errs() << "Warning: __dyn_predict input has " << predVar->getNumUses()
+                 << " users; consumers other than the pred call will bypass "
+                    "the producer_output_attr_marker and not be marked for "
+                    "prediction\n";
+
+  auto it = valueMap.find(predVar);
+  if (it == valueMap.end())
+    llvm::report_fatal_error("__dyn_predict: variable not found in valueMap");
+  // actually get the cf value
+  mlir::Value v = it->second;
+
+  // Build the actual attribute
+  mlir::DictionaryAttr predAttr = mlir::DictionaryAttr::get(
+      ctx,
+      {builder.getNamedAttr("values", builder.getStringAttr(valuesStr)),
+       builder.getNamedAttr("location", builder.getStringAttr(location)),
+       builder.getNamedAttr("marker", builder.getI32IntegerAttr(markerValue)),
+       builder.getNamedAttr("type", builder.getStringAttr(typeStr))});
+
+  // build the operationstate that is used for the unregistered op
+  mlir::OperationState markerState(
+      v.getLoc(), mlir::OperationName("dynamatic.prediction_marker", ctx));
+
+  markerState.addOperands(v);
+  markerState.addTypes(v.getType());
+  markerState.attributes.append("dynamatic.predict", predAttr);
+
+  // actually build the operation
+  mlir::Operation *markerOp = builder.create(markerState);
   valueMap[callInst] = markerOp->getResult(0);
 }
