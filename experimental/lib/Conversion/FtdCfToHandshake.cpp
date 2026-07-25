@@ -152,6 +152,43 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
   }
 };
 
+/// Same as `ConvertIndexCast`, but tolerates an operand that is already a
+/// `handshake::ChannelType`: in the FTD flow `addGsaGates` runs before
+/// `lowerSignature` and replaces phis with channelified mux results.
+template <typename CastOp, typename ExtOp>
+LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
+    CastOp castOp, OpAdaptor adaptor,
+    ConversionPatternRewriter &rewriter) const {
+
+  auto getWidth = [](Type type) -> unsigned {
+    // The operand may already have been channelified by `addGsaGates`.
+    if (auto chanTy = dyn_cast<handshake::ChannelType>(type))
+      type = chanTy.getDataType();
+    if (isa<IndexType>(type))
+      return 32;
+    return type.getIntOrFloatBitWidth();
+  };
+
+  unsigned srcWidth = getWidth(castOp.getOperand().getType());
+  unsigned dstWidth = getWidth(castOp.getResult().getType());
+  Type dstType = handshake::ChannelType::get(rewriter.getIntegerType(dstWidth));
+  Operation *newOp;
+  if (srcWidth < dstWidth) {
+    // This is an extension
+    newOp =
+        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
+                               castOp->getAttrDictionary().getValue());
+  } else {
+    // This is a truncation
+    newOp = rewriter.create<handshake::TruncIOp>(
+        castOp.getLoc(), dstType, adaptor.getOperands(),
+        castOp->getAttrDictionary().getValue());
+  }
+  this->namer.replaceOp(castOp, newOp);
+  rewriter.replaceOp(castOp, newOp);
+  return success();
+}
+
 /// Per-block edge information captured from CF-level IR before conversion.
 struct BlockEdgeInfo {
   bool isConditional = false;
@@ -289,8 +326,8 @@ struct FtdCfToHandshakePass
     patterns.add<
         AllocaOpConversion, ConvertCalls,
         GetGlobalOpConversion, GlobalOpConversion,
-        ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
-        ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+        FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+        FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
         OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
         OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
