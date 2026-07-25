@@ -114,8 +114,8 @@ public:
   convertMemoryOps(handshake::FuncOp funcOp,
                    ConversionPatternRewriter &rewriter,
                    const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
-                   BackedgeBuilder &edgeBuilder, MemInterfacesInfo &memInfo,
-                   bool isFtd = false) const;
+                   BackedgeBuilder &edgeBuilder, 
+                   MemInterfacesInfo &memInfo) const;
 
   /// Verifies that LSQ groups derived from input IR annotations make sense
   /// (check for linear dominance property within each group and cross-group
