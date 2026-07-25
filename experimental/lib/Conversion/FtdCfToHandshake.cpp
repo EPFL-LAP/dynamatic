@@ -287,9 +287,8 @@ struct FtdCfToHandshakePass
         ctx);
 
     patterns.add<
-        // LowerFuncToHandshake,
-        /*ConvertConstants,*/ AllocaOpConversion, ConvertCalls,
-        /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
+        AllocaOpConversion, ConvertCalls,
+        GetGlobalOpConversion, GlobalOpConversion,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
