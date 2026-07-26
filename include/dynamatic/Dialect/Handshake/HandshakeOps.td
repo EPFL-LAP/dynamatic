@@ -2329,5 +2329,40 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 }
 
+def RepeatingInitOp : Handshake_Op<"repeating_init", [
+  HasClock, SameOperandsAndResultType,
+  IsIntSizedChannel<1, "operand">,
+  IsIntSizedChannel<1, "result">
+]> {
+  let summary = "repeating init operation";
+  let description = [{
+    A single-slot buffer which contains a token in its reset state.
+    Similar to a buffer, its timing behavior is configurable.
+  }];
+  
+  let arguments = (ins ChannelType:$operand, UI1Attr:$initialValue);
+  let results = (outs ChannelType:$result);
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral INITIAL_VALUE_ATTR_NAME = "INITIAL_VALUE",
+                                           TIMING_ATTR_NAME = "TIMING";
+  }];
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand)
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    RepeatingInitOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "INITIAL_VALUE"),
+         getInitialValueAttr()}
+      };
+    }
+  }];
+}
+
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
