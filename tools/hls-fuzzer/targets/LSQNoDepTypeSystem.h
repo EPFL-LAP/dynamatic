@@ -148,9 +148,10 @@ class LSQNoDepTypeSystem final
                                        detail::LSQNoDepTypeSystemInner,
                                        DynamaticTypeSystem, LimitTypeSystem> {
 public:
-  explicit LSQNoDepTypeSystem()
+  explicit LSQNoDepTypeSystem(Randomly &random)
       : ConjunctionTypeSystemBase(detail::LSQNoDepTypeSystemInner(),
-                                  DynamaticTypeSystem(), LimitTypeSystem([] {
+                                  DynamaticTypeSystem(),
+                                  LimitTypeSystem(random, [] {
                                     LimitTypeSystem::Options options{};
                                     options.maxExpressionDepth = 8;
                                     options.maxTotalStatements = 1;
