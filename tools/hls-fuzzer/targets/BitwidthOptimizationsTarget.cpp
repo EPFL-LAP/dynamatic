@@ -49,7 +49,7 @@ void BitwidthOptimizationsGenerator::generate(llvm::raw_ostream &os,
   maxBitwidth = random.getInteger<std::uint8_t>(1, 32);
   gen::ConjunctionTypeSystem<gen::TerminationTypeSystem, gen::LimitTypeSystem>
       bitwidthTypeSystem{gen::TerminationTypeSystem(random),
-                         gen::LimitTypeSystem()};
+                         gen::LimitTypeSystem(random)};
   gen::BasicCGenerator generator(
       random, bitwidthTypeSystem,
       /*entryContext=*/{{gen::BitwidthTypingContext{maxBitwidth}, {}}, {}});
