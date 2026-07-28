@@ -39,6 +39,11 @@ constexpr auto getTupleOfIndices(std::index_sequence<is...>) {
 template <typename Constructor, typename First, typename... Others, typename F>
 decltype(auto) mapTuplesInto(Constructor &&constructor, F &&f, First &&first,
                              Others &&...others) {
+  static_assert(((std::tuple_size_v<std::decay_t<First>> ==
+                  std::tuple_size_v<std::decay_t<Others>>) &&
+                 ...),
+                "all tuples must match in size");
+
   return std::apply(
       [&](auto &&...indices) {
         return std::forward<Constructor>(constructor)(
@@ -139,6 +144,13 @@ void foreachEnumerate(F &&f, First &&first, Others &&...others) {
                       },
                       std::forward<First>(first),
                       std::forward<Others>(others)...);
+}
+
+/// Returns a tuple of 'numElements' number of 'value' copies.
+template <std::size_t numElements, typename T>
+auto repeatInTuple(const T &value) {
+  return mapTuples([&](auto &&) { return value; },
+                   getTupleOfIndices(std::make_index_sequence<numElements>{}));
 }
 
 } // namespace dynamatic

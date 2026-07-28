@@ -8,7 +8,9 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FunctionExtras.h"
 
+#include <algorithm>
 #include <any>
+#include <vector>
 
 namespace dynamatic::gen {
 
@@ -325,6 +327,41 @@ using TypedContextTuple =
     std::array<const TypingContext *,
                std::tuple_size_v<typename ASTNode::SubElements> + 1>;
 
+/// Context a 'Projection' handed to 'OpaqueTransferFn::wrap' projects a
+/// 'TypingContext' down to, i.e. the one the wrapped transfer function was
+/// built for. Deducing it from the projection is what keeps it from having to
+/// be spelled out at every call site.
+template <typename TypingContext, typename Projection>
+using ProjectedContext = std::remove_const_t<
+    std::remove_reference_t<decltype(std::declval<const Projection &>()(
+        std::declval<const TypingContext &>()))>>;
+
+namespace detail {
+
+/// Returns, as a tuple, the arguments the calling convention of 'TransferFn'
+/// passes for the dependency 'index' (see that class): the input context for
+/// 'INPUT_DEPENDENCY', and otherwise the subelement's output context followed
+/// by its AST node .
+///
+/// The optionals are unwrapped for a non-weak dependency, which assumes that
+/// the required contexts and subelements have already been generated.
+template <std::size_t index, typename ASTNode, typename TypingContext>
+auto getDependencyArguments(
+    const SubElementsTuple<ASTNode> &subElements,
+    const TypedContextTuple<ASTNode, TypingContext> &contexts) {
+  if constexpr (index == INPUT_DEPENDENCY) {
+    return std::forward_as_tuple(*contexts.back());
+  } else if constexpr (isWeak(index)) {
+    return std::make_tuple(std::get<unwrapWeak(index)>(contexts),
+                           std::cref(std::get<unwrapWeak(index)>(subElements)));
+  } else {
+    return std::forward_as_tuple(*std::get<index>(contexts),
+                                 *std::get<index>(subElements));
+  }
+}
+
+} // namespace detail
+
 /// Opaque-wrapper over 'TransferFn' that can be constructed from any instance
 /// of 'TransferFn' with the same 'ASTNode'.
 /// Users should construct 'TransferFn' instances instead.
@@ -356,27 +393,9 @@ public:
                 -> TypingContext {
               // Construct a tuple of all arguments that 'dep' should be called
               // with.
-              // This mainly uses 'inputIndices' to index into 'subElements' and
-              // 'contexts'.
-              // The logic here simply unwraps the optionals: It assumes that
-              // the required contexts and subelements have already been
-              // generated.
-              auto argTuple = std::tuple_cat([&](auto &&integral) {
-                constexpr std::size_t index = decltype(integral){};
-                if constexpr (index == INPUT_DEPENDENCY) {
-                  // Input context.
-                  return std::forward_as_tuple(*contexts.back());
-                } else if constexpr (isWeak(index)) {
-                  // Subelement context + ASTNode.
-                  return std::make_tuple(
-                      std::get<unwrapWeak(index)>(contexts),
-                      std::cref(std::get<unwrapWeak(index)>(subElements)));
-                } else {
-                  // Subelement context + ASTNode.
-                  return std::forward_as_tuple(*std::get<index>(contexts),
-                                               *std::get<index>(subElements));
-                }
-              }(std::integral_constant<std::size_t, inputIndices>{})...);
+              auto argTuple = std::tuple_cat(
+                  detail::getDependencyArguments<inputIndices, ASTNode>(
+                      subElements, contexts)...);
 
               return std::apply(dep, std::move(argTuple));
             }) {}
@@ -417,6 +436,69 @@ public:
     return std::visit(
         [](auto &&value) -> llvm::ArrayRef<std::size_t> { return value; },
         inputIndices);
+  }
+
+  /// Returns an 'OpaqueTransferFn' over 'TypingContext' that runs 'f' in place
+  /// of 'this', handing 'this' to it so that it can run it and adjust or
+  /// reinterpret what it computed.
+  ///
+  /// 'f' is called as
+  ///
+  ///   TypingContext(function_ref<SubContext()> wrapped, const Dependency &...)
+  ///
+  /// where the dependency arguments are exactly the ones 'TransferFn' passes
+  /// for 'extraDependencies'.
+  /// 'wrapped' is a callable taking no arguments and returning the context this
+  /// transfer function originally computed.
+  /// 'TypingContext' is the new context type that the returned wrapper should
+  /// accept.
+  ///
+  /// If 'this' was originally created for a different context type 'SubContext,
+  /// 'projection' can be used to map 'TypingContext' to 'SubContext'.
+  /// 'SubContext' cannot be specified explicitly but should simply be the type
+  /// returned by 'projection'.
+  /// It must be callable as 'const SubContext&(const TypingContext&)'.
+  ///
+  /// 'extraDependencies' are unioned into this transfer function's own, for a
+  /// wrapper that needs subelements the wrapped function did not ask for. Like
+  /// any dependency they are thereby also forced to be generated first.
+  template <typename TypingContext, std::size_t... extraDependencies,
+            typename F, typename Projection = llvm::identity<TypingContext>>
+  OpaqueTransferFn wrap(F f, Projection projection = {}) && {
+    using SubContext = ProjectedContext<TypingContext, Projection>;
+
+    llvm::ArrayRef<std::size_t> own = getInputDependencies();
+    std::vector indices(own.begin(), own.end());
+    constexpr std::array<std::size_t, sizeof...(extraDependencies)> extra{
+        extraDependencies...};
+    indices.insert(indices.end(), extra.begin(), extra.end());
+    // Remove duplicates.
+    std::sort(indices.begin(), indices.end());
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+
+    return OpaqueTransferFn(
+        llvm::identity<TypingContext>{}, std::move(indices),
+        [wrapped = std::move(*this), f = std::move(f),
+         projection = std::move(projection)](
+            const SubElementsTuple<ASTNode> &subElements,
+            const TypedContextTuple<ASTNode, TypingContext> &contexts)
+            -> TypingContext {
+          auto callWrapped = [&] {
+            return wrapped.template call<SubContext>(
+                subElements,
+                mapTuplesIntoArray(
+                    [&](const TypingContext *context) -> const SubContext * {
+                      return context ? &projection(*context) : nullptr;
+                    },
+                    contexts));
+          };
+
+          return std::apply(
+              f, std::tuple_cat(
+                     std::tuple(llvm::function_ref<SubContext()>(callWrapped)),
+                     detail::getDependencyArguments<extraDependencies, ASTNode>(
+                         subElements, contexts)...));
+        });
   }
 
   /// Calculates the context from the currently calculated subelements and
@@ -578,6 +660,54 @@ public:
     return computationFn(astNode, contexts);
   }
 
+  /// Returns an 'OpaqueOutputTransferFn' over 'TypingContext' that runs 'f' in
+  /// place of 'this', handing 'this' to it so that it can run it and adjust or
+  /// reinterpret what it computed.
+  ///
+  /// 'f' is called as
+  ///
+  ///   TypingContext(function_ref<SubContext()> wrapped, const ASTNode &,
+  ///                 const TypingContext &...)
+  ///
+  /// which is 'OutputTransferFn's convention with 'wrapped' put in front: the
+  /// fully constructed AST node, then one output context per entry of
+  /// 'extraDependencies', with 'INPUT_DEPENDENCY' naming the input context.
+  ///
+  /// If 'this' was originally created for a different context type 'SubContext,
+  /// 'projection' can be used to map 'TypingContext' to 'SubContext'.
+  /// 'SubContext' cannot be specified explicitly but should simply be the type
+  /// returned by 'projection'.
+  /// It must be callable as 'const SubContext&(const TypingContext&)'.
+  template <typename TypingContext, std::size_t... extraDependencies,
+            typename F, typename Projection = llvm::identity<TypingContext>>
+  OpaqueOutputTransferFn wrap(F f, Projection projection = {}) && {
+    using SubContext = ProjectedContext<TypingContext, Projection>;
+
+    return OpaqueOutputTransferFn(
+        llvm::identity<TypingContext>{},
+        [wrapped = std::move(*this), f = std::move(f),
+         projection = std::move(projection)](
+            const ASTNode &astNode,
+            const TypedContextTuple<ASTNode, TypingContext> &contexts)
+            -> TypingContext {
+          auto callWrapped = [&] {
+            return wrapped.template call<SubContext>(
+                astNode,
+                mapTuplesIntoArray(
+                    [&](const TypingContext *context) -> const SubContext * {
+                      return context ? &projection(*context) : nullptr;
+                    },
+                    contexts));
+          };
+
+          // Like 'OutputTransferFn', an output transfer function is handed
+          // output contexts only, 'INPUT_DEPENDENCY' clamping to the input one.
+          return f(
+              llvm::function_ref<SubContext()>(callWrapped), astNode,
+              *contexts[std::min(extraDependencies, contexts.size() - 1)]...);
+        });
+  }
+
   /// More type-safe variant of the call operator that accepts and returns
   /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
   /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
@@ -622,6 +752,26 @@ struct CalculateDependencyArray<ASTNode, std::tuple<SubElements...>> {
 template <typename ASTNode>
 using TransferFnArray =
     typename details::CalculateDependencyArray<ASTNode>::type;
+
+namespace detail {
+
+/// Deduces the 'ASTNode' of a 'TransferFnArray' from its output transfer
+/// function. Only used in unevaluated contexts.
+template <typename ASTNode>
+ASTNode transferFnArrayASTNode(const OpaqueOutputTransferFn<ASTNode> &) {
+  llvm_unreachable("template mechanism only");
+}
+
+} // namespace detail
+
+/// 'ASTNode' of the 'TransferFnArray' instantiation 'TransferFns'.
+/// Since 'TransferFnArray' is an alias template, 'ASTNode' cannot be deduced
+/// from function parameters of that type. Functions wishing to deduce it should
+/// accept the tuple as a generic type parameter and use this alias instead.
+template <typename TransferFns>
+using TransferFnArrayASTNode = decltype(detail::transferFnArrayASTNode(
+    std::get<std::tuple_size_v<TransferFns> - 1>(
+        std::declval<const TransferFns &>())));
 
 /// Abstract base class for all type systems. Users of a type system such as
 /// the C generator use this interface in conjunction with 'OpaqueContext' to be

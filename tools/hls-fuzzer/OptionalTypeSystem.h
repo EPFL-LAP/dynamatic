@@ -36,10 +36,10 @@ public:
   /// The input context given to these sub-elements is 'context'.
   /// It is the users responsibility to make sure that the given 'context'
   /// makes sense for the sub type system.
-  template <typename ASTNode, std::size_t... subElementsToEnable>
-  static TransferFnArray<ASTNode>
-  enableTypeSystemFor(TransferFnArray<ASTNode> transferFnArray,
-                      const SubContext &context) {
+  template <std::size_t... subElementsToEnable, typename TransferFns>
+  static TransferFns enableTypeSystemFor(TransferFns transferFnArray,
+                                         const SubContext &context) {
+    using ASTNode = TransferFnArrayASTNode<TransferFns>;
     // For the given sub-elements that should be enabled, overwrite their
     // transfer functions such that they now return the given 'context'.
     ((std::get<subElementsToEnable>(transferFnArray) =
@@ -49,14 +49,12 @@ public:
   }
 
   TransferFnArray<ast::Function> getFunctionTransferFns() override {
-    return wrapTransferFns<ast::Function>(
-        subTypeSystem.getFunctionTransferFns());
+    return wrapTransferFns(subTypeSystem.getFunctionTransferFns());
   }
 
   TransferFnArray<ast::ReturnStatement>
   getReturnStatementTransferFns() override {
-    return wrapTransferFns<ast::ReturnStatement>(
-        subTypeSystem.getReturnStatementTransferFns());
+    return wrapTransferFns(subTypeSystem.getReturnStatementTransferFns());
   }
 
   bool discardScalarType(const ast::ScalarType &scalarType,
@@ -67,8 +65,7 @@ public:
   }
 
   TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() override {
-    return wrapTransferFns<ast::ScalarType>(
-        subTypeSystem.getScalarTypeTransferFns());
+    return wrapTransferFns(subTypeSystem.getScalarTypeTransferFns());
   }
 
   bool discardReturnType(const ast::ReturnType &returnType,
@@ -79,8 +76,7 @@ public:
   }
 
   TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() override {
-    return wrapTransferFns<ast::ReturnType>(
-        subTypeSystem.getReturnTypeTransferFns());
+    return wrapTransferFns(subTypeSystem.getReturnTypeTransferFns());
   }
 
   bool discardBinaryExpression(ast::BinaryExpression::Op op,
@@ -92,8 +88,7 @@ public:
 
   TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
-    return wrapTransferFns<ast::BinaryExpression>(
-        subTypeSystem.getBinaryExpressionTransferFns(op));
+    return wrapTransferFns(subTypeSystem.getBinaryExpressionTransferFns(op));
   }
 
   bool discardUnaryExpression(ast::UnaryExpression::Op op,
@@ -105,8 +100,7 @@ public:
 
   TransferFnArray<ast::UnaryExpression>
   getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override {
-    return wrapTransferFns<ast::UnaryExpression>(
-        subTypeSystem.getUnaryExpressionTransferFns(op));
+    return wrapTransferFns(subTypeSystem.getUnaryExpressionTransferFns(op));
   }
 
   bool discardVariable(const Context &context) {
@@ -116,8 +110,7 @@ public:
   }
 
   TransferFnArray<ast::Variable> getVariableTransferFns() override {
-    return wrapTransferFns<ast::Variable>(
-        subTypeSystem.getVariableTransferFns());
+    return wrapTransferFns(subTypeSystem.getVariableTransferFns());
   }
 
   bool discardCastExpression(const Context &context) {
@@ -127,8 +120,7 @@ public:
   }
 
   TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
-    return wrapTransferFns<ast::CastExpression>(
-        subTypeSystem.getCastExpressionTransferFns());
+    return wrapTransferFns(subTypeSystem.getCastExpressionTransferFns());
   }
 
   bool discardConditionalExpression(const Context &context) {
@@ -139,8 +131,7 @@ public:
 
   TransferFnArray<ast::ConditionalExpression>
   getConditionalExpressionTransferFns() override {
-    return wrapTransferFns<ast::ConditionalExpression>(
-        subTypeSystem.getConditionalExpressionTransferFns());
+    return wrapTransferFns(subTypeSystem.getConditionalExpressionTransferFns());
   }
 
   std::optional<ast::Constant> discardConstant(const ast::Constant &constant,
@@ -151,8 +142,7 @@ public:
   }
 
   TransferFnArray<ast::Constant> getConstantTransferFns() override {
-    return wrapTransferFns<ast::Constant>(
-        subTypeSystem.getConstantTransferFns());
+    return wrapTransferFns(subTypeSystem.getConstantTransferFns());
   }
 
   bool discardExistingScalarParameter(const ast::ScalarParameter &parameter,
@@ -164,7 +154,7 @@ public:
 
   TransferFnArray<ast::ExistingScalarParameter>
   getExistingScalarParameterTransferFns() override {
-    return wrapTransferFns<ast::ExistingScalarParameter>(
+    return wrapTransferFns(
         subTypeSystem.getExistingScalarParameterTransferFns());
   }
 
@@ -176,8 +166,7 @@ public:
 
   TransferFnArray<ast::ScalarParameter>
   getFreshScalarParameterTransferFns() override {
-    return wrapTransferFns<ast::ScalarParameter>(
-        subTypeSystem.getFreshScalarParameterTransferFns());
+    return wrapTransferFns(subTypeSystem.getFreshScalarParameterTransferFns());
   }
 
   bool discardArrayReadExpression(const Context &context) {
@@ -188,8 +177,7 @@ public:
 
   TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionTransferFns() override {
-    return wrapTransferFns<ast::ArrayReadExpression>(
-        subTypeSystem.getArrayReadExpressionTransferFns());
+    return wrapTransferFns(subTypeSystem.getArrayReadExpressionTransferFns());
   }
 
   bool discardExistingArrayParameter(const ast::ArrayParameter &parameter,
@@ -201,7 +189,7 @@ public:
 
   TransferFnArray<ast::ExistingArrayParameter>
   getExistingArrayParameterTransferFns() override {
-    return wrapTransferFns<ast::ExistingArrayParameter>(
+    return wrapTransferFns(
         subTypeSystem.getExistingArrayParameterTransferFns());
   }
 
@@ -220,8 +208,7 @@ public:
 
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
-    return wrapTransferFns<ast::ArrayParameter>(
-        subTypeSystem.getFreshArrayParameterTransferFns());
+    return wrapTransferFns(subTypeSystem.getFreshArrayParameterTransferFns());
   }
 
   bool discardArrayAssignmentStatement(const Context &context) {
@@ -232,7 +219,7 @@ public:
 
   TransferFnArray<ast::ArrayAssignmentStatement>
   getArrayAssignmentStatementTransferFns() override {
-    return wrapTransferFns<ast::ArrayAssignmentStatement>(
+    return wrapTransferFns(
         subTypeSystem.getArrayAssignmentStatementTransferFns());
   }
 
@@ -244,7 +231,7 @@ public:
 
   TransferFnArray<ast::ScalarAssignmentStatement>
   getScalarAssignmentStatementTransferFns() override {
-    return wrapTransferFns<ast::ScalarAssignmentStatement>(
+    return wrapTransferFns(
         subTypeSystem.getScalarAssignmentStatementTransferFns());
   }
 
@@ -255,8 +242,7 @@ public:
   }
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
-    return wrapTransferFns<ast::StatementList>(
-        subTypeSystem.getStatementListTransferFns());
+    return wrapTransferFns(subTypeSystem.getStatementListTransferFns());
   }
 
   bool discardStructuredForStatement(const Context &context) {
@@ -267,7 +253,7 @@ public:
 
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
-    return wrapTransferFns<ast::StructuredForStatement>(
+    return wrapTransferFns(
         subTypeSystem.getStructuredForStatementTransferFns());
   }
 
@@ -289,53 +275,47 @@ public:
 private:
   /// Wraps around the existing transfer functions in 'array' to add the ability
   /// of enabling and disabling the sub type system.
-  template <typename ASTNode>
-  static TransferFnArray<ASTNode>
-  wrapTransferFns(TransferFnArray<ASTNode> &&array) {
+  template <typename TransferFns>
+  static TransferFns wrapTransferFns(TransferFns &&array) {
+    using ASTNode = TransferFnArrayASTNode<TransferFns>;
+    // Unwraps a context of an enabled subtree into the
+    // 'SubTypeSystem::Context' the sub type system accepts.
+    auto unwrap = [](const Context &context) -> const SubContext & {
+      assert(context.has_value() &&
+             "input context being enabled implies the entire sub-tree of "
+             "contexts being enabled");
+      return context.value();
+    };
+
     return mapTuples(
         /*mappingFunction=*/
-        [](auto &&element) {
-          // If enabled, unwraps the 'std::optional<typename
-          // SubTypeSystem::Context>' and returns the contained
-          // 'SubTypeSystem::Context'.
-          // This is needed since the sub type system only accepts instances of
-          // 'SubTypeSystem::Context'.
-          auto unwrapFn =
-              [originalTransferFn = std::forward<decltype(element)>(element)](
-                  const auto &arg,
-                  const TypedContextTuple<ASTNode, Context> &contexts)
-              -> Context {
-            assert(contexts.back() && "input context is always present");
-            // If the input context is enabled, then all transfer functions of
-            // the sub type system are enabled.
-            if (!contexts.back()->has_value())
-              // Otherwise, there is nothing to do except forward an empty
-              // optional.
-              return std::nullopt;
-
-            return originalTransferFn.template call<SubContext>(
-                arg, mapTuplesIntoArray(
-                         [](const Context *context) -> const SubContext * {
-                           if (!context)
-                             return nullptr;
-
-                           assert(context->has_value() &&
-                                  "input context being enabled implies the "
-                                  "entire sub-tree of contexts being enabled");
-                           return &context->value();
-                         },
-                         contexts));
-          };
-
+        [&](auto &&element) {
           using T = std::decay_t<decltype(element)>;
           if constexpr (std::is_same_v<T, OpaqueTransferFn<ASTNode>>) {
-            std::vector<std::size_t> indices = element.getInputDependencies();
-            return OpaqueTransferFn<ASTNode>(llvm::identity<Context>{},
-                                             std::move(indices),
-                                             std::move(unwrapFn));
+            return std::move(element).template wrap<Context, INPUT_DEPENDENCY>(
+                [](llvm::function_ref<SubContext()> wrapped,
+                   const Context &input) -> Context {
+                  // If the input context is enabled, then all transfer
+                  // functions of the sub type system are enabled.
+                  if (!input)
+                    return std::nullopt;
+
+                  return wrapped();
+                },
+                unwrap);
           } else {
-            return OpaqueOutputTransferFn<ASTNode>(llvm::identity<Context>{},
-                                                   std::move(unwrapFn));
+            return std::move(element).template wrap<Context, INPUT_DEPENDENCY>(
+                [](llvm::function_ref<SubContext()> wrapped, const ASTNode &,
+                   const Context &input) -> Context {
+                  // If the input context is enabled, then all transfer
+                  // functions of the sub type system must have returned an
+                  // output context.
+                  if (!input)
+                    return std::nullopt;
+
+                  return wrapped();
+                },
+                unwrap);
           }
         },
         /*tuple=*/std::move(array));
