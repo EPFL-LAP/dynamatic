@@ -134,6 +134,10 @@ public:
     return ast::Constant{0};
   }
 
+  static std::optional<std::size_t> discardArrayDimension(std::size_t, bool) {
+    return 8;
+  }
+
   constexpr static std::string_view result =
       R"(double test(double var0[8]) {
   return var0[((uint32_t)((0)) & (7u))];

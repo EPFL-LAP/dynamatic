@@ -308,7 +308,8 @@ public:
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
-        copyFromInput<ast::ArrayParameter>(),
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
         OutputTransferFn<ast::ArrayParameter, INPUT_DEPENDENCY>(
             [](const ast::ArrayParameter &, ParamTypingContext context) {
               context.numArrayParam++;

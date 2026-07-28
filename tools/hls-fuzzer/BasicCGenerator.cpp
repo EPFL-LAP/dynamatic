@@ -365,14 +365,24 @@ gen::BasicCGenerator::generateArrayParameter(OpaqueContext &&context) {
       [&](OpaqueContext &&context) {
         return generateScalarType(std::move(context));
       },
+      /*dimension=*/
+      [&](OpaqueContext &&context)
+          -> std::optional<std::pair<std::size_t, OpaqueContext>> {
+        // Generate a power-of-2 dimension to make the modulo operator fast and
+        // easy to implement. We choose an arbitrary upper-bound of 32 for the
+        // dimension for now.
+        std::size_t dimension = 1 << random.getInteger<std::size_t>(0, 5);
+        std::optional<std::size_t> chosen =
+            typeSystem.discardArrayDimensionOpaque(dimension, context);
+        if (!chosen)
+          return std::nullopt;
+
+        return std::pair{*chosen, std::move(context)};
+      },
       /*constructor=*/
-      [&](ast::ScalarType &&elementType) {
-        return arrayParameters.emplace_back(
-            std::move(elementType), generateFreshVarName(),
-            // Generate a power-of-2 dimension to make the modulo operator
-            // fast and easy to implement. We choose an arbitrary upper-bound
-            // of 32 for the dimension for now.
-            static_cast<std::size_t>(1 << random.getInteger(0, 5)));
+      [&](ast::ScalarType &&elementType, std::size_t &&dimension) {
+        return arrayParameters.emplace_back(std::move(elementType),
+                                            generateFreshVarName(), dimension);
       });
 }
 

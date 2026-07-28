@@ -243,6 +243,16 @@ public:
         context);
   }
 
+  std::optional<std::size_t> discardArrayDimension(std::size_t dimension,
+                                                   const Context &context) {
+    return combineDiscardOptional(
+        dimension,
+        [&](std::size_t dimension, auto &&typeSystem, auto &&context) {
+          return typeSystem.discardArrayDimension(dimension, context);
+        },
+        context);
+  }
+
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return combineGetTransferFns<ast::ArrayParameter>([&](auto &&typeSystem) {
