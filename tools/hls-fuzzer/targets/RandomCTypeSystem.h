@@ -18,7 +18,8 @@ class RandomCTypeSystem final
                                        LimitTypeSystem, TerminationTypeSystem> {
 public:
   explicit RandomCTypeSystem(Randomly &random)
-      : ConjunctionTypeSystemBase(DynamaticTypeSystem(), LimitTypeSystem(),
+      : ConjunctionTypeSystemBase(DynamaticTypeSystem(),
+                                  LimitTypeSystem(random),
                                   TerminationTypeSystem(random)) {}
 };
 } // namespace dynamatic::gen
