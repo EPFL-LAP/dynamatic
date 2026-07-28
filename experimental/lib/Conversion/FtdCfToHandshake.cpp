@@ -323,9 +323,8 @@ struct FtdCfToHandshakePass
         getAnalysis<gsa::GSAAnalysis>(), getAnalysis<NameAnalysis>(), converter,
         ctx);
 
-    patterns.add<
-        AllocaOpConversion, ConvertCalls,
-        GetGlobalOpConversion, GlobalOpConversion,
+    patterns.add<AllocaOpConversion, ConvertCalls, GetGlobalOpConversion,
+        GlobalOpConversion,
         FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
