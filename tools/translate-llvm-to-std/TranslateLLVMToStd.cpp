@@ -777,24 +777,21 @@ void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
 
   const llvm::Value *baseAddressLLVM = findBase(loadInst->getPointerOperand());
   memref = valueMap.at(baseAddressLLVM);
-  mlir::Value actualIndex;
   if (baseAddressLLVM != loadInst->getPointerOperand()) {
     // LoadOp needs the index operand to be of index type
     if (!isa<IndexType>(index.getType()))
-      actualIndex = builder.create<arith::IndexCastOp>(
-          UnknownLoc::get(ctx), builder.getIndexType(), index);
-    else
-      actualIndex = index;
+      index = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
+                                                 builder.getIndexType(), index);
   } else {
-    // Direct loading from the base address means that the index is for sure
-    // zero.
-    actualIndex = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
-                                                    builder.getIndexAttr(0));
+    // Direct loading from the base address is equivalent to loading from the
+    // 0-th position. Here, we create an constant op with value 0.
+    index = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
+                                              builder.getIndexAttr(0));
   }
 
   auto newOp =
       builder.create<memref::LoadOp>(UnknownLoc::get(ctx), resType, memref,
-                                     /*indices = */ actualIndex);
+                                     /*indices = */ index);
   valueMap[loadInst] = newOp.getResult();
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
@@ -803,26 +800,25 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
   mlir::Value memref;
   mlir::Value index = valueMap[storeInst->getPointerOperand()];
 
-  mlir::Value actualIndex;
   const llvm::Value *baseAddressLLVM = findBase(storeInst->getPointerOperand());
   memref = valueMap.at(baseAddressLLVM);
 
   if (baseAddressLLVM != storeInst->getPointerOperand()) {
     // LoadOp needs the index operand to be of index type
     if (!isa<IndexType>(index.getType()))
-      actualIndex = builder.create<arith::IndexCastOp>(
-          UnknownLoc::get(ctx), builder.getIndexType(), index);
-    else
-      actualIndex = index;
+      index = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
+                                                 builder.getIndexType(), index);
   } else {
-    actualIndex = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
-                                                    builder.getIndexAttr(0));
+    // Direct store to the base address is equivalent to storing to the
+    // 0-th position. Here, we create an constant op with value 0.
+    index = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
+                                              builder.getIndexAttr(0));
   }
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
   auto newOp =
       builder.create<memref::StoreOp>(UnknownLoc::get(ctx), storeValue, memref,
-                                      /*indices = */ actualIndex);
+                                      /*indices = */ index);
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
