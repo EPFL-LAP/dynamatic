@@ -353,9 +353,8 @@ public:
              "decisions locked in to calculate the path delays the MILP "
              "believes are present in the circuit."});
     addFlag({INSTRUMENT_II,
-             "Instrument the generated netlist so that the average initiation "
-             "interval (II) of each innermost loop is reported during "
-             "simulation"});
+             "Instrument the generated netlist so that each loop reports "
+             "the initiation of each of its iterations during simulation"});
   }
 
   CommandResult execute(CommandArguments &args) override;

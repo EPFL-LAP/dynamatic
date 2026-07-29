@@ -416,10 +416,7 @@ exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
-LOWER_TO_HW_PASS="--lower-handshake-to-hw"
-if [[ $INSTRUMENT_II -ne 0 ]]; then
-  LOWER_TO_HW_PASS="--lower-handshake-to-hw=instrument-ii=true"
-fi
+LOWER_TO_HW_PASS="--lower-handshake-to-hw=instrument-ii=${INSTRUMENT_II:-0}"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification

@@ -598,9 +598,10 @@
     "name": "ii_monitor",
     "parameters": [
       { "name": "LOOP_DEPTH", "type": "unsigned", "lb": 1 },
-      { "name": "LOOP_MAX_DEPTH", "type": "unsigned", "lb": 1 }
+      { "name": "LOOP_MAX_DEPTH", "type": "unsigned", "lb": 1 },
+      { "name": "INIT_SELECTS", "type": "string" }
     ],
-    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ii_monitor -p loop_depth=$LOOP_DEPTH loop_max_depth=$LOOP_MAX_DEPTH entry_extra_signals=$ENTRY_EXTRA_SIGNALS backedge_extra_signals=$BACKEDGE_EXTRA_SIGNALS exit_extra_signals=$EXIT_EXTRA_SIGNALS",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ii_monitor -p loop_depth=$LOOP_DEPTH loop_max_depth=$LOOP_MAX_DEPTH init_selects='$INIT_SELECTS' sel_bitwidths=$SEL_BITWIDTHS sel_extra_signals=$SEL_EXTRA_SIGNALS",
     "hdl": "vhdl"
   }
 ]

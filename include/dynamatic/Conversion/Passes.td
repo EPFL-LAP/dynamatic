@@ -79,8 +79,8 @@ def HandshakeToHW
   let options = [Option<
       "instrumentII", "instrument-ii", "bool", "false",
       "Instrument the generated netlist with a simulation-only monitor per "
-      "innermost loop that measures and reports its average initiation "
-      "interval (II) during simulation.">];
+      "loop that reports the initiation of each of its iterations during "
+      "simulation.">];
 }
 
 //===----------------------------------------------------------------------===//

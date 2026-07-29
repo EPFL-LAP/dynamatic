@@ -1,21 +1,24 @@
 // RUN: dynamatic-opt --lower-handshake-to-hw=instrument-ii=true %s | FileCheck %s
 // RUN: dynamatic-opt --lower-handshake-to-hw %s | FileCheck %s --check-prefix=NOINSTR
 
+// Both muxes are fired by the loop header's control merge (their selects are
+// the merge's index, through 'fork3'), so both are header muxes of the loop
+// and both are observed at their select channels; nothing else is. The merge
+// input fed from outside the loop is its first, so an activation's first
+// iteration is marked by the select value 0.
 // CHECK-LABEL:   hw.module @selfLoop
-// CHECK:           %{{.*}}, %[[ENTRY:.*]] = hw.instance "fork0"
-// CHECK:           %[[BACKEDGE:.*]], %[[EXIT:.*]] = hw.instance "cond_br2"
-// CHECK:           hw.instance "ii_monitor_control_merge0" @ii_monitor_1_1(
-// CHECK-SAME:        entry: %[[ENTRY]]
-// CHECK-SAME:        backedge: %[[BACKEDGE]]
-// CHECK-SAME:        exit: %[[EXIT]]
+// CHECK:           %[[SEL1:.*]], %[[SEL0:.*]] = hw.instance "fork3"
+// CHECK:           hw.instance "ii_monitor_control_merge0" @ii_monitor_control_merge0(
+// CHECK-SAME:        sel0: %[[SEL0]]
+// CHECK-SAME:        sel1: %[[SEL1]]
 // CHECK-SAME:        clk:
 // CHECK-SAME:        rst:
 // CHECK-SAME:      ) -> ()
-// CHECK:         hw.module.extern @ii_monitor_1_1(
-// CHECK-SAME:      in %{{[[:alnum:]]+}} : !handshake.control<>
-// CHECK-SAME:      in %{{[[:alnum:]]+}} : !handshake.control<>
-// CHECK-SAME:      in %{{[[:alnum:]]+}} : !handshake.control<>
-// CHECK-SAME:      attributes {hw.name = "ii_monitor", hw.parameters = {LOOP_DEPTH = 1 : ui32, LOOP_MAX_DEPTH = 1 : ui32}}
+// CHECK:         hw.module.extern @ii_monitor_control_merge0(
+// CHECK-SAME:      in %{{[[:alnum:]]+}} : !handshake.channel<i1>
+// CHECK-SAME:      in %{{[[:alnum:]]+}} : !handshake.channel<i1>
+// CHECK-SAME:      in %{{[[:alnum:]]+}} : i1
+// CHECK-SAME:      attributes {hw.name = "ii_monitor", hw.parameters = {INIT_SELECTS = "[0]", LOOP_DEPTH = 1 : ui32, LOOP_MAX_DEPTH = 1 : ui32}}
 
 // Without the option, no monitor is inserted.
 // NOINSTR-NOT: ii_monitor

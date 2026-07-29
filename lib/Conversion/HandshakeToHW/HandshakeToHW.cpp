@@ -22,6 +22,7 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -39,7 +40,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/GraphTraits.h"
-#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -53,6 +53,7 @@
 #include <bitset>
 #include <cctype>
 #include <cstdint>
+#include <deque>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -2133,6 +2134,8 @@ static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
 //===----------------------------------------------------------------------===//
 
 namespace {
+/// Graph machinery over control tokens. This is to find loops and their
+/// topology (nesting level, etc.).
 struct ControlGraph;
 
 /// Node of a function's control graph: one per non-memory operation, plus a
@@ -2158,24 +2161,21 @@ struct ControlNode {
 };
 
 struct ControlGraph {
-  std::vector<std::unique_ptr<ControlNode>> storage;
-  SmallVector<ControlNode *> allNodes;
+  /// A deque for the stable addresses, as the nodes point to each other.
+  std::deque<ControlNode> nodes;
   /// Maps each operation to its node.
   DenseMap<Operation *, ControlNode *> nodeFor;
 
   /// Required by 'DomTreeNodeTraits' (entry node).
-  ControlNode &front() { return *allNodes.front(); }
+  ControlNode &front() { return nodes.front(); }
 
   /// Builds the control graph of 'funcOp'.
   explicit ControlGraph(handshake::FuncOp funcOp) {
     auto addNode = [&](Operation *op) -> ControlNode * {
-      auto node = std::make_unique<ControlNode>();
-      node->op = op;
-      node->graph = this;
-      ControlNode *ptr = node.get();
-      allNodes.push_back(ptr);
-      storage.push_back(std::move(node));
-      return ptr;
+      ControlNode &node = nodes.emplace_back();
+      node.op = op;
+      node.graph = this;
+      return &node;
     };
 
     ControlNode *entry = addNode(nullptr);
@@ -2207,10 +2207,10 @@ struct ControlGraph {
     }
 
     // Connect all nodes without predecessors to the virtual entry node.
-    for (ControlNode *node : allNodes)
-      if (node != entry && node->preds.empty()) {
-        entry->succs.push_back(node);
-        node->preds.push_back(entry);
+    for (ControlNode &node : nodes)
+      if (&node != entry && node.preds.empty()) {
+        entry->succs.push_back(&node);
+        node.preds.push_back(entry);
       }
   }
 };
@@ -2241,23 +2241,14 @@ struct GraphTraits<Inverse<ControlNode *>> {
 
 template <>
 struct GraphTraits<ControlGraph *> : public GraphTraits<ControlNode *> {
-  using nodes_iterator = SmallVector<ControlNode *>::iterator;
+  using nodes_iterator = pointer_iterator<std::deque<ControlNode>::iterator>;
   static NodeRef getEntryNode(ControlGraph *graph) { return &graph->front(); }
   static nodes_iterator nodes_begin(ControlGraph *graph) {
-    return graph->allNodes.begin();
+    return nodes_iterator(graph->nodes.begin());
   }
   static nodes_iterator nodes_end(ControlGraph *graph) {
-    return graph->allNodes.end();
+    return nodes_iterator(graph->nodes.end());
   }
-};
-
-template <>
-struct GraphTraits<DomTreeNodeBase<ControlNode> *> {
-  using NodeRef = DomTreeNodeBase<ControlNode> *;
-  using ChildIteratorType = DomTreeNodeBase<ControlNode>::const_iterator;
-  static NodeRef getEntryNode(NodeRef node) { return node; }
-  static ChildIteratorType child_begin(NodeRef node) { return node->begin(); }
-  static ChildIteratorType child_end(NodeRef node) { return node->end(); }
 };
 
 template <>
@@ -2292,17 +2283,14 @@ struct IIMonitorSpec {
   /// Name of the loop header (a control merge) instance; used only to name the
   /// monitor instance.
   std::string loopName;
-  /// Name/result index of the instance producing the loop's entry channel (the
-  /// control merge input fed from outside the loop).
-  std::string entryName;
-  unsigned entryResultIdx;
-  /// Name/result index of the instance producing the loop's back-edge channel
-  /// (the control merge input fed from inside the loop).
-  std::string backedgeName;
-  unsigned backedgeResultIdx;
-  /// Name/result index of the instance producing the loop's own exit channel.
-  std::string exitName;
-  unsigned exitResultIdx;
+  /// Name/result index of the instances producing the select channels of the
+  /// loop's header muxes (see 'getHeaderMuxSelects'); the only channels the
+  /// monitor observes.
+  SmallVector<std::pair<std::string, unsigned>> selChannels;
+  /// The select values that mark the first iteration of an activation: the
+  /// indices of the header control merge's inputs that are fed from outside
+  /// the loop.
+  SmallVector<unsigned> initSelects;
   /// Nesting depth of the loop (1 for a top-level loop, 2 for a loop nested
   /// one level deep, ...).
   unsigned loopDepth;
@@ -2312,91 +2300,52 @@ struct IIMonitorSpec {
 };
 } // namespace
 
-/// Collects the distinct control channels on which a token appears when control
-/// actually leaves 'loop'.
+/// Collects the *select channels* of the loop's header muxes: for every mux
+/// fired by the loop header's control merge, the channel consumed as its
+/// select operand.
 ///
-/// Only conditional branches inside the loop are considered: such a branch
-/// routes its token either back into the loop or out of it, so a control-typed
-/// branch result whose consumers all lie outside the loop fires exactly once
-/// per loop activation and marks an exit. Exits are detected from the branch
-/// results directly (rather than from control-graph exit edges) because the
-/// exit channel's only consumer may be a memory interface, which is
-/// deliberately excluded from the control graph; such an exit would otherwise
-/// be invisible and the loop wrongly treated as infinite. Note that a control
-/// signal leading to e.g. a 'handshake.constant' inside the loop is not an
-/// exit: it stays within the loop and is correctly ignored by the in-loop-user
-/// check.
-static SmallVector<OpResult> getLoopExitChannels(ControlLoop *loop,
-                                                 ControlGraph &graph) {
-  SmallVector<OpResult> exitChannels;
-  for (ControlNode *node : loop->getBlocks()) {
-    if (!node->op || !isa<handshake::ConditionalBranchOp>(node->op))
-      continue;
-
-    for (OpResult res : node->op->getResults()) {
-      if (!isa<handshake::ControlType>(res.getType()) || res.use_empty())
-        continue;
-
-      // A result that feeds any in-loop node is the back-edge, not an exit.
-      bool leavesLoop = llvm::none_of(res.getUsers(), [&](Operation *user) {
-        ControlNode *userNode = graph.nodeFor.lookup(user);
-        return userNode && loop->contains(userNode);
-      });
-      if (leavesLoop && !llvm::is_contained(exitChannels, res))
-        exitChannels.push_back(res);
+/// Such a mux carries a value from one iteration of the loop to the next: its
+/// select is the merge's index output (through whatever forks and buffers the
+/// fan-out inserted), so per iteration it consumes one select token together
+/// with one data token -- the initial value from outside the loop on an
+/// activation's first iteration, the value the previous iteration fed back on
+/// every later one.
+///
+/// The select channel is the one channel that observes its mux's part of the
+/// loop exactly:
+///   * it is consumed the very cycle the mux fires (the mux joins it with the
+///     selected data operand before its internal output buffer), so its fires
+///     mark the moments the loop takes in its iterations' values, and the
+///     interval between two consecutive fires is an iteration-to-iteration
+///     initiation interval as this mux experienced it.
+///     The loop's control network could tell none of this: it forms a much
+///     shorter cycle of its own and runs ahead of the data until buffers fill
+///     up, which on a loop of a few iterations is the whole activation;
+///   * its value is the merge's choice, so it tells an activation's first
+///     iteration apart from the rest.
+///   * it fires exactly once per iteration, so counting its tokens counts the
+///     loop's iterations.
+///
+/// The muxes are found by walking the fan-out of the merge's index forward
+/// through forks and buffers.
+static SmallVector<OpResult>
+getHeaderMuxSelects(handshake::ControlMergeOp cmergeOp) {
+  SmallVector<OpResult> channels;
+  SmallVector<OpResult> worklist{cast<OpResult>(cmergeOp.getIndex())};
+  while (!worklist.empty()) {
+    OpResult channel = worklist.pop_back_val();
+    for (Operation *user : channel.getUsers()) {
+      if (isa<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp>(
+              user)) {
+        for (OpResult res : user->getResults())
+          worklist.push_back(res);
+      } else if (auto muxOp = dyn_cast<handshake::MuxOp>(user)) {
+        if (muxOp.getSelectOperand() == channel)
+          channels.push_back(channel);
+      }
     }
   }
-  return exitChannels;
-}
-
-/// Combines a set of control channels into a single channel that produces a
-/// token whenever any of them fires. A single channel is observed directly (the
-/// monitor passively taps its wires without becoming an extra consumer). If
-/// more than one channel is given, each is tapped through a fork (leaving the
-/// original consumers untouched) and the copies are combined with a freshly
-/// created 'handshake.control_merge' whose outputs are sinked. The combining
-/// hardware is inserted in the loop header's block. Returns a null value if
-/// 'channels' is empty. 'tag' seeds the names of any created operations.
-static OpResult combineChannels(SmallVector<OpResult> channels,
-                                ControlLoop *loop, OpBuilder &builder,
-                                NameAnalysis &namer, StringRef tag) {
-  if (channels.empty())
-    return {};
-  if (channels.size() == 1)
-    return channels.front();
-
-  std::string forkName = (tag + "_fork").str();
-  std::string mergeName = (tag + "_merge").str();
-  std::string sinkName = (tag + "_sink").str();
-
-  // Fork each channel so the merge observes a copy while the original consumer
-  // keeps receiving its token.
-  SmallVector<Value> taps;
-  for (OpResult channel : channels) {
-    builder.setInsertionPointAfter(channel.getOwner());
-    auto forkOp =
-        builder.create<handshake::ForkOp>(channel.getLoc(), channel, 2);
-    (void)namer.setName(forkOp, forkName, /*uniqueWhenTaken=*/true);
-    channel.replaceAllUsesExcept(forkOp->getResult(0), forkOp);
-    taps.push_back(forkOp->getResult(1));
-  }
-
-  // Merge the tapped copies into a single channel that fires on any input.
-  builder.setInsertionPoint(loop->getHeader()->op->getBlock()->getTerminator());
-  auto cmergeOp =
-      builder.create<handshake::ControlMergeOp>(taps.front().getLoc(), taps);
-  (void)namer.setName(cmergeOp, mergeName, /*uniqueWhenTaken=*/true);
-
-  // The merge's outputs are not part of the circuit; consume them with sinks so
-  // the merged channel has a real consumer (the monitor only taps its wires).
-  auto resSink = builder.create<handshake::SinkOp>(cmergeOp.getLoc(),
-                                                   cmergeOp.getResult());
-  (void)namer.setName(resSink, sinkName, /*uniqueWhenTaken=*/true);
-  auto idxSink =
-      builder.create<handshake::SinkOp>(cmergeOp.getLoc(), cmergeOp.getIndex());
-  (void)namer.setName(idxSink, sinkName, /*uniqueWhenTaken=*/true);
-
-  return cast<OpResult>(cmergeOp.getResult());
+  return channels;
 }
 
 /// Returns the deepest nesting depth reachable from 'loop' through its own
@@ -2409,37 +2358,18 @@ static unsigned getMaxLoopDepth(ControlLoop *loop) {
 }
 
 /// Detects every loop of 'funcOp' over its control graph and returns one
-/// monitor specification per loop whose header is a control merge. Loops with
-/// irregular control flow (no control merge header, no exit, ...) are silently
-/// skipped.
+/// monitor specification per loop whose header is a control merge and that
+/// carries at least one value from one iteration to the next. Loops with
+/// irregular control flow (no control merge header, no entry, no back-edge)
+/// are silently skipped, as is a loop that carries nothing: it has no
+/// recurrence to measure an II on and no channel to count its iterations by.
 ///
-/// Each loop is measured entirely from its own header/exit: the monitor
-/// observes three control channels of the loop:
-///   * the entry channel -- the control merge input(s) fed from outside the
-///     loop; a token here starts a fresh measurement window;
-///   * the back-edge channel -- the control merge input(s) fed from inside the
-///     loop; each token here advances the window by one iteration;
-///   * the exit channel -- the loop's own conditional-branch result(s) leaving
-///     the loop; a token here closes and reports the window.
-///
-/// Crucially the monitor taps the merge's *input* channels, not its index
-/// *output*. The control merge is not combinational: internally it buffers
-/// (a one-slot break-ready buffer feeding an eager output fork), so under
-/// backpressure the index output handshake can lag its inputs by several
-/// cycles.
-///
-/// The input side is immune: for the merge to fire the final iteration, and
-/// thus for the branch to ever produce the exit, it must first consume that
-/// iteration's back-edge input, so the last back-edge input is always ordered
-/// before the exit by pure dataflow causality, independent of buffering. This
-/// lets every loop report its own II exactly, including the final window.
-///
-/// This also naturally handles pipelining where iterations of two activations
-/// are in flight together, e.g. for a nest
-///   for (i ...) for (j ...) // work
-/// the last iteration of (0, y-1) may be in flight with (1, 0).
-static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
-                                                   NameAnalysis &namer) {
+/// A loop is observed exclusively through the select channels of its header
+/// muxes (see 'getHeaderMuxSelects'): the monitor reports each iteration as
+/// the slowest of them consumes it. Which select values mark the start of an
+/// activation is determined here, from the control merge: they are the
+/// indices of its inputs fed from outside the loop.
+static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp) {
   ControlGraph graph(funcOp);
 
   llvm::DominatorTreeBase<ControlNode, /*IsPostDom=*/false> domTree;
@@ -2447,83 +2377,69 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp,
   llvm::LoopInfoBase<ControlNode, ControlLoop> loopInfo;
   loopInfo.analyze(domTree);
 
-  OpBuilder builder(funcOp.getContext());
-
   SmallVector<IIMonitorSpec> specs;
   for (ControlLoop *loop : loopInfo.getLoopsInPreorder()) {
     // The loop header on the control network is the control merge that passes
     // exactly one token per iteration; its inputs distinguish an activation
-    // from outside the loop (entry) from one along the back-edge.
-    Operation *headerOp = loop->getHeader()->op;
-    auto cmerge = dyn_cast<handshake::ControlMergeOp>(headerOp);
-    if (!cmerge)
+    // from outside the loop from one along the back-edge.
+    auto cmergeOp =
+        dyn_cast_if_present<handshake::ControlMergeOp>(loop->getHeader()->op);
+    if (!cmergeOp)
       continue;
 
-    // Partition the merge inputs into entry channels (producer outside the
-    // loop) and back-edge channels (producer inside the loop).
-    SmallVector<OpResult> entryChannels, backedgeChannels;
-    for (Value operand : cmerge.getDataOperands()) {
-      auto opRes = dyn_cast<OpResult>(operand);
-      if (!opRes)
-        continue;
-      Operation *defOp = operand.getDefiningOp();
-      ControlNode *defNode = defOp ? graph.nodeFor.lookup(defOp) : nullptr;
+    // The indices of the merge inputs fed from outside the loop: the select
+    // values marking an activation's first iteration.
+    SmallVector<unsigned> initSelects;
+    bool hasBackedge = false;
+    for (auto [idx, operand] : llvm::enumerate(cmergeOp.getDataOperands())) {
+      ControlNode *defNode = nullptr;
+      if (auto opRes = dyn_cast<OpResult>(operand))
+        defNode = graph.nodeFor.lookup(opRes.getOwner());
       if (defNode && loop->contains(defNode))
-        backedgeChannels.push_back(opRes);
+        hasBackedge = true;
       else
-        entryChannels.push_back(opRes);
+        initSelects.push_back(idx);
     }
-    if (entryChannels.empty() || backedgeChannels.empty())
+    if (initSelects.empty() || !hasBackedge)
       continue;
 
-    // Observe the loop's own exit; by the causality argument above this is safe
-    // even for perfect (II=1) pipelining.
-    OpResult entryChannel =
-        combineChannels(entryChannels, loop, builder, namer, "ii_entry");
-    OpResult backedgeChannel =
-        combineChannels(backedgeChannels, loop, builder, namer, "ii_backedge");
-    OpResult exitChannel = combineChannels(getLoopExitChannels(loop, graph),
-                                           loop, builder, namer, "ii_exit");
-    // Skip infinite loops (no exit channel found).
-    if (!exitChannel)
+    SmallVector<std::pair<std::string, unsigned>> selChannels;
+    for (OpResult channel : getHeaderMuxSelects(cmergeOp))
+      selChannels.emplace_back(getUniqueName(channel.getOwner()).str(),
+                               channel.getResultNumber());
+    if (selChannels.empty())
       continue;
 
-    specs.push_back({getUniqueName(headerOp).str(),
-                     getUniqueName(entryChannel.getOwner()).str(),
-                     entryChannel.getResultNumber(),
-                     getUniqueName(backedgeChannel.getOwner()).str(),
-                     backedgeChannel.getResultNumber(),
-                     getUniqueName(exitChannel.getOwner()).str(),
-                     exitChannel.getResultNumber(), loop->getLoopDepth(),
+    specs.push_back({getUniqueName(cmergeOp).str(), std::move(selChannels),
+                     std::move(initSelects), loop->getLoopDepth(),
                      getMaxLoopDepth(loop)});
   }
   return specs;
 }
 
-/// Returns (creating it if necessary) the external HW module for an
-/// 'ii_monitor' with the given parameters. The module name encodes the
-/// parameters so that monitors with different parameters get distinct modules.
+/// Creates the external HW module for the 'ii_monitor' of one loop.
 static hw::HWModuleExternOp
-getOrCreateIIMonitorExtern(mlir::ModuleOp topModOp, OpBuilder &builder,
-                           unsigned loopDepth, unsigned loopMaxDepth,
-                           Type entryType, Type backedgeType, Type exitType) {
-  std::string name =
-      ("ii_monitor_" + Twine(loopDepth) + "_" + Twine(loopMaxDepth)).str();
-  if (auto extOp = topModOp.lookupSymbol<hw::HWModuleExternOp>(name))
-    return extOp;
-
+createIIMonitorExtern(ModuleOp topModOp, OpBuilder &builder, StringRef name,
+                      const IIMonitorSpec &spec, ArrayRef<Type> selTypes) {
   MLIRContext *ctx = builder.getContext();
   ModuleBuilder modBuilder(ctx);
-  modBuilder.addInput("entry", entryType);
-  modBuilder.addInput("backedge", backedgeType);
-  modBuilder.addInput("exit", exitType);
+  for (auto [idx, type] : llvm::enumerate(selTypes))
+    modBuilder.addInput("sel" + std::to_string(idx), type);
   modBuilder.addClkAndRst();
+  hw::ModulePortInfo ports = modBuilder.getPortInfo();
 
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointToEnd(topModOp.getBody());
-  auto extOp = builder.create<hw::HWModuleExternOp>(builder.getUnknownLoc(),
-                                                    builder.getStringAttr(name),
-                                                    modBuilder.getPortInfo());
+  auto extOp = builder.create<hw::HWModuleExternOp>(
+      builder.getUnknownLoc(), builder.getStringAttr(name), ports);
+
+  // The select values marking an activation's first iteration, as a list
+  // literal for the unit generator.
+  std::string initSelects;
+  llvm::raw_string_ostream os(initSelects);
+  os << '[';
+  llvm::interleaveComma(spec.initSelects, os);
+  os << ']';
 
   // Annotate with the RTL name and parameters so the backend can instantiate
   // the monitor through the unit-generation logic.
@@ -2533,9 +2449,11 @@ getOrCreateIIMonitorExtern(mlir::ModuleOp topModOp, OpBuilder &builder,
       RTL_PARAMETERS_ATTR_NAME,
       builder.getDictionaryAttr(
           {builder.getNamedAttr("LOOP_DEPTH",
-                                IntegerAttr::get(ui32, loopDepth)),
+                                IntegerAttr::get(ui32, spec.loopDepth)),
            builder.getNamedAttr("LOOP_MAX_DEPTH",
-                                IntegerAttr::get(ui32, loopMaxDepth))}));
+                                IntegerAttr::get(ui32, spec.loopMaxDepth)),
+           builder.getNamedAttr("INIT_SELECTS",
+                                builder.getStringAttr(initSelects))}));
   return extOp;
 }
 
@@ -2561,25 +2479,30 @@ static void insertIIMonitors(hw::HWModuleOp hwModOp,
   builder.setInsertionPoint(hwModOp.getBodyBlock()->getTerminator());
 
   for (const IIMonitorSpec &spec : specs) {
-    auto entryIt = byName.find(spec.entryName);
-    auto backedgeIt = byName.find(spec.backedgeName);
-    auto exitIt = byName.find(spec.exitName);
-    if (entryIt == byName.end() || backedgeIt == byName.end() ||
-        exitIt == byName.end())
+    // A select channel whose instance cannot be found is dropped rather than
+    // failing the whole monitor: the loop is still measurable, only from one
+    // recurrence less.
+    SmallVector<Value> selVals;
+    for (const auto &[name, resultIdx] : spec.selChannels) {
+      auto it = byName.find(name);
+      if (it != byName.end())
+        selVals.push_back(it->second->getResult(resultIdx));
+    }
+    if (selVals.empty())
       continue;
 
-    Value entryVal = entryIt->second->getResult(spec.entryResultIdx);
-    Value backedgeVal = backedgeIt->second->getResult(spec.backedgeResultIdx);
-    Value exitVal = exitIt->second->getResult(spec.exitResultIdx);
+    SmallVector<Type> selTypes;
+    for (Value val : selVals)
+      selTypes.push_back(val.getType());
 
-    hw::HWModuleExternOp extOp = getOrCreateIIMonitorExtern(
-        topModOp, builder, spec.loopDepth, spec.loopMaxDepth,
-        entryVal.getType(), backedgeVal.getType(), exitVal.getType());
+    std::string name = "ii_monitor_" + spec.loopName;
+    hw::HWModuleExternOp extOp =
+        createIIMonitorExtern(topModOp, builder, name, spec, selTypes);
 
-    SmallVector<Value> operands{entryVal, backedgeVal, exitVal, clkVal, rstVal};
-    builder.create<hw::InstanceOp>(
-        hwModOp.getLoc(), extOp,
-        builder.getStringAttr("ii_monitor_" + spec.loopName), operands);
+    SmallVector<Value> operands(selVals);
+    operands.append({clkVal, rstVal});
+    builder.create<hw::InstanceOp>(hwModOp.getLoc(), extOp,
+                                   builder.getStringAttr(name), operands);
   }
 }
 
@@ -2628,11 +2551,11 @@ public:
     if (failed(convertExternalFunctions(typeConverter)))
       return signalPassFailure();
 
-    // Detect the innermost loops to instrument while the Handshake function is
-    // still available. The monitors are materialized after lowering.
+    // Detect the loops to instrument while the Handshake function is still
+    // available. The monitors are materialized after lowering.
     SmallVector<IIMonitorSpec> iiMonitorSpecs;
     if (instrumentII && funcOp)
-      iiMonitorSpecs = detectIIMonitors(funcOp, namer);
+      iiMonitorSpecs = detectIIMonitors(funcOp);
 
     // Helper struct for lowering
     OpBuilder builder(ctx);
