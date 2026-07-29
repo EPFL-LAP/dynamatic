@@ -315,6 +315,7 @@ The μ gate outputs its initial value during the first iteration of the loop. On
 Therefore, the condition of a μ gate is defined as the **negation of the loop exit condition**.
 
 Later, during FTD implementation, the μ gate is replaced by a MUX whose condition comes from an INIT. The INIT functionality can be implemented either as a merge between a constant and the loop’s iterating condition, or as a one-entry buffer preloaded with an initial value. In both cases, the INIT first drives the MUX to select the initial input. After that, it forwards the loop condition, so the MUX selects between the initial input and the loop-carried input based on whether the loop exits or continues.
+<!--TODO: check with aya which implemntation to keep-->
 
 #### Note:
 The `getLoopExitCondition` function computes the overall exit condition by OR-ing the conditions of all loop exiting blocks. This function relies on `getBlockLoopExitCondition`, which computes the exit condition for a single block.
@@ -346,21 +347,20 @@ This block will be used as the root for path exploration in the next step.
 
 For each input operand:
 
-- Find all paths from the common dominator to the ϕ’s block that **pass through the operand’s block** but **avoid later operand blocks** that come later in the dominance order.
+- Find all paths from the common dominator (`start`) to the ϕ’s block (`end`) that pass through the operand’s producer block (`blockToTraverse`). While doing this, avoid the producer blocks of operands that appear later in the dominance-based ordering.
 
-- Paths are explored through the `findAllPaths` function, which calls `dfsAllPaths` to:
 
-  - finds all possible paths between two blocks,
+- Paths are explored through `findAllPaths`, which calls `dfsAllPaths` to:
 
-  - avoids certain blocks,
+  - find all possible paths between `start` and `end`,
+  - keep only paths that pass through `blockToTraverse`,
+  - avoid later operand producer blocks,
+  - allow a block to be revisited only if it is both the `start` and `end` (for loop cases).
 
-  - and allows a block to be revisited only if it is both the start and end (for loop cases).
-
-<!--TODO: add a simple example for the paths and 1.why revisit start and end, and 2.why avoid later operand blocks(example from Giacomo thesis) -->
 
 #### Sender filtering for operands from the same block
 
-If one block produces multiple values (operands) for the same ϕ, the DFS initially gives them identical paths.
+If multiple operands of the same ϕ are produced in the same block, path search initially gives them the same candidate paths.
 
 This is the case where producer and sender must be distinguished. The producer block tells us where the value was defined, but the sender block tells us which CFG predecessor actually passed that value to the ϕ. During path search, `operand->getBlock()` returns the producer block, so two operands produced in the same block can initially receive the same candidate paths. The `senders` set then filters these paths by requiring the block immediately before the ϕ block to be one of the recorded senders for that operand.
 
@@ -403,7 +403,9 @@ Notice that `%5` and `%8` are both produced in `bb2`, but they are forwarded to 
 When exploring paths, the DFS detects two possible routes from the producer `bb2` to the consumer `bb1`:
 `{bb2, bb1}` and `{bb2, bb3, bb4, bb1}`.
 
-However, the sender information disambiguates the two operands:
+Without sender filtering, both `%5` and `%8` would be associated with both paths, because both operands have producer block `bb2`.
+
+The sender information disambiguates the two operands:
 
 - The sender of `%8` is `bb2`, so only `{bb2, bb1}` is a valid path.
 
@@ -413,63 +415,71 @@ The implementation therefore filters paths by the sender block (the block immedi
 Only paths whose sender matches the operand’s recorded sender are kept.
 
 ### Step 4. Boolean Conditions
-<!--TODO: check if it can be described in a better clearer way-->
-<!--TODO: it seems that condition and expression and cofactore are used instead of each other make it clear which one is which and what do they mean. in theis ection and next section (build gamma tree)-->
 
-For each operand, compute a Boolean expression representing when that operand is chosen:
+For each ϕ operand, the analysis computes a Boolean expression that describes when that operand is selected.
 
-- The condition of a path = AND of all branch conditions along that path.
+The computation uses three related concepts:
 
-- The condition of an operand = OR of the conditions of all valid paths.
+- **Path condition:** the Boolean condition for one CFG path. It is the AND of the branch decisions along that path. For example, taking the true branch of `c0` and the false branch of `c1` gives `c0 & !c1`.
 
-- The resulting Boolean expressions are minimized.
+- **Operand expression:** the Boolean expression for one ϕ operand. It is the OR of the path conditions of all valid paths leading to that operand.
 
-All Boolean conditions (cofactors) are collected and sorted by the index of their originating block.
+- **Cofactor:** a single condition variable, such as `c0` or `c1`, associated with a conditional block. Cofactors are later used by `expandGammaTree` to split the operand expressions and build γ gates.
+
+For each operand:
+
+1. Compute the path condition of each valid path using `getPathExpression`.
+
+2. OR all path conditions together to obtain the operand expression.
+
+3. Minimize the resulting expression.
+
+While computing path expressions, the analysis also records which conditional blocks appear on the valid paths. It stores their block indices in `blocksWithConditionInPath`. These indices are then sorted and converted into the cofactor order used by `expandGammaTree`.
 
 ### Step 5. Build the γ Tree
 
-The `expandGammaTree` function takes a ϕ gate (with its inputs and Boolean conditions) and recursively builds a binary tree of γ gates.
-Each γ is a two-input MUX driven by one simple Boolean condition.
+The `expandGammaTree` function takes the operand expressions computed in the previous step and recursively builds a binary tree of γ gates.
+Each γ is a two-input MUX driven by one cofactor, such as `c0` or `c1`.
 
 The process works as follows:
 
-#### 1. Pick a cofactor (condition):
+#### 1. Pick a cofactor
 
-The function starts from the queue of cofactors (i.e., the Boolean conditions collected and sorted in the previous step). Since they are ordered by block index, the first cofactor we take is guaranteed to be common to all input expressions (because the blocks associated with it dominate the others). This ensures that splitting on this cofactor applies consistently across all inputs.
+The function starts from the queue of cofactors, which were collected from the paths and sorted by block index in the previous step. Because of this ordering, the first cofactor selected for expansion is guaranteed to be common to all current operand expressions. This ensures that splitting on the selected cofactor applies consistently across all current inputs.
 
-#### 2. Split expressions by condition:
+#### 2. Split operand expressions by the selected cofactor
 
-For each input expression (operand + condition):
+For each operand expression:
 
-- Restrict the Boolean expression once assuming the cofactor = `true`.
+- Restrict the expression assuming the cofactor is `true`.
 
-- Restrict it again assuming the cofactor = `false`.
+- Restrict the expression again assuming the cofactor is `false`.
 
-- Add the non-zero result(s) to either `conditionsTrueExpressions` or `conditionsFalseExpressions`.
+- Add each non-zero restricted expression to either `conditionsTrueExpressions` or `conditionsFalseExpressions`.
 
 #### 3. Build γ inputs:
 
-Now we decide what should feed the true and false inputs of the γ gate being built:
+Now we decide what should feed the true and false inputs of the γ gate being built. In the implementation, the false side feeds input `0` of the corresponding γ gate, and the true side feeds input `1`.
 
-- For each condition outcome (`conditionsTrueExpressions` or `conditionsFalseExpressions`), check how many expressions it contains.
+- For each condition outcome (`conditionsTrueExpressions` or `conditionsFalseExpressions`), check how many operand expressions it contains.
 
-- If it contains **more than one expression**, this means multiple operands could be selected under that branch of the condition. To resolve this, we recursively call `expandGammaTree` on that subset. The resulting γ gate from the recursion becomes the input of the current γ.
+- If it contains **more than one operand expression**, multiple operands can still be selected under that branch of the condition. To resolve this, recursively call `expandGammaTree` on that subset. The resulting γ gate becomes the input of the current γ.
 
-- If it contains `exactly one expression`, its operand is directly assigned as the input of the current γ.
+- If it contains **exactly one operand expression**, its operand is directly assigned as the input of the current γ.
 
-- If it contains `no expressions`, that outcome of the condition is never taken, and an empty input is created.
+- If it contains **no operand expressions**, that outcome of the condition is never taken, and an empty input is created.
 
 #### 4. Create the γ gate:
 
-A new γ is generated:
+A new γ gate is generated:
 
-- Its inputs are the “true” and “false” operands from the step above.
+- Its input `0` is the false-side input, and its input `1` is the true-side input.
 
 - Its condition is the cofactor currently being expanded.
 
 - Internally, its output is temporarily set to the original ϕ’s result. If the γ is not the root, this output will later become a “true” or “false” input of another γ, and the connection is updated when that parent γ is created.
 
-#### 5. Placement rule:
+#### 5. Placement rule:<!--TODO: check if it is still the case in code-->
 
 Normally, new γ gates are placed in the **same block as the original ϕ**.
 
@@ -492,9 +502,9 @@ For γs created from these muGenerated phis, we instead place them **in the same
 
 ### Step 6. Reconnect Uses
 
-Once a ϕ is replaced by its γ tree:
+Once a ϕ is replaced by its γ tree, all gates that previously used the ϕ’s output are updated to use the root γ gate instead.
 
-- All gates that previously used the ϕ’s output are updated to use the root γ gate instead.
+After all γ trees are generated and the uses of the original ϕ gates are reconnected to the corresponding γ roots, the remaining ϕ gates are no longer needed. The analysis then calls `removePhiGates()` to remove them from `gatesPerBlock`. This is safe because the γ conversion creates new γ gates instead of modifying the original ϕ gates in place.
 
 ---
 ### Example:
@@ -531,14 +541,15 @@ We will convert the ϕ in block bb3 (which merges values coming from bb0, bb1, a
 
 ### Step 1. Input Ordering
 
-The inputs from `bb0`, `bb1`, and `bb2` (namely `%c0_i32`, `%c0_i32_0`, and `%9`) are referred to as **x₀**, **x₁**, and **x₂**, respectively.  
-After dominance-based ordering, we have:  
+For the first argument of `bb3`, the incoming values from `bb0`, `bb1`, and `bb2` are `%c0_i32`, `%c0_i32_0`, and `%9`. We refer to them as **x₀**, **x₁**, and **x₂**, respectively.
+
+After dominance-based ordering, the operands are:
 `x₀ (bb0)`, `x₁ (bb1)`, `x₂ (bb2)`.
 
 
 ### Step 2. Find Common Dominator
 
-The nearest common dominator of all three input blocks is **bb0**.
+The nearest common dominator of all three input blocks is **bb0**. Therefore, path exploration starts from `bb0`.
 
 
 
@@ -546,15 +557,22 @@ The nearest common dominator of all three input blocks is **bb0**.
 
 For each input, all valid paths from the common dominator (`bb0`) to the ϕ’s block (`bb3`) are identified, while avoiding blocks corresponding to **later operand producers**:
 
-- **x₀:** `{bb0, bb3}`  *(must not pass through `bb1` or `bb2`, which produce later operands)*  
-- **x₁:** `{bb0, bb1, bb3}`  *(must not pass through `bb2`, the later operand producer)*  
-- **x₂:** `{bb0, bb1, bb2, bb3}`  
+- **x₀:** search from `bb0` to `bb3`, passing through `bb0`, while avoiding `bb1` and `bb2`.
+  The only valid path is `{bb0, bb3}`. Other paths such as `{bb0, bb1, bb3}` and `{bb0, bb1, bb2, bb3}` are rejected because they pass through later operand producer blocks.
 
-Next, we filter paths by the **sender block** (the block immediately before the ϕ) to ensure correct operand assignment:
+- **x₁:** search from `bb0` to `bb3`, passing through `bb1`, while avoiding `bb2`.
+  The only valid path is `{bb0, bb1, bb3}`.
 
-- `%c0_i32` (x₀) sender: `bb0` → path `{bb0, bb3}`  
-- `%c0_i32_0` (x₁) sender: `bb1` → path `{bb0, bb1, bb3}`  
-- `%9` (x₂) sender: `bb2` → path `{bb0, bb1, bb2, bb3}`
+- **x₂:** search from `bb0` to `bb3`, passing through `bb2`, with no later operand producer blocks to avoid.
+  The valid path is `{bb0, bb1, bb2, bb3}`.
+
+In this example, sender filtering keeps the same paths because each operand has a different producer block and sender block. The recorded sender of each input matches the block immediately before `bb3` in its selected path:
+
+| Operand | Sender | Selected path |
+| --- | --- | --- |
+| `%c0_i32` (**x₀**) | `bb0` | `{bb0, bb3}` |
+| `%c0_i32_0` (**x₁**) | `bb1` | `{bb0, bb1, bb3}` |
+| `%9` (**x₂**) | `bb2` | `{bb0, bb1, bb2, bb3}` |
 
 
 ### Step 4. Boolean Conditions
@@ -593,4 +611,4 @@ This γ gate becomes the **root** of the tree.
 
 ### Step 6. Connect Uses
 
-All uses of the original ϕ are updated to use the root γ gate instead.
+In this example, no other GSA gate uses the original ϕ, so no reconnection is needed. In general, any GSA gate that used the original ϕ is updated to use the root γ gate instead. After this step, the original ϕ is removed from `gatesPerBlock`.
