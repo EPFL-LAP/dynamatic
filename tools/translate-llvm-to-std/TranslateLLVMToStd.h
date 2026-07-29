@@ -66,6 +66,10 @@ private:
   /// inputs of load/store, see below).
   mlir::DenseMap<llvm::Value *, mlir::Value> valueMap;
 
+  // Mapping base address of array parameters and allocas to the corresponding
+  // MLIR type.
+  mlir::DenseMap<llvm::Value *, mlir::Value> llvmPtrToMemRefMap;
+
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
 
