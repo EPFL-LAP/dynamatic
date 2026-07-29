@@ -1417,6 +1417,196 @@ public:
     return self().getStatementProbabilityTable(context.cast<TypingContext>());
   }
 
+  // Generic adaptors.
+  //
+  // Everything above this point is named after the AST node it is about, which
+  // is what makes a type system readable but also what keeps code that is
+  // generic over the AST node from being written at all.
+  // The methods below turn an 'ASTNode' back into a call of the method
+  // corresponding to it, so that such code only has to name the AST node.
+  //
+  // The methods are called qualified on 'Target', which defaults to the most
+  // derived type system and therefore to the very method the caller would have
+  // named by hand. One can use a base class as 'Target' type instead to call a
+  // super class's implementation.
+  //
+  // 'TemplateTypeSystem' is the mirror image, implementing all of the methods
+  // above from one method template each.
+
+  /// Returns the transfer functions of 'ASTNode' by dispatching to the
+  /// 'get*TransferFns' method corresponding to it. 'args' are the extra
+  /// arguments that method takes, if any.
+  ///
+  /// Note that the AST node alone identifies the method.
+  template <typename ASTNode, typename Target = Self, typename... Args>
+  TransferFnArray<ASTNode> getTransferFn(Args &&...args) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<ASTNode, ast::Function>)
+      return target.Target::getFunctionTransferFns(std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ReturnStatement>)
+      return target.Target::getReturnStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarType>)
+      return target.Target::getScalarTypeTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ReturnType>)
+      return target.Target::getReturnTypeTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::BinaryExpression>)
+      return target.Target::getBinaryExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::UnaryExpression>)
+      return target.Target::getUnaryExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::Variable>)
+      return target.Target::getVariableTransferFns(std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::CastExpression>)
+      return target.Target::getCastExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ConditionalExpression>)
+      return target.Target::getConditionalExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::Constant>)
+      return target.Target::getConstantTransferFns(std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ExistingScalarParameter>)
+      return target.Target::getExistingScalarParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarParameter>)
+      return target.Target::getFreshScalarParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayReadExpression>)
+      return target.Target::getArrayReadExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ExistingArrayParameter>)
+      return target.Target::getExistingArrayParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayParameter>)
+      return target.Target::getFreshArrayParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayAssignmentStatement>)
+      return target.Target::getArrayAssignmentStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarAssignmentStatement>)
+      return target.Target::getScalarAssignmentStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StatementList>)
+      return target.Target::getStatementListTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
+      return target.Target::getStructuredForStatementTransferFns(
+          std::forward<Args>(args)...);
+    else {
+      static_assert(sizeof(ASTNode) == 0,
+                    "'ASTNode' does not have any transfer functions");
+      llvm_unreachable("does not compile");
+    }
+  }
+
+  /// Returns whether the terminal 'node' should be discarded in 'context', by
+  /// dispatching to the 'discard*' method corresponding to it.
+  ///
+  /// A terminal is an AST node the generator already has in hand and merely
+  /// asks the type system to accept, as opposed to a non-terminal which it is
+  /// about to generate from scratch (see 'discardNonTerminal').
+  ///
+  /// Note that 'discardConstant' is the one method that may also *replace* the
+  /// node it is given, which this adaptor cannot express and therefore reduces
+  /// to whether it was discarded. Callers that care have to use the method.
+  template <typename ASTNode, typename Target = Self>
+  bool discardTerminal(const ASTNode &node, const TypingContext &context) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<ASTNode, ast::ScalarType>)
+      return target.Target::discardScalarType(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::ReturnType>)
+      return target.Target::discardReturnType(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::Constant>)
+      return !target.Target::discardConstant(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarParameter>)
+      return target.Target::discardExistingScalarParameter(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayParameter>)
+      return target.Target::discardExistingArrayParameter(node, context);
+    else {
+      static_assert(sizeof(ASTNode) == 0,
+                    "'ASTNode' is not a terminal that can be discarded");
+      llvm_unreachable("does not compile");
+    }
+  }
+
+  /// Returns whether the generator should refrain from generating 'ASTNode' in
+  /// 'context', by dispatching to the 'discard*' method corresponding to it.
+  /// 'args' are the extra arguments that method takes, if any -- the operator
+  /// of a binary or unary expression being the only ones today.
+  ///
+  /// A non-terminal is an AST node the generator is about to generate from
+  /// scratch, which is every AST node with subelements. Note in particular that
+  /// 'ast::ScalarParameter' and 'ast::ArrayParameter' refer to a *fresh*
+  /// parameter here, an existing one being a terminal instead (see
+  /// 'discardTerminal').
+  template <typename ASTNode, typename Target = Self, typename... Args>
+  bool discardNonTerminal(const TypingContext &context, Args &&...args) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<ASTNode, ast::BinaryExpression>)
+      return target.Target::discardBinaryExpression(std::forward<Args>(args)...,
+                                                    context);
+    else if constexpr (std::is_same_v<ASTNode, ast::UnaryExpression>)
+      return target.Target::discardUnaryExpression(std::forward<Args>(args)...,
+                                                   context);
+    else if constexpr (std::is_same_v<ASTNode, ast::Variable>)
+      return target.Target::discardVariable(context,
+                                            std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::CastExpression>)
+      return target.Target::discardCastExpression(context,
+                                                  std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ConditionalExpression>)
+      return target.Target::discardConditionalExpression(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarParameter>)
+      return target.Target::discardFreshScalarParameter(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayReadExpression>)
+      return target.Target::discardArrayReadExpression(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayParameter>)
+      return target.Target::discardFreshArrayParameter(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayAssignmentStatement>)
+      return target.Target::discardArrayAssignmentStatement(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarAssignmentStatement>)
+      return target.Target::discardScalarAssignmentStatement(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StatementList>)
+      return target.Target::discardStatementList(context,
+                                                 std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
+      return target.Target::discardStructuredForStatement(
+          context, std::forward<Args>(args)...);
+    else {
+      static_assert(sizeof(ASTNode) == 0,
+                    "'ASTNode' is not a non-terminal that can be discarded");
+      llvm_unreachable("does not compile");
+    }
+  }
+
+  /// Returns the probability table keyed by 'Key' in 'context', by dispatching
+  /// to the 'get*ProbabilityTable' method corresponding to it.
+  ///
+  /// Unlike the adaptors above this one dispatches on the key of the table
+  /// rather than on an AST node, there being one table per set of AST nodes the
+  /// generator picks from rather than one per AST node.
+  template <typename Key, typename Target = Self>
+  ProbabilityTable<Key> getProbabilityTable(const TypingContext &context) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<Key, ExpressionKey>)
+      return target.Target::getExpressionProbabilityTable(context);
+    else if constexpr (std::is_same_v<Key, StatementKey>)
+      return target.Target::getStatementProbabilityTable(context);
+    else {
+      static_assert(sizeof(Key) == 0, "'Key' does not key a probability table");
+      llvm_unreachable("does not compile");
+    }
+  }
+
 private:
   Self &self() { return static_cast<Self &>(*this); }
 
@@ -1428,83 +1618,6 @@ private:
 class NoopTypeSystem final : public TypeSystem<std::monostate, NoopTypeSystem> {
 public:
   ~NoopTypeSystem() override;
-};
-
-/// Convenience type system that disallows every AST constructs (besides
-/// functions) by default.
-template <typename TypingContext, typename Self>
-class DisallowByDefaultTypeSystem : public TypeSystem<TypingContext, Self> {
-
-public:
-  static bool discardBinaryExpression(ast::BinaryExpression::Op,
-                                      const TypingContext &) {
-    return true;
-  }
-
-  static bool discardUnaryExpression(ast::UnaryExpression::Op,
-                                     const TypingContext &) {
-    return true;
-  }
-
-  static bool discardVariable(const TypingContext &) { return true; }
-
-  static bool discardCastExpression(const TypingContext &) { return true; }
-
-  static bool discardConditionalExpression(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardScalarType(const ast::ScalarType &,
-                                const TypingContext &) {
-    return true;
-  }
-
-  static bool discardReturnType(const ast::ReturnType &,
-                                const TypingContext &) {
-    return true;
-  }
-
-  std::optional<ast::Constant> discardConstant(const ast::Constant &,
-                                               const TypingContext &) {
-    return std::nullopt;
-  }
-
-  static bool discardExistingScalarParameter(const ast::ScalarParameter &,
-                                             const TypingContext &) {
-    return true;
-  }
-
-  static bool discardFreshScalarParameter(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardArrayReadExpression(const TypingContext &) { return true; }
-
-  static bool discardExistingArrayParameter(const ast::ArrayParameter &,
-                                            const TypingContext &) {
-    return true;
-  }
-
-  static bool discardFreshArrayParameter(const TypingContext &) { return true; }
-
-  static std::optional<std::size_t>
-  discardArrayDimension(std::size_t, const TypingContext &) {
-    return std::nullopt;
-  }
-
-  static bool discardArrayAssignmentStatement(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardScalarAssignmentStatement(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardStatementList(const TypingContext &) { return true; }
-
-  static bool discardStructuredForStatement(const TypingContext &) {
-    return true;
-  }
 };
 
 } // namespace dynamatic::gen
