@@ -189,6 +189,15 @@ public:
     return constant;
   }
 
+  /// Note that a dimension is only ever kept or discarded here. A type system
+  /// wanting to replace it with another one has to define this method itself.
+  std::optional<std::size_t>
+  discardArrayDimension(std::size_t dimension, const TypingContext &context) {
+    if (terminal(dimension, context))
+      return std::nullopt;
+    return dimension;
+  }
+
   bool discardExistingScalarParameter(const ast::ScalarParameter &parameter,
                                       const TypingContext &context) {
     return terminal(parameter, context);

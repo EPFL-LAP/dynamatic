@@ -1509,9 +1509,10 @@ public:
   /// asks the type system to accept, as opposed to a non-terminal which it is
   /// about to generate from scratch (see 'discardNonTerminal').
   ///
-  /// Note that 'discardConstant' is the one method that may also *replace* the
-  /// node it is given, which this adaptor cannot express and therefore reduces
-  /// to whether it was discarded. Callers that care have to use the method.
+  /// Note that 'discardConstant' and 'discardArrayDimension' are the methods
+  /// that may also *replace* the node they are given, which this adaptor cannot
+  /// express and therefore reduces to whether it was discarded. Callers that
+  /// care have to use the method.
   template <typename ASTNode, typename Target = Self>
   bool discardTerminal(const ASTNode &node, const TypingContext &context) {
     Target &target = static_cast<Target &>(*this);
@@ -1521,6 +1522,9 @@ public:
       return target.Target::discardReturnType(node, context);
     else if constexpr (std::is_same_v<ASTNode, ast::Constant>)
       return !target.Target::discardConstant(node, context);
+    else if constexpr (std::is_same_v<ASTNode, std::size_t>)
+      // The dimension of an 'ast::ArrayParameter'.
+      return !target.Target::discardArrayDimension(node, context);
     else if constexpr (std::is_same_v<ASTNode, ast::ScalarParameter>)
       return target.Target::discardExistingScalarParameter(node, context);
     else if constexpr (std::is_same_v<ASTNode, ast::ArrayParameter>)

@@ -71,6 +71,17 @@ public:
         context);
   }
 
+  /// Spelled out for the same reason as 'discardConstant'.
+  std::optional<std::size_t> discardArrayDimension(std::size_t dimension,
+                                                   const Context &context) {
+    return combineDiscardOptional(
+        dimension,
+        [&](std::size_t dimension, auto &&typeSystem, auto &&context) {
+          return typeSystem.discardArrayDimension(dimension, context);
+        },
+        context);
+  }
+
   /// Every non-terminal is discarded if any of the sub type systems discards
   /// it.
   template <typename ASTNode, typename... Args>

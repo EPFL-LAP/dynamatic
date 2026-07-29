@@ -78,6 +78,16 @@ public:
     return subTypeSystem.discardConstant(constant, *context);
   }
 
+  /// Spelled out for the same reason as 'discardConstant': the sub type system
+  /// may replace the dimension with another one, which a terminal cannot
+  /// express.
+  std::optional<std::size_t> discardArrayDimension(std::size_t dimension,
+                                                   const Context &context) {
+    if (!context)
+      return dimension;
+    return subTypeSystem.discardArrayDimension(dimension, *context);
+  }
+
   /// While disabled, no non-terminal is ever discarded.
   template <typename ASTNode, typename... Args>
   bool discardNonTerminalImpl(const Context &context, const Args &...args) {
