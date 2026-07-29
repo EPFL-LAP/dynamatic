@@ -23,6 +23,9 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+
 #include <boost/graph/connected_components.hpp>
 #include <boost/property_map/property_map.hpp>
 #include <cstddef>
@@ -72,6 +75,12 @@ using DimInfoOfAllDimensions = std::vector<DimInfo>;
 
 namespace {
 
+struct PragmaPartitionInfo {
+  unsigned dimension;
+  unsigned factor;
+  std::string style;
+};
+
 struct AccessInfo {
   std::map<Instruction *, isl::set> accessMaps;
 
@@ -90,6 +99,18 @@ struct AccessInfo {
     return instToScopId.count(i) == instToScopId.count(j);
   }
 };
+
+std::optional<StringRef> extractStringLiteral(Value *v) {
+  auto *gv = dyn_cast<GlobalVariable>(v->stripPointerCasts());
+  if (!gv || !gv->hasInitializer())
+    return std::nullopt;
+
+  auto *cda = dyn_cast<ConstantDataArray>(gv->getInitializer());
+  if (!cda || !cda->isCString())
+    return std::nullopt;
+
+  return cda->getAsCString();
+}
 
 Value *findBaseInternal(Value *addr) {
   if (auto *arg = dyn_cast<Argument>(addr)) {
@@ -371,6 +392,15 @@ AllocaInst *createAlloca(AllocaInst *origAlloca,
   return newAlloca;
 }
 
+std::vector<AllocaInst *> createBankAllocas(AllocaInst *origAlloca,
+                                            const std::vector<DimInfo> &banks) {
+  std::vector<AllocaInst *> result;
+  result.reserve(banks.size());
+  for (const DimInfo &bank : banks)
+    result.push_back(createAlloca(origAlloca, DimInfoOfAllDimensions{bank}));
+  return result;
+}
+
 void getAllRegions(llvm::Region &r, std::deque<llvm::Region *> &rq) {
   rq.push_back(&r);
   for (const auto &e : r)
@@ -619,6 +649,282 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
   }
 }
 
+std::map<std::string, PragmaPartitionInfo>
+collectAndErasePragmaMarkers(Function &f) {
+  std::map<std::string, PragmaPartitionInfo> result;
+  std::vector<CallInst *> toErase;
+  Function *markerFn = nullptr;
+
+  for (auto &bb : f) {
+    for (auto &inst : bb) {
+      auto *call = dyn_cast<CallInst>(&inst);
+      if (!call)
+        continue;
+
+      Function *callee = call->getCalledFunction();
+      if (!callee || callee->getName() != "__dyn_array_partition")
+        continue;
+
+      markerFn = callee;
+
+      if (call->arg_size() != 4) {
+        llvm::report_fatal_error(
+            Twine("__dyn_array_partition: expected 4 arguments, got ") +
+            Twine(call->arg_size()));
+      }
+
+      auto arrName = extractStringLiteral(call->getArgOperand(0));
+      auto *dimConst = dyn_cast<ConstantInt>(call->getArgOperand(1));
+      auto *factorConst = dyn_cast<ConstantInt>(call->getArgOperand(2));
+      auto style = extractStringLiteral(call->getArgOperand(3));
+
+      if (!arrName)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: could not recover array name "
+            "string literal");
+      if (!dimConst || !factorConst)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: dimension/factor must be "
+            "constant integers");
+      if (!style)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: could not recover style string"
+            "literal");
+
+      LLVM_DEBUG(llvm::errs() << "Found array_partition pragma on '" << *arrName
+                              << "': dim=" << dimConst->getZExtValue()
+                              << " factor=" << factorConst->getZExtValue()
+                              << " style=" << *style << "\n";);
+
+      result[arrName->str()] = PragmaPartitionInfo{
+          static_cast<unsigned>(dimConst->getZExtValue()),
+          static_cast<unsigned>(factorConst->getZExtValue()), style->str()};
+
+      toErase.push_back(call);
+    }
+  }
+
+  for (auto *call : toErase)
+    call->eraseFromParent();
+
+  if (markerFn && markerFn->use_empty())
+    markerFn->eraseFromParent();
+
+  return result;
+}
+
+std::vector<DimInfo> computeBankDimInfo(llvm::Type *arrayType, unsigned factor,
+                                        StringRef style) {
+  if (!arrayType->isArrayTy())
+    llvm::report_fatal_error(
+        "__dyn_array_partition: pragma target is not an array type");
+
+  unsigned totalSize = arrayType->getArrayNumElements();
+
+  if (totalSize == 0)
+    llvm::report_fatal_error(
+        "__dyn_array_partition: cannot partition a zero-length array");
+
+  // TODO: Ensure is logically consistent with the way pragmas are handlded
+  if (style == "complete") {
+    factor = totalSize;
+  }
+
+  if (factor == 0 || factor > totalSize) {
+    llvm::report_fatal_error("__dyn_array_partition: factor must be in [1, N]");
+  }
+
+  unsigned chunkSize = totalSize / factor;
+  unsigned remainder = totalSize % factor;
+
+  std::vector<DimInfo> banks;
+  banks.reserve(factor);
+
+  if (style == "block" || style == "complete") {
+    unsigned offset = 0;
+    for (unsigned b = 0; b < factor; ++b) {
+      // last bank absorbs the remainder
+      unsigned elems = chunkSize + (b + 1 == factor ? remainder : 0);
+      banks.emplace_back(offset, 1, elems);
+      offset += elems;
+    }
+  } else if (style == "cyclic") {
+    for (unsigned b = 0; b < factor; ++b) {
+      unsigned elems = chunkSize + (b < remainder ? 1u : 0u);
+      banks.emplace_back(/*firstIndex=*/b, /*step=*/factor, elems);
+    }
+  } else {
+    std::string errString = "__dyn_array_partition: unknown style '" +
+                            style.str() +
+                            "' (expected block, cyclic, or complete)";
+    llvm::report_fatal_error(errString.c_str());
+  }
+
+  return banks;
+}
+
+void debugPrintBankDimInfo(StringRef arrayName, llvm::Type *arrayType,
+                           unsigned factor, StringRef style) {
+  llvm::errs() << "Computing bank layout for '" << arrayName
+               << "' (factor=" << factor << ", style=" << style << ")\n";
+
+  auto banks = computeBankDimInfo(arrayType, factor, style);
+
+  unsigned sumElems = 0;
+  for (unsigned b = 0; b < banks.size(); ++b) {
+    auto [firstIndex, step, elems] = banks[b];
+    llvm::errs() << "  bank " << b << ": firstIndex=" << firstIndex
+                 << " step=" << step << " elems=" << elems << "\n";
+    sumElems += elems;
+  }
+
+  llvm::errs() << "  (sum of elems across banks: " << sumElems << ")\n";
+}
+
+void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
+                                ArrayRef<DimInfo> bankInfo, StringRef style,
+                                unsigned factor, unsigned chunkSize,
+                                unsigned remainder) {
+  auto *gepInst = dyn_cast<GetElementPtrInst>(findBaseGEP(inst));
+  if (!gepInst) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: expected a GEP for this access (direct "
+        "zero-index accesses are not yet supported here)");
+  }
+
+  Value *origIdx = gepInst->getOperand(gepInst->getNumOperands() - 1);
+  Type *addrTy = origIdx->getType();
+
+  LLVMContext &ctx = inst->getContext();
+  Function *f = inst->getParent()->getParent();
+
+  BasicBlock *origBB = gepInst->getParent();
+  BasicBlock *mergeBB = SplitBlock(origBB, gepInst->getIterator());
+  Instruction *placeholderBr = origBB->getTerminator();
+
+  IRBuilder<> preBuilder(placeholderBr);
+
+  Type *i32Ty = Type::getInt32Ty(ctx);
+  Value *idx32 =
+      addrTy == i32Ty
+          ? origIdx
+          : (addrTy->getIntegerBitWidth() > 32
+                 ? preBuilder.CreateTrunc(origIdx, i32Ty, "idx.trunc")
+                 : preBuilder.CreateZExt(origIdx, i32Ty, "idx.zext"));
+
+  Value *bankIdx;
+  if (style == "cyclic") {
+    bankIdx = preBuilder.CreateURem(idx32, ConstantInt::get(i32Ty, factor),
+                                    "bank.idx");
+  } else {
+    Value *raw = preBuilder.CreateUDiv(
+        idx32, ConstantInt::get(i32Ty, chunkSize), "bank.raw");
+    if (remainder != 0) {
+      Value *maxBank = ConstantInt::get(i32Ty, factor - 1);
+      Value *tooLarge = preBuilder.CreateICmpUGT(raw, maxBank);
+      bankIdx = preBuilder.CreateSelect(tooLarge, maxBank, raw, "bank.idx");
+    } else {
+      bankIdx = raw;
+    }
+  }
+
+  placeholderBr->eraseFromParent();
+
+  std::vector<BasicBlock *> caseBBs;
+  caseBBs.reserve(factor);
+  for (unsigned b = 0; b < factor; ++b)
+    caseBBs.push_back(
+        BasicBlock::Create(ctx, "dyn.partition.bank" + Twine(b), f));
+
+  if (factor == 1) {
+    IRBuilder<>(origBB).CreateBr(caseBBs[0]);
+  } else {
+    BasicBlock *currentBB = origBB;
+    for (unsigned b = 0; b + 1 < factor; ++b) {
+      IRBuilder<> checkBuilder(currentBB);
+      Value *cmp = checkBuilder.CreateICmpEQ(
+          bankIdx, ConstantInt::get(i32Ty, b), "bank.check" + Twine(b));
+      bool isLastCheck = (b + 2 == factor);
+      BasicBlock *elseBB =
+          isLastCheck ? caseBBs[factor - 1]
+                      : BasicBlock::Create(
+                            ctx, "dyn.partition.check" + Twine(b + 1), f);
+      checkBuilder.CreateCondBr(cmp, caseBBs[b], elseBB);
+      currentBB = elseBB;
+    }
+  }
+
+  auto *load = dyn_cast<LoadInst>(inst);
+  auto *store = dyn_cast<StoreInst>(inst);
+  std::vector<std::pair<BasicBlock *, Value *>> incoming;
+
+  for (unsigned b = 0; b < factor; ++b) {
+    IRBuilder<> caseBuilder(caseBBs[b]);
+    auto [firstIndex, step, elems] = bankInfo[b];
+    Value *newIdx = caseBuilder.CreateUDiv(
+        caseBuilder.CreateSub(origIdx, ConstantInt::get(addrTy, firstIndex)),
+        ConstantInt::get(addrTy, step), "part.idx");
+
+    Value *newGEP = caseBuilder.CreateInBoundsGEP(
+        banks[b]->getAllocatedType(), banks[b],
+        {ConstantInt::get(Type::getInt64Ty(ctx), 0), newIdx}, "part.gep");
+
+    if (load) {
+      Value *loaded = caseBuilder.CreateLoad(load->getType(), newGEP,
+                                             load->getName() + ".part");
+      incoming.emplace_back(caseBBs[b], loaded);
+    } else if (store) {
+      caseBuilder.CreateStore(store->getValueOperand(), newGEP);
+    }
+    caseBuilder.CreateBr(mergeBB);
+  }
+
+  if (load) {
+    IRBuilder<> mergeBuilder(&mergeBB->front());
+    PHINode *phi = mergeBuilder.CreatePHI(load->getType(), factor,
+                                          load->getName() + ".merged");
+    for (auto &[bb, val] : incoming)
+      phi->addIncoming(val, bb);
+    load->replaceAllUsesWith(phi);
+  }
+
+  inst->eraseFromParent();
+  gepInst->eraseFromParent();
+}
+
+void partitionAccordingToPragma(Value *base, std::set<Instruction *> &insts,
+                                const PragmaPartitionInfo &pragma) {
+  auto *baseAlloca = dyn_cast<AllocaInst>(base);
+  if (!baseAlloca) {
+    llvm::report_fatal_error(
+        Twine("__dyn_array_partition: only local (alloca) arrays are "
+              "supported so far -- '") +
+        base->getName() + "' is not one");
+  }
+  if (pragma.dimension != 1) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: only 1D arrays (dimension=1) are supported "
+        "so far");
+  }
+
+  auto banks = computeBankDimInfo(baseAlloca->getAllocatedType(), pragma.factor,
+                                  pragma.style);
+  LLVM_DEBUG(debugPrintBankDimInfo(base->getName(),
+                                   baseAlloca->getAllocatedType(),
+                                   pragma.factor, pragma.style););
+
+  auto bankAllocas = createBankAllocas(baseAlloca, banks);
+
+  unsigned N = baseAlloca->getAllocatedType()->getArrayNumElements();
+  unsigned factor = static_cast<unsigned>(bankAllocas.size());
+  unsigned chunkSize = N / factor;
+  unsigned remainder = N % factor;
+
+  for (auto *inst : insts) {
+    rewriteAccessWithBranching(inst, bankAllocas, banks, pragma.style, factor,
+                               chunkSize, remainder);
+  }
+}
 } // namespace
 
 struct ArrayPartition : PassInfoMixin<ArrayPartition> {
@@ -636,6 +942,8 @@ PreservedAnalyses ArrayPartition::run(Function &f,
         << "Skipping main function for automatic array partitioning!\n";
     return PreservedAnalyses::all();
   }
+
+  auto pragmaInfo = collectAndErasePragmaMarkers(f);
 
   auto islCtx = isl::ctx(isl_ctx_alloc());
 
@@ -702,10 +1010,16 @@ PreservedAnalyses ArrayPartition::run(Function &f,
     }
   }
 
+  std::vector<std::pair<Value *, std::set<Instruction *>>> deferredPragmaBases;
   // For each base address of the GEPs that are allocas (i.e., a separate RAM in
   // HLS circuit), compute the optimal partitioning and create separate alloca
   // instructions.
   for (auto [base, insts] : info.baseToInsts) {
+    auto it = pragmaInfo.find(base->getName().str());
+    if (it != pragmaInfo.end()) {
+      deferredPragmaBases.emplace_back(base, insts);
+      continue;
+    }
     if (isa<Instruction>(base)) {
       if (auto *allocaInst = dyn_cast<AllocaInst>(base)) {
         // If the base is an alloca, we can partition it
@@ -723,7 +1037,21 @@ PreservedAnalyses ArrayPartition::run(Function &f,
       }
     }
   }
-  return PreservedAnalyses::all();
+
+  bool didMutateCFG = false;
+
+  if (!deferredPragmaBases.empty()) {
+    info.accessMaps.clear();
+    fam.invalidate(f, PreservedAnalyses::none());
+  }
+
+  for (auto &[base, insts] : deferredPragmaBases) {
+    partitionAccordingToPragma(base, insts,
+                               pragmaInfo.at(base->getName().str()));
+    didMutateCFG = true;
+  }
+
+  return didMutateCFG ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 // Register the pass for opt-style loading

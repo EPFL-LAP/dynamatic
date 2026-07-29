@@ -49,6 +49,9 @@ F_C_REWRITTEN="$COMP_DIR/$KERNEL_NAME.c"
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
+F_CLANG_OPTIMIZED_PARTITIONED="$COMP_DIR/clang.opt.dep.part.ll"
+F_CLANG_OPTIMIZED_PARTITIONED_RENAMED="$COMP_DIR/clang.opt.dep.part.renamed.ll"
+F_CLANG_OPTIMIZED_PARTITIONED_CLEANED="$COMP_DIR/clang.opt.dep.part.clean.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
@@ -216,8 +219,35 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
-$LLVM_TO_STD_TRANSLATION_BIN \
+$LLVM_OPT -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/ArrayPartition.so" \
+  -passes="array-partition" \
+  -polly-process-unprofitable \
   "$F_CLANG_OPTIMIZED_DEPENDENCY" \
+  > "$F_CLANG_OPTIMIZED_PARTITIONED"
+exit_on_fail "Failed to apply array partitioning to LLVM IR" \
+  "Applied array partitioning to LLVM IR"
+
+# NOTE: Unsure if necessary, done a second time to ensure all metadata is attached for later dynamatic specific stuff
+$LLVM_OPT -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
+  -passes="mem-dep-analysis" \
+  -polly-process-unprofitable \
+  "$F_CLANG_OPTIMIZED_PARTITIONED" \
+  > "$F_CLANG_OPTIMIZED_PARTITIONED_RENAMED"
+exit_on_fail "Failed to re-apply memory dependency analysis after partitioning" \
+  "Re-applied memory dependency analysis after partitioning"
+
+# NOTE: Initiailly this was a simple "instcombine" pass, this caused issues due to fold https://llvm.org/doxygen/classllvm_1_1InstCombinerImpl.html#aa8a186c50cdf60ac11ae1d0b884d468d which lead to a `phi ptr ...`
+$LLVM_OPT -S \
+  -passes="adce,simplifycfg,early-cse<memssa>" \
+  "$F_CLANG_OPTIMIZED_PARTITIONED_RENAMED" \
+  > "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED"
+exit_on_fail "Failed to clean up IR after array partitioning" \
+  "Cleaned up IR after array partitioning"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
