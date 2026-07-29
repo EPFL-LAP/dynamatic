@@ -343,16 +343,6 @@ TranslateLLVMToStd::getBranchOperandsForCFGEdge(BasicBlock *currBB,
   for (PHINode &phi : nextBB->phis()) {
     mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
     if (argument) {
-      if (isa<PointerType>(phi.getType()) &&
-          !isa<IndexType>(argument.getType())) {
-        // In LLVM it is OK to merge a value with ptr type and a value with
-        // i64 type. This is not OK for mlir block arguments (all the
-        // incoming values from different predBBs need to have exactly the same
-        // type). Therefore, here we cast the value to index before sending it
-        // to branch.
-        argument = builder.create<mlir::arith::IndexCastOp>(
-            argument.getLoc(), builder.getIndexType(), argument);
-      }
       operands.push_back(argument);
     } else {
       // The value is an undef (usually they can be canonicalized away)
