@@ -305,6 +305,36 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
     mlir::Value trueOperand = valueMap[selInst->getOperand(1)];
     mlir::Value falseOperand = valueMap[selInst->getOperand(2)];
     mlir::Type resType = getMLIRType(selInst->getType(), ctx);
+
+    if (isa<IndexType>(resType)) {
+      if (isa<llvm::Argument>(selInst->getOperand(1)) &&
+          isa<MemRefType>(trueOperand.getType())) {
+        // When a base address is used directly as an operand of any operation,
+        // it should be treated as a zero-index value.
+        trueOperand = builder.create<arith::ConstantOp>(
+            UnknownLoc::get(ctx), builder.getIndexAttr(0));
+      } else if (!isa<IndexType>(trueOperand.getType())) {
+        // In LLVM it is OK to merge a value with ptr type and a value with
+        // i64 type. This is not OK for mlir block arguments. Therefore, here
+        // we cast the value to index before sending it to branch.
+        trueOperand = builder.create<mlir::arith::IndexCastOp>(
+            UnknownLoc::get(ctx), resType, trueOperand);
+      }
+
+      if (isa<llvm::Argument>(selInst->getOperand(2)) &&
+          isa<MemRefType>(falseOperand.getType())) {
+        // When a base address is used directly as an operand of any operation,
+        // it should be treated as a zero-index value.
+        falseOperand = builder.create<arith::ConstantOp>(
+            UnknownLoc::get(ctx), builder.getIndexAttr(0));
+      } else if (!isa<IndexType>(falseOperand.getType())) {
+        // In LLVM it is OK to merge a value with ptr type and a value with
+        // i64 type. This is not OK for mlir block arguments. Therefore, here
+        // we cast the value to index before sending it to branch.
+        falseOperand = builder.create<mlir::arith::IndexCastOp>(
+            UnknownLoc::get(ctx), resType, falseOperand);
+      }
+    }
     naiveTranslation<arith::SelectOp>(
         // clang-format off
         resType,
@@ -783,8 +813,9 @@ void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
       index = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
                                                  builder.getIndexType(), index);
   } else {
-    // Direct loading from the base address is equivalent to loading from the
-    // 0-th position. Here, we create an constant op with value 0.
+    // When a base address is used directly as an operand of any operation,
+    // it should be treated as a zero-index value. Here, we create an constant
+    // op with value 0.
     index = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
                                               builder.getIndexAttr(0));
   }
@@ -809,8 +840,9 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
       index = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
                                                  builder.getIndexType(), index);
   } else {
-    // Direct store to the base address is equivalent to storing to the
-    // 0-th position. Here, we create an constant op with value 0.
+    // When a base address is used directly as an operand of any operation,
+    // it should be treated as a zero-index value. Here, we create an constant
+    // op with value 0.
     index = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
                                               builder.getIndexAttr(0));
   }
@@ -865,8 +897,9 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
           valueMap[callInst->getArgOperand(0)].getType())) {
     // Case: When the ptr operand is a function argument
     //
-    // In this case, it means that we are access the index-0 position of that
-    // array.
+    // When a base address is used directly as an operand of any operation,
+    // it should be treated as a zero-index value. Here, we create an constant
+    // op with value 0.
     memref = valueMap[callInst->getArgOperand(0)];
     offset = builder.create<arith::ConstantOp>(
         UnknownLoc::get(ctx), IntegerAttr::get(builder.getIndexType(), 0));
@@ -926,8 +959,9 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
 
     for (size_t elemPos = 0; elemPos < numElemsToStore; ++elemPos) {
 
-      LLVM_DEBUG(llvm::errs()
-                     << "Converting element position: " << elemPos << "\n";);
+      LLVM_DEBUG({
+        llvm::errs() << "Converting element position: " << elemPos << "\n";
+      });
       auto constIdx = builder.create<arith::ConstantOp>(
           UnknownLoc::get(ctx),
           builder.getIntegerAttr(offset.getType(), elemPos));
