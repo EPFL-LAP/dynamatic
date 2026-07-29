@@ -757,8 +757,9 @@ public:
 
   std::size_t getDimension() const { return dimension; }
 
-  using SubElements = std::tuple<ScalarType>;
+  using SubElements = std::tuple<ScalarType, std::size_t>;
   constexpr static std::size_t ELEMENT_TYPE = 0;
+  constexpr static std::size_t DIMENSION = 1;
 
 private:
   ScalarType dataType;
