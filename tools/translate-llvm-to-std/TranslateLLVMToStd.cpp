@@ -54,7 +54,7 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
     return mlir::FloatType::getF80(context);
   }
   if (llvmType->isPointerTy())
-    llvm::report_fatal_error("Pointer values are unsupported");
+    return mlir::IndexType::get(context);
   LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";);
 
   llvm::report_fatal_error("Unhandled scalar type");
@@ -137,6 +137,31 @@ convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
   return mlir::DenseElementsAttr::get(
       mlir::RankedTensorType::get(/*shape = */ {numElems}, baseMLIRElemType),
       values);
+}
+
+// Find the base address associated with the LLVM value using
+// getUnderlyingObjects(...). This raises an error if the ptr can be the result
+// of merging between two base addresses.
+static const llvm::Value *findBase(llvm::Value *ptr) {
+  llvm::SmallVector<const llvm::Value *, 2> baseArray;
+  getUnderlyingObjects(ptr, baseArray);
+  if (baseArray.empty()) {
+    llvm::report_fatal_error(
+        "Cannot determine the base array of the load operation! Aborting...");
+  } else if (baseArray.size() > 1) {
+    LLVM_DEBUG({
+      llvm::errs()
+          << "The index value is calculated from multiple base addresses!\n";
+      llvm::errs() << "List of addresses:\n";
+      for (const auto *addr : baseArray) {
+        addr->dump();
+      }
+    });
+    llvm::report_fatal_error(
+        "The index value is calculated from multiple distinct base "
+        "addresses. This is a currently unsupported IR construction.");
+  }
+  return baseArray[0];
 }
 
 void convertInitializerToDenseElemAttrRecursive(
@@ -316,11 +341,36 @@ TranslateLLVMToStd::getBranchOperandsForCFGEdge(BasicBlock *currBB,
                                                 BasicBlock *nextBB) {
   SmallVector<mlir::Value> operands;
   for (PHINode &phi : nextBB->phis()) {
+    // Check if the incoming value is a function argument and is an array
     mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
-
-    if (argument)
-      operands.push_back(argument);
-    else {
+    if (argument) {
+      if (llvm::isa<llvm::Argument>(phi.getIncomingValueForBlock(currBB)) &&
+          isa<MemRefType>(argument.getType())) {
+        // Special case: when the branch forwards a base address.
+        //
+        // Since we assume that we cannot do select(cond, base address 1 +
+        // offset 1, base address 2 + offset 2) (it is asserted later), if we
+        // forward a base address, to us it means that we are forwarding the
+        // index-0 position.
+        //
+        // In this case, instead of forwarding the memref value, we forward zero
+        // index.
+        auto indexOp = builder.create<arith::ConstantOp>(
+            UnknownLoc::get(ctx), builder.getIndexAttr(0));
+        operands.push_back(indexOp);
+      } else {
+        // Normal case: just return the branched value.
+        if (isa<PointerType>(phi.getType()) &&
+            !isa<IndexType>(argument.getType())) {
+          // In LLVM it is OK to merge a value with ptr type and a value with
+          // i64 type. This is not OK for mlir block arguments. Therefore, here
+          // we cast the value to index before sending it to branch.
+          argument = builder.create<mlir::arith::IndexCastOp>(
+              UnknownLoc::get(ctx), builder.getIndexType(), argument);
+        }
+        operands.push_back(argument);
+      }
+    } else {
       // The value is an undef (usually they can be canonicalized away)
       mlir::Value undefarg = builder.create<LLVM::UndefOp>(
           UnknownLoc::get(ctx), valueMap[&phi].getType());
@@ -574,19 +624,7 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
 
   SmallVector<llvm::Value *> gepIndices(gepInst->indices());
 
-  mlir::Value baseAddress;
-  if (this->getInstToMemRefMap.count(gepInst->getPointerOperand())) {
-    // When the GEP directly gets calculates from a AllocaInst (i.e., an
-    // internal array) or a pointer in the function argument (i.e.,
-    // my_array[A][B][C][D] in the example above). Here we get the corresponding
-    // memref in MLIR using getInstToMemRefMap.
-    baseAddress = this->getInstToMemRefMap[gepInst->getPointerOperand()];
-  } else {
-    // Otherwise, there should be a chain of GEPs (TODO: assert this
-    // assumption). The base address is the result of the previous GEP.
-    baseAddress = valueMap[gepInst->getPointerOperand()];
-  }
-  this->getInstToMemRefMap[gepInst] = baseAddress;
+  mlir::Value baseAddress = valueMap.at(findBase(gepInst->getPointerOperand()));
 
   // A list of value to be accumulated. For the example above:
   // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
@@ -733,55 +771,58 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
 }
 
 void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
-  auto *instAddr = loadInst->getPointerOperand();
   mlir::Value memref;
   mlir::Value index = valueMap[loadInst->getPointerOperand()];
   mlir::Type resType = getMLIRType(loadInst->getType(), ctx);
 
-  mlir::Value indexOp;
-
-  if (getInstToMemRefMap.count(instAddr)) {
-    memref = getInstToMemRefMap[instAddr];
+  const llvm::Value *baseAddressLLVM = findBase(loadInst->getPointerOperand());
+  memref = valueMap.at(baseAddressLLVM);
+  mlir::Value actualIndex;
+  if (baseAddressLLVM != loadInst->getPointerOperand()) {
     // LoadOp needs the index operand to be of index type
-    indexOp = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
-                                                 builder.getIndexType(), index);
+    if (!isa<IndexType>(index.getType()))
+      actualIndex = builder.create<arith::IndexCastOp>(
+          UnknownLoc::get(ctx), builder.getIndexType(), index);
+    else
+      actualIndex = index;
   } else {
-    assert(isa<MemRefType>(index.getType()));
-    memref = index;
-    indexOp = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
-                                                builder.getIndexAttr(0));
+    // Direct loading from the base address means that the index is for sure
+    // zero.
+    actualIndex = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
+                                                    builder.getIndexAttr(0));
   }
 
   auto newOp =
       builder.create<memref::LoadOp>(UnknownLoc::get(ctx), resType, memref,
-                                     /*indices = */ indexOp);
+                                     /*indices = */ actualIndex);
   valueMap[loadInst] = newOp.getResult();
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
 void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
-  auto *instAddr = storeInst->getPointerOperand();
   mlir::Value memref;
   mlir::Value index = valueMap[storeInst->getPointerOperand()];
 
-  mlir::Value indexOp;
+  mlir::Value actualIndex;
+  const llvm::Value *baseAddressLLVM = findBase(storeInst->getPointerOperand());
+  memref = valueMap.at(baseAddressLLVM);
 
-  if (getInstToMemRefMap.count(instAddr)) {
-    memref = getInstToMemRefMap[instAddr];
+  if (baseAddressLLVM != storeInst->getPointerOperand()) {
     // LoadOp needs the index operand to be of index type
-    indexOp = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
-                                                 builder.getIndexType(), index);
+    if (!isa<IndexType>(index.getType()))
+      actualIndex = builder.create<arith::IndexCastOp>(
+          UnknownLoc::get(ctx), builder.getIndexType(), index);
+    else
+      actualIndex = index;
   } else {
-    assert(isa<MemRefType>(index.getType()));
-    memref = index;
-    indexOp = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
-                                                builder.getIndexAttr(0));
+    actualIndex = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
+                                                    builder.getIndexAttr(0));
   }
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
   auto newOp =
       builder.create<memref::StoreOp>(UnknownLoc::get(ctx), storeValue, memref,
-                                      /*indices = */ indexOp);
+                                      /*indices = */ actualIndex);
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
@@ -827,16 +868,17 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
       isa_and_nonnull<MemRefType>(
           valueMap[callInst->getArgOperand(0)].getType())) {
     // Case: When the ptr operand is a function argument
+    //
+    // In this case, it means that we are access the index-0 position of that
+    // array.
     memref = valueMap[callInst->getArgOperand(0)];
     offset = builder.create<arith::ConstantOp>(
         UnknownLoc::get(ctx), IntegerAttr::get(builder.getIndexType(), 0));
-  } else if (getInstToMemRefMap.count(callInst->getArgOperand(0))) {
-    // Case: When the ptr operand is a GEP
-    memref = getInstToMemRefMap[callInst->getArgOperand(0)];
-    offset = valueMap[callInst->getArgOperand(0)];
   } else {
-    llvm::report_fatal_error(
-        "Cannot determine the base ptr of the memset intrinsic!");
+    // Normal case
+    const llvm::Value *baseAddressLLVM = findBase(callInst->getArgOperand(0));
+    memref = valueMap.at(baseAddressLLVM);
+    offset = valueMap[callInst->getArgOperand(0)];
   }
 
   mlir::Value valToSet = valueMap[callInst->getArgOperand(1)];
