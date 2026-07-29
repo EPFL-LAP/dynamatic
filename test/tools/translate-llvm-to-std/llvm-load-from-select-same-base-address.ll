@@ -1,5 +1,7 @@
 ; RUN: %translate-llvm-to-std -o - | FileCheck %s
 
+; COM: This test checks if our importer can handle loading a value from a memory location specified by a select inst
+
 ;--- test.ll
 
 ; CHECK: func.func @test(
