@@ -1130,8 +1130,8 @@ public:
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
     return TransferFnArray<ast::StatementList>{
-        /*statement list=*/copyFromInput<ast::StatementList>(),
         /*statement=*/copyFromInput<ast::StatementList>(),
+        /*statement list=*/copyFromInput<ast::StatementList>(),
         /*output=*/copyInputToOutput<ast::StatementList>(),
     };
   }
