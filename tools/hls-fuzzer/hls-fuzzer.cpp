@@ -446,11 +446,12 @@ static void work(const dynamatic::Options &options,
 /// be caught in a debugger. Returns a process exit code.
 ///
 /// An existing 'test.c' is never overwritten: the program is regenerated into
-/// memory and, if a 'test.c' is already present but differs from it, an error
-/// is reported and nothing is verified, since the reproducer no longer matches
-/// what would be generated (e.g. because the fuzzer changed since it was
-/// written). A matching 'test.c' is left in place and an absent one is written
-/// out, after which the program is verified as usual.
+/// the fuzzer's own program memory and, if a 'test.c' is already present but
+/// differs from it, an error is reported and nothing is verified, since the
+/// reproducer no longer matches what would be generated (e.g. because the
+/// fuzzer changed since it was written). A matching 'test.c' is left in place
+/// and an absent one is written out, after which the program is verified as
+/// usual.
 static int reproduceProgram(const dynamatic::AbstractTarget &target,
                             const dynamatic::Options &options,
                             const std::filesystem::path &directory,
@@ -458,8 +459,8 @@ static int reproduceProgram(const dynamatic::AbstractTarget &target,
   std::unique_ptr<dynamatic::AbstractWorker> worker =
       target.createWorker(options, dynamatic::Randomly(seed));
 
-  // Regenerate into memory first so it can be compared against an existing
-  // 'test.c' before anything on disk is touched.
+  // Regenerate into the fuzzer's own program memory first so it can be
+  // compared against an existing 'test.c' before anything on disk is touched.
   std::string generated;
   llvm::raw_string_ostream os(generated);
   worker->generate(os, "test");
@@ -541,6 +542,8 @@ int main(int argc, char **argv) {
   // are read back from the reproducer and parsed through the very same
   // command-line logic used for a normal run, so nothing about how they map to
   // options is duplicated here.
+  //
+  // Empty if not reproducing a program generation.
   if (std::optional<std::string> directory =
           optionsParser.getReproduceDirectory()) {
     std::optional<dynamatic::ReproducerInfo> info =
