@@ -12,6 +12,7 @@ add_llvm_library(DynamaticHLSFuzzer
         AST.cpp
         BasicCGenerator.cpp
         Randomly.cpp
+        Reproducer.cpp
         TypeSystem.cpp
         PARTIAL_SOURCES_INTENDED
 )
