@@ -34,8 +34,7 @@ llvm::Error writeReproducer(const std::filesystem::path &file,
 
 /// Reads a reproducer written by 'writeReproducer' back from 'file'. Returns
 /// 'std::nullopt' if it could not be read, reporting the reason on the console.
-std::optional<ReproducerInfo>
-readReproducer(const std::filesystem::path &file);
+std::optional<ReproducerInfo> readReproducer(const std::filesystem::path &file);
 
 } // namespace dynamatic
 

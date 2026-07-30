@@ -96,8 +96,7 @@ std::string dynamatic::OptionsParser::getTargetName() const {
   return args.getLastArgValue(OPT_target).str();
 }
 
-std::vector<std::string>
-dynamatic::OptionsParser::getTargetArguments() const {
+std::vector<std::string> dynamatic::OptionsParser::getTargetArguments() const {
   // Whether 'option' belongs to the target options group, directly or through
   // one of its nested groups (e.g. the oracle options).
   auto inTargetGroup = [](llvm::opt::Option option) {
