@@ -135,6 +135,13 @@ bool wouldReplaceMemoryControlWithStartDerived(Value oldValue, Value newValue) {
          isDerivedFromFunctionStart(newValue);
 }
 
+/// Replaces all uses of a value except one exact operand use.
+void replaceAllUsesExceptUse(PatternRewriter &rewriter, Value from, Value to,
+                             OpOperand *exceptedUse) {
+  rewriter.replaceUsesWithIf(
+      from, to, [&](OpOperand &use) { return &use != exceptedUse; });
+}
+
 bool isSuppress(handshake::ConditionalBranchOp condBranchOp) {
   return (condBranchOp.getTrueResult().getUsers().empty() &&
           !condBranchOp.getFalseResult().getUsers().empty());
@@ -1906,14 +1913,14 @@ struct DistributeSuppresses
       Value branchOldFalseResult = oldBranch.getFalseResult();
       // Direct all users of the old branch to the users of the new branch
       // except 1 user
-      rewriter.replaceAllUsesExcept(
-          branchOldFalseResult, newBranchFalseResult,
-          *oldBranch.getFalseResult().getUsers().begin());
+      replaceAllUsesExceptUse(rewriter, branchOldFalseResult,
+                              newBranchFalseResult,
+                              &*oldBranch.getFalseResult().getUses().begin());
       oldBranch = newBranch;
       i++;
     }
 
-    // llvm::errs() << "\t***Rules D: distribute-suppresses!***\n";
+    llvm::errs() << "\t***Rules D: distribute-suppresses!***\n";
     return success();
   }
 };
