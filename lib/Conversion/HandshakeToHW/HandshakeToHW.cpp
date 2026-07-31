@@ -780,23 +780,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", resType.getNumElements());
       })
       .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
-        // auto paramsAttr =
-        //     initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
-        // if (paramsAttr) {
-        //   auto initTokenAttr =
-        //       paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
-        //   int initialValue =
-        //       (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
-        //   addUnsigned("INITIAL_VALUE", initialValue);
-        // }
-
-        // addUnsigned("INITIAL_VALUE", 0);
-
-        // addType("DATA_TYPE", op->getResult(0));
-        // addString("BUFFER_TYPE", "ONE_SLOT_BREAK_R");
-        // addUnsigned("NUM_SLOTS", 1);
-        // addUnsigned("DV_LATENCY", 0);
-
         auto paramsAttr =
             initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
         if (paramsAttr) {

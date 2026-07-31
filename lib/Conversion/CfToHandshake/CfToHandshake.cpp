@@ -1201,6 +1201,8 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   auto getWidth = [](Type type) -> unsigned {
+    if (auto chanTy = dyn_cast<handshake::ChannelType>(type))
+      type = chanTy.getDataType();
     if (isa<IndexType>(type))
       return 32;
     return type.getIntOrFloatBitWidth();
@@ -1511,13 +1513,13 @@ ConvertConstants::matchAndRewrite(arith::ConstantOp cstOp,
 
   // Determine the new constant's control input
   Value controlVal;
-  if (isCstSourcable(cstOp)) {
-    auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
-    inheritBB(cstOp, sourceOp);
-    controlVal = sourceOp.getResult();
-  } else {
-    controlVal = getBlockControl(cstOp);
-  }
+  // if (isCstSourcable(cstOp)) {
+  //   auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
+  //   inheritBB(cstOp, sourceOp);
+  //   controlVal = sourceOp.getResult();
+  // } else {
+  controlVal = getBlockControl(cstOp);
+  //}
 
   TypedAttr cstAttr = cstOp.getValue();
   // Convert IndexType'd values to equivalent signless integers
