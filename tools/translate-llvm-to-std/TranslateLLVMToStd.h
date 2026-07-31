@@ -66,13 +66,9 @@ private:
   /// inputs of load/store, see below).
   mlir::DenseMap<llvm::Value *, mlir::Value> valueMap;
 
-  /// In LLVM IR to CF, we convert GEP -> LOAD/STORE to LOAD/STORE.
-  /// - In LLVM IR: load and store take pointer operand
-  /// - In MLIR IR: load and store take base address and indices
-  ///
-  /// We use this data structure to store the mapping between the GEP
-  /// instruction and the corresponding base address.
-  mlir::DenseMap<llvm::Value *, mlir::Value> getInstToMemRefMap;
+  // Mapping base address of array parameters and allocas to the corresponding
+  // MLIR value.
+  mlir::DenseMap<llvm::Value *, mlir::Value> llvmPtrToMemRefMap;
 
   /// The (C-code-level) argument types of the LLVM functions.
   FuncNameToCFuncArgsMap &argMap;
