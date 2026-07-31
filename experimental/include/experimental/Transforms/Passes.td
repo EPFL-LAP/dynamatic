@@ -137,4 +137,14 @@ def EagerlyElasticAll : Pass<"eagerly-elastic-all", "mlir::ModuleOp"> {
             "The number of times that Rewrite D should be applied.">];
 }
 
+def MarkSubloop : Pass<"mark-subloop", "mlir::ModuleOp"> {
+  let summary = "Marks the entire subloop with an attribute";
+  let description = [{
+    Marks the entire subloop with an attribute.
+  }];
+  let options =
+    [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
+            "The number of times that Rewrite D should be applied.">];
+}
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

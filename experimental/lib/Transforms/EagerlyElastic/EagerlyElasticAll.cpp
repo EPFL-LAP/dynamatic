@@ -55,6 +55,10 @@ private:
 
   void applyRewriteXOnce(DenseSet<handshake::ConditionalBranchOp> &frontier,
                          NameAnalysis &namer, RewriteStrategy rewrite);
+
+  void movePastFunctionBlock(
+      DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &name,
+      ModuleOp modOp);
 };
 
 /// Identifies conditional branches and converts them into suppressors which
@@ -331,8 +335,11 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
 
             // check whether the suppressor is connected to path A of the mux
             if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
-              applyRewriteD(mux, branchOp, init, frontier, namer);
-              // return;
+              auto nameAttr = mux->getAttrOfType<mlir::StringAttr>("handshake.name");
+              if (nameAttr && nameAttr.getValue() == "mux1") {
+                applyRewriteD(mux, branchOp, init, frontier, namer);
+                // return;
+              }
             }
           }
           break;
@@ -344,6 +351,139 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
           break;
         }
       }
+    }
+  }
+}
+
+void EagerlyElasticAllPass::movePastFunctionBlock(
+      DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer,
+      ModuleOp modOp) {
+
+  SmallVector<handshake::ConditionalBranchOp> initialFrontier(frontier.begin(),
+                                                              frontier.end());
+
+  auto infoDict = modOp->getAttrOfType<DictionaryAttr>("handshake.subatomic_region_info");
+  if (!infoDict) return;
+
+  auto subloopBbAttr = infoDict.getAs<IntegerAttr>("subloop_bb");
+  auto storeOpsArray = infoDict.getAs<ArrayAttr>("store_ops");
+  auto entryOpsArray = infoDict.getAs<ArrayAttr>("entry_ops");
+  if (!entryOpsArray || !subloopBbAttr) return;
+
+  for (auto branchOp : initialFrontier) {
+    for (auto *user : branchOp.getFalseResult().getUsers()) {
+      auto mux = dyn_cast<handshake::MuxOp>(user);
+      if (!mux) continue;
+
+      // check that we wouldn't apply another rewrite
+      if (mux.getDataOperands()[1] == branchOp.getFalseResult()) continue;
+
+      // check that this mux is part of bb2
+      auto bbAttr = mux->getAttrOfType<IntegerAttr>("handshake.bb");
+      if (!bbAttr || bbAttr.getInt() != subloopBbAttr.getInt()) 
+        continue;
+
+      llvm::errs() << "start moving past entire bb2 function!\n";
+
+      Value condition = branchOp.getConditionOperand();
+
+      // place a suppressor in front of all identified entry ops
+      for (Attribute attr : entryOpsArray) {
+        auto entryDict = cast<DictionaryAttr>(attr);
+        StringRef opName = entryDict.getAs<StringAttr>("op").getValue();
+        int64_t operandIdx = entryDict.getAs<IntegerAttr>("operand_idx").getInt();
+
+        // Find the target operation by handshake.name
+        Operation *targetOp = namer.getOp(opName);
+        if (!targetOp) continue;
+
+        OpOperand &targetOperand = targetOp->getOpOperand(operandIdx);
+        Value incomingData = targetOperand.get();
+
+        // Insert suppressor (ConditionalBranchOp) before targetOp's operand
+        OpBuilder builder(targetOp);
+        Location loc = targetOp->getLoc();
+
+        auto newBranch = builder.create<handshake::ConditionalBranchOp>(
+            loc, condition, incomingData);
+        setHandshakeAttrs(targetOp->getAttr("handshake.bb"), namer, {newBranch});
+
+        // Rewire operand to consume the false outcome of the new suppressor
+        targetOperand.set(newBranch.getFalseResult());
+        frontier.insert(newBranch);
+      }
+
+      llvm::errs() << "placed all new suppressors\n";
+
+      // if there's a store in the region, add a suppressor in front of it
+      if (storeOpsArray && !storeOpsArray.empty()) {
+        Value conditionInBB2 = nullptr;
+        for (Operation &op : mux->getBlock()->getOperations()) {
+          if (auto targetMux = dyn_cast<handshake::MuxOp>(&op)) {
+          
+            // Check if one of its data inputs comes from the pseudo-constant
+            for (unsigned i = 0; i < targetMux.getDataOperands().size(); ++i) {
+              Value operand = targetMux.getDataOperands()[i];
+              if (Operation *defOp = operand.getDefiningOp()) {
+                if (defOp->hasAttr("handshake.pseudo_cond")) {
+                  // rewire the mux: replace the pseudo-constant with the real condition
+                  targetMux.setOperand(i+1, condition);
+                  conditionInBB2 = targetMux.getResult();
+                  break;
+                }
+              }
+            }
+          }
+          if (conditionInBB2) break;
+        }
+
+        if (!conditionInBB2) {
+          llvm::errs() << "Could not find pseudo-constant Mux in bb2!\n";
+          return;
+        }
+
+        for (Attribute attr : storeOpsArray) {
+          StringRef storeName = cast<StringAttr>(attr).getValue();
+
+          // Look up the store operation by its handshake.name
+          Operation *storeOp = namer.getOp(storeName);
+          if (!storeOp) continue;
+
+          OpOperand &dataOperand = storeOp->getOpOperand(1);
+          Value incomingData = dataOperand.get();
+
+          if (incomingData.getDefiningOp<handshake::ConditionalBranchOp>())
+            continue;
+
+          // create the suppressor using the token channel from the pseudo constant
+          OpBuilder builder(storeOp);
+          auto newBranch = builder.create<handshake::ConditionalBranchOp>(
+              storeOp->getLoc(), conditionInBB2, incomingData);
+          setHandshakeAttrs(storeOp->getAttr("handshake.bb"), namer,
+                            {newBranch});
+
+          dataOperand.set(newBranch.getFalseResult());
+          frontier.insert(newBranch);
+        } 
+      }
+
+      // rewire the old branchOp
+      for (OpOperand &use : mux->getOpOperands()) {
+        if (use.get() == branchOp.getFalseResult()) {
+          use.set(branchOp.getDataOperand());
+        }
+      }
+
+      llvm::errs() << "rewiring done\n";
+
+      // if the branchOp has no uses anymore, delete it
+      if (branchOp.getFalseResult().use_empty()) {
+        llvm::errs() << "erase!\n";
+        frontier.erase(branchOp);
+        branchOp.erase();
+      }
+
+      return;
     }
   }
 }
@@ -364,13 +504,16 @@ void EagerlyElasticAllPass::runOnOperation() {
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteE);
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteF);
 
-  for (unsigned i = 0; i < 2; i++) {
+  for (unsigned i = 0; i < 1; i++) {
     applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteG);
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   }
 
-  for (unsigned i = 0; i < 3; i++) {
+  movePastFunctionBlock(frontier, namer, modOp);
+  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
+
+  for (unsigned i = 0; i < 0; i++) {
     applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteB);
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteH);

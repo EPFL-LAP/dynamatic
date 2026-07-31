@@ -3,6 +3,7 @@ add_dynamatic_library(DynamaticEagerlyElastic
   EagerlyElasticAD.cpp
   EagerlyElasticAll.cpp
   EagerlyElasticLib.cpp
+  MarkSubloop.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
