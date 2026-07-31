@@ -362,13 +362,8 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
   SmallVector<handshake::ConditionalBranchOp> initialFrontier(frontier.begin(),
                                                               frontier.end());
 
-  auto infoDict = modOp->getAttrOfType<DictionaryAttr>("handshake.subatomic_region_info");
-  if (!infoDict) return;
-
-  auto subloopBbAttr = infoDict.getAs<IntegerAttr>("subloop_bb");
-  auto storeOpsArray = infoDict.getAs<ArrayAttr>("store_ops");
-  auto entryOpsArray = infoDict.getAs<ArrayAttr>("entry_ops");
-  if (!entryOpsArray || !subloopBbAttr) return;
+  auto infoArray = modOp->getAttrOfType<ArrayAttr>("handshake.subatomic_region_info");
+  if (!infoArray || infoArray.empty()) return;
 
   for (auto branchOp : initialFrontier) {
     for (auto *user : branchOp.getFalseResult().getUsers()) {
@@ -378,17 +373,35 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
       // check that we wouldn't apply another rewrite
       if (mux.getDataOperands()[1] == branchOp.getFalseResult()) continue;
 
-      // check that this mux is part of bb2
+      // check that this mux is part of a subloop
       auto bbAttr = mux->getAttrOfType<IntegerAttr>("handshake.bb");
-      if (!bbAttr || bbAttr.getInt() != subloopBbAttr.getInt()) 
+      if (!bbAttr) 
         continue;
 
-      llvm::errs() << "start moving past entire bb2 function!\n";
+      // find matching entry in the infoArray
+      DictionaryAttr matchedRegionDict = nullptr;
+      for (Attribute attr : infoArray) {
+        auto dict = cast<DictionaryAttr>(attr);
+        auto subloopBbAttr = dict.getAs<IntegerAttr>("subloop_bb");
+        if (subloopBbAttr && subloopBbAttr.getInt() == bbAttr.getInt()) {
+          matchedRegionDict = dict;
+          break;
+        }
+      }
+
+      if (!matchedRegionDict) continue;
+
+      auto storeOpsArray = matchedRegionDict.getAs<ArrayAttr>("store_ops");
+      auto entryOpsArray = matchedRegionDict.getAs<ArrayAttr>("entry_ops");
+
+      llvm::errs() << "start moving past entire subloop bb " << bbAttr.getInt() << "!\n";
 
       Value condition = branchOp.getConditionOperand();
 
       // place a suppressor in front of all identified entry ops
       for (Attribute attr : entryOpsArray) {
+        llvm::errs() << "place suppressor on: ";
+        attr.dump();
         auto entryDict = cast<DictionaryAttr>(attr);
         StringRef opName = entryDict.getAs<StringAttr>("op").getValue();
         int64_t operandIdx = entryDict.getAs<IntegerAttr>("operand_idx").getInt();
@@ -413,32 +426,20 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         frontier.insert(newBranch);
       }
 
-      llvm::errs() << "placed all new suppressors\n";
-
-      // if there's a store in the region, add a suppressor in front of it
+      // handle stores
       if (storeOpsArray && !storeOpsArray.empty()) {
-        Value conditionInBB2 = nullptr;
-        for (Operation &op : mux->getBlock()->getOperations()) {
-          if (auto targetMux = dyn_cast<handshake::MuxOp>(&op)) {
-          
-            // Check if one of its data inputs comes from the pseudo-constant
-            for (unsigned i = 0; i < targetMux.getDataOperands().size(); ++i) {
-              Value operand = targetMux.getDataOperands()[i];
-              if (Operation *defOp = operand.getDefiningOp()) {
-                if (defOp->hasAttr("handshake.pseudo_cond")) {
-                  // rewire the mux: replace the pseudo-constant with the real condition
-                  targetMux.setOperand(i+1, condition);
-                  conditionInBB2 = targetMux.getResult();
-                  break;
-                }
-              }
-            }
-          }
-          if (conditionInBB2) break;
-        }
+        std::string pseudoName = "pseudo_cond" + std::to_string(bbAttr.getInt());
+        Operation *pseudoConstant = namer.getOp(pseudoName);
+        if (!pseudoConstant) continue;
 
-        if (!conditionInBB2) {
-          llvm::errs() << "Could not find pseudo-constant Mux in bb2!\n";
+        // set the use to be the original condition going into the Mux
+        OpOperand &use = *pseudoConstant->getResult(0).use_begin();
+        use.set(condition);
+        // the conditionInSubloop is now the result of that mux
+        Value conditionInSubloop = use.getOwner()->getResult(0);
+
+        if (!conditionInSubloop) {
+          llvm::errs() << "Could not find pseudo-constant Mux in this subloop!\n";
           return;
         }
 
@@ -458,7 +459,7 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
           // create the suppressor using the token channel from the pseudo constant
           OpBuilder builder(storeOp);
           auto newBranch = builder.create<handshake::ConditionalBranchOp>(
-              storeOp->getLoc(), conditionInBB2, incomingData);
+              storeOp->getLoc(), conditionInSubloop, incomingData);
           setHandshakeAttrs(storeOp->getAttr("handshake.bb"), namer,
                             {newBranch});
 
@@ -467,14 +468,12 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         } 
       }
 
-      // rewire the old branchOp
+      // rewire the original mux to bypass the old branchOp
       for (OpOperand &use : mux->getOpOperands()) {
         if (use.get() == branchOp.getFalseResult()) {
           use.set(branchOp.getDataOperand());
         }
       }
-
-      llvm::errs() << "rewiring done\n";
 
       // if the branchOp has no uses anymore, delete it
       if (branchOp.getFalseResult().use_empty()) {

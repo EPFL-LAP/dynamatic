@@ -14,6 +14,12 @@ struct EntryOpInfo {
   unsigned operandIdx;
 };
 
+struct LoopInfo {
+  mlir::Block *outerHeader;
+  mlir::Block *subloop;
+  mlir::Block *exitBlock;
+};
+
 // [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
@@ -67,167 +73,158 @@ void MarkSubloopPass::runOnOperation() {
 
   // Compute Dominance Info for the region
   DominanceInfo domInfo(funcOp);
-  mlir::Block *outerHeader = nullptr, *bb2 = nullptr, *bb3 = nullptr;
+  llvm::SmallVector<LoopInfo> validLoops;
 
-  // find the first subloop (bb2) and its outer loop header
+  // find all loops with exactly one subloop
   for (mlir::Block &block : region) {
+    mlir::Block *outerLatch = nullptr;
     for (mlir::Block *pred : block.getPredecessors()) {
       if (domInfo.dominates(&block, pred)) {
-        if (!outerHeader) {
-          outerHeader = &block;
-        } else if (domInfo.properlyDominates(outerHeader, &block)) {
-          bb2 = &block;
-          break;
-        }
-      }
-    } if (bb2) break;
-  }
-
-  if (!bb2) {
-    llvm::errs() << "No subloops found in function!\n";
-    return;
-  } else {
-    llvm::errs() << "Could identify a subloop header\n";
-  }
-  int subloopBbIdx = std::distance(region.begin(), bb2->getIterator());
-  
-  // find the subloop exit block
-  if (auto condBr = dyn_cast<cf::CondBranchOp>(bb2->getTerminator())) {
-    bb3 = (condBr.getTrueDest() != bb2) ? condBr.getTrueDest() : condBr.getFalseDest();
-  }
-
-  // Check if bb3 is dominated by the outer loop header
-  if (!bb3 || !domInfo.dominates(outerHeader, bb3)) {
-    llvm::errs() << "Invalid or non-returning subloop exit block!\n";
-    return;
-  }
-
-  // Collect the names of all store operations inside bb2
-  llvm::SmallVector<Attribute> storeOpAttrs;
-  
-  for (Operation &op : bb2->getOperations()) {
-    if (isa<memref::StoreOp>(&op)) {
-      if (auto nameAttr = op.getAttrOfType<StringAttr>("handshake.name")) {
-        storeOpAttrs.push_back(nameAttr);
-      } else {
-        storeOpAttrs.push_back(builder.getStringAttr(op.getName().getStringRef()));
+        outerLatch = pred;
+        break;
       }
     }
-  }
+    if (!outerLatch) continue;
 
-  
-  // Collect the names and operandIDs of entry operations in bb3
-  llvm::SmallVector<Attribute> entryOpAttrs;
-
-  // Helper lambda to format entry info into a DictionaryAttr
-  auto addEntryOpAttr = [&](Operation *op, unsigned idx) {
-    if (isa<memref::StoreOp>(op)) {
-      return; }
-    StringAttr nameAttr = op->getAttrOfType<StringAttr>("handshake.name");
-    NamedAttribute entries[] = {
-        builder.getNamedAttr("op", nameAttr),
-        builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(idx))
-    };
-    entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
-  };
-
-  // trace values defined in bb2 used directly in bb3
-  for (Operation &op : bb3->getOperations()) {
-    // Skip constants
-    if (isa<arith::ConstantOp>(&op)) continue;
-    
-    for (OpOperand &use : op.getOpOperands()) {
-      Value operand = use.get();
-      if (operand.getType().isa<MemRefType>()) continue;
-      Operation *defOp = operand.getDefiningOp();
-
-      bool comesFromBB2 = false;
-      if (defOp && defOp->getBlock() == bb2) {
-        comesFromBB2 = true;
-      } else if (auto blockArg = dyn_cast<BlockArgument>(operand)) {
-        if (blockArg.getOwner() == bb2)
-          comesFromBB2 = true;
-      }
-      if (comesFromBB2) {
-        if (isa<arith::ExtUIOp, arith::ExtSIOp, arith::IndexCastOp>(&op)) {
-          // Trace past casts
-          llvm::SmallVector<EntryOpInfo, 2> consumers;
-          getRealConsumers(op.getResult(0), bb3, consumers);
-          for (const auto &info : consumers) {
-            addEntryOpAttr(info.op, info.operandIdx);
+    llvm::SmallVector<mlir::Block *> innerLoops;
+    for (mlir::Block &potentialSub : region) {
+      if (&potentialSub != &block && domInfo.properlyDominates(&block, &potentialSub)) {
+        for (mlir::Block *pred : potentialSub.getPredecessors()) {
+          if (domInfo.dominates(&potentialSub, pred)) {
+            innerLoops.push_back(&potentialSub);
+            break;
           }
-        } else {
-          // Direct non-cast user inside bb3
-          addEntryOpAttr(&op, use.getOperandNumber());
         }
+      }
+    }
+
+    if (innerLoops.size() == 1) {
+      mlir::Block *subloop = innerLoops.front();
+      mlir::Block *exitSubloop = nullptr;
+      if (auto condBr = dyn_cast<cf::CondBranchOp>(subloop->getTerminator())) {
+        exitSubloop = (condBr.getTrueDest() != subloop) ? condBr.getTrueDest() : condBr.getFalseDest();
+      }
+      
+      if (exitSubloop && exitSubloop == outerLatch) {
+        validLoops.push_back({&block, subloop, outerLatch});
       }
     }
   }
 
-  // What happens if no operations are found? - nothing!
-  if (entryOpAttrs.empty()) {
-    llvm::errs() << "no operations found!\n";
-    // return;
+  if (validLoops.empty()) {
+    llvm::errs() << "No loops with exactly one subloop found!\n";
+    return;
   }
 
-  // construct the Metadata Dictionary
-  NamedAttribute metadata[] = {
-      builder.getNamedAttr("subloop_bb", builder.getI64IntegerAttr(subloopBbIdx)),
-      builder.getNamedAttr("store_ops", builder.getArrayAttr(storeOpAttrs)),
-      builder.getNamedAttr("entry_ops", builder.getArrayAttr(entryOpAttrs))
-  };
+  llvm::SmallVector<Attribute> allLoopsMetadata;
 
-  DictionaryAttr regionInfoAttr = builder.getDictionaryAttr(metadata);
+  // Process all discovered loops
+  for (auto &loop : validLoops) {
+    mlir::Block *outerHeader = loop.outerHeader;
+    mlir::Block *subloop = loop.subloop;
+    mlir::Block *exitBlock = loop.exitBlock;
+
+    int subloopBbIdx = std::distance(region.begin(), subloop->getIterator());
+
+    // Collect the names of all store operations inside the subblock
+    llvm::SmallVector<Attribute> storeOpAttrs;  
+    for (Operation &op : subloop->getOperations()) {
+      if (isa<memref::StoreOp>(&op)) {
+        storeOpAttrs.push_back(op.getAttrOfType<StringAttr>("handshake.name"));
+      }
+    }  
+    
+    // Collect the names and operandIDs of entry operations in exitBlock
+    llvm::SmallVector<Attribute> entryOpAttrs;
+
+    // Helper lambda to format entry info into a DictionaryAttr
+    auto addEntryOpAttr = [&](Operation *op, unsigned idx) {
+      if (isa<memref::StoreOp>(op)) { // TODO: fix?
+        return; }
+      StringAttr nameAttr = op->getAttrOfType<StringAttr>("handshake.name");
+      NamedAttribute entries[] = {
+          builder.getNamedAttr("op", nameAttr),
+          builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(idx))
+      };
+      entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
+    };
+
+    // trace values defined in the subloop used directly in the exitBlock
+    for (Operation &op : exitBlock->getOperations()) {
+      // Skip constants
+      if (isa<arith::ConstantOp>(&op)) continue;
+      
+      for (OpOperand &use : op.getOpOperands()) {
+        Value operand = use.get();
+        if (operand.getType().isa<MemRefType>()) continue;
+        
+        Operation *defOp = operand.getDefiningOp();
+
+        // check if the defining operation or block args comes form any subblock
+        bool comesFromSubloop = false;
+        if (defOp && defOp->getBlock() == subloop) {
+          comesFromSubloop = true;
+        } else if (auto blockArg = dyn_cast<BlockArgument>(operand)) {
+          if (blockArg.getOwner() == subloop)
+            comesFromSubloop = true;
+        }
+
+        if (comesFromSubloop) {
+          if (isa<arith::ExtUIOp, arith::ExtSIOp, arith::IndexCastOp>(&op)) {
+            // Trace past casts
+            llvm::SmallVector<EntryOpInfo, 2> consumers;
+            getRealConsumers(op.getResult(0), exitBlock, consumers);
+            for (const auto &info : consumers) {
+              addEntryOpAttr(info.op, info.operandIdx);
+            }
+          } else {
+            addEntryOpAttr(&op, use.getOperandNumber());
+          }
+        }
+      }
+    }
+
+    // construct the Metadata Dictionary
+    NamedAttribute metadata[] = {
+        builder.getNamedAttr("subloop_bb", builder.getI64IntegerAttr(subloopBbIdx)),
+        builder.getNamedAttr("store_ops", builder.getArrayAttr(storeOpAttrs)),
+        builder.getNamedAttr("entry_ops", builder.getArrayAttr(entryOpAttrs))
+    };
+    allLoopsMetadata.push_back(builder.getDictionaryAttr(metadata)); 
+
+    // if storeOpAttrs isn't empty we need to add a pseudoconstant
+    auto brOp = dyn_cast<cf::BranchOp>(outerHeader->getTerminator());
+    builder.setInsertionPoint(brOp);
+    Location loc = builder.getUnknownLoc();
+
+    // create pseudo-constant in outerHeader
+    auto pseudoCondOp = builder.create<arith::ConstantOp>(
+        loc, 
+        builder.getI1Type(), 
+        builder.getBoolAttr(false)
+    );
+    std::string pseudoName = "pseudo_cond" + std::to_string(subloopBbIdx);
+    pseudoCondOp->setAttr("handshake.name", builder.getStringAttr(pseudoName));
+
+    // add a new block argument to the subblock
+    Value condArg = subloop->addArgument(builder.getI1Type(), loc);
+
+    // pass pseudoCondOp as a branch operand from outerHeader into subloop
+    brOp.getDestOperandsMutable().append(pseudoCondOp.getResult());
+
+    // update the loop back-edge (inside subloop) so it passes the pseudoconstant
+    for (Operation &op : subloop->getOperations()) {
+      if (auto condBr = dyn_cast<cf::CondBranchOp>(&op)) {
+        if (condBr.getTrueDest() == subloop) {
+          condBr.getTrueDestOperandsMutable().append(condArg);
+        } else if (condBr.getFalseDest() == subloop) {
+          condBr.getFalseDestOperandsMutable().append(condArg);
+        }
+      }
+    }
+    
+  }
 
   // attach the attribute directly to modOp
-  modOp->setAttr("handshake.subatomic_region_info", regionInfoAttr);
-
-  // Find the outside predecessor (e.g., ^bb1), ignoring the loop back-edge (^bb2)
-  mlir::Block *bb1 = nullptr;
-  for (mlir::Block *pred : bb2->getPredecessors()) {
-    if (pred != bb2) {
-      bb1 = pred;
-      break;
-    }
-  }
-
-  if (!bb1) {
-    llvm::errs() << "Could not find outside predecessor for subloop!\n";
-    return;
-  }
-  bb1->dump();
-  // 1. Get the branch operation in bb1 targeting bb2
-  auto brOp = cast<cf::BranchOp>(bb1->getTerminator());
-
-  // 2. Set insertion point inside bb1 right before the branch
-  builder.setInsertionPoint(brOp);
-  Location loc = builder.getUnknownLoc();
-
-  // 3. Create pseudo-constant in bb1
-  auto pseudoCondOp = builder.create<arith::ConstantOp>(
-      loc, 
-      builder.getI1Type(), 
-      builder.getBoolAttr(false)
-  );
-  pseudoCondOp->setAttr("handshake.pseudo_cond", builder.getUnitAttr());
-  pseudoCondOp->setAttr("handshake.name", builder.getStringAttr("pseudo_cond0"));
-
-  // 4. Add a new i1 block argument to bb2
-  Value tempCondArg = bb2->addArgument(builder.getI1Type(), loc);
-
-  // 5. Pass pseudoCondOp as a branch operand from bb1 into bb2
-  brOp.getDestOperandsMutable().append(pseudoCondOp.getResult());
-
-  // 6. ALSO update the loop back-edge (inside bb2) so bb2 passes a dummy/recirculated i1 value
-  for (Operation &op : bb2->getOperations()) {
-    if (auto condBr = dyn_cast<cf::CondBranchOp>(&op)) {
-      if (condBr.getTrueDest() == bb2) {
-        condBr.getTrueDestOperandsMutable().append(tempCondArg);
-        llvm::errs() << "went into the if\n";
-      } else if (condBr.getFalseDest() == bb2) {
-        condBr.getFalseDestOperandsMutable().append(tempCondArg);
-        llvm::errs() << "went into the else if\n";
-      }
-    }
-  }
+  modOp->setAttr("handshake.subatomic_region_info", builder.getArrayAttr(allLoopsMetadata));
 }
