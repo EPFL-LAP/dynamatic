@@ -370,38 +370,6 @@ bool CFDFC::isCFDFCBackedge(Value val) {
   return srcBB.has_value() && (!dstBB.has_value() || *srcBB != *dstBB);
 }
 
-void CFDFC::writeDot(const std::string &fileName) {
-
-  //
-  Agraph_t *gv = agopen(const_cast<char *>("cfdfc"), Agdirected, nullptr);
-
-  for (auto value : channels) {
-    auto *pred = value.getDefiningOp();
-    auto succ = value.getUsers().begin();
-
-    std::string predName =
-        pred->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME).str();
-    std::string succName =
-        succ->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME).str();
-
-    auto *predNode = agnode(gv, const_cast<char *>(predName.c_str()),
-                            /* create if not exist */ 1);
-    auto *succNode = agnode(gv, const_cast<char *>(succName.c_str()),
-                            /* create if not exist */ 1);
-
-    agedge(gv, predNode, succNode, nullptr, 1);
-  }
-
-  // Write to DOT file
-  FILE *fs = fopen(fileName.c_str(), "w");
-  if (!fs) {
-    llvm::errs() << "Failed to write file\n";
-  }
-
-  agwrite(gv, fs);
-  fclose(fs);
-}
-
 CFDFCUnion::CFDFCUnion(ArrayRef<CFDFC *> cfdfcs) {
   // Just do the union of everything
   for (CFDFC *cf : cfdfcs) {

@@ -79,10 +79,10 @@ void addSupp(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
 /// blocks.
 LogicalResult addGsaGates(
     Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
-
     std::vector<Operation *> &newUnits,
+    Backedge startValue,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
-    Backedge startValue, bool removeTerminators = true);
+    bool removeTerminators = true);
 
 /// For each non-init merge in the IR, run the GSA analysis to obtain its GSA
 /// equivalent, then use `addGsaGates` to instantiate such operations in the IR.
@@ -108,32 +108,6 @@ LogicalResult createPhiNetworkDeps(
     Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
 
-BoolExpression *enumeratePaths(Block *start, Block *end,
-                               const ftd::BlockIndexing &bi,
-                               const DenseSet<Block *> &controlDeps);
-
-/// Given two sets containing object of type `Block*`, remove the common
-/// entries.
-static void eliminateCommonBlocks(DenseSet<Block *> &s1,
-                                  DenseSet<Block *> &s2) {
-
-  SmallVector<Block *> intersection;
-  for (auto &e1 : s1) {
-    if (s2.contains(e1))
-      intersection.push_back(e1);
-  }
-
-  for (auto &bb : intersection) {
-    s1.erase(bb);
-    s2.erase(bb);
-  }
-}
-
-/// Get a boolean expression representing the exit condition of the current
-/// loop block.
-BoolExpression *getBlockLoopExitCondition(Block *loopExit, CFGLoop *loop,
-                                          CFGLoopInfo &li,
-                                          const ftd::BlockIndexing &bi);
 
 }; // namespace ftd
 }; // namespace experimental

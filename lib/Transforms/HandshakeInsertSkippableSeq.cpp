@@ -22,6 +22,7 @@
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
 #include "experimental/Support/FtdSupport.h"
+#include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/MLIRContext.h"
@@ -667,6 +668,7 @@ void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
 
   gateAllSuccessorAccesses(memAccesses, waitingSignalsForEachSuccessor, funcOp,
                            rewriter);
+  // funcOp.print(llvm::errs());
 }
 
 // write dep graph to a dot file
@@ -686,26 +688,50 @@ void writeDepGraphToDotFile(const std::string &filename) {
 }
 
 void runFTDOnSpecificConsumerOps(
-    FuncOp funcOp, PatternRewriter &rewriter,
-    std::vector<Operation *> (*ftdFunc)(PatternRewriter &, FuncOp &,
-                                        Operation *, Value)) {
+    FuncOp funcOp, mlir::OpBuilder &builder,
+    std::vector<Operation *> (*ftdFunc)(mlir::OpBuilder &, FuncOp &,
+                                        Operation *, Value, ftd::ShadowCFG &),
+    ftd::ShadowCFG shadowCFG) {
   std::vector<std::vector<Operation *>> allNewUnits;
   for (auto const [consumerOp, indices] : consumerOpAndOperandIndexForFTD)
     for (auto index : indices) {
+      llvm::errs() << "[INFO][SKIP] Adding FTD for consumer op: "
+                   << consumerOp->getName().getStringRef()
+                   << " at operand index: " << index << "\n";
       std::vector<Operation *> newUnits =
-          ftdFunc(rewriter, funcOp, consumerOp, consumerOp->getOperand(index));
+          ftdFunc(builder, funcOp, consumerOp, consumerOp->getOperand(index),
+                  shadowCFG);
       allNewUnits.push_back(newUnits);
     }
 
-  for (auto &someNewUnits : allNewUnits) {
-    for (auto *unit : someNewUnits) {
-      int i = 0;
-      for (auto _ : unit->getOperands()) {
-        consumerOpAndOperandIndexForFTD[unit].push_back(i);
-        i++;
-      }
-    }
-  }
+  llvm::errs() << "[INFO][SKIP] Added FTD for "
+               << consumerOpAndOperandIndexForFTD.size()
+               << " consumer ops successfully! \n";
+
+  // for (auto &someNewUnits : allNewUnits) {
+  //   for (auto *unit : someNewUnits) {
+  //     int i = 0;
+  //     for (auto _ : unit->getOperands()) {
+  //       consumerOpAndOperandIndexForFTD[unit].push_back(i);
+  //       i++;
+  //     }
+  //   }
+  // }
+  llvm::errs() << "[INFO][SKIP] Added FTD for " << allNewUnits.size()
+               << " new units successfully! \n";
+}
+
+ftd::ShadowCFG getShadow(FuncOp funcOp, MLIRContext *ctx) {
+  unsigned capturedNumBlocks = 0;
+  SmallVector<CapturedEdgeInfo> capturedEdges;
+  DenseMap<unsigned, Value> capturedConditions;
+  captureCFGTopology(funcOp, capturedNumBlocks, capturedEdges,
+                     capturedConditions);
+
+  OpBuilder builder(ctx);
+  ftd::ShadowCFG shadow = buildShadowFromCapturedTopology(
+      builder, funcOp, capturedNumBlocks, capturedEdges, capturedConditions);
+  return shadow;
 }
 
 void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
@@ -713,6 +739,7 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
   ConversionPatternRewriter rewriter(ctx);
+  OpBuilder builder(ctx);
 
   for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
     if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
@@ -721,9 +748,14 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
     // internally calls `createPhiNetworkDeps`
     handleFuncOp(funcOp, ctx);
 
+    llvm::errs() << "[INFO][SKIP] Inserted skippable sequentializer circuit "
+                    "successfully! \n";
+
     std::vector<Operation *> newUnits;
     if (failed(replaceMergeToGSA(funcOp, rewriter, newUnits)))
       signalPassFailure();
+
+    llvm::errs() << "[INFO][SKIP] Replaced Merge to GSA successfully! \n";
 
     for (auto *unit : newUnits) {
       int i = 0;
@@ -733,13 +765,27 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
       }
     }
 
-    runFTDOnSpecificConsumerOps(funcOp, rewriter, addRegenOperandConsumer);
-    runFTDOnSpecificConsumerOps(funcOp, rewriter, addSuppOperandConsumer);
+    ftd::ShadowCFG shadowCFG = getShadow(funcOp, ctx);
+
+    llvm::errs() << "[INFO][SKIP] Created Shadow CFG successfully! \n";
+
+    runFTDOnSpecificConsumerOps(funcOp, builder, addRegenOperandConsumer,
+                                shadowCFG);
+    runFTDOnSpecificConsumerOps(funcOp, builder, addSuppOperandConsumer,
+                                shadowCFG);
+
+    llvm::errs() << "[INFO][SKIP] Added FTD successfully! \n";
 
     experimental::cfg::markBasicBlocks(funcOp, rewriter);
 
+    llvm::errs() << "[INFO][SKIP] Marked Basic Blocks successfully! \n";
+
     if (failed(cfg::flattenFunction(funcOp)))
       signalPassFailure();
+
+    shadowCFG.destroy();
+
+    llvm::errs() << "[INFO][SKIP] Flattened Function successfully! \n";
   }
 
   std::string path = compDir + "/" + kernelName + "_DEP_G.dot";

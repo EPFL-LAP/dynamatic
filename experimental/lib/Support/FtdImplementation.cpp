@@ -16,6 +16,7 @@
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Transforms/HandshakeInsertSkippableSeq.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
@@ -553,7 +554,7 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
   unsigned numberOfLoops = loops.size();
 
   if (numberOfLoops == 0)
-    return;
+    return newUnits;
 
   Value regeneratedValue = operand;
   auto cstType = builder.getIntegerType(1);
@@ -680,7 +681,7 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
         (!consumerOp->hasAttr(SKIP_COND_GEN) &&
          !consumerOp->hasAttr(SKIP_COND_SEQ)))
-      return;
+      return newUnits;
 
     // Skip the prod-cons if the producer is part of the operations
     // related to the BDD expansion or INIT merges
@@ -718,10 +719,14 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
          operand != consumerOp->getOperand(0)))
       return newUnits;
 
+    llvm::errs() << "Adding suppression for consumer: " << *consumerOp
+                 << " and operand: " << operand << "\n";
+
     // Handle the suppression in all the other cases (including the operand
     // being a function argument)
     insertDirectSuppression(builder, funcOp, consumerOp, operand, shadow);
   }
+  return newUnits;
 }
 
 void ftd::addSupp(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
