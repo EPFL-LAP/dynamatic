@@ -240,7 +240,7 @@ exit_on_fail "Failed to re-apply memory dependency analysis after partitioning" 
 
 # NOTE: Initiailly this was a simple "instcombine" pass, this caused issues due to fold https://llvm.org/doxygen/classllvm_1_1InstCombinerImpl.html#aa8a186c50cdf60ac11ae1d0b884d468d which lead to a `phi ptr ...`
 $LLVM_OPT -S \
-  -passes="adce,simplifycfg,early-cse<memssa>" \
+  -passes="instcombine" \
   "$F_CLANG_OPTIMIZED_PARTITIONED_RENAMED" \
   > "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED"
 exit_on_fail "Failed to clean up IR after array partitioning" \
