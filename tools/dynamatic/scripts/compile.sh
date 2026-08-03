@@ -165,6 +165,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # Here is a brief summary of what each llvm pass does:
 # - inline: Inlines the function calls.
 # - mem2reg: Promote allocas (allocate memory on the heap) into regs.
+# - gvn: remove redundant instructions using global value numbering, also removes redundant load operations. 
 # - lowerswitch: Convert switch case into branches.
 # - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
 # - loop-rotate: canonicalize loops to do-while loops
