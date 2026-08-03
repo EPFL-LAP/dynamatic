@@ -65,7 +65,7 @@ F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
 F_HANDSHAKE_PRE_MATERIALIZE="$COMP_DIR/handshake_pre_materialize.mlir"
-F_HANDSHAKE_REWRITTEN="$COMP_DIR/handshake_rewritten.mlir"
+F_HANDSHAKE_POST_STEERING_REWRITES="$COMP_DIR/handshake_post_steering_rewrites.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
@@ -333,10 +333,10 @@ if [[ $OPTIMIZE_STEERING_REWRITES -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TO_MATERIALIZE" \
     --handshake-rewrite-terms \
     --handshake-combine-steering-logic \
-    > "$F_HANDSHAKE_REWRITTEN"
+    > "$F_HANDSHAKE_POST_STEERING_REWRITES"
   exit_on_fail "Failed to apply steering-term rewrites" \
     "Applied steering-term rewrites"
-  F_HANDSHAKE_TO_MATERIALIZE="$F_HANDSHAKE_REWRITTEN"
+  F_HANDSHAKE_TO_MATERIALIZE="$F_HANDSHAKE_POST_STEERING_REWRITES"
 fi
 
 # Final materialization before speculation and buffer placement.
