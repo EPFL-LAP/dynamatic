@@ -820,7 +820,12 @@ CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
 
     BasicBlock *entry = BasicBlock::Create(ctx, "entry", fn);
     IRBuilder<> b(entry);
-    SmallVector<Value *, 4> fnArgs(fn->arg_begin(), fn->arg_end());
+
+    SmallVector<Value *, 4> fnArgs;
+    fnArgs.reserve(fn->arg_size());
+    for (Argument &arg : fn->args())
+      fnArgs.push_back(&arg);
+
     Value *result = buildBody(b, fnArgs);
     retTy->isVoidTy() ? (void)b.CreateRetVoid() : (void)b.CreateRet(result);
   }
@@ -943,6 +948,7 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
     } else if (store) {
       guardedStore(caseBuilder, newGEP, store->getValueOperand());
     }
+    caseBuilder.CreateBr(mergeBB);
   }
 
   if (load) {
