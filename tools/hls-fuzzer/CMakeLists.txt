@@ -31,6 +31,7 @@ add_llvm_executable(hls-fuzzer
         statistics/ASTStatistic.cpp
         targets/BitwidthOptimizationsTarget.cpp
         targets/BitwidthTypeSystem.cpp
+        targets/DisableLatencyOptTypeSystem.cpp
         targets/DynamaticTypeSystem.cpp
         targets/LSQNoDepTypeSystem.cpp
         targets/LSQOptimizationsTarget.cpp
