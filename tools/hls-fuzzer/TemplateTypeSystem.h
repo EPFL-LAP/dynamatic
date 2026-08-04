@@ -268,6 +268,12 @@ public:
     return probabilityTable<AbstractTypeSystem::StatementKey>(context);
   }
 
+  ProbabilityTable<AbstractTypeSystem::ExistingScalarParameterKey>
+  getExistingScalarParameterProbabilityTable(const TypingContext &context) {
+    return probabilityTable<AbstractTypeSystem::ExistingScalarParameterKey>(
+        context);
+  }
+
 private:
   /// Calls the derived class' 'getTransferFnImpl' for 'ASTNode'.
   template <typename ASTNode, typename... Args>
