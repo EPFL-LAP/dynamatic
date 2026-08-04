@@ -28,7 +28,7 @@ public:
 
   /// Initializes a probability table from the given initializer list.
   ProbabilityTable(std::initializer_list<std::pair<Key, std::size_t>> list)
-      : keyToWeight(std::move(list)) {}
+      : keyToWeight(list.begin(), list.end()) {}
 
   /// Initializes a probability table from the given range of
   /// 'std::pair<Key, std::size_t>'s.

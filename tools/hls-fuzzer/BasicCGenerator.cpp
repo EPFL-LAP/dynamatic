@@ -416,12 +416,20 @@ gen::BasicCGenerator::generateScalarParameter(OpaqueContext &&context) {
       [&]() -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
     // Randomly shuffle the parameter ordering and find the first
     // parameter that passes type checking.
-    std::vector<ast::ScalarParameter> copy = scalarParameters;
+    std::vector<ast::ScalarParameter> inScope = scalarParameters;
     for (auto &iter : localVariableStack)
-      llvm::append_range(copy, iter);
-    random.shuffle(copy);
+      llvm::append_range(inScope, iter);
 
-    for (const ast::ScalarParameter &iter : copy)
+    llvm::SmallVector<ast::ScalarParameter> candidates = random.shuffle(
+        inScope,
+        typeSystem.getExistingScalarParameterProbabilityTableOpaque(context),
+        /*keyF=*/
+        [](const ast::ScalarParameter &parameter) {
+          return parameter.getName().str();
+        },
+        /*mapF=*/llvm::identity<ast::ScalarParameter>{});
+
+    for (const ast::ScalarParameter &iter : candidates)
       if (!typeSystem.discardExistingScalarParameterOpaque(iter, context))
         return generateWithDependencies<ast::ExistingScalarParameter>(
             std::move(context),

@@ -929,6 +929,22 @@ public:
   /// should be a pure function otherwise.
   virtual ProbabilityTable<StatementKey>
   getStatementProbabilityTableOpaque(const OpaqueContext &context) = 0;
+
+  using ExistingScalarParameterKey = std::string;
+
+  /// Returns the probability table for an already existing scalar parameter or
+  /// local variable, represented by its name, to be selected whenever the
+  /// generator reuses a variable that is in scope (e.g. as an operand of an
+  /// expression or as the target of an assignment).
+  ///
+  /// Note that the table only applies to variables that already exist: it has
+  /// no influence on whether the generator instead creates a fresh variable.
+  ///
+  /// The method may return different probabilities for different contexts but
+  /// should be a pure function otherwise.
+  virtual ProbabilityTable<ExistingScalarParameterKey>
+  getExistingScalarParameterProbabilityTableOpaque(
+      const OpaqueContext &context) = 0;
 };
 
 /// CRTP-Base class for all implementations of a type system.
@@ -1312,6 +1328,11 @@ public:
     return {};
   }
 
+  static ProbabilityTable<ExistingScalarParameterKey>
+  getExistingScalarParameterProbabilityTable(const TypingContext &) {
+    return {};
+  }
+
   // Implementations of the virtual methods in 'AbstractTypeSystem'.
   // These are automatically implemented to unbox the 'TypingContext's out of
   // the opaque contexts, calling the corresponding non-opaque 'check*' method
@@ -1415,6 +1436,13 @@ public:
   ProbabilityTable<StatementKey>
   getStatementProbabilityTableOpaque(const OpaqueContext &context) final {
     return self().getStatementProbabilityTable(context.cast<TypingContext>());
+  }
+
+  ProbabilityTable<ExistingScalarParameterKey>
+  getExistingScalarParameterProbabilityTableOpaque(
+      const OpaqueContext &context) final {
+    return self().getExistingScalarParameterProbabilityTable(
+        context.cast<TypingContext>());
   }
 
   // Generic adaptors.
@@ -1605,6 +1633,8 @@ public:
       return target.Target::getExpressionProbabilityTable(context);
     else if constexpr (std::is_same_v<Key, StatementKey>)
       return target.Target::getStatementProbabilityTable(context);
+    else if constexpr (std::is_same_v<Key, ExistingScalarParameterKey>)
+      return target.Target::getExistingScalarParameterProbabilityTable(context);
     else {
       static_assert(sizeof(Key) == 0, "'Key' does not key a probability table");
       llvm_unreachable("does not compile");
