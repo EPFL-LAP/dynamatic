@@ -466,9 +466,9 @@ public:
 
 } // namespace
 
-using MyTypes = ::testing::Types<PlusOfTwoParamOnlyTypeSystem,
-                                 ReturnArrayConstantOnlyTypeSystem,
-                                 ForwardStatementsTypeSystem,
-                                 ZeroPlusOneTypeSystem>;
+using MyTypes =
+    ::testing::Types<PlusOfTwoParamOnlyTypeSystem,
+                     ReturnArrayConstantOnlyTypeSystem,
+                     ForwardStatementsTypeSystem, ZeroPlusOneTypeSystem>;
 #pragma clang diagnostic ignored "-Wvariadic-macro-arguments-omitted"
 INSTANTIATE_TYPED_TEST_SUITE_P(All, TypeSystemTest, MyTypes);
