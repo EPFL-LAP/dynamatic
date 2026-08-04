@@ -73,7 +73,18 @@ using DimInfo = std::tuple<unsigned, unsigned, unsigned>;
 // of all four dimensions).
 using DimInfoOfAllDimensions = std::vector<DimInfo>;
 
+// Type of a guard function to hinder instcombine from doing optimizations
+using OpaqueGuardBodyFn =
+    llvm::function_ref<Value *(IRBuilder<> &, ArrayRef<Value *>)>;
+
 namespace {
+
+static std::string typeSuffix(Type *ty) {
+  std::string s;
+  raw_string_ostream os(s);
+  ty->print(os);
+  return s;
+}
 
 struct PragmaPartitionInfo {
   unsigned dimension;
@@ -751,7 +762,7 @@ std::vector<DimInfo> computeBankDimInfo(llvm::Type *arrayType, unsigned factor,
   } else if (style == "cyclic") {
     for (unsigned b = 0; b < factor; ++b) {
       unsigned elems = chunkSize + (b < remainder ? 1u : 0u);
-      banks.emplace_back(/*firstIndex=*/b, /*step=*/factor, elems);
+      banks.emplace_back(b, factor, elems);
     }
   } else {
     std::string errString = "__dyn_array_partition: unknown style '" +
@@ -779,6 +790,62 @@ void debugPrintBankDimInfo(StringRef arrayName, llvm::Type *arrayType,
   }
 
   llvm::errs() << "  (sum of elems across banks: " << sumElems << ")\n";
+}
+
+CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
+                            OpaqueGuardBodyFn buildBody,
+                            IRBuilder<> &callSiteBuilder,
+                            const Twine &callName = "") {
+  Module *mod = callSiteBuilder.GetInsertBlock()->getModule();
+  LLVMContext &ctx = mod->getContext();
+
+  std::string name = ("__dyn_guard." + kind).str();
+  for (Value *arg : args)
+    name += "." + typeSuffix(arg->getType());
+  name += ".to." + typeSuffix(retTy);
+
+  // Lazily create function. If it exists already it should have been generated
+  // in the same way, so no need to regenerate
+  Function *fn = mod->getFunction(name);
+  if (!fn) {
+    SmallVector<Type *, 4> argTypes;
+    for (Value *arg : args)
+      argTypes.push_back(arg->getType());
+
+    FunctionType *fnTy = FunctionType::get(retTy, argTypes, false);
+    fn = Function::Create(fnTy, GlobalValue::InternalLinkage, name, mod);
+    // For the always-inline pass to inline instead of a more sophisticated
+    // inline pass
+    fn->addFnAttr(Attribute::AlwaysInline);
+
+    BasicBlock *entry = BasicBlock::Create(ctx, "entry", fn);
+    IRBuilder<> b(entry);
+    SmallVector<Value *, 4> fnArgs(fn->arg_begin(), fn->arg_end());
+    Value *result = buildBody(b, fnArgs);
+    retTy->isVoidTy() ? (void)b.CreateRetVoid() : (void)b.CreateRet(result);
+  }
+
+  return callSiteBuilder.CreateCall(fn, args, callName);
+}
+
+Value *guardedLoad(IRBuilder<> &b, Value *ptr, Type *elemTy,
+                   const Twine &name = "") {
+  return createOpaqueGuard(
+      "read", {ptr}, elemTy,
+      [elemTy](IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
+        return body.CreateLoad(elemTy, a[0]);
+      },
+      b, name);
+}
+
+void guardedStore(IRBuilder<> &b, Value *ptr, Value *val) {
+  createOpaqueGuard(
+      "write", {ptr, val}, Type::getVoidTy(b.getContext()),
+      [](IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
+        body.CreateStore(a[1], a[0]);
+        return nullptr;
+      },
+      b);
 }
 
 void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
@@ -870,13 +937,12 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
         {ConstantInt::get(Type::getInt64Ty(ctx), 0), newIdx}, "part.gep");
 
     if (load) {
-      Value *loaded = caseBuilder.CreateLoad(load->getType(), newGEP,
-                                             load->getName() + ".part");
+      Value *loaded = guardedLoad(caseBuilder, newGEP, load->getType(),
+                                  load->getName() + ".part");
       incoming.emplace_back(caseBBs[b], loaded);
     } else if (store) {
-      caseBuilder.CreateStore(store->getValueOperand(), newGEP);
+      guardedStore(caseBuilder, newGEP, store->getValueOperand());
     }
-    caseBuilder.CreateBr(mergeBB);
   }
 
   if (load) {

@@ -228,26 +228,26 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to apply array partitioning to LLVM IR" \
   "Applied array partitioning to LLVM IR"
 
+# NOTE: Perform an instcombine pass followed by an inline pass in order to remoe the guardrail calls from the array-partition pass
+$LLVM_OPT -S \
+-passes="function(instcombine),always-inline" \
+  "$F_CLANG_OPTIMIZED_PARTITIONED" \
+  > "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED"
+exit_on_fail "Failed to clean up IR after array partitioning" \
+  "Cleaned up IR after array partitioning"
+
 # NOTE: Unsure if necessary, done a second time to ensure all metadata is attached for later dynamatic specific stuff
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   -polly-process-unprofitable \
-  "$F_CLANG_OPTIMIZED_PARTITIONED" \
+  "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED" \
   > "$F_CLANG_OPTIMIZED_PARTITIONED_RENAMED"
 exit_on_fail "Failed to re-apply memory dependency analysis after partitioning" \
   "Re-applied memory dependency analysis after partitioning"
 
-# NOTE: Initiailly this was a simple "instcombine" pass, this caused issues due to fold https://llvm.org/doxygen/classllvm_1_1InstCombinerImpl.html#aa8a186c50cdf60ac11ae1d0b884d468d which lead to a `phi ptr ...`
-$LLVM_OPT -S \
-  -passes="instcombine" \
-  "$F_CLANG_OPTIMIZED_PARTITIONED_RENAMED" \
-  > "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED"
-exit_on_fail "Failed to clean up IR after array partitioning" \
-  "Cleaned up IR after array partitioning"
-
 $LLVM_TO_STD_TRANSLATION_BIN \
-  "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED" \
+  "$F_CLANG_OPTIMIZED_PARTITIONED_RENAMED" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
