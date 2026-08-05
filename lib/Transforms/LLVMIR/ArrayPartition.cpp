@@ -856,13 +856,19 @@ void guardedStore(IRBuilder<> &b, Value *ptr, Value *val) {
 void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
                                 ArrayRef<DimInfo> bankInfo, StringRef style,
                                 unsigned factor, unsigned chunkSize,
-                                unsigned remainder) {
+                                unsigned remainder, StringRef arrName,
+                                unsigned accessIdx) {
   auto *gepInst = dyn_cast<GetElementPtrInst>(findBaseGEP(inst));
   if (!gepInst) {
     llvm::report_fatal_error(
         "__dyn_array_partition: expected a GEP for this access (direct "
         "zero-index accesses are not yet supported here)");
   }
+
+  // NOTE: Used for better naming of branches only
+  auto *load = dyn_cast<LoadInst>(inst);
+  auto *store = dyn_cast<StoreInst>(inst);
+  StringRef opKind = load ? "load" : "store";
 
   Value *origIdx = gepInst->getOperand(gepInst->getNumOperands() - 1);
   Type *addrTy = origIdx->getType();
@@ -871,7 +877,10 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
   Function *f = inst->getParent()->getParent();
 
   BasicBlock *origBB = gepInst->getParent();
-  BasicBlock *mergeBB = SplitBlock(origBB, gepInst->getIterator());
+  BasicBlock *mergeBB =
+      SplitBlock(origBB, gepInst->getIterator(), (DominatorTree *)nullptr,
+                 (LoopInfo *)nullptr, (MemorySSAUpdater *)nullptr,
+                 "partition." + arrName + ".merge" + Twine(accessIdx));
   Instruction *placeholderBr = origBB->getTerminator();
 
   IRBuilder<> preBuilder(placeholderBr);
@@ -902,36 +911,35 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
 
   placeholderBr->eraseFromParent();
 
-  std::vector<BasicBlock *> caseBBs;
-  caseBBs.reserve(factor);
-  for (unsigned b = 0; b < factor; ++b)
-    caseBBs.push_back(
-        BasicBlock::Create(ctx, "dyn.partition.bank" + Twine(b), f));
+  std::vector<BasicBlock *> bankBBs;
+  bankBBs.reserve(factor);
+  for (unsigned bank = 0; bank < factor; ++bank)
+    bankBBs.push_back(BasicBlock::Create(
+        ctx, "partition." + arrName + "." + opKind + "." + Twine(bank), f));
 
   if (factor == 1) {
-    IRBuilder<>(origBB).CreateBr(caseBBs[0]);
+    IRBuilder<>(origBB).CreateBr(bankBBs[0]);
   } else {
     BasicBlock *currentBB = origBB;
     for (unsigned b = 0; b + 1 < factor; ++b) {
       IRBuilder<> checkBuilder(currentBB);
       Value *cmp = checkBuilder.CreateICmpEQ(
-          bankIdx, ConstantInt::get(i32Ty, b), "bank.check" + Twine(b));
+          bankIdx, ConstantInt::get(i32Ty, b), "bank.cmp" + Twine(b));
       bool isLastCheck = (b + 2 == factor);
       BasicBlock *elseBB =
-          isLastCheck ? caseBBs[factor - 1]
-                      : BasicBlock::Create(
-                            ctx, "dyn.partition.check" + Twine(b + 1), f);
-      checkBuilder.CreateCondBr(cmp, caseBBs[b], elseBB);
+          isLastCheck
+              ? bankBBs[factor - 1]
+              : BasicBlock::Create(
+                    ctx, "partition." + arrName + ".cmp." + Twine(b + 1), f);
+      checkBuilder.CreateCondBr(cmp, bankBBs[b], elseBB);
       currentBB = elseBB;
     }
   }
 
-  auto *load = dyn_cast<LoadInst>(inst);
-  auto *store = dyn_cast<StoreInst>(inst);
   std::vector<std::pair<BasicBlock *, Value *>> incoming;
 
   for (unsigned b = 0; b < factor; ++b) {
-    IRBuilder<> caseBuilder(caseBBs[b]);
+    IRBuilder<> caseBuilder(bankBBs[b]);
     auto [firstIndex, step, elems] = bankInfo[b];
     Value *newIdx = caseBuilder.CreateUDiv(
         caseBuilder.CreateSub(origIdx, ConstantInt::get(addrTy, firstIndex)),
@@ -944,7 +952,7 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
     if (load) {
       Value *loaded = guardedLoad(caseBuilder, newGEP, load->getType(),
                                   load->getName() + ".part");
-      incoming.emplace_back(caseBBs[b], loaded);
+      incoming.emplace_back(bankBBs[b], loaded);
     } else if (store) {
       guardedStore(caseBuilder, newGEP, store->getValueOperand());
     }
@@ -991,10 +999,13 @@ void partitionAccordingToPragma(Value *base, std::set<Instruction *> &insts,
   unsigned factor = static_cast<unsigned>(bankAllocas.size());
   unsigned chunkSize = N / factor;
   unsigned remainder = N % factor;
+  unsigned accessIdx = 0;
 
   for (auto *inst : insts) {
     rewriteAccessWithBranching(inst, bankAllocas, banks, pragma.style, factor,
-                               chunkSize, remainder);
+                               chunkSize, remainder, base->getName(),
+                               accessIdx);
+    ++accessIdx;
   }
 }
 } // namespace
