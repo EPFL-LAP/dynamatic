@@ -112,7 +112,8 @@ public:
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
-        copyFromInput<ast::ArrayParameter>(),
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
         copyToOutput<ast::ArrayParameter, ast::ArrayParameter::ELEMENT_TYPE>()};
   }
 

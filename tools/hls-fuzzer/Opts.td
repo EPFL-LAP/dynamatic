@@ -2,7 +2,14 @@ include "llvm/Option/OptParser.td"
 
 class F<string letter, string help> : Flag<["-"], letter>, HelpText<help>;
 
-def target : Separate<["--"], "target">, MetaVarName<"<target>">;
+// Options that influence the program that is generated and how it is verified.
+// Every option in this group (directly or through a nested group) is captured
+// in a reproducer and replayed by '--reproduce', so adding a new option here is
+// all that is needed for it to become part of reproducers.
+def grp_target : OptionGroup<"Target options">;
+
+def target : Separate<["--"], "target">, MetaVarName<"<target>">,
+             Group<grp_target>;
 def num_threads : JoinedOrSeparate<["-"], "j">,
                   MetaVarName<"<num-threads>">,
                   HelpText<"Number of threads to use">;
@@ -24,6 +31,18 @@ def single_process : Flag<["--"], "single-process">,
 def run_as_worker_subprocess : Separate<["--"], "run-as-worker-subprocess">,
                                MetaVarName<"<dir>">,
                                Flags<[HelpHidden]>;
+// Internal option that generates a program but skips its verification. Only the
+// generation is exercised, which lets tests check that a program can be
+// regenerated from its reproducer without running the heavy verification flow.
+// Hidden as it is not meant for normal use. Deliberately not a target option:
+// it does not influence the generated program and is therefore not part of a
+// reproducer.
+def no_verify : Flag<["--"], "no-verify">, Flags<[HelpHidden]>;
+def reproduce : Separate<["--"], "reproduce">, MetaVarName<"<dir>">,
+                HelpText<"Regenerate and verify, in this very process, the exact "
+                         "program described by the 'reproducer.json' in <dir>. "
+                         "Used to reproduce and debug a crash of the generation "
+                         "or verification">;
 def help : Flag<["--"], "help">, HelpText<"displays this help text">;
 
 // Bare '--statistics' enables reporting of all statistics, while
@@ -40,7 +59,7 @@ def json_output : Separate<["--"], "json-output">,
                            "all requested statistics to <file> as JSON instead "
                            "of reporting them on the console">;
 
-def grp_oracle : OptionGroup<"Oracle options">;
+def grp_oracle : OptionGroup<"Oracle options">, Group<grp_target>;
 
 def functional : Flag<["--"], "functional">,
                  HelpText<"Switch to functional testing">,

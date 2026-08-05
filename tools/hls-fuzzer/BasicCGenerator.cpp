@@ -365,14 +365,24 @@ gen::BasicCGenerator::generateArrayParameter(OpaqueContext &&context) {
       [&](OpaqueContext &&context) {
         return generateScalarType(std::move(context));
       },
+      /*dimension=*/
+      [&](OpaqueContext &&context)
+          -> std::optional<std::pair<std::size_t, OpaqueContext>> {
+        // Generate a power-of-2 dimension to make the modulo operator fast and
+        // easy to implement. We choose an arbitrary upper-bound of 32 for the
+        // dimension for now.
+        std::size_t dimension = 1 << random.getInteger<std::size_t>(0, 5);
+        std::optional<std::size_t> chosen =
+            typeSystem.discardArrayDimensionOpaque(dimension, context);
+        if (!chosen)
+          return std::nullopt;
+
+        return std::pair{*chosen, std::move(context)};
+      },
       /*constructor=*/
-      [&](ast::ScalarType &&elementType) {
-        return arrayParameters.emplace_back(
-            std::move(elementType), generateFreshVarName(),
-            // Generate a power-of-2 dimension to make the modulo operator
-            // fast and easy to implement. We choose an arbitrary upper-bound
-            // of 32 for the dimension for now.
-            static_cast<std::size_t>(1 << random.getInteger(0, 5)));
+      [&](ast::ScalarType &&elementType, std::size_t &&dimension) {
+        return arrayParameters.emplace_back(std::move(elementType),
+                                            generateFreshVarName(), dimension);
       });
 }
 
@@ -494,18 +504,21 @@ gen::BasicCGenerator::generateStatementList(OpaqueContext &&context) {
 
   return generateWithDependencies<ast::StatementList>(
              std::move(context), typeSystem.getStatementListTransferFns(),
-             /*statement list=*/
-             [&](OpaqueContext &&context) {
-               return generateStatementList(std::move(context));
-             },
              /*statement=*/
              [&](OpaqueContext &&context) {
                return generateStatement(std::move(context));
              },
+             /*statement list=*/
+             [&](OpaqueContext &&context) {
+               return generateStatementList(std::move(context));
+             },
              /*constructor=*/
-             [&](ast::StatementList &&statements, ast::Statement &&statement) {
+             [&](ast::Statement &&statement, ast::StatementList &&statements) {
+               // The list is right recursive: the freshly generated
+               // statement is the head, prepended before the rest of the
+               // list.
                std::vector<ast::Statement> result = statements.takeVector();
-               result.push_back(std::move(statement));
+               result.insert(result.begin(), std::move(statement));
                return ast::StatementList(std::move(result));
              })
       .value_or(std::pair{ast::StatementList(), std::move(context)});

@@ -211,6 +211,13 @@ public:
     return subTypeSystem.discardFreshArrayParameter(*context);
   }
 
+  std::optional<std::size_t> discardArrayDimension(std::size_t dimension,
+                                                   const Context &context) {
+    if (!context)
+      return dimension;
+    return subTypeSystem.discardArrayDimension(dimension, *context);
+  }
+
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return wrapTransferFns<ast::ArrayParameter>(
