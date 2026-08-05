@@ -98,12 +98,12 @@ bool getBBEndpoints(Value val, Operation *user, BBEndpoints &endpoints);
 bool getBBEndpoints(Value val, BBEndpoints &endpoints);
 
 /// Determines whether the value is a backedge i.e., whether the channel
-/// corresponding to the value is located between a branch-like operation and a
-/// merge-like operation, where the merge-like operation happens semantically
-/// "before" the branch-like operation. This function can only correctly
-/// identify backedges if the circuit's branches and merges are associated to
-/// basic blocks (otherwise it will always return false). `user` must be one of
-/// `val`'s users.
+/// corresponding to the value is located between a loop-feedback source
+/// (branch-like or compare-like within a block) and a merge-like operation,
+/// where the merge-like operation happens semantically "before" that source.
+/// This function can only correctly identify backedges if the circuit's
+/// branches, compares, and merges are associated to basic blocks (otherwise it
+/// will always return false). `user` must be one of `val`'s users.
 bool isBackedge(Value val, Operation *user, BBEndpoints *endpoints = nullptr);
 
 /// Determines whether the value is a backedge. The value must have a single

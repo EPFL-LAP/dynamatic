@@ -21,10 +21,11 @@ DISABLE_LSQ=${11}
 FAST_TOKEN_DELIVERY=${12}
 MILP_SOLVER=${13}
 STRAIGHT_TO_QUEUE=${14}
-SPECULATION=${15}
-ENABLE_SHORT_CIRCUIT=${16}
-ENABLE_DUPLICATION=${17:-0}
-CALCULATE_PATH_DELAYS=${18}
+OPTIMIZE_STEERING_REWRITES=${15}
+SPECULATION=${16}
+ENABLE_SHORT_CIRCUIT=${17}
+ENABLE_DUPLICATION=${18:-0}
+CALCULATE_PATH_DELAYS=${19}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -63,6 +64,8 @@ F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
+F_HANDSHAKE_PRE_MATERIALIZE="$COMP_DIR/handshake_pre_materialize.mlir"
+F_HANDSHAKE_POST_STEERING_REWRITES="$COMP_DIR/handshake_post_steering_rewrites.mlir"
 F_HW="$COMP_DIR/hw.mlir"
 F_FREQUENCIES="$COMP_DIR/frequencies.csv"
 
@@ -311,27 +314,40 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   F_HANDSHAKE=$F_HANDSHAKE_SQ
 
-  # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
-
+    > "$F_HANDSHAKE_PRE_MATERIALIZE"
+  exit_on_fail "Failed to apply pre-materialization transformations to handshake" \
+    "Applied pre-materialization transformations to handshake"
 else
-
-  # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
-    > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
+    > "$F_HANDSHAKE_PRE_MATERIALIZE"
+  exit_on_fail "Failed to apply pre-materialization transformations to handshake" \
+    "Applied pre-materialization transformations to handshake"
 fi
+
+F_HANDSHAKE_TO_MATERIALIZE="$F_HANDSHAKE_PRE_MATERIALIZE"
+if [[ $OPTIMIZE_STEERING_REWRITES -ne 0 ]]; then
+  echo_info "Applying steering-term rewrites"
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TO_MATERIALIZE" \
+    --handshake-rewrite-terms \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE_POST_STEERING_REWRITES"
+  exit_on_fail "Failed to apply steering-term rewrites" \
+    "Applied steering-term rewrites"
+  F_HANDSHAKE_TO_MATERIALIZE="$F_HANDSHAKE_POST_STEERING_REWRITES"
+fi
+
+# Final materialization before speculation and buffer placement.
+"$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TO_MATERIALIZE" \
+  --handshake-materialize --handshake-infer-basic-blocks \
+  > "$F_HANDSHAKE_TRANSFORMED"
+exit_on_fail "Failed to apply transformations to handshake" \
+  "Applied transformations to handshake"
 
 # Speculation (pre-buffer): place speculative units and then materialize.
 if [[ "$SPECULATION" == "1" ]]; then
