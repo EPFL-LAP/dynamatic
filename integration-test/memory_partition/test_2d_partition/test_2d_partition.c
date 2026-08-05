@@ -5,9 +5,9 @@
 
 void test_2d_partition(const int A[ROWS][COLS], const int B[ROWS][COLS],
                        const int C[ROWS][COLS], int result[ROWS][COLS]) {
-  int intermediate[ROWS][COLS];
 #pragma DYN array_partition array = intermediate dimension = 1 style =         \
     block factor = 2
+  int intermediate[ROWS][COLS];
   for (int i = 0; i < ROWS; ++i) {
     for (int j = 0; j < COLS; ++j) {
       intermediate[i][j] = A[i][j] * B[i][j];
