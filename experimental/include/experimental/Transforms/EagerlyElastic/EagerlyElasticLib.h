@@ -8,6 +8,9 @@
 using namespace dynamatic;
 using namespace mlir;
 
+#define HANDSHAKEBB "handshake.bb"
+#define SUBLOOP_INFO_ATTR "handshake.subloop_info"
+
 enum class BypassResult : bool { Ineligible = false, Eligible = true };
 
 /// Helper function to add the bbAttr and name to new operations.

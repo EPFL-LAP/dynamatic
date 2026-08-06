@@ -15,6 +15,7 @@ add_dynamatic_library(DynamaticEagerlyElastic
   MLIRSupport
   MLIRTransformUtils
   DynamaticHandshake
+  DynamaticCFExtra
   DynamaticSupport
   DynamaticExperimentalSupport
   DynamaticBufferPlacement

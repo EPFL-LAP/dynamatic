@@ -10,6 +10,7 @@
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
+#include "dynamatic/Dialect/CFExtra/CFExtraOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
@@ -54,6 +55,30 @@ using namespace dynamatic;
 using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 using namespace dynamatic::experimental::ftd;
+
+struct PredicateToDummyConversion
+    : public DynOpConversionPattern<dynamatic::cf_extra::PredicateOp> {
+  using DynOpConversionPattern<
+      dynamatic::cf_extra::PredicateOp>::DynOpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(dynamatic::cf_extra::PredicateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    Value cond = adaptor.getCond();
+    Value data = adaptor.getData();
+
+    // Create handshake::DummySuppressorOp (conditionOperand, dataOperand)
+    auto dummyOp = rewriter.create<handshake::DummySuppressorOp>(
+        loc, cond, data);
+
+    dummyOp->setAttr("ftd.is_predicate", rewriter.getUnitAttr());
+    inheritBB(op, dummyOp);
+
+    rewriter.replaceOp(op, dummyOp.getResult());
+    return success();
+  }
+};
 
 struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
   using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
@@ -274,6 +299,7 @@ struct FtdCfToHandshakePass
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
+    ctx->loadDialect<dynamatic::cf_extra::CFExtraDialect>();
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
@@ -290,6 +316,7 @@ struct FtdCfToHandshakePass
         // LowerFuncToHandshake,
         /*ConvertConstants,*/ AllocaOpConversion, ConvertCalls,
         /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
+        PredicateToDummyConversion,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -332,7 +359,7 @@ struct FtdCfToHandshakePass
     target.addLegalDialect<handshake::HandshakeDialect>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
-                             BuiltinDialect>();
+                             BuiltinDialect, dynamatic::cf_extra::CFExtraDialect>();
 
     target.addDynamicallyLegalOp<func::CallOp>([](func::CallOp op) {
       // If the call is to __init, consider it legal for now.
@@ -418,6 +445,49 @@ struct FtdCfToHandshakePass
       ftd::finalizeCondPlaceholders(funcOp);
 
       shadow.destroy();
+
+      for (auto dummyOp : llvm::make_early_inc_range(
+         funcOp.getOps<handshake::DummySuppressorOp>())) {
+        if (!dummyOp->hasAttr("ftd.is_predicate"))
+          continue;
+
+        builder.setInsertionPoint(dummyOp);
+
+        Value currentData = dummyOp.getDataOperand();
+        Value currentCond = dummyOp.getConditionOperand();
+
+        // Check if the input data is already coming from a suppressor branch
+        if (auto parentBranch = currentData.getDefiningOp<handshake::ConditionalBranchOp>()) {
+          if (parentBranch->hasAttr("store_suppressor") &&
+              currentData == parentBranch.getFalseResult()) {
+
+            // Combine conditions using OrIOp
+            builder.setInsertionPoint(parentBranch);
+            auto combinedCond = builder.create<handshake::OrIOp>(
+                dummyOp.getLoc(), parentBranch.getConditionOperand(), currentCond);
+            inheritBB(dummyOp, combinedCond);
+
+            // Update the existing branch condition
+            parentBranch.getConditionOperandMutable().assign(combinedCond.getResult());
+
+            // Replace dummy uses directly with the parent branch's false result
+            dummyOp.getResult().replaceAllUsesWith(parentBranch.getFalseResult());
+            dummyOp.erase();
+            continue;
+          }
+        }
+
+        // create the first suppressor conditional branch using currentCond and currentData
+        auto condBranchOp = builder.create<handshake::ConditionalBranchOp>(
+            dummyOp.getLoc(), currentCond, currentData);
+
+        condBranchOp->setAttr("store_suppressor", builder.getUnitAttr());
+        inheritBB(dummyOp, condBranchOp);
+
+        // Replace dummy result with falseResult and erase
+        dummyOp.getResult().replaceAllUsesWith(condBranchOp.getFalseResult());
+        dummyOp.erase();
+      }
     }
   }
 };
