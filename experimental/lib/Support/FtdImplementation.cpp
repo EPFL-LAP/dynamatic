@@ -499,7 +499,6 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
   BlockIndexing bi(shadowRegion);
   DominanceInfo domInfo(shadow.shadowFunc);
   CFGLoopInfo loopInfo(domInfo.getDomTree(&shadowRegion));
-  auto startValue = (Value)funcOp.getArguments().back();
 
   // Skip if the consumer was added by this function, if it is an init merge, if
   // it comes from the explicit gsa gate insertion process or if it is a generic
@@ -557,8 +556,6 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
     return newUnits;
 
   Value regeneratedValue = operand;
-  auto cstType = builder.getIntegerType(1);
-  auto cstAttr = IntegerAttr::get(cstType, 0);
 
   // The real (flattened) block where new ops are inserted
   Block *realBlock = &funcOp.getBody().front();
@@ -576,12 +573,6 @@ std::vector<Operation *> ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
 
     conditionValue = computeLoopBackedgeCondition(
         builder, loopHeader, realBlock, bi, nullptr, &shadow);
-
-    // Create the false constant to feed `init`
-    auto constOp = builder.create<handshake::ConstantOp>(consumerOp->getLoc(),
-                                                         cstAttr, startValue);
-    constOp->setAttr(FTD_INIT_MERGE, builder.getUnitAttr());
-    constOp->setAttr("handshake.bb", headerBBAttr);
 
     Operation *initOp;
     initOp =
@@ -677,7 +668,8 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
-    // In any cases, suppressing a branch ends up with incorrect results.
+    // A conditional branch already performs suppression on the value.
+    // Do not insert another suppression unit after it.
     if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
         (!consumerOp->hasAttr(SKIP_COND_GEN) &&
          !consumerOp->hasAttr(SKIP_COND_SEQ)))
@@ -764,7 +756,7 @@ void ftd::addRegen(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
 
 LogicalResult experimental::ftd::addGsaGates(
     Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
-    std::vector<Operation *> &newUnits, Backedge startValue,
+    std::vector<Operation *> &newUnits,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
     bool removeTerminators) {
 
@@ -774,12 +766,10 @@ LogicalResult experimental::ftd::addGsaGates(
   // The function instantiates the GAMMA and MU gates as provided by the GSA
   // analysis pass. A GAMMA function is translated into a multiplexer driven by
   // single control signal and fed by two operands; a MU function is
-  // translated into a multiplexer driven by an init (it is currently
-  // implemented as a Merge fed by a constant triggered from Start once and
-  // from the loop condition thereafter). The input of one of these functions
-  // might be another GSA function, and it's possible that the function was
-  // not instantiated yet. For this reason, we keep track of the missing
-  // operands, and reconnect them later on.
+  // translated into a multiplexer driven by an init. The input of one of these
+  // functions might be another GSA function, and it's possible that the
+  // function was not instantiated yet. For this reason, we keep track of the
+  // missing operands, and reconnect them later on.
   //
   // To simplify the way GSA functions are handled, each of them has an unique
   // index.
@@ -1116,14 +1106,6 @@ LogicalResult experimental::ftd::addGsaGates(
 LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
                                      PatternRewriter &rewriter,
                                      std::vector<Operation *> &newUnits) {
-  auto startValue = (Value)funcOp.getArguments().back();
-  auto *ctx = funcOp->getContext();
-  OpBuilder builder(ctx);
-
-  // Create a backedge for the start value, to be sued during the merges to
-  // multiplexers conversion
-  BackedgeBuilder edgeBuilderStart(builder, funcOp.getRegion().getLoc());
-  Backedge startValueBackedge = edgeBuilderStart.get(startValue.getType());
 
   // For each merge that was signed with the `NEW_PHI` attribute, substitute
   // it with its GSA equivalent
@@ -1136,15 +1118,12 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
     // Muxes to the outside, which is needed in Rouzbeh's pass
     gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
     if (failed(ftd::addGsaGates(funcOp.getRegion(), rewriter, gsa, newUnits,
-                                startValueBackedge, nullptr, false)))
+                                nullptr, false)))
       return failure();
 
     // Get rid of the merge
     merge.erase();
   }
-
-  // Replace the backedge
-  startValueBackedge.setValue(startValue);
 
   return success();
 }

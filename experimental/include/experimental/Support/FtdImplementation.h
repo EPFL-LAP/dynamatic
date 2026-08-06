@@ -80,7 +80,6 @@ void addSupp(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
 LogicalResult addGsaGates(
     Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
     std::vector<Operation *> &newUnits,
-    Backedge startValue,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
     bool removeTerminators = true);
 
@@ -107,7 +106,6 @@ LogicalResult createPhiNetwork(Region &funcRegion, PatternRewriter &rewriter,
 LogicalResult createPhiNetworkDeps(
     Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
-
 
 }; // namespace ftd
 }; // namespace experimental

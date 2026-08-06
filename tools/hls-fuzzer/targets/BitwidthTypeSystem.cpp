@@ -215,25 +215,6 @@ dynamatic::gen::BitwidthTypeSystem::getArrayAssignmentStatementTransferFns() {
   };
 }
 
-dynamatic::gen::TransferFnArray<dynamatic::ast::StructuredForStatement>
-dynamatic::gen::BitwidthTypeSystem::getStructuredForStatementTransferFns() {
-  auto subBitwidth = random.getInteger<std::uint8_t>(
-      1, std::min<std::uint8_t>(4, globalMaxBitwidth));
-  // Restricting all expressions to have a specific bitwidth also inherently
-  // forces a specific range in loop iterations.
-  return {
-      TransferFn<ast::StructuredForStatement>(
-          BitwidthTypingContext{subBitwidth}),
-      TransferFn<ast::StructuredForStatement>(
-          BitwidthTypingContext{subBitwidth}),
-      // NOTE: Still allows 0!
-      TransferFn<ast::StructuredForStatement>(
-          BitwidthTypingContext{subBitwidth}),
-      copyFromInput<ast::StructuredForStatement>(),
-      copyInputToOutput<ast::StructuredForStatement>(),
-  };
-}
-
 dynamatic::gen::BitwidthTypingContext
 dynamatic::gen::BitwidthTypeSystem::getInterestingBitWidthInRange(
     uint8_t bitWidth) const {

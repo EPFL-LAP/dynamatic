@@ -33,7 +33,7 @@ LSQOptimizationsTarget::createWorker(const Options &options,
 
 void LSQOptimizationsWorker::generate(llvm::raw_ostream &os,
                                       llvm::StringRef functionName) {
-  gen::LSQNoDepTypeSystem typeSystem;
+  gen::LSQNoDepTypeSystem typeSystem(random);
   gen::BasicCGenerator generator(random, typeSystem);
   generator.generate(os, functionName);
 }

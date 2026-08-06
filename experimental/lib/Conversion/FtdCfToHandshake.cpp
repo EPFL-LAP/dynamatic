@@ -152,6 +152,43 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
   }
 };
 
+/// Same as `ConvertIndexCast`, but tolerates an operand that is already a
+/// `handshake::ChannelType`: in the FTD flow `addGsaGates` runs before
+/// `lowerSignature` and replaces phis with channelified mux results.
+template <typename CastOp, typename ExtOp>
+LogicalResult FtdConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
+    CastOp castOp, OpAdaptor adaptor,
+    ConversionPatternRewriter &rewriter) const {
+
+  auto getWidth = [](Type type) -> unsigned {
+    // The operand may already have been channelified by `addGsaGates`.
+    if (auto chanTy = dyn_cast<handshake::ChannelType>(type))
+      type = chanTy.getDataType();
+    if (isa<IndexType>(type))
+      return 32;
+    return type.getIntOrFloatBitWidth();
+  };
+
+  unsigned srcWidth = getWidth(castOp.getOperand().getType());
+  unsigned dstWidth = getWidth(castOp.getResult().getType());
+  Type dstType = handshake::ChannelType::get(rewriter.getIntegerType(dstWidth));
+  Operation *newOp;
+  if (srcWidth < dstWidth) {
+    // This is an extension
+    newOp =
+        rewriter.create<ExtOp>(castOp.getLoc(), dstType, adaptor.getOperands(),
+                               castOp->getAttrDictionary().getValue());
+  } else {
+    // This is a truncation
+    newOp = rewriter.create<handshake::TruncIOp>(
+        castOp.getLoc(), dstType, adaptor.getOperands(),
+        castOp->getAttrDictionary().getValue());
+  }
+  this->namer.replaceOp(castOp, newOp);
+  rewriter.replaceOp(castOp, newOp);
+  return success();
+}
+
 /// Per-block edge information captured from CF-level IR before conversion.
 struct BlockEdgeInfo {
   bool isConditional = false;
@@ -286,44 +323,42 @@ struct FtdCfToHandshakePass
         getAnalysis<gsa::GSAAnalysis>(), getAnalysis<NameAnalysis>(), converter,
         ctx);
 
-    patterns.add<
-        // LowerFuncToHandshake,
-        /*ConvertConstants,*/ AllocaOpConversion, ConvertCalls,
-        /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
-        ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
-        ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
-        OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
-        OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
-        OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
-        OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
-        OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
-        OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
-        OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
-        OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
-        OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
-        OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
-        OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
-        OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
-        OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
-        OneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
-        OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
-        OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
-        OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
-        OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
-        OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
-        OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
-        OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
-        OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
-        OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
-        OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
-        OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
-        OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
-        OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
-        OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
-        OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
-        OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
-        OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
+    patterns.add<AllocaOpConversion, ConvertCalls, GetGlobalOpConversion,
+                 GlobalOpConversion,
+                 FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
+                 FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
+                 OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
+                 OneToOneConversion<arith::AddIOp, handshake::AddIOp>,
+                 OneToOneConversion<arith::AndIOp, handshake::AndIOp>,
+                 OneToOneConversion<arith::CmpFOp, handshake::CmpFOp>,
+                 OneToOneConversion<arith::CmpIOp, handshake::CmpIOp>,
+                 OneToOneConversion<arith::DivFOp, handshake::DivFOp>,
+                 OneToOneConversion<arith::DivSIOp, handshake::DivSIOp>,
+                 OneToOneConversion<arith::DivUIOp, handshake::DivUIOp>,
+                 OneToOneConversion<arith::RemSIOp, handshake::RemSIOp>,
+                 OneToOneConversion<arith::ExtSIOp, handshake::ExtSIOp>,
+                 OneToOneConversion<arith::ExtUIOp, handshake::ExtUIOp>,
+                 OneToOneConversion<arith::MaximumFOp, handshake::MaximumFOp>,
+                 OneToOneConversion<arith::MinimumFOp, handshake::MinimumFOp>,
+                 OneToOneConversion<arith::MaxSIOp, handshake::MaxSIOp>,
+                 OneToOneConversion<arith::MulFOp, handshake::MulFOp>,
+                 OneToOneConversion<arith::MulIOp, handshake::MulIOp>,
+                 OneToOneConversion<arith::NegFOp, handshake::NegFOp>,
+                 OneToOneConversion<arith::OrIOp, handshake::OrIOp>,
+                 OneToOneConversion<arith::SelectOp, handshake::SelectOp>,
+                 OneToOneConversion<arith::ShLIOp, handshake::ShLIOp>,
+                 OneToOneConversion<arith::ShRSIOp, handshake::ShRSIOp>,
+                 OneToOneConversion<arith::ShRUIOp, handshake::ShRUIOp>,
+                 OneToOneConversion<arith::SubFOp, handshake::SubFOp>,
+                 OneToOneConversion<arith::SubIOp, handshake::SubIOp>,
+                 OneToOneConversion<arith::TruncIOp, handshake::TruncIOp>,
+                 OneToOneConversion<arith::TruncFOp, handshake::TruncFOp>,
+                 OneToOneConversion<arith::XOrIOp, handshake::XOrIOp>,
+                 OneToOneConversion<arith::SIToFPOp, handshake::SIToFPOp>,
+                 OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
+                 OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
+                 OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
+                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
         getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions
@@ -562,15 +597,9 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   // backedge is replaced with the corresponding hanshake values
   static DenseMap<Value, SmallVector<Backedge, 2>> pendingMuxOperands;
 
-  // Add the muxes as obtained by the GSA analysis pass. This requires the
-  // start value, as init merges need it as one of their output. However,
-  // the start value is not available yet here, so a backedge is adopted
-  // instead.
-  BackedgeBuilder edgeBuilderStart(rewriter, lowerFuncOp.getRegion().getLoc());
-  Backedge startValueBackedge =
-      edgeBuilderStart.get(rewriter.getType<handshake::ControlType>());
+  // Add the muxes as obtained by the GSA analysis pass.
   if (failed(addGsaGates(lowerFuncOp.getRegion(), rewriter, gsaAnalysis,
-                         newUnits, startValueBackedge, &pendingMuxOperands)))
+                         newUnits, &pendingMuxOperands)))
     return failure();
 
   // First lower the parent function itself, without modifying its body
@@ -580,13 +609,6 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   handshake::FuncOp funcOp = *funcOrFailure;
   if (funcOp.isExternal())
     return success();
-
-  // When GSA-MU functions are translated into multiplexers, an `init merge`
-  // is created to feed them. This merge requires the start value of the
-  // function as one of its data inputs. However, the start value was not
-  // present yet when `addGsaGates` is called, thus we need to reconnect
-  // it.
-  startValueBackedge.setValue((Value)funcOp.getArguments().back());
 
   for (auto &[originalValue, backedges] : pendingMuxOperands) {
     Value newVal = rewriter.getRemappedValue(originalValue);
@@ -620,8 +642,11 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     if (!condBr)
       continue;
 
+    // FTD's own branches carry ftd.skip, and they must not count as
+    // the block's condition branch here.
     bool hasHandshakeCondBr = llvm::any_of(block, [](Operation &op) {
-      return isa<handshake::ConditionalBranchOp>(&op);
+      return isa<handshake::ConditionalBranchOp>(&op) &&
+             !op.hasAttr("ftd.skip");
     });
 
     if (!hasHandshakeCondBr) {

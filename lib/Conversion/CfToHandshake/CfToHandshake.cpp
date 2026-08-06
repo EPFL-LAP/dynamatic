@@ -772,7 +772,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
     BackedgeBuilder &edgeBuilder,
-    LowerFuncToHandshake::MemInterfacesInfo &memInfo, bool isFtd) const {
+    LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
   auto funcArgs = funcOp.getArguments();
@@ -875,16 +875,6 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               namer.replaceOp(loadOp, newOp);
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
-
-              // /!\ In FTD, the way operations are converted between dialects
-              // is done in a way that both operations from `cf` to `handshake`
-              // coexist in some intertwined way. New operations from the
-              // `handshake` dialect are instantiated while connected to the old
-              // `cf` versions. When rewriting, we found that this call is
-              // necessary to avoid having a "null operand found" error (e.g.
-              // get_tanh)
-              if (isFtd)
-                loadOp.getResult().replaceAllUsesWith(dataOut);
 
               return newOp;
             })
@@ -1201,8 +1191,6 @@ LogicalResult ConvertIndexCast<CastOp, ExtOp>::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
 
   auto getWidth = [](Type type) -> unsigned {
-    if (auto chanTy = dyn_cast<handshake::ChannelType>(type))
-      type = chanTy.getDataType();
     if (isa<IndexType>(type))
       return 32;
     return type.getIntOrFloatBitWidth();
@@ -1513,13 +1501,13 @@ ConvertConstants::matchAndRewrite(arith::ConstantOp cstOp,
 
   // Determine the new constant's control input
   Value controlVal;
-  // if (isCstSourcable(cstOp)) {
-  //   auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
-  //   inheritBB(cstOp, sourceOp);
-  //   controlVal = sourceOp.getResult();
-  // } else {
-  controlVal = getBlockControl(cstOp);
-  //}
+  if (isCstSourcable(cstOp)) {
+    auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
+    inheritBB(cstOp, sourceOp);
+    controlVal = sourceOp.getResult();
+  } else {
+    controlVal = getBlockControl(cstOp);
+  }
 
   TypedAttr cstAttr = cstOp.getValue();
   // Convert IndexType'd values to equivalent signless integers

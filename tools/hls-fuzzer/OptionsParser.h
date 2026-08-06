@@ -29,6 +29,17 @@ public:
   /// until interrupted.
   std::optional<std::size_t> getNumPrograms() const;
 
+  /// Returns true if '--single-process' was specified, i.e. every program
+  /// should be generated and verified on a thread of this process instead of in
+  /// a process of its own.
+  bool isSingleProcess() const;
+
+  /// Returns the directory a single program should be generated and verified
+  /// in, as requested via the internal '--run-as-worker-subprocess' option.
+  /// Returns 'std::nullopt' if the option was not specified, i.e. this process
+  /// should fuzz rather than work on the single program a fuzzer asked it for.
+  std::optional<std::string> getSingleProgramDirectory() const;
+
   /// Returns the name of the target fuzzer.
   std::string getTargetName() const;
 
