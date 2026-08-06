@@ -638,8 +638,11 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
     if (!condBr)
       continue;
 
+    // FTD's own branches carry ftd.skip, and they must not count as
+    // the block's condition branch here.
     bool hasHandshakeCondBr = llvm::any_of(block, [](Operation &op) {
-      return isa<handshake::ConditionalBranchOp>(&op);
+      return isa<handshake::ConditionalBranchOp>(&op) &&
+             !op.hasAttr("ftd.skip");
     });
 
     if (!hasHandshakeCondBr) {
