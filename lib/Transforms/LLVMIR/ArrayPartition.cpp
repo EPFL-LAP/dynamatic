@@ -865,9 +865,9 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
         "zero-index accesses are not yet supported here)");
   }
 
-  // NOTE: Used for better naming of branches only
   auto *load = dyn_cast<LoadInst>(inst);
   auto *store = dyn_cast<StoreInst>(inst);
+  // NOTE: Could be a boolean/enum
   StringRef opKind = load ? "load" : "store";
 
   Value *origIdx = gepInst->getOperand(gepInst->getNumOperands() - 1);
@@ -885,23 +885,20 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
 
   IRBuilder<> preBuilder(placeholderBr);
 
-  Type *i32Ty = Type::getInt32Ty(ctx);
-  Value *idx32 =
-      addrTy == i32Ty
-          ? origIdx
-          : (addrTy->getIntegerBitWidth() > 32
-                 ? preBuilder.CreateTrunc(origIdx, i32Ty, "idx.trunc")
-                 : preBuilder.CreateZExt(origIdx, i32Ty, "idx.zext"));
+  // NOTE:: Might be an issue if the index isn't a 64bit integer? Maybe there is
+  // some getIndexType, otherwise can be fixed by having everything be 64 bits
+  // and later truncated?
+  Type *i64Ty = Type::getInt64Ty(ctx);
 
   Value *bankIdx;
   if (style == "cyclic") {
-    bankIdx = preBuilder.CreateURem(idx32, ConstantInt::get(i32Ty, factor),
+    bankIdx = preBuilder.CreateURem(origIdx, ConstantInt::get(i64Ty, factor),
                                     "bank.idx");
-  } else {
+  } else { // Both style "block" and "complete". "complete" must ensure that factos == array size essentially
     Value *raw = preBuilder.CreateUDiv(
-        idx32, ConstantInt::get(i32Ty, chunkSize), "bank.raw");
+        origIdx, ConstantInt::get(i64Ty, chunkSize), "bank.raw");
     if (remainder != 0) {
-      Value *maxBank = ConstantInt::get(i32Ty, factor - 1);
+      Value *maxBank = ConstantInt::get(i64Ty, factor - 1);
       Value *tooLarge = preBuilder.CreateICmpUGT(raw, maxBank);
       bankIdx = preBuilder.CreateSelect(tooLarge, maxBank, raw, "bank.idx");
     } else {
@@ -924,7 +921,7 @@ void rewriteAccessWithBranching(Instruction *inst, ArrayRef<AllocaInst *> banks,
     for (unsigned b = 0; b + 1 < factor; ++b) {
       IRBuilder<> checkBuilder(currentBB);
       Value *cmp = checkBuilder.CreateICmpEQ(
-          bankIdx, ConstantInt::get(i32Ty, b), "bank.cmp" + Twine(b));
+          bankIdx, ConstantInt::get(i64Ty, b), "bank.cmp" + Twine(b));
       bool isLastCheck = (b + 2 == factor);
       BasicBlock *elseBB =
           isLastCheck
