@@ -617,9 +617,6 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
 
       // MU gate has exactly one operand from inside and one from outside the
       // loop. If more than one exists, a phi gate is added to select the output
-      // Note: gates created for loop inputs are flagged as MU-generated,
-      // so they will later be placed in the condition block. This flagging is
-      // not done for gates created from initial inputs.
       GateInput *operandInit = nullptr, *operandLoop = nullptr;
 
       // Handle initail input
@@ -637,11 +634,11 @@ void experimental::gsa::GSAAnalysis::convertPhiToMu(Region &region,
       if (loopInputs.size() == 1)
         operandLoop = loopInputs[0];
       else {
-        // The new Phi gate has a flag muGenerated so later in the convert phi
-        // to gamma it effects the place that gaama is added
+        // Create a Phi gate to merge multiple loop inputs before creating the
+        // Mu gate.
         Gate *loopPhi = new Gate(phi->result, loopInputs, GateType::PhiGate,
                                  ++uniqueGateIndex, nullptr,
-                                 BoolExpression::boolZero(), {}, true);
+                                 BoolExpression::boolZero(), {});
         gatesPerBlock[phiBlock].push_back(loopPhi);
         operandLoop = new GateInput(loopPhi);
         gateInputList.push_back(operandLoop);

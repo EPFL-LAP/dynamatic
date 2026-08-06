@@ -121,10 +121,6 @@ struct Gate {
   /// Block in which the gate is placed
   Block *gateBlock;
 
-  /// True if this gate was generated as part of expanding a Mu gate.
-  /// Allows special handling when splitting multi-input Mu structures.
-  bool muGenerated;
-
   /// Index of the current gate, which uniquely identifies it.
   unsigned index;
 
@@ -136,10 +132,10 @@ struct Gate {
   Gate(Value v, ArrayRef<GateInput *> pi, GateType gt, unsigned i,
        Block *c = nullptr,
        boolean::BoolExpression *cond = boolean::BoolExpression::boolZero(),
-       std::vector<std::string> cof = {}, bool muGen = false)
+       std::vector<std::string> cof = {})
       : result(v), operands(pi), gsaGateFunction(gt), conditionBlock(c),
         condition(cond), cofactorList(cof), gateBlock(v.getParentBlock()),
-        muGenerated(muGen), index(i) {}
+        index(i) {}
 
   /// Print the information about the gate.
   void print();
