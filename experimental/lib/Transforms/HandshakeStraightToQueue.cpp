@@ -17,15 +17,20 @@
 #include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/Debug.h"
 #include <stack>
 
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
+
+#define DEBUG_TYPE "handshake-straight-to-queue"
 
 // [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
@@ -300,33 +305,66 @@ static void minimizeGroupsConnections(handshake::FuncOp funcOp,
 
 /// For each element in the group, build a lazy fork and use its output to feed
 /// the correspondent input of the LSQ.
-static DenseMap<Block *, handshake::LazyForkOp>
-connectLSQToForkGraph(handshake::FuncOp &funcOp,
-                      DenseSet<MemoryGroup *> &groups, handshake::LSQOp lsqOp,
-                      PatternRewriter &rewriter) {
-
-  DenseMap<Block *, handshake::LazyForkOp> forksGraph;
-  auto startValue = (Value)funcOp.getArguments().back();
-
-  // Create the fork nodes: for each group among the set of groups
-  for (MemoryGroup *group : groups) {
-    Block *bb = group->bb;
+static handshake::LazyForkOp
+ensureLazyForkOutputCount(Block *bb, Value input, unsigned numResults,
+                          DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
+                          PatternRewriter &rewriter) {
+  auto it = forksGraph.find(bb);
+  if (it == forksGraph.end()) {
     rewriter.setInsertionPointToStart(bb);
-
-    // Add a lazy fork with two outputs, having the start control value as
-    // input and two output ports, one for the LSQ and one for the subsequent
-    // buffer
     auto forkOp = rewriter.create<handshake::LazyForkOp>(bb->front().getLoc(),
-                                                         startValue, 2);
-
-    // Add the new component to the list of components create for FTD and to
-    // the fork graph
+                                                         input, numResults);
     forksGraph[bb] = forkOp;
+    return forkOp;
   }
 
-  // The second output of each lazy fork must be connected to the LSQ, so that
-  // they can activate the allocation for the operations of the corresponding
-  // basic block
+  handshake::LazyForkOp oldFork = it->second;
+  if (oldFork->getNumResults() >= numResults)
+    return oldFork;
+
+  rewriter.setInsertionPoint(oldFork);
+  auto newFork = rewriter.create<handshake::LazyForkOp>(
+      oldFork.getLoc(), oldFork.getOperand(), numResults);
+  newFork->setAttrs(oldFork->getAttrs());
+
+  for (unsigned idx = 0, e = oldFork->getNumResults(); idx < e; ++idx)
+    oldFork->getResult(idx).replaceAllUsesWith(newFork->getResult(idx));
+
+  rewriter.eraseOp(oldFork);
+  forksGraph[bb] = newFork;
+  return newFork;
+}
+
+static void
+connectLSQToForkGraph(handshake::FuncOp &funcOp,
+                      DenseSet<MemoryGroup *> &groups, handshake::LSQOp lsqOp,
+                      DenseMap<Block *, handshake::LazyForkOp> &sharedForks,
+                      DenseMap<Block *, unsigned> &nextAllocPort,
+                      PatternRewriter &rewriter) {
+
+  DenseMap<Block *, unsigned> allocPort;
+  auto startValue = (Value)funcOp.getArguments().back();
+
+  // Create or reuse one fork node per basic block. Result #0 is reserved for
+  // the continuation/dependency network; one extra result is allocated for each
+  // LSQ group allocation control input in the block.
+  for (MemoryGroup *group : groups) {
+    Block *bb = group->bb;
+
+    unsigned port = nextAllocPort.lookup(bb);
+    if (port == 0)
+      port = 1;
+    nextAllocPort[bb] = port + 1;
+    allocPort[bb] = port;
+
+    auto forkOp = ensureLazyForkOutputCount(bb, startValue, port + 1,
+                                            sharedForks, rewriter);
+    sharedForks[bb] = forkOp;
+  }
+
+  // The allocated output of each lazy fork must be connected to the LSQ, so
+  // that it can activate the allocation for the operations of the corresponding
+  // basic block.
   //
   // For each input of the LSQ
   for (auto [opIdx, op] : llvm::enumerate(lsqOp.getOperands())) {
@@ -338,12 +376,10 @@ connectLSQToForkGraph(handshake::FuncOp &funcOp,
     // fork of the graph
     auto cmerge = llvm::dyn_cast<handshake::ControlMergeOp>(op.getDefiningOp());
     Block *bb = cmerge->getBlock();
-    if (!forksGraph.contains(bb))
+    if (!allocPort.contains(bb))
       continue;
-    lsqOp.setOperand(opIdx, forksGraph[bb]->getResult(1));
+    lsqOp.setOperand(opIdx, sharedForks[bb]->getResult(allocPort[bb]));
   }
-
-  return forksGraph;
 }
 
 /// Get all the load and store operations related to a LSQ operation
@@ -363,27 +399,28 @@ getLsqOps(handshake::FuncOp &funcOp, handshake::LSQOp lsqOp) {
 /// Given a graph of lazy forks, connect the elements together with some proper
 /// SSA phi
 static LogicalResult
-connectForkGraph(handshake::FuncOp &funcOp,
-                 const DenseSet<MemoryGroup *> &groupsGraph,
-                 const DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
-                 PatternRewriter &rewriter) {
+connectForkGraphs(handshake::FuncOp &funcOp,
+                  ArrayRef<DenseSet<MemoryGroup *>> allGroupsGraphs,
+                  const DenseMap<Block *, handshake::LazyForkOp> &forksGraph,
+                  PatternRewriter &rewriter) {
 
-  for (MemoryGroup *consumerGroup : groupsGraph) {
+  DenseMap<OpOperand *, SmallVector<Value>> deps;
 
-    DenseMap<OpOperand *, SmallVector<Value>> deps;
-    SmallVector<Value> forkDeps;
+  for (const DenseSet<MemoryGroup *> &groupsGraph : allGroupsGraphs) {
+    for (MemoryGroup *consumerGroup : groupsGraph) {
+      handshake::LazyForkOp consumerLF = forksGraph.at(consumerGroup->bb);
+      SmallVector<Value> &forkDeps = deps[&consumerLF->getOpOperand(0)];
 
-    for (auto &producerGroup : consumerGroup->preds) {
-      Operation *producerLF = forksGraph.at(producerGroup->bb);
-      forkDeps.push_back(producerLF->getResult(0));
+      for (auto &producerGroup : consumerGroup->preds) {
+        Operation *producerLF = forksGraph.at(producerGroup->bb);
+        Value producerToken = producerLF->getResult(0);
+        if (!llvm::is_contained(forkDeps, producerToken))
+          forkDeps.push_back(producerToken);
+      }
     }
-
-    deps[&forksGraph.at(consumerGroup->bb)->getOpOperand(0)] = forkDeps;
-
-    if (failed(ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, deps)))
-      return failure();
   }
-  return success();
+
+  return ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, deps);
 }
 
 /// Remove the network of cmerges in case the function is void. The SQ pass
@@ -475,6 +512,176 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
     toRemove->erase();
 }
 
+/// Per-block edge information captured from the multi-block CFG before
+/// flattening. Used to reconstruct a ShadowCFG afterwards.
+struct CapturedEdgeInfo {
+  bool isConditional = false;
+  bool hasSuccessors = false;
+  unsigned trueSuccIdx = 0;
+  unsigned falseSuccIdx = 0;
+  unsigned uncondSuccIdx = 0;
+};
+
+/// Capture the CFG topology and branch condition Values of a handshake::FuncOp
+/// while it still has restored multi-block structure. Both pieces of
+/// information are destroyed by removeNetworkCMerges + flattenFunction and are
+/// needed later to construct the ShadowCFG for addRegen / addSupp.
+static void captureCFGTopology(handshake::FuncOp funcOp, unsigned &numBlocks,
+                               SmallVector<CapturedEdgeInfo> &edges,
+                               DenseMap<unsigned, Value> &capturedConditions) {
+  Region &region = funcOp.getRegion();
+  DenseMap<Block *, unsigned> blockToIdx;
+  for (auto [idx, block] : llvm::enumerate(region))
+    blockToIdx[&block] = idx;
+
+  numBlocks = blockToIdx.size();
+  edges.resize(numBlocks);
+
+  for (auto [idx, block] : llvm::enumerate(region)) {
+    CapturedEdgeInfo &edge = edges[idx];
+    Operation *term = block.getTerminator();
+    if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+      edge.isConditional = true;
+      edge.hasSuccessors = true;
+      edge.trueSuccIdx = blockToIdx.lookup(condBr.getTrueDest());
+      edge.falseSuccIdx = blockToIdx.lookup(condBr.getFalseDest());
+    } else if (auto br = dyn_cast<cf::BranchOp>(term)) {
+      edge.hasSuccessors = true;
+      edge.uncondSuccIdx = blockToIdx.lookup(br.getDest());
+    }
+  }
+
+  // Capture branch condition Values from handshake::ConditionalBranchOp ops.
+  // This must happen before removeNetworkCMerges, which erases cmerge-network
+  // ConditionalBranchOps and may leave some blocks without any surviving
+  // condition source. We prefer conditions that do NOT originate from a
+  // ControlMergeOp (those belong to the cmerge network and will be erased).
+  funcOp.walk([&](handshake::ConditionalBranchOp brOp) {
+    auto bbAttr = brOp->getAttrOfType<IntegerAttr>("handshake.bb");
+    if (!bbAttr)
+      return;
+    unsigned bbIdx = bbAttr.getUInt();
+    Value cond = brOp.getConditionOperand();
+    bool fromCmerge =
+        cond.getDefiningOp() &&
+        llvm::isa<handshake::ControlMergeOp>(cond.getDefiningOp());
+    // Always prefer a non-cmerge condition; keep the first non-cmerge one found
+    if (!capturedConditions.contains(bbIdx)) {
+      // First condition seen for this BB — always capture
+      capturedConditions[bbIdx] = cond;
+    } else if (!fromCmerge) {
+      // Found a better (non-cmerge) condition — upgrade
+      capturedConditions[bbIdx] = cond;
+    }
+  });
+}
+
+/// Build a ShadowCFG for the given handshake::FuncOp using previously captured
+/// CFG topology and condition Values. The shadow function replicates the
+/// original block structure with standard CF terminators, enabling analysis
+/// passes (BlockIndexing, DominanceInfo, CFGLoopInfo) that addRegen and addSupp
+/// rely on.
+static ftd::ShadowCFG buildShadowFromCapturedTopology(
+    OpBuilder &builder, handshake::FuncOp funcOp, unsigned numBlocks,
+    const SmallVector<CapturedEdgeInfo> &edges,
+    const DenseMap<unsigned, Value> &capturedConditions) {
+
+  ftd::ShadowCFG shadow;
+  Location loc = funcOp.getLoc();
+
+  // Create a temporary func::FuncOp with blocks + CF terminators that mirror
+  // the original multi-block topology.
+  {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointAfter(funcOp);
+    auto funcType = builder.getFunctionType({}, {});
+    shadow.shadowFunc =
+        builder.create<func::FuncOp>(loc, "__ftd_shadow_cfg__", funcType);
+
+    Region &R = shadow.shadowFunc.getBody();
+    SmallVector<Block *> blocks;
+    for (unsigned i = 0; i < numBlocks; ++i)
+      blocks.push_back(builder.createBlock(&R, R.end()));
+
+    for (unsigned i = 0; i < numBlocks; ++i) {
+      const CapturedEdgeInfo &edge = edges[i];
+      builder.setInsertionPointToEnd(blocks[i]);
+
+      if (edge.isConditional) {
+        auto dummyCond =
+            builder.create<arith::ConstantOp>(loc, builder.getBoolAttr(true));
+        builder.create<cf::CondBranchOp>(
+            loc, dummyCond, blocks[edge.trueSuccIdx], ValueRange{},
+            blocks[edge.falseSuccIdx], ValueRange{});
+      } else if (edge.hasSuccessors) {
+        builder.create<cf::BranchOp>(loc, blocks[edge.uncondSuccIdx]);
+      } else {
+        builder.create<func::ReturnOp>(loc);
+      }
+    }
+  }
+
+  // Use the pre-captured condition Values (captured before removeNetworkCMerges
+  // destroyed cmerge-network ConditionalBranchOps).
+  shadow.conditionMap = capturedConditions;
+
+  return shadow;
+}
+
+/// Remove the cmerge network, flatten the function, and run FTD gating on the
+/// flattened IR using a temporary ShadowCFG reconstructed from the original
+/// multi-block topology.
+static LogicalResult runPostCmergeFtd(handshake::FuncOp funcOp,
+                                      MLIRContext *ctx,
+                                      bool resolveCondPlaceholders) {
+  ConversionPatternRewriter rewriter(ctx);
+
+  experimental::cfg::markBasicBlocks(funcOp, rewriter);
+
+  // Capture the original CFG before the cmerge network is removed so we can
+  // rebuild a ShadowCFG after flattening for addRegen/addSupp.
+  unsigned capturedNumBlocks = 0;
+  SmallVector<CapturedEdgeInfo> capturedEdges;
+  DenseMap<unsigned, Value> capturedConditions;
+  captureCFGTopology(funcOp, capturedNumBlocks, capturedEdges,
+                     capturedConditions);
+
+  removeNetworkCMerges(funcOp, rewriter);
+
+  if (failed(cfg::flattenFunction(funcOp)))
+    return failure();
+
+  if (capturedNumBlocks <= 1)
+    return success();
+
+  OpBuilder builder(ctx);
+  ftd::ShadowCFG shadow = buildShadowFromCapturedTopology(
+      builder, funcOp, capturedNumBlocks, capturedEdges, capturedConditions);
+
+  if (resolveCondPlaceholders) {
+    ftd::resolveCondPlaceholders(funcOp, builder, shadow);
+
+    // Pick up negated condition signals produced by resolveCondPlaceholders.
+    for (auto notOp : funcOp.getOps<handshake::NotIOp>()) {
+      if (!notOp->hasAttr("ftd.cvar"))
+        continue;
+      auto bbAttr = notOp->getAttrOfType<IntegerAttr>("handshake.bb");
+      if (!bbAttr)
+        continue;
+      shadow.conditionMap[bbAttr.getUInt()] = notOp.getResult();
+    }
+  }
+
+  ftd::addRegen(funcOp, builder, shadow);
+  ftd::addSupp(funcOp, builder, shadow);
+
+  if (resolveCondPlaceholders)
+    ftd::finalizeCondPlaceholders(funcOp);
+
+  shadow.destroy();
+  return success();
+}
+
 /// Run straight to the queue.
 static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
                                           MLIRContext *ctx) {
@@ -483,13 +690,18 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
 
   // Return if there are no LSQs in the function
   if (funcOp.getOps<handshake::LSQOp>().empty()) {
-    removeNetworkCMerges(funcOp, rewriter);
-    return success();
+    if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
+      return failure();
+    return runPostCmergeFtd(funcOp, ctx, /*resolveCondPlaceholders=*/false);
   }
 
   // Restore the cf structure to work on a structured IR
   if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
     return failure();
+
+  SmallVector<DenseSet<MemoryGroup *>> allGroupsGraphs;
+  DenseMap<Block *, handshake::LazyForkOp> sharedForks;
+  DenseMap<Block *, unsigned> nextAllocPort;
 
   // For each LSQ
   for (const handshake::LSQOp lsqOp : funcOp.getOps<handshake::LSQOp>()) {
@@ -500,8 +712,7 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     // Get all the memory depdencies among the operations connected to the
     // same LSQ
     auto lsqMemDeps = identifyMemoryDependencies(funcOp, lsqOps);
-    for (auto &dep : lsqMemDeps)
-      dep.print();
+    LLVM_DEBUG(for (auto &dep : lsqMemDeps) dep.print());
 
     // Build a group graph out of the dependencies
     auto groupsGraph = constructGroupsGraph(lsqOps, lsqMemDeps);
@@ -509,41 +720,37 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
     // Apply group minimization techniques
     minimizeGroupsConnections(funcOp, groupsGraph);
 
-    for (auto &g : groupsGraph)
-      g->print();
+    LLVM_DEBUG(for (auto &g : groupsGraph) g->print());
 
     // Build a lazy fork for each group and connect it to the related
     // activation input in the LSQ
-    auto forksGraph =
-        connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, rewriter);
+    connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, sharedForks,
+                          nextAllocPort, rewriter);
 
-    // Connect the lazy forks together through a network of merges
-    if (failed(connectForkGraph(funcOp, groupsGraph, forksGraph, rewriter)))
-      return failure();
+    allGroupsGraphs.push_back(std::move(groupsGraph));
+  }
 
-    // Delete the groups
+  // Connect the shared lazy forks together through a network of merges.
+  if (failed(connectForkGraphs(funcOp, allGroupsGraphs, sharedForks, rewriter)))
+    return failure();
+
+  // Delete the groups
+  for (const DenseSet<MemoryGroup *> &groupsGraph : allGroupsGraphs)
     for (auto *g : groupsGraph)
       delete g;
-  }
+
+  // Create condition placeholders for every conditional block in the restored
+  // CFG. The refactored addGsaGates (called by replaceMergeToGSA) relies on
+  // these placeholders when building distribution networks and BDD circuits
+  // for MU gates.  In the FTD flow, createAllCondPlaceholders is called before
+  // addGsaGates; S2Q must do the same.
+  ftd::createAllCondPlaceholders(funcOp.getRegion(), rewriter);
 
   // Replace each merge created by `createPhiNetwork` with a multiplxer
   if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
     return failure();
 
-  // Run fast token delivery on the newly inserted operations
-  experimental::ftd::addRegen(funcOp, rewriter);
-  experimental::ftd::addSupp(funcOp, rewriter);
-  experimental::cfg::markBasicBlocks(funcOp, rewriter);
-
-  // Try to remove the network of cmerges if possible (i.e. if the function was
-  // void)
-  removeNetworkCMerges(funcOp, rewriter);
-
-  // Remove the blocks and terminators
-  if (failed(cfg::flattenFunction(funcOp)))
-    return failure();
-
-  return success();
+  return runPostCmergeFtd(funcOp, ctx, /*resolveCondPlaceholders=*/true);
 }
 
 struct HandshakeStraightToQueuePass
