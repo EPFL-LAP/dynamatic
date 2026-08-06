@@ -138,3 +138,8 @@ jobs:
             integration-test/memory/*/out*/dynamatic_out.txt
             integration-test/memory/*/out*/dynamatic_err.txt
 
+      - name: handshake-count-verification
+        if: steps.build.outputs.exit_code == 0
+        run: |
+          python3 tools/verification/handshake_count_solver.py integration-test --emit-equations handshake_count_equations.txt
+

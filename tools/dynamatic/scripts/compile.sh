@@ -61,6 +61,8 @@ F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
+F_HANDSHAKE_COUNT_SOLVER="$COMP_DIR/handshake_count_solver.txt"
+F_HANDSHAKE_COUNT_EQUATIONS="$COMP_DIR/handshake_count_equations.txt"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
 F_HW="$COMP_DIR/hw.mlir"
@@ -432,5 +434,18 @@ else
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 fi
+
+# handshake count verification (linear, parametric)
+python3 "$DYNAMATIC_DIR/tools/verification/handshake_count_solver.py" \
+  "$F_HANDSHAKE_EXPORT" \
+  --emit-equations "$F_HANDSHAKE_COUNT_EQUATIONS" \
+  > "$F_HANDSHAKE_COUNT_SOLVER" 2>&1
+status=$?
+if [[ $status -ne 0 ]]; then
+  echo_info "handshake count verification failed"
+  cat "$F_HANDSHAKE_COUNT_SOLVER"
+  exit $status
+fi
+cat "$F_HANDSHAKE_COUNT_SOLVER"
 
 echo_info "Compilation succeeded"

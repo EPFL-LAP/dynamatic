@@ -1,0 +1,4 @@
+./integration-test/fir/fir.c
+./integration-test/kernel_2mm_float/kernel_2mm_float.c
+./integration-test/loop_array/loop_array.c
+./integration-test/threshold/threshold.c
