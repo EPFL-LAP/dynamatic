@@ -30,7 +30,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
-#include <fstream>
 #include <unordered_set>
 
 // [START Boilerplate code for the MLIR pass]
@@ -73,20 +72,6 @@ struct HandshakeInsertSkippableSeqPass
 };
 } // namespace
 
-class DependenceGraphEdge {
-public:
-  Operation *srcOp;
-  Operation *dstOp;
-  int comparatoreNum;
-  DependenceGraphEdge(Operation *srcOp, Operation *dstOp, int comparatoreNum) {
-    this->srcOp = srcOp;
-    this->dstOp = dstOp;
-    this->comparatoreNum = comparatoreNum;
-  }
-};
-
-using DependenceGraph = SmallVector<DependenceGraphEdge, 2>;
-DependenceGraph dependenceGraph;
 DenseMap<Operation *, std::vector<int>> consumerOpAndOperandIndexForFTD;
 IsWaitingSignalForSuccDirect isWaitingSignalForSuccDirect;
 delayedDict delayedAddressesForEachPred;
@@ -557,9 +542,6 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
         StringRef successorName = dependency.getDstAccess();
         Operation *successorOpPointer = memAccesses[successorName];
 
-        dependenceGraph.push_back(
-            DependenceGraphEdge(predecessorOpPointer, successorOpPointer, N));
-
         SmallVector<Value> conds =
             skipConditionForEachPair[predecessorOpName][successorName];
 
@@ -671,22 +653,6 @@ void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
   // funcOp.print(llvm::errs());
 }
 
-// write dep graph to a dot file
-void writeDepGraphToDotFile(const std::string &filename) {
-  std::ofstream file(filename);
-  file << "digraph G {\n";
-  for (const auto &edge : dependenceGraph) {
-    std::string predName = getUniqueName(edge.srcOp).str();
-    std::string succName = getUniqueName(edge.dstOp).str();
-    file << "  \"" << predName << "\" -> \"" << succName
-         << "\" [label=\"N=" << edge.comparatoreNum << "\"];\n";
-  }
-  file << "}\n";
-  file.close();
-  llvm::errs() << "[INFO][SKIP] Dependency graph written to " << filename
-               << "\n";
-}
-
 void runFTDOnSpecificConsumerOps(
     FuncOp funcOp, mlir::OpBuilder &builder,
     std::vector<Operation *> (*ftdFunc)(mlir::OpBuilder &, FuncOp &,
@@ -788,9 +754,6 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
     llvm::errs() << "[INFO][SKIP] Flattened Function successfully! \n";
   }
 
-  std::string path = compDir + "/" + kernelName + "_DEP_G.dot";
-
-  writeDepGraphToDotFile(path);
   llvm::errs()
       << "[INFO][SKIP] Inserted Out with LSQs circuit successfully! \n";
 }

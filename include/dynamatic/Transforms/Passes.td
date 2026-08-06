@@ -119,6 +119,9 @@ def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependen
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
+  let options =
+    [Option<"depGraphFile", "dep-graph-file", "std::string", "\"\"",
+            "Optional path at which to write the memory dependence graph in DOT format.">];
 }
 
 def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"> {
@@ -132,11 +135,7 @@ def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"
   }];
   let options =
     [Option<"NStr", "NStr", "std::string", "\"3\"",
-            "Number of comparators">,
-    Option<"kernelName", "kernelName", "std::string", "\"histogram\"",
-            "Name">,
-    Option<"compDir", "compDir", "std::string", "\"./integration-test/historam/out/comp\"",
-    "compile directory path">];
+            "Number of comparators">];
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 

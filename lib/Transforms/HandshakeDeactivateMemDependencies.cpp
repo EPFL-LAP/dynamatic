@@ -20,6 +20,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Visitors.h"
 #include "llvm/ADT/STLExtras.h"
+#include <fstream>
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
@@ -41,9 +42,12 @@ struct HandshakeDeactivateMemDependenciesPass
     : public dynamatic::impl::HandshakeDeactivateMemDependenciesBase<
           HandshakeDeactivateMemDependenciesPass> {
 
+  using HandshakeDeactivateMemDependenciesBase::HandshakeDeactivateMemDependenciesBase;
+
   void runOnOperation() override;
 
   LogicalResult analyzeFunction(handshake::FuncOp funcOp);
+  LogicalResult writeDependenceGraph(ModuleOp modOp);
 };
 
 } // namespace
@@ -147,6 +151,52 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
   return success();
 }
 
+/// Writes all memory dependences after their activation status has been
+/// determined. Inactive dependences are retained in the graph and rendered as
+/// dashed edges so that the graph represents both the original analysis result
+/// and the edges that still need to be enforced.
+LogicalResult HandshakeDeactivateMemDependenciesPass::writeDependenceGraph(
+    ModuleOp modOp) {
+  std::ofstream file(depGraphFile);
+  if (!file.is_open()) {
+    modOp.emitError() << "failed to open dependence graph file '"
+                      << depGraphFile << "'";
+    return failure();
+  }
+
+  file << "digraph G {\n";
+  for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
+    funcOp.walk([&](Operation *op) {
+      if (!isa<handshake::LoadOp, handshake::StoreOp>(op))
+        return;
+
+      auto deps = getDialectAttr<MemDependenceArrayAttr>(op);
+      if (!deps)
+        return;
+
+      StringRef srcAccess = getUniqueName(op);
+      for (MemDependenceAttr dep : deps.getDependencies()) {
+        file << "  \"" << srcAccess.str() << "\" -> \"" << dep.getDstAccess().str()
+             << "\" [label=\"depth=" << dep.getLoopDepth()
+             << ", distance=" << dep.getDistance() << "\"";
+        if (!dep.getIsActive())
+          file << ", style=dashed";
+        file << "];\n";
+      }
+    });
+  }
+  file << "}\n";
+
+  if (!file.good()) {
+    modOp.emitError() << "failed to write dependence graph file '"
+                      << depGraphFile << "'";
+    return failure();
+  }
+  llvm::errs() << "[INFO] Dependency graph written to " << depGraphFile
+               << "\n";
+  return success();
+}
+
 void HandshakeDeactivateMemDependenciesPass::runOnOperation() {
   ModuleOp modOp = getOperation();
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -164,4 +214,7 @@ void HandshakeDeactivateMemDependenciesPass::runOnOperation() {
     if (failed(analyzeFunction(funcOp)))
       return signalPassFailure();
   }
+
+  if (!depGraphFile.empty() && failed(writeDependenceGraph(modOp)))
+    return signalPassFailure();
 }

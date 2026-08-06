@@ -126,6 +126,15 @@ export_cfg() {
   return 0
 }
 
+export_dep_graph() {
+  local f_dot="$COMP_DIR/$1.dot"
+  local f_png="$COMP_DIR/$1.png"
+
+  dot -Tpng "$f_dot" > "$f_png"
+  exit_on_fail "Failed to convert $1 DOT to PNG" "Converted $1 DOT to PNG"
+  return 0
+}
+
 # ============================================================================ #
 # Compilation flow
 # ============================================================================ #
@@ -319,7 +328,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   # FPT19 should run before straight to the queue, so that no useless components are instantiated.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_SQ"
@@ -342,8 +351,8 @@ else
   # with skippable sequentializer
   if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
       "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-        --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
-        --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N kernelName=$KERNEL_NAME compDir=$COMP_DIR" \
+        --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces\
+        --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N" \
         --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
         --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_OUT_WITH_LSQ"
@@ -370,7 +379,7 @@ else
   # without skippable sequentializer
   else
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-      --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+      --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces \
       --handshake-remove-unused-memrefs \
       --handshake-optimize-bitwidths \
       --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
@@ -465,7 +474,7 @@ exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
-dot -Tpng "$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" > "$COMP_DIR/${KERNEL_NAME}_DEP_G.png"
+export_dep_graph "${KERNEL_NAME}_DEP_G"
 
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
