@@ -17,7 +17,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
@@ -32,10 +31,13 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 #include <filesystem>
+#include <functional>
 #include <string>
 
 using namespace mlir;
@@ -231,10 +233,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
-    // Check IR invariants and parse basic block archs from disk
-    if (failed(checkFuncInvariants(info)))
-      return failure();
-
     // Get CFDFCs from the function unless the functions has no archs (i.e.,
     // it has a single block) in which case there are no CFDFCs
     std::vector<CFDFC> cfdfcs;
@@ -291,16 +289,6 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
 }
 
 LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
-  // Store all archs in a map for fast query time
-  DenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>> transitions;
-  for (ArchBB &arch : info.archs)
-    transitions[arch.srcBB].insert(arch.dstBB);
-
-  // Store the BB to which each block belongs for quick access later
-  DenseMap<Operation *, std::optional<unsigned>> opBlocks;
-  for (Operation &op : info.funcOp.getOps())
-    opBlocks[&op] = getLogicBB(&op);
-
   for (Operation &op : info.funcOp.getOps()) {
     // Most operations should belong to a basic block for buffer placement to
     // work correctly. Don't outright fail in case one operation is outside of
@@ -315,32 +303,6 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       if (!getLogicBB(&op).has_value()) {
         op.emitWarning() << "Operation does not belong to any block, MILP "
                             "behavior may be suboptimal or incorrect.";
-      }
-    }
-
-    std::optional<unsigned> srcBB = opBlocks[&op];
-    for (OpResult res : op.getResults()) {
-      Operation *user = *res.getUsers().begin();
-      std::optional<unsigned> dstBB = opBlocks[user];
-
-      // All transitions between blocks must exist in the original CFG
-      if (srcBB && dstBB && *srcBB != *dstBB &&
-          !transitions[*srcBB].contains(*dstBB)) {
-        auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
-        if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
-            dstBB == endBB) {
-          /// NOTE: (lucas-rami) This is probably the start->end control channel
-          /// which goes from the entry block to the exit block. This is fine in
-          /// general so we let this pass without triggering a warning or error
-          continue;
-        }
-
-        return op.emitError()
-               << "Result " << res.getResultNumber() << " defined in block "
-               << *srcBB << " is used in block " << *dstBB
-               << ". This connection does not exist according to the CFG "
-                  "graph. Solving the buffer placement MILP would yield an "
-                  "incorrect placement.";
       }
     }
   }
@@ -385,6 +347,142 @@ static void logFuncInfo(FuncInfo &info) {
   os.flush();
 }
 
+namespace {
+struct CircuitEdge {
+  Operation *src;
+  Operation *dst;
+  Value channel;
+};
+
+static bool isBackedgeSourceLike(Operation *op) {
+  do {
+    if (!op)
+      return false;
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::CmpIOp, handshake::CmpFOp>(op))
+      return true;
+    if (isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+            handshake::TruncIOp>(op))
+      op = op->getOperand(0).getDefiningOp();
+    else
+      return false;
+  } while (true);
+}
+
+static bool isBackedgeDestinationLike(Operation *op) {
+  if (isa<handshake::InitOp, handshake::MergeLikeOpInterface>(op))
+    return true;
+
+  auto notOp = dyn_cast<handshake::NotIOp>(op);
+  if (!notOp)
+    return false;
+
+  return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
+    return isa<handshake::MergeLikeOpInterface>(user);
+  });
+}
+
+/// Finds all loop-feedback-source -> merge-like backward channels per cyclic
+/// SCC in the handshake graph. Grouping by SCC remains more stable than trying
+/// to assign channels to every simple cycle when cycles overlap.
+static mlir::DenseSet<Value>
+findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
+  SmallVector<Operation *> ops;
+  SmallVector<CircuitEdge> edges;
+  llvm::DenseMap<Operation *, SmallVector<Operation *, 4>> succs;
+
+  for (Operation &op : funcOp.getOps()) {
+    ops.push_back(&op);
+    succs[&op] = {};
+  }
+
+  for (Operation *src : ops) {
+    for (Value result : src->getResults()) {
+      for (OpOperand &use : result.getUses()) {
+        Operation *dst = use.getOwner();
+
+        if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(dst))
+          continue;
+
+        edges.push_back({src, dst, result});
+        succs[src].push_back(dst);
+      }
+    }
+  }
+
+  llvm::DenseMap<Operation *, unsigned> index, lowlink;
+  llvm::DenseSet<Operation *> onStack;
+  SmallVector<Operation *> stack;
+  SmallVector<SmallVector<Operation *>> sccs;
+  unsigned nextIndex = 0;
+
+  std::function<void(Operation *)> strongConnect = [&](Operation *op) {
+    index[op] = nextIndex;
+    lowlink[op] = nextIndex;
+    ++nextIndex;
+    stack.push_back(op);
+    onStack.insert(op);
+
+    for (Operation *succ : succs[op]) {
+      if (!index.contains(succ)) {
+        strongConnect(succ);
+        lowlink[op] = std::min(lowlink[op], lowlink[succ]);
+      } else if (onStack.contains(succ)) {
+        lowlink[op] = std::min(lowlink[op], index[succ]);
+      }
+    }
+
+    if (lowlink[op] != index[op])
+      return;
+
+    SmallVector<Operation *> scc;
+    while (true) {
+      Operation *top = stack.pop_back_val();
+      onStack.erase(top);
+      scc.push_back(top);
+      if (top == op)
+        break;
+    }
+    sccs.push_back(std::move(scc));
+  };
+
+  for (Operation *op : ops) {
+    if (!index.contains(op))
+      strongConnect(op);
+  }
+
+  mlir::DenseSet<Value> backwardChannels;
+  for (const auto &scc : sccs) {
+    llvm::DenseSet<Operation *> sccNodes(scc.begin(), scc.end());
+
+    bool isCyclic = scc.size() > 1;
+    if (!isCyclic) {
+      Operation *only = scc.front();
+      isCyclic = llvm::any_of(edges, [&](const CircuitEdge &edge) {
+        return edge.src == only && edge.dst == only;
+      });
+    }
+    if (!isCyclic)
+      continue;
+
+    for (const CircuitEdge &edge : edges) {
+      if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
+        continue;
+      if (!isBackedge(edge.channel))
+        continue;
+      if (!isBackedgeSourceLike(edge.src))
+        continue;
+      if (!isBackedgeDestinationLike(edge.dst))
+        continue;
+      backwardChannels.insert(edge.channel);
+    }
+  }
+
+  return backwardChannels;
+}
+
+} // namespace
+
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    std::vector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
@@ -402,6 +500,9 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     bbs.insert(arch.srcBB);
     bbs.insert(arch.dstBB);
   }
+
+  mlir::DenseSet<Value> backwardChannels =
+      findBackwardChannelPerCyclicRegion(info.funcOp);
 
   // Set of selected archs
   ArchSet selectedArchs;
@@ -427,7 +528,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs);
+    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs, backwardChannels);
   } while (!firstCFDFC);
 
   return success();

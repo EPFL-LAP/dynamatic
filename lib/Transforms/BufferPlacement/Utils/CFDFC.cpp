@@ -155,7 +155,8 @@ static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   }
 }
 
-CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
+CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
+             const DenseSet<Value> &backwardChannels)
     : numExecs(numExec) {
 
   // Identify the block that starts the CFDFC; it's the only one that is both
@@ -214,31 +215,30 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       else
         dstBB = *optBB;
 
-      if (srcBB != dstBB) {
-        // The channel is in the CFDFC if it belongs belong to a selected arch
-        // between two basic blocks
-        for (size_t i = 0; i < cycle.size(); ++i) {
-          unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
-          if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
-            channels.insert(res);
-            if (isCFDFCBackedge(res))
-              backedges.insert(res);
-            break;
-          }
-        }
-      } else if (cycle.size() == 1) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the CFDFC is just a block looping to itself
+      if (!cycle.contains(dstBB))
+        continue;
+
+      // FTD circuits may contain channels between blocks without a matching CFG
+      // edge. Include every non-backward channel whose endpoints belong to the
+      // cycle. Include backward channels only when they correspond to an edge
+      // in the CFG cycle currently being modeled.
+      if (!backwardChannels.contains(res))
         channels.insert(res);
-        if (isCFDFCBackedge(res))
-          backedges.insert(res);
-      } else if (!isBackedge(res)) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the channel is not a backedge
+      else if (isCFGCompliant(srcBB, dstBB)) {
         channels.insert(res);
+        backedges.insert(res);
       }
     }
   }
+}
+
+bool CFDFC::isCFGCompliant(unsigned srcBB, unsigned dstBB) const {
+  for (size_t i = 0; i < cycle.size(); ++i) {
+    unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+    if (srcBB == cycle[i] && dstBB == cycle[nextBB])
+      return true;
+  }
+  return false;
 }
 
 bool CFDFC::isCFDFCBackedge(Value val) {
