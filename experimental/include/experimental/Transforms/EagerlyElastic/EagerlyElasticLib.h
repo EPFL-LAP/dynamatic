@@ -10,6 +10,9 @@ using namespace mlir;
 
 #define HANDSHAKEBB "handshake.bb"
 #define SUBLOOP_INFO_ATTR "handshake.subloop_info"
+#define ENTRY_OPS "entry_ops"
+#define STORES "stores"
+#define HEADER_BB "header_bb"
 
 enum class BypassResult : bool { Ineligible = false, Eligible = true };
 

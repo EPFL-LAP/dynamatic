@@ -184,6 +184,7 @@ void MarkSubloopPass::runOnOperation() {
     for (Operation &op : exitBlock->getOperations()) {
       // Skip constants
       if (isa<arith::ConstantOp>(&op)) continue;
+      if (isa<dynamatic::cf_extra::PredicateOp>(&op)) continue;
 
       for (OpOperand &use : op.getOpOperands()) {
         Value operand = use.get();
@@ -252,7 +253,7 @@ void MarkSubloopPass::runOnOperation() {
 
     // construct the Metadata Dictionary
     allLoopsMetadata.push_back(builder.getDictionaryAttr({
-        builder.getNamedAttr("outer_header_bb",
+        builder.getNamedAttr("header_bb",
                              builder.getI64IntegerAttr(outerHeaderBbIdx)),
         builder.getNamedAttr("stores", builder.getBoolAttr(storesInSubblock)),
         builder.getNamedAttr("entry_ops", builder.getArrayAttr(entryOpAttrs)),
