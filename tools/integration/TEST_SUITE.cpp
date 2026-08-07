@@ -580,7 +580,9 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       "nested_loop",
       "sparse",
       "subdiag",
-      "subdiag_fast"
+      "subdiag_fast",
+      "newton_raphson",
+      "backtrack"
       ),
     [](const auto &info) { return "spec_" + info.param; });
 

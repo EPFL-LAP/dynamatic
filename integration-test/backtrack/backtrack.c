@@ -7,13 +7,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Integration.h"
+#include "stdbool.h"
 #include <stdlib.h>
 int backtrack(float best[1000], float cost[1000]) {
   int i;
   for (i = 0; i < 1000; i++) {
     float temp = best[i] + cost[i];
     float x = 5.0;
-    if ((1000 - temp) <= x * (temp))
+    bool continueLoop = !((1000 - temp) <= x * (temp));
+    // clang-format off
+    #pragma DYN speculate variable=continueLoop max_predictions=4 style=standard
+    // clang-format on
+    if (!continueLoop)
       break;
   }
   return i;
