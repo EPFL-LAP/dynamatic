@@ -1,14 +1,18 @@
 //===- ii_nested_int.c - Nested loop with an II=1 recurrence ------*- C -*-===//
 //
-// Implements the ii_nested_int kernel.
+// Kernel whose inner loop carries an integer accumulation: a combinational
+// recurrence that pipelines at II=1.
 //
 //===----------------------------------------------------------------------===//
 
-#include "ii_nested_int.h"
 #include "dynamatic/Integration.h"
 #include "stdlib.h"
 
-void ii_nested_int(in_int_t a[N][M], out_int_t sums[N]) {
+#define N 8
+#define M 30
+
+/// Sums each row of a matrix into a vector of per-row sums.
+void ii_nested_int(int a[N][M], int sums[N]) {
   for (unsigned i = 0; i < N; ++i) {
     int acc = 0;
     for (unsigned j = 0; j < M; ++j)
@@ -18,8 +22,8 @@ void ii_nested_int(in_int_t a[N][M], out_int_t sums[N]) {
 }
 
 int main(void) {
-  in_int_t a[N][M];
-  out_int_t sums[N];
+  int a[N][M];
+  int sums[N];
 
   for (int y = 0; y < N; ++y)
     for (int x = 0; x < M; ++x)

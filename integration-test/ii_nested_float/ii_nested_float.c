@@ -1,14 +1,19 @@
 //===- ii_nested_float.c - Nested loop with a slow recurrence -----*- C -*-===//
 //
-// Implements the ii_nested_float kernel.
+// Kernel whose inner loop carries a floating-point accumulation: a recurrence
+// of several cycles, run for only a few iterations per activation of the
+// frequently re-entered inner loop.
 //
 //===----------------------------------------------------------------------===//
 
-#include "ii_nested_float.h"
 #include "dynamatic/Integration.h"
 #include "stdlib.h"
 
-void ii_nested_float(in_float_t a[N][M], out_float_t sums[N]) {
+#define N 20
+#define M 5
+
+/// Sums each row of a matrix into a vector of per-row sums.
+void ii_nested_float(float a[N][M], float sums[N]) {
   for (unsigned i = 0; i < N; ++i) {
     float acc = 0.0f;
     for (unsigned j = 0; j < M; ++j)
@@ -18,8 +23,8 @@ void ii_nested_float(in_float_t a[N][M], out_float_t sums[N]) {
 }
 
 int main(void) {
-  in_float_t a[N][M];
-  out_float_t sums[N];
+  float a[N][M];
+  float sums[N];
 
   for (int y = 0; y < N; ++y)
     for (int x = 0; x < M; ++x)

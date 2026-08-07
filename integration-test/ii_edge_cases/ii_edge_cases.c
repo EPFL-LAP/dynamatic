@@ -9,10 +9,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ii_edge_cases.h"
 #include "dynamatic/Integration.h"
 
-void ii_edge_cases(in_int_t n0, in_int_t n1, in_int_t n2, inout_int_t a[N]) {
+#define N 8
+
+void ii_edge_cases(int n0, int n1, int n2, int a[N]) {
   // Never entered (n0 == 0).
   int sum0 = 0;
   for (int i = 0; i < n0; i++)
@@ -33,10 +34,10 @@ void ii_edge_cases(in_int_t n0, in_int_t n1, in_int_t n2, inout_int_t a[N]) {
 }
 
 int main(void) {
-  in_int_t n0 = 0;
-  in_int_t n1 = 1;
-  in_int_t n2 = 2;
-  inout_int_t a[N];
+  int n0 = 0;
+  int n1 = 1;
+  int n2 = 2;
+  int a[N];
   for (int i = 0; i < N; ++i)
     a[i] = i + 1;
 

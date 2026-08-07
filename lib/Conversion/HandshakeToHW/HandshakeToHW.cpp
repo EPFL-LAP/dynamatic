@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/ControlNetworkAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -39,16 +40,12 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/GenericDomTree.h"
-#include "llvm/Support/GenericDomTreeConstruction.h"
-#include "llvm/Support/GenericLoopInfoImpl.h"
 #include <algorithm>
 #include <bitset>
 #include <cctype>
@@ -2134,147 +2131,6 @@ static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Graph machinery over control tokens. This is to find loops and their
-/// topology (nesting level, etc.).
-struct ControlGraph;
-
-/// Node of a function's control graph: one per non-memory operation, plus a
-/// single virtual entry node (whose 'op' is null) connected to every root so
-/// that the whole graph is dominated by one entry (required to build a
-/// dominator tree over an otherwise multi-rooted graph).
-struct ControlNode {
-  Operation *op = nullptr;
-  ControlGraph *graph = nullptr;
-  SmallVector<ControlNode *> succs;
-  SmallVector<ControlNode *> preds;
-
-  /// Required by the dominator tree.
-  ControlGraph *getParent() const { return graph; }
-
-  /// Required by the dominator tree.
-  void printAsOperand(raw_ostream &os, bool /*printType*/ = false) const {
-    if (op)
-      os << getUniqueName(op);
-    else
-      os << "<entry>";
-  }
-};
-
-struct ControlGraph {
-  /// A deque for the stable addresses, as the nodes point to each other.
-  std::deque<ControlNode> nodes;
-  /// Maps each operation to its node.
-  DenseMap<Operation *, ControlNode *> nodeFor;
-
-  /// Required by 'DomTreeNodeTraits' (entry node).
-  ControlNode &front() { return nodes.front(); }
-
-  /// Builds the control graph of 'funcOp'.
-  explicit ControlGraph(handshake::FuncOp funcOp) {
-    auto addNode = [&](Operation *op) -> ControlNode * {
-      ControlNode &node = nodes.emplace_back();
-      node.op = op;
-      node.graph = this;
-      return &node;
-    };
-
-    ControlNode *entry = addNode(nullptr);
-
-    // Memory interfaces (shared by the whole function) are excluded from the
-    // control graph so that loop detection reflects only the program's control
-    // flow. Including these could otherwise run at the risk of creating
-    // irreducible loops that are not detected.
-    for (Operation &op : *funcOp.getBodyBlock())
-      if (!isa<handshake::MemoryOpInterface>(op))
-        nodeFor[&op] = addNode(&op);
-
-    // Control-only edges between operations.
-    for (Operation &op : *funcOp.getBodyBlock()) {
-      ControlNode *src = nodeFor.lookup(&op);
-      if (!src)
-        continue;
-
-      for (Value res : op.getResults()) {
-        if (!isa<ControlType>(res.getType()))
-          continue;
-
-        for (Operation *user : res.getUsers())
-          if (ControlNode *dst = nodeFor.lookup(user)) {
-            src->succs.push_back(dst);
-            dst->preds.push_back(src);
-          }
-      }
-    }
-
-    // Connect all nodes without predecessors to the virtual entry node.
-    for (ControlNode &node : nodes)
-      if (&node != entry && node.preds.empty()) {
-        entry->succs.push_back(&node);
-        node.preds.push_back(entry);
-      }
-  }
-};
-} // namespace
-
-namespace llvm {
-template <>
-struct GraphTraits<ControlNode *> {
-  using NodeRef = ControlNode *;
-  using ChildIteratorType = SmallVector<ControlNode *>::iterator;
-  static NodeRef getEntryNode(NodeRef node) { return node; }
-  static ChildIteratorType child_begin(NodeRef node) {
-    return node->succs.begin();
-  }
-  static ChildIteratorType child_end(NodeRef node) { return node->succs.end(); }
-};
-
-template <>
-struct GraphTraits<Inverse<ControlNode *>> {
-  using NodeRef = ControlNode *;
-  using ChildIteratorType = SmallVector<ControlNode *>::iterator;
-  static NodeRef getEntryNode(Inverse<ControlNode *> inv) { return inv.Graph; }
-  static ChildIteratorType child_begin(NodeRef node) {
-    return node->preds.begin();
-  }
-  static ChildIteratorType child_end(NodeRef node) { return node->preds.end(); }
-};
-
-template <>
-struct GraphTraits<ControlGraph *> : public GraphTraits<ControlNode *> {
-  using nodes_iterator = pointer_iterator<std::deque<ControlNode>::iterator>;
-  static NodeRef getEntryNode(ControlGraph *graph) { return &graph->front(); }
-  static nodes_iterator nodes_begin(ControlGraph *graph) {
-    return nodes_iterator(graph->nodes.begin());
-  }
-  static nodes_iterator nodes_end(ControlGraph *graph) {
-    return nodes_iterator(graph->nodes.end());
-  }
-};
-
-template <>
-struct GraphTraits<const DomTreeNodeBase<ControlNode> *> {
-  using NodeRef = const DomTreeNodeBase<ControlNode> *;
-  using ChildIteratorType = DomTreeNodeBase<ControlNode>::const_iterator;
-  static NodeRef getEntryNode(NodeRef node) { return node; }
-  static ChildIteratorType child_begin(NodeRef node) { return node->begin(); }
-  static ChildIteratorType child_end(NodeRef node) { return node->end(); }
-};
-} // namespace llvm
-
-namespace {
-/// Concrete loop type for 'LoopInfoBase' over the control graph.
-class ControlLoop : public llvm::LoopBase<ControlNode, ControlLoop> {
-public:
-  ControlLoop() = default;
-
-private:
-  friend class llvm::LoopBase<ControlNode, ControlLoop>;
-  friend class llvm::LoopInfoBase<ControlNode, ControlLoop>;
-
-  explicit ControlLoop(ControlNode *node)
-      : llvm::LoopBase<ControlNode, ControlLoop>(node) {}
-};
-
 /// Describes the 'ii_monitor' instance to insert for one detected loop. All
 /// references to the circuit are by name/index so that they remain valid
 /// after the Handshake operations have been lowered to HW instances (instance
@@ -2348,42 +2204,27 @@ getHeaderMuxSelects(handshake::ControlMergeOp cmergeOp) {
   return channels;
 }
 
-/// Returns the deepest nesting depth reachable from 'loop' through its own
-/// descendants (i.e. 'loop->getLoopDepth()' itself when 'loop' is innermost).
-static unsigned getMaxLoopDepth(ControlLoop *loop) {
-  unsigned maxDepth = loop->getLoopDepth();
-  for (ControlLoop *subLoop : loop->getSubLoops())
-    maxDepth = std::max(maxDepth, getMaxLoopDepth(subLoop));
-  return maxDepth;
-}
-
-/// Detects every loop of 'funcOp' over its control graph and returns one
-/// monitor specification per loop whose header is a control merge and that
-/// carries at least one value from one iteration to the next. Loops with
-/// irregular control flow (no control merge header, no entry, no back-edge)
-/// are silently skipped, as is a loop that carries nothing: it has no
-/// recurrence to measure an II on and no channel to count its iterations by.
+/// Returns one monitor specification per loop of 'controlNetwork' whose header
+/// is a control merge and that carries at least one value from one iteration to
+/// the next. Loops with irregular control flow (no control merge header, no
+/// entry, no back-edge) are silently skipped, as is a loop that carries
+/// nothing: it has no recurrence to measure an II on and no channel to count
+/// its iterations by.
 ///
 /// A loop is observed exclusively through the select channels of its header
 /// muxes (see 'getHeaderMuxSelects'): the monitor reports each iteration as
 /// the slowest of them consumes it. Which select values mark the start of an
 /// activation is determined here, from the control merge: they are the
 /// indices of its inputs fed from outside the loop.
-static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp) {
-  ControlGraph graph(funcOp);
-
-  llvm::DominatorTreeBase<ControlNode, /*IsPostDom=*/false> domTree;
-  domTree.recalculate(graph);
-  llvm::LoopInfoBase<ControlNode, ControlLoop> loopInfo;
-  loopInfo.analyze(domTree);
-
+static SmallVector<IIMonitorSpec>
+detectIIMonitors(ControlNetworkAnalysis &controlNetwork) {
   SmallVector<IIMonitorSpec> specs;
-  for (ControlLoop *loop : loopInfo.getLoopsInPreorder()) {
+  for (ControlLoop *loop : controlNetwork.getLoopsInPreorder()) {
     // The loop header on the control network is the control merge that passes
     // exactly one token per iteration; its inputs distinguish an activation
     // from outside the loop from one along the back-edge.
-    auto cmergeOp =
-        dyn_cast_if_present<handshake::ControlMergeOp>(loop->getHeader()->op);
+    auto cmergeOp = dyn_cast_if_present<handshake::ControlMergeOp>(
+        loop->getHeader()->getOp());
     if (!cmergeOp)
       continue;
 
@@ -2394,7 +2235,7 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp) {
     for (auto [idx, operand] : llvm::enumerate(cmergeOp.getDataOperands())) {
       ControlNode *defNode = nullptr;
       if (auto opRes = dyn_cast<OpResult>(operand))
-        defNode = graph.nodeFor.lookup(opRes.getOwner());
+        defNode = controlNetwork.getNode(opRes.getOwner());
       if (defNode && loop->contains(defNode))
         hasBackedge = true;
       else
@@ -2412,7 +2253,7 @@ static SmallVector<IIMonitorSpec> detectIIMonitors(handshake::FuncOp funcOp) {
 
     specs.push_back({getUniqueName(cmergeOp).str(), std::move(selChannels),
                      std::move(initSelects), loop->getLoopDepth(),
-                     getMaxLoopDepth(loop)});
+                     loop->getMaxLoopDepth()});
   }
   return specs;
 }
@@ -2555,7 +2396,8 @@ public:
     // available. The monitors are materialized after lowering.
     SmallVector<IIMonitorSpec> iiMonitorSpecs;
     if (instrumentII && funcOp)
-      iiMonitorSpecs = detectIIMonitors(funcOp);
+      iiMonitorSpecs =
+          detectIIMonitors(getChildAnalysis<ControlNetworkAnalysis>(funcOp));
 
     // Helper struct for lowering
     OpBuilder builder(ctx);
