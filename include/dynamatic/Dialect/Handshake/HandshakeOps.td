@@ -2071,52 +2071,5 @@ def RepeatingInitOp : Handshake_Op<"repeating_init", [
   }];
 }
 
-def DummySuppressorOp : Handshake_Op<"dummy_suppressor", [
-  AllTypesMatch<["dataOperand", "result"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
-]> {
-  let summary = "Temporary passthrough placeholder for store suppressors";
-  let description = [{
-    A passthrough data operation that holds a condition operand. Used as a
-    topology-preserving placeholder during CFG analysis and lowering, avoiding
-    the structural inversion issues of SelectOp before materializing into
-    a true ConditionalBranchOp.
-
-    Example:
-    ```mlir
-    %result = handshake.dummy_suppressor[%cond] %data : <i1>, <i32> to <i32>
-    ```
-  }];
-
-  let arguments = (ins HandshakeType:$conditionOperand, HandshakeType:$dataOperand);
-  let results = (outs HandshakeType:$result);
-
-  let assemblyFormat = [{
-    `[` $conditionOperand `]` $dataOperand attr-dict `:`
-      type($conditionOperand) `,` type($dataOperand) `to` type($result)
-  }];
-
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
-      return idx == 0 ? "cond" : "data";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
-      return "outs";
-    }
-
-    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
-    DummySuppressorOp::getRTLParameters() {
-      ::mlir::MLIRContext *ctx = (*this)->getContext();
-      return ::llvm::SmallVector<::mlir::NamedAttribute>{
-        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
-         ::mlir::TypeAttr::get(getResult().getType())}
-      };
-    }
-  }];
-}
-
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
