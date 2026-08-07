@@ -749,6 +749,9 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
     if (failed(cfg::flattenFunction(funcOp)))
       signalPassFailure();
 
+    ftd::resolveCondPlaceholders(funcOp, builder, shadowCFG);
+    ftd::finalizeCondPlaceholders(funcOp);
+
     shadowCFG.destroy();
 
     llvm::errs() << "[INFO][SKIP] Flattened Function successfully! \n";

@@ -929,6 +929,7 @@ LogicalResult experimental::ftd::addGsaGates(
       auto mux = rewriter.create<handshake::MuxOp>(
           loc, ftd::channelifyType(gate->result.getType()), conditionValue,
           operands);
+      setBBAttr(mux, gate->getBlock(), rewriter);
 
       // The one input gamma is marked as an operation to skip in the IR and
       // later removed
@@ -1074,6 +1075,15 @@ LogicalResult experimental::ftd::addGsaGates(
         changed = true;
       }
     }
+  }
+
+  // Report the gates that survived to the caller. Entries of `gsaList` are set
+  // to nullptr above whenever a mux is erased by the one-input-gamma removal or
+  // by the simplification loop, so reading the map here rather than pushing at
+  // creation time is what keeps erased operations out of `newUnits`.
+  for (const auto &entry : gsaList) {
+    if (entry.second)
+      newUnits.push_back(entry.second);
   }
 
   if (!removeTerminators)
