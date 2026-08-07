@@ -28,10 +28,10 @@ int newton_raphson(int rts, int x1, int xh, int df) {
     else
       xh = rts;
 
+    bool complicatedIfElse = ((rts - x1) * df - f) * ((rts - xh) * df - f) <= 0;
     // clang-format off
     #pragma DYN speculate variable=complicatedIfElse max_predictions=4 style=standard
     // clang-format on
-    bool complicatedIfElse = ((rts - x1) * df - f) * ((rts - xh) * df - f) <= 0;
     if (complicatedIfElse) {
       dx = (xh - x1) >> 2;
       rts = x1 + dx;
