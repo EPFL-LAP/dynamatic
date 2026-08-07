@@ -49,6 +49,9 @@ public:
   /// own thread; implementations must therefore be thread-safe with respect to
   /// the worker's 'generate' and 'verify' methods. The default implementation
   /// returns no statistics.
+  ///
+  /// It is the workers responsibility to only return requested statistics.
+  /// See 'isStatisticEnabled'.
   virtual std::vector<Statistic> getStatistics() const { return {}; }
 
 protected:
