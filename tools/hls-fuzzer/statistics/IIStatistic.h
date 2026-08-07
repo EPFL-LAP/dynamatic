@@ -4,6 +4,7 @@
 #include "Histogram.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <filesystem>
@@ -25,11 +26,23 @@ public:
 
   void print(llvm::raw_ostream &os) const;
 
+  /// Returns an object holding the II histogram, its per-depth breakdown and
+  /// the iteration count histogram.
+  llvm::json::Value toJSON() const;
+
+  /// Replaces the samples with the ones described by 'value', which must have
+  /// been created by 'toJSON'.
+  bool fromJSON(const llvm::json::Value &value, llvm::json::Path path);
+
   constexpr static llvm::StringRef CATEGORY = "II";
 
 private:
-  /// Histogram of each measured II across all loop activation windows that had
-  /// a measurable II (i.e. more than one iteration).
+  /// Histogram of the achieved II of every loop that had a measurable one, i.e.
+  /// that ran at least one activation of more than one iteration. A loop
+  /// contributes a single sample however often it was activated: the number of
+  /// activations is a property of the loop nest around it, not of the loop's
+  /// own II, so counting each activation separately would weight a program's
+  /// loops by their enclosing trip counts.
   Histogram<double> iiCounts;
 
   /// Per-depth II histograms, keyed by the loop's depth measured from the
@@ -39,9 +52,8 @@ private:
   /// nesting depth of their nest.
   std::map<int, Histogram<double>> iiCountsByDepth;
 
-  /// Histogram of each loop's measured iteration count across all activation
-  /// windows. Includes single-iteration windows, for which no II can be
-  /// measured.
+  /// Histogram of how many iterations each activation of each loop ran.
+  /// Includes single-iteration activations, which contribute no II.
   Histogram<unsigned> iterationCounts;
 };
 

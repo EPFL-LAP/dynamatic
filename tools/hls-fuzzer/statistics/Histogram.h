@@ -1,8 +1,13 @@
 #ifndef DYNAMATIC_HLS_FUZZER_STATISTICS_HISTOGRAM
 #define DYNAMATIC_HLS_FUZZER_STATISTICS_HISTOGRAM
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/JSON.h"
+
 #include <cstddef>
+#include <cstdint>
 #include <map>
+#include <type_traits>
 
 namespace dynamatic {
 
@@ -65,6 +70,57 @@ public:
 private:
   std::map<T, std::size_t> counts;
 };
+
+/// The type a histogram value of type 'T' is parsed as before being narrowed
+/// back to 'T'. 'llvm::json' only parses the widest integer and floating-point
+/// types, so a 'Histogram<unsigned>' has to go through 'uint64_t'.
+template <typename T>
+using HistogramParseType = std::conditional_t<
+    std::is_floating_point_v<T>, double,
+    std::conditional_t<std::is_signed_v<T>, int64_t, uint64_t>>;
+
+/// Serializes 'histogram' as an array of '{"value": ..., "count": ...}'
+/// objects, ordered by value.
+///
+/// Counts are written raw rather than as a share of the total, so that a
+/// histogram read back by 'fromJSON' is indistinguishable from the original and
+/// can still be merged into another one.
+template <typename T>
+llvm::json::Value toJSON(const Histogram<T> &histogram) {
+  llvm::json::Array entries;
+  for (const auto &[value, count] : histogram)
+    entries.push_back(llvm::json::Object{
+        {"value", value},
+        {"count", static_cast<uint64_t>(count)},
+    });
+  return entries;
+}
+
+/// Parses a histogram written by 'toJSON', replacing the contents of
+/// 'histogram'. Returns false if 'value' is not a valid representation,
+/// reporting why to 'path'.
+template <typename T>
+bool fromJSON(const llvm::json::Value &value, Histogram<T> &histogram,
+              llvm::json::Path path) {
+  const llvm::json::Array *entries = value.getAsArray();
+  if (!entries) {
+    path.report("expected array");
+    return false;
+  }
+
+  histogram = Histogram<T>();
+  for (const auto &[index, entry] : llvm::enumerate(*entries)) {
+    HistogramParseType<T> entryValue;
+    uint64_t count;
+    llvm::json::ObjectMapper mapper(entry, path.index(index));
+    if (!mapper || !mapper.map("value", entryValue) ||
+        !mapper.map("count", count))
+      return false;
+
+    histogram.add(static_cast<T>(entryValue), static_cast<std::size_t>(count));
+  }
+  return true;
+}
 
 } // namespace dynamatic
 #endif
