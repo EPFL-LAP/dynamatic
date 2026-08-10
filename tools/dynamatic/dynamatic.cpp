@@ -325,7 +325,7 @@ public:
       "enable-duplication";
   static constexpr llvm::StringLiteral CALCULATE_PATH_DELAYS =
       "calculate-path-delays";
-  static constexpr llvm::StringLiteral SKIPPABLE_SEQ_N = "skippable-seq-n";
+  static constexpr llvm::StringLiteral OUT_WITH_LSQS_N = "out-with-lsqs-n";
   static constexpr llvm::StringLiteral FORK_FIFO_SIZE = "fork-fifo-size";
 
   Compile(FrontendState &state)
@@ -350,8 +350,9 @@ public:
         {FORK_FIFO_SIZE,
          "Adds buffers with the specified size to the output of every fork"});
     addMultiOption({
-        SKIPPABLE_SEQ_N,
-        "Number of Comparators in SkippableSeq",
+        OUT_WITH_LSQS_N,
+        "Number of Comparators in Out With LSQs circuit which replaces the LSQ "
+        "circuit with elastic components",
     });
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
@@ -843,7 +844,7 @@ CommandResult Compile::execute(CommandArguments &args) {
     forkFifoSize = std::to_string(val);
   }
 
-  if (auto it = args.multiOptions.find(SKIPPABLE_SEQ_N);
+  if (auto it = args.multiOptions.find(OUT_WITH_LSQS_N);
       it != args.multiOptions.end()) {
     skippableSeqNListString = "";
     for (const auto &valStr : it->second) {

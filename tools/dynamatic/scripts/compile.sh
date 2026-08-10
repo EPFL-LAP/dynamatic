@@ -30,14 +30,14 @@ FORK_FIFO_SIZE=${19}
 
 for i in {1..19}; do shift; done
 
-SKIPPABLE_ACTTIVE=0
-SKIPPABLE_SEQ_N=()
+OUT_WITH_LSQS_ACTTIVE=0
+OUT_WITH_LSQS_N=()
 
 if [ "$1" != "none" ]; then
-  SKIPPABLE_ACTTIVE=1
+  OUT_WITH_LSQS_ACTTIVE=1
   while [[ "$#" -gt 0 && "${1}" != "--" ]]; do
-    SKIPPABLE_ACTTIVE=1
-    SKIPPABLE_SEQ_N+=("$1")
+    OUT_WITH_LSQS_ACTTIVE=1
+    OUT_WITH_LSQS_N+=("$1")
     shift
   done
 else
@@ -349,10 +349,13 @@ else
 
   # handshake transformations
   # with skippable sequentializer
-  if [[ $SKIPPABLE_ACTTIVE -ne 0 ]]; then
-      "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+  if [[ $OUT_WITH_LSQS_ACTTIVE -ne 0 ]]; then
+    
+    echo_info "Using Out with LSQs (FPGA'26) instead of LSQ"
+
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
         --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces\
-        --handshake-insert-skippable-seq="NStr=$SKIPPABLE_SEQ_N" \
+        --handshake-insert-skippable-seq="NStr=$OUT_WITH_LSQS_N" \
         --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
         --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_OUT_WITH_LSQ"
@@ -360,13 +363,6 @@ else
       "Applied transformations to handshake with skippable sequentializer"
     
     F_HANDSHAKE=$F_HANDSHAKE_OUT_WITH_LSQ
-
-    # "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    # --handshake-remove-unused-memrefs \
-    # --handshake-minimize-cst-width \
-    # > "$F_HANDSHAKE_TRANSFORMED"
-    # exit_on_fail "Failed to apply transformations to handshake" \
-    #   "Applied transformations to handshake"
 
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \

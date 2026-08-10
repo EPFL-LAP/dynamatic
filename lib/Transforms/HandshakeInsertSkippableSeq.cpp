@@ -5,7 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-//
+// This file implements the HandshakeInsertSkippableSeq pass which inserts the
+// `Out with LSQs` circuit based on https://doi.org/10.1145/3748173.3779204.
+// This circuit replaces the LSQ circuit with elastic components. The circuit is
+// inserted for each pair of memory accesses that have a dependency. For better
+// comprehension, the reader is advised to refer to figure 8 in the paper.
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,6 +35,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include <unordered_set>
+
+#define DEBUG_TYPE "out-with-lsqs"
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
@@ -68,7 +74,7 @@ struct HandshakeInsertSkippableSeqPass
 
   void runDynamaticPass() override;
 
-  void handleFuncOp(FuncOp funcOp, MLIRContext *ctx);
+  void createBaseOutWithLSQsCircuit(FuncOp funcOp, MLIRContext *ctx);
 };
 } // namespace
 
@@ -193,6 +199,7 @@ SmallVector<Value> createDelayGenerator(Value initialVal,
     extendedDelayedValues.push_back(initOp.getResult());
     prevValue = initOp.getResult();
   }
+  delayedValuesForEachPred[predecessorOp] = extendedDelayedValues;
   return extendedDelayedValues;
 }
 
@@ -294,12 +301,9 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
         rewriter.create<handshake::UnbundleOp>(loc, loadResult);
     inheritBB(loadOp, unbundleOp);
 
-    // ValueRange *ab = new ValueRange();
-    // handshake::ChannelType ch =
-    //     handshake::ChannelType::get(unbundleOp.getResult(1).getType());
-    // handshake::BundleOp bundleOp = rewriter.create<handshake::BundleOp>(
-    //     loc, unbundleOp.getResult(0), unbundleOp.getResult(1), *ab, ch);
-    // inheritBB(loadOp, bundleOp);
+    llvm::errs() << "unbundleOp.getResult(0): " << unbundleOp.getResult(0)
+                 << " "
+                 << "\n";
 
     return unbundleOp.getResult(0);
   } else if (auto storeOp = dyn_cast<handshake::StoreOp>(memOp)) {
@@ -313,9 +317,7 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
 /// This function creates the skip conditions for all pairs of memory
 /// accesses. This means that it creates the left side of the circuit for each
 /// pair. This includes the delay generator which is shared for the same
-/// predecessor. The regeneration/suppression block and the skip condition
-/// generator are created specifically for each pair in
-/// `createSkipConditionForPair`.
+/// predecessor.
 SkipConditionForPair
 createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
                                 std::vector<unsigned> Nvector,
@@ -354,22 +356,6 @@ createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
           if (N != 0) {
             SmallVector<Operation *> addressDelayGenerator;
 
-            // rewriter.setInsertionPoint(predecessorOpPointer);
-            // Value prevResult = predecessorOpDoneSignal;
-            // for (unsigned i = 0; i < N; i++) {
-            //   handshake::InitOp initOp = rewriter.create<handshake::InitOp>(
-            //       predecessorOpPointer->getLoc(), prevResult);
-            //   inheritBB(predecessorOpPointer, initOp);
-            //   prevResult = initOp.getResult();
-            // }
-
-            // mark
-            // rewriter.setInsertionPoint(predecessorOpPointer);
-            // handshake::GateOp gateOp = rewriter.create<handshake::GateOp>(
-            //     predecessorOpPointer->getLoc(), predecessorOpAddr,
-            //     prevResult);
-            // inheritBB(predecessorOpPointer, gateOp);
-
             SmallVector<Value> delayedAddresses =
                 createDelayGenerator(predecessorOpAddr, predecessorOpPointer, N,
                                      true, addressDelayGenerator, rewriter);
@@ -381,6 +367,7 @@ createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
                 predecessorOpDoneSignal, predecessorOpPointer,
                 successorOpPointer, delayedAddresses, N,
                 dependenciesMapForPhiNetwork, rewriter);
+
             skipConditionForEachPair[predecessorOpName][successorOpName] =
                 skipConditions;
             handledSuccessors.push_back(successorOpName);
@@ -394,7 +381,7 @@ createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
                                   dependenciesMapForPhiNetwork)))
     llvm::errs() << "Failed to create phi network dependencies\n";
 
-  llvm::errs() << "[INFO][SKIP] Created Skip Conditions\n";
+  LLVM_DEBUG(llvm::errs() << "[INFO][SKIP] Created Skip Conditions\n";);
   return skipConditionForEachPair;
 }
 
@@ -472,9 +459,6 @@ Value createWaitingSignalForPair(
   addAttrToList(conditionalSequentializerOps, SKIP_COND_SEQ,
                 rewriter.getUnitAttr());
   return joinOp.getResult();
-
-  // return joinValues(conditionallySkippedDoneSignals, predecessorOp,
-  // rewriter);
 }
 
 /// This function returns the deactivated version of a given dependency.
@@ -488,9 +472,7 @@ MemDependenceAttr getDeactivatedDependency(MemDependenceAttr dependency) {
 /// This function creates the waiting signals for all pairs of memory
 /// accesses. This means that it creates the right side of the circuit for
 /// each pair. This includes the delay generator which is shared for the same
-/// predecessor. The regeneration/suppression block and the conditional
-/// sequentializer are created specifically for each pair in
-/// `createWaitingSignalForPair`.
+/// predecessor.
 WaitingSignalForSucc createWaitingSignalsForAllPairs(
     MemAccesses &memAccesses, SkipConditionForPair &skipConditionForEachPair,
     MLIRContext *ctx, FuncOp funcOp, std::vector<unsigned> NVector,
@@ -557,8 +539,6 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
       }
       setDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer, ctx,
                                              newDeps);
-      // setDialectAttr<MemDependenceArrayAttr>(
-      //     predecessorOpPointer, MemDependenceArrayAttr::get(ctx, newDeps));
     }
     setDialectAttr<MemInterfaceAttr>(predecessorOpPointer, ctx);
   }
@@ -566,7 +546,7 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
                                   dependenciesMapForPhiNetwork)))
     llvm::errs() << "Failed to create phi network dependencies\n";
 
-  llvm::errs() << "[INFO][SKIP] Created Waiting Signals\n";
+  LLVM_DEBUG(llvm::errs() << "[INFO][SKIP] Created Waiting Signals\n");
   return waitingSignalsForEachSuccessor;
 }
 
@@ -594,6 +574,8 @@ void gateAddress(
   }
 }
 
+// This function gates all successor accesses with the waiting signals created
+// before. This means that it creates the very last join in the figure.
 void gateAllSuccessorAccesses(
     MemAccesses &memAccesses,
     WaitingSignalForSucc &waitingSignalsForEachSuccessor, FuncOp &funcOp,
@@ -612,7 +594,7 @@ void gateAllSuccessorAccesses(
   if (failed(createPhiNetworkDeps(funcOp.getRegion(), rewriter,
                                   dependenciesMapForPhiNetwork)))
     llvm::errs() << "Failed to create phi network dependencies\n";
-  llvm::errs() << "[INFO][SKIP] Gated Successor Accesses\n";
+  LLVM_DEBUG(llvm::errs() << "[INFO][SKIP] Gated Successor Accesses\n");
 }
 
 /// This function casts the string `NStr` to std::vector<unsigned> N.
@@ -628,9 +610,9 @@ std::vector<unsigned> getNVector(const std::string &NStr) {
 }
 
 /// This function is the main function. It is responsible to insert the
-/// necessary components for skippable sequencializing in every funcOp.
-void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
-                                                   MLIRContext *ctx) {
+/// necessary components to replace the LSQ circuit with elastic components.
+void HandshakeInsertSkippableSeqPass::createBaseOutWithLSQsCircuit(
+    FuncOp funcOp, MLIRContext *ctx) {
   ConversionPatternRewriter rewriter(ctx);
 
   std::vector<unsigned> NVector = getNVector(NStr);
@@ -641,6 +623,12 @@ void HandshakeInsertSkippableSeqPass::handleFuncOp(FuncOp funcOp,
   std::vector<Operation *> consumerOpListForFTD;
 
   memAccesses = findMemAccessesInFunc(funcOp);
+
+  // Inserting the components is done in three main steps. First, the skip
+  // conditions are created for each pair of memory accesses (i.e. the
+  // comparators' part). Then, the waiting signals are created for each
+  // successor (i.e. the join of all control signals it needs to wait for).
+  // Finally, the successor accesses are gated with the waiting signals.
 
   skipConditionForEachPair =
       createSkipConditionsForAllPairs(memAccesses, funcOp, NVector, rewriter);
@@ -661,30 +649,21 @@ void runFTDOnSpecificConsumerOps(
   std::vector<std::vector<Operation *>> allNewUnits;
   for (auto const [consumerOp, indices] : consumerOpAndOperandIndexForFTD)
     for (auto index : indices) {
-      // llvm::errs() << "[INFO][SKIP] Adding FTD for consumer op: "
-      //              << consumerOp->getName().getStringRef()
-      //              << " at operand index: " << index << "\n";
       std::vector<Operation *> newUnits =
           ftdFunc(builder, funcOp, consumerOp, consumerOp->getOperand(index),
                   shadowCFG);
       allNewUnits.push_back(newUnits);
     }
 
-  llvm::errs() << "[INFO][SKIP] Added FTD for "
-               << consumerOpAndOperandIndexForFTD.size()
-               << " consumer ops successfully! \n";
-
-  // for (auto &someNewUnits : allNewUnits) {
-  //   for (auto *unit : someNewUnits) {
-  //     int i = 0;
-  //     for (auto _ : unit->getOperands()) {
-  //       consumerOpAndOperandIndexForFTD[unit].push_back(i);
-  //       i++;
-  //     }
-  //   }
-  // }
-  llvm::errs() << "[INFO][SKIP] Added FTD for " << allNewUnits.size()
-               << " new units successfully! \n";
+  for (auto &someNewUnits : allNewUnits) {
+    for (auto *unit : someNewUnits) {
+      int i = 0;
+      for (auto _ : unit->getOperands()) {
+        consumerOpAndOperandIndexForFTD[unit].push_back(i);
+        i++;
+      }
+    }
+  }
 }
 
 ftd::ShadowCFG getShadow(FuncOp funcOp, MLIRContext *ctx) {
@@ -711,17 +690,20 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
     if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
       signalPassFailure();
 
+    // This is the main function which inserts the base circuit without FTD. It
     // internally calls `createPhiNetworkDeps`
-    handleFuncOp(funcOp, ctx);
+    createBaseOutWithLSQsCircuit(funcOp, ctx);
 
-    llvm::errs() << "[INFO][SKIP] Inserted skippable sequentializer circuit "
-                    "successfully! \n";
+    LLVM_DEBUG(llvm::errs()
+               << "[INFO][SKIP] Inserted skippable sequentializer circuit "
+                  "successfully! \n");
 
     std::vector<Operation *> newUnits;
     if (failed(replaceMergeToGSA(funcOp, rewriter, newUnits)))
       signalPassFailure();
 
-    llvm::errs() << "[INFO][SKIP] Replaced Merge to GSA successfully! \n";
+    LLVM_DEBUG(llvm::errs()
+                   << "[INFO][SKIP] Replaced Merge to GSA successfully! \n";);
 
     for (auto *unit : newUnits) {
       int i = 0;
@@ -733,18 +715,14 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
 
     ftd::ShadowCFG shadowCFG = getShadow(funcOp, ctx);
 
-    llvm::errs() << "[INFO][SKIP] Created Shadow CFG successfully! \n";
-
     runFTDOnSpecificConsumerOps(funcOp, builder, addRegenOperandConsumer,
                                 shadowCFG);
     runFTDOnSpecificConsumerOps(funcOp, builder, addSuppOperandConsumer,
                                 shadowCFG);
 
-    llvm::errs() << "[INFO][SKIP] Added FTD successfully! \n";
+    LLVM_DEBUG(llvm::errs() << "[INFO][SKIP] Added FTD successfully! \n");
 
     experimental::cfg::markBasicBlocks(funcOp, rewriter);
-
-    llvm::errs() << "[INFO][SKIP] Marked Basic Blocks successfully! \n";
 
     if (failed(cfg::flattenFunction(funcOp)))
       signalPassFailure();
@@ -753,10 +731,8 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
     ftd::finalizeCondPlaceholders(funcOp);
 
     shadowCFG.destroy();
-
-    llvm::errs() << "[INFO][SKIP] Flattened Function successfully! \n";
   }
 
-  llvm::errs()
-      << "[INFO][SKIP] Inserted Out with LSQs circuit successfully! \n";
+  LLVM_DEBUG(llvm::errs()
+             << "[INFO][SKIP] Inserted Out with LSQs circuit successfully! \n");
 }

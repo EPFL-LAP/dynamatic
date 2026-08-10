@@ -711,9 +711,6 @@ std::vector<Operation *> ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
          operand != consumerOp->getOperand(0)))
       return newUnits;
 
-    llvm::errs() << "Adding suppression for consumer: " << *consumerOp
-                 << " and operand: " << operand << "\n";
-
     // Handle the suppression in all the other cases (including the operand
     // being a function argument)
     insertDirectSuppression(builder, funcOp, consumerOp, operand, shadow);
