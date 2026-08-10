@@ -1,11 +1,11 @@
 #include <stdlib.h>
-#define N 32
+#define N 67
 #include "dynamatic/Integration.h"
 
-// NOTE: Simple test for 1d array halve partition
-void test_1d_partition(const int A[N], const int B[N], const int C[N],
+// NOTE: Test for division with remainder after doing N / factor
+void test_1d_partition_fu(const int A[N], const int B[N], const int C[N],
                        int result[N]) {
-#pragma DYN array_partition array=intermediate dimension=1 style=block factor=2
+#pragma DYN array_partition array=intermediate dimension=1 style=block factor=8
   int intermediate[N];
   for (int i = 0; i < N; ++i) {
     intermediate[i] = A[i] * B[i];
@@ -25,6 +25,6 @@ int main(void) {
     B[i] = rand() % 100;
     C[i] = rand() % 100;
   }
-  CALL_KERNEL(test_1d_partition, A, B, C, result);
+  CALL_KERNEL(test_1d_partition_fu, A, B, C, result);
   return 0;
 }

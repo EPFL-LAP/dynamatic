@@ -3,10 +3,10 @@
 #define COLS 64
 #include "dynamatic/Integration.h"
 
-// NOTE: Test for outer partition of 2d array, i.e. A[N][M] -> A1[N/2][M], A2[N/2][M]
-void test_2d_partition(const int A[ROWS][COLS], const int B[ROWS][COLS],
+// NOTE: Test for inner partition of 2d array, i.e. A[N][M] -> A1[N][M/2], A2[N][M/2]
+void test_2d_partition_inner(const int A[ROWS][COLS], const int B[ROWS][COLS],
                        const int C[ROWS][COLS], int result[ROWS][COLS]) {
-#pragma DYN array_partition array = intermediate dimension = 1 style =         \
+#pragma DYN array_partition array = intermediate dimension = 2 style =         \
     block factor = 2
   int intermediate[ROWS][COLS];
   for (int i = 0; i < ROWS; ++i) {
@@ -33,6 +33,6 @@ int main(void) {
       C[i][j] = rand() % 100;
     }
   }
-  CALL_KERNEL(test_2d_partition, A, B, C, result);
+  CALL_KERNEL(test_2d_partition_inner, A, B, C, result);
   return 0;
 }
