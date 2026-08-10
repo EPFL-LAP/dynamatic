@@ -569,6 +569,9 @@ INSTANTIATE_TEST_SUITE_P(
     MemoryPartitionBenchmarks, MemoryPartitionFixture,
     testing::Values(
       "test_1d_partition",
+      "test_1d_partition_f4",
+      "test_1d_partition_fu",
+      "test_2d_partition_inner",
       "test_2d_partition"
     ),
     [](const auto &info) { return "memory_partition_" + info.param; });
