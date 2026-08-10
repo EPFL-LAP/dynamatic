@@ -661,9 +661,9 @@ void runFTDOnSpecificConsumerOps(
   std::vector<std::vector<Operation *>> allNewUnits;
   for (auto const [consumerOp, indices] : consumerOpAndOperandIndexForFTD)
     for (auto index : indices) {
-      llvm::errs() << "[INFO][SKIP] Adding FTD for consumer op: "
-                   << consumerOp->getName().getStringRef()
-                   << " at operand index: " << index << "\n";
+      // llvm::errs() << "[INFO][SKIP] Adding FTD for consumer op: "
+      //              << consumerOp->getName().getStringRef()
+      //              << " at operand index: " << index << "\n";
       std::vector<Operation *> newUnits =
           ftdFunc(builder, funcOp, consumerOp, consumerOp->getOperand(index),
                   shadowCFG);
