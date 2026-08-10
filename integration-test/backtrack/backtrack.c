@@ -16,7 +16,7 @@ int backtrack(float best[1000], float cost[1000]) {
     float x = 5.0;
     bool continueLoop = !((1000 - temp) <= x * (temp));
     // clang-format off
-    #pragma DYN speculate variable=continueLoop max_predictions=4 style=standard
+    #pragma DYN speculate variable=continueLoop max_predictions=10 style=standard
     // clang-format on
     if (!continueLoop)
       break;
