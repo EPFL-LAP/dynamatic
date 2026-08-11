@@ -286,7 +286,6 @@ Operation *isConditionFeedingInit(Value condition) {
   return existingInit;
 }
 
-// Rules E
 /// Erases unconditional branches (which would eventually lower to simple
 /// wires).
 struct EraseUnconditionalBranches
@@ -296,12 +295,10 @@ struct EraseUnconditionalBranches
   LogicalResult matchAndRewrite(handshake::BranchOp brOp,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOp(brOp, brOp.getOperand());
-    // llvm::errs() << "\t***Rules E: Removing unconditional Branch!!***\n";
     return success();
   }
 };
 
-// Rules E
 /// Erases merges with a single data operand.
 struct EraseSingleInputMerges : public OpRewritePattern<handshake::MergeOp> {
   using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
@@ -316,7 +313,6 @@ struct EraseSingleInputMerges : public OpRewritePattern<handshake::MergeOp> {
   }
 };
 
-// Rules E
 /// Erases muxes with a single data operand. Inserts a sink operation to consume
 /// the select operand of erased muxes.
 struct EraseSingleInputMuxes : public OpRewritePattern<handshake::MuxOp> {
@@ -338,7 +334,6 @@ struct EraseSingleInputMuxes : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
-// Rules E
 /// Erases control merges with a single data operand. If necessary, inserts a
 /// sourced 0 constant to replace any real uses of the index result of erased
 /// control merges.
@@ -389,7 +384,6 @@ struct EraseSingleInputControlMerges
   }
 };
 
-// Rules E
 /// Downgrades control merges whose index result has no real uses to simpler
 /// yet equivalent merges.
 struct DowngradeIndexlessControlMerge
@@ -417,7 +411,6 @@ struct DowngradeIndexlessControlMerge
   }
 };
 
-// Rules E
 /// Remove Conditional Branches that have no successors
 struct RemoveDoubleSinkBranches
     : public OpRewritePattern<handshake::ConditionalBranchOp> {
@@ -434,13 +427,11 @@ struct RemoveDoubleSinkBranches
       return failure();
 
     rewriter.eraseOp(condBranchOp);
-    // llvm::errs() << "\t***Rules E: remove-double-sink-branch!***\n";
 
     return success();
   }
 };
 
-// Rules E
 /// Remove floating cycles that can have a Mux or a Merge at the cycle header
 template <typename MuxOrMergeOp>
 struct RemoveFloatingLoop : public OpRewritePattern<MuxOrMergeOp> {
@@ -492,14 +483,11 @@ struct RemoveFloatingLoop : public OpRewritePattern<MuxOrMergeOp> {
     rewriter.eraseOp(muxOrMergeOp);
     rewriter.eraseOp(condBranchOp);
 
-    llvm::errs() << "\t***Rules E: remove-GENERIC-floating-loop!***\n";
-
     return success();
   }
 };
 
 // TODO the if-then-else rewrites
-// Rules A
 // Remove redundant if-then-else structures
 struct RemoveBranchMergeIfThenElse
     : public OpRewritePattern<handshake::MergeOp> {
@@ -573,32 +561,11 @@ struct RemoveBranchMergeIfThenElse
     // Delete the merge
     rewriter.eraseOp(mergeOp);
 
-    // Delegated the deletiong to such Branches through a separate function that
-    // deletes Branches ffedng sinks on both sides
-    // If the only user of the two Branches is the merge, delete them
-    // if ((std::distance(firstBranchOperand.getTrueResult().getUsers().begin(),
-    //                    firstBranchOperand.getTrueResult().getUsers().end()) +
-    //      std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-    //                    firstBranchOperand.getFalseResult().getUsers().end()))
-    //                    ==
-    //     1)
-    //   rewriter.eraseOp(firstBranchOperand);
-
-    // if
-    // ((std::distance(secondBranchOperand.getTrueResult().getUsers().begin(),
-    //                    secondBranchOperand.getTrueResult().getUsers().end())
-    //                    +
-    //      std::distance(
-    //          secondBranchOperand.getFalseResult().getUsers().begin(),
-    //          secondBranchOperand.getFalseResult().getUsers().end())) == 1)
-    //   rewriter.eraseOp(secondBranchOperand);
-
-    llvm::errs() << "\t***Rules A: remove-branch-merge-if-then-else!***\n";
     return success();
   }
 };
 
-// Rules A Removes Conditional Branch and Mux
+// Removes Conditional Branch and Mux
 // operation pairs if both the inputs of the Mux are outputs of the Conditional
 // Branch. The results of the MeMuxrge are replaced with the data operand.
 struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
@@ -684,33 +651,10 @@ struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
     // Delete the mux
     rewriter.eraseOp(muxOp);
 
-    // Delegated the deletiong to such Branches through a separate function that
-    // deletes Branches ffedng sinks on both sides
-    // If the only user of the two
-    // Branches is the merge, delete them if
-    // ((std::distance(firstBranchOperand.getTrueResult().getUsers().begin(),
-    //                    firstBranchOperand.getTrueResult().getUsers().end()) +
-    //      std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-    //                    firstBranchOperand.getFalseResult().getUsers().end()))
-    //                    ==
-    //     1)
-    //   rewriter.eraseOp(firstBranchOperand);
-
-    // if
-    // ((std::distance(secondBranchOperand.getTrueResult().getUsers().begin(),
-    //                    secondBranchOperand.getTrueResult().getUsers().end())
-    //                    +
-    //      std::distance(
-    //          secondBranchOperand.getFalseResult().getUsers().begin(),
-    //          secondBranchOperand.getFalseResult().getUsers().end())) == 1)
-    //   rewriter.eraseOp(secondBranchOperand);
-
-    llvm::errs() << "\t***Rules A: remove-branch-mux-if-then-else!***\n";
     return success();
   }
 };
 
-// Rules A
 // Removes redundant loops that are guarded by two suppresses
 template <typename MuxOrMergeOp>
 struct EliminateRedundantLoop : public OpRewritePattern<MuxOrMergeOp> {
@@ -777,13 +721,11 @@ struct EliminateRedundantLoop : public OpRewritePattern<MuxOrMergeOp> {
                                 muxOrMergeOperands[outsideInputIdx]);
 
     rewriter.eraseOp(exitingCondBranchOp);
-    llvm::errs() << "\t***Rules A: eliminate-GENERIC-redundant-loop!***\n";
 
     return success();
   }
 };
 
-// Rules B
 // Extract the index result of the Control Merge in a loop structure.
 struct ExtractLoopCondition
     : public OpRewritePattern<handshake::ControlMergeOp> {
@@ -883,12 +825,10 @@ struct ExtractLoopCondition
     Value index = cmergeOp.getIndex();
     rewriter.replaceAllUsesWith(index, muxSel);
 
-    llvm::errs() << "\t***Rules B: extract-loop-mux-condition!***\n";
     return success();
   }
 };
 
-// Rules B
 // Extract the index result of the Control Merge in an if-then-else structure.
 struct ExtractIfThenElseCondition
     : public OpRewritePattern<handshake::ControlMergeOp> {
@@ -999,12 +939,10 @@ struct ExtractIfThenElseCondition
     // Replace the Cmerge index output with the branch condition
     rewriter.replaceAllUsesWith(index, cond);
 
-    llvm::errs() << "\t***Rules B: extract-if-then-else-mux-condition!***\n";
     return success();
   }
 };
 
-// Rules C
 // Replaces a pair of consecutive Suppress operations with a
 // a single suppress operation with a mux at its condition input.
 struct ShortenSuppressPairs
@@ -1105,11 +1043,6 @@ struct ShortenSuppressPairs
       // Retrieve the new value of the condition, in case it is not updated
       condBr1 = firstCondBranchOp.getConditionOperand();
     } else {
-      // llvm::errs() << firstFalseSuccOnlyFlag << ", " <<
-      // secondTrueSuccOnlyFlag
-      //              << ", " << firstTrueSuccOnlyFlag << ", "
-      //              << secondFalseSuccOnlyFlag << "\n";
-      // assert(firstFalseSuccOnlyFlag && secondTrueSuccOnlyFlag);
 
       if (firstFalseSuccOnlyFlag && secondTrueSuccOnlyFlag) {
         // Check if the condition already feeds a NOT, no need to create a new
@@ -1204,13 +1137,11 @@ struct ShortenSuppressPairs
     // Erase the first Branch
     rewriter.eraseOp(firstCondBranchOp);
 
-    llvm::errs() << "\t***Rules C: shorten-suppress-pairs!***\n";
 
     return success();
   }
 };
 
-// Rules C
 // Replaces a pair of consecutive Repeats with a
 // a single Repeat with a mux at its condition input.
 struct ShortenMuxRepeatPairs : public OpRewritePattern<handshake::MuxOp> {
@@ -1498,13 +1429,11 @@ struct ShortenMuxRepeatPairs : public OpRewritePattern<handshake::MuxOp> {
 
     // TODO: Erase the first INIT as well!!!!!
 
-    llvm::errs() << "\t***Rules C: shorten-mux-repeat-pairs!***\n";
 
     return success();
   }
 };
 
-// Rules C
 // Replaces a pair of consecutive Repeats with a
 // a single Repeat with a merge at its condition input.
 struct ShortenMergeRepeatPairs : public OpRewritePattern<handshake::MergeOp> {
@@ -1780,13 +1709,10 @@ struct ShortenMergeRepeatPairs : public OpRewritePattern<handshake::MergeOp> {
     rewriter.eraseOp(firstMergeOp);
     rewriter.eraseOp(firstCondBranchOp);
 
-    llvm::errs() << "\t***Rules C: shorten-merge-repeat-pairs!***\n";
-
     return success();
   }
 };
 
-// Rules D
 // Breaks a Branch that has both true and false successors into two
 // Suppresses.
 struct ConstructSuppresses
@@ -1817,13 +1743,11 @@ struct ConstructSuppresses
     Value newBranchFalseResult = newBranch.getFalseResult();
     rewriter.replaceAllUsesWith(branchFalseResult, newBranchFalseResult);
 
-    // llvm::errs() << "\t***Rules D: break-branches!***\n";
 
     return success();
   }
 };
 
-// Rules D
 // If a Branch has one successor in the true side, reverse it to be really a
 // Suppress
 struct FixSuppresses : public OpRewritePattern<handshake::ConditionalBranchOp> {
@@ -1871,13 +1795,11 @@ struct FixSuppresses : public OpRewritePattern<handshake::ConditionalBranchOp> {
     Value newBranchFalseResult = newBranch.getFalseResult();
     rewriter.replaceAllUsesWith(branchTrueResult, newBranchFalseResult);
 
-    // llvm::errs() << "\t***Rules D: fix-branches-for-suppresses!***\n";
 
     return success();
   }
 };
 
-// Rules D
 // If a Suppress has two or more successors, feed each successor by a separate
 // Suppress
 struct DistributeSuppresses
@@ -1920,12 +1842,10 @@ struct DistributeSuppresses
       i++;
     }
 
-    llvm::errs() << "\t***Rules D: distribute-suppresses!***\n";
     return success();
   }
 };
 
-// Rules D
 // If a Repeat has two or more successors, feed each successor by a separate
 // Repeat
 template <typename MuxOrMergeOp>
@@ -2047,7 +1967,6 @@ struct DistributeRepeats : public OpRewritePattern<MuxOrMergeOp> {
       i++;
     }
 
-    llvm::errs() << "\t***Rules D: distribute-GENERIC-repeats!***\n";
 
     return success();
   }
@@ -2229,7 +2148,6 @@ struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
     rewriter.replaceOp(mergeOp, newMuxOp);
     inheritBB(mergeOp, newMuxOp);
 
-    llvm::errs() << "\t***Converted Merge to Mux!***\n";
 
     return success();
   }
