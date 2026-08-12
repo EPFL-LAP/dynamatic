@@ -114,9 +114,9 @@ Value *guardedLoad(IRBuilder<> &b, Value *ptr, Type *elemTy, Align align,
 void guardedStore(IRBuilder<> &b, Value *ptr, Value *val, Align align) {
   std::string kind = ("store.align" + Twine(align.value())).str();
   createOpaqueGuard(
-      kind, {ptr, val}, Type::getVoidTy(b.getContext()),
+      kind, {val, ptr}, Type::getVoidTy(b.getContext()),
       [align](IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
-        StoreInst *store = body.CreateStore(a[1], a[0]);
+        StoreInst *store = body.CreateStore(a[0], a[1]);
         store->setAlignment(align);
         // NOTE: nullptr used to satisfy Lambda function Value* type
         return nullptr;
