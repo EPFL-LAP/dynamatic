@@ -1,6 +1,32 @@
 // -----------------------------------------------------------------------
 // Guard ALL load/stores in a function from optimizations by wrapping them
-// in opaque (always-inline) function calls.
+// in opaque (always-inline) function calls. 
+//
+// Ex. Store
+// C:
+//  x[idx] = var;
+//
+// LLVM: 
+//  %gep = getelementptr inbounds i32, ptr %x, i64 %idx
+//  store i32 %value, ptr %gep, align 4
+//
+// LLVM guarded:
+//  %gep = getelementptr inbounds i32, ptr %x, i64 %idx
+//  call void @__dyn_guard.store.align4.ptr.i32.to.void(ptr %gep, i32 %var)
+//
+// Ex. Load
+// C: 
+//  int var = x[idx];
+//
+// LLVM:
+//  %gep = getelementptr inbounds i32, ptr %x, i64 %idx
+//  %value = load i32, ptr %gep, align 4
+//
+// LLVM guarded:
+//  %gep = getelementptr inbounds i32, ptr %x, i64 %idx
+//  %value.g = call i32 @__dyn_guard.load.align4.ptr.to.i32(ptr %gep)
+//
+// NOTE:: GEP operations are unchanged
 // -----------------------------------------------------------------------
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/DerivedTypes.h"
