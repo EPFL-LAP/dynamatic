@@ -517,6 +517,140 @@ private:
   }
 };
 
+struct ArrayPartitionPragmaInfo {
+  std::string ArrayName;
+  uint64_t Dimension = 0;
+  uint64_t Factor = 0;
+  std::string Style;
+  SourceLocation PragmaLoc;
+};
+
+class ArrayPartitionPragmaHandler : public PragmaHandler {
+public:
+  ArrayPartitionPragmaHandler() : PragmaHandler("array_partition") {}
+
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override {
+    ArrayPartitionPragmaInfo Info;
+    if (failed(parseOptions(PP, FirstToken, Info)))
+      return;
+    emitInjectedTokens(PP, Info);
+  }
+
+private:
+  LogicalResult parseOptions(Preprocessor &PP, const Token &FirstToken,
+                             ArrayPartitionPragmaInfo &ArrPragmaInfo) {
+    ArrPragmaInfo.PragmaLoc = FirstToken.getLocation();
+
+    bool sawArray = false, sawDimension = false, sawFactor = false,
+         sawStyle = false;
+
+    Token Tok;
+
+    PP.Lex(Tok);
+
+    while (Tok.isNot(tok::eod)) {
+      if (Tok.isNot(tok::identifier)) {
+        error(PP, Tok, "expected named option in #pragma DYN array_partition");
+        return failure();
+      }
+
+      llvm::StringRef Name = Tok.getIdentifierInfo()->getName();
+
+      PP.Lex(Tok);
+      if (Tok.isNot(tok::equal)) {
+        error(PP, Tok, "expected '=' after option name");
+        return failure();
+      }
+
+      if (Name == "array") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected variable name after array=");
+          return failure();
+        }
+
+        ArrPragmaInfo.ArrayName = Tok.getIdentifierInfo()->getName().str();
+        sawArray = true;
+
+        PP.Lex(Tok);
+
+      } else if (Name == "dimension") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, ArrPragmaInfo.Dimension)) {
+          error(PP, Tok, "expected integer literal after dimension=");
+          return failure();
+        }
+        sawDimension = true;
+
+      } else if (Name == "style") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected identifier after style=");
+          return failure();
+        }
+
+        std::string Style = Tok.getIdentifierInfo()->getName().str();
+
+        // check the allowed partitioning styles
+        // NOTE: Maybe use an enum to store the final type instead of a string?
+        if (Style != "block" && Style != "cyclic" && Style != "complete") {
+          error(PP, Tok, "style must be block, cyclic, or complete");
+          return failure();
+        }
+
+        ArrPragmaInfo.Style = Style;
+        sawStyle = true;
+
+        PP.Lex(Tok);
+
+      } else if (Name == "factor") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, ArrPragmaInfo.Factor)) {
+          error(PP, Tok, "expected integer literal after factor=");
+          return failure();
+        }
+        sawFactor = true;
+
+      } else {
+        error(PP, Tok, "unknown option in #pragma DYN array_partition");
+        return failure();
+      }
+    }
+
+    // NOTE: Right now all are enforced, maybe we can be less strict at times?
+    if (!sawArray || !sawDimension || !sawStyle || !sawFactor) {
+      error(PP, FirstToken,
+            "#pragma DYN array_partition requires array=, dimension=, "
+            "style=, factor=");
+      return failure();
+    }
+    return success();
+  }
+
+  void emitInjectedTokens(Preprocessor &PP,
+                          const ArrayPartitionPragmaInfo &Info) {
+    std::string FuncDecl = "extern void __dyn_array_partition(const char*, "
+                           "int, int, const char*) "
+                           "__attribute__((noinline, noduplicate));\n";
+    std::string Call =
+        llvm::formatv("__dyn_array_partition(\"{0}\", {1}, {2}, \"{3}\");\n",
+                      Info.ArrayName, Info.Dimension, Info.Factor, Info.Style);
+
+    auto MB = llvm::MemoryBuffer::getMemBufferCopy(
+        FuncDecl + Call, "<dyn-array-partition-injected>");
+    FileID FID = PP.getSourceManager().createFileID(
+        std::move(MB), SrcMgr::C_User, 0, 0, Info.PragmaLoc);
+    PP.EnterSourceFile(FID, nullptr, Info.PragmaLoc);
+  }
+};
+
 // Declare the DynPragmaNamespace object
 // which stores all of our Dyn pragmas
 class DynPragmaNamespace : public PragmaNamespace {
@@ -526,6 +660,7 @@ public:
     // put the speculate pragma in the DYN namespace
     AddPragma(new SpeculatePragmaHandler());
     AddPragma(new PredictPragmaHandler());
+    AddPragma(new ArrayPartitionPragmaHandler());
   }
 };
 
