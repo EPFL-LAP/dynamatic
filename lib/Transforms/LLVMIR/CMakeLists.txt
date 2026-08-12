@@ -31,14 +31,13 @@ add_llvm_pass_plugin(ArrayPartition
   MLIRSupport
 )
 
-# Link to required LLVM and Polly libraries
+# Link to required LLVM libraries
 add_llvm_pass_plugin(GuardLoadStore
   GuardLoadStore.cpp
   DEPENDS
   LLVMCore
   LLVMSupport
   LLVMAnalysis
-  Polly
 
   MLIRIR
   MLIRSupport
