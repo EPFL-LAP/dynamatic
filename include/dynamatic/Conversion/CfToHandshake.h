@@ -27,6 +27,8 @@
 
 namespace dynamatic {
 
+using BlockArgToMergeResult = DenseMap<BlockArgument, OpResult>;
+
 /// Converts cf-level types to those expected by handshake-level IR. Right now
 /// these are the sames but this will change as soon as the new type system is
 /// integrated.
@@ -129,10 +131,10 @@ public:
   /// - Both a `handhsake::MemoryControllerOp` and `handhsake::LSQOp` will be
   /// instantiated if some but not all of its accesses indicate that they should
   /// connect to an LSQ.
-  virtual LogicalResult
-  verifyAndCreateMemInterfaces(handshake::FuncOp funcOp,
-                               ConversionPatternRewriter &rewriter,
-                               MemInterfacesInfo &memInfo) const;
+  virtual LogicalResult verifyAndCreateMemInterfaces(
+      handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
+      MemInterfacesInfo &memInfo,
+      const BlockArgToMergeResult &argReplacements) const;
 
   /// Sets an integer "bb" attribute on each operation to identify the basic
   /// block from which the operation originates in the std-level IR.
