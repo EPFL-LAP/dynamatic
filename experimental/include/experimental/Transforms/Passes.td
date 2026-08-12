@@ -145,6 +145,7 @@ def MarkSubloop : Pass<"mark-subloop", "mlir::ModuleOp"> {
   let options =
     [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
             "The number of times that Rewrite D should be applied.">];
+  let dependentDialects = ["cf_extra::CFExtraDialect"];
 }
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

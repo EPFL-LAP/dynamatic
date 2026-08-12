@@ -16,7 +16,7 @@ struct EntryOpInfo {
 };
 
 struct LoopInfo {
-  mlir::Block *outerHeader;
+  mlir::Block *entryBlock;
   llvm::SetVector<mlir::Block *> subblocks;
   mlir::Block *exitBlock;
 };
@@ -99,10 +99,9 @@ Block *MarkSubloopPass::getTrueDefiningBlock(Value val) {
 
 void MarkSubloopPass::runOnOperation() {
   ModuleOp modOp = getOperation();
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
-
-  getContext().loadDialect<dynamatic::cf_extra::CFExtraDialect>();
 
   auto funcOps = modOp.getBody()->getOps<mlir::func::FuncOp>();
   assert(funcOp && "No funcOp found!");
@@ -115,40 +114,59 @@ void MarkSubloopPass::runOnOperation() {
   PostDominanceInfo postDomInfo(funcOp);
   llvm::SmallVector<LoopInfo> validLoops;
 
-  // find all loops and collect their subblocks
-  for (mlir::Block &header : region) {
-    for (mlir::Block *exitBlock : header.getPredecessors()) {
-      if (!domInfo.dominates(&header, exitBlock)) continue;
+  // iterate over all dom / postdom pairs
+  for (mlir::Block &entry : region) {
+    for (mlir::Block &exit : region) {
+      if (&entry == &exit) continue;
+
+      // must be a valid dom / postdom pair
+      if (!domInfo.dominates(&entry, &exit)) continue;
+      if (!postDomInfo.postDominates(&exit, &entry)) continue;
       
+      // collect all subblocks
       llvm::SetVector<mlir::Block *> subBlocksSet;      
       for (mlir::Block &subblock : region) {
         // subblock is dominated by the header and postdominated by the exitblock
-        if (domInfo.properlyDominates(&header, &subblock) &&
-            postDomInfo.properlyPostDominates(exitBlock, &subblock)) {
+        if (domInfo.properlyDominates(&entry, &subblock) &&
+            postDomInfo.properlyPostDominates(&exit, &subblock)) {
           subBlocksSet.insert(&subblock);
         }
       }
+      if (subBlocksSet.empty()) continue;
 
-      // check that subblocks stay within the loop boundary
-      bool validSubblocks = true;
+      // verify that subblocks stay within the loop boundary
+      bool validSuccessors = true;
       for (mlir::Block *subblock : subBlocksSet) {
         for (mlir::Block *succ : subblock->getSuccessors()) {
-          if (!subBlocksSet.contains(succ) && succ != exitBlock) {
-            validSubblocks = false;
+          if (!subBlocksSet.contains(succ) && succ != &exit) {
+            validSuccessors = false;
             break;
           }
         }
-        if (!validSubblocks) break;
+        if (!validSuccessors) break;
       }
 
-      if (validSubblocks && !subBlocksSet.empty()) {
-        validLoops.push_back({&header, subBlocksSet, exitBlock});
+      // verify that no control enters subblocks from anywhere except entry
+      bool validPredecessors = true;
+      for (mlir::Block *subblock : subBlocksSet) {
+        for (mlir::Block *pred : subblock->getPredecessors()) {
+          if (!subBlocksSet.contains(pred) && pred != &entry) {
+            validPredecessors = false;
+            break;
+          }
+        }
+        if (!validPredecessors) break;
+      }
+
+      if (validSuccessors && validPredecessors) {
+        validLoops.push_back({&entry, subBlocksSet, &exit});
+        llvm::errs() << &entry << '\n';
       }
     }
   }
 
   if (validLoops.empty()) {
-    llvm::errs() << "No loops with subblocks found!\n";
+    llvm::errs() << "No valid dom / postdom pairs with subblocks found!\n";
     return;
   }
   llvm::errs() << "size of validLoops: " << validLoops.size() << '\n';
@@ -157,24 +175,33 @@ void MarkSubloopPass::runOnOperation() {
 
   // Process all discovered loops
   for (auto &loop : validLoops) {
-    mlir::Block *outerHeader = loop.outerHeader;
+    mlir::Block *outerHeader = loop.entryBlock;
     llvm::SetVector<mlir::Block *> &subblocks = loop.subblocks;
     mlir::Block *exitBlock = loop.exitBlock;
     for (mlir::Block *b : subblocks) {
       b->printAsOperand(llvm::errs());
       llvm::errs() << ", ";
     }
+    llvm::errs() << "\n";
 
     int outerHeaderBbIdx = std::distance(region.begin(), outerHeader->getIterator());
-    
+    bool storesInSubblock = false;
+    bool multSuccessors = (outerHeader->getNumSuccessors() > 1);
+
     // Collect the names and operandIDs of entry operations in exitBlock
     llvm::SmallVector<Attribute> entryOpAttrs;
 
     // Helper to format entry info into a DictionaryAttr
     auto addEntryOpAttr = [&](Operation *op, unsigned idx) {
       StringAttr nameAttr = op->getAttrOfType<StringAttr>("handshake.name");
+      std::string nameStr = nameAttr.getValue().str();
+
+      if (isa<dynamatic::cf_extra::PredicateOp>(op)) {
+        nameStr = "cond_br_" + nameStr;
+      }
+
       NamedAttribute entries[] = {
-          builder.getNamedAttr("op", nameAttr),
+          builder.getNamedAttr("op", builder.getStringAttr(nameStr)),
           builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(idx))
       };
       entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
@@ -184,12 +211,11 @@ void MarkSubloopPass::runOnOperation() {
     for (Operation &op : exitBlock->getOperations()) {
       // Skip constants
       if (isa<arith::ConstantOp>(&op)) continue;
-      if (isa<dynamatic::cf_extra::PredicateOp>(&op)) continue;
 
       for (OpOperand &use : op.getOpOperands()) {
         Value operand = use.get();
         if (isa<MemRefType>(operand.getType())) continue;
-        
+
         // determine the defining block whether it's an OpResult or a BlockArgument
         Block *definingBlock = getTrueDefiningBlock(operand);
 
@@ -207,11 +233,10 @@ void MarkSubloopPass::runOnOperation() {
           }
         }
       }
-    }
+    }    
 
     // find all the stores in the subblocks
     llvm::SmallVector<memref::StoreOp> storesToModify;
-    bool storesInSubblock = false;
     for (mlir::Block *block : subblocks) {
       for (auto storeOp : block->getOps<memref::StoreOp>()) {
         storesInSubblock = true;
@@ -233,6 +258,7 @@ void MarkSubloopPass::runOnOperation() {
       );
       std::string pseudoName = "pseudo_cond" + std::to_string(outerHeaderBbIdx);
       pseudoCondOp->setAttr("handshake.name", builder.getStringAttr(pseudoName));
+      pseudoCondOp->setAttr("ftd.pseudo_cond", builder.getUnitAttr());
         
       for (memref::StoreOp storeOp : storesToModify) {
         builder.setInsertionPoint(storeOp);
@@ -245,6 +271,7 @@ void MarkSubloopPass::runOnOperation() {
             pseudoCondOp.getResult(),
             incomingData
         );
+        namer.setName(predOp);
 
         // Rewire the data operand safely using setOperand on its specific index
         storeOp.setOperand(0, predOp->getResult(0));

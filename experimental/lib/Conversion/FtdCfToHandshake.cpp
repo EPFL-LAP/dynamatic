@@ -56,6 +56,33 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 using namespace dynamatic::experimental::ftd;
 
+struct ConvertPredicateOp
+    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::PredicateOp> {
+  using DynOpConversionPattern<dynamatic::cf_extra::PredicateOp>::DynOpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(dynamatic::cf_extra::PredicateOp srcOp, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    rewriter.setInsertionPoint(srcOp);
+
+    llvm::SmallVector<mlir::Type> newTypes;
+    for (mlir::Type resType : srcOp->getResultTypes()) {
+      newTypes.push_back(ftd::channelifyType(resType));
+    }
+
+    auto newOp = rewriter.create<dynamatic::cf_extra::PredicateOp>(
+        srcOp->getLoc(), 
+        newTypes, 
+        adaptor.getOperands(),
+        srcOp->getAttrDictionary().getValue()
+    );
+    namer.replaceOp(srcOp, newOp);
+    rewriter.replaceOp(srcOp, newOp);
+
+    return mlir::success();
+  }
+};
+
 struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
   using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
 
@@ -275,7 +302,6 @@ struct FtdCfToHandshakePass
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
-    ctx->loadDialect<dynamatic::cf_extra::CFExtraDialect>();
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
@@ -292,6 +318,7 @@ struct FtdCfToHandshakePass
         // LowerFuncToHandshake,
         /*ConvertConstants,*/ AllocaOpConversion, ConvertCalls,
         /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
+        ConvertPredicateOp,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -331,10 +358,16 @@ struct FtdCfToHandshakePass
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
     target.addLegalOp<mlir::ModuleOp>();
-    target.addLegalDialect<handshake::HandshakeDialect, dynamatic::cf_extra::CFExtraDialect>();
+    target.addLegalDialect<handshake::HandshakeDialect>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
-                             BuiltinDialect>();
+                             BuiltinDialect, dynamatic::cf_extra::CFExtraDialect>();
+
+                             
+    target.addDynamicallyLegalOp<dynamatic::cf_extra::PredicateOp>(
+    [](dynamatic::cf_extra::PredicateOp op) {
+      return llvm::isa<handshake::ChannelType>(op.getType());
+    });
 
     target.addDynamicallyLegalOp<func::CallOp>([](func::CallOp op) {
       // If the call is to __init, consider it legal for now.
@@ -420,6 +453,7 @@ struct FtdCfToHandshakePass
       ftd::finalizeCondPlaceholders(funcOp);
 
       shadow.destroy();
+      llvm::errs() << "kinda done\n";
 
       for (auto predOp : llvm::make_early_inc_range(
          funcOp.getOps<dynamatic::cf_extra::PredicateOp>())) {
@@ -455,6 +489,10 @@ struct FtdCfToHandshakePass
 
         condBranchOp->setAttr("store_suppressor", builder.getUnitAttr());
         inheritBB(predOp, condBranchOp);
+
+        StringAttr predNameAttr = predOp->getAttrOfType<StringAttr>("handshake.name");
+        std::string expectedName = "cond_br_" + (predNameAttr.getValue().str());
+        condBranchOp->setAttr("handshake.name", builder.getStringAttr(expectedName));
 
         // Replace predicate result with falseResult and erase
         predOp.getResult().replaceAllUsesWith(condBranchOp.getFalseResult());
@@ -550,7 +588,12 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
     // constant is considered as sourcable, this will be the output of a source
     // component, otherwise it remains startValue
     Value controlValue;
-    if (isCstSourcable(cstOp)) {
+    if (cstOp->hasAttr("ftd.pseudo_cond")) {
+      // Trigger from the block argument / block control signal instead of startValue!
+      Block *cstBlock = cstOp->getBlock();
+      controlValue = cstBlock->getArguments().back(); // Block control token!
+    }
+    else if (isCstSourcable(cstOp)) {
       auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
       inheritBB(cstOp, sourceOp);
       controlValue = sourceOp.getResult();
