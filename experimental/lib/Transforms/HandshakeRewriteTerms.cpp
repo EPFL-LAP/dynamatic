@@ -655,6 +655,96 @@ struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
   }
 };
 
+// Removes Conditional Branch and mux/merge operation pairs if both the inputs
+// of the mux/merge are outputs of the Conditional Branch. The results of the
+// mux/merge are replaced with the data operand.
+template <typename MuxOrMergeOp>
+struct RemoveBranchIfThenElse : public OpRewritePattern<MuxOrMergeOp> {
+  using OpRewritePattern<MuxOrMergeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(MuxOrMergeOp muxOrMergeOp,
+                                PatternRewriter &rewriter) const override {
+    bool isMux = false;
+    if (isa_and_nonnull<handshake::MuxOp>(muxOrMergeOp))
+      isMux = true;
+    else if (!isa_and_nonnull<handshake::MergeOp>(muxOrMergeOp))
+      return failure();
+
+    auto dataOperands = muxOrMergeOp->getOperands();
+    if (isMux)
+      dataOperands = cast<handshake::MuxOp>(muxOrMergeOp).getDataOperands();
+
+    if (dataOperands.size() != 2)
+      return failure();
+
+    // The two operands of the mux/merge should be conditional Branches;
+    // otherwise, the pattern match fails
+    Operation *firstOperand = dataOperands[0].getDefiningOp();
+    Operation *secondOperand = dataOperands[1].getDefiningOp();
+    if (!isa_and_nonnull<handshake::ConditionalBranchOp>(firstOperand) ||
+        !isa_and_nonnull<handshake::ConditionalBranchOp>(secondOperand))
+      return failure();
+
+    handshake::ConditionalBranchOp firstBranchOperand =
+        cast<handshake::ConditionalBranchOp>(firstOperand);
+    handshake::ConditionalBranchOp secondBranchOperand =
+        cast<handshake::ConditionalBranchOp>(secondOperand);
+
+    if (!OPTIM_BRANCH_TO_SUPP) {
+      // New conditions: to ensure we only conside suppresses
+      if (!isSuppress(firstBranchOperand) || !isSuppress(secondBranchOperand))
+        return failure();
+    }
+
+    if (!OPTIM_DISTR) {
+      // Kill Distrib. for Optim.: Another new condition (to make a meaningful
+      // use of the suppress->distribute rule): the two suppresses should have
+      // only a single usage; otherwise the pattern match fails
+      if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
+                        firstBranchOperand.getFalseResult().getUsers().end()) !=
+          1)
+        return failure();
+      if (std::distance(
+              secondBranchOperand.getFalseResult().getUsers().begin(),
+              secondBranchOperand.getFalseResult().getUsers().end()) != 1)
+        return failure();
+    }
+
+    Value firstBranchCondition = firstBranchOperand.getConditionOperand();
+    Value secondBranchCondition = secondBranchOperand.getConditionOperand();
+
+    if (isMux) {
+      if (isa_and_nonnull<handshake::NotIOp>(
+              firstBranchCondition.getDefiningOp()))
+        firstBranchCondition =
+            firstBranchCondition.getDefiningOp()->getOperand(0);
+      if (isa_and_nonnull<handshake::NotIOp>(
+              secondBranchCondition.getDefiningOp()))
+        secondBranchCondition =
+            secondBranchCondition.getDefiningOp()->getOperand(0);
+    }
+
+    // If the two original conditions are not equivalent, the pattern match
+    // fails
+    if (firstBranchCondition != secondBranchCondition)
+      return failure();
+
+    // If the data input of the two Branches is not the same, the pattern match
+    // fails
+    Value firstBranchData = firstBranchOperand.getDataOperand();
+    Value secondBranchData = secondBranchOperand.getDataOperand();
+    if (firstBranchData != secondBranchData)
+      return failure();
+
+    // Replace all uses of the mux/merge output with the input of the Branches
+    rewriter.replaceAllUsesWith(muxOrMergeOp->getResult(0), firstBranchData);
+    // Delete the mux/merge
+    rewriter.eraseOp(muxOrMergeOp);
+
+    return success();
+  }
+};
+
 // Removes redundant loops that are guarded by two suppresses
 template <typename MuxOrMergeOp>
 struct EliminateRedundantLoop : public OpRewritePattern<MuxOrMergeOp> {
@@ -2177,7 +2267,7 @@ struct HandshakeRewriteTermsPass
                  DistributeRepeats<handshake::MuxOp>,
                  DistributeRepeats<handshake::MergeOp>,
                  ExtractIfThenElseCondition, ExtractLoopCondition,
-                 RemoveBranchMergeIfThenElse, RemoveBranchMuxIfThenElse,
+                 RemoveBranchIfThenElse<handshake::MuxOp>, RemoveBranchIfThenElse<handshake::MergeOp>,
                  EliminateRedundantLoop<handshake::MuxOp>,
                  EliminateRedundantLoop<handshake::MergeOp>, ConvertLoopMergeToMux/*,
                  ShortenSuppressPairs
