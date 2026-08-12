@@ -98,8 +98,7 @@ std::string dynamatic::substituteParams(StringRef input,
 
 RTLRequestFromOp::RTLRequestFromOp(Operation *op, const llvm::Twine &name)
     : RTLRequest(op->getLoc()), name(name.str()), op(op),
-      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {
-      };
+      parameters(op->getAttrOfType<DictionaryAttr>(RTL_PARAMETERS_ATTR_NAME)) {}
 
 Attribute RTLRequestFromOp::getParameter(const RTLParameter &param) const {
   if (!parameters)
@@ -178,7 +177,7 @@ ParamMatch RTLRequestFromOp::matchParameter(const RTLParameter &param) const {
 LogicalResult
 RTLRequestFromOp::paramsToJSON(const llvm::Twine &filepath) const {
   return serializeToJSON(parameters, filepath.str(), loc);
-};
+}
 
 RTLRequestFromHWModule::RTLRequestFromHWModule(hw::HWModuleExternOp modOp)
     : RTLRequestFromOp(modOp, getName(modOp)) {}
@@ -310,6 +309,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.merge" ||
       handshakeOp == "handshake.muli" ||
       handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.formal.dead_buffer" ||
       handshakeOp == "handshake.subi" ||
       handshakeOp == "handshake.shli" ||
       handshakeOp == "handshake.blocker" ||
@@ -337,7 +337,8 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.spec_commit" ||
       handshakeOp == "handshake.spec_save_commit" ||
       handshakeOp == "handshake.sharing_wrapper" ||
-      handshakeOp == "handshake.non_spec"
+      handshakeOp == "handshake.non_spec" || 
+      handshakeOp == "handshake.init"
       // clang-format on
   ) {
     // Default
@@ -410,7 +411,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
              handshakeOp == "handshake.extf" ||
              handshakeOp == "handshake.maximumf" ||
              handshakeOp == "handshake.minimumf" ||
-             handshakeOp == "handshake.join") {
+             handshakeOp == "handshake.join" || handshakeOp == "ii_monitor") {
     // Skip
   } else if (handshakeOp == "handshake.ram") {
     // NOTE: this port order is currently hardcoded in HandshakeToHW.cpp
@@ -452,6 +453,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.muli" ||
       handshakeOp == "handshake.select" ||
       handshakeOp == "handshake.sink" ||
+      handshakeOp == "handshake.formal.dead_buffer" ||
       handshakeOp == "handshake.subf" ||
       handshakeOp == "handshake.extui" ||
       handshakeOp == "handshake.shli" ||
@@ -492,7 +494,8 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.load" ||
       handshakeOp == "handshake.store" ||
       handshakeOp == "handshake.spec_commit" ||
-      handshakeOp == "handshake.speculating_branch"
+      handshakeOp == "handshake.speculating_branch" ||
+      handshakeOp == "handshake.init"
       // clang-format on
 
   ) {
@@ -506,6 +509,38 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
   ) {
     serializedParams["EXTRA_SIGNALS"] =
         serializeExtraSignals(modType.getOutputType(0));
+  } else if (handshakeOp == "ii_monitor") {
+    // The II monitor passively observes the select channels of a loop's
+    // header muxes. The monitor only uses the channels' data, but it must
+    // declare ports matching every observed channel so the instantiation in the
+    // parent module is well-formed when a channel carries extra signals (e.g.
+    // under speculation). Each parameter is serialized as a list with one
+    // element per channel, which is also what tells the generator how many of
+    // them there are.
+    SmallVector<Type> selTypes;
+    for (unsigned idx = 0, numInputs = modType.getNumInputs(); idx < numInputs;
+         ++idx) {
+      StringRef portName = modType.getInputName(idx);
+      if (portName.starts_with("sel"))
+        selTypes.push_back(modType.getInputType(idx));
+    }
+
+    // Serializes what 'serialize' returns for each of 'types' as a Python
+    // list literal (e.g. "'[32, 0]'").
+    auto serializeList = [](ArrayRef<Type> types,
+                            llvm::function_ref<std::string(Type)> serialize) {
+      std::string value;
+      llvm::raw_string_ostream os(value);
+      os << "'[";
+      llvm::interleaveComma(types, os,
+                            [&](Type type) { os << serialize(type); });
+      os << "]'";
+      return value;
+    };
+    serializedParams["SEL_BITWIDTHS"] =
+        serializeList(selTypes, getBitwidthString);
+    serializedParams["SEL_EXTRA_SIGNALS"] =
+        serializeList(selTypes, serializeExtraSignalsInner);
   } else if (
       // clang-format off
       handshakeOp == "handshake.mem_controller" ||

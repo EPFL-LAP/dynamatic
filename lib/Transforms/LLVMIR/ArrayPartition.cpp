@@ -38,7 +38,6 @@
 #define DEBUG_TYPE "array-partition"
 
 #include <boost/throw_exception.hpp>
-void boost::throw_exception(std::exception const &e) { std::abort(); }
 
 using namespace llvm;
 using namespace polly;

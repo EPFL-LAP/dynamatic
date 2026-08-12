@@ -1,4 +1,3 @@
-
 //===- gemver_float.c ------------------------------------------- -*- C -*-===//
 //
 // This file is adapted from the PolyBench/C 3.2 test suite.
@@ -8,14 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "gemver_float.h"
 #include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-void gemver_float(in_float_t alpha, in_float_t beta, inout_float_t A[N][N],
-                  in_float_t u1[N], in_float_t v1[N], in_float_t u2[N],
-                  in_float_t v2[N], inout_float_t w[N], inout_float_t x[N],
-                  in_float_t y[N], in_float_t z[N]) {
+#define N 10
+
+void gemver_float(float alpha, float beta, float A[N][N], float u1[N],
+                  float v1[N], float u2[N], float v2[N], float w[N], float x[N],
+                  float y[N], float z[N]) {
   int i, j;
 
   for (i = 0; i < N; i++)
@@ -42,17 +41,17 @@ void gemver_float(in_float_t alpha, in_float_t beta, inout_float_t A[N][N],
 }
 
 int main(void) {
-  in_float_t alpha;
-  in_float_t beta;
-  inout_float_t A[N][N];
-  in_float_t u1[N];
-  in_float_t v1[N];
-  in_float_t u2[N];
-  in_float_t v2[N];
-  inout_float_t w[N];
-  inout_float_t x[N];
-  in_float_t y[N];
-  in_float_t z[N];
+  float alpha;
+  float beta;
+  float A[N][N];
+  float u1[N];
+  float v1[N];
+  float u2[N];
+  float v2[N];
+  float w[N];
+  float x[N];
+  float y[N];
+  float z[N];
 
   alpha = rand() % 20;
   beta = rand() % 20;
@@ -65,8 +64,8 @@ int main(void) {
     x[yy] = rand() % 20;
     y[yy] = rand() % 20;
     z[yy] = rand() % 20;
-    for (int x = 0; x < N; ++x) {
-      A[yy][x] = rand() % 10;
+    for (int xx = 0; xx < N; ++xx) {
+      A[yy][xx] = rand() % 10;
     }
   }
 

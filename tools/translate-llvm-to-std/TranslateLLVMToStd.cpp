@@ -12,6 +12,7 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -28,6 +29,8 @@
 
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/MemoryDependency.h"
+
+#include "llvm/IR/PatternMatch.h"
 
 #define DEBUG_TYPE "translate-llvm-to-std"
 
@@ -50,6 +53,8 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
                     "type is not currently supported\n";
     return mlir::FloatType::getF80(context);
   }
+  if (llvmType->isPointerTy())
+    return mlir::IndexType::get(context);
   LLVM_DEBUG(llvm::errs() << "Unhandled LLVM scalar type:\n";);
 
   llvm::report_fatal_error("Unhandled scalar type");
@@ -132,6 +137,31 @@ convertInitializerToDenseElemAttr(llvm::GlobalVariable *globVar,
   return mlir::DenseElementsAttr::get(
       mlir::RankedTensorType::get(/*shape = */ {numElems}, baseMLIRElemType),
       values);
+}
+
+// Find the base address associated with the LLVM value using
+// getUnderlyingObjects(...). This raises an error if the ptr can be the result
+// of merging between two base addresses.
+static const llvm::Value *findBase(llvm::Value *ptr) {
+  llvm::SmallVector<const llvm::Value *, 2> baseArray;
+  getUnderlyingObjects(ptr, baseArray);
+  if (baseArray.empty()) {
+    llvm::report_fatal_error(
+        "Cannot determine the base array of the load operation! Aborting...");
+  } else if (baseArray.size() > 1) {
+    LLVM_DEBUG({
+      llvm::errs()
+          << "The index value is calculated from multiple base addresses!\n";
+      llvm::errs() << "List of addresses:\n";
+      for (const auto *addr : baseArray) {
+        addr->dump();
+      }
+    });
+    llvm::report_fatal_error(
+        "The index value is calculated from multiple distinct base "
+        "addresses. This is a currently unsupported IR construction.");
+  }
+  return baseArray[0];
 }
 
 void convertInitializerToDenseElemAttrRecursive(
@@ -298,6 +328,9 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
     return;
   } else if (auto *callInst = dyn_cast<llvm::CallInst>(inst)) {
     translateCallInst(callInst);
+  } else if (inst->getOpcode() == Instruction::FNeg) {
+    naiveTranslation<arith::NegFOp>(getMLIRType(inst->getType(), ctx),
+                                    valueMap[inst->getOperand(0)], inst);
   } else {
     llvm_unreachable("Not implemented");
   }
@@ -309,10 +342,9 @@ TranslateLLVMToStd::getBranchOperandsForCFGEdge(BasicBlock *currBB,
   SmallVector<mlir::Value> operands;
   for (PHINode &phi : nextBB->phis()) {
     mlir::Value argument = valueMap[phi.getIncomingValueForBlock(currBB)];
-
-    if (argument)
+    if (argument) {
       operands.push_back(argument);
-    else {
+    } else {
       // The value is an undef (usually they can be canonicalized away)
       mlir::Value undefarg = builder.create<LLVM::UndefOp>(
           UnknownLoc::get(ctx), valueMap[&phi].getType());
@@ -338,9 +370,27 @@ void TranslateLLVMToStd::initializeBlocksAndBlockMapping(
         "C function potentially contains unhandled argument types.");
   }
 
+  builder.setInsertionPointToStart(entryBlock);
+
   for (auto [llvmArg, mlirArg] :
        llvm::zip_equal(llvmFunc->args(), entryBlock->getArguments())) {
-    valueMap[&llvmArg] = mlirArg;
+    if (isa<MemRefType>(mlirArg.getType())) {
+      // We use the contract "pointers are in reality represented
+      // as an index offset to some base that we find via analysis later".
+      //
+      // In this case valueMap[&llvmArg] contains a zero index
+      // value for the select and any other pointer operation as part of
+      // translation the llvm::Argument and then allow the rest of the
+      // pointer-related lowerings to always assume "llvm pointers are index
+      // values that are the accumulated offsets to base"
+      valueMap[&llvmArg] = builder.create<arith::ConstantOp>(
+          UnknownLoc::get(ctx), builder.getIndexAttr(0));
+    } else {
+      valueMap[&llvmArg] = mlirArg;
+    }
+
+    // Remember the type of base address
+    this->llvmPtrToMemRefMap[&llvmArg] = mlirArg;
   }
 
   // Remaining basic blocks
@@ -414,7 +464,19 @@ void TranslateLLVMToStd::createGetGlobals(llvm::Function *llvmFunc) {
           auto getGlobalOp = builder.create<memref::GetGlobalOp>(
               loc, memrefType, globalOp.getSymName());
 
-          valueMap[val] = getGlobalOp.getResult();
+          // We use the contract "pointers are in reality represented
+          // as an index offset to some base that we find via analysis later".
+          //
+          // In this case valueMap[val] contains a zero index
+          // value for the select and any other pointer operation as part of
+          // translation the llvm::Argument and then allow the rest of the
+          // pointer-related lowerings to always assume "llvm pointers are index
+          // values that are the accumulated offsets to base"
+          valueMap[val] = builder.create<arith::ConstantOp>(
+              UnknownLoc::get(ctx), builder.getIndexAttr(0));
+          // Remember the corrsponding memref of base address
+          auto getGlobalOpMemref = getGlobalOp.getResult();
+          this->llvmPtrToMemRefMap[val] = getGlobalOpMemref;
         }
       }
     }
@@ -566,19 +628,7 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
 
   SmallVector<llvm::Value *> gepIndices(gepInst->indices());
 
-  mlir::Value baseAddress;
-  if (this->getInstToMemRefMap.count(gepInst->getPointerOperand())) {
-    // When the GEP directly gets calculates from a AllocaInst (i.e., an
-    // internal array) or a pointer in the function argument (i.e.,
-    // my_array[A][B][C][D] in the example above). Here we get the corresponding
-    // memref in MLIR using getInstToMemRefMap.
-    baseAddress = this->getInstToMemRefMap[gepInst->getPointerOperand()];
-  } else {
-    // Otherwise, there should be a chain of GEPs (TODO: assert this
-    // assumption). The base address is the result of the previous GEP.
-    baseAddress = valueMap[gepInst->getPointerOperand()];
-  }
-  this->getInstToMemRefMap[gepInst] = baseAddress;
+  const llvm::Value *baseAddressLLVM = findBase(gepInst->getPointerOperand());
 
   // A list of value to be accumulated. For the example above:
   // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
@@ -603,7 +653,8 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
         // Here we are using GEP to advance 4 * i8 = 32 bits. If the
         // element of the original array was 32-bit wide, then here we need to
         // increment 1 step (instead of 4).
-        auto memrefType = dyn_cast<MemRefType>(baseAddress.getType());
+        auto memrefType = dyn_cast<MemRefType>(
+            this->llvmPtrToMemRefMap.at(baseAddressLLVM).getType());
         assert(memrefType);
 
         // This is the size of the actual element (i.e., for 32 in the example
@@ -627,8 +678,7 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
             (currBaseElementBitWidth * constInt) / actualBaseElementWidth;
 
         auto byteAlignedConstantValue = builder.create<arith::ConstantOp>(
-            UnknownLoc::get(ctx),
-            builder.getIntegerAttr(builder.getI64Type(), actualAdvanceValue));
+            UnknownLoc::get(ctx), builder.getIndexAttr(actualAdvanceValue));
         multipliedIndices.push_back(byteAlignedConstantValue);
       } else {
         multipliedIndices.push_back(mlirIndexValue);
@@ -673,7 +723,15 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
       return vals[0];
     auto mid = vals.size() / 2;
     auto lhs = buildAdderTree(vals.take_front(mid));
+    if (!isa<IndexType>(lhs.getType())) {
+      lhs = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
+                                               builder.getIndexType(), lhs);
+    }
     auto rhs = buildAdderTree(vals.drop_front(mid));
+    if (!isa<IndexType>(rhs.getType())) {
+      rhs = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
+                                               builder.getIndexType(), rhs);
+    }
     return builder.create<arith::AddIOp>(UnknownLoc::get(ctx), lhs, rhs);
   };
   mlir::Value accumulatedArrayIndex = buildAdderTree(multipliedIndices);
@@ -725,55 +783,56 @@ void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
 }
 
 void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
-  auto *instAddr = loadInst->getPointerOperand();
   mlir::Value memref;
   mlir::Value index = valueMap[loadInst->getPointerOperand()];
   mlir::Type resType = getMLIRType(loadInst->getType(), ctx);
 
-  mlir::Value indexOp;
-
-  if (getInstToMemRefMap.count(instAddr)) {
-    memref = getInstToMemRefMap[instAddr];
+  const llvm::Value *baseAddressLLVM = findBase(loadInst->getPointerOperand());
+  memref = llvmPtrToMemRefMap.at(baseAddressLLVM);
+  if (baseAddressLLVM != loadInst->getPointerOperand()) {
     // LoadOp needs the index operand to be of index type
-    indexOp = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
+    if (!isa<IndexType>(index.getType()))
+      index = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
                                                  builder.getIndexType(), index);
   } else {
-    assert(isa<MemRefType>(index.getType()));
-    memref = index;
-    indexOp = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
-                                                builder.getIndexAttr(0));
+    // When a base address is used directly as an operand of any operation,
+    // it should be treated as a zero-index value. Here, we create an constant
+    // op with value 0.
+    index = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
+                                              builder.getIndexAttr(0));
   }
 
   auto newOp =
       builder.create<memref::LoadOp>(UnknownLoc::get(ctx), resType, memref,
-                                     /*indices = */ indexOp);
+                                     /*indices = */ index);
   valueMap[loadInst] = newOp.getResult();
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
 void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
-  auto *instAddr = storeInst->getPointerOperand();
   mlir::Value memref;
   mlir::Value index = valueMap[storeInst->getPointerOperand()];
 
-  mlir::Value indexOp;
+  const llvm::Value *baseAddressLLVM = findBase(storeInst->getPointerOperand());
+  memref = llvmPtrToMemRefMap.at(baseAddressLLVM);
 
-  if (getInstToMemRefMap.count(instAddr)) {
-    memref = getInstToMemRefMap[instAddr];
-    // LoadOp needs the index operand to be of index type
-    indexOp = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
+  if (baseAddressLLVM != storeInst->getPointerOperand()) {
+    // StoreOp needs the index operand to be of index type
+    if (!isa<IndexType>(index.getType()))
+      index = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
                                                  builder.getIndexType(), index);
   } else {
-    assert(isa<MemRefType>(index.getType()));
-    memref = index;
-    indexOp = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
-                                                builder.getIndexAttr(0));
+    // When a base address is used directly as an operand of any operation,
+    // it should be treated as a zero-index value. Here, we create an constant
+    // op with value 0.
+    index = builder.create<arith::ConstantOp>(UnknownLoc::get(ctx),
+                                              builder.getIndexAttr(0));
   }
 
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
   auto newOp =
       builder.create<memref::StoreOp>(UnknownLoc::get(ctx), storeValue, memref,
-                                      /*indices = */ indexOp);
+                                      /*indices = */ index);
   translateMemDepAndNameAttrs(storeInst, newOp, *ctx, builder);
 }
 
@@ -795,7 +854,18 @@ void TranslateLLVMToStd::translateAllocaInst(llvm::AllocaInst *allocaInst) {
                                     getMLIRType(baseElementType, ctx));
 
   auto allocaOp = builder.create<memref::AllocaOp>(loc, memrefType);
-  valueMap[allocaInst] = allocaOp->getResult(0);
+  // We use the contract "pointers are in reality represented
+  // as an index offset to some base that we find via analysis later".
+  //
+  // In this case valueMap[val] contains a zero index
+  // value for the select and any other pointer operation as part of
+  // translation the llvm::Argument and then allow the rest of the
+  // pointer-related lowerings to always assume "llvm pointers are index
+  // values that are the accumulated offsets to base"
+  valueMap[allocaInst] = builder.create<arith::ConstantOp>(
+      UnknownLoc::get(ctx), builder.getIndexAttr(0));
+
+  this->llvmPtrToMemRefMap[allocaInst] = allocaOp.getResult();
 }
 
 void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
@@ -819,16 +889,18 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
       isa_and_nonnull<MemRefType>(
           valueMap[callInst->getArgOperand(0)].getType())) {
     // Case: When the ptr operand is a function argument
+    //
+    // When a base address is used directly as an operand of any operation,
+    // it should be treated as a zero-index value. Here, we create an constant
+    // op with value 0.
     memref = valueMap[callInst->getArgOperand(0)];
     offset = builder.create<arith::ConstantOp>(
         UnknownLoc::get(ctx), IntegerAttr::get(builder.getIndexType(), 0));
-  } else if (getInstToMemRefMap.count(callInst->getArgOperand(0))) {
-    // Case: When the ptr operand is a GEP
-    memref = getInstToMemRefMap[callInst->getArgOperand(0)];
-    offset = valueMap[callInst->getArgOperand(0)];
   } else {
-    llvm::report_fatal_error(
-        "Cannot determine the base ptr of the memset intrinsic!");
+    // Normal case
+    const llvm::Value *baseAddressLLVM = findBase(callInst->getArgOperand(0));
+    memref = valueMap.at(baseAddressLLVM);
+    offset = valueMap[callInst->getArgOperand(0)];
   }
 
   mlir::Value valToSet = valueMap[callInst->getArgOperand(1)];
@@ -880,8 +952,9 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
 
     for (size_t elemPos = 0; elemPos < numElemsToStore; ++elemPos) {
 
-      LLVM_DEBUG(llvm::errs()
-                     << "Converting element position: " << elemPos << "\n";);
+      LLVM_DEBUG({
+        llvm::errs() << "Converting element position: " << elemPos << "\n";
+      });
       auto constIdx = builder.create<arith::ConstantOp>(
           UnknownLoc::get(ctx),
           builder.getIntegerAttr(offset.getType(), elemPos));
@@ -975,6 +1048,17 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
 
   Function *calledFunc = callInst->getCalledFunction();
   assert(calledFunc);
+
+  if (calledFunc->getName().starts_with("__dyn_speculate")) {
+    handleSpeculateMarker(callInst);
+    return;
+  }
+
+  if (calledFunc->getName().starts_with("__dyn_predict")) {
+    handlePredictMarker(callInst);
+    return;
+  }
+
   assert(calledFunc->isIntrinsic() &&
          "Function calls are not currently supported");
 
@@ -983,11 +1067,21 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<arith::MaxSIOp>(retType, {lhs, rhs}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::umax) {
+    mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
+    mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<arith::MaxUIOp>(retType, {lhs, rhs}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::smin) {
     mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
     mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<arith::MinSIOp>(retType, {lhs, rhs}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::umin) {
+    mlir::Value lhs = valueMap[callInst->getArgOperand(0)];
+    mlir::Value rhs = valueMap[callInst->getArgOperand(1)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<arith::MinUIOp>(retType, {lhs, rhs}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::fabs) {
     mlir::Value arg = valueMap[callInst->getArgOperand(0)];
     auto retType = getMLIRType(callInst->getType(), ctx);
@@ -997,8 +1091,174 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
   } else if (calledFunc->getIntrinsicID() == Intrinsic::fshl ||
              calledFunc->getIntrinsicID() == Intrinsic::fshr) {
     this->translateFunnelShiftIntrinsic(callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::assume) {
+    // An assume op can be simply dropped. It does not have any semantics
+    // besides causing undefined behavior.
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::bitreverse) {
+    if (!callInst->getType()->isIntegerTy(1))
+      llvm::report_fatal_error("Non i1 '@llvm.bitreverse' unimplemented");
+
+    mlir::Value operand = valueMap[callInst->getArgOperand(0)];
+    valueMap[callInst] = operand;
   } else {
     llvm::report_fatal_error(
         "Not implemented llvm intrinsic function handling!");
   }
+}
+
+void TranslateLLVMToStd::handleSpeculateMarker(llvm::CallInst *callInst) {
+
+  // try cast arg1 (max_predictions) to a llvm::ConstantInt
+  auto *maxPredConst =
+      llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(1));
+
+  // if cast failed, it means we don't have
+  // a constant int value for max predictions
+  // and so conversion fails
+  if (!maxPredConst)
+    llvm::report_fatal_error(
+        "__dyn_speculate: max_predictions arg is not a ConstantInt");
+
+  // pulling a uint64_t from a llvm::ConstantInt is annoying
+  // since they store the value as an APInt (arbitrary precision)
+  // getLimitedValue returns a uint64_t clamped to UINT64_MAX
+  // so that the conversion doesn't fail if the value is larger
+  // than that
+  uint64_t maxPred = maxPredConst->getValue().getLimitedValue();
+
+  llvm::StringRef style;
+  // using existing llvm utility function
+  // to try turn the style arg into a string
+  // (handles lots of edge cases of pointers etc.)
+  // if it fails, we don't have a constant string
+  // for the speculation style
+  // and so conversion fails
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(2), style))
+    llvm::report_fatal_error(
+        "__dyn_speculate: style arg is not a constant C string");
+
+  // get the value we want to speculate on
+  llvm::Value *specVal = callInst->getArgOperand(0);
+
+  // Warn if the value has other users besides this call.
+  // LLVM does some weird duplication stuff sometimes
+  // to do more aggressive folding
+  if (specVal->getNumUses() > 1)
+    llvm::errs() << "Warning: __dyn_speculate input has "
+                 << specVal->getNumUses()
+                 << " users; consumers other than the spec call will bypass "
+                    "the producer_output_attr_marker and not be marked for "
+                    "speculation\n";
+
+  // find the producer of the variable
+  // inside our internal valueMap structure
+  auto it = valueMap.find(specVal);
+
+  // if we don't find the value to speculate on
+  // conversion fails
+  if (it == valueMap.end())
+    llvm::report_fatal_error("__dyn_speculate: arg0 not found in valueMap");
+  // actually get the cf value
+  mlir::Value v = it->second;
+
+  // Build the speculation edge attribute
+  // which is a dictionary attr with
+  // {"max_predictions" : max_predictions, "style" : style}
+  // based on the real extracted values
+  mlir::DictionaryAttr specAttr = mlir::DictionaryAttr::get(
+      ctx, {builder.getNamedAttr("max_predictions",
+                                 builder.getI64IntegerAttr(maxPred)),
+            builder.getNamedAttr("style", builder.getStringAttr(style))});
+
+  // Build the OperationState that we use to build
+  // an unregistered op with the dictionary attr on it.
+  // MLIR allows you to create operations of an unknown type
+  // (i.e. op types it knows nothing about)
+  // as long as the serialized form gives enough info,
+  // which is enough for our purposes here.
+  // So this op is never actually defined anywhere
+  // and the op type is "dynamatic.producer_output_attr_marker"
+  mlir::OperationState markerState(
+      v.getLoc(),
+      mlir::OperationName("dynamatic.producer_output_attr_marker", ctx));
+  // single input
+  markerState.addOperands(v);
+  // return type is the same as the input type
+  markerState.addTypes(v.getType());
+  // has the dictionary attribute in the attribute dict
+  // under the name "dynamatic.speculate"
+  markerState.attributes.append("dynamatic.speculate", specAttr);
+
+  // Actually build the operation
+  mlir::Operation *markerOp = builder.create(markerState);
+  // And have any op which consumes the
+  // speculator function's output use
+  // the output of our edge attr op
+  valueMap[callInst] = markerOp->getResult(0);
+}
+
+void TranslateLLVMToStd::handlePredictMarker(llvm::CallInst *callInst) {
+
+  // try to get the string info
+  llvm::StringRef valuesStr;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(1), valuesStr))
+    llvm::report_fatal_error(
+        "__dyn_predict: values arg is not a constant C string");
+
+  // try to get the string start or end for location
+  llvm::StringRef location;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(2), location))
+    llvm::report_fatal_error(
+        "__dyn_predict: location arg is not a constant C string");
+
+  // try to get the marker value
+  auto markerValueConst =
+      llvm::dyn_cast<llvm::ConstantInt>(callInst->getArgOperand(3));
+  if (!markerValueConst)
+    llvm::report_fatal_error("__dyn_predict: marker arg is not a ConstantInt");
+  uint64_t markerValue = markerValueConst->getValue().getLimitedValue();
+
+  llvm::StringRef typeStr;
+  if (!llvm::getConstantStringInfo(callInst->getArgOperand(4), typeStr))
+    llvm::report_fatal_error(
+        "__dyn_predict: type arg is not a constant C string");
+
+  // get the value we want to predict
+  llvm::Value *predVar = callInst->getArgOperand(0);
+
+  // Warn if the value has other users besides this call.
+  // LLVM does some weird duplication stuff sometimes
+  // to do more aggressive folding
+  // TODO: now it might really be unnecessary
+  if (predVar->getNumUses() > 1)
+    llvm::errs() << "Warning: __dyn_predict input has " << predVar->getNumUses()
+                 << " users; consumers other than the pred call will bypass "
+                    "the producer_output_attr_marker and not be marked for "
+                    "prediction\n";
+
+  auto it = valueMap.find(predVar);
+  if (it == valueMap.end())
+    llvm::report_fatal_error("__dyn_predict: variable not found in valueMap");
+  // actually get the cf value
+  mlir::Value v = it->second;
+
+  // Build the actual attribute
+  mlir::DictionaryAttr predAttr = mlir::DictionaryAttr::get(
+      ctx,
+      {builder.getNamedAttr("values", builder.getStringAttr(valuesStr)),
+       builder.getNamedAttr("location", builder.getStringAttr(location)),
+       builder.getNamedAttr("marker", builder.getI32IntegerAttr(markerValue)),
+       builder.getNamedAttr("type", builder.getStringAttr(typeStr))});
+
+  // build the operationstate that is used for the unregistered op
+  mlir::OperationState markerState(
+      v.getLoc(), mlir::OperationName("dynamatic.prediction_marker", ctx));
+
+  markerState.addOperands(v);
+  markerState.addTypes(v.getType());
+  markerState.attributes.append("dynamatic.predict", predAttr);
+
+  // actually build the operation
+  mlir::Operation *markerOp = builder.create(markerState);
+  valueMap[callInst] = markerOp->getResult(0);
 }

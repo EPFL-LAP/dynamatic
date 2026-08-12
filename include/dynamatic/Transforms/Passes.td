@@ -104,16 +104,16 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
 // Handshake passes
 //===----------------------------------------------------------------------===//
 
-def HandshakeAnalyzeLSQUsage : DynamaticPass<"handshake-analyze-lsq-usage"> {
-  let summary = "Analyzes memory accesses to LSQs to find unnecessary ones";
+
+def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependencies", "mlir::ModuleOp"> {
+  let summary = "Deactivates memory dependences that do not need to be enforced";
   let description = [{
-    Performs flow analysis to identify WAR dependencies between memory accesses
-    that are ensured by the circuit's semantics and which therefore do not need
-    to be enforced by an LSQ. This allows to reduce the number of memory ports
-    that go to LSQs, thereby improving the circuit's performance and area thanks
-    to LSQ size reduction (or elimination, in some instances). The pass does not
-    modify the IR's structure, it only sets `handshake::MemInterfaceAttr`
-    attributes on memory ports to encode the analysis' results.
+    Performs flow analysis to identify memory dependencies between memory
+    accesses that are ensured by the circuit's semantics and which therefore do
+    not need to be enforced by an LSQ. Specifically, write-after-read 
+    dependencies where the store is globally in-order dependent (GIID) on the 
+    load along all non-cyclic CFG paths are deactivated, as are 
+    write-after-write dependencies between a store and itself. 
 
     The pass requires that all eligible operations within Handshake functions
     are tagged with the basic block they belong to, and that all memory access
@@ -154,6 +154,20 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   }];
 }
 
+def ConsumeProducerOutputAttrMarker
+    : Pass<"consume-producer-output-attr-marker", "mlir::ModuleOp"> {
+  let summary = "Consume `dynamatic.producer_output_attr_marker` ops by "
+                "moving their `dynamatic.*` attributes onto the producer.";
+  let description = [{
+    Transfer the contents of any producer-attribute marker ops to the actual
+    producer, and then erase the producer-attribute marker ops.
+    We use the ops in the std files to avoid the producer's output from 
+    being folded away during the front-end's lowering passes,
+    but once the IR has reached Dynamatic's internal IRs, 
+    we can just store the attribute directly on the producer.
+  }];
+}
+
 def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
   let summary = "Materializes forks and sinks into the IR.";
   let description = [{
@@ -177,21 +191,10 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
     reduction, considering the specific semantics of all operations present at
     the Handhsake level.
   }];
-}
 
-def HandshakeMinimizeCstWidth : DynamaticPass<"handshake-minimize-cst-width",
-                                              ["mlir::arith::ArithDialect"]> {
-  let summary = "Minimizes the bitwidth of all Handshake constants.";
-  let description = [{
-    Rewrites constant operations with the minimum required bitwidth to support
-    the constants' values. The pass inserts extension operations as needed to
-    ensure consistency with users of constant operations. The pass also pays
-    attention to not create duplicated constants indirectly due to the
-    minimization process.
-  }];
-  let options =
-    [Option<"optNegatives", "opt-negatives", "bool", "false",
-            "If true, allows bitwidth optimization of negative values.">];
+  let statistics = [
+    Statistic<"bitwidthReduced", "Bitwidth reduced", "Number of operations whose bitwidth was reduced">,
+  ];
 }
 
 def HandshakeReplaceMemoryInterfaces : DynamaticPass<
@@ -199,7 +202,12 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
 > {
   let summary = "Place memory interfaces according to memoty port annotations.";
   let description = [{
-    Replaces existing memory interfaces and memory ports in Handshake functions
+    Inspects the `handshake::MemDependenceAttr` attributes on LSQ memory ports
+    to determine which ports have only inactive dependencies and which therefore 
+    do not need to be enforced by an LSQ and updates the 
+    `handshake::MemInterfaceAttr` attributes of these ports accordingly. 
+
+    Then replaces existing memory interfaces and memory ports in Handshake functions
     following the `handshake::MemInterfaceAttr` attribute on each memory port.
 
     In general the pass needs to identify new control signals to appropriately
@@ -264,16 +272,21 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"timingModels", "timing-models", "std::string", "",
     "Path to JSON-formatted file containing timing models for dataflow "
     "components.">,
+    Option<"specTimingModels", "spec-timing-models", "std::string", "",
+    "Path to JSON-formatted file containing per-port timing models for "
+    "speculative units.">,
     Option<"firstCFDFC", "first-cfdfc", "bool", "false",
     "If true, only extract the first CFDFC from the input file">,
     Option<"targetCP", "target-period", "double", "4.0",
     "Target clock period for the buffer placement CFDFC">,
     Option<"timeout", "timeout", "unsigned", "180",
     "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
-    Option<"dumpLogs", "dump-logs", "bool", "false",
-    "If true, dump debugging information (identified CFDFCs, MILP "
-    "placement decisions, solution summaries) into a directory named "
-    "'buffer-placement' at the binary's location.">,
+    Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
+    "If true, dump MILP models into a directory named 'buffer-placement'.">,
+    Option<"calculatePathDelays", "calculate-path-delays", "bool", "false",
+    "After buffer placement, re-run the MILP with the buffering decisions "
+    "locked in to calculate the path delays the MILP believes are present in "
+    "the circuit.">,
     Option<"blifFiles", "blif-files", "std::string", "",
     "Path to AND-Inverter Graphs of dataflow components in Berkeley "
     "Logic Interchange Format (BLIF).">,
@@ -309,24 +322,55 @@ def CreditBasedSharing : Pass<"credit-based-sharing"> {
   let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
-def HandshakeMarkFPUImpl : DynamaticPass<"handshake-mark-fpu-impl"> {
-  let summary = "Sets the floating point arithmetic unit 'vendor'.";
+def HandshakeSetUnitImplAttributes : Pass<
+  "handshake-set-unit-impl-attr",
+  "handshake::FuncOp"
+> {
+  let summary = "Sets the unit attributes needed for the unit generators of the backend";
   let description = [{
-    This pass takes a single floating point unit 'vendor' as input and
-    marks every floating point arithmetic operation. This is later used
-    to decide how to generate the RTL of these units.
-    Defaults to vivado.
+    Sets the following attributes:
+    - the floating-point arithmetic unit 'vendor'. 
+    - the internal delays of the floating point units.
+    - the latencies of the pipeline units.
   }];
   let options = [
-    Option<"impl", "impl", "::std::string",
-      "\"VIVADO\"",
-      "Which FPU impl to use.">
+    Option<"impl", "impl", "::std::string", "\"VIVADO\"", "Which FPU impl to use.">,
+    Option<"timingModels", "timing-models", "std::string", "",
+    "Path to JSON-formatted file containing timing models for dataflow "
+    "components.">,
+    Option<"targetCP", "target-period", "double", "4.0",
+    "Target clock period for the buffer placement CFDFC">
+  ];
+  let dependentDialects = ["handshake::HandshakeDialect"];
+}
+
+def HandshakeMarkBLIFImpl : Pass<"handshake-mark-blif-impl"> {
+  let summary = "Sets the BLIF file path for each Handshake operation.";
+  let description = [{
+    This pass takes as input the directory containing the AIG 
+    implementations of handshake operations in BLIF format. It annotates 
+    each handshake operation with the path to its corresponding BLIF file. 
+    This information is subsequently used during the conversion from 
+    Handshake to Synth.
+  }];
+  let options = [
+    Option<"blifDirPath", "blif-dir-path", "std::string", "",
+            "Path to directory containing BLIF files for AIG implementations of "
+            "Handshake operations.">
   ];
 }
 
 //===----------------------------------------------------------------------===//
 // Other passes
 //===----------------------------------------------------------------------===//
+
+def FlattenModules : Pass<"hw-flatten-modules", "mlir::ModuleOp"> {
+  let summary = "Eagerly inline HW modules";
+  let description = [{
+    This pass eagerly inlines HW modules into their instantiation sites.
+  }];
+}
+
 
 def BackAnnotate : DynamaticPass<"back-annotate"> {
   let summary = "Back-annotates IR from JSON-formatted attributes";
@@ -388,27 +432,6 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
   }];
 }
 
-def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
-  let summary = "Mark all memory dependencies in the IR.";
-  let description = [{
-    Analyzes memory accesses in each function in a module and identifies all
-    dependencies between them. Stores information about these dependencies in a
-    `dynamatic::handshake::MemDependenceArrayAttr` attribute attached to each
-    operation that is the source of at least one dependency.
-
-    The pass attempts to find dependencies between all `affine::AffineLoadOp`,
-    `affine::AffineStoreOp`, `memref::LoadOp` and `memref::StoreOp` operations.
-    It uses MLIR's polyhedral analysis infrastructure to identify complex
-    dependencies between pairs of affine accesses, and uses a pessimistic
-    approach for pairs of accesses that involve at least one non-affine access.
-    While this pass can be ran at any point before conversion to Handshake, it
-    makes the most sense to run it as early as possible since affine analysis 
-    relies on very high-level information.
-
-    The pass will fail if MLIR's polyhedral analysis infrastructure fails to
-    check for a dependence between two affine accesses.
-  }];
-}
 
 def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
   let summary = "Mark memory accesses with the interface they should connect to.";
@@ -499,5 +522,6 @@ def HandshakeTreeHeightReduction : Pass<"handshake-tree-height-reduction"> {
   let summary = "Optimizes the arithmetic operation depth in handshake IR.";
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
+
 
 #endif // DYNAMATIC_TRANSFORMS_PASSES_TD

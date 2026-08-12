@@ -1,9 +1,11 @@
 add_dynamatic_library(DynamaticBufferPlacement
-  BufferingSupport.cpp
-  BufferPlacementMILP.cpp
-  CFDFC.cpp
+  Utils/BufferingSupport.cpp
+  Utils/BufferPlacementMILP.cpp
+  Utils/CFDFC.cpp
+  Utils/UnitMILPVars.cpp
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
+  FPGA24Buffers.cpp
   LatencyAndOccupancyBalancingSupport.cpp
   CostAwareBuffers.cpp
   HandshakePlaceBuffers.cpp

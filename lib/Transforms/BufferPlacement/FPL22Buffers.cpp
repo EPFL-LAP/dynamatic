@@ -16,11 +16,17 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
-#include "dynamatic/Transforms/BufferPlacement/CFDFC.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <iterator>
+#include <limits>
 #include <optional>
+
+// NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
+// - Dynamatic is built in debug mode
+// - dynamatic-opt is called with `--debug` or `--debug-only=<DEBUG_TYPE>`.
+#define DEBUG_TYPE "fpl22-buffers"
 
 using namespace llvm::sys;
 using namespace mlir;
@@ -78,8 +84,7 @@ void FPL22BuffersBase::extractResult(BufferPlacement &placement) {
     placement[channel] = result;
   }
 
-  if (logger)
-    logResults(placement);
+  LLVM_DEBUG(logResults(placement));
 
   llvm::MapVector<size_t, double> cfdfcTPResult;
   for (auto [idx, cfdfcWithVars] : llvm::enumerate(vars.cfdfcVars)) {
@@ -300,20 +305,10 @@ void FPL22BuffersBase::addUnitMixedPathConstraints(Operation *unit,
 CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
                                      int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
-                                     double targetPeriod, CFDFCUnion &cfUnion)
-    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod),
-      cfUnion(cfUnion) {
-  if (!unsatisfiable)
-    setup();
-}
-
-CFDFCUnionBuffers::CFDFCUnionBuffers(CPSolver::SolverKind solverKind,
-                                     int timeout, FuncInfo &funcInfo,
-                                     const TimingDatabase &timingDB,
                                      double targetPeriod, CFDFCUnion &cfUnion,
-                                     Logger &logger, StringRef milpName)
+                                     StringRef writeTo)
     : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                       logger, milpName),
+                       writeTo),
       cfUnion(cfUnion) {
   if (!unsatisfiable)
     setup();
@@ -375,6 +370,12 @@ void CFDFCUnionBuffers::setup() {
   // Add single-domain and mixed-domain path constraints as well as elasticity
   // constraints over all units in the CFDFC union
   for (Operation *unit : cfUnion.units) {
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(unit)) {
+      addSpecUnitConstraints(
+          unit, {SignalType::DATA, SignalType::VALID, SignalType::READY},
+          channelFilter);
+      continue;
+    }
     addUnitTimingConstraints(unit, SignalType::DATA, channelFilter);
     addUnitTimingConstraints(unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(unit, SignalType::READY, channelFilter);
@@ -403,19 +404,9 @@ void CFDFCUnionBuffers::setup() {
 OutOfCycleBuffers::OutOfCycleBuffers(CPSolver::SolverKind solverKind,
                                      int timeout, FuncInfo &funcInfo,
                                      const TimingDatabase &timingDB,
-                                     double targetPeriod)
-    : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod) {
-  if (!unsatisfiable)
-    setup();
-}
-
-OutOfCycleBuffers::OutOfCycleBuffers(CPSolver::SolverKind solverKind,
-                                     int timeout, FuncInfo &funcInfo,
-                                     const TimingDatabase &timingDB,
-                                     double targetPeriod, Logger &logger,
-                                     StringRef milpName)
+                                     double targetPeriod, StringRef writeTo)
     : FPL22BuffersBase(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                       logger, milpName) {
+                       writeTo) {
   if (!unsatisfiable)
     setup();
 }
@@ -499,6 +490,12 @@ void OutOfCycleBuffers::setup() {
     if (cfUnion.units.contains(&unit))
       continue;
 
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(&unit)) {
+      addSpecUnitConstraints(
+          &unit, {SignalType::DATA, SignalType::VALID, SignalType::READY},
+          channelFilter);
+      continue;
+    }
     addUnitTimingConstraints(&unit, SignalType::DATA, channelFilter);
     addUnitTimingConstraints(&unit, SignalType::VALID, channelFilter);
     addUnitTimingConstraints(&unit, SignalType::READY, channelFilter);

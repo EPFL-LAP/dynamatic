@@ -13,8 +13,8 @@ int test_loop_free(int a, int b, int c, int d) {
 }
 
 int main() {
-  int a = 0;
-  int b = 1;
+  int a = 1;
+  int b = -1;
   int c = 2;
   int d = 3;
 

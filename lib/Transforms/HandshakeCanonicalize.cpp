@@ -181,4 +181,4 @@ struct HandshakeCanonicalizePass
       return signalPassFailure();
   };
 };
-}; // namespace
+} // namespace

@@ -48,7 +48,8 @@ struct ArchBB {
 struct StdProfiler {
 
   /// Holds the number of transitions between each block pair.
-  mlir::DenseMap<std::pair<mlir::Block *, mlir::Block *>, unsigned> transitions;
+  llvm::MapVector<std::pair<mlir::Block *, mlir::Block *>, unsigned>
+      transitions;
 
   /// Constructs a profiler on a given function.
   StdProfiler(mlir::func::FuncOp funcOp);

@@ -16,10 +16,16 @@ TARGET_CP=$6
 USE_SHARING=$7
 FPUNITS_GEN=$8
 USE_RIGIDIFICATION=${9}
-DISABLE_LSQ=${10}
-FAST_TOKEN_DELIVERY=${11}
-MILP_SOLVER=${12}
-STRAIGHT_TO_QUEUE=${13}
+USE_K_INDUCTION=${10}
+DISABLE_LSQ=${11}
+FAST_TOKEN_DELIVERY=${12}
+MILP_SOLVER=${13}
+STRAIGHT_TO_QUEUE=${14}
+SPECULATION=${15}
+ENABLE_SHORT_CIRCUIT=${16}
+ENABLE_DUPLICATION=${17:-0}
+CALCULATE_PATH_DELAYS=${18}
+INSTRUMENT_II=${19}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -38,19 +44,22 @@ RIGIDIFICATION_SH="$DYNAMATIC_DIR/experimental/tools/rigidification/rigidificati
 # Generated directories/files
 COMP_DIR="$OUTPUT_DIR/comp"
 
-F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c" 
+F_C_SOURCE="$SRC_DIR/$KERNEL_NAME.c"
+F_C_REWRITTEN="$COMP_DIR/$KERNEL_NAME.c"
 
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
-
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
+F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
@@ -104,7 +113,17 @@ export_cfg() {
 # ============================================================================ #
 
 # Reset output directory
-rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+rm -rf "$OUTPUT_DIR"/*/
+mkdir -p "$COMP_DIR"
+
+cp "$F_C_SOURCE" "$F_C_REWRITTEN"
+exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"
+
+if [[ "$ENABLE_SHORT_CIRCUIT" != "1" ]]; then
+  "$DYNAMATIC_BINS/source-rewriter" "$F_C_REWRITTEN" -- \
+    -I "$DYNAMATIC_DIR/include" -I "$SRC_DIR" -I "$DYNAMATIC_DIR/build/include/clang_headers"
+  exit_on_fail "Failed to disable short-circuiting" "Disabled short-circuiting"
+fi
 
 # ------------------------------------------------------------------------------
 # NOTE:
@@ -113,8 +132,13 @@ rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
 # optimizations, e.g., loop unrolling:
 # https://clang.llvm.org/docs/LanguageExtensions.html#loop-unrolling
 # ------------------------------------------------------------------------------
-$DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_SOURCE" \
+$DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_REWRITTEN" \
   -I "$DYNAMATIC_DIR/include"  \
+  -I "$SRC_DIR" \
+  -I "$DYNAMATIC_DIR/build/include/clang_headers" \
+  -Werror=uninitialized \
+  -Werror=shadow \
+  -fplugin="$DYNAMATIC_DIR/build/lib/DynPragmasPlugin.so" \
   -Xclang \
   -ffp-contract=off \
   -o "$F_CLANG"
@@ -142,6 +166,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # Here is a brief summary of what each llvm pass does:
 # - inline: Inlines the function calls.
 # - mem2reg: Promote allocas (allocate memory on the heap) into regs.
+# - gvn: remove redundant instructions using global value numbering, also removes redundant load operations. 
 # - lowerswitch: Convert switch case into branches.
 # - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
 # - loop-rotate: canonicalize loops to do-while loops
@@ -158,7 +183,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -210,6 +235,7 @@ exit_on_fail "Failed to convert to std dialect" \
 # - "arith-reduce-strength": Convert muls to adds. "max-adder-depth-mul" limits
 # the maximum length of the adder chain created via this pass.
 $DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
   "$F_CF" \
   --drop-unlisted-functions="function-names=$KERNEL_NAME" \
   --func-set-arg-names="source=$F_C_SOURCE" \
@@ -221,14 +247,37 @@ $DYNAMATIC_OPT_BIN \
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
+# duplicate parts of the operations specified by pragmas
+if [[ "$ENABLE_DUPLICATION" == "1" ]]; then
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --predicted-constant-duplication \
+  --canonicalize \
+  > "$F_CF_DUPLICATED"
+exit_on_fail "Failed to apply CF duplication" \
+  "Applied CF duplication"
+F_CF_TRANSFORMED="$F_CF_DUPLICATED"
+fi
+
+# consume the markers
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --consume-producer-output-attr-marker \
+  > "$F_CF_CONSUMED_PRAGMARKERS"
+exit_on_fail "Failed to consume markers" \
+  "Consumed markers successfully"
+
+
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --force-memory-interface="force-mc=true" \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --mark-memory-interfaces \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
@@ -255,8 +304,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   # FPT19 should run before straight to the queue, so that no useless components are instantiated.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage \
-    --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_SQ"
@@ -267,8 +315,8 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
-    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
+    --handshake-optimize-bitwidths \
+    --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
@@ -277,13 +325,23 @@ else
 
   # handshake transformations
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-analyze-lsq-usage --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
     --handshake-remove-unused-memrefs \
-    --handshake-minimize-cst-width --handshake-optimize-bitwidths \
+    --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
+fi
+
+# Speculation (pre-buffer): place speculative units and then materialize.
+if [[ "$SPECULATION" == "1" ]]; then
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
+    --handshake-speculation \
+    --handshake-materialize \
+    > "$F_HANDSHAKE_SPECULATION"
+  exit_on_fail "Failed to add speculative units" "Added speculative units"
+  F_HANDSHAKE_TRANSFORMED="$F_HANDSHAKE_SPECULATION"
 fi
 
 # Credit-based sharing
@@ -300,7 +358,7 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
   echo_info "Running simple buffer placement (on-merges)."
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
+    --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER timing-models=$DYNAMATIC_DIR/data/components.json" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
@@ -326,10 +384,18 @@ else
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
+  if [[ "$CALCULATE_PATH_DELAYS" == "1" ]]; then
+    CALCULATE_PATH_DELAYS_FLAG="calculate-path-delays"
+  else
+    CALCULATE_PATH_DELAYS_FLAG=""
+  fi
+  # To enable debug information, make sure that Dynamatic is built with Debug
+  # mode and add "--debug-only=<DEBUG_TYPE>" to the binary call below. Check
+  # out the value of <DEBUG_TYPE> in the cpp source files.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
-    --handshake-mark-fpu-impl="impl=$FPUNITS_GEN" \
+    --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-logs \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
@@ -337,29 +403,36 @@ else
   cd - > /dev/null
 fi
 
-# handshake canonicalization
+# speculation (post-buffer): 
+# add extra buffer slots to cover the commit unit weirdness 
+# materialize and then
+# canonicalize
 "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_BUFFERED" \
+  --handshake-spec-post-buffer \
+  --handshake-materialize \
   --handshake-canonicalize \
   --handshake-hoist-ext-instances \
   > "$F_HANDSHAKE_EXPORT"
-exit_on_fail "Failed to canonicalize Handshake" "Canonicalized handshake"
+exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
+LOWER_TO_HW_PASS="--lower-handshake-to-hw=instrument-ii=${INSTRUMENT_II:-0}"
+
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
-  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED"
+  bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED" "$USE_K_INDUCTION"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 else
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 fi

@@ -18,6 +18,7 @@
 - [Dependencies](UserGuide/Dependencies.md)
 - [Kernel Code Guidelines](UserGuide/KernelCodeGuideLines.md)
 - [Optimizations And Directives](UserGuide/OptimizationsAndDirectives.md)
+    - [LSQ](UserGuide/LSQ.md)
 - [Sub Modules Guide](UserGuide/SubModulesGuide.md)
 - [Verification](UserGuide/Verification.md)
 
@@ -36,6 +37,7 @@
 - [Testing & CI]()
   - [Introduction](DeveloperGuide/TestingCI/Introduction.md)
   - [Integration Tests](DeveloperGuide/TestingCI/IntegrationTests.md)
+  - [Fuzzer](DeveloperGuide/TestingCI/Fuzzer.md)
   - [Formatting Checks](DeveloperGuide/TestingCI/Formatting.md)
   - [GitHub Actions](DeveloperGuide/TestingCI/Actions.md)
   
@@ -75,11 +77,19 @@
   - [Speculation]()
     - [Adding Spec Tags to Spec Region](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/AddingSpecTagsToSpecRegion.md)
     - [Commit Unit Placement Algorithm](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/CommitUnitPlacementAlgorithm.md)
-    - [Integration Tests](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/IntegrationTests.md)
-    - [Save Commit Behavior](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/SaveCommitBehavior.md)
+    - [Integration Tests](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/2025/IntegrationTests.md)
+    - [Save Commit Behavior](DeveloperGuide/DynamaticFeaturesAndOptimizations/Speculation/2025/SaveCommitBehavior.md)
+  - [Synth]()
+    - [Blif Exporter](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifExporter.md)
+    - [Blif File Manager](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BLIFFileManager.md)
+    - [Blif Importer](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/BlifImporter.md)
+    - [Handshake To Synth Conversion](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/HandshakeToSynthConversion.md)
+    - [Mark Blif File](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/MarkBlifFile.md)
+    - [Synth Dialect](DeveloperGuide/DynamaticFeaturesAndOptimizations/Synth/Synth.md)
 
 - [Specs]()
   - [Floating Point Units](DeveloperGuide/Specs/FloatingPointUnits.md)
+  - [HW Flattening Pass](DeveloperGuide/Specs/HWFlattening.md)
   - [Timing Characterization](DeveloperGuide/Specs/TimingCharacterization.md)
 
 - [XLS](DeveloperGuide/Xls/XlsIntegration.md)

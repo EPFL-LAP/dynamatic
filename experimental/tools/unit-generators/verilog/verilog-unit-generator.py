@@ -47,10 +47,13 @@ generators.add("handshake", "br")
 generators.add("handshake", "cond_br")
 generators.add("handshake", "source")
 generators.add("handshake", "control_merge")
+generators.add("handshake", "merge")
 generators.add("handshake", "load")
 generators.add("handshake", "store")
 generators.add("handshake", "mem_controller")
 generators.add("handshake", "buffer")
+generators.add("handshake", "ready_remover")
+generators.add("handshake", "valid_merger")
 generators.add("support", "mem_to_bram")
 
 

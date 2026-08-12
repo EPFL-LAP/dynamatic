@@ -87,12 +87,10 @@ unsigned dynamatic::getOpDatawidth(Operation *op) {
 
 LogicalResult TimingModel::getTotalDataDelay(unsigned bitwidth,
                                              double &delay) const {
-  double unitDelay, inPortDelay, outPortDelay;
-  if (failed(dataDelay.getCeilMetric(bitwidth, unitDelay)) ||
-      failed(inputModel.dataDelay.getCeilMetric(bitwidth, inPortDelay)) ||
-      failed(outputModel.dataDelay.getCeilMetric(bitwidth, outPortDelay)))
+  auto unitDelayOrFail = dataDelay.select(bitwidth);
+  if (failed(unitDelayOrFail))
     return failure();
-  delay = unitDelay + inPortDelay + outPortDelay;
+  delay = unitDelayOrFail->get();
   return success();
 }
 
@@ -123,31 +121,45 @@ const TimingModel *TimingDatabase::getModel(Operation *op) const {
   return getModel(baseName);
 }
 
-LogicalResult TimingDatabase::getLatency(
-    Operation *op, SignalType signalType, double &latency,
-    double targetPeriod) const // Our current timing model doesn't have latency
-                               // information for valid and
-// ready signals, assume it is 0
-{
-
-  if (signalType != SignalType::DATA) {
-    latency = 0.0;
-    return success();
-  }
+FailureOr<double> TimingDatabase::getLatency(Operation *op,
+                                             SignalType signalType,
+                                             double targetPeriod,
+                                             unsigned pathId) const {
+  // Our current timing model doesn't have latency information for valid and
+  // ready signals; assume it is 0.
+  if (signalType != SignalType::DATA)
+    return 0.0;
 
   const TimingModel *model = getModel(op);
-  if (!model)
+  if (!model) {
+    op->emitWarning() << "TimingDatabase::getLatency: no timing model for op";
     return failure();
+  }
 
-  // First, we extract the DelayDepMetric instance for a specific biwdidth.
-  // Then, we use its method (getDelayCeilMetric) to get the latency for the
-  // given targetPeriod.
-  DelayDepMetric<double> DelayStruct;
-
-  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+  // Walk inward through the path -> bitwidth -> clock-period nesting.
+  auto latAndMaxFreqByBitwidth = model->latAndMaxFreqByPath.select(pathId);
+  if (failed(latAndMaxFreqByBitwidth)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: no entry for retiming-path id "
+        << pathId;
     return failure();
-  if (failed(DelayStruct.getDelayCeilMetric(targetPeriod, latency)))
+  }
+  auto latAndMaxFreqByClockPeriod = latAndMaxFreqByBitwidth->get().select(op);
+  if (failed(latAndMaxFreqByClockPeriod)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: bitwidth not characterised in the "
+           "timing model";
     return failure();
+  }
+  auto latencyOrFail =
+      latAndMaxFreqByClockPeriod->get().selectLatency(targetPeriod);
+  if (failed(latencyOrFail)) {
+    op->emitWarning()
+        << "TimingDatabase::getLatency: no latency data for target period "
+        << targetPeriod;
+    return failure();
+  }
+  double latency = *latencyOrFail;
 
   // FIXME: We compensante for the fact that the LSQ has roughly 3 extra cycles
   // of latency on loads compared to an MC here because our timing models are
@@ -159,7 +171,7 @@ LogicalResult TimingDatabase::getLatency(
     if (isa_and_present<handshake::LSQOp>(memOp))
       latency += 3;
   }
-  return success();
+  return latency;
 }
 
 LogicalResult TimingDatabase::getInternalCombinationalDelay(
@@ -172,16 +184,19 @@ LogicalResult TimingDatabase::getInternalCombinationalDelay(
   if (!model)
     return failure();
 
-  // This section now must handle the fact that all latency values are now
-  // contained inside an instance of DelayDepMetric. We therefore extract this
-  // structure, and use its method to obtain the latency value at the
-  // targetPeriod provided.
-  DelayDepMetric<double> DelayStruct;
-
-  if (failed(model->latency.getCeilMetric(op, DelayStruct)))
+  // Internal combinational delay uses retiming path 0. Walk inward through
+  // the path -> bitwidth -> clock-period nesting.
+  auto latAndMaxFreqByBitwidth = model->latAndMaxFreqByPath.select(0);
+  if (failed(latAndMaxFreqByBitwidth))
     return failure();
-  if (failed(DelayStruct.getDelayCeilValue(targetPeriod, delay)))
+  auto latAndMaxFreqByClockPeriod = latAndMaxFreqByBitwidth->get().select(op);
+  if (failed(latAndMaxFreqByClockPeriod))
     return failure();
+  auto delayOrFail =
+      latAndMaxFreqByClockPeriod->get().selectDelay(targetPeriod);
+  if (failed(delayOrFail))
+    return failure();
+  delay = *delayOrFail;
 
   return success();
 }
@@ -194,8 +209,13 @@ LogicalResult TimingDatabase::getInternalDelay(Operation *op,
     return failure();
 
   switch (signalType) {
-  case SignalType::DATA:
-    return model->dataDelay.getCeilMetric(op, delay);
+  case SignalType::DATA: {
+    auto delayOrFail = model->dataDelay.select(op);
+    if (failed(delayOrFail))
+      return failure();
+    delay = delayOrFail->get();
+    return success();
+  }
   case SignalType::VALID:
     delay = model->validDelay;
     return success();
@@ -216,8 +236,13 @@ LogicalResult TimingDatabase::getPortDelay(Operation *op, SignalType signalType,
       portType == PortType::IN ? model->inputModel : model->outputModel;
 
   switch (signalType) {
-  case SignalType::DATA:
-    return portModel.dataDelay.getCeilMetric(op, delay);
+  case SignalType::DATA: {
+    auto delayOrFail = portModel.dataDelay.select(op);
+    if (failed(delayOrFail))
+      return failure();
+    delay = delayOrFail->get();
+    return success();
+  }
   case SignalType::VALID:
     delay = portModel.validDelay;
     return success();
@@ -237,12 +262,353 @@ LogicalResult TimingDatabase::getTotalDelay(Operation *op,
   case SignalType::DATA:
     return model->getTotalDataDelay(getOpDatawidth(op), delay);
   case SignalType::VALID:
-    delay = model->getTotalValidDelay();
+    delay = model->validDelay;
     return success();
   case SignalType::READY:
-    delay = model->getTotalReadyDelay();
+    delay = model->readyDelay;
     return success();
   }
+}
+
+const SpecTimingModel *
+TimingDatabase::getSpecModel(StringRef timingModelKey) const {
+  auto it = specModels.find(timingModelKey);
+  if (it == specModels.end())
+    return nullptr;
+  return &it->second;
+}
+
+const SpecTimingModel *TimingDatabase::getSpecModel(Operation *op) const {
+  if (!op)
+    return nullptr;
+  return getSpecModel(op->getName().getStringRef());
+}
+
+static FailureOr<SignalType> signalTypeFromString(StringRef s) {
+  if (s == "data")
+    return SignalType::DATA;
+  if (s == "valid")
+    return SignalType::VALID;
+  if (s == "ready")
+    return SignalType::READY;
+  llvm::errs() << "spec timing port has unrecognised signal kind \"" << s
+               << "\"\n";
+  return failure();
+}
+
+// reads an array of delays into a delay list, or fails
+// the delay of the path is a function of its bitwidth
+static FailureOr<SpecTimingDelayList>
+parseDelayList(const ljson::Array *delays) {
+  // check array of delays exists
+  if (!delays) {
+    llvm::errs() << "spec timing object has no array of delays\n";
+    return failure();
+  }
+
+  // struct to store parsed info in
+  SpecTimingDelayList delayList;
+
+  // for each delay
+  for (const ljson::Value &delayVal : *delays) {
+    // get as json object
+    const ljson::Object *delayObj = delayVal.getAsObject();
+    if (!delayObj) {
+      llvm::errs() << "spec timing delay is not a JSON object\n";
+      return failure();
+    }
+
+    // declare the delay struct
+    SpecTimingDelay delay;
+
+    // read the delay
+    std::optional<double> d = delayObj->getNumber("delay");
+    if (!d) {
+      llvm::errs() << "spec timing delay has no delay\n";
+      return failure();
+    }
+    // store in struct
+    delay.delay = *d;
+
+    // read the bitwidth
+    std::optional<int64_t> bw = delayObj->getInteger("bitwidth");
+    if (!bw) {
+      llvm::errs() << "spec timing delay has no bitwidth\n";
+      return failure();
+    }
+    // store bitwidth in struct
+    delay.bitwidth = *bw;
+
+    // move into the delay list
+    delayList.addDelay(std::move(delay));
+  }
+  return delayList;
+}
+
+// reads a port name and signal kind into a port, or fails
+static FailureOr<SpecTimingPort> parsePort(const ljson::Object *portObj) {
+  // check port exists
+  if (!portObj) {
+    llvm::errs() << "spec timing port is not a JSON object\n";
+    return failure();
+  }
+
+  // struct to save the info in
+  SpecTimingPort port;
+
+  // read the port name (whether input or output)
+  std::optional<StringRef> portName = portObj->getString("name");
+  if (!portName) {
+    llvm::errs() << "spec timing port has no name\n";
+    return failure();
+  }
+  // save in struct
+  port.name = portName->str();
+
+  // read the signal kind as a string
+  std::optional<StringRef> signalName = portObj->getString("signal");
+  if (!signalName) {
+    llvm::errs() << "spec timing port has no signal\n";
+    return failure();
+  }
+
+  // convert the signal string to a SignalType enum
+  FailureOr<SignalType> signalType = signalTypeFromString(*signalName);
+  if (failed(signalType))
+    // signalTypeFromString prints the error message if failed
+    return failure();
+
+  // save in struct
+  port.signal = *signalType;
+
+  return port;
+}
+
+// reads a port2port edge [from port, to port, delay list] or fails
+static FailureOr<SpecTimingPort2Port>
+parsePort2Port(const ljson::Object *edgeObj) {
+  // struct to store info in
+  SpecTimingPort2Port edge;
+
+  // read the 'from' port
+  FailureOr<SpecTimingPort> from = parsePort(edgeObj->getObject("from"));
+  if (failed(from))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store in struct
+  edge.from = *from;
+
+  // read the 'to' port
+  FailureOr<SpecTimingPort> to = parsePort(edgeObj->getObject("to"));
+  if (failed(to))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store in struct
+  edge.to = *to;
+
+  // read the list of delays
+  FailureOr<SpecTimingDelayList> delayList =
+      parseDelayList(edgeObj->getArray("delayList"));
+  if (failed(delayList))
+    // parseDelayList prints the error message if failed
+    return failure();
+
+  // store in struct
+  edge.delayList = std::move(*delayList);
+
+  return edge;
+}
+
+// reads a port2reg port delay [port, delay list] or fails
+static FailureOr<SpecTimingPort2Reg>
+parsePort2Reg(const ljson::Object *portDelayObj) {
+  // struct to store info
+  SpecTimingPort2Reg portDelay;
+
+  // read the port
+  FailureOr<SpecTimingPort> port = parsePort(portDelayObj);
+  if (failed(port))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store in struct
+  portDelay.port = *port;
+
+  // read the list of delays
+  FailureOr<SpecTimingDelayList> delayList =
+      parseDelayList(portDelayObj->getArray("delayList"));
+  if (failed(delayList))
+    // parseDelayList prints the error message if failed
+    return failure();
+
+  // store in struct
+  portDelay.delayList = std::move(*delayList);
+
+  return portDelay;
+}
+
+// reads a reg2port port delay [port, delay list] or fails
+static FailureOr<SpecTimingReg2Port>
+parseReg2Port(const ljson::Object *portDelayObj) {
+  // struct to save into
+  SpecTimingReg2Port portDelay;
+
+  // read the port
+  FailureOr<SpecTimingPort> port = parsePort(portDelayObj);
+  if (failed(port))
+    // parsePort prints the error message if failed
+    return failure();
+
+  // store tos truct
+  portDelay.port = *port;
+
+  // read the list of delays
+  FailureOr<SpecTimingDelayList> delayList =
+      parseDelayList(portDelayObj->getArray("delayList"));
+  if (failed(delayList))
+    // parseDelayList prints the error message if failed
+    return failure();
+
+  // store to struct
+  portDelay.delayList = std::move(*delayList);
+
+  return portDelay;
+}
+
+LogicalResult TimingDatabase::readSpecTimingFromJSON(std::string &jsonpath,
+                                                     TimingDatabase &timingDB) {
+  // open the file
+  std::ifstream inputFile(jsonpath);
+  if (!inputFile.is_open()) {
+    llvm::errs() << "Failed to open spec timing JSON at \"" << jsonpath
+                 << "\"\n";
+    return failure();
+  }
+
+  // read the file into a string
+  std::string jsonString;
+  std::string line;
+  while (std::getline(inputFile, line))
+    jsonString += line;
+
+  // parse the string as JSON
+  llvm::Expected<ljson::Value> value = ljson::parse(jsonString);
+  if (!value) {
+    llvm::errs() << "Failed to parse spec timing JSON in \"" << jsonpath
+                 << "\"\n";
+    return failure();
+  }
+
+  // get as an object
+  const ljson::Object *root = value->getAsObject();
+  if (!root) {
+    llvm::errs() << "Spec timing JSON root must be an object\n";
+    return failure();
+  }
+
+  // read one timing model per type of unit
+  for (const auto &unitEntry : *root) {
+    // key is the operation type this info is for
+    StringRef unitKey = unitEntry.first;
+
+    // get characterization info as object
+    const ljson::Object *timingModelInfo = unitEntry.second.getAsObject();
+    if (!timingModelInfo) {
+      llvm::errs() << "spec timing model is not a JSON object\n";
+      return failure();
+    }
+
+    // declare the model we will fill in
+    SpecTimingModel model;
+
+    // read the port2port edges as an arry
+    const ljson::Array *port2portArr = timingModelInfo->getArray("port2port");
+    if (!port2portArr) {
+      llvm::errs() << "spec timing unit has no port2port array\n";
+      return failure();
+    }
+
+    // for each port2port edge
+    for (const ljson::Value &port2portVal : *port2portArr) {
+
+      // get as json object
+      const ljson::Object *port2portObj = port2portVal.getAsObject();
+      if (!port2portObj) {
+        llvm::errs() << "port2port delay is not a JSON object\n";
+        return failure();
+      }
+
+      // parse into struct
+      FailureOr<SpecTimingPort2Port> port2port = parsePort2Port(port2portObj);
+      if (failed(port2port))
+        // parsePort2Port prints the error message if failed
+        return failure();
+
+      // store in model
+      model.port2port.push_back(std::move(*port2port));
+    }
+
+    // read the port2reg delays as an array
+    const ljson::Array *port2regArr = timingModelInfo->getArray("port2reg");
+    if (!port2regArr) {
+      llvm::errs() << "spec timing unit has no port2reg array\n";
+      return failure();
+    }
+
+    // for each port2reg port delay
+    for (const ljson::Value &port2regVal : *port2regArr) {
+
+      // get as json object
+      const ljson::Object *port2regObj = port2regVal.getAsObject();
+      if (!port2regObj) {
+        llvm::errs() << "port2reg delay is not a JSON object\n";
+        return failure();
+      }
+
+      // parse into struct
+      FailureOr<SpecTimingPort2Reg> port2reg = parsePort2Reg(port2regObj);
+
+      if (failed(port2reg))
+        // parsePort2Reg prints the error message if failed
+        return failure();
+
+      // store in model
+      model.port2reg.push_back(std::move(*port2reg));
+    }
+
+    // read the reg2port delays as an array
+    const ljson::Array *reg2portArr = timingModelInfo->getArray("reg2port");
+    if (!reg2portArr) {
+      llvm::errs() << "spec timing unit has no reg2port array\n";
+      return failure();
+    }
+
+    // for each reg2port port delay
+    for (const ljson::Value &reg2portVal : *reg2portArr) {
+
+      // get as json object
+      const ljson::Object *reg2portObj = reg2portVal.getAsObject();
+      if (!reg2portObj) {
+        llvm::errs() << "reg2port delay is not a JSON object\n";
+        return failure();
+      }
+
+      // parse into struct
+      FailureOr<SpecTimingReg2Port> reg2port = parseReg2Port(reg2portObj);
+      if (failed(reg2port))
+        // parseReg2Port prints the error message if failed
+        return failure();
+
+      // store in model
+      model.reg2port.push_back(std::move(*reg2port));
+    }
+
+    // store the unit's model under its key
+    timingDB.specModels[unitKey] = std::move(model);
+  }
+  return success();
 }
 
 LogicalResult TimingDatabase::readFromJSON(std::string &jsonpath,
@@ -294,6 +660,21 @@ static bool bitwidthFromJSON(const ljson::ObjectKey &value, unsigned &bitwidth,
     return false;
   }
   bitwidth = std::stoi(key.str());
+  return true;
+}
+
+/// Parses an unsigned number representing a retiming-path id from a JSON key.
+/// Returns true and sets the second argument to the parsed number if the key
+/// represents a valid unsigned number; returns false otherwise.
+static bool pathIdFromJSON(const ljson::ObjectKey &value, unsigned &pathId,
+                           ljson::Path path) {
+  StringRef key = value;
+  if (std::any_of(key.begin(), key.end(),
+                  [](char c) { return !std::isdigit(c); })) {
+    path.report("expected unsigned integer for retiming-path id");
+    return false;
+  }
+  pathId = std::stoi(key.str());
   return true;
 }
 
@@ -349,55 +730,75 @@ bool dynamatic::fromJSON(const ljson::Value &value,
   return true;
 }
 
-bool dynamatic::fromJSON(const ljson::Value &value,
-                         BitwidthDepMetric<DelayDepMetric<double>> &metric,
+bool dynamatic::fromJSON(const ljson::Value &value, DelayDepMetric &metric,
                          ljson::Path path) {
-
   const ljson::Object *object = value.getAsObject();
 
-  // standard empty object check
   if (!object) {
     path.report("expected JSON object");
     return false;
   }
-  // The outer loop is on the bitwidths: each is associated with a
-  // DelayDepMetric map in the JSON.
+
+  // Key-value pair of {delay : latency, delay : latency}
+  for (const auto &[delayKey, latencyValue] : *object) {
+    double delay = std::stod(delayKey.str());
+    double latency;
+    if (!fromJSON(latencyValue, latency, path.field(delayKey)))
+      return false;
+    metric.data[delay] = latency;
+  }
+
+  return true;
+}
+
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         BitwidthDepMetric<DelayDepMetric> &metric,
+                         ljson::Path path) {
+
+  const ljson::Object *object = value.getAsObject();
+
+  if (!object) {
+    path.report("expected JSON object");
+    return false;
+  }
+
+  // The outer keys are bitwidths; each maps to a delay-dependent
+  // timing metric.
   for (const auto &[bitwidthKey, metricValue] : *object) {
     unsigned bitwidth;
-    // we start by obtaining the bitwidth value associated with this key
     if (!bitwidthFromJSON(bitwidthKey, bitwidth, path.field(bitwidthKey)))
       return false;
 
-    // We instantiate inside the loop an internalMap for this specific bitwidth.
-    std::map<double, double> internalMap;
-
-    // Validity check to ensure the presence of a map.
-    const ljson::Object *nestedMap = metricValue.getAsObject();
-    if (!nestedMap) {
-      path.field(bitwidthKey).report("expected nested map object");
+    DelayDepMetric delayDepStruct;
+    if (!fromJSON(metricValue, delayDepStruct, path.field(bitwidthKey)))
       return false;
-    }
 
-    // nested fromJSON call, which deserializes individual delay & value pairs
-    // into the internalMap
-    for (const auto &[doubleDelay, doubleValue] : *nestedMap) {
-      double key;
-      key = std::stod(doubleDelay.str());
+    metric.data[bitwidth] = delayDepStruct;
+  }
 
-      double value;
-      if (!fromJSON(doubleValue, value,
-                    path.field(bitwidthKey).field(doubleDelay)))
-        return false;
+  return true;
+}
 
-      internalMap[key] = value;
-    }
-    // We save the internal map as the data field of the DelayDepMetric.
-    DelayDepMetric<double> DelayDepStruct;
-    DelayDepStruct.data = internalMap;
+bool dynamatic::fromJSON(const ljson::Value &value,
+                         PathDepMetric &latAndMaxFreqByPath, ljson::Path path) {
+  const ljson::Object *object = value.getAsObject();
+  if (!object) {
+    path.report("expected JSON object");
+    return false;
+  }
 
-    // Each DelayDepMetric structure is then associated with its bitwidth,
-    // completing the 2-level nested map.
-    metric.data[bitwidth] = DelayDepStruct;
+  // The outer keys are retiming-path ids; each maps to a bitwidth-dependent
+  // timing metric.
+  for (const auto &[pathKey, metricValue] : *object) {
+    unsigned pathId;
+    if (!pathIdFromJSON(pathKey, pathId, path.field(pathKey)))
+      return false;
+
+    BitwidthDepMetric<DelayDepMetric> bitwidthMetric;
+    if (!fromJSON(metricValue, bitwidthMetric, path.field(pathKey)))
+      return false;
+
+    latAndMaxFreqByPath.data[pathId] = bitwidthMetric;
   }
 
   return true;
@@ -438,8 +839,8 @@ bool dynamatic::fromJSON(const ljson::Value &value, TimingModel &model,
     return false;
   }
 
-  // Deserialize the latencies
-  FW_FALSE(deserializeNested(LATENCY, object, model.latency, path));
+  // Deserialize the latency and max frequency
+  FW_FALSE(deserializeNested(LATENCY, object, model.latAndMaxFreqByPath, path));
   // Deserialize the data delays
   FW_FALSE(deserializeNested(DELAY, object, model.dataDelay, path));
   // Deserialize the valid/ready delay

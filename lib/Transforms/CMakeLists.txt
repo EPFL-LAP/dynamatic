@@ -5,17 +5,17 @@ add_dynamatic_library(DynamaticTransforms
   ForceMemoryInterface.cpp
   FuncMaximizeSSA.cpp
   FuncSetArgNames.cpp
-  HandshakeAnalyzeLSQUsage.cpp
+  ConsumeProducerOutputAttrMarker.cpp
   HandshakeCanonicalize.cpp
+  HandshakeDeactivateMemDependencies.cpp
   HandshakeHoistExtInstances.cpp
   HandshakeMaterialize.cpp
-  HandshakeMinimizeCstWidth.cpp
   HandshakeOptimizeBitwidths.cpp
   HandshakeInferBasicBlocks.cpp
   HandshakeReplaceMemoryInterfaces.cpp
   HandshakeRemoveUnusedMemRefs.cpp
-  HandshakeMarkFPUImpl.cpp
-  MarkMemoryDependencies.cpp
+  HandshakeMarkBLIFImpl.cpp
+  HWFlatten.cpp
   MarkMemoryInterfaces.cpp
   OperationNames.cpp
   PushConstants.cpp
@@ -24,6 +24,7 @@ add_dynamatic_library(DynamaticTransforms
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
   HandshakeTreeHeightReduction.cpp
+  HandshakeSetUnitImplAttributes.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

@@ -68,7 +68,7 @@ def BufferLikeOpInterface : OpInterface<"BufferLikeOpInterface"> {
   }];
   let methods = [
    InterfaceMethod<[{
-       Get the internal state of each slot.
+       Get the internal state namer of each slot.
      }],
      "std::vector<BufferSlotFullNamer>", "getInternalSlotStateNamers", (ins)
    >,
@@ -114,6 +114,32 @@ def ShiftLikeArithOpInterface : OpInterface<"ShiftLikeArithOpInterface"> {
      }],
      "bool", "isShiftByConstant", (ins)
    >,
+  ];
+}
+
+def RetimingPathsOpInterface : OpInterface<"RetimingPathsOpInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    For ops with multiple independent paths through them. 
+    
+    If tokens can pass through a unit from a set of operands to a set
+    of results without affecting a separate set of operands and results,
+    then there is multiple paths through the unit.
+    
+    The MILP buffering algorithms require a unique retiming algorithm
+    per path through a unit to correctly distribute token occupancy 
+    among the circuits channels to achieve maximum performance. 
+
+    Eachh operand and result of the op must belong to exactly
+    one path.
+  }];
+  let methods = [
+    InterfaceMethod<[{
+      Returns the list of independent retiming paths of this op.
+    }],
+    "llvm::SmallVector<::dynamatic::buffer::RetimingPath>",
+    "getRetimingPaths", (ins)
+    >,
   ];
 }
 
@@ -210,64 +236,80 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
   ];
 }
 
+
+//===----------------------------------------------------------------------===//
+// IO Naming Interfaces
+//===----------------------------------------------------------------------===//
+//
+// To generate the netlist, we need to know the names of
+// the operands (inputs) and results (outputs)
+// for each operation.
+//
+// These are already named inside of the Tablegen, 
+// but this does not generate any way to access the names as strings
+// only using the names to generate functions.
+//
+// There are 2 useful traits that represent common implementations
+// For an operation which uses the simple trait:
+// The operand names are 'ins_n', where n is the index of the operand
+// the result names are 'outs_n' where n is the idnex of the result
+//
+// If there is only 1 operand or 1 result, the name is 'ins' or 'outs',
+// respectively.
+//
+// For an operation which uses the BinaryArith trait: 
+// the operation should have 2 operands and 1 result
+// They will be named 'lhs', 'rhs', and 'result'.
+//
+// If the custom interface is used, the name uses a fully custom function
+// If the naming is easy to do, 
+// the function definition can be added to the operation declaration in tablegen
+//
+// If it is hard,
+// the function declaration can be added to the operation declaration in tablegen
+// and the definition can be written in HandshakeOps.cpp
+//
+//===----------------------------------------------------------------------===//
+
 def NamedIOInterface : OpInterface<"NamedIOInterface"> {
   let cppNamespace = "::dynamatic::handshake";
   let description =
-      [{"Provides detailed names for the operands and results of an operation."}];
+      [{"Provide access to string representations of operand and result names."}];
 
   let methods = [
-    StaticInterfaceMethod<
-        "Returns the default name of a specific operand.",
-        "std::string", "getDefaultOperandName", (ins "unsigned" : $idx),
-        "",
-        [{
-          return "ins_" + std::to_string(idx);
-        }]>,
-    StaticInterfaceMethod<
-        "Returns the default name of a specific result.",
-        "std::string", "getDefaultResultName", (ins "unsigned" : $idx),
-        "",
-        [{
-          return "outs_" + std::to_string(idx);
-        }]>,
     InterfaceMethod<
-        "Returns the name of a specific operand.",
-        "std::string", "getOperandName", (ins "unsigned" : $idx),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-
-          // Operations which always have a single operand get a specific port
-          // name for it
-          if (concreteOp.template hasTrait<mlir::OpTrait::OneOperand>()) {
-            assert(idx == 0 && "index too high");
-            return "ins";
-          }
-
-          // Generic input name
-          assert(idx < concreteOp->getNumOperands() && "index too high");
-          return getDefaultOperandName(idx);
-        }]>,
+      "Returns the name of a specific operand.",
+      "std::string", "getOperandName", (ins "unsigned" : $idx)>,
     InterfaceMethod<
-        "Returns the name of a specific result.",
-        "std::string", "getResultName", (ins "unsigned" : $idx),
-        "",
-        [{
-          ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
-          
-          // Operations which always have a single result get a specific port
-          // name for it
-          if (concreteOp.template hasTrait<mlir::OpTrait::OneResult>()) {
-            assert(idx == 0 && "index too high");
-            return "outs";
-          }
-
-          // Generic output name
-          assert(idx < concreteOp->getNumResults() && "index too high");
-          return getDefaultResultName(idx);
-        }]>
+      "Returns the name of a specific result.",
+      "std::string", "getResultName", (ins "unsigned" : $idx)
+    >
   ];
 }
+
+// Trait that returns operand/result names as "ins"/"ins_N" and "outs"/"outs_N"
+// based on operand/result count.
+def SimpleNamedIOTrait : NativeOpTrait<"SimpleNamedIO"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+// Bundled with NamedIOInterface so ops
+// using SimpleNamedIO get both the interface contract and the impl.
+def SimpleNamedIO : TraitList<[NamedIOInterface, SimpleNamedIOTrait]>;
+
+// Trait that returns operands as "lhs"/"rhs" and the single result as "result".
+def BinaryArithNamedIOTrait : NativeOpTrait<"BinaryArithNamedIO"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+// Bundled with NamedIOInterface so ops
+// using BinaryArithNamedIO get both the interface contract and the impl.
+def BinaryArithNamedIO : TraitList<[NamedIOInterface, BinaryArithNamedIOTrait]>;
+
+// Provides helper methods for naming IOs in custom functions
+def NamedIOUtilities : NativeOpTrait<"NamedIOUtilities"> {
+  let cppNamespace = "::dynamatic::handshake";
+}
+
+//===----------------------------------------------------------------------===//
 
 def ControlInterface : OpInterface<"ControlInterface"> {
   let cppNamespace = "::dynamatic::handshake";
@@ -305,6 +347,27 @@ def LatencyInterface : OpInterface<"LatencyInterface"> {
     return attr.getInt();
   }]>,
 
+  InterfaceMethod<[{
+    Gets the pipeline slots based on the II and the latency.
+    TODO: Actually retrieve the II, instead of just assuming II=1
+
+    Implementation is done here instead of in HandshakeOps.cpp as
+    the code will look the same for any operation.
+  }], "std::vector<PipelineSlotNamer>", "getPipelineSlots", (ins), [{
+    Operation *op = $_op.getOperation();
+    auto attr = op->getAttrOfType<IntegerAttr>("latency");
+    assert(attr && "cannot latency slot without defined latency");
+    auto name = op->getAttrOfType<::mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+    assert(name && "cannot latency slot without defined op name");
+    int64_t latency = attr.getInt();
+    int64_t II = 1;
+    int64_t numSlots = latency / II;
+    std::vector<PipelineSlotNamer> ret(numSlots);
+    for (int64_t i = 0; i < numSlots; ++i) {
+      ret[i] = PipelineSlotNamer(name.str(), i);
+    }
+    return ret;
+  }]>,
   InterfaceMethod<[{
   Sets the operation latency.
     }], "void", "setLatency", (ins "int64_t":$latency), [{
@@ -355,6 +418,57 @@ InterfaceMethod<[{
         return attr;
       return StringAttr::get(op->getContext(), "0_0");
     }]>
+  ];
+}
+
+
+def BLIFImplInterface : OpInterface<"BLIFImplInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Allows specification of attributes to specify the BLIF
+      implementation of a Handshake operation, which is used in the
+      Handshake to Synth lowering.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Sets the BLIF Impl. as a StringAttr attr named "blif_impl".
+    }], "void", "setBLIFImpl", (ins "::llvm::StringRef":$value), [{
+      Operation *op = $_op.getOperation();
+      op->setAttr("blif_impl",
+                  StringAttr::get(op->getContext(), value));
+    }]>,
+
+    InterfaceMethod<[{
+      Gets the BLIF impl. as a StringAttr named "blif_impl". Defaults to an empty string if not set.
+    }], "StringAttr", "getBLIFImpl", (ins), [{
+      Operation *op = $_op.getOperation();
+      if (auto attr = op->getAttrOfType<StringAttr>("blif_impl")) {
+        return attr;
+      }
+      return StringAttr::get(op->getContext(), "");
+    }]>
+  ];
+}
+
+def RTLAttrInterface : OpInterface<"RTLAttrInterface"> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+     Allow specification of generic values to be used in the RTL generation of a
+     Handshake operation. Implementations return the complete set of RTL
+     parameters (generic values) as a list of named attributes, where each entry
+     maps a parameter name to its value. These are passed to the component
+     generator specified in the rtl-config file.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the RTL parameters for this operation as a list of named
+      attributes. Each entry maps a parameter name to its corresponding
+      attribute value. Returns failure if parameters cannot be determined
+      (e.g., unsupported constant bitwidth).
+    }], "::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>",
+    "getRTLParameters", (ins)>
   ];
 }
 

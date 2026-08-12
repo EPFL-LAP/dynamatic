@@ -1,0 +1,350 @@
+#ifndef DYNAMATIC_HLS_FUZZER_LIMITTYPESYSTEM
+#define DYNAMATIC_HLS_FUZZER_LIMITTYPESYSTEM
+
+#include "ConjunctionTypeSystem.h"
+#include "CounterTypeSystem.h"
+#include "Randomly.h"
+#include "TypeSystem.h"
+#include <cstddef>
+
+namespace dynamatic::gen {
+
+// Internal implementation details. Users should use the LimitTypeSystem
+// instead.
+namespace details {
+
+struct DepthTypingContext {
+  /// The current expression depth.
+  std::size_t expressionDepth{};
+  /// The current number of statements in the program.
+  std::size_t totalNumberOfStatements{};
+  /// Value 'totalNumberOfStatements' must not exceed while generating a
+  /// statement list.
+  std::size_t statementBudget{};
+};
+
+class DepthTypeSystem : public TypeSystem<DepthTypingContext, DepthTypeSystem> {
+
+  /// Returns a transfer function which increments 'field' of the context of
+  /// 'from' before returning it.
+  template <typename ASTNode, std::size_t DepthTypingContext::*field,
+            std::size_t from = INPUT_DEPENDENCY>
+  static auto incrementDepth() {
+    return TransferFn<ASTNode, from>(
+        [](DepthTypingContext context, auto &&...) {
+          ++(context.*field);
+          return context;
+        });
+  }
+
+  /// Returns the number of statements that 'context' still allows to be
+  /// generated.
+  static std::size_t statementsLeft(const DepthTypingContext &context) {
+    if (context.statementBudget <= context.totalNumberOfStatements)
+      return 0;
+    return context.statementBudget - context.totalNumberOfStatements;
+  }
+
+  /// Returns a new statement budget for statement list receiving 'context'.
+  std::size_t drawNestedBudget(const DepthTypingContext &context) const {
+    std::size_t left = statementsLeft(context);
+    if (!left)
+      return context.totalNumberOfStatements;
+
+    return context.totalNumberOfStatements +
+           random.getInteger<std::size_t>(1, left);
+  }
+
+public:
+  explicit DepthTypeSystem(Randomly &random, std::size_t maxExpressionDepth,
+                           std::size_t maxTotalStatements)
+      : random(random), maxExpressionDepth(maxExpressionDepth),
+        maxTotalStatements(maxTotalStatements) {}
+
+  static bool discardStructuredForStatement(const DepthTypingContext &context) {
+    // A loop needs to fit both itself and at least one statement in its body:
+    // an empty loop is of no interest to any target.
+    return statementsLeft(context) < 2;
+  }
+
+  bool discardBinaryExpression(ast::BinaryExpression::Op,
+                               const DepthTypingContext &context) const {
+    return context.expressionDepth >= maxExpressionDepth;
+  }
+
+  TransferFnArray<ast::BinaryExpression>
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
+    return {
+        /*lhs=*/incrementDepth<ast::BinaryExpression,
+                               &DepthTypingContext::expressionDepth>(),
+        /*rhs=*/
+        incrementDepth<ast::BinaryExpression,
+                       &DepthTypingContext::expressionDepth>(),
+        /*output=*/copyInputToOutput<ast::BinaryExpression>(),
+    };
+  }
+
+  bool discardUnaryExpression(ast::UnaryExpression::Op,
+                              const DepthTypingContext &context) const {
+    return context.expressionDepth >= maxExpressionDepth;
+  }
+
+  TransferFnArray<ast::UnaryExpression>
+  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override {
+    return {
+        /*operand=*/incrementDepth<ast::UnaryExpression,
+                                   &DepthTypingContext::expressionDepth>(),
+        /*output=*/copyInputToOutput<ast::UnaryExpression>(),
+    };
+  }
+
+  bool discardCastExpression(const DepthTypingContext &context) const {
+    return context.expressionDepth >= maxExpressionDepth;
+  }
+
+  TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
+    return {
+        /*target type=*/copyFromInput<ast::CastExpression>(),
+        /*operand=*/
+        incrementDepth<ast::CastExpression,
+                       &DepthTypingContext::expressionDepth>(),
+        /*output=*/copyInputToOutput<ast::CastExpression>(),
+    };
+  }
+
+  bool discardConditionalExpression(const DepthTypingContext &context) const {
+    return context.expressionDepth >= maxExpressionDepth;
+  }
+
+  TransferFnArray<ast::ConditionalExpression>
+  getConditionalExpressionTransferFns() override {
+    // Default implementation: Simply propagates the context to the
+    // subelements.
+    return {
+        /*condition=*/incrementDepth<ast::ConditionalExpression,
+                                     &DepthTypingContext::expressionDepth>(),
+        /*true value=*/
+        incrementDepth<ast::ConditionalExpression,
+                       &DepthTypingContext::expressionDepth>(),
+        /*false value=*/
+        incrementDepth<ast::ConditionalExpression,
+                       &DepthTypingContext::expressionDepth>(),
+        /*output=*/copyInputToOutput<ast::ConditionalExpression>(),
+    };
+  }
+
+  bool discardArrayReadExpression(const DepthTypingContext &context) const {
+    return context.expressionDepth >= maxExpressionDepth;
+  }
+
+  TransferFnArray<ast::ArrayReadExpression>
+  getArrayReadExpressionTransferFns() override {
+    return {
+        /*array parameter=*/copyFromInput<ast::ArrayReadExpression>(),
+        /*index=*/
+        incrementDepth<ast::ArrayReadExpression,
+                       &DepthTypingContext::expressionDepth>(),
+        /*output=*/copyInputToOutput<ast::ArrayReadExpression>(),
+    };
+  }
+
+  TransferFnArray<ast::ArrayAssignmentStatement>
+  getArrayAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ArrayAssignmentStatement>{
+        /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
+        /*output=*/
+        OutputTransferFn<ast::ArrayAssignmentStatement, INPUT_DEPENDENCY>(
+            [](const ast::ArrayAssignmentStatement &,
+               DepthTypingContext context) {
+              context.totalNumberOfStatements++;
+              return context;
+            }),
+    };
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return TransferFnArray<ast::ScalarAssignmentStatement>{
+        /*target=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*value=*/copyFromInput<ast::ScalarAssignmentStatement>(),
+        /*output=*/
+        OutputTransferFn<ast::ScalarAssignmentStatement, INPUT_DEPENDENCY>(
+            [](const ast::ScalarAssignmentStatement &,
+               DepthTypingContext context) {
+              context.totalNumberOfStatements++;
+              return context;
+            }),
+    };
+  }
+
+  TransferFnArray<ast::Function> getFunctionTransferFns() override {
+    return {
+        /*return type=*/copyFromInput<ast::Function>(),
+        /*statement list=*/
+        TransferFn<ast::Function, INPUT_DEPENDENCY>(
+            [maxTotalStatements =
+                 maxTotalStatements](DepthTypingContext context) {
+              // The body of the function is the outermost statement list and is
+              // given the global limit as budget.
+              context.statementBudget = maxTotalStatements;
+              return context;
+            }),
+        /*return statement=*/copyFromInput<ast::Function>(),
+        /*output=*/copyInputToOutput<ast::Function>(),
+    };
+  }
+
+  static bool discardStatementList(const DepthTypingContext &context) {
+    return !statementsLeft(context);
+  }
+
+  TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
+    // Force the statement to be generated before the statement list such that
+    // 'totalNumberOfStatements' is counted correctly.
+    // Otherwise a stack overflow would occur.
+    // TODO: Ideally we'd have support for generating statements in either
+    //       forward or backward direction while still making statement limits
+    //       work.
+    return {
+        /*statement=*/copyFromInput<ast::StatementList>(),
+        /*statement list=*/
+        copyFrom<ast::StatementList, ast::StatementList::STATEMENT>(),
+        /*output=*/
+        copyToOutput<ast::StatementList, ast::StatementList::STATEMENT_LIST>(),
+    };
+  }
+
+  TransferFnArray<ast::StructuredForStatement>
+  getStructuredForStatementTransferFns() override {
+    return {
+        /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
+        /*start=*/copyFromInput<ast::StructuredForStatement>(),
+        /*end=*/copyFromInput<ast::StructuredForStatement>(),
+        /*step=*/copyFromInput<ast::StructuredForStatement>(),
+        /*statements=*/
+        TransferFn<ast::StructuredForStatement, INPUT_DEPENDENCY>(
+            [this](DepthTypingContext context) {
+              // The loop itself, like any statement, counts against the
+              // statement budget.
+              ++context.totalNumberOfStatements;
+              // Give the statement list some budget for the number of
+              // statements it should generate.
+              context.statementBudget = drawNestedBudget(context);
+              return context;
+            }),
+        /*output=*/
+        OutputTransferFn<ast::StructuredForStatement, INPUT_DEPENDENCY,
+                         ast::StructuredForStatement::BODY>(
+            [](const ast::StructuredForStatement &, DepthTypingContext context,
+               const DepthTypingContext &body) {
+              // The only thing about the body that outlives the loop is how
+              // many statements it generated.
+              context.totalNumberOfStatements = body.totalNumberOfStatements;
+              return context;
+            }),
+    };
+  }
+
+  static ProbabilityTable<ExpressionKey>
+  getExpressionProbabilityTable(const DepthTypingContext &context);
+
+  Randomly &random;
+  std::size_t maxExpressionDepth{};
+  std::size_t maxTotalStatements{};
+};
+
+struct ParamTypingContext {
+  std::size_t numScalarParam{};
+  std::size_t numArrayParam{};
+
+  ParamTypingContext merge(const ParamTypingContext &rhs) const {
+    return {std::max(numScalarParam, rhs.numScalarParam),
+            std::max(numArrayParam, rhs.numArrayParam)};
+  }
+};
+
+/// Type system that caps the maximum amount of scalar parameters, array
+/// parameters and parameters in general.
+class ParamTypeSystem
+    : public CounterTypeSystem<ParamTypingContext, ParamTypeSystem> {
+public:
+  explicit ParamTypeSystem(std::size_t maxScalarParam,
+                           std::size_t maxArrayParam, std::size_t maxParams)
+      : maxScalarParam(maxScalarParam), maxArrayParam(maxArrayParam),
+        maxParams(maxParams) {}
+
+  bool discardFreshScalarParameter(const ParamTypingContext &context) const {
+    return context.numScalarParam >= maxScalarParam ||
+           context.numScalarParam + context.numArrayParam >= maxParams;
+  }
+
+  TransferFnArray<ast::ScalarParameter>
+  getFreshScalarParameterTransferFns() override {
+    return {
+        copyFromInput<ast::ScalarParameter>(),
+        OutputTransferFn<ast::ScalarParameter, INPUT_DEPENDENCY>(
+            [](const ast::ScalarParameter &, ParamTypingContext context) {
+              context.numScalarParam++;
+              return context;
+            }),
+    };
+  }
+
+  bool discardFreshArrayParameter(const ParamTypingContext &context) const {
+    return context.numArrayParam >= maxArrayParam ||
+           context.numScalarParam + context.numArrayParam >= maxParams;
+  }
+
+  TransferFnArray<ast::ArrayParameter>
+  getFreshArrayParameterTransferFns() override {
+    return {
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
+        OutputTransferFn<ast::ArrayParameter, INPUT_DEPENDENCY>(
+            [](const ast::ArrayParameter &, ParamTypingContext context) {
+              context.numArrayParam++;
+              return context;
+            }),
+    };
+  }
+
+private:
+  std::size_t maxScalarParam{};
+  std::size_t maxArrayParam{};
+  std::size_t maxParams{};
+};
+
+} // namespace details
+
+/// Typesystem used to enforce limits such as number of a specific AST nodes,
+/// parameters, depth of expressions and so on.
+class LimitTypeSystem final
+    : public ConjunctionTypeSystemBase<
+          LimitTypeSystem, details::DepthTypeSystem, details::ParamTypeSystem> {
+public:
+  struct Options {
+    Options() = default;
+
+    std::size_t maxExpressionDepth = 4;
+    std::size_t maxTotalStatements = 20;
+    std::size_t maxScalarParam = 16;
+    std::size_t maxArrayParam = 8;
+    std::size_t maxParams = 256;
+  };
+
+  explicit LimitTypeSystem(Randomly &random)
+      : LimitTypeSystem(random, Options()) {}
+
+  explicit LimitTypeSystem(Randomly &random, const Options &options)
+      : ConjunctionTypeSystemBase(
+            details::DepthTypeSystem(random, options.maxExpressionDepth,
+                                     options.maxTotalStatements),
+            details::ParamTypeSystem(options.maxScalarParam,
+                                     options.maxArrayParam,
+                                     options.maxParams)) {}
+};
+} // namespace dynamatic::gen
+
+#endif

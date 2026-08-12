@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 #include "experimental/Support/FormalProperty.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "llvm/Support/JSON.h"
 #include <memory>
@@ -23,28 +23,60 @@ namespace dynamatic {
 std::optional<FormalProperty::TYPE>
 FormalProperty::typeFromStr(const std::string &s) {
 
-  if (s == "AOB")
-    return FormalProperty::TYPE::AOB;
-  if (s == "VEQ")
-    return FormalProperty::TYPE::VEQ;
-  if (s == "EFNAO")
-    return FormalProperty::TYPE::EFNAO;
-  if (s == "CSOAFAF")
-    return FormalProperty::TYPE::CSOAFAF;
+  if (s == "AbsenceOfBackpressure")
+    return FormalProperty::TYPE::AbsenceOfBackpressure;
+  if (s == "ValidEquivalence")
+    return FormalProperty::TYPE::ValidEquivalence;
+  if (s == "EagerForkNotAllOutputSent")
+    return FormalProperty::TYPE::EagerForkNotAllOutputSent;
+  if (s == "CopiedSlotsOfActiveForksAreFull")
+    return FormalProperty::TYPE::CopiedSlotsOfActiveForksAreFull;
+  if (s == "EagerForkPathTokenCopiedMaximumOnce")
+    return FormalProperty::TYPE::EagerForkPathTokenCopiedMaximumOnce;
+  if (s == "ReconvergentPathFlow")
+    return FormalProperty::TYPE::ReconvergentPathFlow;
+  if (s == "IOGSingleToken")
+    return FormalProperty::TYPE::IOGSingleToken;
+  if (s == "IOGConsecutiveTokens")
+    return FormalProperty::TYPE::IOGConsecutiveTokens;
+  if (s == "EntryTokenOrder")
+    return FormalProperty::TYPE::EntryTokenOrder;
+  if (s == "SingleEntryToken")
+    return FormalProperty::TYPE::SingleEntryToken;
+  if (s == "ExitTokenOrder")
+    return FormalProperty::TYPE::ExitTokenOrder;
+  if (s == "ExitTokenNoAncestors")
+    return FormalProperty::TYPE::ExitTokenNoAncestors;
 
   return std::nullopt;
 }
 
 std::string FormalProperty::typeToStr(TYPE t) {
   switch (t) {
-  case TYPE::AOB:
-    return "AOB";
-  case TYPE::VEQ:
-    return "VEQ";
-  case TYPE::EFNAO:
-    return "EFNAO";
-  case TYPE::CSOAFAF:
-    return "CSOAFAF";
+  case TYPE::AbsenceOfBackpressure:
+    return "AbsenceOfBackpressure";
+  case TYPE::ValidEquivalence:
+    return "ValidEquivalence";
+  case TYPE::EagerForkNotAllOutputSent:
+    return "EagerForkNotAllOutputSent";
+  case TYPE::CopiedSlotsOfActiveForksAreFull:
+    return "CopiedSlotsOfActiveForksAreFull";
+  case TYPE::EagerForkPathTokenCopiedMaximumOnce:
+    return "EagerForkPathTokenCopiedMaximumOnce";
+  case TYPE::ReconvergentPathFlow:
+    return "ReconvergentPathFlow";
+  case TYPE::IOGSingleToken:
+    return "IOGSingleToken";
+  case TYPE::IOGConsecutiveTokens:
+    return "IOGConsecutiveTokens";
+  case TYPE::EntryTokenOrder:
+    return "EntryTokenOrder";
+  case TYPE::SingleEntryToken:
+    return "SingleEntryToken";
+  case TYPE::ExitTokenOrder:
+    return "ExitTokenOrder";
+  case TYPE::ExitTokenNoAncestors:
+    return "ExitTokenNoAncestors";
   }
 }
 
@@ -93,15 +125,32 @@ FormalProperty::fromJSON(const llvm::json::Value &value,
     return nullptr;
   TYPE type = *typeOpt;
   switch (type) {
-  case TYPE::AOB:
+  case TYPE::AbsenceOfBackpressure:
     return AbsenceOfBackpressure::fromJSON(value, path.field(INFO_LIT));
-  case TYPE::VEQ:
+  case TYPE::ValidEquivalence:
     return ValidEquivalence::fromJSON(value, path.field(INFO_LIT));
-  case TYPE::EFNAO:
+  case TYPE::EagerForkNotAllOutputSent:
     return EagerForkNotAllOutputSent::fromJSON(value, path.field(INFO_LIT));
-  case TYPE::CSOAFAF:
+  case TYPE::CopiedSlotsOfActiveForksAreFull:
     return CopiedSlotsOfActiveForkAreFull::fromJSON(value,
                                                     path.field(INFO_LIT));
+  case TYPE::EagerForkPathTokenCopiedMaximumOnce:
+    return EagerForkPathTokenCopiedMaximumOnce::fromJSON(value,
+                                                         path.field(INFO_LIT));
+  case TYPE::ReconvergentPathFlow:
+    return ReconvergentPathFlow::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::IOGSingleToken:
+    return IOGSingleToken::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::IOGConsecutiveTokens:
+    return IOGConsecutiveTokens::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::EntryTokenOrder:
+    return EntryTokenOrder::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::SingleEntryToken:
+    return SingleEntryToken::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::ExitTokenOrder:
+    return ExitTokenOrder::fromJSON(value, path.field(INFO_LIT));
+  case TYPE::ExitTokenNoAncestors:
+    return ExitTokenNoAncestors::fromJSON(value, path.field(INFO_LIT));
   }
 }
 
@@ -137,12 +186,9 @@ FormalProperty::parseBaseAndExtractInfo(const llvm::json::Value &value,
 
 AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
                                              const OpResult &res)
-    : FormalProperty(id, tag, TYPE::AOB) {
+    : FormalProperty(id, tag, TYPE::AbsenceOfBackpressure) {
   Operation *ownerOp = res.getOwner();
   Operation *userOp = *res.getUsers().begin();
-
-  handshake::PortNamer ownerNamer(ownerOp);
-  handshake::PortNamer userNamer(userOp);
 
   unsigned long operandIndex = userOp->getNumOperands();
   for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
@@ -158,8 +204,11 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
   ownerChannel.channelName =
-      ownerNamer.getOutputName(res.getResultNumber()).str();
-  userChannel.channelName = userNamer.getInputName(operandIndex).str();
+      mlir::cast<handshake::NamedIOInterface>(ownerOp).getResultName(
+          res.getResultNumber());
+  userChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(userOp).getOperandName(
+          operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -194,21 +243,21 @@ AbsenceOfBackpressure::fromJSON(const llvm::json::Value &value,
 
 ValidEquivalence::ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
                                    const OpResult &res2)
-    : FormalProperty(id, tag, TYPE::VEQ) {
+    : FormalProperty(id, tag, TYPE::ValidEquivalence) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
-  handshake::PortNamer namer1(op1);
 
   Operation *op2 = res2.getOwner();
   unsigned int j = res2.getResultNumber();
-  handshake::PortNamer namer2(op2);
 
   ownerChannel.operationName = getUniqueName(op1).str();
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  ownerChannel.channelName = namer1.getOutputName(i).str();
-  targetChannel.channelName = namer2.getOutputName(j).str();
+  ownerChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(op1).getResultName(i);
+  targetChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(op2).getResultName(j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
@@ -239,34 +288,37 @@ ValidEquivalence::fromJSON(const llvm::json::Value &value,
   return prop;
 }
 
-// Invariant 1 -- see https://ieeexplore.ieee.org/document/10323796
-
 EagerForkNotAllOutputSent::EagerForkNotAllOutputSent(
     uint64_t id, TAG tag, handshake::EagerForkLikeOpInterface &forkOp)
-    : FormalProperty(id, tag, TYPE::EFNAO) {
+    : FormalProperty(id, tag, TYPE::EagerForkNotAllOutputSent) {
   sentStateNamers = forkOp.getInternalSentStateNamers();
 }
 
 llvm::json::Value EagerForkNotAllOutputSent::extraInfoToJSON() const {
-  std::vector<std::string> channels(sentStateNamers.size());
-  std::string opName = sentStateNamers[0].opName;
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    assert(state.opName == opName);
-    channels[i] = state.channelName;
-  }
   // Example JSON:
-  // {
-  //   "owner_op": "fork0",
-  //   "channels": ["out0", "out1", "out2"]
-  // }
-  //
-  // or
-  //
-  // {
-  //   "owner_op": "control_merge0",
-  //   "channels": ["outs", "index"]
-  // }
-  return llvm::json::Object({{OWNER_OP_LIT, opName}, {CHANNELS_LIT, channels}});
+  // [
+  //   {
+  //     "channel_name": "outs_0",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   },
+  //   {
+  //     "channel_name": "outs_1",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   },
+  //   {
+  //     "channel_name": "outs_2",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   },
+  //   {
+  //     "channel_name": "outs_3",
+  //     "channel_size": 0,
+  //     "operation": "fork0",
+  //   }
+  // ]
+  return llvm::json::Array(sentStateNamers);
 }
 
 std::unique_ptr<EagerForkNotAllOutputSent>
@@ -275,18 +327,8 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<EagerForkNotAllOutputSent>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
-  llvm::json::ObjectMapper mapper(info, path);
-  std::string opName;
-  std::vector<std::string> channelNames;
-  if (!mapper || !mapper.map(OWNER_OP_LIT, opName) ||
-      !mapper.map(CHANNELS_LIT, channelNames))
-    return nullptr;
-  prop->sentStateNamers =
-      std::vector<handshake::EagerForkSentNamer>(channelNames.size());
-  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
-    prop->sentStateNamers[i] =
-        handshake::EagerForkSentNamer(opName, channelName);
-  }
+  bool success = llvm::json::fromJSON(info, prop->sentStateNamers, path);
+  assert(success);
   return prop;
 }
 
@@ -295,24 +337,26 @@ EagerForkNotAllOutputSent::fromJSON(const llvm::json::Value &value,
 CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
     uint64_t id, TAG tag, handshake::BufferLikeOpInterface &bufferOpI,
     handshake::EagerForkLikeOpInterface &forkOpI)
-    : FormalProperty(id, tag, TYPE::CSOAFAF) {
+    : FormalProperty(id, tag, TYPE::CopiedSlotsOfActiveForksAreFull) {
   sentStateNamers = forkOpI.getInternalSentStateNamers();
   auto slots = bufferOpI.getInternalSlotStateNamers();
   // last slot is the copied slot!
-  copiedSlot = slots[slots.size() - 1];
+  copiedSlot = std::make_unique<BufferSlotFullNamer>(slots[slots.size() - 1]);
+}
+
+CopiedSlotsOfActiveForkAreFull::CopiedSlotsOfActiveForkAreFull(
+    uint64_t id, TAG tag, handshake::LatencyInterface &latencyOpI,
+    handshake::EagerForkLikeOpInterface &forkOpI)
+    : FormalProperty(id, tag, TYPE::CopiedSlotsOfActiveForksAreFull) {
+  sentStateNamers = forkOpI.getInternalSentStateNamers();
+  auto slots = latencyOpI.getPipelineSlots();
+  // last slot is the copied slot!
+  copiedSlot = std::make_unique<PipelineSlotNamer>(slots[slots.size() - 1]);
 }
 
 llvm::json::Value CopiedSlotsOfActiveForkAreFull::extraInfoToJSON() const {
-  std::vector<std::string> channels(sentStateNamers.size());
-  std::string forkOpName = sentStateNamers[0].opName;
-  for (auto [i, state] : llvm::enumerate(sentStateNamers)) {
-    assert(state.opName == forkOpName);
-    channels[i] = state.channelName;
-  }
-  return llvm::json::Object({{FORK_OP_LIT, forkOpName},
-                             {FORK_CHANNELS_LIT, channels},
-                             {BUFFER_OP_LIT, copiedSlot.opName},
-                             {BUFFER_SLOT_LIT, copiedSlot.slotName}});
+  return llvm::json::Object(
+      {{FORK_CHANNELS_LIT, sentStateNamers}, {COPIED_SLOT_LIT, copiedSlot}});
 }
 
 std::unique_ptr<CopiedSlotsOfActiveForkAreFull>
@@ -321,26 +365,197 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
   auto prop = std::make_unique<CopiedSlotsOfActiveForkAreFull>();
 
   auto info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(FORK_CHANNELS_LIT, prop->sentStateNamers) ||
+      !mapper.map(COPIED_SLOT_LIT, prop->copiedSlot))
+    return nullptr;
+  return prop;
+}
+
+// Eager Fork Path
+
+EagerForkPathTokenCopiedMaximumOnce::EagerForkPathTokenCopiedMaximumOnce(
+    uint64_t id, TAG tag, ForkOp &op)
+    : FormalProperty(id, tag, TYPE::EagerForkPathTokenCopiedMaximumOnce) {
+  // ForkOp has only 1 input
+  validOp = getUniqueName(op);
+  validChannel = mlir::cast<handshake::NamedIOInterface>(op.getOperation())
+                     .getOperandName(0);
+  sentStateNamers = op.getInternalSentStateNamers();
+}
+
+llvm::json::Value EagerForkPathTokenCopiedMaximumOnce::extraInfoToJSON() const {
+  return llvm::json::Object({{VALID_OP_LIT, validOp},
+                             {VALID_CHANNEL_LIT, validChannel},
+                             {SENTS_LIT, sentStateNamers}});
+}
+
+std::unique_ptr<EagerForkPathTokenCopiedMaximumOnce>
+EagerForkPathTokenCopiedMaximumOnce::fromJSON(const llvm::json::Value &value,
+                                              llvm::json::Path path) {
+  auto prop = std::make_unique<EagerForkPathTokenCopiedMaximumOnce>();
+
+  auto info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(VALID_OP_LIT, prop->validOp) ||
+      !mapper.map(VALID_CHANNEL_LIT, prop->validChannel) ||
+      !mapper.map(SENTS_LIT, prop->sentStateNamers))
+    return nullptr;
+  return prop;
+}
+
+// Reconvergent path flow
+
+ReconvergentPathFlow::ReconvergentPathFlow(unsigned long id, TAG tag)
+    : FormalProperty(id, tag, TYPE::ReconvergentPathFlow) {}
+
+llvm::json::Value ReconvergentPathFlow::extraInfoToJSON() const {
+  std::vector<llvm::json::Value> jsonEqs{};
+  jsonEqs.reserve(equations.size());
+
+  for (auto &eq : equations) {
+    jsonEqs.push_back(eq.toJSON());
+  }
+  return llvm::json::Array(jsonEqs);
+}
+
+std::unique_ptr<ReconvergentPathFlow>
+ReconvergentPathFlow::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<ReconvergentPathFlow>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  const llvm::json::Array *arr = info.getAsArray();
+  if (!arr)
+    return nullptr;
+
+  for (const llvm::json::Value &eq : *arr) {
+    prop->equations.push_back(FlowExpression::fromJSON(eq, path));
+  }
+
+  return prop;
+}
+
+// IOGSingleToken
+
+llvm::json::Value IOGSingleToken::extraInfoToJSON() const {
+  return llvm::json::Object({{SLOTS_LIT, slots}, {FORKS_LIT, forks}});
+}
+
+std::unique_ptr<IOGSingleToken>
+IOGSingleToken::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  auto prop = std::make_unique<IOGSingleToken>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
+      !mapper.map(FORKS_LIT, prop->forks))
+    return nullptr;
+  return prop;
+}
+
+// IOGConsecutiveTokens
+
+llvm::json::Value IOGConsecutiveTokens::extraInfoToJSON() const {
+  return llvm::json::Object(
+      {{SLOT1_LIT, slot1}, {SLOT2_LIT, slot2}, {SENTS_LIT, sents}});
+}
+
+std::unique_ptr<IOGConsecutiveTokens>
+IOGConsecutiveTokens::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<IOGConsecutiveTokens>();
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+
+  llvm::json::ObjectMapper mapper(info, path);
+  if (!mapper || !mapper.map(SLOT1_LIT, prop->slot1) ||
+      !mapper.map(SLOT2_LIT, prop->slot2) ||
+      !mapper.map(SENTS_LIT, prop->sents))
+    return nullptr;
+  return prop;
+}
+
+IOGConsecutiveTokens::IOGConsecutiveTokens(
+    unsigned long id, TAG tag, const TokenCountNamer &slot1,
+    const TokenCountNamer &slot2, std::vector<EagerForkSentNamer> sents)
+    : FormalProperty(id, tag, TYPE::IOGConsecutiveTokens), slot1(slot1),
+      slot2(slot2), sents(std::move(sents)) {}
+
+// EntryTokenOrder
+
+llvm::json::Value EntryTokenOrder::extraInfoToJSON() const {
+  return llvm::json::Object(
+      {{SLOTS_LIT, slots}, {ENTRY_VALUE_LIT, entryValue}});
+}
+
+std::unique_ptr<EntryTokenOrder>
+EntryTokenOrder::fromJSON(const llvm::json::Value &value,
+                          llvm::json::Path path) {
+  auto prop = std::make_unique<EntryTokenOrder>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
   llvm::json::ObjectMapper mapper(info, path);
 
-  std::string forkOpName;
-  std::vector<std::string> channelNames;
-  if (!mapper || !mapper.map(FORK_OP_LIT, forkOpName) ||
-      !mapper.map(FORK_CHANNELS_LIT, channelNames))
+  if (!mapper || !mapper.map(SLOTS_LIT, prop->slots) ||
+      !mapper.map(ENTRY_VALUE_LIT, prop->entryValue))
     return nullptr;
-  prop->sentStateNamers =
-      std::vector<handshake::EagerForkSentNamer>(channelNames.size());
-  for (auto [i, channelName] : llvm::enumerate(channelNames)) {
-    prop->sentStateNamers[i] =
-        handshake::EagerForkSentNamer(forkOpName, channelName);
-  }
-  std::string bufferOpName;
-  std::string slotName;
-  if (!mapper.map(BUFFER_OP_LIT, bufferOpName) ||
-      !mapper.map(BUFFER_SLOT_LIT, slotName))
-    return nullptr;
+  return prop;
+}
 
-  prop->copiedSlot = handshake::BufferSlotFullNamer(bufferOpName, slotName);
+llvm::json::Value SingleEntryToken::extraInfoToJSON() const {
+  return llvm::json::Object({{PATH_CM_LIT, cm}, {PATH_EC_LIT, ec}});
+}
+
+std::unique_ptr<SingleEntryToken>
+SingleEntryToken::fromJSON(const llvm::json::Value &value,
+                           llvm::json::Path path) {
+  auto prop = std::make_unique<SingleEntryToken>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(PATH_CM_LIT, prop->cm) ||
+      !mapper.map(PATH_EC_LIT, prop->ec))
+    return nullptr;
+  return prop;
+}
+llvm::json::Value ExitTokenOrder::extraInfoToJSON() const {
+  return llvm::json::Object({{EXIT_VALUE_LIT, exitValue}, {SLOTS_LIT, slots}});
+}
+std::unique_ptr<ExitTokenOrder>
+ExitTokenOrder::fromJSON(const llvm::json::Value &value,
+                         llvm::json::Path path) {
+  auto prop = std::make_unique<ExitTokenOrder>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(EXIT_VALUE_LIT, prop->exitValue) ||
+      !mapper.map(SLOTS_LIT, prop->slots))
+    return nullptr;
+  return prop;
+}
+
+llvm::json::Value ExitTokenNoAncestors::extraInfoToJSON() const {
+  return llvm::json::Object({{EXIT_VALUE_LIT, exitValue},
+                             {EXIT_SLOTS_LIT, exitSlots},
+                             {ANCESTORS_LIT, ancestors}});
+}
+std::unique_ptr<ExitTokenNoAncestors>
+ExitTokenNoAncestors::fromJSON(const llvm::json::Value &value,
+                               llvm::json::Path path) {
+  auto prop = std::make_unique<ExitTokenNoAncestors>();
+
+  llvm::json::Value info = prop->parseBaseAndExtractInfo(value, path);
+  llvm::json::ObjectMapper mapper(info, path);
+
+  if (!mapper || !mapper.map(EXIT_VALUE_LIT, prop->exitValue) ||
+      !mapper.map(EXIT_SLOTS_LIT, prop->exitSlots) ||
+      !mapper.map(ANCESTORS_LIT, prop->ancestors))
+    return nullptr;
   return prop;
 }
 

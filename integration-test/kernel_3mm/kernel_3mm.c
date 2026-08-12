@@ -6,47 +6,55 @@
  * Web address: http://polybench.sourceforge.net
  */
 
-#include "kernel_3mm.h"
 #include "dynamatic/Integration.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-void kernel_3mm(in_int_t A[NI][NK], in_int_t B[NK][NJ], in_int_t C[NJ][NM],
-                in_int_t D[NM][NL], inout_int_t E[NI][NJ],
-                inout_int_t F[NJ][NL], inout_int_t G[NI][NL]) {
+#define NI 10
+#define NJ 10
+#define NK 10
+#define NL 10
+#define NM 10
+#define N 10
+
+void kernel_3mm(int A[NI][NK], int B[NK][NJ], int C[NJ][NM], int D[NM][NL],
+                int E[NI][NJ], int F[NJ][NL], int G[NI][NL]) {
   for (unsigned i = 0; i < NI; i++) {
     for (unsigned j = 0; j < NJ; j++) {
-      E[i][j] = 0;
+      int tmp = 0;
       for (unsigned k = 0; k < NK; ++k)
-        E[i][j] += A[i][k] * B[k][j];
+        tmp += A[i][k] * B[k][j];
+      E[i][j] = tmp;
     }
   }
 
   for (unsigned j = 0; j < NJ; j++) {
     for (unsigned l = 0; l < NL; l++) {
-      F[j][l] = 0;
+      int tmp = 0;
       for (unsigned m = 0; m < NM; ++m)
-        F[j][l] += C[j][m] * D[m][l];
+        tmp += C[j][m] * D[m][l];
+      F[j][l] = tmp;
     }
   }
 
   for (unsigned i = 0; i < NI; i++) {
     for (unsigned l = 0; l < NL; l++) {
-      G[i][l] = 0;
+      int tmp = 0;
       for (unsigned j = 0; j < NJ; ++j)
-        G[i][l] += E[i][j] * F[j][l];
+        tmp += E[i][j] * F[j][l];
+      G[i][l] = tmp;
     }
   }
 }
 
 int main(void) {
-  in_int_t A[NI][NK];
-  in_int_t B[NK][NJ];
-  in_int_t C[NJ][NM];
-  in_int_t D[NM][NL];
-  inout_int_t E[NI][NJ];
-  inout_int_t F[NJ][NL];
-  inout_int_t G[NI][NL];
+  int A[NI][NK];
+  int B[NK][NJ];
+  int C[NJ][NM];
+  int D[NM][NL];
+  int E[NI][NJ];
+  int F[NJ][NL];
+  int G[NI][NL];
 
   for (unsigned i = 0; i < NI; ++i) {
     for (unsigned k = 0; k < NK; ++k)

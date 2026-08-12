@@ -20,8 +20,8 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_MAPBUFBUFFERS_H
 
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferPlacementMILP.h"
-#include "dynamatic/Transforms/BufferPlacement/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "experimental/Support/BlifReader.h"
 #include "experimental/Support/CutlessMapping.h"
 
@@ -45,16 +45,7 @@ public:
   MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
                 FuncInfo &funcInfo, const TimingDatabase &timingDB,
                 double targetPeriod, StringRef blifFiles, double lutDelay,
-                int lutSize, bool acyclicType);
-
-  /// Achieves the same as the other constructor but additionally logs placement
-  /// decisions and achieved throughputs using the provided logger, and dumps
-  /// the MILP model and solution at the provided name next to the log file.
-  MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
-                FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, StringRef blifFiles, double lutDelay,
-                int lutSize, bool acyclicType, Logger &logger,
-                StringRef milpName = "placement");
+                int lutSize, bool acyclicType, StringRef writeTo);
 
 protected:
   /// The same extractResult function used in FPL22Buffers.

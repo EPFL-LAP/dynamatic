@@ -1,4 +1,6 @@
 add_dynamatic_library(DynamaticAnalysis
+  ControlNetworkAnalysis.cpp
+  IndexChannelAnalysis.cpp
   NameAnalysis.cpp
   NumericAnalysis.cpp
   ControlDependenceAnalysis.cpp

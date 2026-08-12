@@ -14,9 +14,10 @@ on:
       - 'docs/**'
     branches: ["main"]
 
+# Cancel previous CI builds when a new push occurs to the same PR.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-release:

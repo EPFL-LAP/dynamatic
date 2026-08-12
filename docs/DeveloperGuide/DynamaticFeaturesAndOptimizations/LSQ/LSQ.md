@@ -12,9 +12,34 @@ Detailed documentation for the `LSQ` generator, which emits a VHDL entity and ar
 ![LSQ Top-Level](./Figures/lsq/LSQ_Top-level_lsq.png)
 
 The LSQ is the system for managing all memory operations within the dataflow circuit. Its primary role is to accept out-of-order memory requests, track their dependencies, issue them to memory when safe, and return results in the correct order to the appropriate access ports.
+It also includes an any-to-any bypass network, which allows store data to be forwarded directly to subsequent loads to the same address without a memory round-trip.
 
 The LSQ module acts as the master architect, instantiating the previously generated modules such as `Port-to-Queue Dispatcher`, `Queue-to-Port Dispatcher`, and `Group Allocator` modules. It wires them together with the load queue, the store queue, the dependency checking logic, and the requesting issue logic.
 
+## 1.1. Configuration
+
+The LSQ is configured through a JSON file that is passed to the Python generator.
+There are two categories of options:
+
+- **Required for Corretness:**
+  These options must be set correctly to ensure programm correctness and that the LSQ interface matches what is expected by the compiler.
+  These options are set by the compiler using information it has about the circuit.
+  This includes:
+    - Number of groups
+    - Number of load and store ports in each group
+    - Relative order of loads and stores in each group
+    - Address bit width
+    - Data bit width
+    - ...
+- **Optional Configuration:**
+   These options can be used to tune performance, critical path, and/or resource usage of the LSQ.
+   They are currently fixed to default values, and no method to change them is exposed to users of Dynamatic.
+   This includes:
+     - Size of the load and store queues (default: both 16)
+     - Pipeline configuration (see [Pipelining](#3-pipelining); default: all disabled)
+     - Bypass enable/disable (default: enabled)
+
+All available options are described in `configs.py`.
 
 ## 2. LSQ Internal Blocks
 
@@ -383,6 +408,7 @@ This is the primary logic for ensuring load safety. It checks every active load 
 
 * **Input**:
     * **`stq_alloc`**: A vector indicating which store queue entries are active.
+    * **`store_completed`**: A vector indicating whether a store has already received its response from memory.
     * **`store_is_older`**: The 2D matrix establishing the program order between loads and stores.
     * **`addr_same`**: The 2D matrix indicating which load-store pairs have identical addresses.
     * **`stq_addr_valid`**: A vector indicating which stores have a valid address.
@@ -390,8 +416,9 @@ This is the primary logic for ensuring load safety. It checks every active load 
 * **Processing**:
     * It calculates the `ld_st_conflict` matrix. A conflict at `ld_st_conflict[i][j]` is asserted ('1') if all of the following are true:
         1. The store `j` is allocated (`stq_alloc[j]`).
-        2. The store `j` is older than the load `i` (`store_is_older[i][j]`).
-        3. A potential address hazard exists, which means either:
+        2. The store `j` has not completed (`NOT store_completed[j]`).
+        3. The store `j` is older than the load `i` (`store_is_older[i][j]`).
+        4. A potential address hazard exists, which means either:
             * Their addresses are identical (`addr_same[i][j]`).
             * OR the store's address is not yet known (`NOT stq_addr_valid[j]`).
 
@@ -402,6 +429,11 @@ This is the primary logic for ensuring load safety. It checks every active load 
 9. **Load Queue Bypass Logic (Determining Bypass Potential)**  
 ![Load-Store Bypass Logic](./Figures/lsq/LSQ_9.png)
 This block determines for which load-store pairs a bypass (store-to-load forwarding) is *potentially* possible.
+
+> **Note:**
+> The bypass logic can be disabled by setting the config parameter `bypass` to `False`.
+> In that case, `bypass_en` is tied to constant zero, which enables the synthesizer to optimize out the entire bypass logic (including the `can_bypass` matrix).
+> This can significantly lower the LSQ's resource cost (e.g., by around 50% for `histogram` with 16-entry load and store queues).
 
 * **Input**:
     * **`ldq_alloc`**: A vector indicating which load queue entries are active.
@@ -447,6 +479,7 @@ This logic ensures a store operation is not issued if it might conflict with an 
 
 * **Input**:
     * **`ldq_alloc`**: A vector indicating which load entries are active.
+    * **`load_completed`**: A vector indicating whether a load has already received its data from memory.
     * **`store_is_older`**: The program order matrix.
     * **`addr_same`**: The address equality matrix.
     * **`ldq_addr_valid`**: A vector indicating which loads have valid addresses.
@@ -455,8 +488,9 @@ This logic ensures a store operation is not issued if it might conflict with an 
 * **Processing**:
     * It checks the store candidate at `stq_issue` against every active load `i`. A conflict `st_ld_conflict[i]` is asserted if:
         1. The load `i` is active (`ldq_alloc[i]`).
-        2. The load `i` is older than the store candidate (`NOT store_is_older[i][stq_issue]`).
-        3. A potential address hazard exists, meaning their addresses are identical (`addr_same[i][stq_issue]`) OR the load's address is not yet known (`NOT ldq_addr_valid[i]`).
+        2. The load `i` has not completed yet (`NOT load_completed[i]`).
+        3. The load `i` is older than the store candidate (`NOT store_is_older[i][stq_issue]`).
+        4. A potential address hazard exists, meaning their addresses are identical (`addr_same[i][stq_issue]`) OR the load's address is not yet known (`NOT ldq_addr_valid[i]`).
 
 * **Output**:
     * **`st_ld_conflict`**: A vector indicating which loads are in conflict with the current store candidate. This vector is then OR-reduced to create a single `store_conflict` signal for the **Request Issue Logic**.
@@ -464,6 +498,11 @@ This logic ensures a store operation is not issued if it might conflict with an 
 12. **Store Queue Bypass Logic (Finalizing the Bypass Decision)**  
 ![Store Queue Bypass Logic](./Figures/lsq/LSQ_12.png)
 This logic makes the final decision on whether to execute a bypass for a given load.
+
+> **Note:**
+> The bypass logic can be disabled by setting the config parameter `bypass` to `False`.
+> In that case, `bypass_en` is tied to constant zero, which enables the synthesizer to optimize out the entire bypass logic (including the `can_bypass` matrix).
+> This can significantly lower the LSQ's resource cost (e.g., by around 50% for `histogram` with 16-entry load and store queues).
 
 * **Input**:
     * **`ld_st_conflict`**: The matrix of all load-store dependencies.
@@ -478,10 +517,35 @@ This logic makes the final decision on whether to execute a bypass for a given l
 * **Output**:
     * **`bypass_en`**: A vector where `bypass_en[i]` is asserted if load `i` will be satisfied via a bypass in the current cycle. This signal triggers the `ldq_issue_set` and the data muxing from the store queue to the load queue.
 ---
-13. **Memory Request Issue Logic**  
+13. ** Store Issue Stall Logic**
+This logic handles a special case that can occur if the store queue is small compared to the memory latency.
+In that case, it can happen that all store queue entries have been allocated and are in-flight to memory.
+This would case the store issue pointer (`stq_issue`) to point to a valid entry (allocated, address valid, and data valid), and would lead to it being issued a second time.
+To avoid this, we detect the case where the issue pointer (`stq_issue`) catches up to the tail pointer (`stq_tail`).
+If this occurs, store issue is stalled until the tail pointer updates.
+
+* **Input**:
+    * **`stq_issue_next`**: The store queue issue pointer, plus one.
+    * **`stq_tail`**: The store queue tail pointer.
+    * **`stq_issue_en`**:
+      Whether the issue pointer will advance in the next cycle.
+      It is asserted when a store is successfully issued and accepted by the memory interface.
+    * **`stq_tail_update`**:
+      Whether the tail pointer will update in the next cycle.
+      This is the case when a new group will be allocated that contains at least one store.
+
+* **Processing**:
+    * A single state bit is used to indicate whether store issue is currently stalled.
+    * The stall bit is set if the next issue pointer equals the tail pointer (`stq_issue_next == stq_tail`) and issue is enabled (`stq_issue_en`).
+    * The stall bit is cleared if the tail pointer updates (`stq_tail_update`).
+
+* **Output**:
+    * **`store_issue_stall`**: Indicates whether store issue is currently stalled.
+---
+14. **Memory Request Issue Logic**
 This logic is the final stage of the dependency-checking pipeline. It is responsible for arbitrating among safe, ready-to-go memory operations and driving the signals to the external memory interface. It is composed of two distinct parts for handling load and store requests.
 
-    13.1. **Load Request Issue Logic**  
+    14.1. **Load Request Issue Logic**
     This part of the logic selects which non-conflicting load requests should be sent to the memory system's read channels.
 
     * **Input**:
@@ -499,16 +563,17 @@ This logic is the final stage of the dependency-checking pipeline. It is respons
         * **`rreq_addr_o`**: The address of the winning load, selected from the `ldq_addr` array via a multiplexer controlled by the arbitration result (`load_idx_oh`).
         * **`rreq_id_o`**: The ID for the read request, which corresponds to the load's index in the queue. This is also derived from the arbitration result and is used to match the memory response later.
 
-    13.2. **Store Request Issue Logic**  
+    14.2. **Store Request Issue Logic**
     This part of the logic determines if the single, oldest pending store request (indicated by the `stq_issue` pointer) is safe to send to the memory write channel.
 
     * **Input**:
         * **`st_ld_conflict`**: A vector indicating if the current store candidate conflicts with any older loads.
         * **`stq_alloc`**, **`stq_addr_valid`**, **`stq_data_valid`**: The status bits for the store entry at the `stq_issue` pointer.
         * **`stq_addr`**, **`stq_data`**: The payload data for the store entry at the `stq_issue` pointer.
+        * **`store_issue_stall`**: Indicates whether store issue is currently stalled (to avoid wrap-around).
 
     * **Processing**:
-        1.  It performs a final check to generate the `store_en` signal. The signal is asserted only if the store candidate has no conflicts with older loads (`NOT store_conflict`) AND its entry is fully prepared (i.e., it is allocated and both its address and data are valid).
+        1.  It performs a final check to generate the `store_en` signal. The signal is asserted only if the store candidate has no conflicts with older loads (`NOT store_conflict`) AND its entry is fully prepared (i.e., it is allocated and both its address and data are valid) AND store issue is not stalled (`NOT store_issue_stall`).
         2.  If `store_en` is asserted, the logic gates the address and data from the store entry at `stq_issue` to the write request output ports.
 
     * **Output**:
@@ -528,4 +593,3 @@ This logic is the final stage of the dependency-checking pipeline. It is respons
     - Stage 2 `pipe1`
 
 > **Note:** Each of these stages can be independently enabled or disabled via the `pipeComp`, `pipe0`, and `pipe1` config flags—so you only pay the pipeline overhead where you need the extra timing slack.
-

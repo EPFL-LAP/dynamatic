@@ -11,15 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Transforms/Speculation/PlacementFinder.h"
 #include "experimental/Transforms/Speculation/SpeculationPlacement.h"
-#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
@@ -35,7 +32,6 @@ using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
 using namespace dynamatic::experimental;
-using namespace dynamatic::experimental::speculation;
 
 // [START Boilerplate code for the MLIR pass]
 #include "experimental/Transforms/Passes.h" // IWYU pragma: keep
@@ -55,11 +51,11 @@ struct HandshakeSpeculationPass
 
   using HandshakeSpeculationBase::HandshakeSpeculationBase;
 
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 private:
   SpeculationPlacements placements;
-  SpeculatorOp specOp;
+  SpeculatorOp speculatorOp;
 
   // In the placeCommits method, commit units are temporarily connected to
   // this value as an alternative to control signals and are subsequently
@@ -76,11 +72,8 @@ private:
   /// signal.
   LogicalResult placeCommits();
 
-  /// Generate the save-commit control path and return the control signal
-  FailureOr<Value> generateSaveCommitCtrl();
-
-  /// Place save-commit units.
-  LogicalResult placeSaveCommits(Value ctrlSignal);
+  /// Place save-commit units and connect directly to speculator
+  LogicalResult placeSaveCommits();
 
   /// Adds a spec tag to the operand/result types in the speculative region.
   /// Traverses both upstream and downstream within the region, starting from
@@ -94,7 +87,6 @@ private:
   // their type requirements.
   LogicalResult addNonSpecOp();
 };
-} // namespace
 
 // The list item to trace the branches that need to be replicated
 struct BranchTracingItem {
@@ -241,7 +233,7 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
             /*trueResultType=*/conditionOperand.getType(),
             /*falseResultType=*/conditionOperand.getType(),
             /*specTag=*/valueForSpecTag, conditionOperand);
-        inheritBB(specOp, *branchDiscardNonSpec);
+        inheritBB(branchOp, *branchDiscardNonSpec);
       }
 
       std::optional<ConditionalBranchOp> branchReplicated =
@@ -254,7 +246,7 @@ routeCommitControlRecursive(MLIRContext *ctx, SpeculatorOp &specOp,
             branchDiscardNonSpec->getLoc(),
             /*condition=*/branchDiscardNonSpec->getTrueResult(),
             /*data=*/ctrlSignal);
-        inheritBB(specOp, *branchReplicated);
+        inheritBB(*branchDiscardNonSpec, *branchReplicated);
       }
 
       // Update ctrlSignal
@@ -314,17 +306,17 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
   llvm::DenseSet<Operation *> arrived;
   std::vector<BranchTracingItem> branchTrace;
   // Start traversal from the speculator
-  for (OpOperand &succOpOperand : specOp.getDataOut().getUses()) {
-    routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
-                                branchTrace);
+  for (OpOperand &succOpOperand : speculatorOp.getDataOut().getUses()) {
+    routeCommitControlRecursive(&getContext(), speculatorOp, arrived,
+                                succOpOperand, branchTrace);
   }
   // Start traversal from save-commit units
-  for (auto saveCommitOp :
-       mlir::cast<FuncOp>(specOp->getParentOp()).getOps<SpecSaveCommitOp>()) {
+  for (auto saveCommitOp : mlir::cast<FuncOp>(speculatorOp->getParentOp())
+                               .getOps<SpecSaveCommitOp>()) {
     for (OpOperand &succOpOperand : saveCommitOp.getDataOut().getUses()) {
       branchTrace.clear();
-      routeCommitControlRecursive(&getContext(), specOp, arrived, succOpOperand,
-                                  branchTrace);
+      routeCommitControlRecursive(&getContext(), speculatorOp, arrived,
+                                  succOpOperand, branchTrace);
     }
   }
 
@@ -334,7 +326,7 @@ LogicalResult HandshakeSpeculationPass::routeCommitControl() {
 
 LogicalResult HandshakeSpeculationPass::placeCommits() {
   // Create a temporal value to connect the commits
-  Value commitCtrl = specOp.getCommitCtrl();
+  Value commitCtrl = speculatorOp.getCommitCtrl();
   OpBuilder builder(&getContext());
 
   // Build a temporary control value using mlir::UnrealizedConversionCastOp
@@ -345,7 +337,7 @@ LogicalResult HandshakeSpeculationPass::placeCommits() {
   fakeControlForCommits =
       builder
           .create<mlir::UnrealizedConversionCastOp>(
-              specOp->getLoc(), commitCtrl.getType(), ValueRange{})
+              speculatorOp->getLoc(), commitCtrl.getType(), ValueRange{})
           .getResult(0);
 
   // Place commits and connect to the fake control signal
@@ -360,7 +352,7 @@ LogicalResult HandshakeSpeculationPass::placeCommits() {
     SpecCommitOp newOp = builder.create<SpecCommitOp>(
         dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
         /*dataIn=*/srcOpResult, /*ctrl=*/fakeControlForCommits.value());
-    inheritBB(dstOp, newOp);
+    inheritBB(srcOpResult.getDefiningOp(), newOp);
 
     // Connect the new CommitOp to dstOp
     operand->set(newOp.getResult());
@@ -369,14 +361,27 @@ LogicalResult HandshakeSpeculationPass::placeCommits() {
   return success();
 }
 
-LogicalResult HandshakeSpeculationPass::placeSaveCommits(Value ctrlSignal) {
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
+LogicalResult HandshakeSpeculationPass::placeSaveCommits() {
+  OpBuilder builder(&getContext());
+
+  // Save-Commits receive two control inputs from the Speculator:
+  // issueCtrl and historyCtrl
+  // Both connect directly from the speculator to the save-commit
+  // with no routing.
+  // The first controls issuing tokens from the save-commit
+  // The second controls updating the save-commits internal memory
+  // If the speculator wishes to take an action which affects both
+  // both are sent simultaneously from the speculator
+  // and consumed simultaneously from the save-commit
+  // to ensure each atomic action is processed correctly
+  Value issueCtrl = speculatorOp.getIssueCtrl();
+  Value historyCtrl = speculatorOp.getHistoryCtrl();
 
   // Get the specified FIFO depth
   unsigned fifoDepth = placements.getSaveCommitsFifoDepth();
   if (fifoDepth == 0) {
-    llvm_unreachable("Save Commit FIFO depth cannot be 0");
+    llvm::errs() << "Save Commit FIFO depth cannot be 0\n";
+    return failure();
   }
 
   for (OpOperand *operand : placements.getPlacements<SpecSaveCommitOp>()) {
@@ -385,11 +390,15 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits(Value ctrlSignal) {
 
     // Create and connect the new Operation
     builder.setInsertionPoint(dstOp);
-    // resultType is tentative and will be updated in the addSpecTag algorithm
-    // later.
+
+    // resultType is tentative
+    // since we place the save-commit before we mark
+    // where the spec tag is needed
+    // and so will be updated later
     SpecSaveCommitOp newOp = builder.create<SpecSaveCommitOp>(
         dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-        /*dataIn=*/srcOpResult, /*ctrl=*/ctrlSignal,
+        /*dataIn=*/srcOpResult, /*issueCtrl=*/issueCtrl,
+        /*historyCtrl=*/historyCtrl,
         /*fifoDepth=*/fifoDepth);
     inheritBB(dstOp, newOp);
 
@@ -398,116 +407,6 @@ LogicalResult HandshakeSpeculationPass::placeSaveCommits(Value ctrlSignal) {
   }
 
   return success();
-}
-
-static handshake::ConditionalBranchOp findControlBranch(Operation *op) {
-  handshake::FuncOp funcOp = op->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "op should have parent function");
-  auto handshakeBlocks = getLogicBBs(funcOp);
-  unsigned bb = getLogicBB(op).value();
-
-  for (auto condBrOp : funcOp.getOps<handshake::ConditionalBranchOp>()) {
-    if (auto brBB = getLogicBB(condBrOp); !brBB || brBB != bb)
-      continue;
-
-    for (Value result : condBrOp->getResults()) {
-      for (Operation *user : result.getUsers()) {
-
-        if (isBackedge(result, user))
-          return condBrOp;
-      }
-    }
-  }
-
-  return nullptr;
-}
-
-FailureOr<Value> HandshakeSpeculationPass::generateSaveCommitCtrl() {
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  // The save commits are a result of a control branch being in the BB
-  // The control path for the SC needs to replicate the branch
-  ConditionalBranchOp controlBranch = findControlBranch(specOp);
-  if (controlBranch == nullptr) {
-    specOp->emitError() << "Could not find backedge within speculation bb.\n";
-    return failure();
-  }
-
-  // To connect a Save-Commit, two control signals are sent from the Speculator
-  // and are merged before reaching the Save-Commit.
-  // The tokens take differents paths. One (SCSaveCtrl) needs to always reach
-  // the SC, the other (SCCommitCtrl) should follow the actual branches
-  // similarly to the Commits
-  builder.setInsertionPointAfterValue(specOp.getSCCommitCtrl());
-
-  // First, discard if speculation didn't happen
-
-  auto conditionOperand = controlBranch.getConditionOperand();
-  // trueResultType and falseResultType are tentative and will be updated in the
-  // addSpecTag algorithm later.
-  auto branchDiscardCondNonSpec =
-      builder.create<handshake::SpeculatingBranchOp>(
-          controlBranch.getLoc(),
-          /*trueResultType=*/conditionOperand.getType(),
-          /*falseResultType=*/conditionOperand.getType(),
-          /*specTag=*/specOp.getDataOut(), conditionOperand);
-  inheritBB(specOp, branchDiscardCondNonSpec);
-
-  // Second, discard if speculation happened but it was correct
-  // Create a conditional branch driven by SCBranchControl from speculator
-  // SCBranchControl discards the commit-like signal when speculation is correct
-  auto branchDiscardCondNonMisspec =
-      builder.create<handshake::ConditionalBranchOp>(
-          branchDiscardCondNonSpec.getLoc(), specOp.getSCIsMisspec(),
-          branchDiscardCondNonSpec.getTrueResult());
-  inheritBB(specOp, branchDiscardCondNonMisspec);
-
-  // This branch will propagate the signal SCCommitControl according to
-  // the control branch condition, which comes from branchDiscardCondNonMisSpec
-  auto branchReplicated = builder.create<handshake::ConditionalBranchOp>(
-      branchDiscardCondNonMisspec.getLoc(),
-      branchDiscardCondNonMisspec.getTrueResult(), specOp.getSCCommitCtrl());
-  inheritBB(specOp, branchReplicated);
-
-  // We create a Merge operation to join SCCSaveCtrl and SCCommitCtrl signals
-  SmallVector<Value, 2> mergeOperands;
-  mergeOperands.push_back(specOp.getSCSaveCtrl());
-
-  // Helper function to check if a value leads to a Backedge
-  auto isBranchBackedge = [&](Value result) {
-    return llvm::any_of(result.getUsers(), [&](Operation *user) {
-      return isBackedge(result, user);
-    });
-  };
-
-  // We need to send the control token to the same path that the speculative
-  // token followed. Hence, if any branch output leads to a backedge, replicate
-  // the branch in the SaveCommit control path.
-
-  // Check if trueResult of controlBranch leads to a backedge (loop)
-  if (isBranchBackedge(controlBranch.getTrueResult())) {
-    mergeOperands.push_back(branchReplicated.getTrueResult());
-  }
-  // Check if falseResult of controlBranch leads to a backedge (loop)
-  else if (isBranchBackedge(controlBranch.getFalseResult())) {
-    mergeOperands.push_back(branchReplicated.getFalseResult());
-  }
-  // If neither trueResult nor falseResult leads to a backedge, handle the error
-  else {
-    unsigned bb = getLogicBB(specOp).value();
-    controlBranch->emitError()
-        << "Could not find the backedge in the Control Branch " << bb << "\n";
-    return failure();
-  }
-
-  // All the inputs to the merge operation are ready
-  auto mergeOp = builder.create<handshake::MergeOp>(branchReplicated.getLoc(),
-                                                    mergeOperands);
-  inheritBB(specOp, mergeOp);
-
-  // The control signal is the result of the merge op.
-  return mergeOp.getResult();
 }
 
 std::optional<Value> findControlInputToBB(handshake::FuncOp &funcOp,
@@ -558,7 +457,10 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   Value srcOpResult = operand.get();
 
   handshake::FuncOp funcOp = dstOp->getParentOfType<handshake::FuncOp>();
-  assert(funcOp && "op should have parent function");
+  if (!funcOp) {
+    dstOp->emitError("Op should have parent function.");
+    return failure();
+  }
 
   // Get the BB number of the operation safely
   std::optional<unsigned> targetBB = getLogicBB(dstOp);
@@ -580,22 +482,23 @@ LogicalResult HandshakeSpeculationPass::placeSpeculator() {
   // Get the specified FIFO depth
   unsigned fifoDepth = placements.getSpeculatorFifoDepth();
   if (fifoDepth == 0) {
-    llvm_unreachable("Speculator FIFO depth cannot be 0");
+    llvm::errs() << "Speculator FIFO depth cannot be 0\n";
+    return failure();
   }
 
-  // resultType is tentative and will be updated in the addSpecTag algorithm
+  // dataOutType is tentative and will be updated in the addSpecTag algorithm
   // later.
-  specOp = builder.create<handshake::SpeculatorOp>(
-      dstOp->getLoc(), /*resultType=*/srcOpResult.getType(),
-      /*dataIn=*/srcOpResult, /*specIn=*/specTrigger.value(), fifoDepth);
+  speculatorOp = builder.create<SpeculatorOp>(
+      dstOp->getLoc(), /*dataOutType=*/srcOpResult.getType(),
+      /*dataIn=*/srcOpResult, /*trigger=*/specTrigger.value(), fifoDepth);
 
   // Replace uses of the original source operation's result with the
-  // speculator's result, except in the speculator's operands (otherwise this
-  // would create a self-loop from the speculator to the speculator)
-  srcOpResult.replaceAllUsesExcept(specOp.getDataOut(), specOp);
+  // speculator's dataOut, except where srcOpResult feeds the speculator
+  // itself (otherwise this would create a self-loop on the speculator).
+  srcOpResult.replaceAllUsesExcept(speculatorOp.getDataOut(), speculatorOp);
 
   // Assign a Basic Block to the speculator
-  inheritBB(dstOp, specOp);
+  inheritBB(dstOp, speculatorOp);
 
   return success();
 }
@@ -723,26 +626,46 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
     return success();
   }
 
-  if (isa<handshake::ControlMergeOp>(op) || isa<handshake::MuxOp>(op)) {
-    if (isDownstream) {
-      // Continue normal downstream traversal, including the index channel
-      // (i.e., ControlMergeOp).
-      for (auto result : op->getResults()) {
-        for (auto &operand : result.getUses()) {
-          if (failed(
-                  addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
-            return failure();
-        }
+  if (isa<handshake::ControlMergeOp>(op)) {
+    // Downstream traversal only of the cmerge,
+    // we do not know if the operands are part of the spec region
+    // so only if they are encountered through a separate downstream
+    // are they labelled
+    for (auto result : op->getResults()) {
+      for (auto &operand : result.getUses()) {
+        // Skip the operand that is the same as the current operand
+        if (!isDownstream && &operand == &opOperand)
+          continue;
+        if (failed(
+                addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
+          return failure();
       }
-    } else {
-      // Continue upstream traversal only to the MuxOp's index channel
-      if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
-        for (auto &operand : muxOp.getSelectOperand().getUses()) {
-          if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false,
-                                                     visited)))
-            return failure();
-        }
+    }
+
+    return success();
+  }
+
+  if (auto muxOp = dyn_cast<handshake::MuxOp>(op)) {
+    // Normal downstream traversal
+    for (auto result : op->getResults()) {
+      for (auto &operand : result.getUses()) {
+        // Skip the operand that is the same as the current operand
+        if (!isDownstream && &operand == &opOperand)
+          continue;
+        if (failed(
+                addSpecTagToSpecRegionRecursive(ctx, operand, true, visited)))
+          return failure();
       }
+    }
+    // Continue upstream traversal only to the MuxOp's index channel
+    // we do not know if the data operands are part of the spec region
+    // so only if they are encountered through a separate downstream
+    // are they labelled
+    for (auto &operand : muxOp.getSelectOperand().getUses()) {
+      if (isDownstream && &operand == &opOperand)
+        continue;
+      if (failed(addSpecTagToSpecRegionRecursive(ctx, operand, false, visited)))
+        return failure();
     }
 
     return success();
@@ -775,12 +698,12 @@ addSpecTagToSpecRegionRecursive(MLIRContext &ctx, OpOperand &opOperand,
 
 LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
   llvm::DenseSet<Operation *> visited;
-  visited.insert(specOp);
+  visited.insert(speculatorOp);
 
   // For the speculator, perform downstream traversal to only dataOut, skipping
   // control signals. The upstream dataIn will be handled by the recursive
   // traversal.
-  for (OpOperand &opOperand : specOp.getDataOut().getUses()) {
+  for (OpOperand &opOperand : speculatorOp.getDataOut().getUses()) {
     if (failed(addSpecTagToSpecRegionRecursive(getContext(), opOperand, true,
                                                visited)))
       return failure();
@@ -789,7 +712,7 @@ LogicalResult HandshakeSpeculationPass::addSpecTagToSpecRegion() {
 }
 
 LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
-  auto funcOp = cast<FuncOp>(specOp->getParentOp());
+  auto funcOp = cast<FuncOp>(speculatorOp->getParentOp());
   OpBuilder builder(&getContext());
 
   for (auto mergeLikeOp : funcOp.getOps<MergeLikeOpInterface>()) {
@@ -826,19 +749,15 @@ LogicalResult HandshakeSpeculationPass::addNonSpecOp() {
   return success();
 }
 
-void HandshakeSpeculationPass::runDynamaticPass() {
-  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+void HandshakeSpeculationPass::runOnOperation() {
+  mlir::ModuleOp modOp = getOperation();
 
-  if (failed(SpeculationPlacements::readFromJSON(
-          this->jsonPath, this->placements, nameAnalysis)))
+  if (failed(SpeculationPlacements::readFromAttribute(modOp, this->placements)))
     return signalPassFailure();
 
-  // Run automatic finding of the unit placements
-  if (this->automatic) {
-    PlacementFinder finder(this->placements);
-    if (failed(finder.findPlacements()))
-      return signalPassFailure();
-  }
+  PlacementFinder finder(this->placements);
+  if (failed(finder.findPlacements()))
+    return signalPassFailure();
 
   if (failed(placeSpeculator()))
     return signalPassFailure();
@@ -848,18 +767,9 @@ void HandshakeSpeculationPass::runDynamaticPass() {
     llvm::errs() << "Error: Placement of save units is not supported.\n";
     return signalPassFailure();
   }
-  // Place Save operations
-  // if (failed(placeUnits<handshake::SpecSaveOp>(this->specOp.getSaveCtrl())))
-  //   return signalPassFailure();
 
   if (!placements.getPlacements<SpecSaveCommitOp>().empty()) {
-    // Generate Place SaveCommit operations and the SaveCommit control path
-    FailureOr<Value> saveCommitCtrl = generateSaveCommitCtrl();
-    if (failed(saveCommitCtrl))
-      return signalPassFailure();
-
-    // Place SaveCommit operations
-    if (failed(placeSaveCommits(saveCommitCtrl.value())))
+    if (failed(placeSaveCommits()))
       return signalPassFailure();
   }
 
@@ -881,4 +791,13 @@ void HandshakeSpeculationPass::runDynamaticPass() {
   // to satisfy their type requirements.
   if (failed(addNonSpecOp()))
     return signalPassFailure();
+
+  // Name any ops created by this pass; subsequent passes assume every op has
+  // a unique name.
+  NameAnalysis &nameAnalysis = getAnalysis<NameAnalysis>();
+  if (failed(nameAnalysis.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+  markAnalysesPreserved<NameAnalysis>();
 }
+
+} // namespace

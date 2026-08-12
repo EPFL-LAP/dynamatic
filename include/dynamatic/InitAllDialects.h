@@ -16,6 +16,7 @@
 
 #include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Dialect/Synth/SynthDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -32,7 +33,8 @@ inline void registerAllDialects(mlir::DialectRegistry &registry) {
                   mlir::math::MathDialect, mlir::memref::MemRefDialect,
                   mlir::func::FuncDialect, mlir::arith::ArithDialect,
                   mlir::cf::ControlFlowDialect, mlir::scf::SCFDialect,
-                  handshake::HandshakeDialect, hw::HWDialect>();
+                  handshake::HandshakeDialect, hw::HWDialect,
+                  synth::SynthDialect>();
 }
 
 } // namespace dynamatic
