@@ -209,6 +209,7 @@ class CBCSolverFixture : public BaseFixture {};
 // Use FPL22 placement algorithm on a small subset of MiscBenchmarks
 class FPL22Fixture : public BaseFixture {};
 class MemoryFixture : public BaseFixture {};
+class MemoryPartitionFixture : public BaseFixture {};
 class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
@@ -280,6 +281,24 @@ TEST_P(MemoryFixture, basic) {
       .name = GetParam(),
       .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
+      .testVerilog = true,
+      .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+TEST_P(MemoryPartitionFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory_partition",
       .testVerilog = true,
       .useSharing = false,
       .milpSolver = "gurobi",
@@ -545,6 +564,17 @@ INSTANTIATE_TEST_SUITE_P(
       "test_constant_array"
     ),
     [](const auto &info) { return "memory_" + info.param; });
+
+INSTANTIATE_TEST_SUITE_P(
+    MemoryPartitionBenchmarks, MemoryPartitionFixture,
+    testing::Values(
+      "test_1d_partition",
+      "test_1d_partition_f4",
+      "test_1d_partition_fu",
+      "test_2d_partition_inner",
+      "test_2d_partition"
+    ),
+    [](const auto &info) { return "memory_partition_" + info.param; });
 
 INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
     testing::Values(
