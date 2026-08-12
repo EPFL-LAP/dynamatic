@@ -116,7 +116,7 @@ void guardedStore(IRBuilder<> &b, Value *ptr, Value *val, Align align) {
   createOpaqueGuard(
       kind, {val, ptr}, Type::getVoidTy(b.getContext()),
       [align](IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
-        StoreInst *store = body.CreateStore(a[0], a[1]);
+        StoreInst *store = body.CreateStore(/*Val=*/a[1], /*Ptr=*/ a[0]);
         store->setAlignment(align);
         // NOTE: nullptr used to satisfy Lambda function Value* type
         return nullptr;
