@@ -1,12 +1,12 @@
 // -----------------------------------------------------------------------
 // Guard ALL load/stores in a function from optimizations by wrapping them
-// in opaque (always-inline) function calls. 
+// in opaque (always-inline) function calls.
 //
 // Ex. Store
 // C:
 //  x[idx] = var;
 //
-// LLVM: 
+// LLVM:
 //  %gep = getelementptr inbounds i32, ptr %x, i64 %idx
 //  store i32 %value, ptr %gep, align 4
 //
@@ -15,7 +15,7 @@
 //  call void @__dyn_guard.store.align4.ptr.i32.to.void(ptr %gep, i32 %var)
 //
 // Ex. Load
-// C: 
+// C:
 //  int var = x[idx];
 //
 // LLVM:
@@ -98,25 +98,28 @@ CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
   return callSiteBuilder.CreateCall(fn, args, callName);
 }
 
-Value *guardedLoad(IRBuilder<> &b, Value *ptr, Type *elemTy, Align align,
-                   const Twine &name = "") {
-  std::string kind = ("load.align" + Twine(align.value())).str();
+Value *guardedLoad(IRBuilder<> &b, LoadInst *load) {
+  std::string kind = "load.align" + Twine(load->getAlign().value()).str();
+  std::string name = load->hasName() ? load->getName().str() : "ld";
   return createOpaqueGuard(
-      kind, {ptr}, elemTy,
-      [elemTy, align](IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
-        LoadInst *load = body.CreateLoad(elemTy, a[0]);
-        load->setAlignment(align);
-        return load;
+      kind, {load->getPointerOperand()}, load->getType(),
+      [align = load->getAlign(), elemTy = load->getType()](
+          IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
+        LoadInst *l = body.CreateLoad(elemTy, a[0]);
+        l->setAlignment(align);
+        return l;
       },
-      b, name);
+      b, name + ".g");
 }
 
-void guardedStore(IRBuilder<> &b, Value *ptr, Value *val, Align align) {
-  std::string kind = ("store.align" + Twine(align.value())).str();
+void guardedStore(IRBuilder<> &b, StoreInst *store) {
+  std::string kind = ("store.align" + Twine(store->getAlign().value())).str();
   createOpaqueGuard(
-      kind, {val, ptr}, Type::getVoidTy(b.getContext()),
-      [align](IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
-        StoreInst *store = body.CreateStore(/*Val=*/a[1], /*Ptr=*/ a[0]);
+      kind, {store->getValueOperand(), store->getPointerOperand()},
+      Type::getVoidTy(b.getContext()),
+      [align = store->getAlign()](IRBuilder<> &body,
+                                  ArrayRef<Value *> a) -> Value * {
+        StoreInst *store = body.CreateStore(/*Val=*/a[0], /*Ptr=*/a[1]);
         store->setAlignment(align);
         // NOTE: nullptr used to satisfy Lambda function Value* type
         return nullptr;
@@ -161,17 +164,14 @@ PreservedAnalyses GuardLoadStore::run(Function &f, FunctionAnalysisManager &) {
 
   for (LoadInst *load : loads) {
     IRBuilder<> b(load);
-    Twine name = load->hasName() ? load->getName() : Twine("ld");
-    Value *guarded = guardedLoad(b, load->getPointerOperand(), load->getType(),
-                                 load->getAlign(), name + ".g");
+    Value *guarded = guardedLoad(b, load);
     load->replaceAllUsesWith(guarded);
     load->eraseFromParent();
   }
 
   for (StoreInst *store : stores) {
     IRBuilder<> b(store);
-    guardedStore(b, store->getPointerOperand(), store->getValueOperand(),
-                 store->getAlign());
+    guardedStore(b, store);
     store->eraseFromParent();
   }
 
