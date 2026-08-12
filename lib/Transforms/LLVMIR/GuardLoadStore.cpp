@@ -118,6 +118,7 @@ void guardedStore(IRBuilder<> &b, Value *ptr, Value *val, Align align) {
       [align](IRBuilder<> &body, ArrayRef<Value *> a) -> Value * {
         StoreInst *store = body.CreateStore(a[1], a[0]);
         store->setAlignment(align);
+        // NOTE: nullptr used to satisfy Lambda function Value* type
         return nullptr;
       },
       b);
