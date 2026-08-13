@@ -764,11 +764,10 @@ INSTANTIATE_TEST_SUITE_P(
       [](const auto &info) { return info.param; });
 #endif // DYNAMATIC_ENABLE_CBC
 
-// Smoke test: Using the fast token delivery algorithm to compile the circuit.
 INSTANTIATE_TEST_SUITE_P(
     Tiny, FtdWithSimpleBuffersFixture,
     testing::Values(
-      // "matvec" // matvec does not work currently
+      "matvec",
       "fir",
       "if_loop_add",
       "if_loop_mul",
