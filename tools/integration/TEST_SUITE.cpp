@@ -144,6 +144,10 @@ struct IntegrationTest {
   // Use model checking to remove redundant logic.
   bool useRigidification = false;
   bool verifyInvariants = false;
+
+  // Enable FTD
+  bool useFTD = false;
+
   // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
   bool useDuplication = false;
@@ -192,6 +196,7 @@ int IntegrationTest::run() {
              << " --buffer-algorithm " << this->bufferAlgorithm
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
+             << (this->useFTD ? " --fast-token-delivery" : "")
              << (this->useSpeculation ? " --speculation" : "")
              << (this->useDuplication ? " --enable-duplication" : "")
              << (this->instrumentII ? " --instrument-ii" : "")
@@ -297,6 +302,7 @@ class DuplicationFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
+class FtdWithSimpleBuffersFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
   IntegrationTest config{
@@ -335,6 +341,25 @@ TEST_P(CBCSolverFixture, basic) {
   logPerformance(config.simTime);
 }
 #endif // DYNAMATIC_ENABLE_CBC
+
+TEST_P(FtdWithSimpleBuffersFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .disableLsq = true,
+      .milpSolver = "cbc",
+      .bufferAlgorithm = "on-merges",
+      .useFTD = true,
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
 
 #if 0
 TEST_P(FPL22Fixture, basic) {
@@ -738,6 +763,24 @@ INSTANTIATE_TEST_SUITE_P(
       ),
       [](const auto &info) { return info.param; });
 #endif // DYNAMATIC_ENABLE_CBC
+
+// Smoke test: Using the fast token delivery algorithm to compile the circuit.
+INSTANTIATE_TEST_SUITE_P(
+    Tiny, FtdWithSimpleBuffersFixture,
+    testing::Values(
+      // "matvec" // matvec does not work currently
+      "fir",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir",
+      "matvec",
+      "kernel_2mm",
+      "kernel_3mm",
+      "kmp",
+      "gcd",
+      "bicg"
+      ),
+      [](const auto &info) { return info.param; });
 
 #if 0
 // Smoke test: Using the FPL22 placement algorithm to optimize some simple benchmarks
