@@ -165,6 +165,19 @@ Instruction *findBaseGEP(Instruction *inst) {
   return findBaseGEPInternal(addr, inst);
 }
 
+// Helper function for getting StringLiterals from LLVM value
+std::optional<StringRef> extractStringLiteral(Value *v) {
+  auto *gv = dyn_cast<GlobalVariable>(v->stripPointerCasts());
+  if (!gv || !gv->hasInitializer())
+    return std::nullopt;
+
+  auto *cda = dyn_cast<ConstantDataArray>(gv->getInitializer());
+  if (!cda || !cda->isCString())
+    return std::nullopt;
+
+  return cda->getAsCString();
+}
+
 /// \brief: After shrinking the array to an optimal size, we also need to update
 /// the GEP ops to the new array.
 ///
