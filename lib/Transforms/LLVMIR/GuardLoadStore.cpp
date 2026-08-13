@@ -33,6 +33,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include <vector>
@@ -175,9 +176,7 @@ PreservedAnalyses GuardLoadStore::run(Function &f, FunctionAnalysisManager &) {
     store->eraseFromParent();
   }
 
-  PreservedAnalyses pa;
-  pa.preserveSet<CFGAnalyses>();
-  return pa;
+  return PreservedAnalyses::all();
 }
 
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
