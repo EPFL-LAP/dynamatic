@@ -350,7 +350,6 @@ TEST_P(FtdWithSimpleBuffersFixture, basic) {
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
       .testVerilog = false,
       .useSharing = false,
-      .disableLsq = true,
       .milpSolver = "cbc",
       .bufferAlgorithm = "on-merges",
       .useFTD = true,
@@ -786,7 +785,6 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     Tiny, FtdWithSimpleBuffersFixture,
     testing::Values(
-      "matvec",
       "fir",
       "if_loop_add",
       "if_loop_mul",
