@@ -353,7 +353,7 @@ TEST_P(FtdWithSimpleBuffersFixture, basic) {
       .useSharing = false,
       .useFTD = true,
       .milpSolver = "gurobi",
-      .bufferAlgorithm = "fpga20",
+      .bufferAlgorithm = "on-merges",
       .simTime = -1,
       // clang-format on
   };
