@@ -72,6 +72,12 @@ using DimInfoOfAllDimensions = std::vector<DimInfo>;
 
 namespace {
 
+struct PartitionInfo {
+  unsigned dimension;
+  unsigned factor;
+  std::string style;
+};
+
 struct AccessInfo {
   std::map<Instruction *, isl::set> accessMaps;
 
@@ -619,6 +625,79 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
   }
 }
 
+// Function that returns map of arrayNames -> partitionInfo for later partition
+// has side effect of removing all call sites of pragma markers and deleting the
+// pragma marker function
+//
+// NOTE: This could be made more general, i.e. providing
+// the name of the pragma marker function and parsing out the function arguemnts
+// and naming them later/providing a handler function that maps from argument
+// index to struct field. Overkill if this is the only occurance for this
+std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
+  std::map<std::string, PartitionInfo> result;
+  std::vector<CallInst *> callSites;
+  Function *markerFn = nullptr;
+
+  for (auto &bb : f) {
+    for (auto &inst : bb) {
+      auto *call = dyn_cast<CallInst>(&inst);
+      if (!call) {
+        continue;
+      }
+
+      Function *callee = call->getCalledFunction();
+      if (!callee || callee->getName() != "__dyn_array_partition") {
+        continue;
+      }
+
+      markerFn = callee;
+
+      if (call->arg_size() != 4) {
+        llvm::report_fatal_error(
+            Twine("__dyn_array_partition: expected 4 arguments, got ") +
+            Twine(call->arg_size()));
+      }
+
+      auto arrName = extractStringLiteral(call->getArgOperand(0));
+      auto *dimConst = dyn_cast<ConstantInt>(call->getArgOperand(1));
+      auto *factorConst = dyn_cast<ConstantInt>(call->getArgOperand(2));
+      auto style = extractStringLiteral(call->getArgOperand(3));
+
+      if (!arrName)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: could not recover array name "
+            "string literal");
+      if (!dimConst || !factorConst)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: dimension/factor must be "
+            "constant integers");
+      if (!style)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: could not recover style string"
+            "literal");
+
+      LLVM_DEBUG(llvm::errs()
+                 << "Partitioning: " << arrName << "\n\t" << dimConst << "\n\t"
+                 << factorConst << "\n\t" << style << "\n");
+
+      result[arrName->str()] = PartitionInfo{
+          static_cast<unsigned>(dimConst->getZExtValue()),
+          static_cast<unsigned>(factorConst->getZExtValue()), style->str()};
+
+      callSites.push_back(call);
+    }
+  }
+
+  // Finally remove all found call sites from the function
+  for (auto *call : callSites)
+    call->eraseFromParent();
+
+  // Finally remove the external function declaration
+  if (markerFn && markerFn->use_empty())
+    markerFn->eraseFromParent();
+
+  return result;
+}
 } // namespace
 
 struct ArrayPartition : PassInfoMixin<ArrayPartition> {
@@ -636,6 +715,8 @@ PreservedAnalyses ArrayPartition::run(Function &f,
         << "Skipping main function for automatic array partitioning!\n";
     return PreservedAnalyses::all();
   }
+
+  auto pragmaInfo = collectAndErasePragmaMarkers(f);
 
   auto islCtx = isl::ctx(isl_ctx_alloc());
 
