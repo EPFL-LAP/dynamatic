@@ -346,13 +346,14 @@ TEST_P(FtdWithSimpleBuffersFixture, basic) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .testVerilog = false,
+      .testVerilog = true,
       .useSharing = false,
-      .milpSolver = "cbc",
-      .bufferAlgorithm = "on-merges",
       .useFTD = true,
-      .simTime = -1
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1,
       // clang-format on
   };
   EXPECT_EQ(config.run(), 0);
