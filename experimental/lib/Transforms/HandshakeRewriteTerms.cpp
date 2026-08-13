@@ -39,13 +39,6 @@ using namespace dynamatic;
 
 namespace {
 
-#define OPTIM_DISTR                                                            \
-  false // associate it with a disable of DistributeSuppresses,
-        // DistributeMergeRepeats,DistributeMuxRepeats
-#define OPTIM_BRANCH_TO_SUPP                                                   \
-  false // associate it with a disable of ConstructSuppresses,
-        // FixBranchesToSuppresses
-
 // Helper functions
 bool isFunctionStartArgument(Value value) {
   auto blockArg = dyn_cast<BlockArgument>(value);
@@ -487,174 +480,6 @@ struct RemoveFloatingLoop : public OpRewritePattern<MuxOrMergeOp> {
   }
 };
 
-// TODO the if-then-else rewrites
-// Remove redundant if-then-else structures
-struct RemoveBranchMergeIfThenElse
-    : public OpRewritePattern<handshake::MergeOp> {
-  using OpRewritePattern<handshake::MergeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::MergeOp mergeOp,
-                                PatternRewriter &rewriter) const override {
-
-    if (mergeOp->getNumOperands() != 2)
-      return failure();
-
-    // The two operands of the merge should be conditional Branches; otherwise,
-    // the pattern match fails
-    Operation *firstOperand = mergeOp.getOperands()[0].getDefiningOp();
-    Operation *secondOperand = mergeOp.getOperands()[1].getDefiningOp();
-    if (!isa_and_nonnull<handshake::ConditionalBranchOp>(firstOperand) ||
-        !isa_and_nonnull<handshake::ConditionalBranchOp>(secondOperand))
-      return failure();
-
-    handshake::ConditionalBranchOp firstBranchOperand =
-        cast<handshake::ConditionalBranchOp>(firstOperand);
-    handshake::ConditionalBranchOp secondBranchOperand =
-        cast<handshake::ConditionalBranchOp>(secondOperand);
-
-    if (!OPTIM_BRANCH_TO_SUPP) {
-      // New conditions: to ensure we only conside suppresses
-      // If the first branch is not a suppress, the pattern match fails
-      if ((!firstBranchOperand.getTrueResult().getUsers().empty()) ||
-          (firstBranchOperand.getTrueResult().getUsers().empty() &&
-           firstBranchOperand.getFalseResult().getUsers().empty()))
-        return failure();
-      // If the second branch is not a suppress, the pattern match fails
-      if ((!secondBranchOperand.getTrueResult().getUsers().empty()) ||
-          (secondBranchOperand.getTrueResult().getUsers().empty() &&
-           secondBranchOperand.getFalseResult().getUsers().empty()))
-        return failure();
-    }
-
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: Another new condition (to make a meaningful
-      // use of the suppress->distribute rule): the two suppresses should have
-      // only a single usage; otherwise the pattern match fails
-      if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-                        firstBranchOperand.getFalseResult().getUsers().end()) !=
-          1)
-        return failure();
-      if (std::distance(
-              secondBranchOperand.getFalseResult().getUsers().begin(),
-              secondBranchOperand.getFalseResult().getUsers().end()) != 1)
-        return failure();
-    }
-    Value firstBranchCondition = firstBranchOperand.getConditionOperand();
-    Value secondBranchCondition = secondBranchOperand.getConditionOperand();
-
-    // If the two original conditions are not equivalent, the pattern match
-    // fails
-    if (firstBranchCondition != secondBranchCondition)
-      return failure();
-
-    // If the data input of the two Branches is not the same, the pattern match
-    // fails
-    Value firstBranchData = firstBranchOperand.getDataOperand();
-    Value secondBranchData = secondBranchOperand.getDataOperand();
-    if (firstBranchData != secondBranchData)
-      return failure();
-
-    Value mergeOutput = mergeOp.getResult();
-
-    // Replace all uses of the merge output with the input of the Branches
-    rewriter.replaceAllUsesWith(mergeOutput, firstBranchData);
-    // Delete the merge
-    rewriter.eraseOp(mergeOp);
-
-    return success();
-  }
-};
-
-// Removes Conditional Branch and Mux
-// operation pairs if both the inputs of the Mux are outputs of the Conditional
-// Branch. The results of the MeMuxrge are replaced with the data operand.
-struct RemoveBranchMuxIfThenElse : public OpRewritePattern<handshake::MuxOp> {
-  using OpRewritePattern<handshake::MuxOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(handshake::MuxOp muxOp,
-                                PatternRewriter &rewriter) const override {
-
-    if (muxOp->getNumOperands() != 3)
-      return failure();
-
-    // The two operands of the mux should be conditional Branches; otherwise,
-    // the pattern match fails
-    Operation *firstOperand = muxOp.getDataOperands()[0].getDefiningOp();
-    Operation *secondOperand = muxOp.getDataOperands()[1].getDefiningOp();
-    if (!isa_and_nonnull<handshake::ConditionalBranchOp>(firstOperand) ||
-        !isa_and_nonnull<handshake::ConditionalBranchOp>(secondOperand))
-      return failure();
-
-    handshake::ConditionalBranchOp firstBranchOperand =
-        cast<handshake::ConditionalBranchOp>(firstOperand);
-    handshake::ConditionalBranchOp secondBranchOperand =
-        cast<handshake::ConditionalBranchOp>(secondOperand);
-
-    if (!OPTIM_BRANCH_TO_SUPP) {
-      // New conditions: to ensure we only conside suppresses
-      // If the first branch is not a suppress, the pattern match fails
-      if ((!firstBranchOperand.getTrueResult().getUsers().empty()) ||
-          (firstBranchOperand.getTrueResult().getUsers().empty() &&
-           firstBranchOperand.getFalseResult().getUsers().empty()))
-        return failure();
-      // If the second branch is not a suppress, the pattern match fails
-      if ((!secondBranchOperand.getTrueResult().getUsers().empty()) ||
-          (secondBranchOperand.getTrueResult().getUsers().empty() &&
-           secondBranchOperand.getFalseResult().getUsers().empty()))
-        return failure();
-    }
-
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: Another new condition (to make a meaningful
-      // use of the suppress->distribute rule): the two suppresses should have
-      // only a single usage; otherwise the pattern match fails
-      if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-                        firstBranchOperand.getFalseResult().getUsers().end()) !=
-          1)
-        return failure();
-      if (std::distance(
-              secondBranchOperand.getFalseResult().getUsers().begin(),
-              secondBranchOperand.getFalseResult().getUsers().end()) != 1)
-        return failure();
-    }
-
-    Value firstBranchCondition = firstBranchOperand.getConditionOperand();
-    Value firstOriginalBranchCondition = firstBranchCondition;
-    if (isa_and_nonnull<handshake::NotIOp>(
-            firstBranchCondition.getDefiningOp()))
-      firstOriginalBranchCondition =
-          firstBranchCondition.getDefiningOp()->getOperand(0);
-
-    Value secondBranchCondition = secondBranchOperand.getConditionOperand();
-    Value secondOriginalBranchCondition = secondBranchCondition;
-    if (isa_and_nonnull<handshake::NotIOp>(
-            secondBranchCondition.getDefiningOp()))
-      secondOriginalBranchCondition =
-          secondBranchCondition.getDefiningOp()->getOperand(0);
-
-    // If the two original conditions are not equivalent, the pattern match
-    // fails
-    if (firstOriginalBranchCondition != secondOriginalBranchCondition)
-      return failure();
-
-    // If the data input of the two Branches is not the same, the pattern match
-    // fails
-    Value firstBranchData = firstBranchOperand.getDataOperand();
-    Value secondBranchData = secondBranchOperand.getDataOperand();
-    if (firstBranchData != secondBranchData)
-      return failure();
-
-    Value muxOutput = muxOp.getResult();
-
-    // Replace all uses of the mux output with the input of the Branches
-    rewriter.replaceAllUsesWith(muxOutput, firstBranchData);
-    // Delete the mux
-    rewriter.eraseOp(muxOp);
-
-    return success();
-  }
-};
-
 // Removes Conditional Branch and mux/merge operation pairs if both the inputs
 // of the mux/merge are outputs of the Conditional Branch. The results of the
 // mux/merge are replaced with the data operand.
@@ -690,25 +515,19 @@ struct RemoveBranchIfThenElse : public OpRewritePattern<MuxOrMergeOp> {
     handshake::ConditionalBranchOp secondBranchOperand =
         cast<handshake::ConditionalBranchOp>(secondOperand);
 
-    if (!OPTIM_BRANCH_TO_SUPP) {
-      // New conditions: to ensure we only conside suppresses
-      if (!isSuppress(firstBranchOperand) || !isSuppress(secondBranchOperand))
-        return failure();
-    }
+    // If the first or second branch is not a suppress, the pattern match fails
+    if (!isSuppress(firstBranchOperand) || !isSuppress(secondBranchOperand))
+      return failure();
 
-    if (!OPTIM_DISTR) {
-      // Kill Distrib. for Optim.: Another new condition (to make a meaningful
-      // use of the suppress->distribute rule): the two suppresses should have
-      // only a single usage; otherwise the pattern match fails
-      if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-                        firstBranchOperand.getFalseResult().getUsers().end()) !=
-          1)
-        return failure();
-      if (std::distance(
-              secondBranchOperand.getFalseResult().getUsers().begin(),
-              secondBranchOperand.getFalseResult().getUsers().end()) != 1)
-        return failure();
-    }
+    // Each suppress output must only feed this mux/merge. If it has multiple users,
+    // the pattern match fails so DistributeSuppresses can split it first.
+    if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
+                      firstBranchOperand.getFalseResult().getUsers().end()) !=1)
+      return failure();
+    if (std::distance(
+            secondBranchOperand.getFalseResult().getUsers().begin(),
+            secondBranchOperand.getFalseResult().getUsers().end()) != 1)
+      return failure();
 
     Value firstBranchCondition = firstBranchOperand.getConditionOperand();
     Value secondBranchCondition = secondBranchOperand.getConditionOperand();
@@ -944,18 +763,14 @@ struct ExtractIfThenElseCondition
     handshake::ConditionalBranchOp secondBranchOperand =
         cast<handshake::ConditionalBranchOp>(secondOperand);
 
-    if (!OPTIM_BRANCH_TO_SUPP) {
-      // New condition: The firstBranchOperand has to be a suppress; otherwise,
-      // the pattern match fails
-      if (!firstBranchOperand.getTrueResult().getUsers().empty() ||
-          firstBranchOperand.getFalseResult().getUsers().empty())
-        return failure();
-      // The secondBranchOperand has to be a suppress; otherwise,
-      // the pattern match fails
-      if (!secondBranchOperand.getTrueResult().getUsers().empty() ||
-          secondBranchOperand.getFalseResult().getUsers().empty())
-        return failure();
-    }
+    // The firstBranchOperand has to be a suppress; otherwise,
+    // the pattern match fails
+    if (!isSuppress(firstBranchOperand))
+      return failure();
+    // The secondBranchOperand has to be a suppress; otherwise,
+    // the pattern match fails
+    if (!isSuppress(secondBranchOperand))
+      return failure();
 
     Value firstBranchCondition = firstBranchOperand.getConditionOperand();
     Value firstOriginalBranchCondition = firstBranchCondition;
@@ -1811,9 +1626,6 @@ struct ConstructSuppresses
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
-    if (OPTIM_BRANCH_TO_SUPP)
-      return failure();
-
     if (isSuppress(condBranchOp) ||
         condBranchOp.getFalseResult().getUsers().empty())
       return failure();
@@ -1845,9 +1657,6 @@ struct FixSuppresses : public OpRewritePattern<handshake::ConditionalBranchOp> {
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
-    if (OPTIM_BRANCH_TO_SUPP)
-      return failure();
-
     if (isSuppress(condBranchOp))
       return failure();
 
@@ -1898,8 +1707,6 @@ struct DistributeSuppresses
 
   LogicalResult matchAndRewrite(handshake::ConditionalBranchOp condBranchOp,
                                 PatternRewriter &rewriter) const override {
-    if (OPTIM_DISTR)
-      return failure();
     // All rewrites should operate on suppresses
     if (!isSuppress(condBranchOp))
       return failure();
@@ -1944,9 +1751,6 @@ struct DistributeRepeats : public OpRewritePattern<MuxOrMergeOp> {
 
   LogicalResult matchAndRewrite(MuxOrMergeOp muxOrMergeOp,
                                 PatternRewriter &rewriter) const override {
-    if (OPTIM_DISTR)
-      return failure();
-
     bool isMux = false;
     if (isa_and_nonnull<handshake::MuxOp>(muxOrMergeOp))
       isMux = true;
@@ -2121,13 +1925,10 @@ struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
     if (!foundCycle)
       return failure();
 
-    if (!OPTIM_BRANCH_TO_SUPP) {
-      // New condition: The condBranchOp has to be a suppress; otherwise,
-      // the pattern match fails
-      if (!condBranchOp.getTrueResult().getUsers().empty() ||
-          condBranchOp.getFalseResult().getUsers().empty())
-        return failure();
-    }
+    // The condBranchOp has to be a suppress; otherwise,
+    // the pattern match fails
+    if (!isSuppress(condBranchOp))
+      return failure();
 
     mergeOuterInputIdx = (mergeCycleInputIdx == 0) ? 1 : 0;
 
