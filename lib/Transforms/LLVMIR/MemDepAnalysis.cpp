@@ -684,39 +684,29 @@ bool hasMemoryReadOrWrite(ScopStmt &stmt) {
 
 // Returns the base address produced by the alloca instruction or the global
 // constant declaration.
-Value *findBaseInternal(Value *addr) {
-  if (auto *arg = dyn_cast<Argument>(addr)) {
-    if (!arg->getType()->isPointerTy())
-      llvm_unreachable("Only pointer arguments are considered addresses");
-    return addr;
+const Value *findBaseInternal(Value *addr) {
+  llvm::SmallVector<const llvm::Value *, 2> baseArray;
+  getUnderlyingObjects(addr, baseArray);
+  if (baseArray.empty()) {
+    llvm::report_fatal_error(
+        "Cannot determine the base array of the load operation! Aborting...");
+  } else if (baseArray.size() > 1) {
+    LLVM_DEBUG({
+      llvm::errs()
+          << "The index value is calculated from multiple base addresses!\n";
+      llvm::errs() << "List of addresses:\n";
+      for (const auto *addr : baseArray) {
+        addr->dump();
+      }
+    });
+    llvm::report_fatal_error(
+        "The index value is calculated from multiple distinct base "
+        "addresses. This is a currently unsupported IR construction.");
   }
-
-  // Example: returns a global constant or variable
-  if (isa<Constant>(addr))
-    return addr;
-
-  if (auto *inst = dyn_cast_or_null<Instruction>(addr)) {
-    if (isa<AllocaInst>(inst))
-      return addr;
-    if (auto *gepi = dyn_cast<GetElementPtrInst>(inst))
-      return findBaseInternal(gepi->getPointerOperand());
-    if (auto *si = dyn_cast<SelectInst>(inst)) {
-      auto *trueBase = findBaseInternal(si->getTrueValue());
-      auto *falseBase = findBaseInternal(si->getFalseValue());
-
-      // Select must choose pointers to same array. Otherwise cannot
-      // choose relevant arrayRAM in elastic circuit
-      assert(trueBase == falseBase);
-      return trueBase;
-    }
-  }
-
-  // We try to find a few known cases of pointer expression. For others,
-  // implement when you come across them
-  llvm_unreachable("Cannot  determine base array, aborting...");
+  return baseArray[0];
 }
 
-Value *findBase(Instruction *inst) {
+const Value *findBase(Instruction *inst) {
   Value *addr;
   if (auto *loadInst = dyn_cast<LoadInst>(inst)) {
     addr = loadInst->getPointerOperand();

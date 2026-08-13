@@ -3,6 +3,7 @@
 
 #include "ConjunctionTypeSystem.h"
 #include "CounterTypeSystem.h"
+#include "Randomly.h"
 #include "TypeSystem.h"
 #include <cstddef>
 
@@ -17,6 +18,9 @@ struct DepthTypingContext {
   std::size_t expressionDepth{};
   /// The current number of statements in the program.
   std::size_t totalNumberOfStatements{};
+  /// Value 'totalNumberOfStatements' must not exceed while generating a
+  /// statement list.
+  std::size_t statementBudget{};
 };
 
 class DepthTypeSystem : public TypeSystem<DepthTypingContext, DepthTypeSystem> {
@@ -33,11 +37,35 @@ class DepthTypeSystem : public TypeSystem<DepthTypingContext, DepthTypeSystem> {
         });
   }
 
+  /// Returns the number of statements that 'context' still allows to be
+  /// generated.
+  static std::size_t statementsLeft(const DepthTypingContext &context) {
+    if (context.statementBudget <= context.totalNumberOfStatements)
+      return 0;
+    return context.statementBudget - context.totalNumberOfStatements;
+  }
+
+  /// Returns a new statement budget for statement list receiving 'context'.
+  std::size_t drawNestedBudget(const DepthTypingContext &context) const {
+    std::size_t left = statementsLeft(context);
+    if (!left)
+      return context.totalNumberOfStatements;
+
+    return context.totalNumberOfStatements +
+           random.getInteger<std::size_t>(1, left);
+  }
+
 public:
-  explicit DepthTypeSystem(std::size_t maxExpressionDepth,
+  explicit DepthTypeSystem(Randomly &random, std::size_t maxExpressionDepth,
                            std::size_t maxTotalStatements)
-      : maxExpressionDepth(maxExpressionDepth),
+      : random(random), maxExpressionDepth(maxExpressionDepth),
         maxTotalStatements(maxTotalStatements) {}
+
+  static bool discardStructuredForStatement(const DepthTypingContext &context) {
+    // A loop needs to fit both itself and at least one statement in its body:
+    // an empty loop is of no interest to any target.
+    return statementsLeft(context) < 2;
+  }
 
   bool discardBinaryExpression(ast::BinaryExpression::Op,
                                const DepthTypingContext &context) const {
@@ -151,52 +179,78 @@ public:
     };
   }
 
-  bool discardStatementList(const DepthTypingContext &context) const {
-    return context.totalNumberOfStatements >= maxTotalStatements;
+  TransferFnArray<ast::Function> getFunctionTransferFns() override {
+    return {
+        /*return type=*/copyFromInput<ast::Function>(),
+        /*statement list=*/
+        TransferFn<ast::Function, INPUT_DEPENDENCY>(
+            [maxTotalStatements =
+                 maxTotalStatements](DepthTypingContext context) {
+              // The body of the function is the outermost statement list and is
+              // given the global limit as budget.
+              context.statementBudget = maxTotalStatements;
+              return context;
+            }),
+        /*return statement=*/copyFromInput<ast::Function>(),
+        /*output=*/copyInputToOutput<ast::Function>(),
+    };
+  }
+
+  static bool discardStatementList(const DepthTypingContext &context) {
+    return !statementsLeft(context);
   }
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
+    // Force the statement to be generated before the statement list such that
+    // 'totalNumberOfStatements' is counted correctly.
+    // Otherwise a stack overflow would occur.
+    // TODO: Ideally we'd have support for generating statements in either
+    //       forward or backward direction while still making statement limits
+    //       work.
     return {
-        /*statement list=*/copyFirstOf<ast::StatementList,
-                                       weak(ast::StatementList::STATEMENT),
-                                       INPUT_DEPENDENCY>(),
-        /*statement=*/
-        copyFirstOf<ast::StatementList,
-                    weak(ast::StatementList::STATEMENT_LIST),
-                    INPUT_DEPENDENCY>(),
+        /*statement=*/copyFromInput<ast::StatementList>(),
+        /*statement list=*/
+        copyFrom<ast::StatementList, ast::StatementList::STATEMENT>(),
         /*output=*/
-        OutputTransferFn<ast::StatementList, ast::StatementList::STATEMENT,
-                         ast::StatementList::STATEMENT_LIST>(
-            [](const auto &, DepthTypingContext statement,
-               const DepthTypingContext &statementList) {
-              // Regardless of which of the two was generated first, we can
-              // extract the total number of statements by taking their maximum.
-              statement.totalNumberOfStatements =
-                  std::max(statement.totalNumberOfStatements,
-                           statementList.totalNumberOfStatements);
-              return statement;
-            }),
+        copyToOutput<ast::StatementList, ast::StatementList::STATEMENT_LIST>(),
     };
   }
 
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
     return {
+        /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
         /*start=*/copyFromInput<ast::StructuredForStatement>(),
         /*end=*/copyFromInput<ast::StructuredForStatement>(),
         /*step=*/copyFromInput<ast::StructuredForStatement>(),
         /*statements=*/
-        incrementDepth<ast::StructuredForStatement,
-                       &DepthTypingContext::totalNumberOfStatements>(),
+        TransferFn<ast::StructuredForStatement, INPUT_DEPENDENCY>(
+            [this](DepthTypingContext context) {
+              // The loop itself, like any statement, counts against the
+              // statement budget.
+              ++context.totalNumberOfStatements;
+              // Give the statement list some budget for the number of
+              // statements it should generate.
+              context.statementBudget = drawNestedBudget(context);
+              return context;
+            }),
         /*output=*/
-        copyToOutput<ast::StructuredForStatement,
-                     ast::StructuredForStatement::BODY>(),
+        OutputTransferFn<ast::StructuredForStatement, INPUT_DEPENDENCY,
+                         ast::StructuredForStatement::BODY>(
+            [](const ast::StructuredForStatement &, DepthTypingContext context,
+               const DepthTypingContext &body) {
+              // The only thing about the body that outlives the loop is how
+              // many statements it generated.
+              context.totalNumberOfStatements = body.totalNumberOfStatements;
+              return context;
+            }),
     };
   }
 
   static ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTable(const DepthTypingContext &context);
 
+  Randomly &random;
   std::size_t maxExpressionDepth{};
   std::size_t maxTotalStatements{};
 };
@@ -246,7 +300,8 @@ public:
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
-        copyFromInput<ast::ArrayParameter>(),
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
         OutputTransferFn<ast::ArrayParameter, INPUT_DEPENDENCY>(
             [](const ast::ArrayParameter &, ParamTypingContext context) {
               context.numArrayParam++;
@@ -273,17 +328,18 @@ public:
     Options() = default;
 
     std::size_t maxExpressionDepth = 4;
-    std::size_t maxTotalStatements = 10;
+    std::size_t maxTotalStatements = 20;
     std::size_t maxScalarParam = 16;
     std::size_t maxArrayParam = 8;
     std::size_t maxParams = 256;
   };
 
-  LimitTypeSystem() : LimitTypeSystem(Options()) {}
+  explicit LimitTypeSystem(Randomly &random)
+      : LimitTypeSystem(random, Options()) {}
 
-  explicit LimitTypeSystem(const Options &options)
+  explicit LimitTypeSystem(Randomly &random, const Options &options)
       : ConjunctionTypeSystemBase(
-            details::DepthTypeSystem(options.maxExpressionDepth,
+            details::DepthTypeSystem(random, options.maxExpressionDepth,
                                      options.maxTotalStatements),
             details::ParamTypeSystem(options.maxScalarParam,
                                      options.maxArrayParam,

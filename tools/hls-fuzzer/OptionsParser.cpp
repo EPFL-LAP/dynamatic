@@ -2,6 +2,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Option/Arg.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -71,8 +72,49 @@ std::optional<std::size_t> dynamatic::OptionsParser::getNumPrograms() const {
   return numPrograms;
 }
 
+bool dynamatic::OptionsParser::isSingleProcess() const {
+  return args.hasArg(OPT_single_process);
+}
+
+std::optional<std::string>
+dynamatic::OptionsParser::getSingleProgramDirectory() const {
+  if (!args.hasArg(OPT_run_as_worker_subprocess))
+    return std::nullopt;
+
+  return args.getLastArgValue(OPT_run_as_worker_subprocess).str();
+}
+
+std::optional<std::string>
+dynamatic::OptionsParser::getReproduceDirectory() const {
+  if (!args.hasArg(OPT_reproduce))
+    return std::nullopt;
+
+  return args.getLastArgValue(OPT_reproduce).str();
+}
+
 std::string dynamatic::OptionsParser::getTargetName() const {
   return args.getLastArgValue(OPT_target).str();
+}
+
+std::vector<std::string> dynamatic::OptionsParser::getTargetArguments() const {
+  // Whether 'option' belongs to the target options group, directly or through
+  // one of its nested groups (e.g. the oracle options).
+  auto inTargetGroup = [](llvm::opt::Option option) {
+    for (llvm::opt::Option group = option.getGroup(); group.isValid();
+         group = group.getGroup()) {
+      if (group.getID() == OPT_grp_target)
+        return true;
+    }
+    return false;
+  };
+
+  llvm::opt::ArgStringList rendered;
+  for (const llvm::opt::Arg *arg : args) {
+    if (inTargetGroup(arg->getOption()))
+      arg->render(args, rendered);
+  }
+
+  return std::vector<std::string>(rendered.begin(), rendered.end());
 }
 
 std::optional<std::vector<std::string>>
@@ -100,6 +142,8 @@ dynamatic::Options dynamatic::OptionsParser::apply(Options defaults) {
   if (arguments.size() == 1)
     defaults.dynamaticExecutablePath = getPositionalArguments()[0];
 
+  defaults.targetArguments = getTargetArguments();
+  defaults.noVerify = args.hasArg(OPT_no_verify);
   defaults.kind = args.hasFlag(OPT_functional, OPT_non_functional,
                                defaults.kind == OracleKind::Functional)
                       ? OracleKind::Functional

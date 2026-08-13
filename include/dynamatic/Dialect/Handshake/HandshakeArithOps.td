@@ -454,9 +454,9 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
 
 def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
   BinaryArithNamedIO,
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">,
+  IsIntChannel<"result">,
   LatencyInterface
 ]>{
     let summary = "Signed integer division.";
@@ -464,9 +464,9 @@ def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
 
 def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
   BinaryArithNamedIO,
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">,
+  IsIntChannel<"result">,
   LatencyInterface
 ]> {
   let summary = "Signed integer remainder.";
@@ -474,9 +474,9 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
 
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
   BinaryArithNamedIO,
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">,
+  IsIntChannel<"result">,
   LatencyInterface
 ]>
 {

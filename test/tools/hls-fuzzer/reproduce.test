@@ -1,0 +1,8 @@
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: hls-fuzzer --target random-c --run-as-worker-subprocess %t --no-verify
+// RUN: mv %t/test.c %t/expected.c
+
+// Reproducing reads the seed and target options back from 'reproducer.json' and
+// regenerates the program, which must match the one generated above.
+// RUN: hls-fuzzer --reproduce %t --no-verify
+// RUN: diff %t/test.c %t/expected.c

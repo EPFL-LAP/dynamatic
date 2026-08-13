@@ -21,11 +21,13 @@ DISABLE_LSQ=${11}
 FAST_TOKEN_DELIVERY=${12}
 MILP_SOLVER=${13}
 STRAIGHT_TO_QUEUE=${14}
-OPTIMIZE_STEERING_REWRITES=${15}
-SPECULATION=${16}
-ENABLE_SHORT_CIRCUIT=${17}
-ENABLE_DUPLICATION=${18:-0}
-CALCULATE_PATH_DELAYS=${19}
+SPECULATION=${15}
+ENABLE_SHORT_CIRCUIT=${16}
+ENABLE_DUPLICATION=${17:-0}
+CALCULATE_PATH_DELAYS=${18}
+INSTRUMENT_II=${19}
+OPTIMIZE_STEERING_REWRITES=${20}
+
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -138,6 +140,8 @@ $DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_REWRITTEN" \
   -I "$DYNAMATIC_DIR/include"  \
   -I "$SRC_DIR" \
   -I "$DYNAMATIC_DIR/build/include/clang_headers" \
+  -Werror=uninitialized \
+  -Werror=shadow \
   -fplugin="$DYNAMATIC_DIR/build/lib/DynPragmasPlugin.so" \
   -Xclang \
   -ffp-contract=off \
@@ -166,6 +170,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # Here is a brief summary of what each llvm pass does:
 # - inline: Inlines the function calls.
 # - mem2reg: Promote allocas (allocate memory on the heap) into regs.
+# - gvn: remove redundant instructions using global value numbering, also removes redundant load operations. 
 # - lowerswitch: Convert switch case into branches.
 # - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
 # - loop-rotate: canonicalize loops to do-while loops
@@ -182,7 +187,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -431,18 +436,20 @@ exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
+LOWER_TO_HW_PASS="--lower-handshake-to-hw=instrument-ii=${INSTRUMENT_II:-0}"
+
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
   bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED" "$USE_K_INDUCTION"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 else
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 fi

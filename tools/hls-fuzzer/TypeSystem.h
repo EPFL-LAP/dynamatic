@@ -725,6 +725,10 @@ public:
   virtual bool
   discardFreshArrayParameterOpaque(const OpaqueContext &context) = 0;
 
+  virtual std::optional<std::size_t>
+  discardArrayDimensionOpaque(std::size_t dimension,
+                              const OpaqueContext &context) = 0;
+
   virtual TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() = 0;
 
@@ -1081,10 +1085,16 @@ public:
     return false;
   }
 
+  static std::optional<std::size_t>
+  discardArrayDimension(std::size_t dimension, const TypingContext &) {
+    return dimension;
+  }
+
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
         /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
         /*output=*/copyInputToOutput<ast::ArrayParameter>(),
     };
   }
@@ -1120,8 +1130,8 @@ public:
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
     return TransferFnArray<ast::StatementList>{
-        /*statement list=*/copyFromInput<ast::StatementList>(),
         /*statement=*/copyFromInput<ast::StatementList>(),
+        /*statement list=*/copyFromInput<ast::StatementList>(),
         /*output=*/copyInputToOutput<ast::StatementList>(),
     };
   }
@@ -1133,6 +1143,7 @@ public:
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
     return {
+        /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
         /*start=*/copyFromInput<ast::StructuredForStatement>(),
         /*end=*/copyFromInput<ast::StructuredForStatement>(),
         /*step=*/copyFromInput<ast::StructuredForStatement>(),
@@ -1217,6 +1228,13 @@ public:
 
   bool discardFreshArrayParameterOpaque(const OpaqueContext &context) final {
     return self().discardFreshArrayParameter(context.cast<TypingContext>());
+  }
+
+  std::optional<std::size_t>
+  discardArrayDimensionOpaque(std::size_t dimension,
+                              const OpaqueContext &context) final {
+    return self().discardArrayDimension(dimension,
+                                        context.cast<TypingContext>());
   }
 
   bool
@@ -1318,6 +1336,11 @@ public:
   }
 
   static bool discardFreshArrayParameter(const TypingContext &) { return true; }
+
+  static std::optional<std::size_t>
+  discardArrayDimension(std::size_t, const TypingContext &) {
+    return std::nullopt;
+  }
 
   static bool discardArrayAssignmentStatement(const TypingContext &) {
     return true;
