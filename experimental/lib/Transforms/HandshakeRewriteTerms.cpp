@@ -519,14 +519,16 @@ struct RemoveBranchIfThenElse : public OpRewritePattern<MuxOrMergeOp> {
     if (!isSuppress(firstBranchOperand) || !isSuppress(secondBranchOperand))
       return failure();
 
-    // Each suppress output must only feed this mux/merge. If it has multiple users,
-    // the pattern match fails so DistributeSuppresses can split it first.
+    // Each suppress output must only feed this mux/merge. If it has multiple
+    // users, the pattern match fails so DistributeSuppresses can split it
+    // first.
     if (std::distance(firstBranchOperand.getFalseResult().getUsers().begin(),
-                      firstBranchOperand.getFalseResult().getUsers().end()) !=1)
+                      firstBranchOperand.getFalseResult().getUsers().end()) !=
+        1)
       return failure();
-    if (std::distance(
-            secondBranchOperand.getFalseResult().getUsers().begin(),
-            secondBranchOperand.getFalseResult().getUsers().end()) != 1)
+    if (std::distance(secondBranchOperand.getFalseResult().getUsers().begin(),
+                      secondBranchOperand.getFalseResult().getUsers().end()) !=
+        1)
       return failure();
 
     Value firstBranchCondition = firstBranchOperand.getConditionOperand();
@@ -1042,7 +1044,6 @@ struct ShortenSuppressPairs
     // Erase the first Branch
     rewriter.eraseOp(firstCondBranchOp);
 
-
     return success();
   }
 };
@@ -1333,7 +1334,6 @@ struct ShortenMuxRepeatPairs : public OpRewritePattern<handshake::MuxOp> {
     rewriter.eraseOp(firstCondBranchOp);
 
     // TODO: Erase the first INIT as well!!!!!
-
 
     return success();
   }
@@ -1645,7 +1645,6 @@ struct ConstructSuppresses
     Value newBranchFalseResult = newBranch.getFalseResult();
     rewriter.replaceAllUsesWith(branchFalseResult, newBranchFalseResult);
 
-
     return success();
   }
 };
@@ -1693,7 +1692,6 @@ struct FixSuppresses : public OpRewritePattern<handshake::ConditionalBranchOp> {
     Value branchTrueResult = condBranchOp.getTrueResult();
     Value newBranchFalseResult = newBranch.getFalseResult();
     rewriter.replaceAllUsesWith(branchTrueResult, newBranchFalseResult);
-
 
     return success();
   }
@@ -1860,7 +1858,6 @@ struct DistributeRepeats : public OpRewritePattern<MuxOrMergeOp> {
       oldBranchOp = newBranch;
       i++;
     }
-
 
     return success();
   }
@@ -2038,7 +2035,6 @@ struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
         mergeOp->getOperands());
     rewriter.replaceOp(mergeOp, newMuxOp);
     inheritBB(mergeOp, newMuxOp);
-
 
     return success();
   }
