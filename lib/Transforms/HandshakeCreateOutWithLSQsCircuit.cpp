@@ -1,19 +1,20 @@
-//===- HandshakeInsertSkippableSeq.cpp - Out with LSQs ----------*- C++ -*-===//
+//===- HandshakeCreateOutWithLSQsCircuit.cpp - Out with LSQs ----------*- C++
+//-*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-// This file implements the HandshakeInsertSkippableSeq pass which inserts the
-// `Out with LSQs` circuit based on https://doi.org/10.1145/3748173.3779204.
+// This file implements the HandshakeCreateOutWithLSQsCircuit pass which inserts
+// the `Out with LSQs` circuit based on https://doi.org/10.1145/3748173.3779204.
 // This circuit replaces the LSQ circuit with elastic components. The circuit is
 // inserted for each pair of memory accesses that have a dependency. For better
 // comprehension, the reader is advised to refer to figure 8 in the paper.
 //
 //===----------------------------------------------------------------------===//
 
-// #include "dynamatic/Transforms/HandshakeInsertSkippableSeq.h"
+// #include "dynamatic/Transforms/HandshakeCreateOutWithLSQsCircuit.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Conversion/CfToHandshake.h"
@@ -43,7 +44,7 @@
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
-#define GEN_PASS_DEF_HANDSHAKEINSERTSKIPPABLESEQ
+#define GEN_PASS_DEF_HANDSHAKECREATEOUTWITHLSQSCIRCUIT
 #include "dynamatic/Transforms/Passes.h.inc"
 } // namespace dynamatic
 // [END Boilerplate]
@@ -69,11 +70,12 @@ const int DEFAULT_COMPARATOR_NUM = 3;
 
 namespace {
 
-struct HandshakeInsertSkippableSeqPass
-    : public dynamatic::impl::HandshakeInsertSkippableSeqBase<
-          HandshakeInsertSkippableSeqPass> {
+struct HandshakeCreateOutWithLSQsCircuitPass
+    : public dynamatic::impl::HandshakeCreateOutWithLSQsCircuitBase<
+          HandshakeCreateOutWithLSQsCircuitPass> {
 
-  using HandshakeInsertSkippableSeqBase::HandshakeInsertSkippableSeqBase;
+  using HandshakeCreateOutWithLSQsCircuitBase::
+      HandshakeCreateOutWithLSQsCircuitBase;
 
   void runDynamaticPass() override;
 
@@ -639,7 +641,8 @@ std::vector<unsigned> getNVector(const std::string &NStr) {
 
 /// This function is the main function. It is responsible to insert the
 /// necessary components to replace the LSQ circuit with elastic components.
-LogicalResult HandshakeInsertSkippableSeqPass::createBaseOutWithLSQsCircuit(
+LogicalResult
+HandshakeCreateOutWithLSQsCircuitPass::createBaseOutWithLSQsCircuit(
     FuncOp funcOp, MLIRContext *ctx) {
 
   if (numComparators.empty()) {
@@ -726,7 +729,7 @@ ftd::ShadowCFG getShadow(FuncOp funcOp, MLIRContext *ctx) {
   return shadow;
 }
 
-void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
+void HandshakeCreateOutWithLSQsCircuitPass::runDynamaticPass() {
 
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();

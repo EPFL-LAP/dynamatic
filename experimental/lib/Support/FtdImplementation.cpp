@@ -16,7 +16,7 @@
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Transforms/HandshakeInsertSkippableSeq.h"
+#include "dynamatic/Transforms/HandshakeCreateOutWithLSQsCircuit.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"

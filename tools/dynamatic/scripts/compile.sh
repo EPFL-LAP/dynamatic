@@ -339,19 +339,19 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 else
 
   # handshake transformations
-  # with skippable sequentializer
+  # using out with LSQs (FPGA'26) instead of LSQ
   if [[ $OUT_WITH_LSQS_ACTIVE -ne 0 ]]; then
     
     echo_info "Using Out with LSQs (FPGA'26) instead of LSQ"
 
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
         --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces\
-        --handshake-insert-skippable-seq="num-of-comparators=$OUT_WITH_LSQS_N dep-graph-file=$OUT_WITH_LSQS_DEP_GRAPH_FILE dynamatic-dir=$DYNAMATIC_DIR" \
+        --handshake-create-out-with-lsqs-circuit="num-of-comparators=$OUT_WITH_LSQS_N dep-graph-file=$OUT_WITH_LSQS_DEP_GRAPH_FILE dynamatic-dir=$DYNAMATIC_DIR" \
         --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
         --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_OUT_WITH_LSQ"
-    exit_on_fail "Failed to apply transformations to handshake with skippable sequentializer" \
-      "Applied transformations to handshake with skippable sequentializer"
+    exit_on_fail "Failed to apply transformations to handshake using out with LSQs" \
+      "Applied transformations to handshake using out with LSQs"
     
     F_HANDSHAKE=$F_HANDSHAKE_OUT_WITH_LSQ
 
@@ -360,10 +360,10 @@ else
       --handshake-optimize-bitwidths \
       --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
-    exit_on_fail "Failed to apply transformations to handshake" \
-      "Applied transformations to handshake"
+    exit_on_fail "Failed to apply rest of the transformations to handshake after out with LSQs" \
+      "Applied rest of the transformations to handshake after out with LSQs"
 
-  # without skippable sequentializer
+  # without out with LSQs (FPGA'26)
   else
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
       --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces \

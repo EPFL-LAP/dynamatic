@@ -124,7 +124,7 @@ def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependen
             "Optional path at which to write the memory dependence graph in DOT format.">];
 }
 
-def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"> {
+def HandshakeCreateOutWithLSQsCircuit : DynamaticPass<"handshake-create-out-with-lsqs-circuit"> {
   let summary = "Inserts the skippable sequencializer which replaces the LSQ.";
   let description = [{
     Inserts a specific logic in the IR to respect the memory dependencies
