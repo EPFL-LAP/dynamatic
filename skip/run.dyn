@@ -1,8 +1,0 @@
-set-src integration-test/histogram/histogram.c
-
-compile --skippable-seq-n 3 --buffer-algorithm cpbuf --fork-fifo-size 15
-
-write-hdl
-simulate
-
-exit

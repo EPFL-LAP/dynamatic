@@ -1,2 +1,0 @@
-Benchmark,N,Target CP,Real CP,Cycles,Slices,FF,DSPs,LUTs
-jacobi_1d_imper,0,4.0,3.7,2359,299,676,0,878

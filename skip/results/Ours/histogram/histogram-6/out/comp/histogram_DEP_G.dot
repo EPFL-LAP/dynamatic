@@ -1,3 +1,0 @@
-digraph G {
-  "store1" -> "load5" [label="N=6"];
-}
