@@ -280,6 +280,9 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
     Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
     "If true, dump MILP models into a directory named 'buffer-placement'.">,
+    Option<"ftd", "ftd", "bool", "false",
+    "If true, use FTD-specific CFDFC extraction and backedge "
+    "identification.">,
     Option<"blifFiles", "blif-files", "std::string", "",
     "Path to AND-Inverter Graphs of dataflow components in Berkeley "
     "Logic Interchange Format (BLIF).">,

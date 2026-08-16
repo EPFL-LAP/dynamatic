@@ -59,8 +59,10 @@ struct CFDFC {
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
   /// function. Assumes that every value in the function is used exactly once.
+  /// When `backwardChannels` is null, uses the standard CFDFC construction.
+  /// Otherwise, uses the FTD-specific channel selection.
   CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
-        const DenseSet<Value> &backwardChannels);
+        const DenseSet<Value> *backwardChannels = nullptr);
 
   /// Returns whether the channel between the two blocks has a corresponding
   /// edge in this CFDFC's CFG cycle.

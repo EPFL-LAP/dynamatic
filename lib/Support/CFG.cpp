@@ -158,21 +158,23 @@ static inline bool canBacktrackToLoopSourceThrough(Operation *op) {
 
 /// Determines whether the operation is of a nature which can be traversed
 /// forwards during backedge destination identification.
-static inline bool canFollowToMergeThrough(Operation *op) {
+static inline bool canFollowToMergeThrough(Operation *op, bool ftd) {
   return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
-             handshake::TruncIOp, handshake::NotIOp>(op);
+             handshake::TruncIOp>(op) ||
+         (ftd && isa<handshake::NotIOp>(op));
 }
 
 /// Attempts to backtrack through source-transparent operations till reaching
 /// an operation that can act as the source of loop feedback within a block. On
 /// success, returns that operation (or the passed operation if it was itself
 /// such a source); otherwise, returns nullptr.
-static Operation *backtrackToLoopSource(Operation *op) {
+static Operation *backtrackToLoopSource(Operation *op, bool ftd) {
   do {
     if (!op)
       break;
-    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
-            handshake::CmpIOp, handshake::CmpFOp>(op))
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp>(op))
+      return op;
+    if (ftd && isa<handshake::CmpIOp, handshake::CmpFOp>(op))
       return op;
     if (canBacktrackToLoopSourceThrough(op))
       op = op->getOperand(0).getDefiningOp();
@@ -187,16 +189,16 @@ static Operation *backtrackToLoopSource(Operation *op) {
 /// all belong to the same basic block. On success, returns one of the
 /// merge-like operations reached by a def-use chain (or the passed operation if
 /// it was itself merge-like); otherwise, returns nullptr.
-static Operation *followToMerge(Operation *op) {
+static Operation *followToMerge(Operation *op, bool ftd) {
   if (isa<handshake::MergeLikeOpInterface>(op))
     return op;
-  if (canFollowToMergeThrough(op)) {
+  if (canFollowToMergeThrough(op, ftd)) {
     // All users of the operation's results must lead to merges within a unique
     // block
     SmallVector<Operation *> mergeOps;
     for (OpResult res : op->getResults()) {
       for (Operation *user : res.getUsers()) {
-        Operation *op = followToMerge(user);
+        Operation *op = followToMerge(user, ftd);
         if (!op)
           return nullptr;
         mergeOps.push_back(op);
@@ -237,7 +239,8 @@ bool dynamatic::getBBEndpoints(Value val, BBEndpoints &endpoints) {
   return getBBEndpoints(val, *users.begin(), endpoints);
 }
 
-bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
+bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints,
+                           bool ftd) {
   // Get the value's BB endpoints
   BBEndpoints bbs;
   if (!getBBEndpoints(val, user, bbs))
@@ -254,10 +257,10 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
 
   // If both source and destination blocks are identical, the edge must be
   // located between a loop-feedback source and a merge-like operation.
-  Operation *srcOp = backtrackToLoopSource(val.getDefiningOp());
+  Operation *srcOp = backtrackToLoopSource(val.getDefiningOp(), ftd);
   if (!srcOp)
     return false;
-  Operation *mergeOp = followToMerge(user);
+  Operation *mergeOp = followToMerge(user, ftd);
   if (!mergeOp)
     return false;
 
@@ -269,11 +272,11 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
          *srcBB == bbs.srcBB;
 }
 
-bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
+bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints, bool ftd) {
   auto users = val.getUsers();
   assert(std::distance(users.begin(), users.end()) == 1 &&
          "value must have a single user");
-  return isBackedge(val, *users.begin(), endpoints);
+  return isBackedge(val, *users.begin(), endpoints, ftd);
 }
 
 namespace {

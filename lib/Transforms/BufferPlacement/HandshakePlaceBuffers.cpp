@@ -17,6 +17,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeEnums.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
@@ -230,6 +231,10 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
              << "Failed to read profiling information from CSV";
     }
 
+    // Check IR invariants and parse basic block archs from disk
+    if (failed(checkFuncInvariants(info)))
+      return failure();
+
     // Get CFDFCs from the function unless the functions has no archs (i.e.,
     // it has a single block) in which case there are no CFDFCs
     std::vector<CFDFC> cfdfcs;
@@ -286,6 +291,16 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
 }
 
 LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
+  // Store all archs in a map for fast query time
+  DenseMap<unsigned, llvm::SmallDenseSet<unsigned, 2>> transitions;
+  for (ArchBB &arch : info.archs)
+    transitions[arch.srcBB].insert(arch.dstBB);
+
+  // Store the BB to which each block belongs for quick access later
+  DenseMap<Operation *, std::optional<unsigned>> opBlocks;
+  for (Operation &op : info.funcOp.getOps())
+    opBlocks[&op] = getLogicBB(&op);
+
   for (Operation &op : info.funcOp.getOps()) {
     // Most operations should belong to a basic block for buffer placement to
     // work correctly. Don't outright fail in case one operation is outside of
@@ -300,6 +315,37 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       if (!getLogicBB(&op).has_value()) {
         op.emitWarning() << "Operation does not belong to any block, MILP "
                             "behavior may be suboptimal or incorrect.";
+      }
+    }
+
+    // FTD circuits may legitimately contain channels between blocks that have
+    // no corresponding edge in the original CFG.
+    if (ftd)
+      continue;
+
+    std::optional<unsigned> srcBB = opBlocks[&op];
+    for (OpResult res : op.getResults()) {
+      Operation *user = *res.getUsers().begin();
+      std::optional<unsigned> dstBB = opBlocks[user];
+
+      // All transitions between blocks must exist in the original CFG
+      if (srcBB && dstBB && *srcBB != *dstBB &&
+          !transitions[*srcBB].contains(*dstBB)) {
+        auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
+        if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
+            dstBB == endBB) {
+          /// NOTE: (lucas-rami) This is probably the start->end control channel
+          /// which goes from the entry block to the exit block. This is fine in
+          /// general so we let this pass without triggering a warning or error
+          continue;
+        }
+
+        return op.emitError()
+               << "Result " << res.getResultNumber() << " defined in block "
+               << *srcBB << " is used in block " << *dstBB
+               << ". This connection does not exist according to the CFG "
+                  "graph. Solving the buffer placement MILP would yield an "
+                  "incorrect placement.";
       }
     }
   }
@@ -465,7 +511,7 @@ findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
     for (const CircuitEdge &edge : edges) {
       if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
         continue;
-      if (!isBackedge(edge.channel))
+      if (!isBackedge(edge.channel, /*endpoints=*/nullptr, /*ftd=*/true))
         continue;
       if (!isBackedgeSourceLike(edge.src))
         continue;
@@ -498,8 +544,9 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     bbs.insert(arch.dstBB);
   }
 
-  mlir::DenseSet<Value> backwardChannels =
-      findBackwardChannelPerCyclicRegion(info.funcOp);
+  mlir::DenseSet<Value> backwardChannels;
+  if (ftd)
+    backwardChannels = findBackwardChannelPerCyclicRegion(info.funcOp);
 
   // Set of selected archs
   ArchSet selectedArchs;
@@ -525,7 +572,8 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs, backwardChannels);
+    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs,
+                        ftd ? &backwardChannels : nullptr);
   } while (!firstCFDFC);
 
   return success();
