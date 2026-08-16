@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the --handshake-insert-skippable-seq
+// This file declares the --handshake-create-out-with-lsqs-circuit pass.
 //
 //===----------------------------------------------------------------------===//
 
