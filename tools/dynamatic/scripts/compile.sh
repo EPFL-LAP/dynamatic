@@ -27,22 +27,9 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 
 FORK_FIFO_SIZE=${19}
-
-for i in {1..19}; do shift; done
-
-OUT_WITH_LSQS_ACTTIVE=0
-OUT_WITH_LSQS_N=()
-
-if [ "$1" != "none" ]; then
-  OUT_WITH_LSQS_ACTTIVE=1
-  while [[ "$#" -gt 0 && "${1}" != "--" ]]; do
-    OUT_WITH_LSQS_ACTTIVE=1
-    OUT_WITH_LSQS_N+=("$1")
-    shift
-  done
-else
-  shift
-fi
+OUT_WITH_LSQS_ACTIVE=${20}
+OUT_WITH_LSQS_N=${21}
+OUT_WITH_LSQS_DEP_GRAPH_FILE=${22}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -349,13 +336,13 @@ else
 
   # handshake transformations
   # with skippable sequentializer
-  if [[ $OUT_WITH_LSQS_ACTTIVE -ne 0 ]]; then
+  if [[ $OUT_WITH_LSQS_ACTIVE -ne 0 ]]; then
     
     echo_info "Using Out with LSQs (FPGA'26) instead of LSQ"
 
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
         --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces\
-        --handshake-insert-skippable-seq="NStr=$OUT_WITH_LSQS_N" \
+        --handshake-insert-skippable-seq="num-of-comparators=$OUT_WITH_LSQS_N dep-graph-file=$OUT_WITH_LSQS_DEP_GRAPH_FILE dynamatic-dir=$DYNAMATIC_DIR" \
         --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
         --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_OUT_WITH_LSQ"

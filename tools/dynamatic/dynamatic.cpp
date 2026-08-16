@@ -325,7 +325,11 @@ public:
       "enable-duplication";
   static constexpr llvm::StringLiteral CALCULATE_PATH_DELAYS =
       "calculate-path-delays";
-  static constexpr llvm::StringLiteral OUT_WITH_LSQS_N = "out-with-lsqs-n";
+  static constexpr llvm::StringLiteral OUT_WITH_LSQS = "out-with-lsqs";
+  static constexpr llvm::StringLiteral NUM_OF_COMPARATORS =
+      "num-of-comparators";
+  static constexpr llvm::StringLiteral OUT_WITH_LSQS_DEP_GRAPH_FILE =
+      "dep-graph-file";
   static constexpr llvm::StringLiteral FORK_FIFO_SIZE = "fork-fifo-size";
 
   Compile(FrontendState &state)
@@ -349,11 +353,15 @@ public:
     addOption(
         {FORK_FIFO_SIZE,
          "Adds buffers with the specified size to the output of every fork"});
-    addMultiOption({
-        OUT_WITH_LSQS_N,
-        "Number of Comparators in Out With LSQs circuit which replaces the LSQ "
-        "circuit with elastic components",
-    });
+    addFlag(
+        {OUT_WITH_LSQS, "Replace LSQs with the Out with LSQs elastic circuit"});
+    addMultiOption({NUM_OF_COMPARATORS,
+                    "Comparator counts for Out with LSQs, assigned cyclically "
+                    "to memory dependence edges"});
+    addOption(
+        {OUT_WITH_LSQS_DEP_GRAPH_FILE,
+         "Optional DOT file providing per-edge comparator counts; unspecified "
+         "dependences use default number of comparators"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
@@ -631,6 +639,9 @@ void Command::help() const {
   printListArgs(flags, "FLAGS", [&](auto ref) { os << "--" << ref; });
   printListArgs(options, "OPTIONS",
                 [&](auto ref) { os << "--" << ref << " <option-value>"; });
+  printListArgs(
+      multiOptions, "OPTIONS with multiple option values",
+      [&](auto ref) { os << "--" << ref << " [<option-values-list>]"; });
   os << "\n";
 }
 
@@ -809,7 +820,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string milpSolver = "cbc";
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
-  std::string skippableSeqNListString = "none";
+  std::string outWithLsqsNumComparators = "3";
+  std::string outWithLsqsDepGraphFile;
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
@@ -844,14 +856,20 @@ CommandResult Compile::execute(CommandArguments &args) {
     forkFifoSize = std::to_string(val);
   }
 
-  if (auto it = args.multiOptions.find(OUT_WITH_LSQS_N);
+  if (auto it = args.multiOptions.find(NUM_OF_COMPARATORS);
       it != args.multiOptions.end()) {
-    skippableSeqNListString = "";
+    outWithLsqsNumComparators = "";
     for (const auto &valStr : it->second) {
       int val = std::stoi(std::string(valStr));
-      skippableSeqNListString += std::to_string(val) + ",";
+      outWithLsqsNumComparators += std::to_string(val) + ",";
     }
   }
+
+  if (auto it = args.options.find(OUT_WITH_LSQS_DEP_GRAPH_FILE);
+      it != args.options.end())
+    outWithLsqsDepGraphFile = it->second;
+
+  std::string outWithLsqs = args.flags.contains(OUT_WITH_LSQS) ? "1" : "0";
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
@@ -868,13 +886,13 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string calculatePathDelays =
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
 
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), sharing,
-                 state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
-                 fastTokenDelivery, milpSolver, straightToQueue, speculation,
-                 enableShortCircuit, enableDuplication, calculatePathDelays,
-                 forkFifoSize, skippableSeqNListString);
+  return execCmd(
+      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
+      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
+      state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
+      fastTokenDelivery, milpSolver, straightToQueue, speculation,
+      enableShortCircuit, enableDuplication, calculatePathDelays, forkFifoSize,
+      outWithLsqs, outWithLsqsNumComparators, outWithLsqsDepGraphFile);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

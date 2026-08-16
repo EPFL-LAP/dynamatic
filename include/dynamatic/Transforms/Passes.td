@@ -134,8 +134,12 @@ def HandshakeInsertSkippableSeq : DynamaticPass<"handshake-insert-skippable-seq"
     independent.
   }];
   let options =
-    [Option<"NStr", "NStr", "std::string", "\"3\"",
-            "Number of comparators">];
+    [Option<"numComparators", "num-of-comparators", "std::string", "\"3\"",
+            "Comma-separated comparator counts, assigned cyclically to memory dependence edges.">,
+     Option<"depGraphFile", "dep-graph-file", "std::string", "\"\"",
+            "DOT file providing per-edge comparator counts; unspecified dependences use default number of comparators.">,
+     Option<"dynamaticDir", "dynamatic-dir", "std::string", "\"\"",
+            "Dynamatic directory used as the base path fordependence graph.">];
   let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 

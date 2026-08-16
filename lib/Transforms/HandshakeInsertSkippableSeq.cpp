@@ -21,6 +21,7 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/DOT.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/CFGAnnotation.h"
@@ -33,6 +34,7 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include <unordered_set>
 
@@ -63,6 +65,7 @@ using delayedDict = DenseMap<Operation *, SmallVector<Value>>;
 
 constexpr llvm::StringLiteral SKIP_COND_GEN("Skip.Condition_Generator");
 constexpr llvm::StringLiteral SKIP_COND_SEQ("Skip.Conditional_Sequentializer");
+const int DEFAULT_COMPARATOR_NUM = 3;
 
 namespace {
 
@@ -74,7 +77,7 @@ struct HandshakeInsertSkippableSeqPass
 
   void runDynamaticPass() override;
 
-  void createBaseOutWithLSQsCircuit(FuncOp funcOp, MLIRContext *ctx);
+  LogicalResult createBaseOutWithLSQsCircuit(FuncOp funcOp, MLIRContext *ctx);
 };
 } // namespace
 
@@ -82,6 +85,7 @@ DenseMap<Operation *, std::vector<int>> consumerOpAndOperandIndexForFTD;
 IsWaitingSignalForSuccDirect isWaitingSignalForSuccDirect;
 delayedDict delayedAddressesForEachPred;
 delayedDict delayedDoneSignalsForEachPred;
+std::unique_ptr<DOTGraph> comparatorGraph;
 
 /// This function traverses the function and finds all memory accesses.
 MemAccesses findMemAccessesInFunc(FuncOp funcOp) {
@@ -118,6 +122,39 @@ MemAccesses findMemAccessesInFunc(FuncOp funcOp) {
   }
 
   return memAccesses;
+}
+/// Returns the comparator count for a dependence. With a DOT graph, an edge
+/// attribute overrides the default count of three; otherwise CLI counts cycle.
+unsigned getNumComparatorsForDependence(StringRef srcAccess,
+                                        StringRef dstAccess,
+                                        ArrayRef<unsigned> counts,
+                                        unsigned &countIndex) {
+  if (!comparatorGraph) {
+    unsigned count = counts[countIndex];
+    countIndex = (countIndex + 1) % counts.size();
+    return count;
+  }
+  const DOTGraph::Node *srcNode = comparatorGraph->getNode(srcAccess);
+  if (!srcNode)
+    return DEFAULT_COMPARATOR_NUM;
+  for (const DOTGraph::Edge *edge : comparatorGraph->getSuccessors(*srcNode)) {
+    if (edge->dstNode->id != dstAccess)
+      continue;
+    for (StringRef attrName : {"num-comparator", "num-comparators",
+                               "num_comparator", "num_comparators"}) {
+      auto attr = edge->attrs.find(attrName);
+      if (attr == edge->attrs.end())
+        continue;
+      unsigned count;
+      if (!StringRef(attr->getValue()).getAsInteger(10, count))
+        return count;
+      llvm::errs() << "[WARN] Invalid comparator count for " << srcAccess
+                   << " -> " << dstAccess << "; using "
+                   << DEFAULT_COMPARATOR_NUM << "\n";
+      return DEFAULT_COMPARATOR_NUM;
+    }
+  }
+  return DEFAULT_COMPARATOR_NUM;
 }
 
 /// This function checks if there is at least one active dependency in the
@@ -349,10 +386,9 @@ createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
             continue;
           }
 
-          N = Nvector[NvectorIndex];
-          NvectorIndex++;
-          NvectorIndex = NvectorIndex % Nvector.size();
-
+          N = getNumComparatorsForDependence(predecessorOpName,
+                                             dependency.getDstAccess(), Nvector,
+                                             NvectorIndex);
           if (N != 0) {
             SmallVector<Operation *> addressDelayGenerator;
 
@@ -500,22 +536,17 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
           newDeps.push_back(dependency);
           continue;
         }
-
         if (std::find(handledSuccessors.begin(), handledSuccessors.end(),
                       dependency.getDstAccess()) != handledSuccessors.end()) {
           newDeps.push_back(getDeactivatedDependency(dependency));
           continue;
         }
 
-        N = NVector[NvectorIndex];
-        NvectorIndex++;
-
-        if (NvectorIndex == NVector.size()) {
-          NvectorIndex = 0;
-        }
+        N = getNumComparatorsForDependence(predecessorOpName,
+                                           dependency.getDstAccess(), NVector,
+                                           NvectorIndex);
 
         SmallVector<Operation *> doneDelayGenerator;
-
         unsigned effective_N = N == 0 ? 1 : N;
         SmallVector<Value> delayedDoneSignals = createDelayGenerator(
             predecessorOpDoneSignal, predecessorOpPointer, effective_N, false,
@@ -611,11 +642,29 @@ std::vector<unsigned> getNVector(const std::string &NStr) {
 
 /// This function is the main function. It is responsible to insert the
 /// necessary components to replace the LSQ circuit with elastic components.
-void HandshakeInsertSkippableSeqPass::createBaseOutWithLSQsCircuit(
+LogicalResult HandshakeInsertSkippableSeqPass::createBaseOutWithLSQsCircuit(
     FuncOp funcOp, MLIRContext *ctx) {
+
+  if (numComparators.empty()) {
+    funcOp.emitError("--num-of-comparators must not be empty");
+    return failure();
+  }
+
+  comparatorGraph.reset();
+  if (!depGraphFile.empty()) {
+    comparatorGraph = std::make_unique<DOTGraph>();
+    if (failed(comparatorGraph->getBuilder().parseFromFile(dynamaticDir + "/" +
+                                                           depGraphFile)))
+      llvm::errs() << "[INFO] failed to read the dot file.";
+  }
+
   ConversionPatternRewriter rewriter(ctx);
 
-  std::vector<unsigned> NVector = getNVector(NStr);
+  std::vector<unsigned> NVector = getNVector(numComparators);
+  if (NVector.empty()) {
+    funcOp.emitError("--num-of-comparators must contain a comparator count");
+    return failure();
+  }
 
   MemAccesses memAccesses;
   SkipConditionForPair skipConditionForEachPair;
@@ -639,6 +688,7 @@ void HandshakeInsertSkippableSeqPass::createBaseOutWithLSQsCircuit(
   gateAllSuccessorAccesses(memAccesses, waitingSignalsForEachSuccessor, funcOp,
                            rewriter);
   // funcOp.print(llvm::errs());
+  return success();
 }
 
 void runFTDOnSpecificConsumerOps(
@@ -683,6 +733,7 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
 
   mlir::ModuleOp modOp = getOperation();
   MLIRContext *ctx = &getContext();
+
   ConversionPatternRewriter rewriter(ctx);
   OpBuilder builder(ctx);
 
@@ -692,7 +743,8 @@ void HandshakeInsertSkippableSeqPass::runDynamaticPass() {
 
     // This is the main function which inserts the base circuit without FTD. It
     // internally calls `createPhiNetworkDeps`
-    createBaseOutWithLSQsCircuit(funcOp, ctx);
+    if (failed(createBaseOutWithLSQsCircuit(funcOp, ctx)))
+      return signalPassFailure();
 
     LLVM_DEBUG(llvm::errs()
                << "[INFO][SKIP] Inserted skippable sequentializer circuit "
