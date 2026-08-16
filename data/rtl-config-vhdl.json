@@ -566,8 +566,8 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t gate -p size=$SIZE bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
-    "name": "handshake.unbundle",
-    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t unbundle -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "name": "handshake.ctrl_extractor",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ctrl_extractor -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
 
   },
   {

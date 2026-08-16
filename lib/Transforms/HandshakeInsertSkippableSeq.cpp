@@ -334,15 +334,12 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
   if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp)) {
     Value loadResult = loadOp->getResult(1);
     Location loc = loadOp->getLoc();
-    handshake::UnbundleOp unbundleOp =
-        rewriter.create<handshake::UnbundleOp>(loc, loadResult);
-    inheritBB(loadOp, unbundleOp);
 
-    llvm::errs() << "unbundleOp.getResult(0): " << unbundleOp.getResult(0)
-                 << " "
-                 << "\n";
+    handshake::CtrlExtractorOp ctrlExtractorOp =
+        rewriter.create<handshake::CtrlExtractorOp>(loc, loadResult);
+    inheritBB(loadOp, ctrlExtractorOp);
 
-    return unbundleOp.getResult(0);
+    return ctrlExtractorOp.getResult();
   } else if (auto storeOp = dyn_cast<handshake::StoreOp>(memOp)) {
     return storeOp->getResult(2);
   } else {
@@ -697,7 +694,7 @@ void runFTDOnSpecificConsumerOps(
                                         Operation *, Value, ftd::ShadowCFG &),
     ftd::ShadowCFG shadowCFG) {
   std::vector<std::vector<Operation *>> allNewUnits;
-  for (auto const [consumerOp, indices] : consumerOpAndOperandIndexForFTD)
+  for (auto [consumerOp, indices] : consumerOpAndOperandIndexForFTD)
     for (auto index : indices) {
       std::vector<Operation *> newUnits =
           ftdFunc(builder, funcOp, consumerOp, consumerOp->getOperand(index),

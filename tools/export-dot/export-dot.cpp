@@ -257,7 +257,7 @@ static StringRef getNodeColor(Operation *op) {
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
       .Case<handshake::GateOp>([&](auto) { return "cyan"; })
-      .Case<handshake::UnbundleOp>([&](auto) { return "lightyellow"; })
+      .Case<handshake::CtrlExtractorOp>([&](auto) { return "lightyellow"; })
       .Case<handshake::InitOp>([&](auto) { return "lightgrey"; })
       .Case<handshake::BufferOp>(
           [&](handshake::BufferOp bufferOp) -> StringRef {

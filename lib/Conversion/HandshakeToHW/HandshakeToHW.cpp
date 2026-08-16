@@ -598,7 +598,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // }
         addType("DATA_TYPE", op->getOperand(0));
       })
-      .Case<handshake::UnbundleOp>(
+      .Case<handshake::CtrlExtractorOp>(
           [&](auto) { addType("DATA_TYPE", op->getOperand(0)); })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp>(
           [&](auto) {
@@ -809,6 +809,14 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
                                   .cast<handshake::ChannelType>()
                                   .getDataType());
       })
+      .Case<handshake::CtrlExtractorOp>(
+          [&](handshake::CtrlExtractorOp ctrlExtractorOp) {
+            // No parameters needed for these operations
+            addType("DATA_WIDTH", op->getOperand(0)
+                                      .getType()
+                                      .cast<handshake::ChannelType>()
+                                      .getDataType());
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -2452,6 +2460,7 @@ public:
         ConvertToHWInstance<handshake::BlockerOp>,
         ConvertToHWInstance<handshake::GateOp>,
         ConvertToHWInstance<handshake::UnbundleOp>,
+        ConvertToHWInstance<handshake::CtrlExtractorOp>,
         ConvertToHWInstance<handshake::InitOp>,
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,

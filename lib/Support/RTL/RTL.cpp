@@ -332,7 +332,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.ready_remover" || 
       handshakeOp == "handshake.init" ||
       handshakeOp == "handshake.gate" ||
-      handshakeOp == "handshake.unbundle" ||
+      handshakeOp == "handshake.ctrl_extractor" ||
       handshakeOp == "handshake.maxsi" ||
       handshakeOp == "handshake.maxui" ||
       handshakeOp == "handshake.minsi" ||
@@ -497,7 +497,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.minui" ||
       handshakeOp == "handshake.init" ||
       handshakeOp == "handshake.gate" ||
-      handshakeOp == "handshake.unbundle" ||
+      handshakeOp == "handshake.ctrl_extractor" ||
       // the first input has extra signals
       handshakeOp == "handshake.load" ||
       handshakeOp == "handshake.store" ||

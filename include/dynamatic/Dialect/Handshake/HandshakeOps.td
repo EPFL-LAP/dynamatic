@@ -2341,6 +2341,44 @@ def UnbundleOp : Handshake_Op<"unbundle", [
   }];
 }
 
+def CtrlExtractorOp : Handshake_Op<"ctrl_extractor", [
+  SimpleNamedIO
+]> {
+  let summary = [{
+    Extracts the control signal from a channel.
+  }];
+  let description = [{
+    Extracts the control signal from a channel by dropping the data signal.
+  }];
+
+  let arguments = (ins HandshakeType:$channelIn);
+  let results = (outs ControlType:$channelOut);
+
+  let builders = [
+    // The result is always a control-only channel without extra signals.
+    OpBuilder<(ins "::mlir::Value":$channelIn), [{
+      $_state.addOperands(channelIn);
+      $_state.addTypes(ControlType::get($_builder.getContext()));
+    }]>
+  ];
+
+  let assemblyFormat = [{
+    $channelIn attr-dict `:` custom<HandshakeType>(type($channelIn))
+    `->` type($channelOut)
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    CtrlExtractorOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getOperand().getType())}
+      };
+    }
+  }];
+}
+
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
   SimpleNamedIO
