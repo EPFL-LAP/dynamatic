@@ -717,6 +717,7 @@ struct ArrayPartition : PassInfoMixin<ArrayPartition> {
 
   unsigned memCount = 0;
 
+struct ArrayPartition : PassInfoMixin<ArrayPartition> {
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
 };
 
@@ -731,21 +732,7 @@ PreservedAnalyses ArrayPartition::run(Function &f,
 
   auto pragmaInfo = collectAndErasePragmaMarkers(f);
 
-  auto islCtx = isl::ctx(isl_ctx_alloc());
-
-  auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(f);
-
-  auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(f);
-
-  auto &aliasAnalysis = fam.getResult<AAManager>(f);
-
-  // Needed for constructing the global constants
-  Module *mod = f.getParent();
-
   AccessInfo info;
-
-  std::deque<Region *> rq;
-  getAllRegions(*regionInfoAnalysis.getTopLevelRegion(), rq);
 
   for (auto &bb : f) {
     for (auto &inst : bb) {
@@ -756,67 +743,31 @@ PreservedAnalyses ArrayPartition::run(Function &f,
     }
   }
 
-  Scop *s;
-  unsigned scopId = 0;
-  for (Region *r : rq) {
-    if ((s = scopInfoAnalysis.getScop(r))) {
-      for (auto &stmt : *s) {
-        for (auto *memAccess : stmt) {
-          auto *inst = memAccess->getAccessInstruction();
-
-          info.instToScopId[inst] = scopId;
-
-          // Find the access
-          auto *memoryAccess = stmt.getArrayAccessOrNULLFor(inst);
-
-          if (!memoryAccess) {
-            continue;
-          }
-
-          // Maps iteration indices to array access indices:
-          // example:
-          // stmt[i, j] -> A[i, j]
-          // stmt[i, j] -> B[i, j - 1]
-          // NOTE:
-          // - The base address might be different for different maps.
-          isl::map currentMap = memoryAccess->getLatestAccessRelation();
-
-          // The domain of the map, e.g., the loop bounds for the iterators.
-          isl::set domain = stmt.getDomain();
-
-          // The range of the map over the domain
-          // e.g.,
-          // - input: stmt[i, j] -> A[i, j] | i \in [0, N] and j \in [0, M]
-          // - output: A[i, j] | i \in [0, N] and j \in [0, M]
-          isl::set range = currentMap.intersect_domain(domain).range();
-          info.accessMaps[inst] = range;
-        }
-      }
-      scopId += 1;
-    }
-  }
-
-  // For each base address of the GEPs that are allocas (i.e., a separate RAM in
-  // HLS circuit), compute the optimal partitioning and create separate alloca
-  // instructions.
   for (auto [base, insts] : info.baseToInsts) {
-    if (isa<Instruction>(base)) {
-      if (auto *allocaInst = dyn_cast<AllocaInst>(base)) {
-        // If the base is an alloca, we can partition it
-        partitionVariableAlloca(allocaInst, insts, info, aliasAnalysis, islCtx);
-      } else {
-        assert(false &&
-               "Base address of the GEP is not an alloca, cannot partition!");
+    auto it = pragmaInfo.find(base->getName().str());
+    if (it != pragmaInfo.end()) {
+      auto *baseAlloca = dyn_cast<AllocaInst>(base);
+      if (!baseAlloca) {
+        llvm::report_fatal_error(
+            Twine("__dyn_array_partition: only local (alloca) arrays are "
+                  "supported so far '") +
+            base->getName() + "' is not one");
       }
-    }
 
-    if (isa<Constant>(base)) {
-      if (auto *globVar = dyn_cast<GlobalVariable>(base)) {
-        // If the base is a global variable, we can partition it
-        partitionGlobalAlloca(mod, globVar, insts, info, aliasAnalysis, islCtx);
+      const PartitionInfo &partInfo = it->second;
+      auto [bankAllocas, bankInfo] =
+          createPartitionBankAllocas(baseAlloca, partInfo);
+
+      unsigned accessIdx = 0;
+      for (Instruction *inst : insts) {
+        rewriteAccessWithBranching(inst, baseAlloca, bankAllocas, bankInfo,
+                                   partInfo, accessIdx);
+        ++accessIdx;
       }
+      continue;
     }
   }
+
   return PreservedAnalyses::all();
 }
 
