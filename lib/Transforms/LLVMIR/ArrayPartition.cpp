@@ -724,8 +724,8 @@ PreservedAnalyses ArrayPartition::run(Function &f,
                                       FunctionAnalysisManager &fam) {
 
   if (f.getName() == "main") {
-    llvm::errs()
-        << "Skipping main function for automatic array partitioning!\n";
+    LLVM_DEBUG(llvm::errs()
+               << "Skipping main function for automatic array partitioning!\n");
     return PreservedAnalyses::all();
   }
 
