@@ -5,7 +5,8 @@
 // NOTE: Simple test for 1d array halve partition
 void test_1d_partition(const int A[N], const int B[N], const int C[N],
                        int result[N]) {
-#pragma DYN array_partition array=intermediate dimension=1 style=block factor=2
+#pragma DYN array_partition array = intermediate dimension = 1 style =         \
+    block factor = 2
   int intermediate[N];
   for (int i = 0; i < N; ++i) {
     intermediate[i] = A[i] * B[i];
