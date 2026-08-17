@@ -358,7 +358,7 @@ else
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
       --handshake-optimize-bitwidths \
-      --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
+      --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
     exit_on_fail "Failed to apply rest of the transformations to handshake after out with LSQs" \
       "Applied rest of the transformations to handshake after out with LSQs"
@@ -369,7 +369,7 @@ else
       --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces \
       --handshake-remove-unused-memrefs \
       --handshake-optimize-bitwidths \
-      --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
+      --handshake-materialize --handshake-infer-basic-blocks \
       > "$F_HANDSHAKE_TRANSFORMED"
     exit_on_fail "Failed to apply transformations to handshake" \
       "Applied transformations to handshake"

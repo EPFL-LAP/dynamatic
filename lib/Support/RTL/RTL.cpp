@@ -121,7 +121,7 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
   LLVM_DEBUG(llvm::dbgs() << "Attempting match with RTL component "
                           << component.getName() << "\n";);
   if (name != component.getName()) {
-    // LLVM_DEBUG(llvm::dbgs() << "\t-> Names do not match.\n");
+    LLVM_DEBUG(llvm::dbgs() << "\t-> Names do not match.\n");
 
     return failure();
   }

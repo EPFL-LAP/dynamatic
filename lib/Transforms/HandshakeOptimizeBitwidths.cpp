@@ -2090,10 +2090,6 @@ struct HandshakeOptimizeBitwidthsPass
     auto *ctx = &getContext();
     mlir::ModuleOp modOp = getOperation();
 
-    // for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
-    //   funcOp.print(llvm::errs());
-    // }
-
     // Create greedy config for all optimization passes
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;

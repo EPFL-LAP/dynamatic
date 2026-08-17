@@ -93,8 +93,6 @@ static void replaceFirstUse(Operation *op, Value oldVal, Value newVal) {
 /// Materializes a value, potentially placing an eager fork (if it has more than
 /// one uses) or a sink (if it has no uses) to ensure that it is used exactly
 /// once.
-int mine = 0;
-int general = 0;
 static void materializeValue(Value val, OpBuilder &builder) {
   if (!eligibleForMaterialization(val))
     return;
@@ -109,16 +107,8 @@ static void materializeValue(Value val, OpBuilder &builder) {
   // The value has multiple uses, collect its owners
   unsigned numUses = std::distance(val.getUses().begin(), val.getUses().end());
   SmallVector<Operation *> valUsers;
-  bool hasSpecialUser = false;
-  for (OpOperand &oprd : val.getUses()) {
-    Operation *user = oprd.getOwner();
-    valUsers.push_back(user);
-    // llvm::errs() << *user << " ine \n";
-    if (user->hasAttr("drawing")) {
-      hasSpecialUser = true;
-      // llvm::errs() << "******* *** ** \n";
-    }
-  }
+  for (OpOperand &oprd : val.getUses())
+    valUsers.push_back(oprd.getOwner());
 
   // Insert a fork with as many results as the value has uses
   builder.setInsertionPointAfterValue(val);
@@ -127,20 +117,8 @@ static void materializeValue(Value val, OpBuilder &builder) {
     inheritBB(defOp, forkOp);
 
   // Replace original uses of the value with the fork's results
-  for (auto [user, forkRes] : llvm::zip_equal(valUsers, forkOp->getResults())) {
-    if (hasSpecialUser) {
-      // handshake::BufferOp bufferOp = builder.create<handshake::BufferOp>(
-      //     val.getLoc(), forkRes, 6, handshake::BufferType::FIFO_BREAK_NONE);
-      // inheritBB(user, bufferOp);
-
-      // replaceFirstUse(user, val, bufferOp.getResult());
-      replaceFirstUse(user, val, forkRes);
-      mine++;
-    } else {
-      replaceFirstUse(user, val, forkRes);
-      general++;
-    }
-  }
+  for (auto [user, forkRes] : llvm::zip_equal(valUsers, forkOp->getResults()))
+    replaceFirstUse(user, val, forkRes);
 }
 
 /// Promotes some eager forks to lazy forks to ensure that different group
@@ -447,8 +425,6 @@ struct HandshakeMaterializePass
       }
     }
 
-    // llvm::errs() << " goh " << mine << " | " << general << "\n";
-
     // Then, greedily optimize forks
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
@@ -472,75 +448,6 @@ struct HandshakeMaterializePass
     // Finally, promote forks to lazy wherever necessary
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
       promoteEagerToLazyForks(funcOp);
-
-    int num = 0;
-    int allResults = 0;
-    int forkFifoSizeInt = std::stoi(forkFifoSize);
-
-    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>()) {
-      // llvm::errs() << "ghabl shoro ----------------\n";
-      // funcOp.print(llvm::errs());
-      // llvm::errs() << "ghabl tamoom----------------\n";
-      for (Operation &op : funcOp.getOps()) {
-        if (isa<handshake::ForkOp>(op)) {
-          // llvm::errs() << "operation " << op << "\n";
-          for (Value res : op.getResults()) {
-
-            // llvm::errs() << "result " << res << "\n";
-
-            if (isa<handshake::ControlType>(res.getType())) {
-              continue;
-            }
-
-            allResults++;
-            for (auto user : res.getUsers()) {
-
-              bool skip = false;
-              if (isa<handshake::TruncIOp, handshake::ExtSIOp>(user)) {
-                for (Value resultOfTrunc : user->getResults()) {
-                  for (auto userOfTrunc : resultOfTrunc.getUsers()) {
-                    // handshake::BufferOp bufferOp =
-                    //     builder.create<handshake::BufferOp>(
-                    //         resultOfTrunc.getLoc(), resultOfTrunc, 4,
-                    //         handshake::BufferType::FIFO_BREAK_NONE);
-                    // inheritBB(userOfTrunc, bufferOp);
-
-                    if (isa<handshake::MemoryControllerOp>(userOfTrunc)) {
-                      skip = true;
-                      break;
-                    }
-                  }
-                }
-              }
-
-              // llvm::errs() << "user " << *user << "\n";
-
-              if (isa<handshake::MemoryControllerOp>(user) || skip) {
-                continue;
-              }
-
-              if (forkFifoSizeInt != 0) {
-                builder.setInsertionPointAfter(user);
-                handshake::BufferOp bufferOp =
-                    builder.create<handshake::BufferOp>(
-                        res.getLoc(), res, forkFifoSizeInt,
-                        handshake::BufferType::FIFO_BREAK_NONE);
-                inheritBB(user, bufferOp);
-
-                replaceFirstUse(user, res, bufferOp.getResult());
-              }
-
-              if (user->hasAttr("drawing"))
-                num++;
-            }
-          }
-        }
-      }
-
-      // llvm::errs() << "bad shoro----------------\n";
-      // funcOp.print(llvm::errs());
-      // llvm::errs() << "bad tamoom----------------\n";
-    }
 
     assert(succeeded(verifyIRMaterialized(modOp)) && "IR is not materialized");
   }

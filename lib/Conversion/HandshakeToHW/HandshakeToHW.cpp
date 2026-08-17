@@ -589,15 +589,6 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", op->getNumOperands());
         addType("DATA_TYPE", op->getOperand(0));
       })
-      .Case<handshake::BlockerOp>([&](auto) {
-        // Number of input channels and data bitwidth
-        addUnsigned("SIZE", op->getNumOperands());
-        // for (int i= 0; i < op->getNumOperands(); i++){
-        //   Type type = op->getOperand(i).getType();
-        //   if ()
-        // }
-        addType("DATA_TYPE", op->getOperand(0));
-      })
       .Case<handshake::CtrlExtractorOp>(
           [&](auto) { addType("DATA_TYPE", op->getOperand(0)); })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp>(

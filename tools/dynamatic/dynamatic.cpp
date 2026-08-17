@@ -331,7 +331,6 @@ public:
       "num-of-comparators";
   static constexpr llvm::StringLiteral OUT_WITH_LSQS_DEP_GRAPH_FILE =
       "dep-graph-file";
-  static constexpr llvm::StringLiteral FORK_FIFO_SIZE = "fork-fifo-size";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -351,9 +350,6 @@ public:
                "needs to be built with Gurobi support) and 'cbc'. The default "
                "option is gurobi and it will fall back to cbc if gurobi is not "
                "available."});
-    addOption(
-        {FORK_FIFO_SIZE,
-         "Adds buffers with the specified size to the output of every fork"});
     addFlag(
         {OUT_WITH_LSQS, "Replace LSQs with the Out with LSQs elastic circuit"});
     addMultiOption({NUM_OF_COMPARATORS,
@@ -830,7 +826,6 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
-  std::string forkFifoSize = "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -853,11 +848,6 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   if (auto it = args.options.find(MILP_SOLVER); it != args.options.end()) {
     milpSolver = it->second;
-  }
-
-  if (auto it = args.options.find(FORK_FIFO_SIZE); it != args.options.end()) {
-    int val = std::stoi(std::string(it->second));
-    forkFifoSize = std::to_string(val);
   }
 
   if (auto it = args.multiOptions.find(NUM_OF_COMPARATORS);
@@ -891,14 +881,13 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
 
-  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
-                 state.getOutputDir(), state.getKernelName(), buffers,
-                 floatToString(state.targetCP, 3), sharing,
-                 state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
-                 fastTokenDelivery, milpSolver, straightToQueue, speculation,
-                 enableShortCircuit, enableDuplication, calculatePathDelays,
-                 instrumentII, forkFifoSize, outWithLsqs,
-                 outWithLsqsNumComparators, outWithLsqsDepGraphFile);
+  return execCmd(
+      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
+      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
+      state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
+      fastTokenDelivery, milpSolver, straightToQueue, speculation,
+      enableShortCircuit, enableDuplication, calculatePathDelays, instrumentII,
+      outWithLsqs, outWithLsqsNumComparators, outWithLsqsDepGraphFile);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

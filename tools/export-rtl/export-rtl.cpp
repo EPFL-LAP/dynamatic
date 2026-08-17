@@ -216,10 +216,7 @@ LogicalResult ExportInfo::concretizeExternalModules() {
         return failure();
       }
 
-    auto a = match->concretize(request, dynamaticPath, outputPath);
-
-    // ...then generate the component itself
-    return a;
+    return match->concretize(request, dynamaticPath, outputPath);
   };
 
   for (hw::HWModuleExternOp extOp : modOp.getOps<hw::HWModuleExternOp>()) {
@@ -736,9 +733,7 @@ void RTLWriter::constructIOMappings(
   };
 
   auto addPortType = [&](Type portType, StringRef port, StringRef signal) {
-    if (instOp.getModuleName().contains("unbundle") ||
-        instOp.getModuleName().contains("bundle") ||
-        instOp.getModuleName().contains("ctrl_extractor")) {
+    if (instOp.getModuleName().contains("ctrl_extractor")) {
       size_t idx = port.rfind("_");
       if (idx != std::string::npos)
         port = port.substr(0, idx);
