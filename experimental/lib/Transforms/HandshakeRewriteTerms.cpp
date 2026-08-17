@@ -1566,18 +1566,20 @@ struct HandshakeRewriteTermsPass
     config.enableRegionSimplification = false;
     config.maxIterations = 100;
     RewritePatternSet patterns(ctx);
-    patterns.add<EraseUnconditionalBranches, EraseSingleInputMerges,
-                 EraseSingleInputMuxes, EraseSingleInputControlMerges,
-                 DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
-                 RemoveFloatingLoop<handshake::MergeOp>,
-                 RemoveFloatingLoop<handshake::MuxOp>,
-                 ConstructSuppresses, FixSuppresses, DistributeSuppresses,
-                 DistributeRepeats<handshake::MuxOp>,
-                 DistributeRepeats<handshake::MergeOp>,
-                 ExtractIfThenElseCondition, ExtractLoopCondition,
-                 RemoveBranchIfThenElse<handshake::MuxOp>, RemoveBranchIfThenElse<handshake::MergeOp>,
-                 EliminateRedundantLoop<handshake::MuxOp>,
-                 EliminateRedundantLoop<handshake::MergeOp>, ConvertLoopMergeToMux>(ctx);
+    patterns
+        .add<EraseUnconditionalBranches, EraseSingleInputMerges,
+             EraseSingleInputMuxes, EraseSingleInputControlMerges,
+             DowngradeIndexlessControlMerge, RemoveDoubleSinkBranches,
+             RemoveFloatingLoop<handshake::MergeOp>,
+             RemoveFloatingLoop<handshake::MuxOp>, ConstructSuppresses,
+             FixSuppresses, DistributeSuppresses,
+             DistributeRepeats<handshake::MuxOp>,
+             DistributeRepeats<handshake::MergeOp>, ExtractIfThenElseCondition,
+             ExtractLoopCondition, RemoveBranchIfThenElse<handshake::MuxOp>,
+             RemoveBranchIfThenElse<handshake::MergeOp>,
+             EliminateRedundantLoop<handshake::MuxOp>,
+             EliminateRedundantLoop<handshake::MergeOp>, ConvertLoopMergeToMux>(
+            ctx);
 
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
