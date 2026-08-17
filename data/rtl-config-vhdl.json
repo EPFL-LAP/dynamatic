@@ -21,7 +21,8 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t addf -p is_double=$IS_DOUBLE fpu_impl='\"$FPU_IMPL\"' internal_delay='\"$INTERNAL_DELAY\"' latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "flopoco_ip_cores", "vivado_ip_wrappers"
+      "flopoco_ip_cores",
+      "vivado_ip_wrappers"
     ]
   },
   {
@@ -50,7 +51,8 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cmpf -p is_double=$IS_DOUBLE fpu_impl='\"$FPU_IMPL\"' latency=$LATENCY extra_signals=$EXTRA_SIGNALS predicate=\"'$PREDICATE'\"",
     "dependencies": [
-      "flopoco_ip_cores", "vivado_ip_wrappers"
+      "flopoco_ip_cores",
+      "vivado_ip_wrappers"
     ]
   },
   {
@@ -59,7 +61,17 @@
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
     "hdl": "vhdl",
     "io-kind": "flat",
-    "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
+    "io-map": [
+      {
+        "clk": "clock"
+      },
+      {
+        "rst": "reset"
+      },
+      {
+        "*": "io_*"
+      }
+    ],
     "io-signals": {
       "data": "_bits"
     }
@@ -72,8 +84,8 @@
         "type": "unsigned"
       },
       {
-        "name" : "INITIAL_VALUES",
-        "type" : "string"
+        "name": "INITIAL_VALUES",
+        "type": "string"
       }
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ram -p data_width=$DATA_WIDTH addr_width=$ADDR_WIDTH size=$SIZE values=\"($INITIAL_VALUES)\""
@@ -106,7 +118,8 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t divf -p is_double=$IS_DOUBLE fpu_impl='\"$FPU_IMPL\"' internal_delay='\"$INTERNAL_DELAY\"' latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "flopoco_ip_cores", "vivado_ip_wrappers"
+      "flopoco_ip_cores",
+      "vivado_ip_wrappers"
     ]
   },
   {
@@ -178,7 +191,8 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t mulf -p is_double=$IS_DOUBLE fpu_impl='\"$FPU_IMPL\"' internal_delay='\"$INTERNAL_DELAY\"' latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "flopoco_ip_cores", "vivado_ip_wrappers"
+      "flopoco_ip_cores",
+      "vivado_ip_wrappers"
     ]
   },
   {
@@ -221,7 +235,8 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t subf -p is_double=$IS_DOUBLE fpu_impl='\"$FPU_IMPL\"' internal_delay='\"$INTERNAL_DELAY\"' latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "flopoco_ip_cores", "vivado_ip_wrappers"
+      "flopoco_ip_cores",
+      "vivado_ip_wrappers"
     ]
   },
   {
@@ -373,7 +388,17 @@
     "use-json-config": "$OUTPUT_DIR/$MODULE_NAME.json",
     "hdl": "vhdl",
     "io-kind": "flat",
-    "io-map": [{ "clk": "clock" }, { "rst": "reset" }, { "*": "io_*" }],
+    "io-map": [
+      {
+        "clk": "clock"
+      },
+      {
+        "rst": "reset"
+      },
+      {
+        "*": "io_*"
+      }
+    ],
     "io-signals": {
       "data": "_bits"
     }
@@ -417,7 +442,8 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculator -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "types", "spec_types"
+      "types",
+      "spec_types"
     ]
   },
   {
@@ -556,13 +582,28 @@
   {
     "name": "handshake.join",
     "parameters": [
-      { "name": "SIZE", "type": "unsigned"}
+      {
+        "name": "SIZE",
+        "type": "unsigned"
+      }
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t top_join -p size=$SIZE"
   },
   {
     "name": "handshake.gate",
-    "parameters": [{ "name": "SIZE", "type": "unsigned", "lb": 1 }, { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }],
+    "parameters": [
+      {
+        "name": "SIZE",
+        "type": "unsigned",
+        "lb": 1
+      },
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0
+      }
+    ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t gate -p size=$SIZE bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
@@ -573,24 +614,36 @@
   {
     "name": "handshake.not",
     "parameters": [
-      { "name": "SIZE", "type": "unsigned"}
+      {
+        "name": "SIZE",
+        "type": "unsigned"
+      }
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t top_join -p size=$SIZE"
   },
   {
     "name": "handshake.sharing_wrapper",
-    "parameters":[
-      { "name": "NUM_SHARED_OPERANDS", "type": "unsigned"},
-      { "name": "LATENCY", "type": "unsigned"},
-      { "name": "CREDITS", "type": "string"}
+    "parameters": [
+      {
+        "name": "NUM_SHARED_OPERANDS",
+        "type": "unsigned"
+      },
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      },
+      {
+        "name": "CREDITS",
+        "type": "string"
+      }
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sharing_wrapper -p bitwidth=$BITWIDTH num_shared_operands=$NUM_SHARED_OPERANDS latency=$LATENCY credits='\"$CREDITS\"'",
-    "dependencies":[
+    "dependencies": [
       "types",
       "sharing_support"
     ]
   },
-    {
+  {
     "name": "handshake.lazy_fork",
     "parameters": [
       {
@@ -624,9 +677,20 @@
   {
     "name": "ii_monitor",
     "parameters": [
-      { "name": "LOOP_DEPTH", "type": "unsigned", "lb": 1 },
-      { "name": "LOOP_MAX_DEPTH", "type": "unsigned", "lb": 1 },
-      { "name": "INIT_SELECTS", "type": "string" }
+      {
+        "name": "LOOP_DEPTH",
+        "type": "unsigned",
+        "lb": 1
+      },
+      {
+        "name": "LOOP_MAX_DEPTH",
+        "type": "unsigned",
+        "lb": 1
+      },
+      {
+        "name": "INIT_SELECTS",
+        "type": "string"
+      }
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ii_monitor -p loop_depth=$LOOP_DEPTH loop_max_depth=$LOOP_MAX_DEPTH init_selects='$INIT_SELECTS' sel_bitwidths=$SEL_BITWIDTHS sel_extra_signals=$SEL_EXTRA_SIGNALS",
     "hdl": "vhdl"
