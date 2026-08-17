@@ -63,6 +63,7 @@ using WaitingSignalForSucc = DenseMap<StringRef, SmallVector<Value>>;
 using IsWaitingSignalForSuccDirect = DenseMap<StringRef, SmallVector<bool>>;
 using BlockControlDepsMap = ControlDependenceAnalysis::BlockControlDepsMap;
 using delayedDict = DenseMap<Operation *, SmallVector<Value>>;
+using DoneSignalForMemoryOp = DenseMap<Operation *, Value>;
 
 constexpr llvm::StringLiteral SKIP_COND_GEN("Skip.Condition_Generator");
 constexpr llvm::StringLiteral SKIP_COND_SEQ("Skip.Conditional_Sequentializer");
@@ -332,8 +333,12 @@ SmallVector<Value> createSkipConditionForPair(
 /// signal. This difference needs to be taken care of when using the done
 /// signal.
 Value getDoneSignalFromMemoryOp(Operation *memOp,
+                                DoneSignalForMemoryOp &doneSignals,
                                 ConversionPatternRewriter &rewriter) {
   if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp)) {
+    if (auto it = doneSignals.find(memOp); it != doneSignals.end())
+      return it->second;
+
     Value loadResult = loadOp->getResult(1);
     Location loc = loadOp->getLoc();
 
@@ -341,7 +346,9 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
         rewriter.create<handshake::CtrlExtractorOp>(loc, loadResult);
     inheritBB(loadOp, ctrlExtractorOp);
 
-    return ctrlExtractorOp.getResult();
+    Value doneSignal = ctrlExtractorOp.getResult();
+    doneSignals[memOp] = doneSignal;
+    return doneSignal;
   } else if (auto storeOp = dyn_cast<handshake::StoreOp>(memOp)) {
     return storeOp->getResult(2);
   } else {
@@ -357,6 +364,7 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
 SkipConditionForPair
 createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
                                 std::vector<unsigned> Nvector,
+                                DoneSignalForMemoryOp &doneSignals,
                                 ConversionPatternRewriter &rewriter) {
 
   SkipConditionForPair skipConditionForEachPair;
@@ -367,15 +375,17 @@ createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
 
   for (auto [predecessorOpName, predecessorOpPointer] : memAccesses) {
     rewriter.setInsertionPointToStart(predecessorOpPointer->getBlock());
-    Value predecessorOpDoneSignal =
-        getDoneSignalFromMemoryOp(predecessorOpPointer, rewriter);
-    Value predecessorOpAddr = predecessorOpPointer->getOperand(0);
 
     if (auto deps =
             getDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer)) {
 
       if (hasAtLeastOneActiveDep(deps)) {
         SmallVector<StringRef> handledSuccessors;
+        Value predecessorOpDoneSignal =
+            getDoneSignalFromMemoryOp(predecessorOpPointer, doneSignals,
+                                      rewriter);
+        Value predecessorOpAddr = predecessorOpPointer->getOperand(0);
+
         for (MemDependenceAttr dependency : deps.getDependencies()) {
           if (!dependency.getIsActive())
             continue;
@@ -511,6 +521,7 @@ MemDependenceAttr getDeactivatedDependency(MemDependenceAttr dependency) {
 WaitingSignalForSucc createWaitingSignalsForAllPairs(
     MemAccesses &memAccesses, SkipConditionForPair &skipConditionForEachPair,
     MLIRContext *ctx, FuncOp funcOp, std::vector<unsigned> NVector,
+    DoneSignalForMemoryOp &doneSignals,
     ConversionPatternRewriter &rewriter) {
 
   WaitingSignalForSucc waitingSignalsForEachSuccessor;
@@ -522,53 +533,59 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
 
   for (auto [predecessorOpName, predecessorOpPointer] : memAccesses) {
     rewriter.setInsertionPointToStart(predecessorOpPointer->getBlock());
-    Value predecessorOpDoneSignal =
-        getDoneSignalFromMemoryOp(predecessorOpPointer, rewriter);
 
-    SmallVector<StringRef> handledSuccessors;
-    SmallVector<MemDependenceAttr> newDeps;
     if (auto deps =
             getDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer)) {
 
-      for (MemDependenceAttr dependency : deps.getDependencies()) {
-        if (!dependency.getIsActive()) {
-          newDeps.push_back(dependency);
-          continue;
-        }
-        if (std::find(handledSuccessors.begin(), handledSuccessors.end(),
-                      dependency.getDstAccess()) != handledSuccessors.end()) {
+      if (hasAtLeastOneActiveDep(deps)) {
+        Value predecessorOpDoneSignal =
+            getDoneSignalFromMemoryOp(predecessorOpPointer, doneSignals,
+                                      rewriter);
+
+        SmallVector<StringRef> handledSuccessors;
+        SmallVector<MemDependenceAttr> newDeps;
+
+        for (MemDependenceAttr dependency : deps.getDependencies()) {
+          if (!dependency.getIsActive()) {
+            newDeps.push_back(dependency);
+            continue;
+          }
+          if (std::find(handledSuccessors.begin(), handledSuccessors.end(),
+                        dependency.getDstAccess()) != handledSuccessors.end()) {
+            newDeps.push_back(getDeactivatedDependency(dependency));
+            continue;
+          }
+
+          N = getNumComparatorsForDependence(predecessorOpName,
+                                             dependency.getDstAccess(), NVector,
+                                             NvectorIndex);
+
+          SmallVector<Operation *> doneDelayGenerator;
+          unsigned effective_N = N == 0 ? 1 : N;
+          SmallVector<Value> delayedDoneSignals = createDelayGenerator(
+              predecessorOpDoneSignal, predecessorOpPointer, effective_N, false,
+              doneDelayGenerator, rewriter);
+
+          StringRef successorName = dependency.getDstAccess();
+          Operation *successorOpPointer = memAccesses[successorName];
+
+          SmallVector<Value> conds =
+              skipConditionForEachPair[predecessorOpName][successorName];
+
+          Value waitingSignal = createWaitingSignalForPair(
+              predecessorOpDoneSignal, delayedDoneSignals, conds,
+              predecessorOpPointer, successorOpPointer, N,
+              dependenciesMapForPhiNetwork, rewriter);
+          waitingSignalsForEachSuccessor[successorName].push_back(
+              waitingSignal);
+          isWaitingSignalForSuccDirect[successorName].push_back(N == 0);
+
           newDeps.push_back(getDeactivatedDependency(dependency));
-          continue;
+          handledSuccessors.push_back(successorName);
         }
-
-        N = getNumComparatorsForDependence(predecessorOpName,
-                                           dependency.getDstAccess(), NVector,
-                                           NvectorIndex);
-
-        SmallVector<Operation *> doneDelayGenerator;
-        unsigned effective_N = N == 0 ? 1 : N;
-        SmallVector<Value> delayedDoneSignals = createDelayGenerator(
-            predecessorOpDoneSignal, predecessorOpPointer, effective_N, false,
-            doneDelayGenerator, rewriter);
-
-        StringRef successorName = dependency.getDstAccess();
-        Operation *successorOpPointer = memAccesses[successorName];
-
-        SmallVector<Value> conds =
-            skipConditionForEachPair[predecessorOpName][successorName];
-
-        Value waitingSignal = createWaitingSignalForPair(
-            predecessorOpDoneSignal, delayedDoneSignals, conds,
-            predecessorOpPointer, successorOpPointer, N,
-            dependenciesMapForPhiNetwork, rewriter);
-        waitingSignalsForEachSuccessor[successorName].push_back(waitingSignal);
-        isWaitingSignalForSuccDirect[successorName].push_back(N == 0);
-
-        newDeps.push_back(getDeactivatedDependency(dependency));
-        handledSuccessors.push_back(successorName);
+        setDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer, ctx,
+                                               newDeps);
       }
-      setDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer, ctx,
-                                             newDeps);
     }
     setDialectAttr<MemInterfaceAttr>(predecessorOpPointer, ctx);
   }
@@ -669,6 +686,7 @@ HandshakeCreateOutWithLSQsCircuitPass::createBaseOutWithLSQsCircuit(
   MemAccesses memAccesses;
   SkipConditionForPair skipConditionForEachPair;
   WaitingSignalForSucc waitingSignalsForEachSuccessor;
+  DoneSignalForMemoryOp doneSignals;
   std::vector<Operation *> consumerOpListForFTD;
 
   memAccesses = findMemAccessesInFunc(funcOp);
@@ -680,10 +698,12 @@ HandshakeCreateOutWithLSQsCircuitPass::createBaseOutWithLSQsCircuit(
   // Finally, the successor accesses are gated with the waiting signals.
 
   skipConditionForEachPair =
-      createSkipConditionsForAllPairs(memAccesses, funcOp, NVector, rewriter);
+      createSkipConditionsForAllPairs(memAccesses, funcOp, NVector,
+                                      doneSignals, rewriter);
 
   waitingSignalsForEachSuccessor = createWaitingSignalsForAllPairs(
-      memAccesses, skipConditionForEachPair, ctx, funcOp, NVector, rewriter);
+      memAccesses, skipConditionForEachPair, ctx, funcOp, NVector, doneSignals,
+      rewriter);
 
   gateAllSuccessorAccesses(memAccesses, waitingSignalsForEachSuccessor, funcOp,
                            rewriter);
