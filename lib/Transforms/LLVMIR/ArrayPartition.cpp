@@ -711,11 +711,99 @@ std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
 
   return result;
 }
-} // namespace
 
 struct ArrayPartition : PassInfoMixin<ArrayPartition> {
 
   unsigned memCount = 0;
+
+// Helper function for gathering type of inner arrays in multidimensional arrays
+ArrayType *getTargetDimType(Type *ty, unsigned dimension) {
+  for (unsigned i = 1; i < dimension; ++i) {
+    auto *at = dyn_cast<ArrayType>(ty);
+    if (!at)
+      llvm::report_fatal_error(
+          "__dyn_array_partition: dimension exceeds array rank");
+    ty = at->getElementType();
+  }
+  auto *at = dyn_cast<ArrayType>(ty);
+  if (!at)
+    llvm::report_fatal_error(
+        "__dyn_array_partition: dimension exceeds array rank");
+  return at;
+}
+
+// Recursive funtion for rebuilding the array type. Go through each dimension
+// and generate the corresponding array type
+Type *getPartitionedArrayType(Type *ty, unsigned dimension, unsigned numElems) {
+  auto *at = cast<ArrayType>(ty);
+  if (dimension == 1)
+    return ArrayType::get(at->getElementType(), numElems);
+  return ArrayType::get(
+      getPartitionedArrayType(at->getElementType(), dimension - 1, numElems),
+      at->getNumElements());
+}
+
+std::tuple<std::vector<AllocaInst *>, std::vector<DimInfo>>
+createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
+  // Get total size of the dimension we'd like to partition accross
+  unsigned totalSize =
+      getTargetDimType(baseAlloca->getAllocatedType(), info.dimension)
+          ->getArrayNumElements();
+
+  if (totalSize < 1) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: cannot partition a less than 1 length array");
+  }
+
+  unsigned factor = info.style == "complete" ? totalSize : info.factor;
+
+  if (factor == 0 || factor > totalSize) {
+    llvm::report_fatal_error("__dyn_array_partition: factor must be in [1, N]");
+  }
+
+  // Logic for determining bank partition numbers
+  unsigned chunkSize = totalSize / factor;
+  unsigned remainder = totalSize % factor;
+
+  std::vector<DimInfo> banks;
+  banks.reserve(factor);
+  if (info.style == "block" || info.style == "complete") {
+    unsigned offset = 0;
+    for (unsigned bank = 0; bank < factor; ++bank) {
+      // Put all remaining elements into the last bank
+      unsigned elems = chunkSize + (bank + 1 == factor ? remainder : 0);
+      banks.emplace_back(offset, 1, elems);
+      offset += elems;
+    }
+  } else if (info.style == "cyclic") {
+    for (unsigned bank = 0; bank < factor; ++bank) {
+      unsigned elems = chunkSize + (bank < remainder ? 1u : 0u);
+      banks.emplace_back(bank, factor, elems);
+    }
+  } else {
+    llvm::report_fatal_error(Twine("__dyn_array_partition: unknown style '") +
+                             info.style +
+                             "' (expected block, cyclic, or complete)");
+  }
+
+  // Insertion of allocations
+  std::vector<AllocaInst *> bankAllocas;
+  bankAllocas.reserve(banks.size());
+
+  IRBuilder<> builder(baseAlloca->getNextNode());
+  for (auto &[firstIndex, step, elems] : banks) {
+    Type *bankType = getPartitionedArrayType(baseAlloca->getAllocatedType(),
+                                             info.dimension, elems);
+    AllocaInst *newAlloca = builder.CreateAlloca(
+        bankType, baseAlloca->getArraySize(), baseAlloca->getName());
+    newAlloca->setAlignment(baseAlloca->getAlign());
+    bankAllocas.push_back(newAlloca);
+  }
+
+  return {bankAllocas, banks};
+}
+
+} // namespace
 
 struct ArrayPartition : PassInfoMixin<ArrayPartition> {
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
