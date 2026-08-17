@@ -23,6 +23,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <boost/graph/connected_components.hpp>
 #include <boost/property_map/property_map.hpp>
 #include <cstddef>
@@ -712,9 +713,188 @@ std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
   return result;
 }
 
-struct ArrayPartition : PassInfoMixin<ArrayPartition> {
+void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
+                                ArrayRef<AllocaInst *> banks,
+                                ArrayRef<DimInfo> bankInfo,
+                                const PartitionInfo &partInfo,
+                                unsigned accessIdx) {
 
-  unsigned memCount = 0;
+  StringRef arrName = baseAlloca->getName();
+
+  auto *gepInst = dyn_cast<GetElementPtrInst>(findBaseGEP(inst));
+
+  auto *load = dyn_cast<LoadInst>(inst);
+  auto *store = dyn_cast<StoreInst>(inst);
+  StringRef opKind = load ? "load" : "store";
+
+  if (!gepInst) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: expected a GEP for this access");
+  }
+
+  // If the wanted dimension to partition from exceeds the available indices in
+  // the gep instruction we can not change the indices accordingly
+  if (partInfo.dimension >= gepInst->getNumIndices()) {
+    llvm::report_fatal_error("__dyn_array_partition: dimension exceeds the "
+                             "number of indices in this access");
+  }
+
+  // For gep instruciton:
+  // %p = getelementptr [10 x [10 x i32]], ptr %arr, i64 0, i64 1, 5
+  // and dimension = 2 we'd want origIdx to be value 5 in this example
+  Value *origIdx = *(gepInst->idx_begin() + partInfo.dimension);
+  Type *addrTy = origIdx->getType();
+
+  unsigned factor = static_cast<unsigned>(banks.size());
+  unsigned totalSize = 0;
+  for (auto &[firstIndex, step, elems] : bankInfo)
+    totalSize += elems;
+
+  unsigned chunkSize = totalSize / factor;
+  unsigned remainder = totalSize % factor;
+
+  LLVMContext &ctx = inst->getContext();
+  Function *f = inst->getParent()->getParent();
+
+  // Splits origBB right before the GEP: everything from the GEP onward
+  // moves into mergeBB.
+  //
+  // origBB:
+  //  ...
+  //  %gep = getelementptr ...;
+  //  %v = load ...;
+  //  br %next
+  //
+  // ->
+  //
+  // origBB:
+  //  ...
+  //  br %mergeBB
+  //
+  // mergeBB:
+  //  %gep = getelementptr ...;
+  //  %v = load ...;
+  //  br %next
+  BasicBlock *origBB = gepInst->getParent();
+  BasicBlock *mergeBB =
+      SplitBlock(origBB, gepInst->getIterator(), (DominatorTree *)nullptr,
+                 (LoopInfo *)nullptr, (MemorySSAUpdater *)nullptr,
+                 "partition." + arrName + ".merge" + Twine(accessIdx));
+  Instruction *placeholderBr = origBB->getTerminator();
+
+  IRBuilder<> preBuilder(placeholderBr);
+  Type *i64Ty = Type::getInt64Ty(ctx);
+
+  // Computation of th bank that the index falls into
+  Value *bankIdxNative;
+  if (partInfo.style == "cyclic") {
+    bankIdxNative = preBuilder.CreateURem(
+        origIdx, ConstantInt::get(addrTy, factor), "bank.idx");
+  } else { // "block" or "complete"
+    Value *raw = preBuilder.CreateUDiv(
+        origIdx, ConstantInt::get(addrTy, chunkSize), "bank.raw");
+    if (remainder != 0) {
+      Value *maxBank = ConstantInt::get(addrTy, factor - 1);
+      Value *tooLarge = preBuilder.CreateICmpUGT(raw, maxBank);
+      bankIdxNative =
+          preBuilder.CreateSelect(tooLarge, maxBank, raw, "bank.idx");
+    } else {
+      bankIdxNative = raw;
+    }
+  }
+
+  // Normalize to i64 for the comparison chain below, regardless of addrTy.
+  // NOTE: I had issues with i32 vs i64 indices before
+  Value *bankIdx =
+      bankIdxNative->getType() == i64Ty
+          ? bankIdxNative
+          : preBuilder.CreateZExtOrTrunc(bankIdxNative, i64Ty, "bank.idx.64");
+
+  placeholderBr->eraseFromParent();
+
+  // One basic block per bank for either load/store
+  std::vector<BasicBlock *> bankBBs;
+  bankBBs.reserve(factor);
+  for (unsigned bank = 0; bank < factor; ++bank)
+    bankBBs.push_back(BasicBlock::Create(
+        ctx, "partition." + arrName + "." + opKind + "." + Twine(bank), f));
+
+  if (factor == 1) {
+    IRBuilder<>(origBB).CreateBr(bankBBs[0]);
+  } else {
+    // if/else-if chain:
+    //   bankIdx == 0 ? bank0 : (bankIdx == 1 ? bank1 : ... : bank[factor-1])
+    BasicBlock *currentBB = origBB;
+    for (unsigned b = 0; b + 1 < factor; ++b) {
+      IRBuilder<> checkBuilder(currentBB);
+      Value *cmp = checkBuilder.CreateICmpEQ(
+          bankIdx, ConstantInt::get(i64Ty, b), "bank.cmp." + Twine(b));
+      bool isLastCheck = (b + 2 == factor);
+      BasicBlock *elseBB =
+          isLastCheck
+              ? bankBBs[factor - 1]
+              : BasicBlock::Create(
+                    ctx, "partition." + arrName + ".cmp." + Twine(b + 1), f);
+      checkBuilder.CreateCondBr(cmp, bankBBs[b], elseBB);
+      currentBB = elseBB;
+    }
+  }
+
+  // Body for the load/store basic blocks
+  std::vector<std::pair<BasicBlock *, Value *>> incoming;
+  for (unsigned b = 0; b < factor; ++b) {
+    IRBuilder<> caseBuilder(bankBBs[b]);
+    auto [firstIndex, step, elems] = bankInfo[b];
+
+    // Creation of bank specific target index
+    //   newTargetIdx = (origIdx - firstIndex) / step
+    // e.g. firstIndex=50, step=1 (block bank covering global 50..99):
+    //   %sub = sub i64 %origIdx, 50
+    //   %part.idx = udiv i64 %sub, 1        ; a[73] -> bank[23]
+    Value *newTargetIdx = caseBuilder.CreateUDiv(
+        caseBuilder.CreateSub(origIdx, ConstantInt::get(addrTy, firstIndex)),
+        ConstantInt::get(addrTy, step), "part.idx");
+
+    std::vector<Value *> newIndices;
+    newIndices.reserve(gepInst->getNumIndices());
+
+    // GEP indices are either the same as before or transformed exactly in the
+    // case where they match the target dimension
+    for (unsigned i = 0; i < gepInst->getNumIndices(); ++i) {
+      auto *newIndex =
+          i == partInfo.dimension ? newTargetIdx : *(gepInst->idx_begin() + i);
+      newIndices.push_back(newIndex);
+    }
+
+    Value *newGEP = caseBuilder.CreateInBoundsGEP(
+        banks[b]->getAllocatedType(), banks[b], newIndices, "part.gep");
+
+    if (load) {
+      LoadInst *newLoad = caseBuilder.CreateLoad(load->getType(), newGEP,
+                                                 load->getName() + ".part");
+      newLoad->setAlignment(load->getAlign());
+      incoming.emplace_back(bankBBs[b], newLoad);
+    } else if (store) {
+      StoreInst *newStore =
+          caseBuilder.CreateStore(store->getValueOperand(), newGEP);
+      newStore->setAlignment(store->getAlign());
+    }
+    caseBuilder.CreateBr(mergeBB);
+  }
+
+  // In case we were working with a load we need to unify using phi nodes
+  if (load) {
+    IRBuilder<> mergeBuilder(&mergeBB->front());
+    PHINode *phi = mergeBuilder.CreatePHI(load->getType(), factor,
+                                          load->getName() + ".merged");
+    for (auto &[bb, val] : incoming)
+      phi->addIncoming(val, bb);
+    load->replaceAllUsesWith(phi);
+  }
+
+  inst->eraseFromParent();
+  gepInst->eraseFromParent();
+}
 
 // Helper function for gathering type of inner arrays in multidimensional arrays
 ArrayType *getTargetDimType(Type *ty, unsigned dimension) {
