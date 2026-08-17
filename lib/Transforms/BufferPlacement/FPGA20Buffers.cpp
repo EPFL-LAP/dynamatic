@@ -43,14 +43,6 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
   for (auto &[channel, chVars] : vars.channelVars) {
     // Extract number and type of slots from the MILP solution, as well as
     // channel-specific buffering properties
-    if (auto op = channel.getDefiningOp(); op)
-      if (isa<handshake::UnbundleOp>(op) &&
-          !isa<handshake::ControlType>(channel.getType())) {
-        // llvm::errs() << "skipping" << channel << "\n";
-        continue;
-      }
-    // llvm::errs() << channel << " has " << channel.getType()
-    //              << "slots to place.\n";
     unsigned numSlotsToPlace =
         static_cast<unsigned>(model->getValue(chVars.bufNumSlots) + 0.5);
 
@@ -94,16 +86,15 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
     auto [cf, cfVars] = cfdfcWithVars;
     double tmpThroughput = model->getValue(cfVars.throughput);
 
-    //   cfdfcTPResult[idx] = tmpThroughput;
-    // }
-
-    // Create and add the handshake.tp attribute
-    auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
-        funcInfo.funcOp.getContext(), cfdfcTPResult);
-    setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
-
-    populateCFDFCThroughputAndOccupancy();
+    cfdfcTPResult[idx] = tmpThroughput;
   }
+
+  // Create and add the handshake.tp attribute
+  auto cfdfcTPMap = handshake::CFDFCThroughputAttr::get(
+      funcInfo.funcOp.getContext(), cfdfcTPResult);
+  setDialectAttr(funcInfo.funcOp, cfdfcTPMap);
+
+  populateCFDFCThroughputAndOccupancy();
 }
 
 void FPGA20Buffers::addCustomChannelConstraints(Value channel) {
@@ -174,13 +165,6 @@ void FPGA20Buffers::setup() {
   // Create channel variables and constraints
   std::vector<Value> allChannels;
   for (auto &[channel, _] : channelProps) {
-    // llvm::errs() << "Adding vars for channel: " << channel << "\n";
-    // llvm::errs() <<  channel.getDefiningOp()->getName().getStringRef() <<
-    // "\n";
-    // if (auto op = channel.getDefiningOp(); op)
-    //   if (isa<handshake::UnbundleOp>(op))
-    //     // llvm::errs() << channel << " is unbundle\n";
-    //     continue;
     allChannels.push_back(channel);
     addChannelVars(channel, signalTypes);
     addCustomChannelConstraints(channel);
@@ -206,25 +190,18 @@ void FPGA20Buffers::setup() {
 
   // Create CFDFC variables and add throughput constraints for each CFDFC that
   // was marked to be optimized
-  // SmallVector<CFDFC *> cfdfcs;
-  // for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
-  //   if (!optimize)
-  //     continue;
-  //   cfdfcs.push_back(cfdfc);
-  //   addCFDFCVars(*cfdfc);
-  //   // addMuxConstraint(*cfdfc);
-  //   addSteadyStateReachabilityConstraints(*cfdfc);
-  //   addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
-  //   addUnitThroughputConstraints(*cfdfc);
-  // }
-  // addBackedgeConstraints();
-  // addDataBufConstraint();
+  SmallVector<CFDFC *> cfdfcs;
+  for (auto [cfdfc, optimize] : funcInfo.cfdfcs) {
+    if (!optimize)
+      continue;
+    cfdfcs.push_back(cfdfc);
+    addCFDFCVars(*cfdfc);
+    addSteadyStateReachabilityConstraints(*cfdfc);
+    addChannelThroughputConstraintsForBinaryLatencyChannel(*cfdfc);
+    addUnitThroughputConstraints(*cfdfc);
+  }
 
-  // GRBLinExpr objective = addBackedgeObjective(allChannels);
   // Add the MILP objective and mark the MILP ready to be optimized
-  // addMaxThroughputObjective(allChannels, cfdfcs, objective);
-
-  // addBackedgeConstraints();
-  addMinBufferAreaObjective(allChannels);
+  addMaxThroughputObjective(allChannels, cfdfcs);
   markReadyToOptimize();
 }

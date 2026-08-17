@@ -6,11 +6,8 @@ add_dynamatic_library(DynamaticBufferPlacement
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
   FPGA24Buffers.cpp
-  CPBuffers.cpp
   LatencyAndOccupancyBalancingSupport.cpp
   CostAwareBuffers.cpp
-  Johnson.cpp
-  Reconvergence.cpp
   HandshakePlaceBuffers.cpp
   HandshakeSetBufferingProperties.cpp
   MAPBUFBuffers.cpp

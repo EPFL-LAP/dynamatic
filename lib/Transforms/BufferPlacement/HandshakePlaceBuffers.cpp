@@ -20,7 +20,6 @@
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
-#include "dynamatic/Transforms/BufferPlacement/CPBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
@@ -49,7 +48,7 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    COST_AWARE("costaware"), MAPBUF("mapbuf"), FPGA24("fpga24"), CPBUF("cpbuf");
+    COST_AWARE("costaware"), MAPBUF("mapbuf"), FPGA24("fpga24");
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
@@ -177,8 +176,7 @@ void HandshakePlaceBuffersPass::runOnOperation() {
       algorithm == FPL22 || 
       algorithm == FPGA24 ||
       algorithm == COST_AWARE ||
-      algorithm == MAPBUF ||
-      algorithm == CPBUF
+      algorithm == MAPBUF
       // clang-format on
   ) {
     if (failed(placeUsingMILP()))
@@ -320,34 +318,31 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       }
     }
 
-    // std::optional<unsigned> srcBB = opBlocks[&op];
-    // for (OpResult res : op.getResults()) {
-    //   Operation *user = *res.getUsers().begin();
-    //   std::optional<unsigned> dstBB = opBlocks[user];
+    std::optional<unsigned> srcBB = opBlocks[&op];
+    for (OpResult res : op.getResults()) {
+      Operation *user = *res.getUsers().begin();
+      std::optional<unsigned> dstBB = opBlocks[user];
 
-    //   // All transitions between blocks must exist in the original CFG
-    //   if (srcBB && dstBB && *srcBB != *dstBB &&
-    //       !transitions[*srcBB].contains(*dstBB)) {
-    //     auto endBB =
-    //     *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator()); if
-    //     (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
-    //         dstBB == endBB) {
-    //       /// NOTE: (lucas-rami) This is probably the start->end control
-    //       channel
-    //       /// which goes from the entry block to the exit block. This is fine
-    //       in
-    //       /// general so we let this pass without triggering a warning or
-    //       error continue;
-    //     }
+      // All transitions between blocks must exist in the original CFG
+      if (srcBB && dstBB && *srcBB != *dstBB &&
+          !transitions[*srcBB].contains(*dstBB)) {
+        auto endBB = *opBlocks.at(info.funcOp.getBodyBlock()->getTerminator());
+        if (isa<ControlType>(res.getType()) && srcBB == ENTRY_BB &&
+            dstBB == endBB) {
+          /// NOTE: (lucas-rami) This is probably the start->end control channel
+          /// which goes from the entry block to the exit block. This is fine in
+          /// general so we let this pass without triggering a warning or error
+          continue;
+        }
 
-    //     return op.emitError()
-    //            << "Result " << res.getResultNumber() << " defined in block "
-    //            << *srcBB << " is used in block " << *dstBB
-    //            << ". This connection does not exist according to the CFG "
-    //               "graph. Solving the buffer placement MILP would yield an "
-    //               "incorrect placement.";
-    //   }
-    // }
+        return op.emitError()
+               << "Result " << res.getResultNumber() << " defined in block "
+               << *srcBB << " is used in block " << *dstBB
+               << ". This connection does not exist according to the CFG "
+                  "graph. Solving the buffer placement MILP would yield an "
+                  "incorrect placement.";
+      }
+    }
   }
   return success();
 }
@@ -567,15 +562,6 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     mapbuf::MAPBUFBuffers milp(solverKind, timeout, info, timingDB, targetCP,
                                blifFiles, lutDelay, lutSize, acyclicType,
                                writeTo);
-    return milp.solve(placement, calculatePathDelays);
-  }
-  if (algorithm == CPBUF) {
-    if (dumpMILPModels) {
-      writeTo = dumpDir + sep + funcName + "-cpbuf";
-    }
-    // Create and solve the MILP
-    cpbuf::CPBuffers milp(solverKind, timeout, info, timingDB, targetCP,
-                          writeTo);
     return milp.solve(placement, calculatePathDelays);
   }
 

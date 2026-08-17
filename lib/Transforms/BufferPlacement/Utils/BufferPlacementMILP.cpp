@@ -11,12 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
-#include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
-#include "dynamatic/Transforms/BufferPlacement/Johnson.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -430,7 +428,6 @@ void BufferPlacementMILP::addChannelVars(Value channel,
   chVars.bufNumSlots = createVar("bufNumSlots", INTEGER);
   chVars.dataLatency = createVar("dataLatency", INTEGER);
   chVars.shiftReg = createVar("shiftReg", BOOLEAN);
-  chVars.isBackedge = createVar("backedge", BOOLEAN);
 }
 
 void BufferPlacementMILP::addCFDFCVars(CFDFC &cfdfc) {
@@ -1293,34 +1290,6 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
     if (cfdfc->channels.contains(channel))
       numExec += cfdfc->numExecs;
   return numExec;
-}
-
-LinExpr BufferPlacementMILP::addBackedgeObjective(ValueRange allChannels) {
-  LinExpr objective;
-
-  for (Value channel : allChannels) {
-    ChannelVars &chVars = vars.channelVars[channel];
-    objective -= chVars.isBackedge;
-  }
-
-  return objective;
-}
-
-void BufferPlacementMILP::addMinBufferAreaObjective(ValueRange channels) {
-  LinExpr objective = 0;
-
-  for (Value channel : channels) {
-    ChannelVars &chVars = vars.channelVars[channel];
-    objective -= chVars.bufPresent;
-    objective -= 0.1 * chVars.bufNumSlots;
-  }
-
-  // llvm::errs() << "Objective: " << "\n";
-  // model.computeIIS();
-
-  // model.write("model.ilp");
-  // llvm::errs() << "wrote IIS" << "\n";
-  model->setMaximizeObjective(objective);
 }
 
 void BufferPlacementMILP::addMaxThroughputObjective(ValueRange channels,

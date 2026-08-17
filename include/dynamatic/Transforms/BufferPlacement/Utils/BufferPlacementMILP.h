@@ -84,9 +84,6 @@ struct ChannelVars {
   CPVar stalled;
   /// [FPGA24] Maximum token occupancy for this channel (real).
   CPVar maxOccupancy;
-
-  /// Whether the channel is a backedge or not (binary).
-  CPVar isBackedge;
 };
 
 /// [FPGA24] Holds all variables associated to a synchronization pattern. (e.g.
@@ -144,7 +141,7 @@ struct MILPVars {
 class BufferPlacementMILP : public MILP<BufferPlacement> {
 public:
   // Enum representation of algorithm class
-  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF, CPBUF };
+  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF };
 
   /// Contains timing characterizations for dataflow components required to
   /// create the MILP constraints.
@@ -316,12 +313,6 @@ protected:
   /// steady state.
   void addSteadyStateReachabilityConstraints(CFDFC &cfdfc);
 
-  void addBackedgeConstraints();
-
-  void addDataBufConstraint();
-
-  void addMuxConstraint(CFDFC &cfdfc);
-
   /// Adds throughput constraints for all channels in the CFDFC. Throughput is a
   /// data-centric notion, so it only makes sense to call this method if channel
   /// variables were created for the data signal.
@@ -410,18 +401,13 @@ protected:
   /// extracted CFDFCs.
   unsigned getChannelNumExecs(Value channel);
 
-  LinExpr addBackedgeObjective(ValueRange allChannels);
-
-  void addMinBufferAreaObjective(ValueRange channels);
-
-  /// Adds the MILP model's objective. The objective maximizes throughput
-  /// while minimizing buffer usage, with throughput prioritized. It has a
-  /// positive "throughput term" for every provided CFDFC. These terms are
-  /// weighted by the "importance" of the CFDFC compared to the others,
-  /// which is determined using an estimation of the total number of
-  /// executions over each provided channel. The objective has a negative
-  /// term for each buffer placement decision and for each buffer slot
-  /// placed on any of the provide channels.
+  /// Adds the MILP model's objective. The objective maximizes throughput while
+  /// minimizing buffer usage, with throughput prioritized. It has a positive
+  /// "throughput term" for every provided CFDFC. These terms are weighted by
+  /// the "importance" of the CFDFC compared to the others, which is determined
+  /// using an estimation of the total number of executions over each provided
+  /// channel. The objective has a negative term for each buffer placement
+  /// decision and for each buffer slot placed on any of the provide channels.
   ///
   /// Choose only one function between 'addMaxThroughputObjective' and
   /// 'addBufferAreaAwareObjective'.
