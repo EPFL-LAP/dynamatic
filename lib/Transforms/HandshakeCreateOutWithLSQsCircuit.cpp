@@ -361,11 +361,9 @@ Value getDoneSignalFromMemoryOp(Operation *memOp,
 /// accesses. This means that it creates the left side of the circuit for each
 /// pair. This includes the delay generator which is shared for the same
 /// predecessor.
-SkipConditionForPair
-createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
-                                std::vector<unsigned> Nvector,
-                                DoneSignalForMemoryOp &doneSignals,
-                                ConversionPatternRewriter &rewriter) {
+SkipConditionForPair createSkipConditionsForAllPairs(
+    MemAccesses &memAccesses, FuncOp funcOp, std::vector<unsigned> Nvector,
+    DoneSignalForMemoryOp &doneSignals, ConversionPatternRewriter &rewriter) {
 
   SkipConditionForPair skipConditionForEachPair;
   DenseMap<OpOperand *, SmallVector<Value>> dependenciesMapForPhiNetwork;
@@ -381,9 +379,8 @@ createSkipConditionsForAllPairs(MemAccesses &memAccesses, FuncOp funcOp,
 
       if (hasAtLeastOneActiveDep(deps)) {
         SmallVector<StringRef> handledSuccessors;
-        Value predecessorOpDoneSignal =
-            getDoneSignalFromMemoryOp(predecessorOpPointer, doneSignals,
-                                      rewriter);
+        Value predecessorOpDoneSignal = getDoneSignalFromMemoryOp(
+            predecessorOpPointer, doneSignals, rewriter);
         Value predecessorOpAddr = predecessorOpPointer->getOperand(0);
 
         for (MemDependenceAttr dependency : deps.getDependencies()) {
@@ -521,8 +518,7 @@ MemDependenceAttr getDeactivatedDependency(MemDependenceAttr dependency) {
 WaitingSignalForSucc createWaitingSignalsForAllPairs(
     MemAccesses &memAccesses, SkipConditionForPair &skipConditionForEachPair,
     MLIRContext *ctx, FuncOp funcOp, std::vector<unsigned> NVector,
-    DoneSignalForMemoryOp &doneSignals,
-    ConversionPatternRewriter &rewriter) {
+    DoneSignalForMemoryOp &doneSignals, ConversionPatternRewriter &rewriter) {
 
   WaitingSignalForSucc waitingSignalsForEachSuccessor;
 
@@ -538,9 +534,8 @@ WaitingSignalForSucc createWaitingSignalsForAllPairs(
             getDialectAttr<MemDependenceArrayAttr>(predecessorOpPointer)) {
 
       if (hasAtLeastOneActiveDep(deps)) {
-        Value predecessorOpDoneSignal =
-            getDoneSignalFromMemoryOp(predecessorOpPointer, doneSignals,
-                                      rewriter);
+        Value predecessorOpDoneSignal = getDoneSignalFromMemoryOp(
+            predecessorOpPointer, doneSignals, rewriter);
 
         SmallVector<StringRef> handledSuccessors;
         SmallVector<MemDependenceAttr> newDeps;
@@ -697,9 +692,8 @@ HandshakeCreateOutWithLSQsCircuitPass::createBaseOutWithLSQsCircuit(
   // successor (i.e. the join of all control signals it needs to wait for).
   // Finally, the successor accesses are gated with the waiting signals.
 
-  skipConditionForEachPair =
-      createSkipConditionsForAllPairs(memAccesses, funcOp, NVector,
-                                      doneSignals, rewriter);
+  skipConditionForEachPair = createSkipConditionsForAllPairs(
+      memAccesses, funcOp, NVector, doneSignals, rewriter);
 
   waitingSignalsForEachSuccessor = createWaitingSignalsForAllPairs(
       memAccesses, skipConditionForEachPair, ctx, funcOp, NVector, doneSignals,

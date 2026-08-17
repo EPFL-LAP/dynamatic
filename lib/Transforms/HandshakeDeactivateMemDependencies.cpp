@@ -42,7 +42,8 @@ struct HandshakeDeactivateMemDependenciesPass
     : public dynamatic::impl::HandshakeDeactivateMemDependenciesBase<
           HandshakeDeactivateMemDependenciesPass> {
 
-  using HandshakeDeactivateMemDependenciesBase::HandshakeDeactivateMemDependenciesBase;
+  using HandshakeDeactivateMemDependenciesBase::
+      HandshakeDeactivateMemDependenciesBase;
 
   void runOnOperation() override;
 
@@ -155,8 +156,8 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::analyzeFunction(
 /// determined. Inactive dependences are retained in the graph and rendered as
 /// dashed edges so that the graph represents both the original analysis result
 /// and the edges that still need to be enforced.
-LogicalResult HandshakeDeactivateMemDependenciesPass::writeDependenceGraph(
-    ModuleOp modOp) {
+LogicalResult
+HandshakeDeactivateMemDependenciesPass::writeDependenceGraph(ModuleOp modOp) {
   std::ofstream file(depGraphFile);
   if (!file.is_open()) {
     modOp.emitError() << "failed to open dependence graph file '"
@@ -176,7 +177,8 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::writeDependenceGraph(
 
       StringRef srcAccess = getUniqueName(op);
       for (MemDependenceAttr dep : deps.getDependencies()) {
-        file << "  \"" << srcAccess.str() << "\" -> \"" << dep.getDstAccess().str()
+        file << "  \"" << srcAccess.str() << "\" -> \""
+             << dep.getDstAccess().str()
              << "\" [label=\"depth=" << dep.getLoopDepth()
              << ", distance=" << dep.getDistance() << "\"";
         if (!dep.getIsActive())
@@ -192,8 +194,7 @@ LogicalResult HandshakeDeactivateMemDependenciesPass::writeDependenceGraph(
                       << depGraphFile << "'";
     return failure();
   }
-  llvm::errs() << "[INFO] Dependency graph written to " << depGraphFile
-               << "\n";
+  llvm::errs() << "[INFO] Dependency graph written to " << depGraphFile << "\n";
   return success();
 }
 
