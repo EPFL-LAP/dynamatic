@@ -4,8 +4,9 @@
 
 // NOTE: Test for testing larger factors
 void test_1d_partition_f4(const int A[N], const int B[N], const int C[N],
-                       int result[N]) {
-#pragma DYN array_partition array=intermediate dimension=1 style=block factor=4
+                          int result[N]) {
+#pragma DYN array_partition array = intermediate dimension = 1 style =         \
+    block factor = 4
   int intermediate[N];
   for (int i = 0; i < N; ++i) {
     intermediate[i] = A[i] * B[i];
