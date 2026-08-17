@@ -161,12 +161,14 @@ class LSQWrapper:
         # Define all the IOs, details can be found in the table above
         # ! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
         # io_storeData: output
-        io_storeData = VHDLLogicVecType("io_storeData", "o", self.lsq_config.dataW)
+        io_storeData = VHDLLogicVecType(
+            "io_storeData", "o", self.lsq_config.dataW)
 
         self.lsq_wrapper_str += io_storeData.signalInit()
 
         # io_storeAddr: output
-        io_storeAddr = VHDLLogicVecType("io_storeAddr", "o", self.lsq_config.addrW)
+        io_storeAddr = VHDLLogicVecType(
+            "io_storeAddr", "o", self.lsq_config.addrW)
 
         self.lsq_wrapper_str += io_storeAddr.signalInit()
 
@@ -176,12 +178,14 @@ class LSQWrapper:
         self.lsq_wrapper_str += io_storeEn.signalInit()
 
         # io_loadData: input
-        io_loadData = VHDLLogicVecType("io_loadData", "i", self.lsq_config.dataW)
+        io_loadData = VHDLLogicVecType(
+            "io_loadData", "i", self.lsq_config.dataW)
 
         self.lsq_wrapper_str += io_loadData.signalInit()
 
         # io_loadAddr: output
-        io_loadAddr = VHDLLogicVecType("io_loadAddr", "o", self.lsq_config.addrW)
+        io_loadAddr = VHDLLogicVecType(
+            "io_loadAddr", "o", self.lsq_config.addrW)
 
         self.lsq_wrapper_str += io_loadAddr.signalInit()
 
@@ -284,7 +288,7 @@ class LSQWrapper:
             "io_stDone_ready", "i", self.lsq_config.numStPorts
         )
         self.lsq_wrapper_str += io_stDone_ready.signalInit()
-        
+
         # io_stDone_valid: input
         io_stDone_valid = VHDLLogicTypeArray(
             "io_stDone_valid", "o", self.lsq_config.numStPorts
@@ -377,11 +381,13 @@ class LSQWrapper:
             (self.tab_level + 1) + "if reset = '1' then\n"
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), "'0'")
+            self.lsq_wrapper_str += OpTab(rreq_ready[i],
+                                          (self.tab_level + 2), "'0'")
             self.lsq_wrapper_str += OpTab(rresp_valid[i],
                                           (self.tab_level + 2), "'0'")
             self.lsq_wrapper_str += OpTab(
-                rresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+                rresp_id[i], (self.tab_level +
+                              2), "(", "others", "=>", "'0'", ")"
             )
 
         self.lsq_wrapper_str += (
@@ -389,7 +395,8 @@ class LSQWrapper:
         )
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), "'1'")
+            self.lsq_wrapper_str += OpTab(rreq_ready[i],
+                                          (self.tab_level + 2), "'1'")
 
         self.lsq_wrapper_str += (
             "\n"
@@ -432,11 +439,13 @@ class LSQWrapper:
             (self.tab_level + 1) + "if reset = '1' then\n"
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), "'0'")
+            self.lsq_wrapper_str += OpTab(wreq_ready[i],
+                                          (self.tab_level + 2), "'0'")
             self.lsq_wrapper_str += OpTab(wresp_valid[i],
                                           (self.tab_level + 2), "'0'")
             self.lsq_wrapper_str += OpTab(
-                wresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+                wresp_id[i], (self.tab_level +
+                              2), "(", "others", "=>", "'0'", ")"
             )
 
         self.lsq_wrapper_str += (
@@ -444,7 +453,8 @@ class LSQWrapper:
         )
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), "'1'")
+            self.lsq_wrapper_str += OpTab(wreq_ready[i],
+                                          (self.tab_level + 2), "'1'")
 
         self.lsq_wrapper_str += (
             "\n"
@@ -486,8 +496,10 @@ class LSQWrapper:
         )
         self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + f"port map(\n"
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"rst => reset,\n"
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"clk => clock,\n"
+        self.lsq_wrapper_str += "\t" * \
+            (self.tab_level + 2) + f"rst => reset,\n"
+        self.lsq_wrapper_str += "\t" * \
+            (self.tab_level + 2) + f"clk => clock,\n"
 
         self.lsq_wrapper_str += (
             "\t" * (self.tab_level + 2)
@@ -608,11 +620,11 @@ class LSQWrapper:
                 + f"stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n"
             )
             self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2) 
+                "\t" * (self.tab_level + 2)
                 + f"stp_done_ready_{i}_i => {io_stDone_ready[i].getNameRead()},\n"
             )
             self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2) 
+                "\t" * (self.tab_level + 2)
                 + f"stp_done_valid_{i}_o => {io_stDone_valid[i].getNameWrite()},\n"
             )
 
@@ -819,11 +831,11 @@ class LSQWrapper:
         self.lsq_wrapper_str += io_stDataToMC_valid.signalInit()
 
         # io_stDoneFromMC_ready
-        io_stDoneFromMC_ready = VHDLLogicType("io_stDoneFromMC_ready", "o");
+        io_stDoneFromMC_ready = VHDLLogicType("io_stDoneFromMC_ready", "o")
         self.lsq_wrapper_str += io_stDoneFromMC_ready.signalInit()
-        
+
         # io_stDoneFromMC_valid
-        io_stDoneFromMC_valid = VHDLLogicType("io_stDoneFromMC_valid", "i");
+        io_stDoneFromMC_valid = VHDLLogicType("io_stDoneFromMC_valid", "i")
         self.lsq_wrapper_str += io_stDoneFromMC_valid.signalInit()
 
         ##
@@ -885,7 +897,8 @@ class LSQWrapper:
 
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += OpTab(
-                rresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+                rresp_id[i], (self.tab_level +
+                              2), "(", "others", "=>", "'0'", ")"
             )
 
         self.lsq_wrapper_str += (
@@ -927,7 +940,8 @@ class LSQWrapper:
             self.lsq_wrapper_str += OpTab(wresp_valid[i],
                                           (self.tab_level + 2), "'0'")
             self.lsq_wrapper_str += OpTab(
-                wresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+                wresp_id[i], (self.tab_level +
+                              2), "(", "others", "=>", "'0'", ")"
             )
 
         self.lsq_wrapper_str += (
@@ -994,8 +1008,10 @@ class LSQWrapper:
         )
         self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + f"port map(\n"
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"rst => reset,\n"
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"clk => clock,\n"
+        self.lsq_wrapper_str += "\t" * \
+            (self.tab_level + 2) + f"rst => reset,\n"
+        self.lsq_wrapper_str += "\t" * \
+            (self.tab_level + 2) + f"clk => clock,\n"
 
         self.lsq_wrapper_str += (
             "\t" * (self.tab_level + 2)
@@ -1085,11 +1101,11 @@ class LSQWrapper:
                 + f"stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n"
             )
             self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2) 
+                "\t" * (self.tab_level + 2)
                 + f"stp_done_ready_{i}_i => {io_stDoneFromMC_ready[i].getNameRead()},\n"
             )
             self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2) 
+                "\t" * (self.tab_level + 2)
                 + f"stp_done_valid_{i}_o => {io_stDoneFromMC_valid[i].getNameWrite()},\n"
             )
 
