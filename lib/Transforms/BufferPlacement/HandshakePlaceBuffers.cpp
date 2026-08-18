@@ -576,9 +576,9 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
 
     // Create the CFDFC from the set of selected archs and BBs
     // If FTD has no backward channels, use the legacy CFDFC construction.
-    cfdfcs.emplace_back(
-        info.funcOp, selectedArchs, numExecs,
-        ftd && !backwardChannels.empty() ? &backwardChannels : nullptr);
+    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs,
+                        ftd && !backwardChannels.empty() ? &backwardChannels
+                                                         : nullptr);
   } while (!firstCFDFC);
 
   return success();

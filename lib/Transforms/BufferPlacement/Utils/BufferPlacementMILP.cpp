@@ -1286,8 +1286,7 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   // number of executions. Backedges are executed one less time than "forward
   // edges" since they are only taken between executions of the cycle the CFDFC
   // represents
-  unsigned numExec =
-      isBackedge(channel, /*endpoints=*/nullptr, ftd) ? 0 : 1;
+  unsigned numExec = isBackedge(channel, /*endpoints=*/nullptr, ftd) ? 0 : 1;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
     if (cfdfc->channels.contains(channel))
       numExec += cfdfc->numExecs;
