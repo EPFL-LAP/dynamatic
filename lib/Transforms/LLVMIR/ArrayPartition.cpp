@@ -647,13 +647,16 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
 // pragma marker function.
 //
 // Pragma Syntax:
-// #pragma DYN array_partition array={array name} dimension={1..array depth} style={block, cyclic, full} factor=int
+// #pragma DYN array_partition array={array name} dimension={1..array depth}
+// style={block, cyclic, full} factor=int
+//
 // Example for int arr[10][10];
 // #pragma DYN array_partition array=arr dimension=2 style=block factor=2
-// NOTE: This could be made more general, i.e. providing
-// the name of the pragma marker function and parsing out the function arguemnts
-// and naming them later/providing a handler function that maps from argument
-// index to struct field. Overkill if this is the only occurance for this
+//
+// NOTE: This could be made more general, i.e. providing the name of the pragma
+// marker function and parsing out the function arguemnts and naming them
+// later/providing a handler function that maps from argument index to struct
+// field. Overkill if this is the only occurance for this
 std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
   std::map<std::string, PartitionInfo> result;
   std::vector<CallInst *> callSites;
