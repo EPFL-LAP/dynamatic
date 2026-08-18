@@ -384,9 +384,11 @@ BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
                                          int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod,
+                                         Algorithm algorithm,
                                          llvm::StringRef writeTo, bool ftd)
     : MILP<BufferPlacement>(solverKind, timeout, writeTo), timingDB(timingDB),
-      targetPeriod(targetPeriod), algorithm(algorithm), funcInfo(funcInfo), ftd(ftd) {
+      targetPeriod(targetPeriod), algorithm(algorithm), funcInfo(funcInfo),
+      ftd(ftd) {
   initialize();
 }
 
