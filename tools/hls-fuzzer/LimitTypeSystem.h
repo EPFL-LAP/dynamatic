@@ -201,26 +201,18 @@ public:
   }
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
+    // Force the statement to be generated before the statement list such that
+    // 'totalNumberOfStatements' is counted correctly.
+    // Otherwise a stack overflow would occur.
+    // TODO: Ideally we'd have support for generating statements in either
+    //       forward or backward direction while still making statement limits
+    //       work.
     return {
-        /*statement list=*/copyFirstOf<ast::StatementList,
-                                       weak(ast::StatementList::STATEMENT),
-                                       INPUT_DEPENDENCY>(),
-        /*statement=*/
-        copyFirstOf<ast::StatementList,
-                    weak(ast::StatementList::STATEMENT_LIST),
-                    INPUT_DEPENDENCY>(),
+        /*statement=*/copyFromInput<ast::StatementList>(),
+        /*statement list=*/
+        copyFrom<ast::StatementList, ast::StatementList::STATEMENT>(),
         /*output=*/
-        OutputTransferFn<ast::StatementList, ast::StatementList::STATEMENT,
-                         ast::StatementList::STATEMENT_LIST>(
-            [](const auto &, DepthTypingContext statement,
-               const DepthTypingContext &statementList) {
-              // Regardless of which of the two was generated first, we can
-              // extract the total number of statements by taking their maximum.
-              statement.totalNumberOfStatements =
-                  std::max(statement.totalNumberOfStatements,
-                           statementList.totalNumberOfStatements);
-              return statement;
-            }),
+        copyToOutput<ast::StatementList, ast::StatementList::STATEMENT_LIST>(),
     };
   }
 
@@ -308,7 +300,8 @@ public:
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
-        copyFromInput<ast::ArrayParameter>(),
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
         OutputTransferFn<ast::ArrayParameter, INPUT_DEPENDENCY>(
             [](const ast::ArrayParameter &, ParamTypingContext context) {
               context.numArrayParam++;

@@ -40,8 +40,21 @@ public:
   /// should fuzz rather than work on the single program a fuzzer asked it for.
   std::optional<std::string> getSingleProgramDirectory() const;
 
+  /// Returns the directory holding the 'reproducer.json' whose program should
+  /// be regenerated and verified in this process, as requested via
+  /// '--reproduce'. Returns 'std::nullopt' if the option was not specified,
+  /// i.e. this process should fuzz rather than reproduce a single program.
+  std::optional<std::string> getReproduceDirectory() const;
+
   /// Returns the name of the target fuzzer.
   std::string getTargetName() const;
+
+  /// Returns the arguments that were passed for options in the target options
+  /// group, rendered so that feeding them back to a new parser reconstructs the
+  /// exact same options. This is what a reproducer stores, which keeps it in
+  /// sync with the option definitions: any option added to the group is picked
+  /// up here automatically.
+  std::vector<std::string> getTargetArguments() const;
 
   /// Returns the statistics selection requested on the command line.
   /// Returns 'std::nullopt' if '--statistics' was not specified, an empty
