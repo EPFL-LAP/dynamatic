@@ -1086,6 +1086,10 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     mlir::Value arg = valueMap[callInst->getArgOperand(0)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<math::AbsFOp>(retType, {arg}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::abs) {
+    mlir::Value arg = valueMap[callInst->getArgOperand(0)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<math::AbsIOp>(retType, {arg}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::memset) {
     this->translateMemsetIntrinsic(callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::fshl ||

@@ -757,4 +757,12 @@ def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf", [
   // TODO: add folder
 }
 
+def Handshake_AbsIOp : Handshake_Arith_IToICastOp<"absi", [
+  SimpleNamedIO
+]> {
+  let summary = "integer absolute-value operation";
+  let hasFolder = 0;
+  let hasVerifier = 0;
+}
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ARTIH_OPS_TD

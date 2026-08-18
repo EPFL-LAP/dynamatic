@@ -1728,7 +1728,8 @@ struct CfToHandshakePass
         OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
         OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
         OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>
+        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>,
+        OneToOneConversion<math::AbsIOp, handshake::AbsIOp>
         // clang-format on
         >(getAnalysis<NameAnalysis>(), converter, ctx);
 
