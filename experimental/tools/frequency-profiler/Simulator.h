@@ -113,6 +113,8 @@ private:
                         std::vector<Any> &);
   LogicalResult execute(mlir::math::AbsFOp, std::vector<Any> &,
                         std::vector<Any> &);
+  LogicalResult execute(mlir::math::AbsIOp, std::vector<Any> &,
+                        std::vector<Any> &);
   LogicalResult execute(mlir::arith::MaxUIOp, std::vector<Any> &,
                         std::vector<Any> &);
   LogicalResult execute(mlir::arith::MaxSIOp, std::vector<Any> &,

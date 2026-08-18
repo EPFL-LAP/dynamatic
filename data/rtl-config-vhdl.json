@@ -4,6 +4,10 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t absf -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.absi",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t absi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "name": "handshake.addf",
     "parameters": [
       {
