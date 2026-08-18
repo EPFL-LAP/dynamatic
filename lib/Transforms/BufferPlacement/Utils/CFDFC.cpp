@@ -225,9 +225,12 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
         // an edge in the CFG cycle currently being modeled.
         if (!backwardChannels->contains(res))
           channels.insert(res);
-        else if (isCFGCompliant(srcBB, dstBB)) {
-          channels.insert(res);
+        else {
+          // Record all identified backward channels as backedges, but include
+          // them as CFDFC channels only if they are compliant with the CFG.
           backedges.insert(res);
+          if (isCFGCompliant(srcBB, dstBB))
+            channels.insert(res);
         }
         continue;
       }

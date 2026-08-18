@@ -154,7 +154,8 @@ public:
   /// constructor sets the `unsatisfiable` flag to true.
   BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod, llvm::StringRef writeTo = "");
+                      double targetPeriod, llvm::StringRef writeTo = "",
+                      bool ftd = false);
 
 protected:
   /// Represents a list of signals that are buffered together by a single
@@ -199,6 +200,8 @@ protected:
   /// Aggregates all data members related to the Handshake function under
   /// optimization.
   FuncInfo &funcInfo;
+  /// Whether the circuit was produced using fast token delivery.
+  bool ftd;
   /// After construction, maps all channels (i.e, values) defined in the
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).

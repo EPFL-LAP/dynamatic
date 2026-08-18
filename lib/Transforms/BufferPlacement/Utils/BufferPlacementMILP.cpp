@@ -237,9 +237,9 @@ BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
                                          int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod,
-                                         llvm::StringRef writeTo)
+                                         llvm::StringRef writeTo, bool ftd)
     : MILP<BufferPlacement>(solverKind, timeout, writeTo), timingDB(timingDB),
-      targetPeriod(targetPeriod), funcInfo(funcInfo) {
+      targetPeriod(targetPeriod), funcInfo(funcInfo), ftd(ftd) {
   initialize();
 }
 
@@ -1126,7 +1126,8 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   // number of executions. Backedges are executed one less time than "forward
   // edges" since they are only taken between executions of the cycle the CFDFC
   // represents
-  unsigned numExec = isBackedge(channel) ? 0 : 1;
+  unsigned numExec =
+      isBackedge(channel, /*endpoints=*/nullptr, ftd) ? 0 : 1;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
     if (cfdfc->channels.contains(channel))
       numExec += cfdfc->numExecs;

@@ -421,7 +421,7 @@ static bool isBackedgeDestinationLike(Operation *op) {
     return false;
 
   return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
-    return isa<handshake::MergeLikeOpInterface>(user);
+    return isa<handshake::InitOp, handshake::MergeLikeOpInterface>(user);
   });
 }
 
@@ -572,8 +572,10 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs,
-                        ftd ? &backwardChannels : nullptr);
+    // If FTD has no backward channels, use the legacy CFDFC construction.
+    cfdfcs.emplace_back(
+        info.funcOp, selectedArchs, numExecs,
+        ftd && !backwardChannels.empty() ? &backwardChannels : nullptr);
   } while (!firstCFDFC);
 
   return success();
@@ -648,8 +650,8 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
     }
-    return solveMILP<fpga20::FPGA20Buffers>(placement, solverKind, timeout,
-                                            info, timingDB, targetCP, writeTo);
+    return solveMILP<fpga20::FPGA20Buffers>(
+        placement, solverKind, timeout, info, timingDB, targetCP, writeTo, ftd);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -749,6 +751,26 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
             << "Cannot place opaque buffer on merge-like operation's "
                "output due to channel-specific buffering constraints. This may "
                "yield an invalid buffering.";
+      }
+    }
+
+    for (auto initOp : funcOp.getOps<handshake::InitOp>()) {
+      ChannelBufProps &resProps = channelProps[initOp->getResult(0)];
+      if (resProps.maxTrans.value_or(1) >= 1) {
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
+      } else {
+        initOp->emitWarning()
+            << "Cannot place transparent buffer on init operation's output "
+               "due to channel-specific buffering constraints. This may yield "
+               "an invalid buffering.";
+      }
+      if (resProps.maxOpaque.value_or(1) >= 1) {
+        resProps.minOpaque = std::max(resProps.minOpaque, 10U);
+      } else {
+        initOp->emitWarning()
+            << "Cannot place opaque buffer on init operation's output due to "
+               "channel-specific buffering constraints. This may yield an "
+               "invalid buffering.";
       }
     }
 

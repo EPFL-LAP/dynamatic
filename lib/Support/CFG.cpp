@@ -190,7 +190,7 @@ static Operation *backtrackToLoopSource(Operation *op, bool ftd) {
 /// merge-like operations reached by a def-use chain (or the passed operation if
 /// it was itself merge-like); otherwise, returns nullptr.
 static Operation *followToMerge(Operation *op, bool ftd) {
-  if (isa<handshake::MergeLikeOpInterface>(op))
+  if (isa<handshake::InitOp, handshake::MergeLikeOpInterface>(op))
     return op;
   if (canFollowToMergeThrough(op, ftd)) {
     // All users of the operation's results must lead to merges within a unique
