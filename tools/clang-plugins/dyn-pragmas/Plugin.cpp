@@ -255,6 +255,402 @@ private:
   }
 };
 
+struct PredictPragmaInfo {
+  uint64_t Marker;
+  std::string Variable;
+  std::string Values;   // "[7, 3, 1]"
+  std::string Location; // start or end
+  std::string Type;
+  SourceLocation PragmaLoc;
+};
+
+// PragmaHandler to handle the predict pragma
+class PredictPragmaHandler : public PragmaHandler {
+public:
+  PredictPragmaHandler() : PragmaHandler("predict") {}
+
+  // what to do when the pragma is encountered
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override {
+    // initialize the struct we use to store
+    // the pragma information
+    PredictPragmaInfo PredPragmaInfo;
+
+    // populate the fields of PredPragmaInfo
+    // by parsing the pragma text
+    if (failed(parseOptions(PP, FirstToken, PredPragmaInfo)))
+      return;
+
+    emitInjectedTokens(PP, PredPragmaInfo);
+  }
+
+private:
+  LogicalResult parseOptions(Preprocessor &PP, const Token &FirstToken,
+                             PredictPragmaInfo &PredPragmaInfo) {
+
+    // store the location of the pragma
+    PredPragmaInfo.PragmaLoc = FirstToken.getLocation();
+
+    // booleans to track which info we have received
+    bool sawVariable = false, sawValues = false, sawLocation = false,
+         sawMarker = false, sawType = false;
+
+    // store output of lexer
+    Token Tok;
+
+    // lex the initial token for the first iteration
+    PP.Lex(Tok);
+
+    // while the lexer has input from this line
+    while (Tok.isNot(tok::eod)) {
+      // we expect a named option
+      if (Tok.isNot(tok::identifier)) {
+        error(PP, Tok, "expected named option in #pragma DYN predict");
+        return failure();
+      }
+
+      // get the value of the named option
+      llvm::StringRef Name = Tok.getIdentifierInfo()->getName();
+
+      // lex the = sign
+      PP.Lex(Tok);
+      if (Tok.isNot(tok::equal)) {
+        error(PP, Tok, "expected '=' after option name");
+        return failure();
+      }
+
+      if (Name == "variable") {
+        // if the named option is variable
+        // lex the variable name
+        PP.Lex(Tok);
+
+        // enforce that variable name
+        // lexes properly
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected variable name after variable=");
+          return failure();
+        }
+
+        // store the variable name info
+        PredPragmaInfo.Variable = Tok.getIdentifierInfo()->getName().str();
+        sawVariable = true;
+
+        // lex the initial token for the next iteration
+        PP.Lex(Tok);
+
+      } else if (Name == "values") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::l_square)) {
+          error(PP, Tok, "expected '[' after values=");
+          return failure();
+        }
+
+        PredPragmaInfo.Values = "[";
+
+        while (true) {
+          PP.Lex(Tok);
+
+          if (Tok.is(tok::minus)) {
+            PredPragmaInfo.Values += "-";
+            PP.Lex(Tok);
+          }
+
+          if (Tok.isNot(tok::numeric_constant)) {
+            error(PP, Tok, "expected numeric literal inside values list");
+            return failure();
+          }
+          PredPragmaInfo.Values += PP.getSpelling(Tok);
+          PP.Lex(Tok);
+
+          if (Tok.is(tok::r_square)) {
+            PredPragmaInfo.Values += "]";
+            PP.Lex(Tok);
+            break;
+          }
+
+          if (Tok.isNot(tok::comma)) {
+            error(PP, Tok, "expected ',' or ']' in values list");
+            return failure();
+          }
+          PredPragmaInfo.Values += ",";
+        }
+
+        sawValues = !PredPragmaInfo.Values.empty();
+
+      } else if (Name == "location") {
+        PP.Lex(Tok);
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected identifier after location=");
+          return failure();
+        }
+
+        // store the variable name info
+        PredPragmaInfo.Location = Tok.getIdentifierInfo()->getName().str();
+
+        // location has to be "start" or "end"
+        if (PredPragmaInfo.Location != "start" &&
+            PredPragmaInfo.Location != "end") {
+          error(PP, Tok, "location must be start or end");
+          return failure();
+        }
+        sawLocation = true;
+
+        // lex the initial token for the next iteration
+        PP.Lex(Tok);
+      } else if (Name == "marker") {
+        PP.Lex(Tok);
+        if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, PredPragmaInfo.Marker)) {
+          error(PP, Tok, "expected integer literal after marker=");
+          return failure();
+        }
+        sawMarker = true;
+
+      } else if (Name == "type") {
+        PP.Lex(Tok);
+        bool isValidType = false;
+
+        // check if it's an inherent keyword type
+        if (Tok.is(tok::kw_int) || Tok.is(tok::kw_float) ||
+            Tok.is(tok::kw_double)) {
+          isValidType = true;
+          PredPragmaInfo.Type = tok::getKeywordSpelling(Tok.getKind());
+        }
+        // check allowed custom identifier types (like int32_t)
+        else if (Tok.is(tok::identifier)) {
+          std::string identName = Tok.getIdentifierInfo()->getName().str();
+          if (identName == "int32_t" || identName == "int64_t") {
+            isValidType = true;
+            PredPragmaInfo.Type = identName;
+          }
+        }
+
+        // else error
+        if (!isValidType) {
+          error(PP, Tok,
+                "expected valid type identifier after type= (e.g., int, "
+                "int32_t, int64_t, float, double)");
+          return failure();
+        }
+
+        sawType = true;
+
+        // lex the initial token for the next iteration
+        PP.Lex(Tok);
+      } else {
+        // otherwise we have gotten an unknown named option
+        error(PP, Tok, "unknown option in #pragma DYN predict");
+        return failure();
+      }
+    }
+
+    // Enforce that we got every option needed
+    bool valuesRequired = (PredPragmaInfo.Location != "end");
+    if (!sawVariable || (valuesRequired && !sawValues) || !sawLocation ||
+        !sawMarker || (valuesRequired && !sawType)) {
+      error(PP, FirstToken,
+            "#pragma DYN predict requires variable=, "
+            "values= (unless location=end), location=, marker=, name= (unless "
+            "location=end), type= (unless location=end)");
+      return failure();
+    }
+    return success();
+  }
+
+  void emitInjectedTokens(Preprocessor &PP,
+                          const PredictPragmaInfo &PredPragmaInfo) {
+    // Inspired by emitInjectedTokens from Speculate Pragma
+
+    // Define a function
+    // for each type of variable we could predict on
+    // so that no casts are added before or after the speculator
+    std::string FuncDecls = "extern _Bool  __dyn_predict_b(_Bool,  const "
+                            "char*, const char*, unsigned int, const char*) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern char   __dyn_predict_c(char,   const "
+                            "char*, const char*, unsigned int, const char*) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern short  __dyn_predict_s(short,  const "
+                            "char*, const char*, unsigned int, const char*) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern int    __dyn_predict_i(int,    const "
+                            "char*, const char*, unsigned int, const char*) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern long   __dyn_predict_l(long,   const "
+                            "char*, const char*, unsigned int, const char*) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern float  __dyn_predict_f(float,  const "
+                            "char*, const char*, unsigned int, const char*) "
+                            "__attribute__((noinline, noduplicate));\n"
+                            "extern double __dyn_predict_d(double, const "
+                            "char*, const char*, unsigned int, const char*) "
+                            "__attribute__((noinline, noduplicate));\n";
+
+    // use a generic macro
+    std::string GenericMacro =
+        "#define __dyn_predict(x, n, s, m, t) _Generic((x), \\\n"
+        "  _Bool:  __dyn_predict_b, \\\n"
+        "  char:   __dyn_predict_c, \\\n"
+        "  short:  __dyn_predict_s, \\\n"
+        "  int:    __dyn_predict_i, \\\n"
+        "  long:   __dyn_predict_l, \\\n"
+        "  float:  __dyn_predict_f, \\\n"
+        "  double: __dyn_predict_d)((x), (n), (s), (m), (t))\n";
+
+    std::string Call = llvm::formatv(
+        "{0} = __dyn_predict({0}, \"{1}\", \"{2}\", {3}, \"{4}\");\n",
+        PredPragmaInfo.Variable, PredPragmaInfo.Values, PredPragmaInfo.Location,
+        PredPragmaInfo.Marker, PredPragmaInfo.Type);
+
+    // LLVM reads files into memory buffers before processing them
+    auto MB = llvm::MemoryBuffer::getMemBufferCopy(
+        FuncDecls + GenericMacro + Call, "<dyn-predict-injected>");
+
+    FileID FID = PP.getSourceManager().createFileID(
+        std::move(MB), SrcMgr::C_User, /*LoadedID=*/0,
+        /*LoadedOffset=*/0, PredPragmaInfo.PragmaLoc);
+
+    // process the fake header file next
+    // in the same way #include directives work
+    PP.EnterSourceFile(FID, /*DirLookup=*/nullptr, PredPragmaInfo.PragmaLoc);
+  }
+};
+
+struct ArrayPartitionPragmaInfo {
+  std::string ArrayName;
+  uint64_t Dimension = 0;
+  uint64_t Factor = 0;
+  std::string Style;
+  SourceLocation PragmaLoc;
+};
+
+class ArrayPartitionPragmaHandler : public PragmaHandler {
+public:
+  ArrayPartitionPragmaHandler() : PragmaHandler("array_partition") {}
+
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override {
+    ArrayPartitionPragmaInfo Info;
+    if (failed(parseOptions(PP, FirstToken, Info)))
+      return;
+    emitInjectedTokens(PP, Info);
+  }
+
+private:
+  LogicalResult parseOptions(Preprocessor &PP, const Token &FirstToken,
+                             ArrayPartitionPragmaInfo &ArrPragmaInfo) {
+    ArrPragmaInfo.PragmaLoc = FirstToken.getLocation();
+
+    bool sawArray = false, sawDimension = false, sawFactor = false,
+         sawStyle = false;
+
+    Token Tok;
+
+    PP.Lex(Tok);
+
+    while (Tok.isNot(tok::eod)) {
+      if (Tok.isNot(tok::identifier)) {
+        error(PP, Tok, "expected named option in #pragma DYN array_partition");
+        return failure();
+      }
+
+      llvm::StringRef Name = Tok.getIdentifierInfo()->getName();
+
+      PP.Lex(Tok);
+      if (Tok.isNot(tok::equal)) {
+        error(PP, Tok, "expected '=' after option name");
+        return failure();
+      }
+
+      if (Name == "array") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected variable name after array=");
+          return failure();
+        }
+
+        ArrPragmaInfo.ArrayName = Tok.getIdentifierInfo()->getName().str();
+        sawArray = true;
+
+        PP.Lex(Tok);
+
+      } else if (Name == "dimension") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, ArrPragmaInfo.Dimension)) {
+          error(PP, Tok, "expected integer literal after dimension=");
+          return failure();
+        }
+        sawDimension = true;
+
+      } else if (Name == "style") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::identifier)) {
+          error(PP, Tok, "expected identifier after style=");
+          return failure();
+        }
+
+        std::string Style = Tok.getIdentifierInfo()->getName().str();
+
+        // check the allowed partitioning styles
+        // NOTE: Maybe use an enum to store the final type instead of a string?
+        if (Style != "block" && Style != "cyclic" && Style != "complete") {
+          error(PP, Tok, "style must be block, cyclic, or complete");
+          return failure();
+        }
+
+        ArrPragmaInfo.Style = Style;
+        sawStyle = true;
+
+        PP.Lex(Tok);
+
+      } else if (Name == "factor") {
+        PP.Lex(Tok);
+
+        if (Tok.isNot(tok::numeric_constant) ||
+            !PP.parseSimpleIntegerLiteral(Tok, ArrPragmaInfo.Factor)) {
+          error(PP, Tok, "expected integer literal after factor=");
+          return failure();
+        }
+        sawFactor = true;
+
+      } else {
+        error(PP, Tok, "unknown option in #pragma DYN array_partition");
+        return failure();
+      }
+    }
+
+    // NOTE: Right now all are enforced, maybe we can be less strict at times?
+    if (!sawArray || !sawDimension || !sawStyle || !sawFactor) {
+      error(PP, FirstToken,
+            "#pragma DYN array_partition requires array=, dimension=, "
+            "style=, factor=");
+      return failure();
+    }
+    return success();
+  }
+
+  void emitInjectedTokens(Preprocessor &PP,
+                          const ArrayPartitionPragmaInfo &Info) {
+    std::string FuncDecl = "extern void __dyn_array_partition(const char*, "
+                           "int, int, const char*) "
+                           "__attribute__((noinline, noduplicate));\n";
+    std::string Call =
+        llvm::formatv("__dyn_array_partition(\"{0}\", {1}, {2}, \"{3}\");\n",
+                      Info.ArrayName, Info.Dimension, Info.Factor, Info.Style);
+
+    auto MB = llvm::MemoryBuffer::getMemBufferCopy(
+        FuncDecl + Call, "<dyn-array-partition-injected>");
+    FileID FID = PP.getSourceManager().createFileID(
+        std::move(MB), SrcMgr::C_User, 0, 0, Info.PragmaLoc);
+    PP.EnterSourceFile(FID, nullptr, Info.PragmaLoc);
+  }
+};
+
 // Declare the DynPragmaNamespace object
 // which stores all of our Dyn pragmas
 class DynPragmaNamespace : public PragmaNamespace {
@@ -263,6 +659,8 @@ public:
   DynPragmaNamespace() : PragmaNamespace("DYN") {
     // put the speculate pragma in the DYN namespace
     AddPragma(new SpeculatePragmaHandler());
+    AddPragma(new PredictPragmaHandler());
+    AddPragma(new ArrayPartitionPragmaHandler());
   }
 };
 

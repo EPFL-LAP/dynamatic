@@ -52,12 +52,13 @@ static ast::Expression safeCastAsNeeded(const ast::ScalarType &to,
 }
 
 std::pair<ast::ReturnStatement, gen::OpaqueContext>
-gen::BasicCGenerator::generateReturnStatement(const OpaqueContext &context) {
+gen::BasicCGenerator::generateReturnStatement(OpaqueContext &&context) {
   return *generateWithDependencies<ast::ReturnStatement>(
-      context, typeSystem.getReturnStatementTransferFns(),
+      std::move(context), typeSystem.getReturnStatementTransferFns(),
       /*return value=*/
-      [&](const OpaqueContext &context) {
-        auto [expression, outputContext] = generateExpression(context);
+      [&](OpaqueContext &&context) {
+        auto [expression, outputContext] =
+            generateExpression(std::move(context));
         if (maybeReturnType && llvm::isa<ast::ScalarType>(*maybeReturnType))
           expression =
               safeCastAsNeeded(llvm::cast<ast::ScalarType>(*maybeReturnType),
@@ -71,7 +72,7 @@ gen::BasicCGenerator::generateReturnStatement(const OpaqueContext &context) {
 }
 
 std::pair<ast::Expression, gen::OpaqueContext>
-gen::BasicCGenerator::generateExpression(const OpaqueContext &context) {
+gen::BasicCGenerator::generateExpression(OpaqueContext &&context) {
   llvm::SmallVector<Constructor<ast::Expression>> constructors = random.shuffle(
       expressionGenerators,
       typeSystem.getExpressionProbabilityTableOpaque(context),
@@ -85,7 +86,7 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context) {
   // Continuously generate an expression until one passes the type checker.
   for (Constructor<ast::Expression> &con : constructors)
     if (std::optional<std::pair<ast::Expression, OpaqueContext>> result =
-            con(this, context))
+            con(this, std::move(context)))
       return std::move(*result);
 
   llvm_unreachable("it should always be possible to generate an expression");
@@ -93,16 +94,20 @@ gen::BasicCGenerator::generateExpression(const OpaqueContext &context) {
 
 std::optional<std::pair<ast::Expression, gen::OpaqueContext>>
 gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
-                                               const OpaqueContext &context) {
+                                               OpaqueContext &&context) {
   if (typeSystem.discardBinaryExpressionOpaque(op, context))
     return std::nullopt;
 
   return generateWithDependencies<ast::BinaryExpression>(
-      context, typeSystem.getBinaryExpressionTransferFns(op),
+      std::move(context), typeSystem.getBinaryExpressionTransferFns(op),
       /*lhs=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*rhs=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*constructor=*/
       [&](ast::Expression &&lhs,
           ast::Expression &&rhs) -> std::optional<ast::BinaryExpression> {
@@ -182,14 +187,16 @@ gen::BasicCGenerator::generateBinaryExpression(ast::BinaryExpression::Op op,
 
 std::optional<std::pair<ast::Expression, gen::OpaqueContext>>
 gen::BasicCGenerator::generateUnaryExpression(ast::UnaryExpression::Op op,
-                                              const OpaqueContext &context) {
+                                              OpaqueContext &&context) {
   if (typeSystem.discardUnaryExpressionOpaque(op, context))
     return std::nullopt;
 
   return generateWithDependencies<ast::UnaryExpression>(
-      context, typeSystem.getUnaryExpressionTransferFns(op),
+      std::move(context), typeSystem.getUnaryExpressionTransferFns(op),
       /*operand=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*constructor=*/
       [&](ast::Expression &&operand) -> std::optional<ast::UnaryExpression> {
         return ast::UnaryExpression{op, std::move(operand)};
@@ -197,19 +204,24 @@ gen::BasicCGenerator::generateUnaryExpression(ast::UnaryExpression::Op op,
 }
 
 std::optional<std::pair<ast::ConditionalExpression, gen::OpaqueContext>>
-gen::BasicCGenerator::generateConditionalExpression(
-    const OpaqueContext &context) {
+gen::BasicCGenerator::generateConditionalExpression(OpaqueContext &&context) {
   if (typeSystem.discardConditionalExpressionOpaque(context))
     return std::nullopt;
 
   return generateWithDependencies<ast::ConditionalExpression>(
-      context, typeSystem.getConditionalExpressionTransferFns(),
+      std::move(context), typeSystem.getConditionalExpressionTransferFns(),
       /*condition=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*true value=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*false value=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*constructor=*/
       [&](ast::Expression &&cond, ast::Expression &&trueExpr,
           ast::Expression &&falseExpr) {
@@ -219,16 +231,20 @@ gen::BasicCGenerator::generateConditionalExpression(
 }
 
 std::optional<std::pair<ast::CastExpression, gen::OpaqueContext>>
-gen::BasicCGenerator::generateCastExpression(const OpaqueContext &context) {
+gen::BasicCGenerator::generateCastExpression(OpaqueContext &&context) {
   if (typeSystem.discardCastExpressionOpaque(context))
     return std::nullopt;
 
   return generateWithDependencies<ast::CastExpression>(
-      context, typeSystem.getCastExpressionTransferFns(),
+      std::move(context), typeSystem.getCastExpressionTransferFns(),
       /*data type=*/
-      [&](const OpaqueContext &context) { return generateScalarType(context); },
+      [&](OpaqueContext &&context) {
+        return generateScalarType(std::move(context));
+      },
       /*operand=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*constructor=*/
       [](ast::ScalarType &&datatype, ast::Expression &&expression) {
         return ast::CastExpression{std::move(datatype), std::move(expression)};
@@ -268,7 +284,7 @@ ast::Constant gen::BasicCGenerator::getConstantForType(
 }
 
 std::optional<std::pair<ast::Constant, gen::OpaqueContext>>
-gen::BasicCGenerator::generateConstant(const OpaqueContext &context) const {
+gen::BasicCGenerator::generateConstant(OpaqueContext &&context) const {
   auto candidates = ast::PrimitiveType::ALL_PRIMITIVES;
   random.shuffle(candidates);
 
@@ -276,25 +292,26 @@ gen::BasicCGenerator::generateConstant(const OpaqueContext &context) const {
     if (std::optional constant =
             typeSystem.discardConstantOpaque(getConstantForType(iter), context))
       return generateWithDependencies<ast::Constant>(
-          context, typeSystem.getConstantTransferFns(), *constant);
+          std::move(context), typeSystem.getConstantTransferFns(), *constant);
 
   return std::nullopt;
 }
 
 std::optional<std::pair<ast::ArrayReadExpression, gen::OpaqueContext>>
-gen::BasicCGenerator::generateArrayReadExpression(
-    const OpaqueContext &context) {
+gen::BasicCGenerator::generateArrayReadExpression(OpaqueContext &&context) {
   if (typeSystem.discardArrayReadExpressionOpaque(context))
     return std::nullopt;
 
   return generateWithDependencies<ast::ArrayReadExpression>(
-      context, typeSystem.getArrayReadExpressionTransferFns(),
+      std::move(context), typeSystem.getArrayReadExpressionTransferFns(),
       /*array parameter=*/
-      [&](const OpaqueContext &context) {
-        return generateArrayParameter(context);
+      [&](OpaqueContext &&context) {
+        return generateArrayParameter(std::move(context));
       },
       /*index=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*constructor=*/
       [&](ast::ArrayParameter &&param, ast::Expression &&expression) {
         ast::ScalarType elementType = param.getElementType();
@@ -322,7 +339,7 @@ gen::BasicCGenerator::generateArrayReadExpression(
 }
 
 std::optional<std::pair<ast::ArrayParameter, gen::OpaqueContext>>
-gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context) {
+gen::BasicCGenerator::generateArrayParameter(OpaqueContext &&context) {
   // With a low chance, skip picking an existing parameter and try to generate
   // a new one.
   if (!random.getRatherLowProbabilityBool()) {
@@ -335,86 +352,50 @@ gen::BasicCGenerator::generateArrayParameter(const OpaqueContext &context) {
       if (!typeSystem.discardExistingArrayParameterOpaque(candidateParam,
                                                           context))
         return generateWithDependencies<ast::ExistingArrayParameter>(
-            context, typeSystem.getExistingArrayParameterTransferFns(),
-            candidateParam);
+            std::move(context),
+            typeSystem.getExistingArrayParameterTransferFns(), candidateParam);
   }
 
   if (typeSystem.discardFreshArrayParameterOpaque(context))
     return std::nullopt;
 
   return generateWithDependencies<ast::ArrayParameter>(
-      context, typeSystem.getFreshArrayParameterTransferFns(),
+      std::move(context), typeSystem.getFreshArrayParameterTransferFns(),
       /*element type=*/
-      [&](const OpaqueContext &context) { return generateScalarType(context); },
+      [&](OpaqueContext &&context) {
+        return generateScalarType(std::move(context));
+      },
+      /*dimension=*/
+      [&](OpaqueContext &&context)
+          -> std::optional<std::pair<std::size_t, OpaqueContext>> {
+        // Generate a power-of-2 dimension to make the modulo operator fast and
+        // easy to implement. We choose an arbitrary upper-bound of 32 for the
+        // dimension for now.
+        std::size_t dimension = 1 << random.getInteger<std::size_t>(0, 5);
+        std::optional<std::size_t> chosen =
+            typeSystem.discardArrayDimensionOpaque(dimension, context);
+        if (!chosen)
+          return std::nullopt;
+
+        return std::pair{*chosen, std::move(context)};
+      },
       /*constructor=*/
-      [&](ast::ScalarType &&elementType) {
-        return arrayParameters.emplace_back(
-            std::move(elementType), generateFreshVarName(),
-            // Generate a power-of-2 dimension to make the modulo operator
-            // fast and easy to implement. We choose an arbitrary upper-bound
-            // of 32 for the dimension for now.
-            static_cast<std::size_t>(1 << random.getInteger(0, 5)));
+      [&](ast::ScalarType &&elementType, std::size_t &&dimension) {
+        return arrayParameters.emplace_back(std::move(elementType),
+                                            generateFreshVarName(), dimension);
       });
 }
 
 std::optional<std::pair<ast::Variable, gen::OpaqueContext>>
-gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context) {
+gen::BasicCGenerator::generateVariable(OpaqueContext &&context) {
   if (typeSystem.discardVariableOpaque(context))
     return std::nullopt;
 
   return generateWithDependencies<ast::Variable>(
-      context, typeSystem.getVariableTransferFns(),
+      std::move(context), typeSystem.getVariableTransferFns(),
       /*parameter=*/
-      [&](const OpaqueContext &context)
-          -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
-        std::array<std::function<std::optional<
-                       std::pair<ast::ScalarParameter, OpaqueContext>>()>,
-                   2>
-            generators;
-        generators[0] = [&]()
-            -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
-          // Randomly shuffle the parameter ordering and find the first
-          // parameter that passes type checking.
-          std::vector<ast::ScalarParameter> copy = scalarParameters;
-          for (auto &iter : localVariableStack)
-            llvm::append_range(copy, iter);
-          random.shuffle(copy);
-
-          for (const ast::ScalarParameter &iter : copy)
-            if (!typeSystem.discardExistingScalarParameterOpaque(iter, context))
-              return generateWithDependencies<ast::ExistingScalarParameter>(
-                  context, typeSystem.getExistingScalarParameterTransferFns(),
-                  iter);
-
-          return std::nullopt;
-        };
-        generators[1] = [&]()
-            -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
-          if (typeSystem.discardFreshScalarParameterOpaque(context))
-            return std::nullopt;
-
-          return generateWithDependencies<ast::ScalarParameter>(
-              context, typeSystem.getFreshScalarParameterTransferFns(),
-              /*datatype=*/
-              [&](const OpaqueContext &context) {
-                return generateScalarType(context);
-              },
-              /*constructor=*/
-              [&](ast::ScalarType &&datatype) {
-                return scalarParameters.emplace_back(std::move(datatype),
-                                                     generateFreshVarName());
-              });
-        };
-
-        if (random.getRatherLowProbabilityBool())
-          std::swap(generators[0], generators[1]);
-
-        for (auto &iter : generators)
-          if (std::optional<std::pair<ast::ScalarParameter, OpaqueContext>>
-                  result = iter())
-            return result;
-
-        return std::nullopt;
+      [&](OpaqueContext &&context) {
+        return generateScalarParameter(std::move(context));
       },
       /*constructor=*/
       [&](ast::ScalarParameter &&parameter) {
@@ -423,9 +404,65 @@ gen::BasicCGenerator::generateScalarParameter(const OpaqueContext &context) {
       });
 }
 
+std::optional<std::pair<ast::ScalarParameter, gen::OpaqueContext>>
+gen::BasicCGenerator::generateScalarParameter(OpaqueContext &&context) {
+  std::array<std::function<std::optional<
+                 std::pair<ast::ScalarParameter, OpaqueContext>>()>,
+             2>
+      generators;
+
+  // Existing scalar parameter.
+  generators[0] =
+      [&]() -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
+    // Randomly shuffle the parameter ordering and find the first
+    // parameter that passes type checking.
+    std::vector<ast::ScalarParameter> copy = scalarParameters;
+    for (auto &iter : localVariableStack)
+      llvm::append_range(copy, iter);
+    random.shuffle(copy);
+
+    for (const ast::ScalarParameter &iter : copy)
+      if (!typeSystem.discardExistingScalarParameterOpaque(iter, context))
+        return generateWithDependencies<ast::ExistingScalarParameter>(
+            std::move(context),
+            typeSystem.getExistingScalarParameterTransferFns(), iter);
+
+    return std::nullopt;
+  };
+
+  // Fresh scalar parameter.
+  generators[1] =
+      [&]() -> std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> {
+    if (typeSystem.discardFreshScalarParameterOpaque(context))
+      return std::nullopt;
+
+    return generateWithDependencies<ast::ScalarParameter>(
+        std::move(context), typeSystem.getFreshScalarParameterTransferFns(),
+        /*datatype=*/
+        [&](OpaqueContext &&context) {
+          return generateScalarType(std::move(context));
+        },
+        /*constructor=*/
+        [&](ast::ScalarType &&datatype) {
+          return scalarParameters.emplace_back(std::move(datatype),
+                                               generateFreshVarName());
+        });
+  };
+
+  if (random.getRatherLowProbabilityBool())
+    std::swap(generators[0], generators[1]);
+
+  for (auto &iter : generators)
+    if (std::optional<std::pair<ast::ScalarParameter, OpaqueContext>> result =
+            iter())
+      return result;
+
+  return std::nullopt;
+}
+
 std::optional<std::pair<ast::ScalarType, gen::OpaqueContext>>
 gen::BasicCGenerator::generateScalarType(
-    const OpaqueContext &context,
+    OpaqueContext &&context,
     llvm::function_ref<bool(const ast::ScalarType &)> toExclude) const {
   auto candidates = ast::PrimitiveType::ALL_PRIMITIVES;
   random.shuffle(candidates);
@@ -436,14 +473,14 @@ gen::BasicCGenerator::generateScalarType(
 
     if (!typeSystem.discardScalarTypeOpaque(iter, context))
       return generateWithDependencies<ast::ScalarType>(
-          context, typeSystem.getScalarTypeTransferFns(), iter);
+          std::move(context), typeSystem.getScalarTypeTransferFns(), iter);
   }
 
   return std::nullopt;
 }
 
 std::pair<ast::ReturnType, gen::OpaqueContext>
-gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
+gen::BasicCGenerator::generateReturnType(OpaqueContext &&context) const {
   // Candidates for return types are all primitive types as well as 'void'.
   // (i.e., one more than the number of primitive types).
   std::array<ast::ReturnType, ast::PrimitiveType::ALL_PRIMITIVES.size() + 1>
@@ -454,38 +491,41 @@ gen::BasicCGenerator::generateReturnType(const OpaqueContext &context) const {
   for (const ast::ReturnType &iter : candidates)
     if (!typeSystem.discardReturnTypeOpaque(iter, context))
       return generateWithDependencies<ast::ReturnType>(
-          context, typeSystem.getReturnTypeTransferFns(), iter);
+          std::move(context), typeSystem.getReturnTypeTransferFns(), iter);
 
   llvm::report_fatal_error(
       "It must always be possible to generate a return type");
 }
 
 std::pair<ast::StatementList, gen::OpaqueContext>
-gen::BasicCGenerator::generateStatementList(const OpaqueContext &context) {
+gen::BasicCGenerator::generateStatementList(OpaqueContext &&context) {
   if (typeSystem.discardStatementListOpaque(context))
-    return std::pair{ast::StatementList(), context};
+    return std::pair{ast::StatementList(), std::move(context)};
 
   return generateWithDependencies<ast::StatementList>(
-             context, typeSystem.getStatementListTransferFns(),
-             /*statement list=*/
-             [&](const OpaqueContext &context) {
-               return generateStatementList(context);
-             },
+             std::move(context), typeSystem.getStatementListTransferFns(),
              /*statement=*/
-             [&](const OpaqueContext &context) {
-               return generateStatement(context);
+             [&](OpaqueContext &&context) {
+               return generateStatement(std::move(context));
+             },
+             /*statement list=*/
+             [&](OpaqueContext &&context) {
+               return generateStatementList(std::move(context));
              },
              /*constructor=*/
-             [&](ast::StatementList &&statements, ast::Statement &&statement) {
+             [&](ast::Statement &&statement, ast::StatementList &&statements) {
+               // The list is right recursive: the freshly generated
+               // statement is the head, prepended before the rest of the
+               // list.
                std::vector<ast::Statement> result = statements.takeVector();
-               result.push_back(std::move(statement));
+               result.insert(result.begin(), std::move(statement));
                return ast::StatementList(std::move(result));
              })
-      .value_or(std::pair{ast::StatementList(), context});
+      .value_or(std::pair{ast::StatementList(), std::move(context)});
 }
 
 std::optional<std::pair<ast::Statement, gen::OpaqueContext>>
-gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
+gen::BasicCGenerator::generateStatement(OpaqueContext &&context) {
   llvm::SmallVector<Constructor<ast::Statement>> constructors = random.shuffle(
       statementGenerators,
       typeSystem.getStatementProbabilityTableOpaque(context),
@@ -494,7 +534,7 @@ gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
       &ConstructorKeyPair<ast::Statement,
                           AbstractTypeSystem::StatementKey>::first);
   for (auto &iter : constructors)
-    if (auto result = iter(this, context))
+    if (auto result = iter(this, std::move(context)))
       return result;
 
   return std::nullopt;
@@ -502,28 +542,29 @@ gen::BasicCGenerator::generateStatement(const OpaqueContext &context) {
 
 std::optional<std::pair<ast::ArrayAssignmentStatement, gen::OpaqueContext>>
 gen::BasicCGenerator::generateArrayAssignmentStatement(
-    const OpaqueContext &context) {
+    OpaqueContext &&context) {
   if (typeSystem.discardArrayAssignmentStatementOpaque(context))
     return std::nullopt;
 
   return generateWithDependencies<ast::ArrayAssignmentStatement>(
-      context, typeSystem.getArrayAssignmentStatementTransferFns(),
+      std::move(context), typeSystem.getArrayAssignmentStatementTransferFns(),
       /*array parameter=*/
-      [&](const OpaqueContext &context) {
-        return generateArrayParameter(context);
+      [&](OpaqueContext &&context) {
+        return generateArrayParameter(std::move(context));
       },
       /*index=*/
-      [&](const OpaqueContext &context) {
-        auto [expression, outputContext] = generateExpression(context);
-        expression = safeCastAsNeeded(
-            /*to=*/ast::PrimitiveType::UInt32, std::move(expression));
-        return std::pair(std::move(expression), std::move(outputContext));
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
       },
       /*value=*/
-      [&](const OpaqueContext &context) { return generateExpression(context); },
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
       /*constructor=*/
       [&](ast::ArrayParameter &&param, ast::Expression &&index,
           ast::Expression &&value) {
+        index = safeCastAsNeeded(
+            /*to=*/ast::PrimitiveType::UInt32, std::move(index));
         index = ast::BinaryExpression{std::move(index),
                                       ast::BinaryExpression::BitAnd,
                                       ast::Constant{static_cast<std::uint32_t>(
@@ -536,50 +577,95 @@ gen::BasicCGenerator::generateArrayAssignmentStatement(
       });
 }
 
+std::optional<std::pair<ast::ScalarAssignmentStatement, gen::OpaqueContext>>
+gen::BasicCGenerator::generateScalarAssignmentStatement(
+    OpaqueContext &&context) {
+  if (typeSystem.discardScalarAssignmentStatementOpaque(context))
+    return std::nullopt;
+
+  return generateWithDependencies<ast::ScalarAssignmentStatement>(
+      std::move(context), typeSystem.getScalarAssignmentStatementTransferFns(),
+      /*target=*/
+      [&](OpaqueContext &&context) {
+        return generateScalarParameter(std::move(context));
+      },
+      /*value=*/
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
+      /*constructor=*/
+      [&](ast::ScalarParameter &&target, ast::Expression &&value) {
+        // Ensure the assigned value matches the variable's type without
+        // triggering undefined behavior.
+        value = safeCastAsNeeded(target.getDataType(), std::move(value));
+        return ast::ScalarAssignmentStatement{target.getName().str(),
+                                              std::move(value)};
+      });
+}
+
 std::optional<std::pair<ast::StructuredForStatement, gen::OpaqueContext>>
-gen::BasicCGenerator::generateStructuredForStatement(
-    const OpaqueContext &context) {
+gen::BasicCGenerator::generateStructuredForStatement(OpaqueContext &&context) {
   if (typeSystem.discardStructuredForStatementOpaque(context))
     return std::nullopt;
 
   std::string varName = generateFreshVarName();
   return generateWithDependencies<ast::StructuredForStatement>(
-      context, typeSystem.getStructuredForStatementTransferFns(),
-      [&](const OpaqueContext &context) { return generateExpression(context); },
-      [&](const OpaqueContext &context) { return generateExpression(context); },
-      [&](const OpaqueContext &context) { return generateExpression(context); },
-      [&](const OpaqueContext &context) {
+      std::move(context), typeSystem.getStructuredForStatementTransferFns(),
+      /*iteration variable=*/
+      [&](OpaqueContext &&context)
+          -> std::optional<std::pair<std::string, OpaqueContext>> {
+        // The iteration variable is a terminal whose name is made available to
+        // transfer functions (e.g., to forbid writing to it in the body). Its
+        // output context is never consumed, so simply forward the input.
+        return std::pair{varName, std::move(context)};
+      },
+      /*start=*/
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
+      /*end=*/
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
+      /*step=*/
+      [&](OpaqueContext &&context) {
+        return generateExpression(std::move(context));
+      },
+      /*body=*/
+      [&](OpaqueContext &&context) {
         auto scopeExit = pushNewScope();
         addVariable(ast::PrimitiveType::UInt32, varName);
-        return generateStatementList(context);
+        return generateStatementList(std::move(context));
       },
-      [&](ast::Expression &&start, ast::Expression &&end,
-          ast::Expression &&step, ast::StatementList &&statements) {
+      /*constructor=*/
+      [&](std::string &&iterVariable, ast::Expression &&start,
+          ast::Expression &&end, ast::Expression &&step,
+          ast::StatementList &&statements) {
         // Note: Requiring the step to be at least one to ensure termination!
         // TODO: Negative steps are currently unsupported.
         step = generateMaxExpression(step, ast::Constant{1});
-        return ast::StructuredForStatement(std::move(varName), std::move(start),
-                                           std::move(end), std::move(step),
-                                           std::move(statements));
+        return ast::StructuredForStatement(
+            std::move(iterVariable), std::move(start), std::move(end),
+            std::move(step), std::move(statements));
       });
 }
 
 void gen::BasicCGenerator::initGenerators() {
   expressionGenerators.emplace_back(&BasicCGenerator::generateConstant,
                                     ast::Constant::Tag{});
-  expressionGenerators.emplace_back(&BasicCGenerator::generateScalarParameter,
+  expressionGenerators.emplace_back(&BasicCGenerator::generateVariable,
                                     ast::Variable::Tag{});
   for (auto op : enumRange<ast::BinaryExpression::Op>()) {
     expressionGenerators.emplace_back(
-        [op](BasicCGenerator *self, const OpaqueContext &context) {
-          return self->generateBinaryExpression(op, context);
+        [op](BasicCGenerator *self, OpaqueContext &&context) {
+          return self->generateBinaryExpression(op, std::move(context));
         },
         op);
   }
   for (auto op : enumRange<ast::UnaryExpression::Op>()) {
     expressionGenerators.emplace_back(
-        [op](BasicCGenerator *self, const OpaqueContext &context) {
-          return self->generateUnaryExpression(op, context);
+        [op](BasicCGenerator *self, OpaqueContext &&context) {
+          return self->generateUnaryExpression(op, std::move(context));
         },
         op);
   }
@@ -598,10 +684,13 @@ void gen::BasicCGenerator::initGenerators() {
   statementGenerators.emplace_back(
       &BasicCGenerator::generateStructuredForStatement,
       ast::StructuredForStatement::Tag{});
+  statementGenerators.emplace_back(
+      &BasicCGenerator::generateScalarAssignmentStatement,
+      ast::ScalarAssignmentStatement::Tag{});
 }
 
-void gen::BasicCGenerator::generate(llvm::raw_ostream &os,
-                                    std::string_view functionName) {
+ast::Function gen::BasicCGenerator::generate(llvm::raw_ostream &os,
+                                             std::string_view functionName) {
   ast::Function function = generateFunction(functionName);
   os << R"(
 #include <stdint.h>
@@ -614,26 +703,28 @@ constexpr
 )";
   os << function << '\n';
   os << generateTestBench(function);
+  return function;
 }
 
 ast::Function
 gen::BasicCGenerator::generateFunction(llvm::StringRef functionName) {
   return std::move(
       generateWithDependencies<ast::Function>(
-          entryContext, typeSystem.getFunctionTransferFns(),
+          std::move(entryContext), typeSystem.getFunctionTransferFns(),
           /*return type=*/
-          [&](const OpaqueContext &context) {
-            auto [returnType, outputContext] = generateReturnType(context);
+          [&](OpaqueContext &&context) {
+            auto [returnType, outputContext] =
+                generateReturnType(std::move(context));
             maybeReturnType = returnType;
             return std::pair{std::move(returnType), std::move(outputContext)};
           },
           /*statement list=*/
-          [&](const OpaqueContext &context) {
-            return generateStatementList(context);
+          [&](OpaqueContext &&context) {
+            return generateStatementList(std::move(context));
           },
           /*return statement=*/
-          [&](const OpaqueContext &context) {
-            return generateReturnStatement(context);
+          [&](OpaqueContext &&context) {
+            return generateReturnStatement(std::move(context));
           },
           /*constructor=*/
           [&](ast::ReturnType &&returnType, ast::StatementList &&statements,

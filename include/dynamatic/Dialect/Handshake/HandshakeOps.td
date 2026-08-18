@@ -31,10 +31,10 @@ include "dynamatic/Dialect/Handshake/HandshakeTypes.td"
 class Handshake_Op<string mnemonic, list<Trait> traits = []>
     : Op<Handshake_Dialect, mnemonic,
          traits #[HasParent<"handshake::FuncOp">,
-         DeclareOpInterfaceMethods<NamedIOInterface>,
          DeclareOpInterfaceMethods<ControlInterface>,
          DeclareOpInterfaceMethods<RTLAttrInterface>,
-         DeclareOpInterfaceMethods<BLIFImplInterface>]> {
+         DeclareOpInterfaceMethods<BLIFImplInterface>,
+         NamedIOUtilities]> {
 }
 
 // This is almost exactly like a standard FuncOp, except that it has some
@@ -46,7 +46,11 @@ def FuncOp : Op<Handshake_Dialect, "func", [
    Symbol,
    RegionKindInterface,
    OpAsmOpInterface,
-   HasClock
+   HasClock,
+  // The IOs of a FuncOp have custom names,
+  // defined here in the Tablegen
+  // as part of the FuncOp declaration
+   NamedIOInterface
 ]> {
   let summary = "Handshake dialect function.";
   let description = [{
@@ -97,12 +101,18 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     /// Returns the argument name at the given index.
     StringAttr getArgName(unsigned idx) {
-      return getArgNames()[idx].cast<StringAttr>();
+      auto names = getArgNames();
+      if (idx >= names.size())
+        llvm::report_fatal_error("argument index too high");
+      return names[idx].cast<StringAttr>();
     }
 
     /// Returns the result name at the given index.
     StringAttr getResName(unsigned idx) {
-      return getResNames()[idx].cast<StringAttr>();
+      auto names = getResNames();
+      if (idx >= names.size())
+        llvm::report_fatal_error("result index too high");
+      return names[idx].cast<StringAttr>();
     }
 
     /// Hook for FunctionOpInterface, called after verifying that the 'type'
@@ -129,6 +139,18 @@ def FuncOp : Op<Handshake_Dialect, "func", [
 
     static ::llvm::StringRef getDefaultDialect() {
       return "handshake";
+    }
+
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    std::string getOperandName(unsigned idx){
+      return getArgName(idx).str();
+    }
+
+    std::string getResultName(unsigned idx){
+      return getResName(idx).str();
     }
   }];
 
@@ -226,7 +248,9 @@ def InstanceOp : Handshake_Op<"instance", [
 }
 
 def BufferOp : Handshake_Op<"buffer", [
-  HasClock, SameOperandsAndResultType,
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIO,
   DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
 ]> {
   let summary = "buffer operation";
@@ -330,7 +354,9 @@ def BufferOp : Handshake_Op<"buffer", [
 }
 
 def InitOp : Handshake_Op<"init", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIO
 ]> {
   let summary = "init operation";
   let description = [{
@@ -341,10 +367,6 @@ def InitOp : Handshake_Op<"init", [
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
-  let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
-                                           TIMING_ATTR_NAME = "TIMING";
-  }];
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
@@ -360,7 +382,9 @@ def InitOp : Handshake_Op<"init", [
 }
 
 def NDWireOp : Handshake_Op<"ndwire", [
-  HasClock, SameOperandsAndResultType
+  HasClock,
+  SameOperandsAndResultType,
+  SimpleNamedIO
 ]> {
   let summary = "non-deterministic wire operation";
   let description = [{
@@ -388,7 +412,10 @@ def NDWireOp : Handshake_Op<"ndwire", [
 
 class Handshake_ForkOp<string mnemonic, list<Trait> traits = []> :
   Handshake_Op<mnemonic, traits # [
-    Pure, HasClock, SameOperandsAndResultType
+    Pure,
+    HasClock,
+    SameOperandsAndResultType,
+    SimpleNamedIO
 ]> {
   let arguments = (ins HandshakeType:$operand);
   let results = (outs Variadic<HandshakeType>:$result);
@@ -460,7 +487,8 @@ def MergeOp : Handshake_Op<"merge", [
   // require that the data types match.
   SameOperandsAndResultType,
   VariadicHasElement<"dataOperands">,
-  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>
+  DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
+  SimpleNamedIO
 ]> {
   let summary = "merge operation";
   let description = [{
@@ -505,7 +533,10 @@ def MuxOp : Handshake_Op<"mux", [
   // Interface declarations
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>
+  // The IOs of a MuxOp have custom names,
+  // defined here in the Tablegen
+  // as part of the MuxOp declaration
+  NamedIOInterface
 ]> {
   let summary = "mux operation";
   let description = [{
@@ -530,6 +561,28 @@ def MuxOp : Handshake_Op<"mux", [
   let arguments = (ins ChannelType:$selectOperand,
                        Variadic<HandshakeType>:$dataOperands);
   let results = (outs HandshakeType:$result);
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named "index"
+    /// Operands 1 to N are named "ins_0" to "ins_<N-1>"
+    /// simpleOperandName handles validation
+    std::string getOperandName(unsigned idx) {
+      return idx == 0 ? "index"
+                      : simpleOperandName(idx - 1, getNumOperands() - 1);
+    }
+
+    /// Result 0 is named "outs"
+    /// simpleResultName handles validation
+    std::string getResultName(unsigned idx) {
+      return simpleResultName(idx);
+    }
+  }];
+
+
 
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
@@ -560,7 +613,10 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
   DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
   DeclareOpInterfaceMethods<EagerForkLikeOpInterface, []>,
   DeclareOpInterfaceMethods<MergeLikeOpInterface, ["getDataResult"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  // The IOs of a CMergeOP have custom names,
+  // defined here in the Tablegen
+  // as part of the CMergeOP declaration
+  NamedIOInterface
 ]> {
   let summary = "control merge operation";
   let description = [{
@@ -592,6 +648,25 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
       $_state.addTypes({operands[0].getType(), idxType});
   }]>];
 
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operands 0 to N are named "ins_0" to "ins_<N>"
+    /// simpleOperandName handles validation
+    std::string getOperandName(unsigned idx) {
+      return simpleOperandName(idx);
+    }
+
+    /// Result 0 is named outs
+    /// Result 1 is named index
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      return idx == 0 ? "outs" : "index";
+    }
+  }];
+
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 
@@ -613,7 +688,9 @@ def ControlMergeOp : Handshake_Op<"control_merge", [
 }
 
 def BranchOp : Handshake_Op<"br", [
-  Pure, SameOperandsAndResultType
+  Pure,
+  SameOperandsAndResultType,
+  SimpleNamedIO
 ]> {
   let summary = "branch operation";
   let description = [{
@@ -654,7 +731,10 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   IsIntSizedChannel<1, "conditionOperand">,
   DeclareOpInterfaceMethods<InferTypeOpInterface, ["inferReturnTypes"]>,
   DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  // The IOs of a ConditionalBranch have custom names,
+  // defined here in the Tablegen
+  // as part of the ConditionalBranch declaration
+  NamedIOInterface
 ]> {
   let summary = "conditional branch operation";
   let description = [{
@@ -679,9 +759,28 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
     $conditionOperand `,` $dataOperand attr-dict
       `:` type($conditionOperand) `,` custom<HandshakeType>(type($dataOperand))
   }];
+
   let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
     // These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
+
+    /// Operand 0 is named condition
+    /// Operand 1 is named data
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
+      return idx == 0 ? "condition" : "data";
+    }
+
+    /// Operand 0 is named trueOut
+    /// Operand 1 is named falseOut
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      return idx == trueIndex ? "trueOut" : "falseOut";
+    }
   }];
 
   let extraClassDefinition = [{
@@ -696,7 +795,9 @@ def ConditionalBranchOp : Handshake_Op<"cond_br", [
   }];
 }
 
-def SinkOp : Handshake_Op<"sink"> {
+def SinkOp : Handshake_Op<"sink", [
+  SimpleNamedIO
+]> {
   let summary = "sink operation";
   let description = [{
     The sink operation discards any data that arrives at its
@@ -727,7 +828,8 @@ def SinkOp : Handshake_Op<"sink"> {
 }
 
 def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
-  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
+  SimpleNamedIO
  ]> {
   let summary = "buffer operation without successor";
   let description = [{
@@ -759,7 +861,10 @@ def DeadBufferOp : Handshake_Op<"formal.dead_buffer", [
   }];
 }
 
-def SourceOp : Handshake_Op<"source", [Pure]> {
+def SourceOp : Handshake_Op<"source", [
+  Pure,
+  SimpleNamedIO
+]> {
   let summary = "source operation";
   let description = [{
     The source operation represents a continuous control-only-token source. The
@@ -795,7 +900,8 @@ def SourceOp : Handshake_Op<"source", [Pure]> {
 
 def JoinOp : Handshake_Op<"join", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>
+  DeclareOpInterfaceMethods<ControlInterface, ["isControl"]>,
+  SimpleNamedIO
 ]> {
   let summary = "join operation";
   let description = [{
@@ -829,7 +935,8 @@ def JoinOp : Handshake_Op<"join", [
 // TODO: Split the input into two parts and explicitly mark the forwarded input,
 // once the backend supports variadic channels with zero or one item correctly.
 def BlockerOp : Handshake_Op<"blocker", [
-  SameOperandsAndResultType
+  SameOperandsAndResultType,
+  SimpleNamedIO
 ]> {
   let summary = "blocker operation";
   let description = [{
@@ -865,6 +972,7 @@ def BlockerOp : Handshake_Op<"blocker", [
 def NotIOp : Handshake_Op<"noti", [
   Pure,
   SameOperandsAndResultType,
+  SimpleNamedIO,
   IsIntChannel<"operand">,
   IsIntChannel<"result">
 ]> {
@@ -908,8 +1016,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
   IsSimpleHandshakeVariadic<"inputs">,
   IsSimpleHandshakeVariadic<"outputs">,
   DeclareOpInterfaceMethods<MemoryOpInterface>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  // The IOs of a MemoryControllerOp have custom names,
+  // As they are complex, they are declared here,
+  // but defined in HandshakeOps.cpp
+  NamedIOInterface
 ]> {
   let summary = "memory controller (dynamatic)";
   let description = [{
@@ -963,6 +1073,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
                                  "ValueRange":$inputs, "Value":$ctrlEnd,
                                  "ArrayRef<unsigned>":$blocks,
                                  "unsigned":$numLoads)>];
+
   let hasVerifier = 1;
 
   // Dispatch SimpleControl signals to custom print and parse
@@ -984,6 +1095,14 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     /// accesses that are connected to the memory controller.
     dynamatic::MCPorts getPorts();
 
+
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
+
     size_t getNumLoadPorts();
     std::optional<LoadPort> getLoadPort(size_t index);
     MemoryControllerSlotNamer getLoadPortSlotNamer(size_t index);
@@ -1000,8 +1119,10 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
 
 def LSQOp : Handshake_Op<"lsq", [
   DeclareOpInterfaceMethods<MemoryOpInterface>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getResultName"]>
+  // The IOs of a MemoryControllerOp have custom names,
+  // As they are complex, they are declared here,
+  // but defined in HandshakeOps.cpp
+  NamedIOInterface
 ]> {
   let summary = "load-store queue  (dynamatic)";
   let description = [{
@@ -1070,7 +1191,7 @@ def LSQOp : Handshake_Op<"lsq", [
 
     /// Returns a convenient data-structure to go over the controls and memory
     /// accesses that are connected to the LSQ.
-    dynamatic::LSQPorts getPorts();
+    dynamatic::LSQPorts getPorts(); 
 
     /// Determines whether the LSQ is connected to an MC.
     bool isConnectedToMC() {
@@ -1090,6 +1211,13 @@ def LSQOp : Handshake_Op<"lsq", [
     /// materialized when called. The returned values are guaranteed to be in
     /// the same order as the control operation's results.
     SmallVector<Value> getControlPaths(Operation *ctrlOp);
+
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    std::string getOperandName(unsigned idx);
+    std::string getResultName(unsigned idx);
   }];
 
   let extraClassDefinition = [{
@@ -1111,7 +1239,6 @@ class Handshake_MemPortOp<
     MemPortOpInterface,
     AllDataTypesMatch<["address", "addressResult"]>,
     AllDataTypesMatch<["data", "dataResult"]>,
-    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
     IsIntChannel<"address">,
     IsIntChannel<"addressResult">
   ]
@@ -1140,7 +1267,11 @@ def LoadOp : Handshake_MemPortOp<"load", [
   // In LoadOp, addressResult and data are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
   IsSimpleHandshake<"data">,
-  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>,
+  // The IOs of a LoadOp have custom names,
+  // defined here in the Tablegen
+  // as part of the LoadOp declaration
+  NamedIOInterface,
+  DeclareOpInterfaceMethods<BufferLikeOpInterface, []>
 ], [
   // TODO: Please add comments on why this builder is necessary
   OpBuilder<(ins "MemRefType":$memrefType, "Value":$address), [{
@@ -1185,18 +1316,27 @@ def LoadOp : Handshake_MemPortOp<"load", [
   let extraClassDeclaration = [{
     static constexpr ::llvm::StringLiteral ADDR_SLOT_LIT = "addr";
     static constexpr ::llvm::StringLiteral DATA_SLOT_LIT = "data";
-  }];
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named addrIn
+    /// Operand 1 is named dataFromMem
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataFromMem";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    /// Result 0 is named addrOut
+    /// Result 1 is named dataOut
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataOut";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     LoadOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1208,14 +1348,17 @@ def LoadOp : Handshake_MemPortOp<"load", [
       };
     }
   }];
-
 }
 
 def StoreOp : Handshake_MemPortOp<"store", [
   AllExtraSignalsMatch<["address", "data"]>,
   // In StoreOp, addressResult and dataResult are connected to a memory controller.
   IsSimpleHandshake<"addressResult">,
-  IsSimpleHandshake<"dataResult">
+  IsSimpleHandshake<"dataResult">,
+  // The IOs of a StoreOp have custom names,
+  // defined here in the Tablegen
+  // as part of the StoreOp declaration
+  NamedIOInterface
 ], []> {
   let summary = "store operation for memory controller (MC)";
   let description = [{
@@ -1239,15 +1382,27 @@ def StoreOp : Handshake_MemPortOp<"store", [
     ```
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned int idx) {
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named addrIn
+    /// Operand 1 is named dataIn
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
       return (idx == 0) ? "addrIn" : "dataIn";
     }
 
-    std::string $cppClass::getResultName(unsigned int idx) {
+    /// Result 0 is named addrOut
+    /// Result 1 is named dataToMem
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
       return (idx == 0) ? "addrOut" : "dataToMem";
     }
-    
+  }];
+
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     StoreOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1265,8 +1420,9 @@ def StoreOp : Handshake_MemPortOp<"store", [
 // Memory hierarchy
 //===----------------------------------------------------------------------===//
 
-def RAMOp : Handshake_Op<"ram", []>  {
+def RAMOp : Handshake_Op<"ram", [NamedIOInterface]>  {
   let arguments = (ins ElementsAttr:$initialValue);
+  let results = (outs AnyStaticShapeMemRef:$result);
 
   let description = [{
     A placeholder operation for an RAM or ROM instantiated inside the handshake
@@ -1307,7 +1463,22 @@ def RAMOp : Handshake_Op<"ram", []>  {
     ```
   }];
 
-  let results = (outs AnyStaticShapeMemRef:$result);
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    std::string getOperandName(unsigned idx) {
+      llvm_unreachable("RAMOp has no operands");
+    }
+
+    // As a memory interface representation, this output is an abstraction
+    // we replace later, and so this string value is not currently used.
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      return "memref";
+    }
+  }];
 
   let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
@@ -1323,8 +1494,8 @@ def RAMOp : Handshake_Op<"ram", []>  {
 //===----------------------------------------------------------------------===//
 
 def EndOp : Handshake_Op<"end", [
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName"]>,
-  Terminator
+  Terminator,
+  SimpleNamedIO
 ]> {
   let summary = "function endpoint (dynamatic)";
   let description = [{
@@ -1363,17 +1534,17 @@ def SpeculatorOp : Handshake_Op<"speculator", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"saveCtrl">,
-  IsIntSizedChannel<1, "saveCtrl">,
+  IsSimpleHandshake<"issueCtrl">,
+  IsIntSizedChannel<2, "issueCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
   IsSimpleHandshake<"commitCtrl">,
   IsIntSizedChannel<1, "commitCtrl">,
-  IsSimpleHandshake<"SCSaveCtrl">,
-  IsIntSizedChannel<3, "SCSaveCtrl">,
-  IsSimpleHandshake<"SCCommitCtrl">,
-  IsIntSizedChannel<3, "SCCommitCtrl">,
-  IsSimpleHandshake<"SCIsMisspec">,
-  IsIntSizedChannel<1, "SCIsMisspec">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  // The IOs of the SpeculatorOp have custom names
+  // defined here in the Tablegen
+  // as part of the SpeculatorOp declaration
+  NamedIOInterface,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Central control unit of the speculative circuit.";
   let description = [{
@@ -1381,19 +1552,21 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     not yet arrived. The speculator is also responsible for deciding
     the correctness of its speculation.
 
-    It needs to send control tokens to save units and commit units
-    ($saveCtrl, $commitCtrl). For save-commit units, three control
-    signals are needed. $SCSaveCtrl is connected directly, while
-    $SCCommitCtrl replicates the branches that $dataOut
-    follows and might not reach a save-commit. $SCIsMisspec is needed
-    in the replicated branches to discard the latter signal.
+    It exposes three control outputs.
+    Two unconditionally go to the save-commits 
+    $issueCtrl (which affects when tokens are issued by the save-commit)
+    and $historyCtrl (which affects what the save-commit does with its
+    internal token history)
+    One to the commit units: $commitCtrl
+    which conditionally connects to the commit units, routing through 
+    the speculative region's branches to reach the correct commits).
 
     Example:
 
     ```mlir
-    %dataOut, %saveCtrl, %commitCtrl, %SCSaveCtrl, %SCCommitCtrl, %SCIsMisspec
+    %dataOut, %issueCtrl, %historyCtrl, %commitCtrl
       = speculator[trigger] %dataIn : <[spec: i1]>, <i1, [spec: i1]>,
-        <i1, [spec: i1]>, <i1>, <i1>, <i3>, <i3>, <i1>
+        <i1>, <i1>, <i1>
     ```
   }];
 
@@ -1401,15 +1574,14 @@ def SpeculatorOp : Handshake_Op<"speculator", [
                        ControlType:$trigger,
                        UI32Attr:$fifoDepth);
   let results = (outs ChannelType:$dataOut,
-                      ChannelType:$saveCtrl, ChannelType:$commitCtrl,
-                      ChannelType:$SCSaveCtrl,
-                      ChannelType:$SCCommitCtrl,
-                      ChannelType:$SCIsMisspec);
+                      ChannelType:$issueCtrl,
+                      ChannelType:$historyCtrl,
+                      ChannelType:$commitCtrl);
 
   let assemblyFormat = [{
     `[` $trigger `]` $dataIn attr-dict `:` type($trigger) `,` type($dataIn) `,`
-    type($dataOut) `,` type($saveCtrl) `,` type($commitCtrl) `,`
-    type($SCSaveCtrl) `,` type($SCCommitCtrl) `,` type($SCIsMisspec)
+    type($dataOut) `,` type($issueCtrl) `,` type($historyCtrl) `,`
+    type($commitCtrl)
   }];
 
   // Infer the type of the control signals
@@ -1417,37 +1589,46 @@ def SpeculatorOp : Handshake_Op<"speculator", [
     $_state.addOperands({dataIn, trigger});
     $_state.addAttribute("fifoDepth", $_builder.getUI32IntegerAttr(fifoDepth));
 
-    ChannelType ctrlType = ChannelType::get($_builder.getIntegerType(1));
-    ChannelType wideControlType = ChannelType::get($_builder.getIntegerType(3));
+    ChannelType issueResolveType = ChannelType::get($_builder.getIntegerType(2));
+    ChannelType commitType = ChannelType::get($_builder.getIntegerType(1));
 
-    $_state.addTypes({dataOutType, ctrlType, ctrlType, wideControlType,
-      wideControlType, ctrlType});
+    $_state.addTypes({dataOutType, issueResolveType, issueResolveType, commitType});
   }]>];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named ins
+    /// Operand 1 is named trigger
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
       return idx == 0 ? "ins" : "trigger";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    /// Result 0 is named outs
+    /// Result 1 is named ctrl_save
+    /// Result 2 is named ctrl_commit
+    /// Result 3 is named ctrl_sc_save
+    /// Result 4 is named ctrl_sc_commit
+    /// Result 5 is named ctrl_sc_branch
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
       switch (idx) {
       case 0:
         return "outs";
       case 1:
-        return "ctrl_save";
+        return "ctrl_issue";
       case 2:
-        return "ctrl_commit";
-      case 3:
-        return "ctrl_sc_save";
-      case 4:
-        return "ctrl_sc_commit";
+        return "ctrl_history";
       default:
-        return "ctrl_sc_branch";
+        return "ctrl_commit";
       }
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpeculatorOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1468,7 +1649,10 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
   HasValidSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  // The IOs of a SpecSaveOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpecSaveOp declaration
+  NamedIOInterface
 ]> {
   let summary = "Saves data tokens that interact in the speculative region.";
   let description = [{
@@ -1494,17 +1678,26 @@ def SpecSaveOp : Handshake_Op<"spec_save", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named ins
+    /// Operand 1 is named ctrl
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+    /// Result 0 is named outs
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
       return "outs";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpecSaveOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1523,7 +1716,10 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
   LacksSpecTag<"dataOut">,
   IsSimpleHandshake<"ctrl">,
   IsIntSizedChannel<1, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  // The IOs of a SpecCommitOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpecCommitOp declaration
+  NamedIOInterface
 ]> {
   let summary = "Stall speculative data tokens until they are resolved.";
   let description = [{
@@ -1551,17 +1747,26 @@ def SpecCommitOp : Handshake_Op<"spec_commit", [
     `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($dataOut) `,` type($ctrl)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named ins
+    /// Operand 1 is named ctrl
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
       return idx == 0 ? "ins" : "ctrl";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+    /// Result 0 is named result
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
       return "outs";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpecCommitOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1577,9 +1782,15 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
   HasValidSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
   AllTypesMatch<["dataIn", "dataOut"]>,
-  IsSimpleHandshake<"ctrl">,
-  IsIntSizedChannel<3, "ctrl">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  IsSimpleHandshake<"issueCtrl">,
+  IsIntSizedChannel<2, "issueCtrl">,
+  IsSimpleHandshake<"historyCtrl">,
+  IsIntSizedChannel<2, "historyCtrl">,
+  // The IOs of a SpecSaveCommitOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpecCommitOp declaration
+  NamedIOInterface,
+  DeclareOpInterfaceMethods<RetimingPathsOpInterface>
 ]> {
   let summary = "Lets all tokens pass and saves a copy of them.";
   let description = [{
@@ -1588,31 +1799,50 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
     speculative and non-speculative tokens pass as well as save
     a copy of them.
 
+    Two control inputs broadcast from the speculator:
+    $issueCtrl affects how tokens are issued
+    $historyCtrl affects how the internalt token history is updated
+
     Example:
 
     ```mlir
-    %dataOut = spec_save_commit[%ctrl] %dataIn : i11
+    %dataOut = spec_save_commit[%issueCtrl, %historyCtrl] %dataIn : i11
     ```
   }];
   let arguments = (ins HandshakeType:$dataIn,
-                       ChannelType:$ctrl,
+                       ChannelType:$issueCtrl,
+                       ChannelType:$historyCtrl,
                        UI32Attr:$fifoDepth);
   let results = (outs HandshakeType:$dataOut);
   let assemblyFormat = [{
-    `[` $ctrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($ctrl)
+    `[` $issueCtrl `,` $historyCtrl `]` $dataIn attr-dict `:` type($dataIn) `,` type($issueCtrl) `,` type($historyCtrl)
+  }];
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named ins
+    /// Operand 1 is named ctrl_issue
+    /// Operand 2 is named ctrl_history
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
+      switch (idx) {
+      case 0: return "ins";
+      case 1: return "ctrl_issue";
+      default: return "ctrl_history";
+      }
+    }
+
+    /// Result 0 is named outs
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      return "outs";
+    }
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
-      return idx == 0 ? "ins" : "ctrl";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
-      return "outs";
-    }
-
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpecSaveCommitOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1620,7 +1850,7 @@ def SpecSaveCommitOp : Handshake_Op<"spec_save_commit", [
         {::mlir::StringAttr::get(ctx, "BITWIDTH"),
          ::mlir::TypeAttr::get(getResult().getType())},
         {::mlir::StringAttr::get(ctx, "FIFO_DEPTH"),
-         ::mlir::TypeAttr::get(getCtrl().getType())}
+         ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32), getFifoDepth())}
       };
     }
   }];
@@ -1633,7 +1863,10 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
   HasValidSpecTag<"dataOperand">,
   LacksSpecTag<"trueResult">,
   LacksSpecTag<"falseResult">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  // The IOs of a SpeculatingBranchOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SpeculatingBranchOp declaration
+  NamedIOInterface
 ]> {
   let summary = "speculating branch operation";
   let description = [{
@@ -1661,17 +1894,28 @@ def SpeculatingBranchOp : Handshake_Op<"speculating_branch", [
       type($trueResult) `,` type($falseResult)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getNumOperands() && "index too high");
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named spec_tag_data
+    /// Operand 1 is named data
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
       return idx == 0 ? "spec_tag_data" : "data";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getNumResults() && "index too high");
+    /// Result 0 is named trueOut
+    /// Result 1 is named falseOut
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
       return idx == 0 ? "trueOut" : "falseOut";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     SpeculatingBranchOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1690,7 +1934,10 @@ def NonSpecOp : Handshake_Op<"non_spec", [
   AllExtraSignalsMatchExcept<"spec", ["dataIn", "dataOut"]>,
   LacksSpecTag<"dataIn">,
   HasValidSpecTag<"dataOut">,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  // The IOs of a NonSpecOp have custom names,
+  // defined here in the Tablegen
+  // as part of the NonSpecOp declaration
+  NamedIOInterface
 ]> {
   let summary = "Adds a non-speculative spec bit.";
   let description = [{
@@ -1712,17 +1959,26 @@ def NonSpecOp : Handshake_Op<"non_spec", [
     $dataIn attr-dict `:` type($dataIn) `to` type($dataOut)
   }];
 
-  let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-      assert(idx < getOperation()->getNumOperands() && "index too high");
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named dataIn
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
       return "dataIn";
     }
 
-    std::string $cppClass::getResultName(unsigned idx) {
-      assert(idx < getOperation()->getNumResults() && "index too high");
+    /// Result 0 is named dataOut
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
       return "dataOut";
     }
+  }];
 
+  let extraClassDefinition = [{
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     NonSpecOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1740,7 +1996,10 @@ def NonSpecOp : Handshake_Op<"non_spec", [
 
 def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+  // The IOs of a SharingWrapperOp have custom names,
+  // defined here in the Tablegen
+  // as part of the SharingWrapperOp declaration
+  NamedIOInterface
 ]> {
 
   let summary = "sharing wrapper operation";
@@ -1784,6 +2043,32 @@ def SharingWrapperOp : Handshake_Op<"sharing_wrapper", [
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$numSharedOperands,
     ConfinedAttr<I32Attr, [IntMinValue<1>]>:$latency);
   let results = (outs Variadic<ChannelType> : $dataOut);
+
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// The first set of operands are named op_<i>_in_<j>
+    /// The last operand is named fromSharedUnitOut0
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
+      if (idx < getNumSharedOperands() * getNumSharedOperations()) {
+        return "op" + std::to_string(idx / getNumSharedOperands()) + "in" +
+              std::to_string(idx % getNumSharedOperands());
+      }
+      return "fromSharedUnitOut0";
+    }
+
+    /// The first set of results are named op_<i>_out_0
+    /// The last set of results are named toSharedUnitIn_<j>
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      if (idx < getNumSharedOperations())
+        return "op" + std::to_string(idx) + "out0";
+      return "toSharedUnitIn" + std::to_string(idx - getNumSharedOperations());
+    }
+  }];
 
   let assemblyFormat = [{
     `[` $dataOperands `]` `,` `[` $sharedOpResult `]` attr-dict `:`
@@ -1953,7 +2238,7 @@ def UnbundleOp : Handshake_Op<"unbundle", [
 
 def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   SameOperandsAndResultType,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  SimpleNamedIO
 ]> {
   let summary = [{
     Rigidifies a channel to simplify the handshake logic.
@@ -1971,14 +2256,6 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
   }];
 
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx = 0) {
-      return "ins";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx = 0) {
-      return "outs";
-    }
-
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     ReadyRemoverOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
@@ -1993,7 +2270,10 @@ def ReadyRemoverOp : Handshake_Op<"ready_remover",[
 def ValidMergerOp : Handshake_Op<"valid_merger",[
   AllTypesMatch<["lhsIn", "lhsOut"]>,
   AllTypesMatch<["rhsIn", "rhsOut"]>,
-  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+  // The IOs of a ValidMergerOp have custom names,
+  // defined here in the Tablegen
+  // as part of the ValidMergerOp declaration
+  NamedIOInterface
 ]> {
   let summary = [{
     Merges the valid signals of two channels.
@@ -2011,17 +2291,27 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
     $lhsIn `,` $rhsIn attr-dict `:` custom<HandshakeType>(type($lhsIn)) `,` custom<HandshakeType>(type($rhsIn))
   }];
 
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // NamedIOInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Operand 0 is named lhs_ins
+    /// Operand 1 is named rhs_ins
+    std::string getOperandName(unsigned idx) {
+      validateOperandIdx(idx);
+      return (idx == 0) ? "lhs_ins" : "rhs_ins";
+    }
+
+    /// Result 0 is named lhs_outs
+    /// Result 1 is named rhs_outs
+    std::string getResultName(unsigned idx) {
+      validateResultIdx(idx);
+      return (idx == 0) ? "lhs_outs" : "rhs_outs";
+    }
+  }];
+
   let extraClassDefinition = [{
-    std::string $cppClass::getOperandName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
-    return (idx == 0) ? "lhs_ins" : "rhs_ins";
-    }
-
-    std::string $cppClass::getResultName(unsigned idx) {
-    assert(idx < getNumOperands() && "index too high");
-    return (idx == 0) ? "lhs_outs" : "rhs_outs";
-    }
-
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     ValidMergerOp::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();

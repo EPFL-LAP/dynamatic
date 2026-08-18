@@ -31,6 +31,8 @@ public:
       TypeSystem<std::tuple<typename SubTypeSystems::Context...>, Self>;
   using Context = typename Base::Context;
 
+  ConjunctionTypeSystemBase() = default;
+
   /// Constructs a conjunctive typesystem from the instances of the
   /// sub-typesystems.
   explicit ConjunctionTypeSystemBase(SubTypeSystems &&...subTypeSystems)
@@ -241,6 +243,16 @@ public:
         context);
   }
 
+  std::optional<std::size_t> discardArrayDimension(std::size_t dimension,
+                                                   const Context &context) {
+    return combineDiscardOptional(
+        dimension,
+        [&](std::size_t dimension, auto &&typeSystem, auto &&context) {
+          return typeSystem.discardArrayDimension(dimension, context);
+        },
+        context);
+  }
+
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return combineGetTransferFns<ast::ArrayParameter>([&](auto &&typeSystem) {
@@ -253,6 +265,22 @@ public:
     return combineGetTransferFns<ast::ArrayAssignmentStatement>(
         [&](auto &&typeSystem) {
           return typeSystem.getArrayAssignmentStatementTransferFns();
+        });
+  }
+
+  bool discardScalarAssignmentStatement(const Context &context) {
+    return combineDiscard(
+        [&](auto &&typeSystem, auto &&context) {
+          return typeSystem.discardScalarAssignmentStatement(context);
+        },
+        context);
+  }
+
+  TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return combineGetTransferFns<ast::ScalarAssignmentStatement>(
+        [&](auto &&typeSystem) {
+          return typeSystem.getScalarAssignmentStatementTransferFns();
         });
   }
 
@@ -304,7 +332,7 @@ public:
         context);
   }
 
-private:
+protected:
   /// Calls 'discardCallback' for every typesystem and corresponding context.
   /// Returns true if any of the typesystems discarded the AST node.
   template <typename F>
@@ -356,7 +384,7 @@ private:
     auto transferFnsPerTypeSystem = mapTuples(transferFnsCallback, typeSystems);
     auto outputTransferFns = mapTuplesIntoArray(
         [](auto &&dep) {
-          return std::move(std::get<OutputTransferFn<ASTNode>>(dep));
+          return std::move(std::get<OpaqueOutputTransferFn<ASTNode>>(dep));
         },
         transferFnsPerTypeSystem);
 
@@ -384,6 +412,7 @@ private:
                           std::tuple_size_v<typename ASTNode::SubElements>>{}));
   }
 
+private:
   /// Combines all 'OpaqueTransferFn' in 'transferFnPerTypeSystem' into a single
   /// 'OpaqueTransferFn'.
   template <typename ASTNode>
@@ -400,19 +429,15 @@ private:
     std::sort(indices.begin(), indices.end());
     indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
 
-    using DepT = std::decay_t<decltype(transferFnPerTypeSystem)>;
     return OpaqueTransferFn<ASTNode>(
-        std::move(indices), std::move(transferFnPerTypeSystem),
-        +[](const std::any &any,
-            const typename OpaqueTransferFn<ASTNode>::SubElementsTuple
-                &subElements,
-            const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts)
-            -> OpaqueContext {
-          const auto &transferFns = std::any_cast<DepT>(any);
-
+        llvm::identity<Context>{}, std::move(indices),
+        [transferFnPerTypeSystem = std::move(transferFnPerTypeSystem)](
+            const SubElementsTuple<ASTNode> &subElements,
+            const TypedContextTuple<ASTNode, Context> &contexts) -> Context {
           // Call all sub-transfer functions with their respective contexts.
-          return OpaqueContext(enumerateTuples(
-              [&](auto &&typeSystemIndexT, auto &&transferFn) {
+          return enumerateTuples(
+              [&](auto &&typeSystemIndexT,
+                  const OpaqueTransferFn<ASTNode> &transferFn) {
                 constexpr std::size_t typeSystemIndex =
                     decltype(typeSystemIndexT){};
 
@@ -420,28 +445,29 @@ private:
                     contextTupleToSubContextTuple<ASTNode, typeSystemIndex>(
                         contexts);
 
-                return transferFn(subElements, subContexts)
-                    .template cast<
-                        std::tuple_element_t<typeSystemIndex, Context>>();
+                return transferFn.template call<
+                    std::tuple_element_t<typeSystemIndex, Context>>(
+                    subElements, subContexts);
               },
-              transferFns));
+              transferFnPerTypeSystem);
         });
   }
 
   /// Combines all 'OutputTransferFn' in 'outputTransferFnPerTypeSystem' into a
   /// single 'OutputTransferFn'.
   template <typename ASTNode>
-  static OutputTransferFn<ASTNode> combineOutputTransferFns(
-      std::array<OutputTransferFn<ASTNode>, sizeof...(SubTypeSystems)>
+  static OpaqueOutputTransferFn<ASTNode> combineOutputTransferFns(
+      std::array<OpaqueOutputTransferFn<ASTNode>, sizeof...(SubTypeSystems)>
           &&outputTransferFnPerTypeSystem) {
-    return OutputTransferFn<ASTNode>(
+    return OpaqueOutputTransferFn<ASTNode>(
+        llvm::identity<Context>{},
         [outputTransferFnPerTypeSystem =
              std::move(outputTransferFnPerTypeSystem)](
             const ASTNode &astNode,
-            const typename OpaqueTransferFn<ASTNode>::ContextTuple
-                &contextTuple) -> OpaqueContext {
-          return OpaqueContext(enumerateTuples(
-              [&](auto typeSystemIndexT, auto &&transferFn) {
+            const TypedContextTuple<ASTNode, Context> &contextTuple) {
+          return enumerateTuples(
+              [&](auto typeSystemIndexT,
+                  const OpaqueOutputTransferFn<ASTNode> &transferFn) {
                 constexpr std::size_t typeSystemIndex =
                     decltype(typeSystemIndexT){};
 
@@ -449,24 +475,24 @@ private:
                     contextTupleToSubContextTuple<ASTNode, typeSystemIndex>(
                         contextTuple);
 
-                return transferFn(astNode, subContexts)
-                    .template cast<
-                        std::tuple_element_t<typeSystemIndex, Context>>();
+                return transferFn.template call<
+                    std::tuple_element_t<typeSystemIndex, Context>>(
+                    astNode, subContexts);
               },
-              outputTransferFnPerTypeSystem));
+              outputTransferFnPerTypeSystem);
         });
   }
 
   template <typename ASTNode, std::size_t index>
   static auto contextTupleToSubContextTuple(
-      const typename OpaqueTransferFn<ASTNode>::ContextTuple &contexts) {
+      const TypedContextTuple<ASTNode, Context> &contexts) {
     return mapTuplesIntoArray(
-        [&](auto &&context) -> std::optional<OpaqueContext> {
+        [&](const Context *context)
+            -> const std::tuple_element_t<index, Context> * {
           if (!context)
-            return std::nullopt;
+            return nullptr;
 
-          return OpaqueContext(
-              std::get<index>(context->template cast<Context>()));
+          return &std::get<index>(*context);
         },
         contexts);
   }

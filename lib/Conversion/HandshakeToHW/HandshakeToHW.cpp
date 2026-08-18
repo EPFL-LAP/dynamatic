@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "dynamatic/Analysis/ControlNetworkAnalysis.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWOps.h"
@@ -22,6 +23,7 @@
 #include "dynamatic/Dialect/Handshake/MemoryInterfaces.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/RTL/RTL.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/HandshakeMaterialize.h"
@@ -40,6 +42,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -47,6 +50,7 @@
 #include <bitset>
 #include <cctype>
 #include <cstdint>
+#include <deque>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -177,9 +181,7 @@ struct MemLoweringState {
   /// Cache memory port information before modifying the interface, which can
   /// make them impossible to query.
   FuncMemoryPorts ports;
-  /// Generates and stores the interface's port names before starting the
-  /// conversion, when those are still queryable.
-  handshake::PortNamer portNames;
+
   /// Backedges to the containing module's `hw::OutputOp` operation, which
   /// must be set, in order, with the memory interface's results that connect
   /// to the top-level module IO.
@@ -196,7 +198,7 @@ struct MemLoweringState {
 
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
-  MemLoweringState() : ports(nullptr), portNames(nullptr) {
+  MemLoweringState() : ports(nullptr) {
     llvm_unreachable("object should never be default-constructed");
   }
 
@@ -204,7 +206,7 @@ struct MemLoweringState {
   MemLoweringState(handshake::MemoryOpInterface memOp, const Twine &name)
       : name(name.str()),
         dataType(lowerType(memOp.getMemRefType().getElementType())),
-        ports(getMemoryPorts(memOp)), portNames(memOp) {
+        ports(getMemoryPorts(memOp)) {
     assert(dataType && "unsupported memory element type");
   };
 
@@ -231,20 +233,17 @@ struct InternalMemLoweringState {
   handshake::MemoryOpInterface memInterface;
   FuncMemoryPorts ports;
 
-  handshake::PortNamer portNames;
-
   /// Needed because we use the class as a value type in a map, which needs to
   /// be default-constructible.
   InternalMemLoweringState()
-      : ramOp(nullptr), memInterface(nullptr), ports(nullptr),
-        portNames(nullptr) {
+      : ramOp(nullptr), memInterface(nullptr), ports(nullptr) {
     llvm_unreachable("object should never be default-constructed");
   }
 
   InternalMemLoweringState(handshake::RAMOp ramOp,
                            handshake::MemoryOpInterface memInterface)
       : ramOp(ramOp), memInterface(memInterface),
-        ports(getMemoryPorts(memInterface)), portNames(memInterface) {};
+        ports(getMemoryPorts(memInterface)) {};
 };
 
 /// Summarizes information to convert a Handshake function into a
@@ -768,6 +767,18 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
         addUnsigned("SIZE", resType.getNumElements());
       })
+      .Case<handshake::InitOp>([&](handshake::InitOp initOp) {
+        auto paramsAttr =
+            initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
+        if (paramsAttr) {
+          auto initTokenAttr =
+              paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+          int initialValue =
+              (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
+          addUnsigned("INITIAL_VALUE", initialValue);
+        } else
+          addUnsigned("INITIAL_VALUE", 0);
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -814,6 +825,41 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addUnsigned("NUM_STORES", ports.getNumPorts<StorePort>() + lsqPort);
         addType("DATA_TYPE", ChannelType::get(dataType));
         addType("ADDR_TYPE", ChannelType::get(addrType));
+
+        // [START hack: pass the port order to the python generator]
+        //
+        // As of 26.5.2026, the port ordering of memory controller is very
+        // complex:
+        //
+        // loadData?, {control_port, load/store*,}+
+        //
+        // Basically the control ports and load/store ports are grouped by BBs,
+        // and this is very complex to encode. SMV backend doesn't know the
+        // order of the ports. This passes the order directly to the SMV backend
+        std::string smvInputSymbolNames;
+        llvm::raw_string_ostream os(smvInputSymbolNames);
+        SmallVector<std::string> smvInputSymbols{"loadData"};
+        auto mcOp = dyn_cast<handshake::MemoryControllerOp>(op);
+        for (unsigned i = 0; i < op->getNumOperands(); i++) {
+          Value operand = op->getOperand(i);
+          if (isa<handshake::ChannelType>(operand.getType())) {
+            smvInputSymbols.push_back(mcOp.getOperandName(i));
+            smvInputSymbols.push_back(mcOp.getOperandName(i) + "_valid");
+          } else if (isa<handshake::ControlType>(operand.getType())) {
+            smvInputSymbols.push_back(mcOp.getOperandName(i) + "_valid");
+          }
+        }
+        for (unsigned i = 0; i < op->getNumResults(); i++) {
+          Value res = op->getResult(i);
+          if (isa<handshake::ChannelType, handshake::ControlType>(
+                  res.getType())) {
+            smvInputSymbols.push_back(mcOp.getResultName(i) + "_ready");
+          }
+        }
+        llvm::interleaveComma(smvInputSymbols, os);
+        os.flush();
+        addString("SMV_INPUT_SYMBOLS", smvInputSymbolNames);
+        // [END hack: pass the port order to the python generator]
       })
       .Case<handshake::LSQOp>([&](auto) {
         LSQGenerationInfo genInfo(ports, getUniqueName(op).str());
@@ -875,6 +921,7 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         addUnsigned("pipe1En", genInfo.pipe1En);
         addUnsigned("pipeCompEn", genInfo.pipeCompEn);
         addUnsigned("headLagEn", genInfo.headLagEn);
+        addUnsigned("bypassEn", genInfo.bypassEn);
       })
       .Default([&](auto) {
         op->emitError() << "Unsupported memory interface type.";
@@ -1171,11 +1218,10 @@ static void addMemIO(ModuleBuilder &modBuilder, handshake::FuncOp funcOp,
 static hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
                                           ModuleLoweringState &state) {
   ModuleBuilder modBuilder(funcOp.getContext());
-  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
+    modBuilder.addOutput(funcOp.getResName(idx).getValue(), lowerType(res));
 
   // Add all function inputs to the module, expanding memory references into a
   // set of individual ports for loads and stores
@@ -1185,7 +1231,7 @@ static hw::ModulePortInfo getFuncPortInfo(handshake::FuncOp funcOp,
     if (TypedValue<MemRefType> memref = dyn_cast<TypedValue<MemRefType>>(arg))
       addMemIO(modBuilder, funcOp, memref, argName, state);
     else
-      modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
+      modBuilder.addInput(argName.getValue(), lowerType(type));
   }
 
   modBuilder.addClkAndRst();
@@ -1346,11 +1392,10 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
 
   StringAttr name = rewriter.getStringAttr(funcOp.getName());
   ModuleBuilder modBuilder(funcOp.getContext());
-  handshake::PortNamer portNames(funcOp);
 
   // Add all function outputs to the module
   for (auto [idx, res] : llvm::enumerate(funcOp.getResultTypes()))
-    modBuilder.addOutput(portNames.getOutputName(idx), lowerType(res));
+    modBuilder.addOutput(funcOp.getResName(idx).getValue(), lowerType(res));
 
   // Add all function inputs to the module
   for (auto [idx, type] : llvm::enumerate(funcOp.getArgumentTypes())) {
@@ -1359,7 +1404,7 @@ LogicalResult ConvertExternalFunc::matchAndRewrite(
              << "Memory interfaces are not supported for external "
                 "functions";
     }
-    modBuilder.addInput(portNames.getInputName(idx), lowerType(type));
+    modBuilder.addInput(funcOp.getArgName(idx).getValue(), lowerType(type));
   }
   modBuilder.addClkAndRst();
 
@@ -1434,16 +1479,18 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   auto inputModPorts = memState.getMemInputPorts(parentModOp);
   for (auto [port, arg] : llvm::zip_equal(inputModPorts, memArgs))
     converter.addInput(removePortNamePrefix(port), arg);
+  auto namedIOInterface =
+      cast<handshake::NamedIOInterface>(memOp.getOperation());
   for (auto [idx, oprd] : llvm::enumerate(operands)) {
     if (!isa<mlir::MemRefType>(oprd.getType()))
-      converter.addInput(memState.portNames.getInputName(idx), oprd);
+      converter.addInput(namedIOInterface.getOperandName(idx), oprd);
   }
   converter.addClkAndRst(parentModOp);
 
   // The HW instance will be connected to the top-level module through a
   // number of output ports, add those last after the regular interface ports
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    converter.addOutput(memState.portNames.getOutputName(idx),
+    converter.addOutput(namedIOInterface.getResultName(idx),
                         lowerType(res.getType()));
   }
   auto outputModPorts = memState.getMemOutputPorts(parentModOp);
@@ -1560,17 +1607,17 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
     memInterfaceConverter.addInput("loadData", bramInstanceOp.getResult(0));
   }
 
-  // Add the ports from handshake op (here we use the port namer to name the
-  // ports that are directly converted from handshake op), except for the memref
-  // type.
+  // Add the ports from handshake op
+  auto namedIOInterface =
+      cast<handshake::NamedIOInterface>(memOp.getOperation());
   for (auto [i, oprd] : llvm::enumerate(operands)) {
     if (!isa<MemRefType>(oprd.getType()))
-      memInterfaceConverter.addInput(memState.portNames.getInputName(i), oprd);
+      memInterfaceConverter.addInput(namedIOInterface.getOperandName(i), oprd);
   }
   memInterfaceConverter.addClkAndRst(parentModOp);
 
   for (auto [idx, res] : llvm::enumerate(memOp->getResults())) {
-    memInterfaceConverter.addOutput(memState.portNames.getOutputName(idx),
+    memInterfaceConverter.addOutput(namedIOInterface.getResultName(idx),
                                     lowerType(res.getType()));
   }
 
@@ -1621,17 +1668,16 @@ template <typename T>
 LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
     T op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const {
   HWConverter converter(this->getContext());
-  handshake::PortNamer portNames(op);
 
   // Add all operation operands to the inputs
+  auto namedIOInterface = cast<handshake::NamedIOInterface>(op.getOperation());
   for (auto [idx, oprd] : llvm::enumerate(adaptor.getOperands()))
-    converter.addInput(portNames.getInputName(idx), oprd);
+    converter.addInput(namedIOInterface.getOperandName(idx), oprd);
   converter.addClkAndRst(((Operation *)op)->getParentOfType<hw::HWModuleOp>());
 
   // Add all operation results to the outputs
   for (auto [idx, type] : llvm::enumerate(op->getResultTypes()))
-    converter.addOutput(portNames.getOutputName(idx), lowerType(type));
-
+    converter.addOutput(namedIOInterface.getResultName(idx), lowerType(type));
   hw::InstanceOp instOp = converter.convertToInstance(op, rewriter);
   return instOp ? success() : failure();
 }
@@ -2080,6 +2126,227 @@ static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
     backedge.setValue(circuitInstOp.getResult(resIdx));
 }
 
+//===----------------------------------------------------------------------===//
+// II instrumentation (--lower-handshake-to-hw=instrument-ii)
+//===----------------------------------------------------------------------===//
+
+namespace {
+/// Describes the 'ii_monitor' instance to insert for one detected loop. All
+/// references to the circuit are by name/index so that they remain valid
+/// after the Handshake operations have been lowered to HW instances (instance
+/// names and result orders are preserved during lowering).
+struct IIMonitorSpec {
+  /// Name of the loop header (a control merge) instance; used only to name the
+  /// monitor instance.
+  std::string loopName;
+  /// Name/result index of the instances producing the select channels of the
+  /// loop's header muxes (see 'getHeaderMuxSelects'); the only channels the
+  /// monitor observes.
+  SmallVector<std::pair<std::string, unsigned>> selChannels;
+  /// The select values that mark the first iteration of an activation: the
+  /// indices of the header control merge's inputs that are fed from outside
+  /// the loop.
+  SmallVector<unsigned> initSelects;
+  /// Nesting depth of the loop (1 for a top-level loop, 2 for a loop nested
+  /// one level deep, ...).
+  unsigned loopDepth;
+  /// Deepest nesting depth reachable from this loop through its own
+  /// descendants (equal to 'loopDepth' when the loop is innermost).
+  unsigned loopMaxDepth;
+};
+} // namespace
+
+/// Collects the *select channels* of the loop's header muxes: for every mux
+/// fired by the loop header's control merge, the channel consumed as its
+/// select operand.
+///
+/// Such a mux carries a value from one iteration of the loop to the next: its
+/// select is the merge's index output (through whatever forks and buffers the
+/// fan-out inserted), so per iteration it consumes one select token together
+/// with one data token -- the initial value from outside the loop on an
+/// activation's first iteration, the value the previous iteration fed back on
+/// every later one.
+///
+/// The select channel is the one channel that observes its mux's part of the
+/// loop exactly:
+///   * it is consumed the very cycle the mux fires (the mux joins it with the
+///     selected data operand before its internal output buffer), so its fires
+///     mark the moments the loop takes in its iterations' values, and the
+///     interval between two consecutive fires is an iteration-to-iteration
+///     initiation interval as this mux experienced it.
+///     The loop's control network could tell none of this: it forms a much
+///     shorter cycle of its own and runs ahead of the data until buffers fill
+///     up, which on a loop of a few iterations is the whole activation;
+///   * its value is the merge's choice, so it tells an activation's first
+///     iteration apart from the rest.
+///   * it fires exactly once per iteration, so counting its tokens counts the
+///     loop's iterations.
+///
+/// The muxes are found by walking the fan-out of the merge's index forward
+/// through forks and buffers.
+static SmallVector<OpResult>
+getHeaderMuxSelects(handshake::ControlMergeOp cmergeOp) {
+  SmallVector<OpResult> channels;
+  SmallVector<OpResult> worklist{cast<OpResult>(cmergeOp.getIndex())};
+  while (!worklist.empty()) {
+    OpResult channel = worklist.pop_back_val();
+    for (Operation *user : channel.getUsers()) {
+      if (isa<handshake::ForkOp, handshake::LazyForkOp, handshake::BufferOp>(
+              user)) {
+        for (OpResult res : user->getResults())
+          worklist.push_back(res);
+      } else if (auto muxOp = dyn_cast<handshake::MuxOp>(user)) {
+        if (muxOp.getSelectOperand() == channel)
+          channels.push_back(channel);
+      }
+    }
+  }
+  return channels;
+}
+
+/// Returns one monitor specification per loop of 'controlNetwork' whose header
+/// is a control merge and that carries at least one value from one iteration to
+/// the next. Loops with irregular control flow (no control merge header, no
+/// entry, no back-edge) are silently skipped, as is a loop that carries
+/// nothing: it has no recurrence to measure an II on and no channel to count
+/// its iterations by.
+///
+/// A loop is observed exclusively through the select channels of its header
+/// muxes (see 'getHeaderMuxSelects'): the monitor reports each iteration as
+/// the slowest of them consumes it. Which select values mark the start of an
+/// activation is determined here, from the control merge: they are the
+/// indices of its inputs fed from outside the loop.
+static SmallVector<IIMonitorSpec>
+detectIIMonitors(ControlNetworkAnalysis &controlNetwork) {
+  SmallVector<IIMonitorSpec> specs;
+  for (ControlLoop *loop : controlNetwork.getLoopsInPreorder()) {
+    // The loop header on the control network is the control merge that passes
+    // exactly one token per iteration; its inputs distinguish an activation
+    // from outside the loop from one along the back-edge.
+    auto cmergeOp = dyn_cast_if_present<handshake::ControlMergeOp>(
+        loop->getHeader()->getOp());
+    if (!cmergeOp)
+      continue;
+
+    // The indices of the merge inputs fed from outside the loop: the select
+    // values marking an activation's first iteration.
+    SmallVector<unsigned> initSelects;
+    bool hasBackedge = false;
+    for (auto [idx, operand] : llvm::enumerate(cmergeOp.getDataOperands())) {
+      ControlNode *defNode = nullptr;
+      if (auto opRes = dyn_cast<OpResult>(operand))
+        defNode = controlNetwork.getNode(opRes.getOwner());
+      if (defNode && loop->contains(defNode))
+        hasBackedge = true;
+      else
+        initSelects.push_back(idx);
+    }
+    if (initSelects.empty() || !hasBackedge)
+      continue;
+
+    SmallVector<std::pair<std::string, unsigned>> selChannels;
+    for (OpResult channel : getHeaderMuxSelects(cmergeOp))
+      selChannels.emplace_back(getUniqueName(channel.getOwner()).str(),
+                               channel.getResultNumber());
+    if (selChannels.empty())
+      continue;
+
+    specs.push_back({getUniqueName(cmergeOp).str(), std::move(selChannels),
+                     std::move(initSelects), loop->getLoopDepth(),
+                     loop->getMaxLoopDepth()});
+  }
+  return specs;
+}
+
+/// Creates the external HW module for the 'ii_monitor' of one loop.
+static hw::HWModuleExternOp
+createIIMonitorExtern(ModuleOp topModOp, OpBuilder &builder, StringRef name,
+                      const IIMonitorSpec &spec, ArrayRef<Type> selTypes) {
+  MLIRContext *ctx = builder.getContext();
+  ModuleBuilder modBuilder(ctx);
+  for (auto [idx, type] : llvm::enumerate(selTypes))
+    modBuilder.addInput("sel" + std::to_string(idx), type);
+  modBuilder.addClkAndRst();
+  hw::ModulePortInfo ports = modBuilder.getPortInfo();
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToEnd(topModOp.getBody());
+  auto extOp = builder.create<hw::HWModuleExternOp>(
+      builder.getUnknownLoc(), builder.getStringAttr(name), ports);
+
+  // The select values marking an activation's first iteration, as a list
+  // literal for the unit generator.
+  std::string initSelects;
+  llvm::raw_string_ostream os(initSelects);
+  os << '[';
+  llvm::interleaveComma(spec.initSelects, os);
+  os << ']';
+
+  // Annotate with the RTL name and parameters so the backend can instantiate
+  // the monitor through the unit-generation logic.
+  Type ui32 = IntegerType::get(ctx, 32, IntegerType::Unsigned);
+  extOp->setAttr(RTL_NAME_ATTR_NAME, builder.getStringAttr("ii_monitor"));
+  extOp->setAttr(
+      RTL_PARAMETERS_ATTR_NAME,
+      builder.getDictionaryAttr(
+          {builder.getNamedAttr("LOOP_DEPTH",
+                                IntegerAttr::get(ui32, spec.loopDepth)),
+           builder.getNamedAttr("LOOP_MAX_DEPTH",
+                                IntegerAttr::get(ui32, spec.loopMaxDepth)),
+           builder.getNamedAttr("INIT_SELECTS",
+                                builder.getStringAttr(initSelects))}));
+  return extOp;
+}
+
+/// Inserts the 'ii_monitor' instances described by 'specs' into the lowered
+/// circuit module 'hwModOp'.
+static void insertIIMonitors(hw::HWModuleOp hwModOp,
+                             ArrayRef<IIMonitorSpec> specs,
+                             OpBuilder &builder) {
+  if (specs.empty())
+    return;
+
+  // Map instance names to instances for quick lookup of the channels to
+  // observe.
+  llvm::StringMap<hw::InstanceOp> byName;
+  for (auto instOp : hwModOp.getOps<hw::InstanceOp>())
+    byName[instOp.getInstanceName()] = instOp;
+
+  auto topModOp = hwModOp->getParentOfType<mlir::ModuleOp>();
+  auto [clkVal, rstVal] = getClkAndRst(hwModOp);
+
+  // Insert the monitors right before the module's terminator.
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPoint(hwModOp.getBodyBlock()->getTerminator());
+
+  for (const IIMonitorSpec &spec : specs) {
+    // A select channel whose instance cannot be found is dropped rather than
+    // failing the whole monitor: the loop is still measurable, only from one
+    // recurrence less.
+    SmallVector<Value> selVals;
+    for (const auto &[name, resultIdx] : spec.selChannels) {
+      auto it = byName.find(name);
+      if (it != byName.end())
+        selVals.push_back(it->second->getResult(resultIdx));
+    }
+    if (selVals.empty())
+      continue;
+
+    SmallVector<Type> selTypes;
+    for (Value val : selVals)
+      selTypes.push_back(val.getType());
+
+    std::string name = "ii_monitor_" + spec.loopName;
+    hw::HWModuleExternOp extOp =
+        createIIMonitorExtern(topModOp, builder, name, spec, selTypes);
+
+    SmallVector<Value> operands(selVals);
+    operands.append({clkVal, rstVal});
+    builder.create<hw::InstanceOp>(hwModOp.getLoc(), extOp,
+                                   builder.getStringAttr(name), operands);
+  }
+}
+
 namespace {
 
 /// Conversion pass driver. The conversion only works on modules containing
@@ -2125,6 +2392,13 @@ public:
     if (failed(convertExternalFunctions(typeConverter)))
       return signalPassFailure();
 
+    // Detect the loops to instrument while the Handshake function is still
+    // available. The monitors are materialized after lowering.
+    SmallVector<IIMonitorSpec> iiMonitorSpecs;
+    if (instrumentII && funcOp)
+      iiMonitorSpecs =
+          detectIIMonitors(getChildAnalysis<ControlNetworkAnalysis>(funcOp));
+
     // Helper struct for lowering
     OpBuilder builder(ctx);
     LoweringState lowerState(modOp, namer, builder);
@@ -2146,6 +2420,7 @@ public:
         ConvertToHWInstance<handshake::MuxOp>,
         ConvertToHWInstance<handshake::JoinOp>,
         ConvertToHWInstance<handshake::BlockerOp>,
+        ConvertToHWInstance<handshake::InitOp>,
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,
         ConvertToHWInstance<handshake::SinkOp>,
@@ -2213,6 +2488,12 @@ public:
 
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // Insert the II monitors into the lowered circuit module(s) before
+    // wrapping.
+    if (instrumentII)
+      for (auto &[circuitOp, _] : lowerState.modState)
+        insertIIMonitors(circuitOp, iiMonitorSpecs, builder);
 
     // Create memory wrappers around all hardware modules
     for (auto &[circuitOp, _] : lowerState.modState)

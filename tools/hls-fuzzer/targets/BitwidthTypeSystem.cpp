@@ -95,7 +95,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getBinaryExpressionTransferFns(
         /*lhs=*/TransferFn<ast::BinaryExpression>(ResultIsTruncated{}),
         /*rhs=*/
         TransferFn<ast::BinaryExpression, INPUT_DEPENDENCY>(
-            [&](const BitwidthTypingContext &context) -> BitwidthTypingContext {
+            [=](const BitwidthTypingContext &context) -> BitwidthTypingContext {
               // Bitand is distributive: Sub-expressions can assume they are
               // truncated as well.
               std::optional<std::uint8_t> req =
@@ -185,7 +185,7 @@ auto dynamatic::gen::BitwidthTypeSystem::getArrayReadExpressionTransferFns()
       /*index=*/
       TransferFn<ast::ArrayReadExpression,
                  ast::ArrayReadExpression::ARRAY_PARAMETER>(
-          [&](const BitwidthTypingContext &,
+          [=](const BitwidthTypingContext &,
               const ast::ArrayParameter &parameter) {
             assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
                    "implementation depends on dimensions being powers of 2");
@@ -203,7 +203,7 @@ dynamatic::gen::BitwidthTypeSystem::getArrayAssignmentStatementTransferFns() {
       /*index=*/
       TransferFn<ast::ArrayAssignmentStatement,
                  ast::ArrayAssignmentStatement::ARRAY>(
-          [&](const BitwidthTypingContext &,
+          [=](const BitwidthTypingContext &,
               const ast::ArrayParameter &parameter) {
             assert(llvm::isPowerOf2_64(parameter.getDimension()) &&
                    "implementation depends on dimensions being powers of 2");
@@ -212,25 +212,6 @@ dynamatic::gen::BitwidthTypeSystem::getArrayAssignmentStatementTransferFns() {
           }),
       copyFromInput<ast::ArrayAssignmentStatement>(),
       /*output=*/copyInputToOutput<ast::ArrayAssignmentStatement>(),
-  };
-}
-
-dynamatic::gen::TransferFnArray<dynamatic::ast::StructuredForStatement>
-dynamatic::gen::BitwidthTypeSystem::getStructuredForStatementTransferFns() {
-  auto subBitwidth = random.getInteger<std::uint8_t>(
-      1, std::min<std::uint8_t>(4, globalMaxBitwidth));
-  // Restricting all expressions to have a specific bitwidth also inherently
-  // forces a specific range in loop iterations.
-  return {
-      TransferFn<ast::StructuredForStatement>(
-          BitwidthTypingContext{subBitwidth}),
-      TransferFn<ast::StructuredForStatement>(
-          BitwidthTypingContext{subBitwidth}),
-      // NOTE: Still allows 0!
-      TransferFn<ast::StructuredForStatement>(
-          BitwidthTypingContext{subBitwidth}),
-      copyFromInput<ast::StructuredForStatement>(),
-      copyInputToOutput<ast::StructuredForStatement>(),
   };
 }
 

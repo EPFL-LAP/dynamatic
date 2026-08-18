@@ -91,9 +91,6 @@ public:
   TransferFnArray<ast::ArrayAssignmentStatement>
   getArrayAssignmentStatementTransferFns() override;
 
-  TransferFnArray<ast::StructuredForStatement>
-  getStructuredForStatementTransferFns() override;
-
 private:
   /// Returns either 'bitWidth' or with a low probability, a value in the range
   /// [1, bitWidth].

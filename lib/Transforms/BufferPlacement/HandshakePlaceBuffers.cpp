@@ -216,6 +216,9 @@ LogicalResult HandshakePlaceBuffersPass::placeUsingMILP() {
   TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
     return failure();
+  if (failed(
+          TimingDatabase::readSpecTimingFromJSON(specTimingModels, timingDB)))
+    return failure();
 
   auto &cfdfcAnalysis = getAnalysis<dynamatic::CFDFCAnalysis>();
 
@@ -650,8 +653,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     if (dumpMILPModels) {
       writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
     }
-    return solveMILP<fpga20::FPGA20Buffers>(
-        placement, solverKind, timeout, info, timingDB, targetCP, writeTo, ftd);
+    fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
+                               writeTo, ftd);
+    return milp.solve(placement, calculatePathDelays);
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs
@@ -670,9 +674,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
       if (dumpMILPModels) {
         writeTo = dumpDir + sep + funcName + "-cfunion" + std::to_string(idx);
       }
-      if (failed(solveMILP<fpl22::CFDFCUnionBuffers>(
-              placement, solverKind, timeout, info, timingDB, targetCP, cfUnion,
-              writeTo)))
+      fpl22::CFDFCUnionBuffers milp(solverKind, timeout, info, timingDB,
+                                    targetCP, cfUnion, writeTo);
+      if (failed(milp.solve(placement, calculatePathDelays)))
         return failure();
     }
 
@@ -681,8 +685,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     }
 
     // Solve last MILP on channels/units that are not part of any CFDFC
-    return solveMILP<fpl22::OutOfCycleBuffers>(
-        placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
+    fpl22::OutOfCycleBuffers milp(solverKind, timeout, info, timingDB, targetCP,
+                                  writeTo);
+    return milp.solve(placement, calculatePathDelays);
   }
 
   if (algorithm == FPGA24) {
@@ -695,8 +700,9 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
       writeTo = dumpDir + sep + funcName + "-cost-aware";
     }
     // Create and solve the MILP
-    return solveMILP<costaware::CostAwareBuffers>(
-        placement, solverKind, timeout, info, timingDB, targetCP, writeTo);
+    costaware::CostAwareBuffers milp(solverKind, timeout, info, timingDB,
+                                     targetCP, writeTo);
+    return milp.solve(placement, calculatePathDelays);
   }
 
   if (algorithm == MAPBUF) {
@@ -704,9 +710,10 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
       writeTo = dumpDir + sep + funcName + "-mapbuf";
     }
     // Create and solve the MILP
-    return solveMILP<mapbuf::MAPBUFBuffers>(
-        placement, solverKind, timeout, info, timingDB, targetCP, blifFiles,
-        lutDelay, lutSize, acyclicType, writeTo);
+    mapbuf::MAPBUFBuffers milp(solverKind, timeout, info, timingDB, targetCP,
+                               blifFiles, lutDelay, lutSize, acyclicType,
+                               writeTo);
+    return milp.solve(placement, calculatePathDelays);
   }
 
   llvm_unreachable("unknown algorithm");

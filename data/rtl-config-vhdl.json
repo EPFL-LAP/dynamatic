@@ -407,7 +407,7 @@
     ],
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t speculator -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
     "dependencies": [
-      "types"
+      "types", "spec_types"
     ]
   },
   {
@@ -425,7 +425,10 @@
         "type": "unsigned"
       }
     ],
-    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_save_commit -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t spec_save_commit -p fifo_depth=$FIFO_DEPTH bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "spec_types"
+    ]
   },
   {
     "name": "handshake.speculating_branch",
@@ -454,6 +457,16 @@
   {
     "name": "handshake.shrsi",
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shrsi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
+    "name": "handshake.init",
+    "parameters": [
+      {
+        "name": "INITIAL_VALUE",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initial_value=$INITIAL_VALUE"
   },
   {
     "name": "handshake.shrui",
@@ -567,6 +580,9 @@
     "generic": "$DYNAMATIC/data/vhdl/support/types.vhd"
   },
   {
+    "generic": "$DYNAMATIC/data/vhdl/support/spec_types.vhd"
+  },
+  {
     "generic": "$DYNAMATIC/data/vhdl/support/flopoco_ip_cores.vhd"
   },
   {
@@ -577,5 +593,15 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd"
+  },
+  {
+    "name": "ii_monitor",
+    "parameters": [
+      { "name": "LOOP_DEPTH", "type": "unsigned", "lb": 1 },
+      { "name": "LOOP_MAX_DEPTH", "type": "unsigned", "lb": 1 },
+      { "name": "INIT_SELECTS", "type": "string" }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ii_monitor -p loop_depth=$LOOP_DEPTH loop_max_depth=$LOOP_MAX_DEPTH init_selects='$INIT_SELECTS' sel_bitwidths=$SEL_BITWIDTHS sel_extra_signals=$SEL_EXTRA_SIGNALS",
+    "hdl": "vhdl"
   }
 ]

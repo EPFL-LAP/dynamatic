@@ -33,7 +33,7 @@ FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
                              FuncInfo &funcInfo, const TimingDatabase &timingDB,
                              double targetPeriod, StringRef writeTo, bool ftd)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                          writeTo, ftd) {
+                          Algorithm::FPGA20, writeTo, ftd) {
   if (!unsatisfiable)
     setup();
 }
@@ -184,6 +184,10 @@ void FPGA20Buffers::setup() {
 
   // Add path and elasticity constraints over all units in the function
   for (Operation &op : funcInfo.funcOp.getOps()) {
+    if (isa<handshake::SpeculatorOp, handshake::SpecSaveCommitOp>(&op)) {
+      addSpecUnitConstraints(&op, {SignalType::DATA});
+      continue;
+    }
     addUnitTimingConstraints(&op, SignalType::DATA);
   }
 
