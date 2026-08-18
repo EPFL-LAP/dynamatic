@@ -9,6 +9,7 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/ISLTools.h"
 
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -85,7 +86,9 @@ struct AccessInfo {
   std::map<Instruction *, unsigned> instToScopId;
 
   // Base to the set of instructions storing to this base
-  std::map<Value *, std::set<Instruction *>> baseToInsts;
+  // NOTE: llvm::SetVector here  since it preserves the order in which
+  // instructions are inserted as well as functioning like a set
+  std::map<Value *, llvm::SetVector<Instruction *>> baseToInsts;
 
   bool sameScop(Instruction *i, Instruction *j) const {
     if (!instToScopId.count(i))
@@ -721,15 +724,27 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
 
   StringRef arrName = baseAlloca->getName();
 
-  auto *gepInst = dyn_cast<GetElementPtrInst>(findBaseGEP(inst));
+  Instruction *baseGEPOrInst = findBaseGEP(inst);
+  auto *gepInst = dyn_cast<GetElementPtrInst>(baseGEPOrInst);
 
   auto *load = dyn_cast<LoadInst>(inst);
   auto *store = dyn_cast<StoreInst>(inst);
   StringRef opKind = load ? "load" : "store";
 
   if (!gepInst) {
-    llvm::report_fatal_error(
-        "__dyn_array_partition: expected a GEP for this access");
+    if (baseGEPOrInst != inst) {
+      llvm::report_fatal_error(
+          "__dyn_array_partition: expected a GEP for this access");
+    }
+
+    // Early return in case we have a 0 access in to an array. i.e. there is no
+    // gep construction. In this case we also do not need to change the access
+    // pattern since the 0th element is always in the 0th bank
+    if (load)
+      load->setOperand(0, banks[0]);
+    else if (store)
+      store->setOperand(1, banks[0]);
+    return;
   }
 
   // If the wanted dimension to partition from exceeds the available indices in
@@ -755,6 +770,14 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
 
   LLVMContext &ctx = inst->getContext();
   Function *f = inst->getParent()->getParent();
+
+  // Since LLVM might reuse gep instructions we have to insert duplicate ones to
+  // ensure that the later split can happen correctly. Otherwise we might split
+  // well before the current instruction that we'd like to split on
+  if (gepInst->getNextNode() != inst) {
+    gepInst = cast<GetElementPtrInst>(gepInst->clone());
+    gepInst->insertBefore(inst);
+  }
 
   // Splits origBB right before the GEP: everything from the GEP onward
   // moves into mergeBB.
@@ -893,7 +916,12 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
   }
 
   inst->eraseFromParent();
-  gepInst->eraseFromParent();
+  // Only conditionally delete the gep instruction. LLVM may reuse previous gep
+  // instructions to access different parts of the array, as such we should only
+  // delete once there is no use left for the calculated gep
+  if (gepInst->use_empty()) {
+    gepInst->eraseFromParent();
+  }
 }
 
 // Helper function for gathering type of inner arrays in multidimensional arrays
