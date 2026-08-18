@@ -644,8 +644,12 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
 
 // Function that returns map of arrayNames -> partitionInfo for later partition
 // has side effect of removing all call sites of pragma markers and deleting the
-// pragma marker function
+// pragma marker function.
 //
+// Pragma Syntax:
+// #pragma DYN array_partition array={array name} dimension={1..array depth} style={block, cyclic, full} factor=int
+// Example for int arr[10][10];
+// #pragma DYN array_partition array=arr dimension=2 style=block factor=2
 // NOTE: This could be made more general, i.e. providing
 // the name of the pragma marker function and parsing out the function arguemnts
 // and naming them later/providing a handler function that maps from argument
@@ -716,6 +720,28 @@ std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
   return result;
 }
 
+// Transforms the code by creating branches accessing different banks for every
+// array access.
+// Original code:
+// #pragma DYN array_partition array=arr dimension=1 style=block factor=3
+// int arr[32];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  sum += arr[i];
+//
+// Transformed code:
+// int arr0[10], arr1[10], arr2[12];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  if (i / 10 == 0){
+//    sum += arr0[i];
+//  } else if (i / 10 == 1){
+//    sum += arr1[i - 10];
+//  } else {
+//    sum += arr2[i - 20];
+//  }
+//  NOTE: This is should be resolved/unrolled later on by LLVM automiatically
+//  via opitmization such that there is no branching logic remaining
 void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
                                 ArrayRef<AllocaInst *> banks,
                                 ArrayRef<DimInfo> bankInfo,
@@ -756,7 +782,8 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
 
   // For gep instruciton:
   // %p = getelementptr [10 x [10 x i32]], ptr %arr, i64 0, i64 1, 5
-  // and dimension = 2 we'd want origIdx to be value 5 in this example
+  // and dimension = 2 we'd want origIdx to have the value of the second index,
+  // i.e. 5 in this example
   Value *origIdx = *(gepInst->idx_begin() + partInfo.dimension);
   Type *addrTy = origIdx->getType();
 
@@ -809,6 +836,8 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
   Type *i64Ty = Type::getInt64Ty(ctx);
 
   // Computation of th bank that the index falls into
+  // NOTE: Only block partitioning needs the tooLarge addition, since cyclic
+  // automatically assign every index to a bin by using modular arithmetic
   Value *bankIdxNative;
   if (partInfo.style == "cyclic") {
     bankIdxNative = preBuilder.CreateURem(
