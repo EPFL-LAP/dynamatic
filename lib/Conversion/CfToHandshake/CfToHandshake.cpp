@@ -28,7 +28,6 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
-#include "experimental/Support/CFGAnnotation.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -240,7 +239,6 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
 
   BackedgeBuilder edgeBuilder(rewriter, funcOp->getLoc());
   LowerFuncToHandshake::MemInterfacesInfo memInfo;
-
   if (failed(convertMemoryOps(funcOp, rewriter, memrefToArgIdx, edgeBuilder,
                               memInfo)))
     return failure();
@@ -253,8 +251,6 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
-  // Annotate the IR with the CFG information
-  experimental::cfg::annotateCFG(funcOp, rewriter, namer);
   return flattenAndTerminate(funcOp, rewriter, argReplacements);
 }
 
