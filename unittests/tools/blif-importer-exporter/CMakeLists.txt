@@ -51,6 +51,6 @@ if(DYNAMATIC_ENABLE_ABC)
     VERBATIM
     USES_TERMINAL
   )
-  add_to_unit_testing(check-dynamatic run-blif-equiv-tests)
+  add_dependencies(check-dynamatic-all run-blif-equiv-tests)
 
 endif()
