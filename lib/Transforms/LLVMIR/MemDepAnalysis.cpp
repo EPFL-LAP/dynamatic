@@ -1011,6 +1011,10 @@ MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
       if (src == dst)
         continue;
 
+      // RARs are not interesting
+      if (isa<LoadInst>(src) && isa<LoadInst>(dst))
+        continue;
+
       if (auto d = dependenceAnalysis.depends(/* proceed */ src,
                                               /* succeed */ dst, true)) {
 
