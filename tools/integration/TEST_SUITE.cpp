@@ -719,7 +719,8 @@ INSTANTIATE_TEST_SUITE_P(
       "unused_arg",
       "test_bool_array",
       "test_divui",
-      "test_fneg"
+      "test_fneg",
+      "interpolate"
       ),
       [](const auto &info) { return info.param; });
 

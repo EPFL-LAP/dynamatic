@@ -74,6 +74,7 @@ def main(generators):
 if __name__ == "__main__":
     generators = Generators()
     generators.add("handshake", "absf")
+    generators.add("handshake", "absi")
     generators.add("handshake", "addf")
     generators.add("handshake", "addi")
     generators.add("handshake", "andi")

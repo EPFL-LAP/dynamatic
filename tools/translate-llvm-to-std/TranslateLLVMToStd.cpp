@@ -189,6 +189,8 @@ void convertInitializerToDenseElemAttrRecursive(
 void TranslateLLVMToStd::translateLLVMModule() {
   translateGlobalVars();
 
+  bool foundFuncName = false;
+
   for (auto &f : llvmModule->functions()) {
     if (f.isDeclaration())
       continue;
@@ -196,7 +198,19 @@ void TranslateLLVMToStd::translateLLVMModule() {
     if (f.getName() != funcName)
       continue;
 
+    foundFuncName = true;
     translateFunction(&f);
+  }
+
+  if (not foundFuncName) {
+    std::string errMsg =
+        "Expected top-level function \"" + this->funcName.str() +
+        "\" is not found in the LLVM module. Please check if "
+        "the C source code contains a function called \"" +
+        this->funcName.str() +
+        "\". Note that Dynamatic assumes that the top-level function has the "
+        "same name as the filename of the C code.";
+    llvm::report_fatal_error(StringRef(errMsg));
   }
 }
 
@@ -1086,6 +1100,10 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     mlir::Value arg = valueMap[callInst->getArgOperand(0)];
     auto retType = getMLIRType(callInst->getType(), ctx);
     naiveTranslation<math::AbsFOp>(retType, {arg}, callInst);
+  } else if (calledFunc->getIntrinsicID() == Intrinsic::abs) {
+    mlir::Value arg = valueMap[callInst->getArgOperand(0)];
+    auto retType = getMLIRType(callInst->getType(), ctx);
+    naiveTranslation<math::AbsIOp>(retType, {arg}, callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::memset) {
     this->translateMemsetIntrinsic(callInst);
   } else if (calledFunc->getIntrinsicID() == Intrinsic::fshl ||

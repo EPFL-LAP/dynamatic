@@ -325,6 +325,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.negf" ||
       handshakeOp == "handshake.divsi" ||
       handshakeOp == "handshake.absf" ||
+      handshakeOp == "handshake.absi" ||
       handshakeOp == "handshake.divui" ||
       handshakeOp == "handshake.shrui" ||
       handshakeOp == "handshake.remsi" ||
@@ -481,6 +482,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.truncf" ||
       handshakeOp == "handshake.divsi" ||
       handshakeOp == "handshake.absf" ||
+      handshakeOp == "handshake.absi" ||
       handshakeOp == "handshake.divui" ||
       handshakeOp == "handshake.extf" ||
       handshakeOp == "handshake.maximumf" ||

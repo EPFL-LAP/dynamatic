@@ -586,7 +586,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
-  // Aya: temporarily added this to export the newly added Muxes to the outside,
+  // Aya: Added this to export the newly added Muxes to the outside,
   // which is needed in Rouzbeh's pass
   std::vector<Operation *> newUnits;
 
