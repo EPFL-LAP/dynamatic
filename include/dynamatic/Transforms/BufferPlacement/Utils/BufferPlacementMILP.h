@@ -159,7 +159,7 @@ public:
   BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
                       double targetPeriod, Algorithm algorithm,
-                      llvm::StringRef writeTo = "");
+                      llvm::StringRef writeTo = "", bool ftd = false);
 
   /// Creates, optimizes, and extract results from an MILP in one go. Fails and
   /// displays an error message to stderr if any step along the process fails.
@@ -215,6 +215,8 @@ protected:
   /// Aggregates all data members related to the Handshake function under
   /// optimization.
   FuncInfo &funcInfo;
+  /// Whether the circuit was produced using fast token delivery.
+  bool ftd;
   /// After construction, maps all channels (i.e, values) defined in the
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).
