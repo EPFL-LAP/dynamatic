@@ -383,6 +383,14 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.absi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/absi.v",
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.extf",
     "parameters": [
       { "name": "INPUT_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },

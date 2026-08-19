@@ -32,10 +32,13 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Path.h"
 #include <filesystem>
+#include <functional>
 #include <string>
 
 using namespace mlir;
@@ -318,6 +321,11 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       }
     }
 
+    // FTD circuits may legitimately contain channels between blocks that have
+    // no corresponding edge in the original CFG.
+    if (ftd)
+      continue;
+
     std::optional<unsigned> srcBB = opBlocks[&op];
     for (OpResult res : op.getResults()) {
       Operation *user = *res.getUsers().begin();
@@ -385,6 +393,142 @@ static void logFuncInfo(FuncInfo &info) {
   os.flush();
 }
 
+namespace {
+struct CircuitEdge {
+  Operation *src;
+  Operation *dst;
+  Value channel;
+};
+
+static bool isBackedgeSourceLike(Operation *op) {
+  do {
+    if (!op)
+      return false;
+    if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
+            handshake::CmpIOp, handshake::CmpFOp>(op))
+      return true;
+    if (isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+            handshake::TruncIOp>(op))
+      op = op->getOperand(0).getDefiningOp();
+    else
+      return false;
+  } while (true);
+}
+
+static bool isBackedgeDestinationLike(Operation *op) {
+  if (isa<handshake::InitOp, handshake::MergeLikeOpInterface>(op))
+    return true;
+
+  auto notOp = dyn_cast<handshake::NotIOp>(op);
+  if (!notOp)
+    return false;
+
+  return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
+    return isa<handshake::InitOp, handshake::MergeLikeOpInterface>(user);
+  });
+}
+
+/// Finds all loop-feedback-source -> merge-like backward channels per cyclic
+/// SCC in the handshake graph. Grouping by SCC remains more stable than trying
+/// to assign channels to every simple cycle when cycles overlap.
+static mlir::DenseSet<Value>
+findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
+  SmallVector<Operation *> ops;
+  SmallVector<CircuitEdge> edges;
+  llvm::DenseMap<Operation *, SmallVector<Operation *, 4>> succs;
+
+  for (Operation &op : funcOp.getOps()) {
+    ops.push_back(&op);
+    succs[&op] = {};
+  }
+
+  for (Operation *src : ops) {
+    for (Value result : src->getResults()) {
+      for (OpOperand &use : result.getUses()) {
+        Operation *dst = use.getOwner();
+
+        if (isa<handshake::MemoryControllerOp, handshake::LSQOp>(dst))
+          continue;
+
+        edges.push_back({src, dst, result});
+        succs[src].push_back(dst);
+      }
+    }
+  }
+
+  llvm::DenseMap<Operation *, unsigned> index, lowlink;
+  llvm::DenseSet<Operation *> onStack;
+  SmallVector<Operation *> stack;
+  SmallVector<SmallVector<Operation *>> sccs;
+  unsigned nextIndex = 0;
+
+  std::function<void(Operation *)> strongConnect = [&](Operation *op) {
+    index[op] = nextIndex;
+    lowlink[op] = nextIndex;
+    ++nextIndex;
+    stack.push_back(op);
+    onStack.insert(op);
+
+    for (Operation *succ : succs[op]) {
+      if (!index.contains(succ)) {
+        strongConnect(succ);
+        lowlink[op] = std::min(lowlink[op], lowlink[succ]);
+      } else if (onStack.contains(succ)) {
+        lowlink[op] = std::min(lowlink[op], index[succ]);
+      }
+    }
+
+    if (lowlink[op] != index[op])
+      return;
+
+    SmallVector<Operation *> scc;
+    while (true) {
+      Operation *top = stack.pop_back_val();
+      onStack.erase(top);
+      scc.push_back(top);
+      if (top == op)
+        break;
+    }
+    sccs.push_back(std::move(scc));
+  };
+
+  for (Operation *op : ops) {
+    if (!index.contains(op))
+      strongConnect(op);
+  }
+
+  mlir::DenseSet<Value> backwardChannels;
+  for (const auto &scc : sccs) {
+    llvm::DenseSet<Operation *> sccNodes(scc.begin(), scc.end());
+
+    bool isCyclic = scc.size() > 1;
+    if (!isCyclic) {
+      Operation *only = scc.front();
+      isCyclic = llvm::any_of(edges, [&](const CircuitEdge &edge) {
+        return edge.src == only && edge.dst == only;
+      });
+    }
+    if (!isCyclic)
+      continue;
+
+    for (const CircuitEdge &edge : edges) {
+      if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
+        continue;
+      if (!isBackedge(edge.channel, /*endpoints=*/nullptr, /*ftd=*/true))
+        continue;
+      if (!isBackedgeSourceLike(edge.src))
+        continue;
+      if (!isBackedgeDestinationLike(edge.dst))
+        continue;
+      backwardChannels.insert(edge.channel);
+    }
+  }
+
+  return backwardChannels;
+}
+
+} // namespace
+
 LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
                                                    std::vector<CFDFC> &cfdfcs) {
   SmallVector<ArchBB> archsCopy(info.archs);
@@ -402,6 +546,10 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
     bbs.insert(arch.srcBB);
     bbs.insert(arch.dstBB);
   }
+
+  mlir::DenseSet<Value> backwardChannels;
+  if (ftd)
+    backwardChannels = findBackwardChannelPerCyclicRegion(info.funcOp);
 
   // Set of selected archs
   ArchSet selectedArchs;
@@ -427,7 +575,10 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs);
+    // If FTD has no backward channels, use the legacy CFDFC construction.
+    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs,
+                        ftd && !backwardChannels.empty() ? &backwardChannels
+                                                         : nullptr);
   } while (!firstCFDFC);
 
   return success();
@@ -503,7 +654,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
       writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
     }
     fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
-                               writeTo);
+                               writeTo, ftd);
     return milp.solve(placement, calculatePathDelays);
   }
   if (algorithm == FPL22) {
@@ -607,6 +758,26 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
             << "Cannot place opaque buffer on merge-like operation's "
                "output due to channel-specific buffering constraints. This may "
                "yield an invalid buffering.";
+      }
+    }
+
+    for (auto initOp : funcOp.getOps<handshake::InitOp>()) {
+      ChannelBufProps &resProps = channelProps[initOp->getResult(0)];
+      if (resProps.maxTrans.value_or(1) >= 1) {
+        resProps.minTrans = std::max(resProps.minTrans, 10U);
+      } else {
+        initOp->emitWarning()
+            << "Cannot place transparent buffer on init operation's output "
+               "due to channel-specific buffering constraints. This may yield "
+               "an invalid buffering.";
+      }
+      if (resProps.maxOpaque.value_or(1) >= 1) {
+        resProps.minOpaque = std::max(resProps.minOpaque, 10U);
+      } else {
+        initOp->emitWarning()
+            << "Cannot place opaque buffer on init operation's output due to "
+               "channel-specific buffering constraints. This may yield an "
+               "invalid buffering.";
       }
     }
 
