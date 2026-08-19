@@ -738,7 +738,6 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
     return success();
   }
   if (width != inputWidth) {
-    // llvm::errs() << memInput.getType() << *memInput.getDefiningOp() << "\n";
     return memInput.getUsers().begin()->emitError()
            << "Inconsistent bitwidths in inputs, expected signal with " << width
            << " bits but got signal with " << inputWidth << " bits.";
@@ -2200,9 +2199,11 @@ std::string LSQOp::getOperandName(unsigned idx) {
 
   // Get the operand name from a port to a memory controller
   assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
-  assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
-         "unknown LSQ/MC operand");
-  return "ldDataFromMC";
+  if (lsqPorts.getMCPort().getLoadDataInputIndex() == idx)
+    return "ldDataFromMC";
+  assert(lsqPorts.getMCPort().getStoreDoneInputIndex() == idx &&
+         "unknown LSQ/MC result");
+  return "stDoneFromMC";
 }
 
 std::string LSQOp::getResultName(unsigned idx) {
@@ -2264,8 +2265,10 @@ std::string MemoryControllerOp::getResultName(unsigned idx) {
   // Get the operand name from a port to an LSQ
   assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-  assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
-  return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
+  if (lsqPort.getLoadDataOutputIndex() == idx)
+    return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
+  assert(lsqPort.getStoreDoneOutputIndex() == idx && "unknown MC/LSQ result");
+  return getArrayElemName(ST_DONE, mcPorts.getNumPorts<StorePort>());
 }
 
 #define GET_OP_CLASSES
