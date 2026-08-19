@@ -196,7 +196,7 @@ int IntegrationTest::run() {
              << " --buffer-algorithm " << this->bufferAlgorithm
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
-             << (this->useFTD ? " --fast-token-delivery" : "")
+             << (this->useFTD ? " --straight-to-queue --fast-token-delivery" : "")
              << (this->useSpeculation ? " --speculation" : "")
              << (this->useDuplication ? " --enable-duplication" : "")
              << (this->instrumentII ? " --instrument-ii" : "")
