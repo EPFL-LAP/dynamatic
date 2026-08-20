@@ -1471,7 +1471,7 @@ handshake::LoadOp LoadPort::getLoadOp() const {
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx,
                      unsigned doneOutputIdx)
     : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {doneOutputIdx},
-                 Kind::STORE) {};
+                 Kind::STORE){};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1504,8 +1504,7 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
-    : ctrlPort(ctrlPort) {};
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort){};
 
 size_t GroupMemoryPorts::getFirstOperandIndex() const {
   if (ctrlPort)
