@@ -495,11 +495,15 @@ def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui", [
   let summary = "Outputs the maximum between two input unsigned integers";
 }
 
-def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi"> {
+def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi", [
+  BinaryArithNamedIO
+]> {
   let summary = "Outputs the minimum between two input signed integers";
 }
 
-def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
+def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui", [
+  BinaryArithNamedIO
+]> {
   let summary = "Outputs the minimum between two input unsigned integers";
 }
 
