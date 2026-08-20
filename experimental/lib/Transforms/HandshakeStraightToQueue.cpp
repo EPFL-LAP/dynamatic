@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "experimental/Transforms/HandshakeStraightToQueue.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/DynamaticPass.h"
@@ -38,11 +39,7 @@ namespace dynamatic {
 namespace experimental {
 #define GEN_PASS_DEF_HANDSHAKESTRAIGHTTOQUEUE
 #include "experimental/Transforms/Passes.h.inc"
-} // namespace experimental
-} // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
-
-namespace {
 
 struct ProdConsMemDep {
   Block *prodBb;
@@ -512,23 +509,13 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
     toRemove->erase();
 }
 
-/// Per-block edge information captured from the multi-block CFG before
-/// flattening. Used to reconstruct a ShadowCFG afterwards.
-struct CapturedEdgeInfo {
-  bool isConditional = false;
-  bool hasSuccessors = false;
-  unsigned trueSuccIdx = 0;
-  unsigned falseSuccIdx = 0;
-  unsigned uncondSuccIdx = 0;
-};
-
 /// Capture the CFG topology and branch condition Values of a handshake::FuncOp
 /// while it still has restored multi-block structure. Both pieces of
 /// information are destroyed by removeNetworkCMerges + flattenFunction and are
 /// needed later to construct the ShadowCFG for addRegen / addSupp.
-static void captureCFGTopology(handshake::FuncOp funcOp, unsigned &numBlocks,
-                               SmallVector<CapturedEdgeInfo> &edges,
-                               DenseMap<unsigned, Value> &capturedConditions) {
+void captureCFGTopology(handshake::FuncOp funcOp, unsigned &numBlocks,
+                        SmallVector<CapturedEdgeInfo> &edges,
+                        DenseMap<unsigned, Value> &capturedConditions) {
   Region &region = funcOp.getRegion();
   DenseMap<Block *, unsigned> blockToIdx;
   for (auto [idx, block] : llvm::enumerate(region))
@@ -581,7 +568,7 @@ static void captureCFGTopology(handshake::FuncOp funcOp, unsigned &numBlocks,
 /// original block structure with standard CF terminators, enabling analysis
 /// passes (BlockIndexing, DominanceInfo, CFGLoopInfo) that addRegen and addSupp
 /// rely on.
-static ftd::ShadowCFG buildShadowFromCapturedTopology(
+ftd::ShadowCFG buildShadowFromCapturedTopology(
     OpBuilder &builder, handshake::FuncOp funcOp, unsigned numBlocks,
     const SmallVector<CapturedEdgeInfo> &edges,
     const DenseMap<unsigned, Value> &capturedConditions) {
@@ -746,8 +733,9 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   // addGsaGates; S2Q must do the same.
   ftd::createAllCondPlaceholders(funcOp.getRegion(), rewriter);
 
+  std::vector<Operation *> newUnits;
   // Replace each merge created by `createPhiNetwork` with a multiplxer
-  if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
+  if (failed(ftd::replaceMergeToGSA(funcOp, rewriter, newUnits)))
     return failure();
 
   return runPostCmergeFtd(funcOp, ctx, /*resolveCondPlaceholders=*/true);
@@ -766,4 +754,6 @@ struct HandshakeStraightToQueuePass
         signalPassFailure();
   };
 };
-} // namespace
+
+} // namespace experimental
+} // namespace dynamatic

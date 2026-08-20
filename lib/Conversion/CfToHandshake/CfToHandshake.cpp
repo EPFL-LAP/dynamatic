@@ -880,8 +880,11 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
               Value addr = rewriter.getRemappedValue(indices.front());
               Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
+              Value done =
+                  edgeBuilder.get(handshake::ControlType::get(getContext()));
               assert((addr && data) && "failed to remap address or data");
-              auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
+              auto newOp =
+                  rewriter.create<handshake::StoreOp>(loc, addr, data, done);
 
               copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp,
                                                                  newOp);

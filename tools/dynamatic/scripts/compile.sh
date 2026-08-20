@@ -27,6 +27,10 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 
+OUT_WITH_LSQS_ACTIVE=${20}
+OUT_WITH_LSQS_N=${21}
+OUT_WITH_LSQS_DEP_GRAPH_FILE=${22}
+
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
 export PATH=$PATH:$DYNAMATIC_BINS
@@ -59,6 +63,7 @@ F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
+F_HANDSHAKE_OUT_WITH_LSQ="$COMP_DIR/handshake_out_with_lsq.mlir"
 F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
@@ -105,6 +110,15 @@ export_cfg() {
   # Convert DOT graph to PNG
   dot -Tpng "$f_dot" > "$f_png"
   exit_on_fail "Failed to convert $2 DOT to PNG" "Converted $2 DOT to PNG"
+  return 0
+}
+
+export_dep_graph() {
+  local f_dot="$COMP_DIR/$1.dot"
+  local f_png="$COMP_DIR/$1.png"
+
+  dot -Tpng "$f_dot" > "$f_png"
+  exit_on_fail "Failed to convert $1 DOT to PNG" "Converted $1 DOT to PNG"
   return 0
 }
 
@@ -304,7 +318,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
   # FPT19 should run before straight to the queue, so that no useless components are instantiated.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces \
     --handshake-straight-to-queue \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE_SQ"
@@ -324,14 +338,41 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 else
 
   # handshake transformations
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+  # using out with LSQs (FPGA'26) instead of LSQ
+  if [[ $OUT_WITH_LSQS_ACTIVE -ne 0 ]]; then
+    
+    echo_info "Using Out with LSQs (FPGA'26) instead of LSQ"
+
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+        --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces\
+        --handshake-create-out-with-lsqs-circuit="num-of-comparators=$OUT_WITH_LSQS_N dep-graph-file=$OUT_WITH_LSQS_DEP_GRAPH_FILE dynamatic-dir=$DYNAMATIC_DIR" \
+        --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces\
+        --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE_OUT_WITH_LSQ"
+    exit_on_fail "Failed to apply transformations to handshake using out with LSQs" \
+      "Applied transformations to handshake using out with LSQs"
+    
+    F_HANDSHAKE=$F_HANDSHAKE_OUT_WITH_LSQ
+
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
-    --handshake-optimize-bitwidths \
-    --handshake-materialize --handshake-infer-basic-blocks \
+      --handshake-optimize-bitwidths \
+      --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
-  exit_on_fail "Failed to apply transformations to handshake" \
-    "Applied transformations to handshake"
+    exit_on_fail "Failed to apply rest of the transformations to handshake after out with LSQs" \
+      "Applied rest of the transformations to handshake after out with LSQs"
+
+  # without out with LSQs (FPGA'26)
+  else
+    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+      --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces \
+      --handshake-remove-unused-memrefs \
+      --handshake-optimize-bitwidths \
+      --handshake-materialize --handshake-infer-basic-blocks \
+      > "$F_HANDSHAKE_TRANSFORMED"
+    exit_on_fail "Failed to apply transformations to handshake" \
+      "Applied transformations to handshake"
+  fi
 fi
 
 # Speculation (pre-buffer): place speculative units and then materialize.
@@ -418,6 +459,8 @@ exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 # Export to DOT
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
+
+export_dep_graph "${KERNEL_NAME}_DEP_G"
 
 LOWER_TO_HW_PASS="--lower-handshake-to-hw=instrument-ii=${INSTRUMENT_II:-0}"
 

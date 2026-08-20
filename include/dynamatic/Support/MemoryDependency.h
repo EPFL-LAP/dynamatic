@@ -125,6 +125,11 @@ struct LLVMMemDependency {
       auto *mdDepth = llvm::dyn_cast<llvm::MDString>(dep->getOperand(1));
       assert(mdDepth &&
              "Malformed IR metadata! The second element must be a string.");
+      auto *mdIsActive = llvm::dyn_cast<llvm::MDString>(dep->getOperand(2));
+      assert(mdIsActive &&
+             "Malformed IR metadata! The third element must be a string.");
+
+      bool isActive = mdIsActive->getString() == "true" ? true : false;
 
       auto *mdDist = llvm::dyn_cast<llvm::MDString>(dep->getOperand(2));
       assert(mdDist &&
