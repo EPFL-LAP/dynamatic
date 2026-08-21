@@ -301,6 +301,8 @@ public:
   static constexpr llvm::StringLiteral K_INDUCTION = "k-induction";
   static constexpr llvm::StringLiteral DISABLE_LSQ = "disable-lsq";
   static constexpr llvm::StringLiteral STRAIGHT_TO_QUEUE = "straight-to-queue";
+  static constexpr llvm::StringLiteral OPTIMIZE_STEERING_REWRITES =
+      "optimize-steering-rewrites";
   static constexpr llvm::StringLiteral ENABLE_SHORT_CIRCUIT =
       "enable-short-circuit";
   static constexpr llvm::StringLiteral SPECULATION = "speculation";
@@ -339,6 +341,8 @@ public:
                           "accesses, use with caution!"});
     addFlag({STRAIGHT_TO_QUEUE,
              "Use straight to queue to connect the circuit to the LSQ"});
+    addFlag(
+        {OPTIMIZE_STEERING_REWRITES, "Use handshake steering-term rewrites"});
     addFlag({ENABLE_SHORT_CIRCUIT,
              "Enable short-circuit evaluation of && and ||, "
              "to match C specification"});
@@ -765,6 +769,8 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
+  std::string optimizeSteeringRewrite =
+      args.flags.contains(OPTIMIZE_STEERING_REWRITES) ? "1" : "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -803,12 +809,13 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
 
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
-      fastTokenDelivery, milpSolver, straightToQueue, speculation,
-      enableShortCircuit, enableDuplication, calculatePathDelays, instrumentII);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), sharing,
+                 state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
+                 fastTokenDelivery, milpSolver, straightToQueue, speculation,
+                 enableShortCircuit, enableDuplication, calculatePathDelays,
+                 instrumentII, optimizeSteeringRewrite);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
