@@ -14,6 +14,7 @@
 #define DYNAMATIC_TRANSFORMS_PASSES_H
 
 #include "dynamatic/Support/LLVM.h"
+#include "dynamatic/Transforms/AggregateMemory.h"
 #include "dynamatic/Transforms/ArithReduceStrength.h"
 #include "dynamatic/Transforms/BackAnnotate.h"
 #include "dynamatic/Transforms/BufferPlacement/HandshakePlaceBuffers.h"
@@ -23,6 +24,7 @@
 #include "dynamatic/Transforms/ForceMemoryInterface.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "dynamatic/Transforms/FuncSetArgNames.h"
+#include "dynamatic/Transforms/HWMarkLIMemoryInterface.h"
 #include "dynamatic/Transforms/HandshakeAnalyzeLSQUsage.h"
 #include "dynamatic/Transforms/HandshakeCanonicalize.h"
 #include "dynamatic/Transforms/HandshakeHoistExtInstances.h"
@@ -39,6 +41,8 @@
 #include "dynamatic/Transforms/RemovePolygeistAttributes.h"
 #include "dynamatic/Transforms/ScfRotateForLoops.h"
 #include "dynamatic/Transforms/ScfSimpleIfToSelect.h"
+#include "dynamatic/Transforms/SystolicUnitGeneration.h"
+#include "dynamatic/Transforms/SystolicUnitReuseOptimization.h"
 #include "mlir/Pass/Pass.h"
 
 namespace dynamatic {

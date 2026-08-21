@@ -1,0 +1,59 @@
+# Benchmark "subi" written by ABC on Fri Jan 16 16:00:14 2026
+.model subi
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs_valid rhs[0] rhs[1] rhs[2] \
+ rhs[3] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result_valid lhs_ready \
+ rhs_ready
+.names lhs[0] rhs[0] new_n21
+10 1
+.names lhs[0] rhs[0] new_n22
+01 1
+.names new_n21 new_n22 result[0]
+00 0
+.names lhs[1] rhs[1] new_n24
+10 1
+.names lhs[1] rhs[1] new_n25
+01 1
+.names new_n24 new_n25 new_n26
+00 1
+.names new_n22 new_n26 new_n27
+01 1
+.names new_n22 new_n26 new_n28
+10 1
+.names new_n27 new_n28 result[1]
+00 1
+.names new_n24 new_n27 new_n30
+00 1
+.names lhs[2] rhs[2] new_n31
+10 1
+.names lhs[2] rhs[2] new_n32
+01 1
+.names new_n31 new_n32 new_n33
+00 1
+.names new_n30 new_n33 new_n34
+01 1
+.names new_n30 new_n33 new_n35
+10 1
+.names new_n34 new_n35 result[2]
+00 1
+.names lhs[3] rhs[3] new_n37
+11 1
+.names lhs[3] rhs[3] new_n38
+00 1
+.names new_n37 new_n38 new_n39
+00 1
+.names new_n31 new_n34 new_n40
+00 1
+.names new_n39 new_n40 new_n41
+01 1
+.names new_n39 new_n40 new_n42
+10 1
+.names new_n41 new_n42 result[3]
+00 0
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

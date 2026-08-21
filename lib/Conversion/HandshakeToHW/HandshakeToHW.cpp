@@ -32,6 +32,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
@@ -42,7 +43,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <bitset>
 #include <cctype>
@@ -107,7 +110,7 @@ class ModuleBuilder {
 public:
   /// The MLIR context is used to create string attributes for port names
   /// and types for the clock and reset ports, should they be added.
-  ModuleBuilder(MLIRContext *ctx) : ctx(ctx) {};
+  ModuleBuilder(MLIRContext *ctx) : ctx(ctx){};
 
   /// Builds the module port information from the current list of inputs and
   /// outputs.
@@ -234,7 +237,7 @@ struct InternalMemLoweringState {
   InternalMemLoweringState(handshake::RAMOp ramOp,
                            handshake::MemoryOpInterface memInterface)
       : ramOp(ramOp), memInterface(memInterface),
-        ports(getMemoryPorts(memInterface)), portNames(memInterface) {};
+        ports(getMemoryPorts(memInterface)), portNames(memInterface){};
 };
 
 /// Summarizes information to convert a Handshake function into a
@@ -305,19 +308,62 @@ void MemLoweringState::connectWithCircuit(ModuleBuilder &modBuilder) {
   MLIRContext *ctx = modBuilder.getContext();
   Type i1Type = IntegerType::get(ctx, 1);
   Type addrType = IntegerType::get(ctx, ports.addrWidth);
+  Type burstLenType;
+  if (ports.burstLenWidth > 0)
+    burstLenType = IntegerType::get(ctx, ports.burstLenWidth);
+  else
+    burstLenType = IntegerType::get(ctx, 32); // Default to 32 bits
 
-  // Load data input
-  modBuilder.addInput(name + "_loadData", dataType);
-  // Load enable output
-  modBuilder.addOutput(name + "_loadEn", i1Type);
-  // Load address output
-  modBuilder.addOutput(name + "_loadAddr", addrType);
-  // Store enable output
-  modBuilder.addOutput(name + "_storeEn", i1Type);
-  // Store address output
-  modBuilder.addOutput(name + "_storeAddr", addrType);
-  // Store data output
-  modBuilder.addOutput(name + "_storeData", dataType);
+  bool isLIInterface = true;
+
+  if (isLIInterface) {
+    // Load address output
+    modBuilder.addOutput(name + "_loadAddr", addrType);
+    // Load address valid output
+    modBuilder.addOutput(name + "_loadAddr_valid", i1Type);
+    // Load address ready input
+    modBuilder.addInput(name + "_loadAddr_ready", i1Type);
+    // Load burst length output
+    modBuilder.addOutput(name + "_loadBurstLen", burstLenType);
+    // Load data input
+    modBuilder.addInput(name + "_loadData", dataType);
+    // Load data valid input
+    modBuilder.addInput(name + "_loadData_valid", i1Type);
+    // Load data ready output
+    modBuilder.addOutput(name + "_loadData_ready", i1Type);
+    // Store address output
+    modBuilder.addOutput(name + "_storeAddr", addrType);
+    // Store address valid output
+    modBuilder.addOutput(name + "_storeAddr_valid", i1Type);
+    // Store address ready input
+    modBuilder.addInput(name + "_storeAddr_ready", i1Type);
+    // Store burst length output
+    modBuilder.addOutput(name + "_storeBurstLen", burstLenType);
+    // Store data output
+    modBuilder.addOutput(name + "_storeData", dataType);
+    // Store data valid output
+    modBuilder.addOutput(name + "_storeData_valid", i1Type);
+    // Store data ready input
+    modBuilder.addInput(name + "_storeData_ready", i1Type);
+  } else {
+
+    // Load data input
+    modBuilder.addInput(name + "_loadData", dataType);
+    // Load enable output
+    modBuilder.addOutput(name + "_loadEn", i1Type);
+    // Load address output
+    modBuilder.addOutput(name + "_loadAddr", addrType);
+    // Store enable output
+    modBuilder.addOutput(name + "_storeEn", i1Type);
+    // Store address output
+    modBuilder.addOutput(name + "_storeAddr", addrType);
+    // Store data output
+    modBuilder.addOutput(name + "_storeData", dataType);
+    // Burst length output
+    modBuilder.addOutput(name + "_loadBurstLen", burstLenType);
+    // Burst length output
+    modBuilder.addOutput(name + "_storeBurstLen", burstLenType);
+  }
 
   numInputs = modBuilder.getNumInputs() - inputIdx;
   numOutputs = modBuilder.getNumOutputs() - outputIdx;
@@ -347,7 +393,7 @@ MemLoweringState::getMemOutputPorts(hw::HWModuleOp modOp) {
 
 LoweringState::LoweringState(mlir::ModuleOp modOp, NameAnalysis &namer,
                              OpBuilder &builder)
-    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()) {};
+    : modOp(modOp), namer(namer), edgeBuilder(builder, modOp.getLoc()){};
 
 /// Attempts to find an external HW module in the MLIR module with the
 /// provided name. Returns it if it exists, otherwise returns `nullptr`.
@@ -596,6 +642,13 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // No discrimianting parameters, just to avoid falling into the
         // default case for sources
       })
+      .Case<handshake::MemPortBurstOpInterface>(
+          [&](handshake::MemPortBurstOpInterface portOp) {
+            // Data bitwidth and address bitwidth
+            addType("DATA_TYPE", portOp.getDataInput());
+            addType("ADDR_TYPE", portOp.getAddressInput());
+            addType("BURST_TYPE", portOp.getBurstLengthInput());
+          })
       .Case<handshake::MemPortOpInterface>(
           [&](handshake::MemPortOpInterface portOp) {
             // Data bitwidth and address bitwidth
@@ -751,6 +804,10 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("DATA_WIDTH", resType.getElementTypeBitWidth());
         addUnsigned("SIZE", resType.getNumElements());
       })
+      .Case<handshake::SystolicUnitOp>([&](handshake::SystolicUnitOp suOp) {
+        addType("DATA_TYPE", suOp.getResult());
+        addType("BURST_TYPE", suOp.getBurstLength());
+      })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -785,8 +842,10 @@ ModuleDiscriminator::ModuleDiscriminator(FuncMemoryPorts &ports) {
         // Control port count, load port count, store port count, data
         // bitwidth, and address bitwidth
         addUnsigned("NUM_CONTROLS", ports.getNumPorts<ControlPort>());
+        addUnsigned("NUM_BURST_LOADS", ports.getNumPorts<BurstLoadPort>());
         addUnsigned("NUM_LOADS", ports.getNumPorts<LoadPort>() + lsqPort);
         addUnsigned("NUM_STORES", ports.getNumPorts<StorePort>() + lsqPort);
+        addUnsigned("LATENCY_INSENSITIVE", 0); // Always 0 for now
         addType("DATA_TYPE", ChannelType::get(dataType));
         addType("ADDR_TYPE", ChannelType::get(addrType));
       })
@@ -909,7 +968,7 @@ namespace {
 class HWBuilder {
 public:
   /// Creates the hardware builder.
-  HWBuilder(MLIRContext *ctx) : modBuilder(ctx) {};
+  HWBuilder(MLIRContext *ctx) : modBuilder(ctx){};
 
   /// Adds a value to the list of operands for the future instance, and its type
   /// to the future external module's input port information.
@@ -1260,7 +1319,33 @@ ConvertFunc::matchAndRewrite(handshake::FuncOp funcOp, OpAdaptor adaptor,
   Block *modBlock = modOp.getBodyBlock();
   Operation *termOp = modBlock->getTerminator();
   ValueRange modBlockArgs = modBlock->getArguments().drop_back(2);
-  rewriter.inlineBlockBefore(funcBlock, termOp, modBlockArgs);
+
+  bool isLIInterface = true;
+  if (isLIInterface) {
+    // Map function arguments to module block arguments
+    llvm::SmallVector<Value> mappedVals;
+    unsigned numFuncArgs = funcOp.getNumArguments();
+    unsigned numArgsPerMemref = 5; // LI interface has 6 ports per memref
+    unsigned idArgAddress = 1;     // Address port index in LI interface
+    auto funcArgs = funcOp.getArguments();
+    unsigned numMemrefArgs = 0;
+    for (auto arg : funcArgs) {
+      if (isa<MemRefType>(arg.getType())) {
+        numMemrefArgs++;
+      }
+    }
+    // Print to errs the modBlockArgs for debugging
+    for (unsigned i = 0; i < numMemrefArgs; ++i) {
+      mappedVals.push_back(modBlockArgs[idArgAddress + i * numArgsPerMemref]);
+    }
+    for (unsigned i = 0; i < numFuncArgs - numMemrefArgs; ++i) {
+      mappedVals.push_back(modBlockArgs[i + numMemrefArgs * numArgsPerMemref]);
+    }
+    rewriter.inlineBlockBefore(funcBlock, termOp, mappedVals);
+  } else {
+
+    rewriter.inlineBlockBefore(funcBlock, termOp, modBlockArgs);
+  }
   rewriter.eraseOp(funcOp);
 
   // Operands for the module's terminators; they are the module's outputs
@@ -1367,7 +1452,8 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
 
   if (!modState.memInterfaces.contains(memOp)) {
     // The memory interface is not in the set of memInterfaces, this means:
-    // - The memory interface is connected to an internal array (assert below).
+    // - The memory interface is connected to an internal array (assert
+    // below).
     // - The IR is malformed.
 
     assert(modState.internalMemInterfaces.contains(memOp) &&
@@ -1382,7 +1468,9 @@ LogicalResult ConvertMemInterface::matchAndRewrite(
   // Removes memory region name prefix from the port name.
   auto removePortNamePrefix = [&](const hw::ModulePort &port) -> StringRef {
     StringRef portName = port.name.strref();
-    size_t idx = portName.rfind("_");
+    // Remove the first _ if there are multiple since some ports have the format
+    // addr_valid, addr_ready, etc.
+    size_t idx = portName.find('_');
     if (idx != std::string::npos)
       return portName.substr(idx + 1);
     return portName;
@@ -1453,7 +1541,8 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
 
   if (!modState.internalMemInterfaces.contains(memOp)) {
     // The memory interface is not in the set of memInterfaces, this means:
-    // - The memory interface is connected to an internal array (assert below).
+    // - The memory interface is connected to an internal array (assert
+    // below).
     // - The IR is malformed.
     assert(modState.memInterfaces.contains(memOp) &&
            "The memory interface op is not registered as an internal one nor "
@@ -1471,6 +1560,13 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
   auto addrType = IntegerType::get(ctx, memState.ports.addrWidth);
   auto dataType = IntegerType::get(ctx, memState.ports.dataWidth);
   Type i1Type = IntegerType::get(ctx, 1);
+  Type burstLenType;
+  if (memState.ports.burstLenWidth > 0)
+    burstLenType = IntegerType::get(ctx, memState.ports.burstLenWidth);
+  else
+    burstLenType = IntegerType::get(ctx, 32); // Default to 32 bits
+
+  bool isLIInterface = true;
 
   SmallVector<Backedge> memInterfaceToBRAMChannels;
 
@@ -1484,31 +1580,88 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
     HWBuilder bramBuilder(getContext());
 
     // Signals of a dual port RAM with the direction:
-    // - [circuit -> mem] loadEn (1-bit)
-    auto loadEn = edgeBuilder.get(i1Type);
-    bramBuilder.addInput("loadEn", loadEn);
-    // - [circuit -> mem] loadAddr (address width)
-    auto loadAddr = edgeBuilder.get(addrType);
-    bramBuilder.addInput("loadAddr", loadAddr);
-    // - [circuit -> mem] storeEn (1-bit)
-    auto storeEn = edgeBuilder.get(i1Type);
-    bramBuilder.addInput("storeEn", storeEn);
-    // - [circuit -> mem] storeAddr (address width)
-    auto storeAddr = edgeBuilder.get(addrType);
-    bramBuilder.addInput("storeAddr", storeAddr);
-    // - [circuit -> mem] storeData (data width)
-    auto storeData = edgeBuilder.get(dataType);
-    bramBuilder.addInput("storeData", storeData);
-    // We need to create backedges for all the signals above.
-    // - [mem -> circuit] loadData (data width)
-    bramBuilder.addOutput("loadData", dataType);
-    // This signal feeds the memory op interface.
-    bramBuilder.addClkAndRst(parentModOp);
+    if (isLIInterface) {
+      // - [circuit -> mem] loadAddr (address width)
+      auto loadAddr = edgeBuilder.get(addrType);
+      bramBuilder.addInput("loadAddr", loadAddr);
+      // - [circuit -> mem] loadAddrValid (1-bit)
+      auto loadAddrValid = edgeBuilder.get(i1Type);
+      bramBuilder.addInput("loadAddr_valid", loadAddrValid);
+      // - [mem -> circuit] loadAddrReady (1-bit)
+      bramBuilder.addOutput("loadAddr_ready", i1Type);
+      // - [circuit -> mem] loadBurstLen (burst length)
+      auto loadBurstLen = edgeBuilder.get(burstLenType);
+      bramBuilder.addInput("loadBurstLen", loadBurstLen);
+      // - [mem -> circuit] loadData (data width)
+      bramBuilder.addOutput("loadData", dataType);
+      // - [mem -> circuit] loadDataValid (1-bit)
+      bramBuilder.addOutput("loadData_valid", i1Type);
+      // - [circuit -> mem] loadDataReady (1-bit)
+      auto loadDataReady = edgeBuilder.get(i1Type);
+      bramBuilder.addInput("loadData_ready", loadDataReady);
+      // - [circuit -> mem] storeAddr (address width)
+      auto storeAddr = edgeBuilder.get(addrType);
+      bramBuilder.addInput("storeAddr", storeAddr);
+      // - [circuit -> mem] storeAddrValid (1-bit)
+      auto storeAddrValid = edgeBuilder.get(i1Type);
+      bramBuilder.addInput("storeAddr_valid", storeAddrValid);
+      // - [mem -> circuit] storeAddrReady (1-bit)
+      bramBuilder.addOutput("storeAddr_ready", i1Type);
+      // - [circuit -> mem] storeBurstLen (burst length)
+      auto storeBurstLen = edgeBuilder.get(burstLenType);
+      bramBuilder.addInput("storeBurstLen", storeBurstLen);
+      // - [circuit -> mem] storeData (data width)
+      auto storeData = edgeBuilder.get(dataType);
+      bramBuilder.addInput("storeData", storeData);
+      // - [circuit -> mem] storeDataValid (1-bit)
+      auto storeDataValid = edgeBuilder.get(i1Type);
+      bramBuilder.addInput("storeData_valid", storeDataValid);
+      // - [mem -> circuit] storeDataReady (1-bit)
+      bramBuilder.addOutput("storeData_ready", i1Type);
+      // This signal feeds the memory op interface.
+      bramBuilder.addClkAndRst(parentModOp);
 
-    // These backedges are passed to the convertToInstance to resolve the
-    // missing drivers
-    memInterfaceToBRAMChannels = {loadEn, loadAddr, storeEn, storeAddr,
-                                  storeData};
+      // These backedges are passed to the convertToInstance to resolve the
+      // missing drivers
+      memInterfaceToBRAMChannels = {
+          loadAddr,       loadAddrValid, loadBurstLen, loadDataReady, storeAddr,
+          storeAddrValid, storeBurstLen, storeData,    storeDataValid};
+
+    } else {
+
+      // - [circuit -> mem] loadEn (1-bit)
+      auto loadEn = edgeBuilder.get(i1Type);
+      bramBuilder.addInput("loadEn", loadEn);
+      // - [circuit -> mem] loadAddr (address width)
+      auto loadAddr = edgeBuilder.get(addrType);
+      bramBuilder.addInput("loadAddr", loadAddr);
+      // - [circuit -> mem] storeEn (1-bit)
+      auto storeEn = edgeBuilder.get(i1Type);
+      bramBuilder.addInput("storeEn", storeEn);
+      // - [circuit -> mem] storeAddr (address width)
+      auto storeAddr = edgeBuilder.get(addrType);
+      bramBuilder.addInput("storeAddr", storeAddr);
+      // - [circuit -> mem] storeData (data width)
+      auto storeData = edgeBuilder.get(dataType);
+      bramBuilder.addInput("storeData", storeData);
+      // We need to create backedges for all the signals above.
+      // - [mem -> circuit] loadData (data width)
+      bramBuilder.addOutput("loadData", dataType);
+      // - [circuit -> mem] loadBurstLen (burst length)
+      auto loadBurstLen = edgeBuilder.get(burstLenType);
+      bramBuilder.addInput("loadBurstLen", loadBurstLen);
+      // - [circuit -> mem] storeBurstLen (burst length)
+      auto storeBurstLen = edgeBuilder.get(burstLenType);
+      bramBuilder.addInput("storeBurstLen", storeBurstLen);
+      // This signal feeds the memory op interface.
+      bramBuilder.addClkAndRst(parentModOp);
+
+      // These backedges are passed to the convertToInstance to resolve the
+      // missing drivers
+      memInterfaceToBRAMChannels = {loadEn,       loadAddr,  storeEn,
+                                    storeAddr,    storeData, loadBurstLen,
+                                    storeBurstLen};
+    }
 
     // Query the parameters of ramOp (used to generate external module op).
     ModuleDiscriminator bramDiscriminator(&memState.ramOp, memState.ports);
@@ -1517,14 +1670,15 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
         bramDiscriminator, getUniqueName(memState.ramOp), memOp->getLoc(),
         rewriter);
 
-    // Create new input connections that are not present in the handshake op (in
-    // this case, only the load data). NOTE: not needed if we have LSQ -> MC
+    // Create new input connections that are not present in the handshake op
+    // (in this case, only the load data). NOTE: not needed if we have LSQ ->
+    // MC
     memInterfaceConverter.addInput("loadData", bramInstanceOp.getResult(0));
   }
 
   // Add the ports from handshake op (here we use the port namer to name the
-  // ports that are directly converted from handshake op), except for the memref
-  // type.
+  // ports that are directly converted from handshake op), except for the
+  // memref type.
   for (auto [i, oprd] : llvm::enumerate(operands)) {
     if (!isa<MemRefType>(oprd.getType()))
       memInterfaceConverter.addInput(memState.portNames.getInputName(i), oprd);
@@ -1537,14 +1691,28 @@ LogicalResult ConvertMemInterfaceForInternalArray::matchAndRewrite(
   }
 
   if (memOp.isMasterInterface()) {
-    // Create new output connections that are not present in the handshake IR
-    // (in this case, the loadEn, loadAddr, storeEn, storeAddr, storeData).
-    // memInterfaceConverter.addOutput("loadEn");
-    memInterfaceConverter.addOutput("loadEn", i1Type);
-    memInterfaceConverter.addOutput("loadAddr", addrType);
-    memInterfaceConverter.addOutput("storeEn", i1Type);
-    memInterfaceConverter.addOutput("storeAddr", addrType);
-    memInterfaceConverter.addOutput("storeData", dataType);
+    if (!isLIInterface) {
+      // Create new output connections that are not present in the handshake
+      // IR (in this case, the loadEn, loadAddr, storeEn, storeAddr,
+      // storeData). memInterfaceConverter.addOutput("loadEn");
+      memInterfaceConverter.addOutput("loadEn", i1Type);
+      memInterfaceConverter.addOutput("loadAddr", addrType);
+      memInterfaceConverter.addOutput("storeEn", i1Type);
+      memInterfaceConverter.addOutput("storeAddr", addrType);
+      memInterfaceConverter.addOutput("storeData", dataType);
+      memInterfaceConverter.addOutput("loadBurstLen", burstLenType);
+      memInterfaceConverter.addOutput("storeBurstLen", burstLenType);
+    } else {
+      memInterfaceConverter.addOutput("loadAddr", addrType);
+      memInterfaceConverter.addOutput("loadAddr_valid", i1Type);
+      memInterfaceConverter.addOutput("loadBurstLen", burstLenType);
+      memInterfaceConverter.addOutput("loadData_ready", i1Type);
+      memInterfaceConverter.addOutput("storeAddr", addrType);
+      memInterfaceConverter.addOutput("storeAddr_valid", i1Type);
+      memInterfaceConverter.addOutput("storeBurstLen", burstLenType);
+      memInterfaceConverter.addOutput("storeData", dataType);
+      memInterfaceConverter.addOutput("storeData_valid", i1Type);
+    }
   }
 
   memInterfaceConverter.convertToInstance(memState, rewriter,
@@ -1597,9 +1765,9 @@ LogicalResult ConvertToHWInstance<T>::matchAndRewrite(
 
 namespace {
 
-/// Converts a Handshake-level instance operation to an equivalent HW-level one.
-/// The pattern assumes that the module the Handshake instance references has
-/// already been converted to a `hw::HWExternModuleOp`.
+/// Converts a Handshake-level instance operation to an equivalent HW-level
+/// one. The pattern assumes that the module the Handshake instance references
+/// has already been converted to a `hw::HWExternModuleOp`.
 class ConvertInstance : public OpConversionPattern<handshake::InstanceOp> {
 public:
   using OpConversionPattern<handshake::InstanceOp>::OpConversionPattern;
@@ -1675,8 +1843,8 @@ struct IOMapping {
 };
 
 /// Helper class to allow for the creation of a "converter hardware module
-/// instance" in between a hardware module's (the "wrapper") top-level IO ports
-/// and a module instance (the "circuit") within it.
+/// instance" in between a hardware module's (the "wrapper") top-level IO
+/// ports and a module instance (the "circuit") within it.
 class ConverterBuilder {
 public:
   /// IO mapping from circuit to the converter.
@@ -1691,8 +1859,8 @@ public:
   ConverterBuilder() = default;
 
   /// Creates the converter builder from the external hardware module which
-  /// instances of the converter will reference and the IO mappings between the
-  /// converter and the circuit/wrapper.
+  /// instances of the converter will reference and the IO mappings between
+  /// the converter and the circuit/wrapper.
   ConverterBuilder(hw::HWModuleExternOp converterModOp,
                    const IOMapping &circuitToConverter,
                    const IOMapping &converterToWrapper,
@@ -1724,8 +1892,8 @@ public:
       modBuilder.addInput(baseName + "_" + port.name.strref(), port.type);
   }
 
-  /// Adds wrapper output that will originate from the converter instance to the
-  /// module builder.
+  /// Adds wrapper output that will originate from the converter instance to
+  /// the module builder.
   void addWrapperOutputs(ModuleBuilder &modBuilder, StringRef baseName) {
     converterToWrapper.dstIdx = modBuilder.getNumOutputs();
     for (const hw::ModulePort port : getSlicedOutputs(converterToWrapper))
@@ -1753,9 +1921,9 @@ public:
   }
 
 public:
-  /// Creates an instance of the wrapper between the module's top-level IO ports
-  /// and the circuit instance within it. This resolves all internally created
-  /// backedges. Returns the converter instance that was inserted.
+  /// Creates an instance of the wrapper between the module's top-level IO
+  /// ports and the circuit instance within it. This resolves all internally
+  /// created backedges. Returns the converter instance that was inserted.
   hw::InstanceOp createInstance(hw::HWModuleOp wrapperOp,
                                 hw::InstanceOp circuitOp, StringRef memName,
                                 OpBuilder &builder);
@@ -1778,19 +1946,18 @@ public:
   /// RTL module's name (must match one in RTL configuration file).
   static constexpr llvm::StringLiteral HW_NAME = "mem_to_bram";
 
-  /// Constructs from the hardware module that the circuit instance references,
-  /// and the memory lowering state object representing the memory interface to
-  /// convert.
+  /// Constructs from the hardware module that the circuit instance
+  /// references, and the memory lowering state object representing the memory
+  /// interface to convert.
   MemToBRAMConverter(hw::HWModuleOp circuitMod, const MemLoweringState &state,
                      OpBuilder &builder)
       : ConverterBuilder(buildExternalModule(circuitMod, state, builder),
-                         IOMapping(state.outputIdx, 0, 5), IOMapping(0, 0, 8),
-                         IOMapping(0, 5, 2),
-                         IOMapping(8, state.inputIdx, 1)) {};
+                         IOMapping(state.outputIdx, 0, 9), IOMapping(0, 0, 6),
+                         IOMapping(0, 9, 2), IOMapping(6, state.inputIdx, 5)){};
 
 private:
-  /// Creates, inserts, and returns the external harware module corresponding to
-  /// the memory converter.
+  /// Creates, inserts, and returns the external harware module corresponding
+  /// to the memory converter.
   hw::HWModuleExternOp buildExternalModule(hw::HWModuleOp circuitMod,
                                            const MemLoweringState &memState,
                                            OpBuilder &builder) const;
@@ -1854,29 +2021,65 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
   Type i1Type = IntegerType::get(ctx, 1);
   Type addrType = IntegerType::get(ctx, memState.ports.addrWidth);
 
-  // Inputs from wrapped circuit
-  modBuilder.addInput("loadEn", i1Type);
-  modBuilder.addInput("loadAddr", addrType);
-  modBuilder.addInput("storeEn", i1Type);
-  modBuilder.addInput("storeAddr", addrType);
-  modBuilder.addInput("storeData", memState.dataType);
+  bool isLIInterface = true;
 
-  // Outputs to wrapper
-  modBuilder.addOutput("ce0", i1Type);
-  modBuilder.addOutput("we0", i1Type);
-  modBuilder.addOutput("address0", addrType);
-  modBuilder.addOutput("dout0", memState.dataType);
-  modBuilder.addOutput("ce1", i1Type);
-  modBuilder.addOutput("we1", i1Type);
-  modBuilder.addOutput("address1", addrType);
-  modBuilder.addOutput("dout1", memState.dataType);
+  if (isLIInterface) {
+    // Inputs from wrapped circuit
+    modBuilder.addInput("loadAddr", addrType);
+    modBuilder.addInput("loadAddr_valid", i1Type);
+    modBuilder.addInput("loadBurstLen", IntegerType::get(ctx, 32));
+    modBuilder.addInput("loadData_ready", i1Type);
+    modBuilder.addInput("storeAddr", addrType);
+    modBuilder.addInput("storeAddr_valid", i1Type);
+    modBuilder.addInput("storeBurstLen", IntegerType::get(ctx, 32));
+    modBuilder.addInput("storeData", memState.dataType);
+    modBuilder.addInput("storeData_valid", i1Type);
 
-  // Inputs from wrapper
-  modBuilder.addInput("din0", memState.dataType);
-  modBuilder.addInput("din1", memState.dataType);
+    // Outputs to wrapper
+    modBuilder.addOutput("we0", i1Type);
+    modBuilder.addOutput("address0", addrType);
+    modBuilder.addOutput("dout0", memState.dataType);
+    modBuilder.addOutput("we1", i1Type);
+    modBuilder.addOutput("address1", addrType);
+    modBuilder.addOutput("dout1", memState.dataType);
 
-  // Outputs to wrapped circuit
-  modBuilder.addOutput("loadData", memState.dataType);
+    // Inputs from wrapper
+    modBuilder.addInput("din0", memState.dataType);
+    modBuilder.addInput("din1", memState.dataType);
+
+    // Outputs to wrapped circuit
+    modBuilder.addOutput("loadAddr_ready", i1Type);
+    modBuilder.addOutput("loadData", memState.dataType);
+    modBuilder.addOutput("loadData_valid", i1Type);
+    modBuilder.addOutput("storeAddr_ready", i1Type);
+    modBuilder.addOutput("storeData_ready", i1Type);
+
+  } else {
+
+    // Inputs from wrapped circuit
+    modBuilder.addInput("loadEn", i1Type);
+    modBuilder.addInput("loadAddr", addrType);
+    modBuilder.addInput("storeEn", i1Type);
+    modBuilder.addInput("storeAddr", addrType);
+    modBuilder.addInput("storeData", memState.dataType);
+
+    // Outputs to wrapper
+    modBuilder.addOutput("ce0", i1Type);
+    modBuilder.addOutput("we0", i1Type);
+    modBuilder.addOutput("address0", addrType);
+    modBuilder.addOutput("dout0", memState.dataType);
+    modBuilder.addOutput("ce1", i1Type);
+    modBuilder.addOutput("we1", i1Type);
+    modBuilder.addOutput("address1", addrType);
+    modBuilder.addOutput("dout1", memState.dataType);
+
+    // Inputs from wrapper
+    modBuilder.addInput("din0", memState.dataType);
+    modBuilder.addInput("din1", memState.dataType);
+
+    // Outputs to wrapped circuit
+    modBuilder.addOutput("loadData", memState.dataType);
+  }
 
   builder.setInsertionPointToEnd(topModOp.getBody());
   StringAttr modNameAttr = builder.getStringAttr(extModName);
@@ -1897,8 +2100,8 @@ MemToBRAMConverter::buildExternalModule(hw::HWModuleOp circuitMod,
 }
 
 /// Creates and returns an empty wrapper module. When the function returns,
-/// `memConverters `associates each memory interface in the wrapped circuit to a
-/// builder for their respective converter; in addition, backedges for the
+/// `memConverters `associates each memory interface in the wrapped circuit to
+/// a builder for their respective converter; in addition, backedges for the
 /// future wrapped circuit results going directly to the wrapper (without
 /// passing through a converter) are stored along their corresponding result
 /// index inside the `circuitBackedges` vector.
@@ -1921,13 +2124,14 @@ static hw::HWModuleOp createEmptyWrapperMod(
   }
 
   // Create input ports for the wrapper; we need to identify the inputs which
-  // map to internal memory interfaces and replace them with an interface for a
-  // dual-port BRAM
+  // map to internal memory interfaces and replace them with an interface for
+  // a dual-port BRAM
   ArrayRef<hw::ModulePort> inputPorts = getModInputs(circuitOp);
   for (size_t i = 0, e = inputPorts.size(); i < e;) {
     hw::ModulePort port = inputPorts[i];
     if (auto it = inputToMem.find(i); it != inputToMem.end()) {
-      // Beginning of internal mem interface, replace with IO for dual-port BRAM
+      // Beginning of internal mem interface, replace with IO for dual-port
+      // BRAM
       const MemLoweringState *memState = it->second;
       ConverterBuilder &converter = memConverters.find(memState)->second;
       converter.addWrapperInputs(wrapperBuilder, memState->name);
@@ -1945,7 +2149,8 @@ static hw::HWModuleOp createEmptyWrapperMod(
   for (size_t i = 0, e = outputPorts.size(); i < e;) {
     hw::ModulePort port = outputPorts[i];
     if (auto it = outputToMem.find(i); it != outputToMem.end()) {
-      // Beginning of internal mem interface, replace with IO for dual-port BRAM
+      // Beginning of internal mem interface, replace with IO for dual-port
+      // BRAM
       const MemLoweringState *memState = it->second;
       ConverterBuilder &converter = memConverters.find(memState)->second;
       wrapperOutputToMem[wrapperBuilder.getNumOutputs()] = &converter;
@@ -1972,8 +2177,8 @@ static hw::HWModuleOp createEmptyWrapperMod(
   for (size_t i = 0, e = wrapperOutputs.size(); i < e;) {
     hw::ModulePort port = wrapperOutputs[i];
     if (auto it = wrapperOutputToMem.find(i); it != wrapperOutputToMem.end()) {
-      // This is the beginning of memory interface outputs that will eventually
-      // come from a converter
+      // This is the beginning of memory interface outputs that will
+      // eventually come from a converter
       it->second->addWrapperBackedges(state.edgeBuilder, modOutputs);
       i += it->second->converterToWrapper.size;
     } else {
@@ -1992,8 +2197,8 @@ static hw::HWModuleOp createEmptyWrapperMod(
 
 /// Creates a wrapper module made up of the hardware module that resulted from
 /// Handshake lowering and of memory converters sitting between the latter's
-/// memory interfaces and "standard memory interfaces" exposed by the wrapper's
-/// module.
+/// memory interfaces and "standard memory interfaces" exposed by the
+/// wrapper's module.
 static void createWrapper(hw::HWModuleOp circuitOp, LoweringState &state,
                           OpBuilder &builder) {
 
@@ -2110,6 +2315,7 @@ public:
         ConvertToHWInstance<handshake::LazyForkOp>,
         ConvertToHWInstance<handshake::LoadOp>,
         ConvertToHWInstance<handshake::StoreOp>,
+        ConvertToHWInstance<handshake::BurstLoadOp>,
         ConvertToHWInstance<handshake::NotOp>,
         ConvertToHWInstance<handshake::ReadyRemoverOp>,
         ConvertToHWInstance<handshake::ValidMergerOp>,
@@ -2146,6 +2352,7 @@ public:
         ConvertToHWInstance<handshake::ExtFOp>,
         ConvertToHWInstance<handshake::AbsFOp>,
         ConvertToHWInstance<handshake::MaxSIOp>,
+        ConvertToHWInstance<handshake::SystolicUnitOp>,
 
         // Speculative operations
         ConvertToHWInstance<handshake::SpecCommitOp>,

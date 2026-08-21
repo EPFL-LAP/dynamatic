@@ -1,0 +1,288 @@
+library ieee;
+use ieee.std_logic_unsigned.all;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use ieee.std_logic_textio.all;
+use std.textio.all;
+-- Import template simulation package
+use work.sim_package.all;
+
+---------------------------------------------------------------------------
+entity two_port_RAM is
+  generic (
+    -- File paths for read and write
+    TV_IN  : string := "";
+    TV_OUT : string := "";
+    -- Memory depth for data
+    DEPTH : integer;
+    -- Bus widths for data and address
+    DATA_WIDTH : integer := 32;
+    ADDR_WIDTH : integer;
+    -- Burst length width
+    BURST_LEN_WIDTH : integer := 32
+  );
+  port (
+    clk  : in std_logic;
+    rst  : in std_logic;
+    done : in std_logic;
+    -- RAM port-0
+    address0_pValid       : in  std_logic;
+    address0_ready       : out  std_logic;
+    address0  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    din0  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    din0_pValid       : in  std_logic;
+    din0_ready       : out  std_logic;
+    dout0 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    dout0_valid       : out  std_logic;
+    dout0_nReady       : in  std_logic;
+    burstLen0 : in  std_logic_vector(BURST_LEN_WIDTH - 1 downto 0);
+    -- RAM port-1
+    address1  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
+    address1_pValid       : in  std_logic;
+    address1_ready       : out  std_logic;
+    din1  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    din1_pValid       : in  std_logic;
+    din1_ready       : out  std_logic;
+    dout1 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
+    dout1_valid       : out  std_logic;
+    dout1_nReady       : in  std_logic;
+    burstLen1 : in  std_logic_vector(BURST_LEN_WIDTH - 1 downto 0)
+  );
+end two_port_RAM;
+
+---------------------------------------------------------------------------
+-- Main body of the entity: Two-Port RAM
+architecture behav of two_port_RAM is
+  -- Internal signals
+  type array2D is
+  array (0 to DEPTH - 1) of std_logic_vector(DATA_WIDTH - 1 downto 0);
+  shared variable mem : array2D := (others => (others => '0'));
+begin
+
+  ---------------------------------------------------------------------------
+  -- DATA READ --------------------------------------------------------------
+
+  -- Transfer: text-file -> mem-array ---------------------------------------
+  file_to_mem : process
+    -- Internal signals
+    file file_ptr        : text;
+    variable file_status : file_open_status;
+    variable line_num    : line;
+    variable token       : string(1 to 128);
+    variable index       : integer;
+  begin
+
+    -- Check if file path is defined
+    if (TV_IN /= "") then
+      -- Initialization
+      index := 0;
+      file_open(file_status, file_ptr, TV_IN, READ_MODE);
+
+      if (file_status /= OPEN_OK) then
+        assert false report "ERROR: Could not open file: " & TV_IN severity failure;
+      end if;
+
+      -- Use read_token procedure to read tokens from the file
+      read_token(file_ptr, line_num, token);
+
+      -- Read tokens with the HLS TB format
+      if (token(1 to 13) /= "[[[runtime]]]") then
+        assert false report "ERROR: Simulation failed." severity failure;
+      end if;
+
+      -- Parse through [[[runtime]]] scope
+      read_token(file_ptr, line_num, token);
+      while (token(1 to 14) /= "[[[/runtime]]]") loop
+        if (token(1 to 15) /= "[[transaction]]") then
+          assert false report "ERROR: Simulation failed." severity failure;
+        end if;
+        -- Discard [[transaction]] number
+        read_token(file_ptr, line_num, token);
+
+        -- Read data from file into mem-array (for every transaction)
+        for i in 0 to DEPTH - 1 loop
+          read_token(file_ptr, line_num, token);
+          mem(i) := hex_str_to_logicVec(token, DATA_WIDTH);
+        end loop;
+        read_token(file_ptr, line_num, token);
+
+        -- Check for end of [[transaction]]
+        if (token(1 to 16) /= "[[/transaction]]") then
+          assert false report "ERROR: Simulation failed." severity failure;
+        end if;
+        read_token(file_ptr, line_num, token);
+
+        -- Increment index for next [[transaction]]
+        index := index + 1;
+      end loop;
+
+      file_close(file_ptr);
+    end if;
+    wait;
+
+  end process file_to_mem;
+
+  -- Transfer: mem-array -> RTL ports ---------------------------------------
+  mem_to_port0 : process (clk, rst)
+  -- Signals to keep track if burst read is ongoing
+  variable burst_read_ongoing0 : boolean := false;
+  variable burst_len0           : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
+  variable burst_count0        : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
+  variable start_addr0         : std_logic_vector(ADDR_WIDTH - 1 downto 0) := (others => '0');
+  begin
+    address0_ready <= '1'; -- For now, we assume that memory operations are 1 cycle latency and the port is always ready
+    din0_ready <= '1';
+    -- Simple memory read
+    if (rst = '1') then
+      dout0 <= (others => '0');
+      dout0_valid <= '0';
+      start_addr0 := (others => '0');
+    elsif rising_edge(clk) then
+      dout0_valid <= '0';
+      if (address0_pValid = '1' and address1_pValid = '1' and din1_pValid = '1' and address0 = address1 and dout0_nReady = '1') then
+        dout0 <= din1 after 0.1 ns;
+        dout0_valid <= '1';
+      elsif (burst_read_ongoing0 = true and dout0_nReady = '1') then
+        -- Continue burst read
+        dout0 <= mem(CONV_INTEGER(start_addr0 + burst_len0 - burst_count0)) after 0.1 ns;
+        dout0_valid <= '1';
+        if (burst_count0 = 1) then
+          -- End burst read
+          burst_read_ongoing0 := false;
+          burst_count0 := (others => '0');
+          burst_len0 := (others => '0');
+        else
+          burst_count0 := burst_count0 - 1;
+        end if;
+      elsif (address0_pValid = '1' and (CONV_INTEGER(address0) < DEPTH) and dout0_nReady = '1') then
+        if (burstLen0 > 1) then
+          -- Start burst read
+          assert burst_read_ongoing0 = false report "ERROR: New burst read started before previous burst read finished." severity failure;
+          burst_read_ongoing0 := true;
+          burst_count0 := burstLen0 - 1;
+          burst_len0 := burstLen0;
+        end if;
+        -- Output data
+        dout0 <= mem(CONV_INTEGER(address0)) after 0.1 ns;
+        dout0_valid <= '1';
+        start_addr0 := address0;
+      end if;
+    end if;
+  end process mem_to_port0;
+
+  mem_to_port1 : process (clk, rst)
+  -- Signals to keep track if burst read is ongoing
+  variable burst_read_ongoing1 : boolean := false;
+  variable burst_len1           : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
+  variable burst_count1        : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
+  variable start_addr1         : std_logic_vector(ADDR_WIDTH - 1 downto 0) := (others => '0');
+  begin
+    address1_ready <= '1'; -- For now, we assume that memory operations are 1 cycle latency and the port is always ready
+    din1_ready <= '1';
+    -- Simple memory read
+    if (rst = '1') then
+      dout1 <= (others => '0');
+      dout1_valid <= '0';
+      start_addr1 := (others => '0');
+    elsif rising_edge(clk) then
+      dout1_valid <= '0';
+      if (address0_pValid = '1' and din0_pValid = '1' and address1_pValid = '1' and address0 = address1 and dout1_nReady = '1') then
+        dout1 <= din0 after 0.1 ns;
+        dout1_valid <= '1';
+      elsif (burst_read_ongoing1 = true and dout1_nReady = '1') then
+        -- Continue burst read
+        dout1 <= mem(CONV_INTEGER(start_addr1 + burst_len1 - burst_count1)) after 0.1 ns;
+        dout1_valid <= '1';
+        if (burst_count1 = 1) then
+          -- End burst read
+          burst_read_ongoing1 := false;
+          burst_count1 := (others => '0');
+          burst_len1 := (others => '0');
+        else
+          burst_count1 := burst_count1 - 1;
+        end if;
+      elsif (address1_pValid = '1' and (CONV_INTEGER(address1) < DEPTH) and dout1_nReady = '1') then
+        if (burstLen1 > 1) then
+          -- Start burst read
+          assert burst_read_ongoing1 = false report "ERROR: New burst read started before previous burst read finished." severity failure;
+          burst_read_ongoing1 := true;
+          burst_count1 := burstLen1 - 1;
+          burst_len1 := burstLen1;
+        end if;
+        -- Output data
+        dout1 <= mem(CONV_INTEGER(address1)) after 0.1 ns;
+        dout1_valid <= '1';
+        start_addr1 := address1;
+      end if;
+    end if;
+  end process mem_to_port1;
+
+  ---------------------------------------------------------------------------
+  -- DATA WRITE -------------------------------------------------------------
+
+  -- Transfer: RTL ports -> mem-array ---------------------------------------
+  port0_to_mem : process (clk)
+  begin
+    -- Simple memory write
+    if rising_edge(clk) then
+      if (address0_pValid = '1' and din0_pValid = '1' and address1_pValid = '1' and address0 = address1 and din1_pValid = '1') then
+        mem(CONV_INTEGER(address0)) := din1;
+      elsif (address0_pValid = '1' and din0_pValid = '1') then
+        mem(CONV_INTEGER(address0)) := din0;
+      end if;
+    end if;
+  end process port0_to_mem;
+
+  port1_to_mem : process (clk)
+  begin
+    -- Simple memory write
+    if rising_edge(clk) then
+      if (address1_pValid = '1' and din1_pValid = '1') then
+        mem(CONV_INTEGER(address1)) := din1;
+      end if;
+    end if;
+  end process port1_to_mem;
+
+  -- Transfer: mem-array -> text-file ---------------------------------------
+  mem_to_file : process
+    -- Internal signals
+    file file_ptr        : text;
+    variable file_status : file_open_status;
+    variable line_num    : line;
+    variable token       : string(1 to 128);
+    variable index       : integer;
+  begin
+
+    -- Check if file path is defined
+    if (TV_OUT /= "") then
+      wait until done = '1';
+      index := 0;
+
+      -- Open file
+      file_open(file_status, file_ptr, TV_OUT, APPEND_MODE);
+      if (file_status /= OPEN_OK) then
+        assert false report "ERROR: Could not open file " & TV_OUT severity failure;
+      end if;
+
+      -- Write [[transaction]] entries in HLS TB format
+      write(line_num, "[[transaction]]    " & integer'image(index));
+      writeline(file_ptr, line_num);
+      --
+      for i in 0 to DEPTH - 1 loop
+        write(line_num, "0x" & hex_logicVec_to_str(mem(i)));
+        writeline(file_ptr, line_num);
+      end loop;
+      --
+      write(line_num, string'("[[/transaction]]"));
+      writeline(file_ptr, line_num);
+
+      -- Close file
+      file_close(file_ptr);
+    end if;
+    wait;
+
+  end process mem_to_file;
+
+  ----------------------------------------------------------------------------
+end behav;
+-- End of code

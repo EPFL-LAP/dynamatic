@@ -1,0 +1,8 @@
+# Benchmark "divsi" written by ABC on Fri Jan 16 16:02:20 2026
+.model divsi
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs_valid rhs[0] rhs[1] rhs[2] \
+ rhs_valid result_ready
+.outputs result[0] result[1] result[2] result_valid lhs_ready rhs_ready
+
+
+.end

@@ -3,7 +3,8 @@ module mem_controller_loadless #(
   parameter NUM_CONTROLS = 1,
   parameter NUM_STORES   = 1,
   parameter DATA_TYPE   = 32,
-  parameter ADDR_TYPE   = 32
+  parameter ADDR_TYPE   = 32,
+  parameter BURST_TYPE  = 32
 ) (
   input                                      clk,
   input                                      rst,
@@ -34,7 +35,9 @@ module mem_controller_loadless #(
   output [               ADDR_TYPE - 1 : 0] loadAddr,
   output                                     storeEn,
   output [               ADDR_TYPE - 1 : 0] storeAddr,
-  output [               DATA_TYPE - 1 : 0] storeData
+  output [               DATA_TYPE - 1 : 0] storeData,
+  output [               BURST_TYPE - 1 : 0] loadBurstLen,
+  output [               BURST_TYPE - 1 : 0] storeBurstLen
 );
   // Terminology:
   // Access ports    : circuit to memory_controller;
@@ -57,6 +60,9 @@ module mem_controller_loadless #(
 
   assign loadEn   = 0;
   assign loadAddr = {ADDR_TYPE{1'b0}};
+
+  assign loadBurstLen = {BURST_TYPE{1'b0}};
+  assign storeBurstLen = 1;
 
   // A store request is complete if both address and data are valid.
   assign store_access_port_complete_request = stAddr_valid & stData_valid;

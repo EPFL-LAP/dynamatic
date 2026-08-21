@@ -177,6 +177,8 @@ void BaseSubjectGraph::processNodesWithRules(
   }
 }
 
+std::string BaseSubjectGraph::getNameSG() const { return uniqueName; }
+
 // Inserts a new SubjectGraph in between two existing SubjectGraphs.
 void BaseSubjectGraph::insertNewSubjectGraph(BaseSubjectGraph *predecessorGraph,
                                              BaseSubjectGraph *successorGraph) {
@@ -953,6 +955,7 @@ void dynamatic::experimental::subjectGraphGenerator(handshake::FuncOp funcOp,
 LogicNetwork *dynamatic::experimental::connectSubjectGraphs() {
   // Connect inputs and outputs of subject graphs to each other
   for (auto *module : experimental::BaseSubjectGraph::subjectGraphVector) {
+    llvm::errs() << "Connecting module: " << module->getNameSG() << "\n";
     module->connectInputNodes();
   }
 

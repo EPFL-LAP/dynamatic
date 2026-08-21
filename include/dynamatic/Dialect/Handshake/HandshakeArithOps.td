@@ -409,4 +409,28 @@ def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf"> {
   // TODO: add folder
 }
 
+def SystolicUnitOp : Handshake_Op<"systolicUnitOp", []> {
+  let summary = "systolic unit";
+  let description = [{
+    The systolic unit receives as input two vectors westInput and northInput and it returns the MAC result
+    together with the input vectors.
+
+    Example:
+    ```mlir
+    %0:3 = systolicUnitOp %westInput %northInput %burstLength {attributes}: index, i32
+    ```
+  }];
+  let arguments = (ins AnyType : $westInput, AnyType : $northInput, AnyType : $burstLength);
+  let results = (outs AnyType : $result, AnyType : $eastOutput, AnyType : $southOutput);
+  let builders = [OpBuilder<
+    (ins "Value":$westInput, "Value":$northInput, "Value":$burstLength), [{
+      $_state.addOperands(westInput);
+      $_state.addOperands(northInput);
+      $_state.addOperands(burstLength);
+      $_state.addTypes(westInput.getType());
+      $_state.addTypes(westInput.getType());
+      $_state.addTypes(northInput.getType());
+  }]>];
+}
+
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ARTIH_OPS_TD

@@ -1,0 +1,273 @@
+# Benchmark "muli" written by ABC on Fri Jan 16 16:02:54 2026
+.model muli
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs_valid rhs[0] rhs[1] rhs[2] \
+ rhs[3] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result_valid lhs_ready \
+ rhs_ready
+
+.latch        n42 buff.regs[1]  0
+.latch        n47 buff.regs[2]  0
+.latch        n52 buff.regs[0]  0
+.latch        n57 mul_4_stage_inst.a_reg[0]  0
+.latch        n62 mul_4_stage_inst.a_reg[1]  0
+.latch        n67 mul_4_stage_inst.a_reg[2]  0
+.latch        n72 mul_4_stage_inst.a_reg[3]  0
+.latch        n77 mul_4_stage_inst.b_reg[0]  0
+.latch        n82 mul_4_stage_inst.b_reg[1]  0
+.latch        n87 mul_4_stage_inst.b_reg[2]  0
+.latch        n92 mul_4_stage_inst.b_reg[3]  0
+.latch        n97 mul_4_stage_inst.q0[0]  0
+.latch       n102 mul_4_stage_inst.q0[1]  0
+.latch       n107 mul_4_stage_inst.q0[2]  0
+.latch       n112 mul_4_stage_inst.q0[3]  0
+.latch       n117 mul_4_stage_inst.q1[0]  0
+.latch       n122 mul_4_stage_inst.q1[1]  0
+.latch       n127 mul_4_stage_inst.q1[2]  0
+.latch       n132 mul_4_stage_inst.q1[3]  0
+.latch       n137 mul_4_stage_inst.q2[0]  0
+.latch       n142 mul_4_stage_inst.q2[1]  0
+.latch       n147 mul_4_stage_inst.q2[2]  0
+.latch       n152 mul_4_stage_inst.q2[3]  0
+.latch       n157 oehb_inst.outputValid  0
+
+.names result_ready oehb_inst.outputValid new_n93
+01 1
+.names rhs_valid new_n93 lhs_ready
+10 1
+.names lhs_valid new_n93 rhs_ready
+10 1
+.names buff.regs[1] new_n93 new_n96
+11 1
+.names buff.regs[0] new_n93 new_n97_1
+10 1
+.names new_n96 new_n97_1 new_n98
+00 1
+.names rst new_n98 n42
+00 1
+.names buff.regs[2] new_n93 new_n100
+11 1
+.names buff.regs[1] new_n93 new_n101
+10 1
+.names new_n100 new_n101 new_n102_1
+00 1
+.names rst new_n102_1 n47
+00 1
+.names buff.regs[0] new_n93 new_n104
+11 1
+.names rhs_valid rhs_ready new_n105
+11 1
+.names new_n104 new_n105 new_n106
+00 1
+.names rst new_n106 n52
+00 1
+.names mul_4_stage_inst.a_reg[0] new_n93 new_n108
+11 1
+.names lhs[0] new_n93 new_n109
+10 1
+.names new_n108 new_n109 n57
+00 0
+.names mul_4_stage_inst.a_reg[1] new_n93 new_n111
+11 1
+.names lhs[1] new_n93 new_n112_1
+10 1
+.names new_n111 new_n112_1 n62
+00 0
+.names mul_4_stage_inst.a_reg[2] new_n93 new_n114
+11 1
+.names lhs[2] new_n93 new_n115
+10 1
+.names new_n114 new_n115 n67
+00 0
+.names mul_4_stage_inst.a_reg[3] new_n93 new_n117_1
+11 1
+.names lhs[3] new_n93 new_n118
+10 1
+.names new_n117_1 new_n118 n72
+00 0
+.names mul_4_stage_inst.b_reg[0] new_n93 new_n120
+11 1
+.names rhs[0] new_n93 new_n121
+10 1
+.names new_n120 new_n121 n77
+00 0
+.names mul_4_stage_inst.b_reg[1] new_n93 new_n123
+11 1
+.names rhs[1] new_n93 new_n124
+10 1
+.names new_n123 new_n124 n82
+00 0
+.names mul_4_stage_inst.b_reg[2] new_n93 new_n126
+11 1
+.names rhs[2] new_n93 new_n127_1
+10 1
+.names new_n126 new_n127_1 n87
+00 0
+.names mul_4_stage_inst.b_reg[3] new_n93 new_n129
+11 1
+.names rhs[3] new_n93 new_n130
+10 1
+.names new_n129 new_n130 n92
+00 0
+.names mul_4_stage_inst.q0[0] new_n93 new_n132_1
+11 1
+.names mul_4_stage_inst.a_reg[0] mul_4_stage_inst.b_reg[0] new_n133
+11 1
+.names new_n93 new_n133 new_n134
+01 1
+.names new_n132_1 new_n134 n97
+00 0
+.names mul_4_stage_inst.q0[1] new_n93 new_n136
+11 1
+.names mul_4_stage_inst.a_reg[1] mul_4_stage_inst.b_reg[0] new_n137_1
+11 1
+.names mul_4_stage_inst.a_reg[0] mul_4_stage_inst.b_reg[1] new_n138
+11 1
+.names new_n137_1 new_n138 new_n139
+00 1
+.names new_n137_1 new_n138 new_n140
+11 1
+.names new_n93 new_n139 new_n141
+00 1
+.names new_n140 new_n141 new_n142_1
+01 1
+.names new_n136 new_n142_1 n102
+00 0
+.names mul_4_stage_inst.q0[2] new_n93 new_n144
+11 1
+.names mul_4_stage_inst.a_reg[0] mul_4_stage_inst.b_reg[2] new_n145
+11 1
+.names mul_4_stage_inst.a_reg[2] mul_4_stage_inst.b_reg[0] new_n146
+11 1
+.names mul_4_stage_inst.a_reg[1] mul_4_stage_inst.b_reg[1] new_n147_1
+11 1
+.names new_n146 new_n147_1 new_n148
+11 1
+.names new_n146 new_n147_1 new_n149
+00 1
+.names new_n148 new_n149 new_n150
+00 1
+.names new_n145 new_n150 new_n151
+11 1
+.names new_n145 new_n150 new_n152_1
+00 1
+.names new_n151 new_n152_1 new_n153
+00 1
+.names new_n140 new_n153 new_n154
+00 1
+.names new_n140 new_n153 new_n155
+11 1
+.names new_n93 new_n154 new_n156
+00 1
+.names new_n155 new_n156 new_n157_1
+01 1
+.names new_n144 new_n157_1 n107
+00 0
+.names mul_4_stage_inst.q0[3] new_n93 new_n159
+11 1
+.names mul_4_stage_inst.a_reg[3] mul_4_stage_inst.b_reg[0] new_n160
+11 1
+.names mul_4_stage_inst.a_reg[2] mul_4_stage_inst.b_reg[1] new_n161
+11 1
+.names new_n160 new_n161 new_n162
+10 1
+.names new_n160 new_n161 new_n163
+01 1
+.names new_n162 new_n163 new_n164
+00 1
+.names mul_4_stage_inst.a_reg[1] mul_4_stage_inst.b_reg[2] new_n165
+11 1
+.names new_n164 new_n165 new_n166
+00 1
+.names new_n164 new_n165 new_n167
+11 1
+.names new_n166 new_n167 new_n168
+00 1
+.names new_n148 new_n151 new_n169
+00 1
+.names new_n168 new_n169 new_n170
+01 1
+.names new_n168 new_n169 new_n171
+10 1
+.names new_n170 new_n171 new_n172
+00 1
+.names mul_4_stage_inst.a_reg[0] mul_4_stage_inst.b_reg[3] new_n173
+11 1
+.names new_n172 new_n173 new_n174
+00 1
+.names new_n172 new_n173 new_n175
+11 1
+.names new_n174 new_n175 new_n176
+00 1
+.names new_n155 new_n176 new_n177
+00 1
+.names new_n155 new_n176 new_n178
+11 1
+.names new_n177 new_n178 new_n179
+00 1
+.names new_n93 new_n179 new_n180
+00 1
+.names new_n159 new_n180 n112
+00 0
+.names mul_4_stage_inst.q1[0] new_n93 new_n182
+11 1
+.names mul_4_stage_inst.q0[0] new_n93 new_n183
+10 1
+.names new_n182 new_n183 n117
+00 0
+.names mul_4_stage_inst.q1[1] new_n93 new_n185
+11 1
+.names mul_4_stage_inst.q0[1] new_n93 new_n186
+10 1
+.names new_n185 new_n186 n122
+00 0
+.names mul_4_stage_inst.q1[2] new_n93 new_n188
+11 1
+.names mul_4_stage_inst.q0[2] new_n93 new_n189
+10 1
+.names new_n188 new_n189 n127
+00 0
+.names mul_4_stage_inst.q1[3] new_n93 new_n191
+11 1
+.names mul_4_stage_inst.q0[3] new_n93 new_n192
+10 1
+.names new_n191 new_n192 n132
+00 0
+.names mul_4_stage_inst.q2[0] new_n93 new_n194
+11 1
+.names mul_4_stage_inst.q1[0] new_n93 new_n195
+10 1
+.names new_n194 new_n195 n137
+00 0
+.names mul_4_stage_inst.q2[1] new_n93 new_n197
+11 1
+.names mul_4_stage_inst.q1[1] new_n93 new_n198
+10 1
+.names new_n197 new_n198 n142
+00 0
+.names mul_4_stage_inst.q2[2] new_n93 new_n200
+11 1
+.names mul_4_stage_inst.q1[2] new_n93 new_n201
+10 1
+.names new_n200 new_n201 n147
+00 0
+.names mul_4_stage_inst.q2[3] new_n93 new_n203
+11 1
+.names mul_4_stage_inst.q1[3] new_n93 new_n204
+10 1
+.names new_n203 new_n204 n152
+00 0
+.names buff.regs[2] new_n93 new_n206
+00 1
+.names rst new_n206 n157
+00 1
+.names mul_4_stage_inst.q2[0] result[0]
+1 1
+.names mul_4_stage_inst.q2[1] result[1]
+1 1
+.names mul_4_stage_inst.q2[2] result[2]
+1 1
+.names mul_4_stage_inst.q2[3] result[3]
+1 1
+.names oehb_inst.outputValid result_valid
+1 1
+.end

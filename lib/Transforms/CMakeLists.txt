@@ -1,4 +1,5 @@
 add_dynamatic_library(DynamaticTransforms
+  AggregateMemory.cpp
   ArithReduceStrength.cpp
   BackAnnotate.cpp
   FlattenMemRefRowMajor.cpp
@@ -14,6 +15,7 @@ add_dynamatic_library(DynamaticTransforms
   HandshakeInferBasicBlocks.cpp
   HandshakeReplaceMemoryInterfaces.cpp
   HandshakeMarkFPUImpl.cpp
+  HWMarkLIMemoryInterface.cpp
   MarkMemoryDependencies.cpp
   MarkMemoryInterfaces.cpp
   OperationNames.cpp
@@ -22,6 +24,8 @@ add_dynamatic_library(DynamaticTransforms
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
   DropUnlistedFunctions.cpp
+  SystolicUnitGeneration.cpp
+  SystolicUnitReuseOptimization.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen
@@ -38,3 +42,7 @@ add_dynamatic_library(DynamaticTransforms
 )
 
 add_subdirectory(BufferPlacement)
+
+target_link_libraries(DynamaticTransforms
+  PUBLIC ${Z3_LIB}
+)

@@ -46,6 +46,7 @@ struct MemRefToDualPortRAM {
     int dataWidth = type.getElementType().getIntOrFloatBitWidth();
     int dataDepth = type.getNumElements();
     int addrWidth = max((int)ceil(log2(dataDepth)), 1);
+    int burstLenWidth = 32; // Fixed to 32 bits for now
 
     // The two_port_RAM has two read/write interfaces, each has
     // - we: write enable (must be set to 1 when writing)
@@ -56,13 +57,39 @@ struct MemRefToDualPortRAM {
     // Currently, our memory controler assumes that there is only one read
     // channel and one write channel. Therefore, many signals are not used
 
-    // This mapping only records the used signals.
-    memrefToDPRAM.emplace_back("storeEn", WE0_PORT, 1);
-    memrefToDPRAM.emplace_back("storeData", D_IN0_PORT, dataWidth);
-    memrefToDPRAM.emplace_back("storeAddr", ADDR0_PORT, addrWidth);
-    memrefToDPRAM.emplace_back("loadEn", CE1_PORT, 1);
-    memrefToDPRAM.emplace_back("loadData", D_OUT1_PORT, dataWidth);
-    memrefToDPRAM.emplace_back("loadAddr", ADDR1_PORT, addrWidth);
+    bool isLIInterface = true;
+
+    if (isLIInterface) {
+      // This mapping only records the used signals.
+      memrefToDPRAM.emplace_back("storeData", D_IN0_PORT, dataWidth);
+      memrefToDPRAM.emplace_back("storeData_valid", D_IN0_VALID_PORT, 1);
+      memrefToDPRAM.emplace_back("storeData_ready", D_IN0_READY_PORT, 1);
+      memrefToDPRAM.emplace_back("storeAddr", ADDR0_PORT, addrWidth);
+      memrefToDPRAM.emplace_back("storeAddr_valid", ADDR0_VALID_PORT, 1);
+      memrefToDPRAM.emplace_back("storeAddr_ready", ADDR0_READY_PORT, 1);
+      memrefToDPRAM.emplace_back("loadData", D_OUT1_PORT, dataWidth);
+      memrefToDPRAM.emplace_back("loadData_valid", D_OUT1_VALID_PORT, 1);
+      memrefToDPRAM.emplace_back("loadData_ready", D_OUT1_READY_PORT, 1);
+      memrefToDPRAM.emplace_back("loadAddr", ADDR1_PORT, addrWidth);
+      memrefToDPRAM.emplace_back("loadAddr_valid", ADDR1_VALID_PORT, 1);
+      memrefToDPRAM.emplace_back("loadAddr_ready", ADDR1_READY_PORT, 1);
+      memrefToDPRAM.emplace_back("storeBurstLen", BURST_LEN0_PORT,
+                                 burstLenWidth);
+      memrefToDPRAM.emplace_back("loadBurstLen", BURST_LEN1_PORT,
+                                 burstLenWidth);
+    } else {
+      // This mapping only records the used signals.
+      memrefToDPRAM.emplace_back("storeEn", WE0_PORT, 1);
+      memrefToDPRAM.emplace_back("storeData", D_IN0_PORT, dataWidth);
+      memrefToDPRAM.emplace_back("storeAddr", ADDR0_PORT, addrWidth);
+      memrefToDPRAM.emplace_back("loadEn", CE1_PORT, 1);
+      memrefToDPRAM.emplace_back("loadData", D_OUT1_PORT, dataWidth);
+      memrefToDPRAM.emplace_back("loadAddr", ADDR1_PORT, addrWidth);
+      memrefToDPRAM.emplace_back("storeBurstLen", BURST_LEN0_PORT,
+                                 burstLenWidth);
+      memrefToDPRAM.emplace_back("loadBurstLen", BURST_LEN1_PORT,
+                                 burstLenWidth);
+    }
   }
 
   void declareConstants(mlir::raw_indented_ostream &os,
@@ -83,6 +110,7 @@ struct MemRefToDualPortRAM {
                     to_string(addrWidth));
     declareConstant(os, "DATA_DEPTH_" + argName, "INTEGER",
                     to_string(dataDepth));
+    declareConstant(os, "BURST_LEN_WIDTH_" + argName, "INTEGER", to_string(32));
   }
 
   // Declare signals appear in the circuit interface
@@ -102,7 +130,7 @@ struct MemRefToDualPortRAM {
     // The write enable of the read interface is not used
     declareSTL(os, argName + "_" + WE1_PORT, nullopt, "\'0\'");
     // The read enable of the write interface is not used
-    declareSTL(os, argName + "_" + CE0_PORT, nullopt, "\'1\'");
+    // declareSTL(os, argName + "_" + CE0_PORT, nullopt, "\'1\'");
   }
 
   void instantiateRAMModel(mlir::raw_indented_ostream &os) {
@@ -113,6 +141,7 @@ struct MemRefToDualPortRAM {
         .parameter(DATA_WIDTH_PARAM, "DATA_WIDTH_" + argName)
         .parameter(ADDR_WIDTH_PARAM, "ADDR_WIDTH_" + argName)
         .parameter(DATA_DEPTH_PARAM, "DATA_DEPTH_" + argName)
+        .parameter(BURST_LEN_WIDTH_PARAM, "BURST_LEN_WIDTH_" + argName)
         .connect(CLK_PORT, "tb_" + CLK_PORT)
         .connect(RST_PORT, "tb_" + RST_PORT)
         .connect(DONE_PORT, "tb_stop");
@@ -123,8 +152,12 @@ struct MemRefToDualPortRAM {
     // Declare unused interfaces in the two port RAM
     memInst.connect(D_OUT0_PORT, argName + "_" + D_OUT0_PORT);
     memInst.connect(D_IN1_PORT, argName + "_" + D_IN1_PORT);
-    memInst.connect(WE1_PORT, argName + "_" + WE1_PORT);
-    memInst.connect(CE0_PORT, "\'1\'");
+    memInst.connect(D_OUT0_READY_PORT, "\'0\'");
+    memInst.connect(D_OUT0_VALID_PORT, "open");
+    memInst.connect(D_IN1_VALID_PORT, "\'0\'");
+    memInst.connect(D_IN1_READY_PORT, "open");
+    // memInst.connect(WE1_PORT, argName + "_" + WE1_PORT);
+    //  memInst.connect(CE0_PORT, "\'1\'");
 
     memInst.emitVhdl(os);
   }

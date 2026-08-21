@@ -15,9 +15,10 @@ BUFFER_ALGORITHM=$5
 TARGET_CP=$6
 USE_SHARING=$7
 FPUNITS_GEN=$8
-USE_RIGIDIFICATION=${9}
-DISABLE_LSQ=${10}
-FAST_TOKEN_DELIVERY=${11}
+EXTERNAL_MEMORY_PROTOCOL=$9
+USE_RIGIDIFICATION=${10}
+DISABLE_LSQ=${11}
+FAST_TOKEN_DELIVERY=${12}
 
 LLVM=$DYNAMATIC_DIR/polygeist/llvm-project
 LLVM_BINS=$LLVM/build/bin
@@ -149,9 +150,9 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
 # ------------------------------------------------------------------------------
-
+if [[ 0 == 1 ]]; then
 $LLVM_BINS/opt -S \
- -passes="inline,mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg,lowerswitch,simplifycfg" \
+ -passes="mem2reg,consthoist,instcombine,simplifycfg,loop-rotate,simplifycfg,lowerswitch,simplifycfg" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -196,18 +197,20 @@ $LLVM_TO_STD_TRANSLATION_BIN \
    -o "$F_CF"
 exit_on_fail "Failed to convert to std dialect" \
   "Converted to std dialect"
-
+fi
 # cf transformations (dynamatic)
 # - drop-unlist-functions: Dropping the functions that are not needed in HLS
 # compilation
 $DYNAMATIC_OPT_BIN \
-  "$F_CF" \
+  "cf_systolic_array_opt.mlir" \
   --drop-unlisted-functions="function-names=$KERNEL_NAME" \
   --func-set-arg-names="source=$F_C_SOURCE" \
   --flatten-memref-row-major \
   --canonicalize \
   --push-constants \
   --mark-memory-interfaces \
+  --aggregate-memory \
+  --allow-unregistered-dialect \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
@@ -221,6 +224,7 @@ if [[ $DISABLE_LSQ -ne 0 ]]; then
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
     --mark-memory-interfaces \
+    --allow-unregistered-dialect \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
     "Marked memory accesses with the corresponding interfaces in cf"
@@ -235,7 +239,7 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
+  MLIR_PRINT_OP_ON_DIAGNOSTIC=1 MLIR_CRASH_ON_ERROR=1 "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake --allow-unregistered-dialect \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
@@ -323,6 +327,16 @@ else
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
+fi
+
+if [[ "$EXTERNAL_MEMORY_PROTOCOL" == "latency-insensitive" ]]; then
+  # Convert to latency-insensitive protocol
+  "$DYNAMATIC_OPT_BIN" "$F_HW" \
+    --hw-mark-li-memory-interface \
+    > "$COMP_DIR/hw_li.mlir"
+  exit_on_fail "Failed to convert to latency-insensitive memory protocol" \
+    "Converted to latency-insensitive memory protocol"
+  cp "$COMP_DIR/hw_li.mlir" "$F_HW"
 fi
 
 echo_info "Compilation succeeded"

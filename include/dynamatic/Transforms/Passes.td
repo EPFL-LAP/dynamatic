@@ -356,6 +356,7 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
     of column-major indexing when converting multidimensional load/store
     operations.}];
   let constructor = "dynamatic::createFlattenMemRefRowMajorPass()";
+  let dependentDialects = ["mlir::vector::VectorDialect"];
 }
 
 def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
@@ -379,6 +380,24 @@ def MarkMemoryDependencies : DynamaticPass<"mark-memory-dependencies"> {
     check for a dependence between two affine accesses.
   }];
   let constructor = "dynamatic::createMarkMemoryDependencies()";
+  let dependentDialects = ["mlir::vector::VectorDialect"];
+}
+
+def AggregateMemory : DynamaticPass<"aggregate-memory"> {
+  let summary = "Aggregate memref blocks into larger ones.";
+  let description = [{
+    This pass aggregates multiple smaller memref allocations into larger ones to
+    reduce the number of memory interfaces in the final design. The pass scans
+    all argument memrefs, and groups them by their element type. It then creates a
+    new memref allocation for each group, with a size equal to the sum of the
+    sizes of the individual memrefs. Finally, it rewrites all load and store
+    operations to use the new aggregated memref, adjusting the indices
+    accordingly. This pass is particularly useful when targeting FPGA architectures
+    where reducing the number of memory interfaces can lead to significant area and
+    performance improvements.
+  }];
+  let constructor = "dynamatic::createAggregateMemoryPass()";
+  let dependentDialects = ["mlir::memref::MemRefDialect"];
 }
 
 def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
@@ -400,6 +419,18 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
     that there are no memory dependencies.  
   }];
   let constructor = "dynamatic::createMarkMemoryInterfaces()";
+}
+
+def HWMarkLIMemoryInterface : DynamaticPass<
+  "hw-mark-li-memory-interface"> {
+  let summary = "Mark memory accesses to use latency-insensitive interfaces.";
+  let description = [{
+    Annotates all memory accesses in the IR with a
+    with an hardware parameter attribute indicating that they should connect to
+    latency-insensitive memory interfaces. This is useful when targeting
+    external memories that use a latency-insensitive protocol.
+  }];
+  let constructor = "dynamatic::createHWMarkLIMemoryInterface()";
 }
 
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
@@ -446,6 +477,33 @@ def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
     --allow-unregistered-dialect flag to all optimizer invokations).
   }];
   let constructor = "dynamatic::createRemovePolygeistAttributes()";
+}
+
+def SystolicUnitGeneration : DynamaticPass<"systolic-unit-generation"> {
+  let summary = "Generate systolic units for matrix multiplication.";
+  let description = [{
+    This pass identifies matrix multiplication operations in the IR and
+    replaces them with calls to systolic array units. The pass generates
+    systolic array units based on the information in the matrix multiplication
+    operation.
+  }];
+  let constructor = "dynamatic::createSystolicUnitGeneration()";
+  let dependentDialects = [
+    "mlir::affine::AffineDialect", "mlir::memref::MemRefDialect", "mlir::vector::VectorDialect"];
+}
+
+def SystolicUnitReuseOptimization : DynamaticPass<"systolic-unit-reuse-optimization"> {
+  let summary = "Optimize reuse of systolic units in the IR.";
+  let description = [{
+    This pass identifies opportunities to reuse data loaded into one systolic
+    unit for another systolic unit, thereby reducing memory bandwidth and
+    improving performance. The pass analyzes the dataflow and memory access
+    patterns in the IR to find such opportunities and modifies the IR to
+    implement the reuse.
+  }];
+  let constructor = "dynamatic::createSystolicUnitReuseOptimization()";
+  let dependentDialects = [
+    "mlir::affine::AffineDialect", "mlir::memref::MemRefDialect", "mlir::vector::VectorDialect"];
 }
 
 // Remark: this is an example where the implicit name analysis in DynamaticPass

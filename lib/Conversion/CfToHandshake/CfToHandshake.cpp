@@ -37,6 +37,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -51,7 +52,10 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Signals.h"
+#include "llvm/Support/raw_ostream.h"
 #include <utility>
 
 using namespace mlir;
@@ -66,7 +70,7 @@ using namespace dynamatic;
 
 /// Determines whether an operation is akin to a load or store memory operation.
 static bool isMemoryOp(Operation *op) {
-  return isa<memref::LoadOp, memref::StoreOp>(op);
+  return isa<memref::LoadOp, memref::StoreOp, vector::TransferReadOp>(op);
 }
 
 /// Determines whether a memref type is suitable for covnersion in the context
@@ -88,6 +92,8 @@ static Value getOpMemRef(Operation *op) {
     return memOp.getMemRef();
   if (auto memOp = dyn_cast<memref::StoreOp>(op))
     return memOp.getMemRef();
+  if (auto memOp = dyn_cast<vector::TransferReadOp>(op))
+    return memOp.getSource();
   return nullptr;
 }
 
@@ -185,7 +191,12 @@ static Type channelifyType(Type type) {
       })
       .Case<handshake::ChannelType, handshake::ControlType>(
           [](auto type) { return type; })
-
+      .Case<VectorType>([](VectorType vecType) {
+        return handshake::ChannelType::get(vecType);
+        // Type elemType = channelifyType(vecType.getElementType());
+        // assert(elemType && "failed to channelify vector element type");
+        // return VectorType::get(vecType.getShape(), elemType);
+      })
       .Default([](auto type) { return nullptr; });
 }
 
@@ -784,13 +795,51 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
 
-              // /!\ In FTD, the way operations are converted between dialects
-              // is done in a way that both operations from `cf` to `handshake`
-              // coexist in some intertwined way. New operations from the
-              // `handshake` dialect are instantiated while connected to the old
-              // `cf` versions. When rewriting, we found that this call is
-              // necessary to avoid having a "null operand found" error (e.g.
-              // get_tanh)
+              // /!\ In FTD, the way operations are converted between
+              // dialects is done in a way that both operations from `cf` to
+              // `handshake` coexist in some intertwined way. New operations
+              // from the `handshake` dialect are instantiated while
+              // connected to the old `cf` versions. When rewriting, we
+              // found that this call is necessary to avoid having a "null
+              // operand found" error (e.g. get_tanh)
+              if (isFtd)
+                loadOp.getResult().replaceAllUsesWith(dataOut);
+
+              return newOp;
+            })
+            .Case<vector::TransferReadOp>([&](vector::TransferReadOp loadOp) {
+              OperandRange indices = loadOp.getIndices();
+              assert(indices.size() == 1 && "load must be unidimensional");
+
+              Value addr = rewriter.getRemappedValue(indices.front());
+              assert(addr && "failed to remap address");
+              Type dataTy = cast<MemRefType>(memref.getType()).getElementType();
+              Value data = edgeBuilder.get(channelifyType(dataTy));
+              // Get the number of elements to load from the vector type
+              auto vecType = loadOp.getType().dyn_cast<VectorType>();
+              assert(vecType && "expected vector type");
+              int64_t burstLength = vecType.getNumElements();
+              // Get basic block of operation
+              auto *block = loadOp.getOperation()->getBlock();
+              Value blockCtrl = getBlockControl(block);
+              // Create constant for burst length
+              Value burstLengthConst = rewriter.create<handshake::ConstantOp>(
+                  loc, rewriter.getI32IntegerAttr(burstLength), blockCtrl);
+              // Create BurstLoad operation
+              auto newOp = rewriter.create<handshake::BurstLoadOp>(
+                  loc, addr, data, burstLengthConst);
+              copyDialectAttr<handshake::MemDependenceArrayAttr>(loadOp, newOp);
+              namer.replaceOp(loadOp, newOp);
+              Value dataOut = newOp.getDataResult();
+              rewriter.replaceOp(loadOp, dataOut);
+
+              // /!\ In FTD, the way operations are converted between
+              // dialects is done in a way that both operations from `cf` to
+              // `handshake` coexist in some intertwined way. New operations
+              // from the `handshake` dialect are instantiated while
+              // connected to the old `cf` versions. When rewriting, we
+              // found that this call is necessary to avoid having a "null
+              // operand found" error (e.g. get_tanh)
               if (isFtd)
                 loadOp.getResult().replaceAllUsesWith(dataOut);
 
@@ -1469,6 +1518,55 @@ struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
   }
 };
 
+std::string fpsaSUName = "fpsa_su";
+struct SysUnitConversion : public ConversionPattern {
+  SysUnitConversion(MLIRContext *ctx, NameAnalysis &namer)
+      : ConversionPattern(Pattern::MatchAnyOpTypeTag(), /*benefit=*/1, ctx),
+        namer(namer) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    MLIRContext *ctx = op->getContext();
+    // Match on the operation name
+    if (op->getName().getStringRef() != fpsaSUName)
+      return failure();
+
+    // Channelify the result types
+    SmallVector<Type> newTypes;
+    for (Type resType : op->getResultTypes()) {
+      // If vector type, channelify the element type
+      if (auto vecType = resType.dyn_cast<VectorType>()) {
+        Type dataTy = vecType.getElementType();
+        newTypes.push_back(channelifyType(dataTy));
+        continue;
+      }
+      // Otherwise channelify the type directly
+      newTypes.push_back(channelifyType(resType));
+    }
+    // Replace with a systolic unit operation
+    auto loc = op->getLoc();
+    auto newOp =
+        rewriter.create<handshake::SystolicUnitOp>(loc, newTypes, operands);
+    namer.replaceOp(op, newOp);
+    auto dataOut = newOp.getResults();
+    rewriter.replaceOp(op, dataOut);
+    // This step is necessary since replaceOp doesn't handle all results
+    // correctly
+    int resIdx = 0;
+    for (auto res : op->getResults()) {
+      res.replaceAllUsesWith(dataOut[resIdx]);
+      ++resIdx;
+    }
+    // Assign BB attribute to the new operation
+    inheritBB(op, newOp);
+    return success();
+  }
+
+private:
+  NameAnalysis &namer;
+};
+
 struct GetGlobalOpConversion
     : public DynOpConversionPattern<memref::GetGlobalOp> {
   using DynOpConversionPattern<memref::GetGlobalOp>::DynOpConversionPattern;
@@ -1561,6 +1659,7 @@ struct CfToHandshakePass
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
+    patterns.add<SysUnitConversion>(ctx, getAnalysis<NameAnalysis>());
     patterns.add<
         // clang-format off
         LowerFuncToHandshake,

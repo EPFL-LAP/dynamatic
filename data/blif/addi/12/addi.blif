@@ -1,0 +1,211 @@
+# Benchmark "addi" written by ABC on Fri Jan 16 16:08:01 2026
+.model addi
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs[10] lhs[11] lhs_valid rhs[0] rhs[1] rhs[2] rhs[3] rhs[4] \
+ rhs[5] rhs[6] rhs[7] rhs[8] rhs[9] rhs[10] rhs[11] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result[10] result[11] result_valid \
+ lhs_ready rhs_ready
+.names lhs[0] rhs[0] new_n45
+11 1
+.names lhs[0] rhs[0] new_n46
+00 1
+.names new_n45 new_n46 result[0]
+00 1
+.names lhs[1] rhs[1] new_n48
+11 1
+.names lhs[1] rhs[1] new_n49
+00 1
+.names new_n48 new_n49 new_n50
+00 1
+.names new_n45 new_n50 new_n51
+11 1
+.names new_n45 new_n50 new_n52
+00 1
+.names new_n51 new_n52 result[1]
+00 1
+.names new_n48 new_n51 new_n54
+00 1
+.names lhs[2] rhs[2] new_n55
+11 1
+.names lhs[2] rhs[2] new_n56
+00 1
+.names new_n55 new_n56 new_n57
+00 1
+.names new_n54 new_n57 new_n58
+01 1
+.names new_n54 new_n57 new_n59
+10 1
+.names new_n58 new_n59 result[2]
+00 1
+.names new_n55 new_n58 new_n61
+00 1
+.names lhs[3] rhs[3] new_n62
+11 1
+.names lhs[3] rhs[3] new_n63
+00 1
+.names new_n62 new_n63 new_n64
+00 1
+.names new_n61 new_n64 new_n65
+11 1
+.names new_n61 new_n64 new_n66
+00 1
+.names new_n65 new_n66 result[3]
+00 0
+.names new_n57 new_n64 new_n68
+11 1
+.names new_n54 new_n68 new_n69
+01 1
+.names new_n55 new_n64 new_n70
+11 1
+.names new_n62 new_n70 new_n71
+00 1
+.names new_n69 new_n71 new_n72
+01 1
+.names lhs[4] rhs[4] new_n73
+11 1
+.names lhs[4] rhs[4] new_n74
+00 1
+.names new_n73 new_n74 new_n75
+00 1
+.names new_n72 new_n75 new_n76
+01 1
+.names new_n72 new_n75 new_n77
+10 1
+.names new_n76 new_n77 result[4]
+00 1
+.names new_n73 new_n76 new_n79
+00 1
+.names lhs[5] rhs[5] new_n80
+11 1
+.names lhs[5] rhs[5] new_n81
+00 1
+.names new_n80 new_n81 new_n82
+00 1
+.names new_n79 new_n82 new_n83
+11 1
+.names new_n79 new_n82 new_n84
+00 1
+.names new_n83 new_n84 result[5]
+00 0
+.names new_n73 new_n82 new_n86
+11 1
+.names new_n80 new_n86 new_n87
+00 1
+.names new_n75 new_n82 new_n88
+11 1
+.names new_n72 new_n88 new_n89
+01 1
+.names new_n87 new_n89 new_n90
+10 1
+.names lhs[6] rhs[6] new_n91
+11 1
+.names lhs[6] rhs[6] new_n92
+00 1
+.names new_n91 new_n92 new_n93
+00 1
+.names new_n90 new_n93 new_n94
+01 1
+.names new_n90 new_n93 new_n95
+10 1
+.names new_n94 new_n95 result[6]
+00 1
+.names new_n91 new_n94 new_n97
+00 1
+.names lhs[7] rhs[7] new_n98
+11 1
+.names lhs[7] rhs[7] new_n99
+00 1
+.names new_n98 new_n99 new_n100
+00 1
+.names new_n97 new_n100 new_n101
+11 1
+.names new_n97 new_n100 new_n102
+00 1
+.names new_n101 new_n102 result[7]
+00 0
+.names new_n93 new_n100 new_n104
+11 1
+.names new_n88 new_n104 new_n105
+11 1
+.names new_n72 new_n105 new_n106
+01 1
+.names new_n87 new_n104 new_n107
+01 1
+.names new_n91 new_n100 new_n108
+11 1
+.names new_n98 new_n108 new_n109
+00 1
+.names new_n107 new_n109 new_n110
+01 1
+.names new_n106 new_n110 new_n111
+01 1
+.names lhs[8] rhs[8] new_n112
+11 1
+.names lhs[8] rhs[8] new_n113
+00 1
+.names new_n112 new_n113 new_n114
+00 1
+.names new_n111 new_n114 new_n115
+01 1
+.names new_n111 new_n114 new_n116
+10 1
+.names new_n115 new_n116 result[8]
+00 1
+.names new_n112 new_n115 new_n118
+00 1
+.names lhs[9] rhs[9] new_n119
+11 1
+.names lhs[9] rhs[9] new_n120
+00 1
+.names new_n119 new_n120 new_n121
+00 1
+.names new_n118 new_n121 new_n122
+11 1
+.names new_n118 new_n121 new_n123
+00 1
+.names new_n122 new_n123 result[9]
+00 0
+.names new_n114 new_n121 new_n125
+11 1
+.names new_n111 new_n125 new_n126
+01 1
+.names new_n112 new_n121 new_n127
+11 1
+.names new_n119 new_n127 new_n128
+00 1
+.names new_n126 new_n128 new_n129
+01 1
+.names lhs[10] rhs[10] new_n130
+11 1
+.names lhs[10] rhs[10] new_n131
+00 1
+.names new_n130 new_n131 new_n132
+00 1
+.names new_n129 new_n132 new_n133
+01 1
+.names new_n129 new_n132 new_n134
+10 1
+.names new_n133 new_n134 result[10]
+00 1
+.names lhs[11] rhs[11] new_n136
+10 1
+.names lhs[11] rhs[11] new_n137
+01 1
+.names new_n136 new_n137 new_n138
+00 1
+.names new_n130 new_n133 new_n139
+00 1
+.names new_n138 new_n139 new_n140
+01 1
+.names new_n138 new_n139 new_n141
+10 1
+.names new_n140 new_n141 result[11]
+00 0
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

@@ -57,7 +57,7 @@ def get_range_for_param(param_type: str) -> Tuple[int, int]:
         'SIZE': (1, 15),
         'INDEX_TYPE': (1, 4),
         'SELECT_TYPE': (1, 4),
-        'DEFAULT': (1, 33)
+        'DEFAULT': (12, 13)
     }
     start, end = ranges.get(param_type, ranges['DEFAULT'])
     return start, end

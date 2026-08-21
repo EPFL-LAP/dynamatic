@@ -4,6 +4,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
@@ -82,7 +83,8 @@ int main(int argc, char **argv) {
   MLIRContext context;
   context.loadDialect<memref::MemRefDialect, arith::ArithDialect,
                       cf::ControlFlowDialect, math::MathDialect,
-                      func::FuncDialect, LLVM::LLVMDialect>();
+                      vector::VectorDialect, func::FuncDialect,
+                      LLVM::LLVMDialect>();
   context.allowUnregisteredDialects();
 
   // Load the MLIR module

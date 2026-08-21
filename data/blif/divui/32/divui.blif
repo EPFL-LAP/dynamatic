@@ -1,0 +1,19 @@
+# Benchmark "divui" written by ABC on Fri Jan 16 16:03:37 2026
+.model divui
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs[10] lhs[11] lhs[12] lhs[13] lhs[14] lhs[15] lhs[16] \
+ lhs[17] lhs[18] lhs[19] lhs[20] lhs[21] lhs[22] lhs[23] lhs[24] lhs[25] \
+ lhs[26] lhs[27] lhs[28] lhs[29] lhs[30] lhs[31] lhs_valid rhs[0] rhs[1] \
+ rhs[2] rhs[3] rhs[4] rhs[5] rhs[6] rhs[7] rhs[8] rhs[9] rhs[10] rhs[11] \
+ rhs[12] rhs[13] rhs[14] rhs[15] rhs[16] rhs[17] rhs[18] rhs[19] rhs[20] \
+ rhs[21] rhs[22] rhs[23] rhs[24] rhs[25] rhs[26] rhs[27] rhs[28] rhs[29] \
+ rhs[30] rhs[31] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result[10] result[11] result[12] \
+ result[13] result[14] result[15] result[16] result[17] result[18] \
+ result[19] result[20] result[21] result[22] result[23] result[24] \
+ result[25] result[26] result[27] result[28] result[29] result[30] \
+ result[31] result_valid lhs_ready rhs_ready
+
+
+.end

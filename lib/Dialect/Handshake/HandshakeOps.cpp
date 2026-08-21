@@ -41,7 +41,10 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Signals.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cassert>
+#include <optional>
 
 using namespace mlir;
 using namespace dynamatic;
@@ -672,7 +675,8 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
   if (width != inputWidth) {
     return memInput.getUsers().begin()->emitError()
            << "Inconsistent bitwidths in inputs, expected signal with " << width
-           << " bits but got signal with " << inputWidth << " bits.";
+           << " bits but got signal with " << inputWidth << " bits for Value "
+           << memInput;
   }
   return success();
 };
@@ -748,13 +752,14 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
           dyn_cast_if_present<IntegerAttr>(portOp->getAttr(BB_ATTR_NAME));
       if (ctrlBlock) {
         portOpBlock = ctrlBlock.getUInt();
-      } else if (isa<handshake::LoadOp, handshake::StoreOp>(portOp)) {
+      } else if (isa<handshake::LoadOp, handshake::StoreOp,
+                     handshake::BurstLoadOp>(portOp)) {
         return portOp->emitError() << "Input operation of memory interface "
                                       "does not belong to any basic block.";
       }
     }
 
-    // Checks wheter an access port belongs to the correct block
+    // Checks wether an access port belongs to the correct block
     auto checkAccessPort = [&]() -> LogicalResult {
       if (portOpBlock != *currentBlockID)
         return mcPorts.memOp->emitError()
@@ -784,6 +789,33 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
       // Add a load port to the group
       currentGroup->accessPorts.push_back(
           LoadPort(loadOp, input.index(), resIdx++));
+      return success();
+    };
+
+    auto handleBurstLoad = [&](handshake::BurstLoadOp loadOp) -> LogicalResult {
+      auto burstLengthInput = *(++currentIt);
+      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth)) ||
+          failed(checkAndSetBitwidth(burstLengthInput.value(),
+                                     mcPorts.burstLenWidth)) ||
+          failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.dataWidth)))
+        return failure();
+
+      if (!currentGroup || portOpBlock != *currentBlockID) {
+        // If this is the first input or if the load belongs to a different
+        // block, allocate a new data stucture for the block's memory ports
+        // (without control)
+        if (failed(getNextBlockID()))
+          return failure();
+        mcPorts.groups.emplace_back();
+        currentGroup = &mcPorts.groups.back();
+      }
+
+      if (failed(checkAccessPort()))
+        return failure();
+
+      // Add a load port to the group
+      currentGroup->accessPorts.push_back(BurstLoadPort(
+          loadOp, input.index(), burstLengthInput.index(), resIdx++));
       return success();
     };
 
@@ -843,6 +875,7 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
       res = llvm::TypeSwitch<Operation *, LogicalResult>(portOp)
                 .Case<handshake::LoadOp>(handleLoad)
                 .Case<handshake::StoreOp>(handleStore)
+                .Case<handshake::BurstLoadOp>(handleBurstLoad)
                 .Case<handshake::LSQOp>(handleLSQ)
                 .Default(handleControl);
     }
@@ -1315,6 +1348,17 @@ LoadPort::LoadPort(handshake::LoadOp loadOp, unsigned addrInputIdx,
 
 handshake::LoadOp LoadPort::getLoadOp() const {
   return cast<handshake::LoadOp>(portOp);
+}
+
+BurstLoadPort::BurstLoadPort(handshake::BurstLoadOp loadOp,
+                             unsigned addrInputIdx,
+                             unsigned burstLengthInputIdx,
+                             unsigned dataOutputIdx)
+    : MemoryPort(loadOp, {addrInputIdx, burstLengthInputIdx}, {dataOutputIdx},
+                 Kind::BURST_LOAD) {}
+
+handshake::BurstLoadOp BurstLoadPort::getLoadOp() const {
+  return cast<handshake::BurstLoadOp>(portOp);
 }
 
 StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)

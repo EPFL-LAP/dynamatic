@@ -92,6 +92,7 @@ struct FrontendState {
   std::string dynamaticPath;
   std::string vivadoPath = "/tools/Xilinx/Vivado/2019.1/";
   std::string fpUnitsGenerator = "flopoco";
+  std::string externalMemoryProtocol = "non-latency-insensitive";
   // By default, the clock period is 4 ns
   double targetCP = 4.0;
   std::optional<std::string> sourcePath = std::nullopt;
@@ -239,6 +240,20 @@ public:
     addPositionalArg({"generator",
                       "floating-point units generator, values are 'flopoco' "
                       "(default option) or 'vivado'"});
+  }
+
+  CommandResult execute(CommandArguments &args) override;
+};
+
+class SetExternalMemoryProtocol : public Command {
+public:
+  SetExternalMemoryProtocol(FrontendState &state)
+      : Command("set-external-memory-protocol",
+                "Sets the external memory protocol to use", state) {
+    addPositionalArg(
+        {"protocol",
+         "external memory protocol, values are 'non-latency-insensitive' "
+         "(default option) or 'latency-insensitive'"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -587,6 +602,26 @@ CommandResult SetFPUnitsGenerator::execute(CommandArguments &args) {
   state.fpUnitsGenerator = generator.str();
   return CommandResult::SUCCESS;
 }
+
+CommandResult SetExternalMemoryProtocol::execute(CommandArguments &args) {
+  if (args.positionals.empty()) {
+    llvm::outs() << ERR << "Please specify a valid external memory protocol.\n"
+                 << "Options: non-latency-insensitive, latency-insensitive\n";
+    return CommandResult::FAIL;
+  }
+
+  StringRef protocol = args.positionals.front();
+
+  if (protocol.empty() || (protocol != "non-latency-insensitive" &&
+                           protocol != "latency-insensitive")) {
+    llvm::outs() << ERR << "Please specify an external memory protocol.\n"
+                 << "Options: non-latency-insensitive, latency-insensitive\n";
+    return CommandResult::FAIL;
+  }
+  state.externalMemoryProtocol = protocol.str();
+  return CommandResult::SUCCESS;
+}
+
 CommandResult SetSrc::execute(CommandArguments &args) {
   if (args.positionals.empty()) {
     llvm::outs() << ERR << "Please specify a non-empty source\n";
@@ -659,10 +694,11 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
   std::string disableLSQ = args.flags.contains(DISABLE_LSQ) ? "1" : "0";
 
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, disableLSQ, fastTokenDelivery);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), sharing,
+                 state.fpUnitsGenerator, state.externalMemoryProtocol,
+                 rigidification, disableLSQ, fastTokenDelivery);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
@@ -786,6 +822,7 @@ int main(int argc, char **argv) {
   commands.add<SetDynamaticPath>(state);
   commands.add<SetVivadoPath>(state);
   commands.add<SetFPUnitsGenerator>(state);
+  commands.add<SetExternalMemoryProtocol>(state);
   commands.add<SetSrc>(state);
   commands.add<SetCP>(state);
   commands.add<Compile>(state);

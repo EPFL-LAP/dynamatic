@@ -57,20 +57,21 @@ if [ "$VIVADO_FPU" = "true" ]; then
 fi
 
 # Copy sources to dedicated folder
-cp "$SRC_DIR/$KERNEL_NAME.c" "$C_SRC_DIR" 
+cp "$SRC_DIR/$KERNEL_NAME-original.c" "$C_SRC_DIR/$KERNEL_NAME.c" 
 # Suppress the error if the header file does not exist (it is optional).
 cp "$SRC_DIR/$KERNEL_NAME.h" "$C_SRC_DIR" 2> /dev/null
 
 # Copy TB supplementary files (memory model, etc.)
 cp "$RESOURCE_DIR/template_tb_join.vhd" "$COSIM_HDL_SRC_DIR/tb_join.vhd"
-cp "$RESOURCE_DIR/template_two_port_RAM.vhd" "$COSIM_HDL_SRC_DIR/two_port_RAM.vhd"
+#cp "$RESOURCE_DIR/template_two_port_RAM.vhd" "$COSIM_HDL_SRC_DIR/two_port_RAM.vhd"
+cp "$RESOURCE_DIR/template_two_port_RAM_li.vhd" "$COSIM_HDL_SRC_DIR/two_port_RAM.vhd"
 cp "$RESOURCE_DIR/template_single_argument.vhd" "$COSIM_HDL_SRC_DIR/single_argument.vhd"
 cp "$RESOURCE_DIR/template_simpackage.vhd" "$COSIM_HDL_SRC_DIR/simpackage.vhd"
 cp "$RESOURCE_DIR/modelsim.ini" "$HLS_VERIFY_DIR/modelsim.ini"
 
 # Compile kernel's main function to generate inputs and golden outputs for the
 # simulation
-"$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME.c" -D HLS_VERIFICATION \
+"$CLANGXX_BIN" "$SRC_DIR/$KERNEL_NAME-original.c" -D HLS_VERIFICATION \
   -DHLS_VERIFICATION_PATH="$SIM_DIR" -I "$DYNAMATIC_DIR/include" \
   -Wno-deprecated -o "$IO_GEN_BIN"
 exit_on_fail "Failed to build kernel for IO gen." "Built kernel for IO gen." 

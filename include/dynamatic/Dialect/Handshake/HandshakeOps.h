@@ -40,6 +40,7 @@ class LoadOp;
 class StoreOp;
 class MemoryControllerOp;
 class LSQOp;
+class BurstLoadOp;
 
 } // end namespace handshake
 } // end namespace dynamatic
@@ -71,6 +72,8 @@ public:
     CONTROL,
     /// Load port (from dynamatic::handshake::LoadOp).
     LOAD,
+    /// Burst load port (from dynamatic::handshake::BurstLoadOp).
+    BURST_LOAD,
     /// Store port (from dynamatic::handshake::StoreOp).
     STORE,
     /// MC load/store port (from dynamatic::handshake::MemoryControllerOp).
@@ -128,7 +131,7 @@ public:
   ControlPort(mlir::Operation *ctrlOp, unsigned ctrlInputIdx);
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  ControlPort(const MemoryPort &memPort) : MemoryPort(memPort) {};
+  ControlPort(const MemoryPort &memPort) : MemoryPort(memPort){};
 
   /// Returns the control operation the port is associated to.
   mlir::Operation *getCtrlOp() const { return portOp; }
@@ -161,7 +164,7 @@ public:
   LoadPort(const LoadPort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LoadPort(const MemoryPort &memPort) : MemoryPort(memPort) {};
+  LoadPort(const MemoryPort &memPort) : MemoryPort(memPort){};
 
   /// Returns the load operation the port is associated to.
   dynamatic::handshake::LoadOp getLoadOp() const;
@@ -177,6 +180,42 @@ public:
   /// Used by LLVM-style RTTI to establish `isa` relationships.
   static inline bool classof(const MemoryPort *port) {
     return port->getKind() == Kind::LOAD;
+  }
+};
+
+class BurstLoadPort : public MemoryPort {
+public:
+  /// Constructs the load port from a load operation, the index of the load's
+  /// address output in the memory interface's inputs, the index of the
+  /// load's data input in the memory interface's outputs, and the specific load
+  /// kind.
+  BurstLoadPort(dynamatic::handshake::BurstLoadOp loadOp, unsigned addrInputIdx,
+                unsigned burstLengthInputIdx, unsigned dataOutputIdx);
+
+  /// Default copy constructor.
+  BurstLoadPort(const BurstLoadPort &other) = default;
+
+  /// Copy-constructor from abstract memory port for LLVM-style RTTI.
+  BurstLoadPort(const MemoryPort &memPort) : MemoryPort(memPort){};
+
+  /// Returns the load operation the port is associated to.
+  dynamatic::handshake::BurstLoadOp getLoadOp() const;
+
+  /// Returns the index of the load address value in the memory interface's
+  /// inputs.
+  unsigned getAddrInputIndex() const { return oprdIndices[0]; }
+
+  /// Returns the index of the load data value in the memory interface's
+  /// outputs.
+  unsigned getDataOutputIndex() const { return resIndices[0]; }
+
+  /// Returns the index of the load burst length value in the memory interface's
+  /// inputs.
+  unsigned getBurstLengthInputIndex() const { return oprdIndices[1]; }
+
+  /// Used by LLVM-style RTTI to establish `isa` relationships.
+  static inline bool classof(const MemoryPort *port) {
+    return port->getKind() == Kind::BURST_LOAD;
   }
 };
 
@@ -197,7 +236,7 @@ public:
   StorePort(const StorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  StorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
+  StorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
 
   /// Returns the store operation the port is associated to.
   dynamatic::handshake::StoreOp getStoreOp() const;
@@ -242,7 +281,7 @@ public:
   LSQLoadStorePort(const LSQLoadStorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  LSQLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
+  LSQLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
 
   /// Returns the LSQ the port is associated to.
   dynamatic::handshake::LSQOp getLSQOp() const;
@@ -296,7 +335,7 @@ public:
   MCLoadStorePort(const MCLoadStorePort &other) = default;
 
   /// Copy-constructor from abstract memory port for LLVM-style RTTI.
-  MCLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort) {};
+  MCLoadStorePort(const MemoryPort &memPort) : MemoryPort(memPort){};
 
   /// Returns the MC the port is associated to.
   dynamatic::handshake::MemoryControllerOp getMCOp() const;
@@ -420,6 +459,8 @@ public:
   unsigned addrWidth = 0;
   /// Bitwidth of data signals.
   unsigned dataWidth = 0;
+  /// Bitwidth of burst length signals.
+  unsigned burstLenWidth = 0;
 
   /// Initializes a function's memory ports from the memory interface it
   /// corresponds to (and without any port).

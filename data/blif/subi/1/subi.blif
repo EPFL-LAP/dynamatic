@@ -1,0 +1,17 @@
+# Benchmark "subi" written by ABC on Fri Jan 16 16:00:12 2026
+.model subi
+.inputs clk rst lhs lhs_valid rhs rhs_valid result_ready
+.outputs result result_valid lhs_ready rhs_ready
+.names lhs rhs new_n12
+11 1
+.names lhs rhs new_n13
+00 1
+.names new_n12 new_n13 result
+00 1
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

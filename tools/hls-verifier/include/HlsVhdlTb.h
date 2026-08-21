@@ -192,19 +192,34 @@ static const string RST_PORT = "rst";
 static const string CE0_PORT = "ce0";
 static const string WE0_PORT = "we0";
 static const string D_IN0_PORT = "din0";
+static const string D_IN0_VALID_PORT = "din0_pValid";
+static const string D_IN0_READY_PORT = "din0_ready";
 static const string D_OUT0_PORT = "dout0";
+static const string D_OUT0_VALID_PORT = "dout0_valid";
+static const string D_OUT0_READY_PORT = "dout0_nReady";
 static const string ADDR0_PORT = "address0";
+static const string ADDR0_VALID_PORT = "address0_pValid";
+static const string ADDR0_READY_PORT = "address0_ready";
 static const string CE1_PORT = "ce1";
 static const string WE1_PORT = "we1";
 static const string D_IN1_PORT = "din1";
+static const string D_IN1_VALID_PORT = "din1_pValid";
+static const string D_IN1_READY_PORT = "din1_ready";
 static const string D_OUT1_PORT = "dout1";
+static const string D_OUT1_VALID_PORT = "dout1_valid";
+static const string D_OUT1_READY_PORT = "dout1_nReady";
 static const string ADDR1_PORT = "address1";
+static const string ADDR1_VALID_PORT = "address1_pValid";
+static const string ADDR1_READY_PORT = "address1_ready";
+static const string BURST_LEN0_PORT = "burstLen0";
+static const string BURST_LEN1_PORT = "burstLen1";
 static const string DONE_PORT = "done";
 static const string IN_FILE_PARAM = "TV_IN";
 static const string OUT_FILE_PARAM = "TV_OUT";
 static const string DATA_WIDTH_PARAM = "DATA_WIDTH";
 static const string ADDR_WIDTH_PARAM = "ADDR_WIDTH";
 static const string DATA_DEPTH_PARAM = "DEPTH";
+static const string BURST_LEN_WIDTH_PARAM = "BURST_LEN_WIDTH";
 
 // Start signal names
 static const string START_VALID = "start_valid";
@@ -299,7 +314,7 @@ inline void declareSTL(mlir::raw_indented_ostream &os, const string &name,
                        std::optional<std::string> size = std::nullopt,
                        std::optional<std::string> initialValue = std::nullopt) {
   os << "signal " << name << " : std_logic";
-  if (size)
+  if (size && *size != "1")
     os << "_vector(" << *size << " - 1 downto 0)";
   if (initialValue)
     os << " := " << *initialValue;

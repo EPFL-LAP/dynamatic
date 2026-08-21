@@ -14,4 +14,5 @@ target_link_libraries(dynamatic-mlir-lsp-server
   MLIRMathDialect
   MLIRMemRefDialect
   MLIRSCFDialect
+  MLIRVectorDialect
 )

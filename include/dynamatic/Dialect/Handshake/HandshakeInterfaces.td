@@ -139,7 +139,35 @@ def MemPortOpInterface : OpInterface<"MemPortOpInterface"> {
         ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
         return concreteOp.getDataResult();
       }]
+    >
+  ];
+}
+
+
+def MemPortBurstOpInterface : OpInterface<"MemPortBurstOpInterface", [MemPortOpInterface]> {
+  let cppNamespace = "::dynamatic::handshake";
+  let description = [{
+    Handshake operations which act as a memory port (load or store) to a memory
+    interface.
+  }];
+
+ let methods = [
+    InterfaceMethod<
+      "Returns the input port for the burst length.",
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>", "getBurstLengthInput",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getBurstLength();
+      }]
     >,
+    InterfaceMethod<
+      "Returns the port's burst length result.",
+      "::mlir::TypedValue<::dynamatic::handshake::ChannelType>", "getBurstLengthResult",
+      (ins), "", [{
+        ConcreteOp concreteOp = mlir::cast<ConcreteOp>($_op);
+        return concreteOp.getBurstLengthResult();
+      }]
+    >
   ];
 }
 

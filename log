@@ -1,0 +1,16 @@
+[INFO] Compiled to LLVM IR
+[INFO] Applied CF transformations
+[INFO] Marked memory accesses with the corresponding interfaces in cf
+[FATAL] Failed to compile cf to handshake
+================================================================================
+============== Dynamatic | Dynamic High-Level Synthesis Compiler ===============
+======================== EPFL-LAP - v2.0.0 | March 2024 ========================
+================================================================================
+
+
+dynamatic> set-dynamatic-path  .
+dynamatic> set-src             integration-test/matrix/matrix.c
+dynamatic> compile             --buffer-algorithm on-merges
+dynamatic> exit
+
+Goodbye!

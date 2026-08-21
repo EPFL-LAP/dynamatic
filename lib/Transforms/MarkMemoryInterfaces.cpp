@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -37,6 +38,8 @@ static Value getMemrefFromOp(Operation *memOp) {
         affine::MemRefAccess access(memOp);
         return access.memref;
       })
+      .Case<vector::TransferReadOp>(
+          [&](auto memrefOp) { return memrefOp.getSource(); })
       .Default([](auto) { return nullptr; });
 }
 
@@ -153,7 +156,7 @@ void MarkMemoryInterfacesPass::markMemoryInterfaces(func::FuncOp funcOp) {
       interfaces[memref].connectAccessToMC(op);
   });
 
-  // Set attributes on memory operations to instruct the tell the rest of the
+  // Set attributes on memory operations to instruct the rest of the
   // pipeline what interface it will eventually connect to
   MLIRContext *ctx = &getContext();
   for (auto &[_, regionInterfaces] : interfaces) {

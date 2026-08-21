@@ -1,0 +1,9 @@
+# Benchmark "divui" written by ABC on Fri Jan 16 16:02:21 2026
+.model divui
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs_valid rhs[0] \
+ rhs[1] rhs[2] rhs[3] rhs[4] rhs[5] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result_valid lhs_ready rhs_ready
+
+
+.end

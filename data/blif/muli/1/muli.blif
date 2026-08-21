@@ -1,0 +1,7 @@
+# Benchmark "muli" written by ABC on Fri Jan 16 16:02:19 2026
+.model muli
+.inputs clk rst lhs lhs_valid rhs rhs_valid result_ready
+.outputs result result_valid lhs_ready rhs_ready
+
+
+.end

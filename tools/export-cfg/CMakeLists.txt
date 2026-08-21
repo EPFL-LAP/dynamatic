@@ -25,4 +25,5 @@ target_link_libraries(export-cfg
   MLIRSCFDialect
   MLIRSupport
   MLIRTransforms
+  MLIRVectorDialect
   )

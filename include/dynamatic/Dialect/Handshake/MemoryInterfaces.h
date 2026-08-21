@@ -48,7 +48,7 @@ public:
                          Value ctrlEnd,
                          const DenseMap<unsigned, Value> &ctrlVals)
       : funcOp(funcOp), memref(memref), memStart(memStart), ctrlEnd(ctrlEnd),
-        ctrlVals(ctrlVals) {};
+        ctrlVals(ctrlVals){};
 
   /// Adds an access port to an MC. The operation must be a load or store
   /// access to an MC. The operation must be tagged with the basic block it
@@ -142,12 +142,14 @@ private:
   Value getCtrl(unsigned block);
 
   using FConnectLoad = std::function<void(handshake::LoadOp, Value)>;
+  using FConnectBurstLoad = std::function<void(handshake::BurstLoadOp, Value)>;
 
   /// For a provided memory interface and its memory ports, invoke the load
   /// connection callback for all load-like operations with successive results
   /// of the memory interface.
   void reconnectLoads(InterfacePorts &ports, Operation *memIfaceOp,
-                      const FConnectLoad &connect);
+                      const FConnectLoad &connect,
+                      const FConnectBurstLoad &burstConnect);
 
   /// Internal implementation of the interface instantiation logic, taking an
   /// additional edge builder argument that was either created using a basic
@@ -156,6 +158,7 @@ private:
   LogicalResult instantiateInterfaces(OpBuilder &builder,
                                       BackedgeBuilder &edgeBuilder,
                                       const FConnectLoad &connect,
+                                      const FConnectBurstLoad &burstConnect,
                                       handshake::MemoryControllerOp &mcOp,
                                       handshake::LSQOp &lsqOp);
 };

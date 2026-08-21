@@ -13,6 +13,8 @@ void matrix(in_int_t inA[A_ROWS][A_COLS], in_int_t inB[A_COLS][B_COLS],
   for (unsigned i = 0; i < A_ROWS; i++) {
     for (unsigned j = 0; j < B_COLS; j++) {
       int sumMult = 0;
+      #pragma clang loop vectorize(enable)
+      #pragma clang loop vectorize_width(32) 
       for (unsigned k = 0; k < A_COLS; k++) {
         sumMult += inA[i][k] * inB[k][j];
       }

@@ -29,9 +29,11 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace dynamatic;
@@ -108,6 +110,18 @@ static Value flattenIndices(ConversionPatternRewriter &rewriter, Location loc,
   return accumulatedArrayIndex;
 }
 
+// Flatten the source of the permutation map.
+static AffineMap flattenPermutationMap(AffineMap map, MemRefType memrefType) {
+  MLIRContext *ctx = map.getContext();
+  // Assert that the result of the initial map is 1D
+  assert(map.getNumResults() == 1 &&
+         "expected permutation map to have a single result");
+  // Generate mapping (d0) -> (d0)
+  AffineExpr d0 = getAffineDimExpr(0, ctx);
+  SmallVector<AffineExpr, 1> dims = {d0};
+  return AffineMap::get(1, 0, dims, ctx);
+}
+
 static bool hasMultiDimMemRef(ValueRange values) {
   return llvm::any_of(values, [](Value v) {
     auto memref = v.getType().dyn_cast<MemRefType>();
@@ -124,7 +138,7 @@ struct LoadOpConversion : public OpConversionPattern<memref::LoadOp> {
 
   LoadOpConversion(NameAnalysis &namer, TypeConverter &converter,
                    MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), namer(namer) {};
+      : OpConversionPattern(converter, ctx), namer(namer){};
 
   LogicalResult
   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
@@ -148,12 +162,50 @@ private:
   NameAnalysis &namer;
 };
 
+struct VectorLoadOpConversion
+    : public OpConversionPattern<vector::TransferReadOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  VectorLoadOpConversion(NameAnalysis &namer, TypeConverter &converter,
+                         MLIRContext *ctx)
+      : OpConversionPattern(converter, ctx), namer(namer){};
+
+  LogicalResult
+  matchAndRewrite(vector::TransferReadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    VectorType type = loadOp.getVectorType();
+    MemRefType memrefType = loadOp.getSource().getType().dyn_cast<MemRefType>();
+    if (isUniDimensional(memrefType) || !memrefType.hasStaticShape() ||
+        /*Already converted?*/ loadOp.getIndices().size() == 1)
+      return failure();
+    Value finalIdx = flattenIndices(rewriter, loadOp.getLoc(),
+                                    loadOp.getIndices(), memrefType);
+    // Flatten the permutation map
+    AffineMap permMap = loadOp.getPermutationMap();
+    if (permMap)
+      permMap = flattenPermutationMap(permMap, memrefType);
+    // Create the new flattened load
+    vector::TransferReadOp flatLoadOp =
+        rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+            loadOp, type, adaptor.getSource(), SmallVector<Value>{finalIdx},
+            permMap ? AffineMapAttr::get(permMap) : nullptr,
+            adaptor.getInBoundsAttr());
+    copyDialectAttr<handshake::MemDependenceArrayAttr>(loadOp, flatLoadOp);
+    namer.replaceOp(loadOp, flatLoadOp);
+    return success();
+  }
+
+private:
+  /// Used to record the operation replacement.
+  NameAnalysis &namer;
+};
+
 struct StoreOpConversion : public OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
   StoreOpConversion(NameAnalysis &namer, TypeConverter &converter,
                     MLIRContext *ctx)
-      : OpConversionPattern(converter, ctx), namer(namer) {};
+      : OpConversionPattern(converter, ctx), namer(namer){};
 
   LogicalResult
   matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
@@ -378,7 +430,8 @@ static void populateFlattenMemRefsLegality(ConversionTarget &target) {
       [](memref::StoreOp op) { return op.getIndices().size() == 1; });
   target.addDynamicallyLegalOp<memref::LoadOp>(
       [](memref::LoadOp op) { return op.getIndices().size() == 1; });
-
+  target.addDynamicallyLegalOp<vector::TransferReadOp>(
+      [](vector::TransferReadOp op) { return op.getIndices().size() == 1; });
   addGenericLegalityConstraint<mlir::cf::CondBranchOp, mlir::cf::BranchOp,
                                func::CallOp, func::ReturnOp, memref::DeallocOp,
                                memref::CopyOp>(target);
@@ -436,8 +489,8 @@ public:
         OperandConversionPattern<memref::CopyOp>, CallOpConversion
         // clang-format on
         >(typeConverter, ctx);
-    patterns.add<LoadOpConversion, StoreOpConversion>(namer, typeConverter,
-                                                      ctx);
+    patterns.add<LoadOpConversion, StoreOpConversion, VectorLoadOpConversion>(
+        namer, typeConverter, ctx);
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
 

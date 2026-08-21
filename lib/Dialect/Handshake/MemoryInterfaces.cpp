@@ -39,7 +39,7 @@ using namespace dynamatic::handshake;
 void MemoryInterfaceBuilder::addMCPort(handshake::MemPortOpInterface portOp) {
   std::optional<unsigned> bb = getLogicBB(portOp);
   assert(bb && "MC port must belong to basic block");
-  if (isa<handshake::LoadOp>(portOp)) {
+  if (isa<handshake::LoadOp, handshake::BurstLoadOp>(portOp)) {
     ++mcNumLoads;
   } else {
     assert(isa<handshake::StoreOp>(portOp) && "invalid MC port");
@@ -65,7 +65,11 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
     loadOp->setOperand(1, dataIn);
   };
-  return instantiateInterfaces(builder, edgeBuilder, connect, mcOp, lsqOp);
+  FConnectBurstLoad burstConnect = [&](BurstLoadOp burstLoadOp, Value dataIn) {
+    burstLoadOp->setOperand(1, dataIn);
+  };
+  return instantiateInterfaces(builder, edgeBuilder, connect, burstConnect,
+                               mcOp, lsqOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
@@ -75,13 +79,18 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
     rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
   };
-  return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
+  FConnectBurstLoad burstConnect = [&](BurstLoadOp burstLoadOp, Value dataIn) {
+    rewriter.updateRootInPlace(burstLoadOp,
+                               [&] { burstLoadOp->setOperand(1, dataIn); });
+  };
+  return instantiateInterfaces(rewriter, edgeBuilder, connect, burstConnect,
+                               mcOp, lsqOp);
 }
 
 LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     OpBuilder &builder, BackedgeBuilder &edgeBuilder,
-    const FConnectLoad &connect, handshake::MemoryControllerOp &mcOp,
-    handshake::LSQOp &lsqOp) {
+    const FConnectLoad &connect, const FConnectBurstLoad &burstConnect,
+    handshake::MemoryControllerOp &mcOp, handshake::LSQOp &lsqOp) {
 
   // Determine interfaces' inputs
   InterfaceInputs inputs;
@@ -148,9 +157,9 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
   // At this point, all load ports are missing their second operand which is the
   // data value coming from a memory interface back to the port
   if (mcOp)
-    reconnectLoads(mcPorts, mcOp, connect);
+    reconnectLoads(mcPorts, mcOp, connect, burstConnect);
   if (lsqOp)
-    reconnectLoads(lsqPorts, lsqOp, connect);
+    reconnectLoads(lsqPorts, lsqOp, connect, burstConnect);
 
   return success();
 }
@@ -160,6 +169,10 @@ MemoryInterfaceBuilder::getMemResultsToInterface(Operation *memOp) {
   // For loads, address output goes to memory
   if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
     return SmallVector<Value, 2>{loadOp.getAddressResult()};
+
+  if (auto tLoadOp = dyn_cast<handshake::BurstLoadOp>(memOp))
+    return SmallVector<Value, 2>{tLoadOp.getAddressResult(),
+                                 tLoadOp.getBurstLengthResult()};
 
   // For stores, all outputs (address and data) go to memory
   auto storeOp = dyn_cast<handshake::StoreOp>(memOp);
@@ -286,14 +299,18 @@ Value MemoryInterfaceBuilder::getCtrl(unsigned block) {
   return groupCtrl->second;
 }
 
-void MemoryInterfaceBuilder::reconnectLoads(InterfacePorts &ports,
-                                            Operation *memIfaceOp,
-                                            const FConnectLoad &connect) {
+void MemoryInterfaceBuilder::reconnectLoads(
+    InterfacePorts &ports, Operation *memIfaceOp, const FConnectLoad &connect,
+    const FConnectBurstLoad &burstConnect) {
   unsigned resIdx = 0;
   for (auto &[_, memGroupOps] : ports) {
     for (Operation *memOp : memGroupOps)
       if (auto loadOp = dyn_cast<handshake::LoadOp>(memOp))
         connect(loadOp, memIfaceOp->getResult(resIdx++));
+      else if (auto tLoadOp = dyn_cast<handshake::BurstLoadOp>(memOp))
+        burstConnect(tLoadOp, memIfaceOp->getResult(resIdx++));
+      else
+        assert(isa<handshake::StoreOp>(memOp) && "invalid memory op");
   }
 }
 

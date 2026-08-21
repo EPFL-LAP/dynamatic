@@ -1,0 +1,8 @@
+# Benchmark "muli" written by ABC on Fri Jan 16 16:02:19 2026
+.model muli
+.inputs clk rst lhs[0] lhs[1] lhs_valid rhs[0] rhs[1] rhs_valid \
+ result_ready
+.outputs result[0] result[1] result_valid lhs_ready rhs_ready
+
+
+.end

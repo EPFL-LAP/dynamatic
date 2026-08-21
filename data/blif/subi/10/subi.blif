@@ -1,0 +1,174 @@
+# Benchmark "subi" written by ABC on Fri Jan 16 16:00:43 2026
+.model subi
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs_valid rhs[0] rhs[1] rhs[2] rhs[3] rhs[4] rhs[5] rhs[6] \
+ rhs[7] rhs[8] rhs[9] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result_valid lhs_ready rhs_ready
+.names lhs[0] rhs[0] new_n39
+10 1
+.names lhs[0] rhs[0] new_n40
+01 1
+.names new_n39 new_n40 result[0]
+00 0
+.names lhs[1] rhs[1] new_n42
+10 1
+.names lhs[1] rhs[1] new_n43
+01 1
+.names new_n42 new_n43 new_n44
+00 1
+.names new_n40 new_n44 new_n45
+01 1
+.names new_n40 new_n44 new_n46
+10 1
+.names new_n45 new_n46 result[1]
+00 1
+.names new_n42 new_n45 new_n48
+00 1
+.names lhs[2] rhs[2] new_n49
+10 1
+.names lhs[2] rhs[2] new_n50
+01 1
+.names new_n49 new_n50 new_n51
+00 1
+.names new_n48 new_n51 new_n52
+01 1
+.names new_n48 new_n51 new_n53
+10 1
+.names new_n52 new_n53 result[2]
+00 1
+.names new_n49 new_n52 new_n55
+00 1
+.names lhs[3] rhs[3] new_n56
+10 1
+.names lhs[3] rhs[3] new_n57
+01 1
+.names new_n56 new_n57 new_n58
+00 1
+.names new_n55 new_n58 new_n59
+11 1
+.names new_n55 new_n58 new_n60
+00 1
+.names new_n59 new_n60 result[3]
+00 0
+.names new_n51 new_n58 new_n62
+11 1
+.names new_n48 new_n62 new_n63
+01 1
+.names new_n49 new_n58 new_n64
+11 1
+.names new_n56 new_n64 new_n65
+00 1
+.names new_n63 new_n65 new_n66
+01 1
+.names lhs[4] rhs[4] new_n67
+10 1
+.names lhs[4] rhs[4] new_n68
+01 1
+.names new_n67 new_n68 new_n69
+00 1
+.names new_n66 new_n69 new_n70
+01 1
+.names new_n66 new_n69 new_n71
+10 1
+.names new_n70 new_n71 result[4]
+00 1
+.names new_n67 new_n70 new_n73
+00 1
+.names lhs[5] rhs[5] new_n74
+10 1
+.names lhs[5] rhs[5] new_n75
+01 1
+.names new_n74 new_n75 new_n76
+00 1
+.names new_n73 new_n76 new_n77
+11 1
+.names new_n73 new_n76 new_n78
+00 1
+.names new_n77 new_n78 result[5]
+00 0
+.names new_n67 new_n76 new_n80
+11 1
+.names new_n74 new_n80 new_n81
+00 1
+.names new_n69 new_n76 new_n82
+11 1
+.names new_n66 new_n82 new_n83
+01 1
+.names new_n81 new_n83 new_n84
+10 1
+.names lhs[6] rhs[6] new_n85
+10 1
+.names lhs[6] rhs[6] new_n86
+01 1
+.names new_n85 new_n86 new_n87
+00 1
+.names new_n84 new_n87 new_n88
+01 1
+.names new_n84 new_n87 new_n89
+10 1
+.names new_n88 new_n89 result[6]
+00 1
+.names new_n85 new_n88 new_n91
+00 1
+.names lhs[7] rhs[7] new_n92
+10 1
+.names lhs[7] rhs[7] new_n93
+01 1
+.names new_n92 new_n93 new_n94
+00 1
+.names new_n91 new_n94 new_n95
+11 1
+.names new_n91 new_n94 new_n96
+00 1
+.names new_n95 new_n96 result[7]
+00 0
+.names new_n87 new_n94 new_n98
+11 1
+.names new_n82 new_n98 new_n99
+11 1
+.names new_n66 new_n99 new_n100
+01 1
+.names new_n81 new_n98 new_n101
+01 1
+.names new_n85 new_n94 new_n102
+11 1
+.names new_n92 new_n102 new_n103
+00 1
+.names new_n101 new_n103 new_n104
+01 1
+.names new_n100 new_n104 new_n105
+01 1
+.names lhs[8] rhs[8] new_n106
+10 1
+.names lhs[8] rhs[8] new_n107
+01 1
+.names new_n106 new_n107 new_n108
+00 1
+.names new_n105 new_n108 new_n109
+01 1
+.names new_n105 new_n108 new_n110
+10 1
+.names new_n109 new_n110 result[8]
+00 1
+.names lhs[9] rhs[9] new_n112
+11 1
+.names lhs[9] rhs[9] new_n113
+00 1
+.names new_n112 new_n113 new_n114
+00 1
+.names new_n106 new_n109 new_n115
+00 1
+.names new_n114 new_n115 new_n116
+01 1
+.names new_n114 new_n115 new_n117
+10 1
+.names new_n116 new_n117 result[9]
+00 0
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

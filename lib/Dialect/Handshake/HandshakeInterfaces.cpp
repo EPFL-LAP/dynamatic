@@ -167,7 +167,9 @@ std::string handshake::SelectOp::getResultName(unsigned idx) {
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
-    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData"),
+    LOAD_BURST_LENGTH("loadBurstLength"),
+    STORE_BURST_LENGTH("storeBurstLength");
 
 static StringRef getIfControlOprd(MemoryOpInterface memOp, unsigned idx) {
   if (!memOp.isMasterInterface())
@@ -204,8 +206,16 @@ static std::string getMemOperandName(const FuncMemoryPorts &ports,
         if (loadPort->getAddrInputIndex() == idx)
           return getArrayElemName(LD_ADDR, loadIdx);
         ++loadIdx;
+      } else if (std::optional<BurstLoadPort> burstLoadPort =
+                     dyn_cast<BurstLoadPort>(accessPort)) {
+        if (burstLoadPort->getAddrInputIndex() == idx)
+          return getArrayElemName(LD_ADDR, loadIdx);
+        if (burstLoadPort->getBurstLengthInputIndex() == idx)
+          return getArrayElemName(LOAD_BURST_LENGTH, loadIdx);
+        ++loadIdx;
       } else {
         std::optional<StorePort> storePort = cast<StorePort>(accessPort);
+        assert(storePort && "port must be load or store");
         if (storePort->getAddrInputIndex() == idx)
           return getArrayElemName(ST_ADDR, storeIdx);
         if (storePort->getDataInputIndex() == idx)
@@ -227,6 +237,11 @@ static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
     for (const MemoryPort &accessPort : blockPorts.accessPorts) {
       if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
         if (loadPort->getDataOutputIndex() == idx)
+          return getArrayElemName(LD_DATA, loadIdx);
+        ++loadIdx;
+      } else if (std::optional<BurstLoadPort> burstLoadPort =
+                     dyn_cast<BurstLoadPort>(accessPort)) {
+        if (burstLoadPort->getDataOutputIndex() == idx)
           return getArrayElemName(LD_DATA, loadIdx);
         ++loadIdx;
       }

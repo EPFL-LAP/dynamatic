@@ -17,7 +17,9 @@ entity two_port_RAM is
     DEPTH : integer;
     -- Bus widths for data and address
     DATA_WIDTH : integer := 32;
-    ADDR_WIDTH : integer
+    ADDR_WIDTH : integer;
+    -- Burst length width
+    BURST_LEN_WIDTH : integer := 32
   );
   port (
     clk  : in std_logic;
@@ -29,12 +31,14 @@ entity two_port_RAM is
     address0  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
     dout0 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
     din0  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    burstLen0 : in  std_logic_vector(BURST_LEN_WIDTH - 1 downto 0);
     -- RAM port-1
     ce1       : in  std_logic;
     we1       : in  std_logic;
     address1  : in  std_logic_vector(ADDR_WIDTH - 1 downto 0);
     dout1 : out std_logic_vector(DATA_WIDTH - 1 downto 0);
-    din1  : in  std_logic_vector(DATA_WIDTH - 1 downto 0)
+    din1  : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
+    burstLen1 : in  std_logic_vector(BURST_LEN_WIDTH - 1 downto 0)
   );
 end two_port_RAM;
 
@@ -112,6 +116,10 @@ begin
 
   -- Transfer: mem-array -> RTL ports ---------------------------------------
   mem_to_port0 : process (clk, rst)
+  -- Signals to keep track if burst read is ongoing
+  variable burst_read_ongoing0 : boolean := false;
+  variable burst_len0           : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
+  variable burst_count0        : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
   begin
     -- Simple memory read
     if (rst = '1') then
@@ -119,13 +127,36 @@ begin
     elsif rising_edge(clk) then
       if (ce0 = '1' and ce1 = '1' and we1 = '1' and address0 = address1) then
         dout0 <= din1 after 0.1 ns;
+      elsif (burst_read_ongoing0 = true) then
+        -- Continue burst read
+        dout0 <= mem(CONV_INTEGER(address0 + burst_len0 - burst_count0)) after 0.1 ns;
+        if (burst_count0 = 1) then
+          -- End burst read
+          burst_read_ongoing0 := false;
+          burst_count0 := (others => '0');
+          burst_len0 := (others => '0');
+        else
+          burst_count0 := burst_count0 - 1;
+        end if;
       elsif (ce0 = '1' and (CONV_INTEGER(address0) < DEPTH)) then
+        if (burstLen0 > 1) then
+          -- Start burst read
+          assert burst_read_ongoing0 = false report "ERROR: New burst read started before previous burst read finished." severity failure;
+          burst_read_ongoing0 := true;
+          burst_count0 := burstLen0 - 1;
+          burst_len0 := burstLen0;
+        end if;
+        -- Output data
         dout0 <= mem(CONV_INTEGER(address0)) after 0.1 ns;
       end if;
     end if;
   end process mem_to_port0;
 
   mem_to_port1 : process (clk, rst)
+  -- Signals to keep track if burst read is ongoing
+  variable burst_read_ongoing1 : boolean := false;
+  variable burst_len1           : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
+  variable burst_count1        : std_logic_vector(BURST_LEN_WIDTH - 1 downto 0) := (others => '0');
   begin
     -- Simple memory read
     if (rst = '1') then
@@ -133,7 +164,26 @@ begin
     elsif rising_edge(clk) then
       if (ce0 = '1' and we0 = '1' and ce1 = '1' and address0 = address1) then
         dout1 <= din0 after 0.1 ns;
+      elsif (burst_read_ongoing1 = true) then
+        -- Continue burst read
+        dout1 <= mem(CONV_INTEGER(address1 + burst_len1 - burst_count1)) after 0.1 ns;
+        if (burst_count1 = 1) then
+          -- End burst read
+          burst_read_ongoing1 := false;
+          burst_count1 := (others => '0');
+          burst_len1 := (others => '0');
+        else
+          burst_count1 := burst_count1 - 1;
+        end if;
       elsif (ce1 = '1' and (CONV_INTEGER(address1) < DEPTH)) then
+        if (burstLen1 > 1) then
+          -- Start burst read
+          assert burst_read_ongoing1 = false report "ERROR: New burst read started before previous burst read finished." severity failure;
+          burst_read_ongoing1 := true;
+          burst_count1 := burstLen1 - 1;
+          burst_len1 := burstLen1;
+        end if;
+        -- Output data
         dout1 <= mem(CONV_INTEGER(address1)) after 0.1 ns;
       end if;
     end if;

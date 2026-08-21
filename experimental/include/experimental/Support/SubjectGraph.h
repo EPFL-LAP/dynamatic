@@ -100,6 +100,9 @@ public:
   // static map that holds all Operation/Subject Graph Pairs
   static inline DenseMap<Operation *, BaseSubjectGraph *> moduleMap;
 
+  // Return name of the SubjectGraph
+  std::string getNameSG() const;
+
   // A vector of all BaseSubjectGraphs. This is not a subset of the Values of
   // moduleMap, since not all of the SubjectGraphs are created from Operations
   // (Buffers will be inserted to ensure acyclicity).

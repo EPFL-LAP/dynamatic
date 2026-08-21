@@ -1,0 +1,16 @@
+# Benchmark "subi" written by ABC on Fri Jan 16 16:00:21 2026
+.model subi
+.inputs clk rst lhs[0] lhs[1] lhs[2] lhs[3] lhs[4] lhs[5] lhs[6] lhs[7] \
+ lhs[8] lhs[9] lhs[10] lhs[11] lhs[12] lhs[13] lhs[14] lhs_valid rhs[0] \
+ rhs[1] rhs[2] rhs[3] rhs[4] rhs[5] rhs[6] rhs[7] rhs[8] rhs[9] rhs[10] \
+ rhs[11] rhs[12] rhs[13] rhs[14] rhs_valid result_ready
+.outputs result[0] result[1] result[2] result[3] result[4] result[5] \
+ result[6] result[7] result[8] result[9] result[10] result[11] result[12] \
+ result[13] result[14] result_valid lhs_ready rhs_ready
+.names lhs_valid rhs_valid result_valid
+11 1
+.names rhs_valid result_ready lhs_ready
+11 1
+.names lhs_valid result_ready rhs_ready
+11 1
+.end

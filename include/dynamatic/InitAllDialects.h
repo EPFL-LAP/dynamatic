@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 namespace dynamatic {
 
@@ -32,7 +33,8 @@ inline void registerAllDialects(mlir::DialectRegistry &registry) {
                   mlir::math::MathDialect, mlir::memref::MemRefDialect,
                   mlir::func::FuncDialect, mlir::arith::ArithDialect,
                   mlir::cf::ControlFlowDialect, mlir::scf::SCFDialect,
-                  handshake::HandshakeDialect, hw::HWDialect>();
+                  mlir::vector::VectorDialect, handshake::HandshakeDialect,
+                  hw::HWDialect>();
 }
 
 } // namespace dynamatic

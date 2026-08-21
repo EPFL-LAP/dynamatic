@@ -695,6 +695,8 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
          through a constant indicating the number of store operations in the 
          block.
       b. Load/Store access requests from within the block, in program order.
+         For each request, there might be an additional input representing
+         the burst length, if the memory operation is a burst operation.
     2. If an LSQ references the same memory region:
       a. Control signals from basic blocks containing store ports to the LSQ but
          not directly to the MC. These have the same semantics as the control
@@ -872,6 +874,38 @@ class Handshake_MemPortOp<
   }];
 }
 
+class Handshake_BurstMemPortOp<
+    string mnemonic, list<Trait> customTraits, list<OpBuilder> customBuilders> :
+  Handshake_Op<mnemonic, customTraits # [
+    MemPortBurstOpInterface,
+    AllDataTypesMatch<["address", "addressResult"]>,
+    AllDataTypesMatch<["data", "dataResult"]>,
+    DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>,
+    IsIntChannel<"address">,
+    IsIntChannel<"addressResult">,
+    IsIntChannel<"burstLengthResult">
+  ]
+> {
+  let arguments = (ins ChannelType:$address, ChannelType:$data, ChannelType:$burstLength);
+  let results = (outs ChannelType:$addressResult, ChannelType:$dataResult, ChannelType:$burstLengthResult);
+
+  let builders = customBuilders # [
+    // Unless otherwise specified, addressResult/dataResult type is the same as
+    // address/data type.
+    OpBuilder<(ins "::mlir::Value":$address, "::mlir::Value":$data, "::mlir::Value":$burstLength), [{
+      $_state.addOperands({address, data, burstLength});
+      // Specify {addressResult type, dataResult type}
+      $_state.addTypes({address.getType(), data.getType(), 
+        ::dynamatic::handshake::ChannelType::get($_builder.getI32Type())});
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    `[` $address `]` $data $burstLength attr-dict `:` type($address)`,` type($data) `,` type($burstLength) `,`
+    type($addressResult) `,` type($dataResult) `,` type($burstLengthResult)
+  }];
+}
+
 def LoadOp : Handshake_MemPortOp<"load", [
   AllExtraSignalsMatch<["address", "dataResult"]>,
   // In LoadOp, addressResult and data are connected to a memory controller.
@@ -922,6 +956,70 @@ def LoadOp : Handshake_MemPortOp<"load", [
     std::string $cppClass::getResultName(unsigned idx) {
       assert(idx < getNumResults() && "index too high");
       return (idx == 0) ? "addrOut" : "dataOut";
+    }
+  }];
+}
+
+// BurstLoadOp corresponds to vector::transfer_load in MLIR.
+// For now, only address and data are supported as operands since 
+// the other vector features are not yet needed.
+def BurstLoadOp : Handshake_BurstMemPortOp<"burstLoad", [
+  AllExtraSignalsMatch<["address", "dataResult"]>,
+  // In LoadOp, addressResult and data are connected to a memory controller.
+  IsSimpleHandshake<"addressResult">,
+  IsSimpleHandshake<"data">,
+  IsSimpleHandshake<"burstLengthResult">
+], [
+  // TODO: Please add comments on why this builder is necessary
+  OpBuilder<(ins "MemRefType":$memrefType, "Value":$address, "Value":$burstLength), [{
+    // Address (data operand needs to be added later)
+    // TODO: Please describe to us when and where the data operand is added
+    $_state.addOperands(address);
+    $_state.addOperands(burstLength);
+
+    // Data and address results
+    $_state.types.push_back(address.getType());
+    $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
+      memrefType.getElementType()));
+    // Burst length result
+    $_state.types.push_back(::dynamatic::handshake::ChannelType::get(
+      $_builder.getI32Type()));
+  }]>
+]> {
+  let summary = "load port for memory interface";
+  let description = [{
+    Represents a load memory port which sends load requests to a memory
+    interface. It receives an address from a dataflow predecessor and a data
+    value from the memory interface that eventually holds the loaded data. It
+    returns an address that is sent to the memory interface as well as a data
+    value that is sent to its dataflow successor. This operation differs from
+    LoadOp since it assumes that the load request is a burst load.
+
+    The order of operands is
+    1. address (from predecessor)
+    2. data value (from memory interface)
+
+    The order of results is
+    1. address (to memory interface).
+    2. data value (to successor)
+    3. burst length (to memory interface)
+
+    Example:
+
+    ```mlir
+    %addrOut, %dataOut, %burstLengthResult = burstLoad [%addrIn] %dataFromMem %burstLength : <i32>, <i32>, <i32>
+    ```
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx) {
+      assert(idx < getNumOperands() && "index too high");
+      return (idx == 0) ? "addrIn" : (idx == 1) ? "dataFromMem" : "burstLength";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx) {
+      assert(idx < getNumResults() && "index too high");
+      return (idx == 0) ? "addrOut" : (idx == 1) ? "dataOut" : "burstLengthResult";
     }
   }];
 }
