@@ -817,6 +817,11 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.noti",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t noti -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.br",
     "parameters": [
       {
