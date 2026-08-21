@@ -31,9 +31,9 @@ using namespace dynamatic::buffer::fpga20;
 
 FPGA20Buffers::FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
                              FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                             double targetPeriod, StringRef writeTo)
+                             double targetPeriod, StringRef writeTo, bool ftd)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                          Algorithm::FPGA20, writeTo) {
+                          Algorithm::FPGA20, writeTo, ftd) {
   if (!unsatisfiable)
     setup();
 }
@@ -68,11 +68,14 @@ void FPGA20Buffers::extractResult(BufferPlacement &placement) {
 
     // See docs/Specs/Buffering.md
     // In FPGA20, buffers only break the data and valid paths.
-    // We insert TEHBs after all Merge-like operations to break the ready paths.
-    // We only break the ready path if the channel is on cycle.
+    // We insert TEHBs after Merge-like and Init operations to break ready
+    // paths. We only break the ready path if the channel is on cycle.
     Operation *srcOp = channel.getDefiningOp();
-    if (isa_and_nonnull<handshake::MuxOp, handshake::MergeOp>(srcOp) &&
-        srcOp->getNumOperands() > 1 && isChannelOnCycle(channel)) {
+    bool needsReadyPathBuffer =
+        isa_and_nonnull<handshake::InitOp>(srcOp) ||
+        (isa_and_nonnull<handshake::MuxOp, handshake::MergeOp>(srcOp) &&
+         srcOp->getNumOperands() > 1);
+    if (needsReadyPathBuffer && isChannelOnCycle(channel)) {
       result.numOneSlotR = 1;
     }
 

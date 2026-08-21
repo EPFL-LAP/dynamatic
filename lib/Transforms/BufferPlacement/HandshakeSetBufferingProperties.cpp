@@ -183,6 +183,17 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
+  // Init ops replace init-merge patterns on loop backedges, so their output
+  // also needs at least one buffer slot when it participates in a cycle.
+  for (handshake::InitOp initOp : funcOp.getOps<handshake::InitOp>()) {
+    for (OpResult initRes : initOp->getResults()) {
+      Channel channel(initRes, true);
+      if (isChannelOnCycle(initRes)) {
+        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
+      }
+    }
+  }
+
   // See docs/Specs/Buffering.md
   // To mitigate the latency asymmetry between LSQ group allocation
   // and the Store/Load operations, we set a minimum number of buffer

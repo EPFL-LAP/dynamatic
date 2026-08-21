@@ -768,7 +768,7 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
     handshake::FuncOp funcOp, ConversionPatternRewriter &rewriter,
     const DenseMap<Value, unsigned> &memrefToFuncArgIndex,
     BackedgeBuilder &edgeBuilder,
-    LowerFuncToHandshake::MemInterfacesInfo &memInfo, bool isFtd) const {
+    LowerFuncToHandshake::MemInterfacesInfo &memInfo) const {
   // Count the number of memory regions in the function, and derive the starting
   // index of memory start arguments
   auto funcArgs = funcOp.getArguments();
@@ -871,16 +871,6 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
               namer.replaceOp(loadOp, newOp);
               Value dataOut = newOp.getDataResult();
               rewriter.replaceOp(loadOp, dataOut);
-
-              // /!\ In FTD, the way operations are converted between dialects
-              // is done in a way that both operations from `cf` to `handshake`
-              // coexist in some intertwined way. New operations from the
-              // `handshake` dialect are instantiated while connected to the old
-              // `cf` versions. When rewriting, we found that this call is
-              // necessary to avoid having a "null operand found" error (e.g.
-              // get_tanh)
-              if (isFtd)
-                loadOp.getResult().replaceAllUsesWith(dataOut);
 
               return newOp;
             })
@@ -1728,7 +1718,8 @@ struct CfToHandshakePass
         OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
         OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
         OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>
+        OneToOneConversion<math::AbsFOp, handshake::AbsFOp>,
+        OneToOneConversion<math::AbsIOp, handshake::AbsIOp>
         // clang-format on
         >(getAnalysis<NameAnalysis>(), converter, ctx);
 

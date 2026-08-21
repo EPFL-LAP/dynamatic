@@ -155,7 +155,8 @@ static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   }
 }
 
-CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
+CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
+             const DenseSet<Value> *backwardChannels)
     : numExecs(numExec) {
 
   // Identify the block that starts the CFDFC; it's the only one that is both
@@ -214,6 +215,26 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       else
         dstBB = *optBB;
 
+      if (backwardChannels) {
+        if (!cycle.contains(dstBB))
+          continue;
+
+        // FTD circuits may contain channels between blocks without a matching
+        // CFG edge. Include every non-backward channel whose endpoints belong
+        // to the cycle. Include backward channels only when they correspond to
+        // an edge in the CFG cycle currently being modeled.
+        if (!backwardChannels->contains(res))
+          channels.insert(res);
+        else {
+          // Record all identified backward channels as backedges, but include
+          // them as CFDFC channels only if they are compliant with the CFG.
+          backedges.insert(res);
+          if (isCFGCompliant(srcBB, dstBB))
+            channels.insert(res);
+        }
+        continue;
+      }
+
       if (srcBB != dstBB) {
         // The channel is in the CFDFC if it belongs belong to a selected arch
         // between two basic blocks
@@ -239,6 +260,15 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
       }
     }
   }
+}
+
+bool CFDFC::isCFGCompliant(unsigned srcBB, unsigned dstBB) const {
+  for (size_t i = 0; i < cycle.size(); ++i) {
+    unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+    if (srcBB == cycle[i] && dstBB == cycle[nextBB])
+      return true;
+  }
+  return false;
 }
 
 bool CFDFC::isCFDFCBackedge(Value val) {
