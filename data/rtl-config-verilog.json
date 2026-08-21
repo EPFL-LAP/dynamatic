@@ -199,11 +199,21 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.maxui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/maxui.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.minsi",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/minsi.v",
+    "dependencies": ["join_type"],
     "hdl": "verilog"
   },
   {
@@ -212,6 +222,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/minui.v",
+    "dependencies": ["join_type"],
     "hdl": "verilog"
   },
   {

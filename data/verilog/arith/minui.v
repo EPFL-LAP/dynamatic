@@ -1,22 +1,30 @@
-module minsi #(
-    parameter DATA_TYPE = 32
+`timescale 1ns/1ps
+module minui #(
+  parameter DATA_TYPE = 32
 )(
-    input  wire                     clk,
-    input  wire                     rst,
-    input  wire [DATA_TYPE-1:0]     lhs,
-    input  wire                     lhs_valid,
-    input  wire [DATA_TYPE-1:0]     rhs,
-    input  wire                     rhs_valid,
-    input  wire                     result_ready,
-
-    output wire [DATA_TYPE-1:0]     result,
-    output wire                     result_valid,
-    output wire                     lhs_ready,
-    output wire                     rhs_ready
+  // inputs
+  input  clk,
+  input  rst,
+  input  [DATA_TYPE - 1 : 0] lhs,
+  input  lhs_valid,
+  input  [DATA_TYPE - 1 : 0] rhs,
+  input  rhs_valid,
+  input  result_ready,
+  // outputs
+  output [DATA_TYPE - 1 : 0] result,
+  output result_valid,
+  output lhs_ready,
+  output rhs_ready
 );
-    assign result = ($unsigned(lhs) < $unsigned(rhs)) ? lhs : rhs;
+  // Instantiate the join node
+  join_type #(
+    .SIZE(2)
+  ) join_inputs (
+    .ins_valid  ({rhs_valid, lhs_valid}),
+    .outs_ready (result_ready             ),
+    .ins_ready  ({rhs_ready, lhs_ready}  ),
+    .outs_valid (result_valid             )
+  );
 
-    assign result_valid = lhs_valid & rhs_valid;
-    assign lhs_ready     = result_ready & rhs_valid;
-    assign rhs_ready     = result_ready & lhs_valid;
+  assign result = ($unsigned(lhs) < $unsigned(rhs)) ? lhs : rhs;
 endmodule
