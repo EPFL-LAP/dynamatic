@@ -767,6 +767,7 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     Tiny, FtdWithSimpleBuffersFixture,
     testing::Values(
+      // Benchmarks used in FPL '22 "FTD" paper
       "fir",
       "if_loop_add",
       "if_loop_mul",
@@ -776,7 +777,18 @@ INSTANTIATE_TEST_SUITE_P(
       "kernel_3mm",
       "kmp",
       "gcd",
-      "bicg"
+      "bicg",
+      // Additional benchmarks used in FPGA '23 "straight to the queue" paper
+      "get_tanh",
+      "covariance",
+      "jacobi_1d_imper",
+      "atax",
+      "triangular",
+      "histogram",
+      // Additional benchmarks used in FPGA '24 "survival of the fastest" paper
+      "gsum",
+      "gemm",
+      "mvt_float"
       ),
       [](const auto &info) { return info.param; });
 
