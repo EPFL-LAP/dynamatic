@@ -1397,32 +1397,32 @@ void BufferPlacementMILP::addBackedgeConstraints(
 void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
     ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
     ArrayRef<CFDFC *> cfdfcs, const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
-    llvm::MapVector<Value, CPVar> &channelOccupancy) {
+    llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+        &cfdfcChannelOccupancy) {
 
+  // We loop through all reconvergent paths.
   for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
     const ReconvergentPath &rp = pathWithGraph.path;
     const CFGTransitionSequenceSubgraph *graph = pathWithGraph.graph;
     const DataflowGraphNode &forkNode = graph->nodes[rp.forkNodeId];
 
-    // We skip paths whose fork is outside all CFDFCs.
     if (forkNode.type == DataflowGraphNode::REGULAR &&
         llvm::none_of(cfdfcs, [&](CFDFC *cfdfc) {
           return cfdfc->units.contains(forkNode.op);
         }))
       continue;
 
+    // Get all simple paths between the fork and join nodes.
     std::vector<SimplePath> simplePaths =
         enumerateSimplePaths(*graph, rp.forkNodeId, rp.joinNodeId, rp.nodeIds);
     if (simplePaths.size() < 2)
       continue;
 
-    // For each simple path, the sum of channel occupancies (N_c) and the total
-    // latency of the units.
-    std::vector<std::pair<LinExpr, double>> pathTerms;
+    // Add up the latency of all simple paths.
+    SmallVector<double> latencySums;
+    latencySums.reserve(simplePaths.size());
     for (const auto &path : simplePaths) {
-      LinExpr occupancySum;
       double latencySum = 0.0;
-
       for (NodeIdType nodeId : path.nodes) {
         if (nodeId == rp.forkNodeId || nodeId == rp.joinNodeId)
           continue;
@@ -1434,32 +1434,40 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
         if (succeeded(latOrFail) && *latOrFail > 0.0)
           latencySum += *latOrFail;
       }
-
-      for (EdgeIdType edgeId : path.edges) {
-        Value channel = graph->edges[edgeId].channel;
-        if (channelOccupancy.count(channel))
-          occupancySum += channelOccupancy[channel];
-      }
-
-      pathTerms.emplace_back(std::move(occupancySum), latencySum);
+      latencySums.push_back(latencySum);
     }
 
-    // (Paper: Section 5, Equation 11): Occupancy(p0) = Occupancy(pi)
+    // We loop through all CFDFCs and add the occupancy constraints.
     for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
       if (forkNode.type == DataflowGraphNode::REGULAR &&
           !cfdfc->units.contains(forkNode.op))
         continue;
 
+      auto *occIt = cfdfcChannelOccupancy.find(cfdfc);
+      if (occIt == cfdfcChannelOccupancy.end())
+        continue;
+
       double cfdfcII = std::max(1.0, cfdfcIIs.lookup(cfdfc));
+      SmallVector<LinExpr> occupancySums;
+      occupancySums.reserve(simplePaths.size());
+      for (const auto &path : simplePaths) {
+        LinExpr occupancySum;
+        for (EdgeIdType edgeId : path.edges) {
+          Value channel = graph->edges[edgeId].channel;
+          auto *chIt = occIt->second.find(channel);
+          if (chIt != occIt->second.end())
+            occupancySum += chIt->second;
+        }
+        occupancySums.push_back(std::move(occupancySum));
+      }
 
-      for (size_t i = 1; i < pathTerms.size(); ++i) {
-        auto &[vars0, lat0] = pathTerms[0];
-        auto &[varsI, latI] = pathTerms[i];
-
+      // Make sure the occupancy is the same accross all simple paths.
+      for (size_t i = 1; i < occupancySums.size(); ++i) {
         std::string name =
             llvm::formatv("pathOccEq_{0}_cfdfc{1}_{2}", pathIdx, cfdfcIdx, i)
                 .str();
-        model->addConstr(vars0 + lat0 / cfdfcII == varsI + latI / cfdfcII,
+        model->addConstr(occupancySums[0] + latencySums[0] / cfdfcII ==
+                             occupancySums[i] + latencySums[i] / cfdfcII,
                          name);
       }
     }

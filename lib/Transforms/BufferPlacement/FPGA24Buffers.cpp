@@ -168,7 +168,7 @@ void OccupancyBalancingLP::setup() {
   /// (Paper: Section 5, Equations 10-11): Path occupancy equality.
   addPathOccupancyEqualityConstraints(reconvergentPaths, cfdfcs,
                                       latencyResult.cfdfcTargetIIs,
-                                      maxChannelOccupancy);
+                                      cfdfcChannelOccupancy);
 
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c).
   this->setOccupancyBalancingObjective(maxChannelOccupancy);
