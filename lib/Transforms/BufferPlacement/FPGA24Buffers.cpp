@@ -158,52 +158,20 @@ void OccupancyBalancingLP::setup() {
 
   /// (Paper: Section 5, Table 2)
   /// N_c: Maximal token occupancy on channel c.
-  this->addOccupancyVars(allChannels, channelOccupancy, MAX_OCCUPANCY);
+  this->addOccupancyVars(allChannels, cfdfcs, cfdfcChannelOccupancy, maxChannelOccupancy, MAX_OCCUPANCY);
 
-  /// (Paper: Section 5, Equation 8): N_c >= L_c / II
-  /// Per-channel lower bound ensuring the pipeline has enough tokens in flight.
-  /// For non-CFDFC channels (executed once), N_c >= 1 suffices.
-  /// We only apply the occupancy constraints to the patterns that are part of a CFDFC,
-  /// therefore we filter out the channels that are not part of a CFDFC first.
-  llvm::MapVector<Value, double> requiredOccupancy;
-  for (Value channel : allChannels) {
-    unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
-
-    bool inCfdfc = llvm::any_of(cfdfcs, [&](CFDFC *cfdfc) {
-      return cfdfc->channels.contains(channel);
-    });
-
-    requiredOccupancy[channel] =
-      inCfdfc ? static_cast<double>(latency) / targetII : 
-      (latency > 0) ? 1.0 : 0.0;
-  }
-
-  /// (Paper: Section 5, Equation 15): Take the maximum across per-CFDFC IIs.
-  for (CFDFC *cfdfc : cfdfcs) {
-    double cfdfcII = latencyResult.cfdfcTargetIIs.lookup(cfdfc);
-    if (cfdfcII < 1.0)
-      continue;
-    for (Value channel : cfdfc->channels) {
-      if (!requiredOccupancy.count(channel))
-        continue;
-      unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
-      double specificOcc = static_cast<double>(latency) / cfdfcII;
-      if (specificOcc > requiredOccupancy[channel])
-        requiredOccupancy[channel] = specificOcc;
-    }
-  }
-
-  addMinOccupancyConstraints(requiredOccupancy, channelOccupancy);
-  addBackedgeConstraints(cfdfcs, channelOccupancy);
-  addChannelPropertyOccupancyConstraints(channelOccupancy);
+  addMinOccupancyConstraints(cfdfcs, latencyResult.cfdfcTargetIIs, latencyResult.channelExtraLatency, cfdfcChannelOccupancy);
+  addMaxOccupancyConstraints(cfdfcChannelOccupancy, maxChannelOccupancy);
+  addBackedgeConstraints(cfdfcs, maxChannelOccupancy);
+  addChannelPropertyOccupancyConstraints(maxChannelOccupancy);
 
   /// (Paper: Section 5, Equations 10-11): Path occupancy equality.
   addPathOccupancyEqualityConstraints(reconvergentPaths, cfdfcs,
                                       latencyResult.cfdfcTargetIIs,
-                                      channelOccupancy);
+                                      maxChannelOccupancy);
 
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c).
-  this->setOccupancyBalancingObjective(channelOccupancy);
+  this->setOccupancyBalancingObjective(maxChannelOccupancy);
 
   markReadyToOptimize();
 }
@@ -245,7 +213,7 @@ void OccupancyBalancingLP::addChannelPropertyOccupancyConstraints(
 }
 
 void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
-  for (auto &[channel, var] : channelOccupancy) {
+  for (auto &[channel, var] : maxChannelOccupancy) {
     double occupancy = model->getValue(var);
     unsigned numSlots = static_cast<unsigned>(std::ceil(occupancy));
 

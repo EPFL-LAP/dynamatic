@@ -14,13 +14,16 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
+#include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/IndentedOstream.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/iterator_range.h"
@@ -1304,12 +1307,27 @@ void BufferPlacementMILP::addSyncCycleVars(
 }
 
 void BufferPlacementMILP::addOccupancyVars(
-    ValueRange channels, llvm::MapVector<Value, CPVar> &channelOccupancy,
+    ArrayRef<Value> allChannels,
+    ArrayRef<CFDFC *> cfdfcs, 
+    llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy,
+    llvm::MapVector<Value, CPVar> &maxChannelOccupancy,
     double maxOccupancy) {
-  for (Value channel : channels) {
+  for (Value channel : allChannels) {
     std::string name = getUniqueName(*channel.getUses().begin());
-    channelOccupancy[channel] =
-        model->addVar("n_" + name, REAL, 0.0, maxOccupancy);
+    maxChannelOccupancy[channel] =
+        model->addVar("nMax_" + name, REAL, 0.0, maxOccupancy);
+  }
+  for (auto [i, cfdfc] : llvm::enumerate(cfdfcs)) {
+    for (Value channel : cfdfc->channels) {
+      // Skip the memref channels that have no N_max.
+      if (!maxChannelOccupancy.count(channel))
+        continue;
+
+      std::string name = getUniqueName(*channel.getUses().begin());
+      cfdfcChannelOccupancy[cfdfc][channel] = model->addVar(
+        "n_" + name + "_cfdfc" + std::to_string(i), REAL, 0.0, maxOccupancy
+      );
+    }
   }
 }
 
@@ -1326,25 +1344,51 @@ void BufferPlacementMILP::setOccupancyBalancingObjective(
 }
 
 void BufferPlacementMILP::addMinOccupancyConstraints(
-    const llvm::MapVector<Value, double> &requiredOccupancy,
-    llvm::MapVector<Value, CPVar> &channelOccupancy) {
-  for (auto const &[channel, minOccupancy] : requiredOccupancy) {
-    model->addConstr(channelOccupancy[channel] >= minOccupancy,
-                     "n_c>=(L_c/II)" +
-                         getUniqueName(*channel.getUses().begin()));
+  ArrayRef<CFDFC *> cfdfcs,
+  const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+  const llvm::MapVector<Value, unsigned> &channelExtraLatency,
+  llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy) {
+
+  for (auto [i, cfdfc] : llvm::enumerate(cfdfcs)) {
+    double cfdfcII = cfdfcIIs.lookup(cfdfc);
+    if (cfdfcII < 1.0) continue;
+
+    auto *occIt = cfdfcChannelOccupancy.find(cfdfc);
+    if (occIt == cfdfcChannelOccupancy.end()) continue;
+
+    for (auto &[channel, nCfc] : occIt->second) {
+      double lat = channelExtraLatency.lookup(channel);
+      std::string name = getUniqueName(*channel.getUses().begin());
+      model->addConstr(nCfc >= lat / cfdfcII,
+                      "nCfc>=(L_c/II): " + name + "_cfdfc" + std::to_string(i));
+    }
+  }
+}
+
+void BufferPlacementMILP::addMaxOccupancyConstraints(
+  llvm::MapVector<CFDFC* , llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy,
+  llvm::MapVector<Value, CPVar> &maxChannelOccupancy) {
+  for (auto [i, cfdfcAndOcc] : llvm::enumerate(cfdfcChannelOccupancy)) {
+    auto &[cfdfc, occMap] = cfdfcAndOcc;
+    for (auto &[channel, nCfc] : occMap) {
+      auto *maxOccIt = maxChannelOccupancy.find(channel);
+      if (maxOccIt == maxChannelOccupancy.end()) continue;
+
+      std::string name = getUniqueName(*channel.getUses().begin());
+      model->addConstr(maxOccIt->second >= nCfc,
+        "N_max>=N_c: " + name + "_cfdfc" + std::to_string(i));
+    }
   }
 }
 
 void BufferPlacementMILP::addBackedgeConstraints(
     ArrayRef<CFDFC *> cfdfcs, llvm::MapVector<Value, CPVar> &channelOccupancy) {
-  size_t cycleConstraints = 0;
   for (size_t i = 0; i < cfdfcs.size(); ++i) {
     CFDFC *cfdfc = cfdfcs[i];
     for (Value channel : cfdfc->backedges) {
       if (channelOccupancy.count(channel)) {
         model->addConstr(channelOccupancy[channel] >= 1.0,
                          "backedge_" + std::to_string(i));
-        cycleConstraints++;
       }
     }
   }
