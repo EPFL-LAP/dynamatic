@@ -170,6 +170,8 @@ void OccupancyBalancingLP::setup() {
                                       latencyResult.cfdfcTargetIIs,
                                       cfdfcChannelOccupancy);
 
+  addCycleOccupancyConstraints(cfdfcs, latencyResult.cfdfcTargetIIs, cfdfcChannelOccupancy);
+
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c).
   this->setOccupancyBalancingObjective(maxChannelOccupancy);
 

@@ -15,6 +15,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/LatencyAndOccupancyBalancingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
@@ -1377,6 +1378,58 @@ void BufferPlacementMILP::addMaxOccupancyConstraints(
       std::string name = getUniqueName(*channel.getUses().begin());
       model->addConstr(maxOccIt->second >= nCfc,
         "N_max>=N_c: " + name + "_cfdfc" + std::to_string(i));
+    }
+  }
+}
+
+void BufferPlacementMILP::addCycleOccupancyConstraints(
+  ArrayRef<CFDFC *> cfdfcs,
+  const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+  llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy) {
+  // For dataflow circuits generated from sequential programs, B = 1,
+  // i.e., there must be no more than one token per cyclic path during
+  // the steady state of the choice-free circuit. (Paper: Section 5, Equation 12)
+  constexpr double maxTokensInCycle = 1.0;
+
+  for (auto [i, cfdfc] : llvm::enumerate(cfdfcs)) {
+    auto *occIt = cfdfcChannelOccupancy.find(cfdfc);
+    if (occIt == cfdfcChannelOccupancy.end()) continue;
+
+    double ii = std::max(1.0, cfdfcIIs.lookup(cfdfc));
+    SynchronizingCyclesFinderGraph graph(funcInfo.funcOp, *cfdfc);
+
+    for (auto [cycleIdx, cycle] : llvm::enumerate(graph.findAllCycles())) {
+      LinExpr occupancy; 
+
+      for (NodeIdType nodeId : cycle.nodes) {
+        const DataflowGraphNode &node = graph.nodes[nodeId];
+        if (node.type != DataflowGraphNode::REGULAR)
+          continue;
+
+        auto lat = timingDB.getLatency(node.op, SignalType::DATA, targetPeriod);
+        if (succeeded(lat) && *lat > 0.0)
+          occupancy += *lat / ii;
+      }
+
+      auto findChannel = [&](NodeIdType src, NodeIdType dst) {
+        for (EdgeIdType edgeId : graph.adjList[src])
+          if (graph.edges[edgeId].dstId == dst)
+            return graph.edges[edgeId].channel;
+        llvm_unreachable("Edge not found");
+        return Value();
+      };
+
+      for (size_t n = 0; n < cycle.nodes.size(); ++n) {
+        Value channel = findChannel(cycle.nodes[n],
+                                    cycle.nodes[(n + 1) % cycle.nodes.size()]);
+        auto *chIt = occIt->second.find(channel);
+        if (chIt != occIt->second.end())
+          occupancy += chIt->second;
+      }
+
+      model->addConstr(occupancy <= maxTokensInCycle,
+                  llvm::formatv("eq12_cfdfc{0}_cycle{1}", i, cycleIdx).str());
+
     }
   }
 }
