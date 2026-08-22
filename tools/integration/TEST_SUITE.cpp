@@ -778,17 +778,23 @@ INSTANTIATE_TEST_SUITE_P(
       "kmp",
       "gcd",
       "bicg",
-      // Additional benchmarks used in FPGA '23 "straight to the queue" paper
+      // More benchmarks used in FPGA '23 "straight to the queue" paper
       "get_tanh",
       "covariance",
       "jacobi_1d_imper",
       "atax",
       "triangular",
       "histogram",
-      // Additional benchmarks used in FPGA '24 "survival of the fastest" paper
+      // More benchmarks used in FPGA '24 "survival of the fastest" paper
       "gsum",
       "gemm",
-      "mvt_float"
+      "mvt_float",
+      // More benchmarks used in ASPLOS '25 "elastic miter" paper
+      "binary_search",
+      "gemver",
+      "sobel",
+      "spmv",
+      "stencil_2d"
       ),
       [](const auto &info) { return info.param; });
 
