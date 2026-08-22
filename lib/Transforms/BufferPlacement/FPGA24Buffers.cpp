@@ -160,22 +160,22 @@ void OccupancyBalancingLP::setup() {
   /// N_c: Maximal token occupancy on channel c.
   this->addOccupancyVars(allChannels, channelOccupancy, MAX_OCCUPANCY);
 
-  /// Determine which channels belong to at least one CFDFC.
-  llvm::DenseSet<Value> cfdfcChannels;
-  for (CFDFC *cfdfc : cfdfcs)
-    for (Value channel : cfdfc->channels)
-      cfdfcChannels.insert(channel);
-
   /// (Paper: Section 5, Equation 8): N_c >= L_c / II
   /// Per-channel lower bound ensuring the pipeline has enough tokens in flight.
   /// For non-CFDFC channels (executed once), N_c >= 1 suffices.
+  /// We only apply the occupancy constraints to the patterns that are part of a CFDFC,
+  /// therefore we filter out the channels that are not part of a CFDFC first.
   llvm::MapVector<Value, double> requiredOccupancy;
   for (Value channel : allChannels) {
     unsigned latency = latencyResult.channelExtraLatency.lookup(channel);
-    if (cfdfcChannels.contains(channel))
-      requiredOccupancy[channel] = static_cast<double>(latency) / targetII;
-    else
-      requiredOccupancy[channel] = (latency > 0) ? 1.0 : 0.0;
+
+    bool inCfdfc = llvm::any_of(cfdfcs, [&](CFDFC *cfdfc) {
+      return cfdfc->channels.contains(channel);
+    });
+
+    requiredOccupancy[channel] =
+      inCfdfc ? static_cast<double>(latency) / targetII : 
+      (latency > 0) ? 1.0 : 0.0;
   }
 
   /// (Paper: Section 5, Equation 15): Take the maximum across per-CFDFC IIs.
