@@ -54,6 +54,7 @@ generators.add("handshake", "mem_controller")
 generators.add("handshake", "buffer")
 generators.add("handshake", "ready_remover")
 generators.add("handshake", "valid_merger")
+generators.add("handshake", "init")
 generators.add("support", "mem_to_bram")
 
 
