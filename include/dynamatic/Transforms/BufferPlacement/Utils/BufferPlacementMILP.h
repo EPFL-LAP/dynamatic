@@ -140,11 +140,15 @@ struct MILPVars {
 /// some pre/post-processind steps and verification they are likely to need.
 class BufferPlacementMILP : public MILP<BufferPlacement> {
 public:
+  // Enum representation of algorithm class
+  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF };
+
   /// Contains timing characterizations for dataflow components required to
   /// create the MILP constraints.
   const TimingDatabase &timingDB;
   /// Target clock period.
   const double targetPeriod;
+  const Algorithm algorithm;
 
   /// Starts setting up a the buffer placement MILP for a Handshake function
   /// (with its CFDFCs) with specific component timing models. The constructor
@@ -154,7 +158,19 @@ public:
   /// constructor sets the `unsatisfiable` flag to true.
   BufferPlacementMILP(CPSolver::SolverKind solverKind, int timeout,
                       FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                      double targetPeriod, llvm::StringRef writeTo = "");
+                      double targetPeriod, Algorithm algorithm,
+                      llvm::StringRef writeTo = "", bool ftd = false);
+
+  /// Creates, optimizes, and extract results from an MILP in one go. Fails and
+  /// displays an error message to stderr if any step along the process fails.
+  /// Otherwise succeeds and stores the MILP's results in the first function
+  /// argument.
+  ///
+  /// if calculatePathDelays is true,
+  /// it asks the MILP to lock in the buffering decisions, and re-run to
+  /// calculate only the path delays. Useful for evaluation of modelling
+  /// accuracy.
+  LogicalResult solve(BufferPlacement &placement, bool calculatePathDelays);
 
 protected:
   /// Represents a list of signals that are buffered together by a single
@@ -199,6 +215,8 @@ protected:
   /// Aggregates all data members related to the Handshake function under
   /// optimization.
   FuncInfo &funcInfo;
+  /// Whether the circuit was produced using fast token delivery.
+  bool ftd;
   /// After construction, maps all channels (i.e, values) defined in the
   /// function to their specific channel buffering properties (unconstraining
   /// properties if none were explicitly specified).
@@ -252,6 +270,16 @@ protected:
   /// `filter` function.
   void addUnitTimingConstraints(Operation *unit, SignalType signalType,
                                 ChannelFilter filter = nullFilter);
+
+  /// Adds combinational delay constraints for a unit whose timing comes from a
+  /// `SpecTimingModel` in the spec-timing JSON (per-port-pair edges). Only
+  /// edges whose endpoint signal(s) are all contained in `signals` are added,
+  /// so an algorithm that models a subset of signals (e.g. FPGA'20: data only)
+  /// passes just those. A `filter` can exclude ports on channels for which it
+  /// returns false. Replaces the per-signal `addUnitTimingConstraints` and
+  /// mixed-domain `addUnitMixedPathConstraints` calls for that unit.
+  void addSpecUnitConstraints(Operation *unit, ArrayRef<SignalType> signals,
+                              ChannelFilter filter = nullFilter);
 
   /// This function models the facts that:
   /// - Signal buffer presence -> buffer presence
@@ -490,6 +518,14 @@ private:
   /// properties mapping and defines a large constant used for elasticity
   /// constraints.
   void initialize();
+
+  /// Re-run the MILP with the buffering decisions locked-in,
+  /// in order to calculate the actual delays the MILP sees
+  /// from the characterization approach
+  ///
+  /// What buffering decisions to fix is algorithm dependent.
+  /// Currently only implemented for FPGA'20 and FPL'22.
+  LogicalResult calculatePathDelays();
 };
 
 } // namespace buffer

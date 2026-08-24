@@ -253,7 +253,10 @@ static StringRef getNodeColor(Operation *op) {
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
       .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
-      .Case<handshake::BufferOp>([&](auto) { return "palegreen"; })
+      .Case<handshake::BufferOp>(
+          [&](handshake::BufferOp bufferOp) -> StringRef {
+            return bufferOp.isBypassDV() ? "palegreen" : "mediumseagreen";
+          })
       .Case<handshake::EndOp>([&](auto) { return "gold"; })
       .Case<handshake::SourceOp, handshake::SinkOp>(
           [&](auto) { return "gainsboro"; })

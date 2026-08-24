@@ -105,7 +105,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/remsi.v",
-    "dependencies": ["join_type", "delay_buffer"],
+    "dependencies": ["join_type", "delay_buffer", "oehb_dataless"],
     "hdl": "verilog"
   },
   {
@@ -141,7 +141,7 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/divsi.v",
-    "dependencies": ["join_type", "delay_buffer"],
+    "dependencies": ["join_type", "delay_buffer", "oehb_dataless"],
     "hdl": "verilog"
   },
   {
@@ -195,7 +195,35 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/maxsi.v",
-    "dependencies": ["join"]
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.maxui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/maxui.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.minsi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/minsi.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.minui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/minui.v",
+    "dependencies": ["join_type"],
+    "hdl": "verilog"
   },
   {
     "name": "handshake.mulf",
@@ -380,6 +408,14 @@
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/absf.v",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.absi",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/absi.v",
     "hdl": "verilog"
   },
   {

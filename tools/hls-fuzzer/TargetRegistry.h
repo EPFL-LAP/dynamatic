@@ -46,17 +46,26 @@ private:
 
 } // namespace dynamatic
 
+/// Expands both arguments before pasting them together. Pasting '__LINE__'
+/// directly would yield the literal token 'Register__LINE__', as '##'
+/// suppresses the expansion of its operands.
+#define DYNAMATIC_TARGET_CONCAT_(a, b) a##b
+#define DYNAMATIC_TARGET_CONCAT(a, b) DYNAMATIC_TARGET_CONCAT_(a, b)
+
 /// Registers a target in the global singleton registry with the given 'name'.
 /// 'name' should be a string literal of the target name as it'll be used on
 /// the command line. 'clazz' should be a subclass of 'AbstractTarget'.
 #define REGISTER_TARGET(name, clazz)                                           \
-  static struct Register##__LINE__ {                                           \
-    Register##__LINE__() {                                                     \
+  namespace {                                                                  \
+  struct DYNAMATIC_TARGET_CONCAT(RegisterTarget, __LINE__) {                   \
+    DYNAMATIC_TARGET_CONCAT(RegisterTarget, __LINE__)() {                      \
       ::dynamatic::TargetRegistry::getInstance().registerTarget(               \
           name, +[]() -> std::unique_ptr<dynamatic::AbstractTarget> {          \
             return std::make_unique<clazz>();                                  \
           });                                                                  \
     }                                                                          \
-  } register##__LINE__
+  } DYNAMATIC_TARGET_CONCAT(registerTarget, __LINE__);                         \
+  }                                                                            \
+  static_assert(true, "force semicolon")
 
 #endif

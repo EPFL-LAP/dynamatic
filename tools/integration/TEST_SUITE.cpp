@@ -12,7 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -54,6 +56,79 @@ int getSimulationTime(const fs::path &logFile) {
             << std::endl;
   return -1;
 }
+
+/// The aggregated measurements of one II monitor, computed from the
+/// per-iteration "II_INSTRUMENT: ..." lines the monitor prints during
+/// simulation (one per loop iteration, as the slowest header mux takes it
+/// in).
+struct IISummary {
+  /// The loop's nesting depth and the deepest depth in its nest.
+  int depth;
+  int maxDepth;
+  /// The achieved II: the median of the intervals between consecutive
+  /// iterations within an activation (the "iter>0" lines; see the II
+  /// monitor's entity comment). The median is the typical interval, robust
+  /// to warmup and other outliers (and thereby to much of the lower-bound
+  /// bias the monitor documents for loops paced behind memory queues). -1
+  /// when no activation ran two or more iterations.
+  double medianII;
+  /// The total number of iterations the loop ran.
+  int iterations;
+  /// How often the loop was entered from outside.
+  int activations;
+};
+
+std::vector<IISummary> parseIISummaries(const fs::path &logFile) {
+  std::vector<IISummary> summaries;
+  std::vector<std::string> loops;
+  std::vector<std::vector<long>> intervals;
+  std::ifstream file(logFile);
+  if (!file.is_open()) {
+    std::cout << "[WARNING] Failed to open " << logFile << std::endl;
+    return summaries;
+  }
+
+  const std::string prefix = "II_INSTRUMENT: ";
+  std::string line;
+  while (std::getline(file, line)) {
+    size_t pos = line.find(prefix);
+    if (pos == std::string::npos)
+      continue;
+    nlohmann::json report =
+        nlohmann::json::parse(line.substr(pos + prefix.size()));
+
+    std::string loop = report["loop"];
+    auto it = std::find(loops.begin(), loops.end(), loop);
+    if (it == loops.end()) {
+      loops.push_back(loop);
+      summaries.push_back({report["depth"].get<int>(),
+                           report["max_depth"].get<int>(), -1.0, 0, 0});
+      intervals.emplace_back();
+      it = std::prev(loops.end());
+    }
+    size_t idx = it - loops.begin();
+    ++summaries[idx].iterations;
+    if (report["iter"].get<int>() == 0) {
+      // An activation's first iteration; its interval spans the gap between
+      // two activations and belongs to neither.
+      ++summaries[idx].activations;
+    } else {
+      intervals[idx].push_back(report["interval"].get<long>());
+    }
+  }
+  for (size_t idx = 0; idx < summaries.size(); ++idx) {
+    std::vector<long> &loopIntervals = intervals[idx];
+    if (loopIntervals.empty())
+      continue;
+    std::sort(loopIntervals.begin(), loopIntervals.end());
+    size_t mid = loopIntervals.size() / 2;
+    summaries[idx].medianII =
+        loopIntervals.size() % 2 != 0
+            ? double(loopIntervals[mid])
+            : (loopIntervals[mid - 1] + loopIntervals[mid]) / 2.0;
+  }
+  return summaries;
+}
 } // namespace
 
 struct IntegrationTest {
@@ -71,13 +146,21 @@ struct IntegrationTest {
   bool verifyInvariants = false;
   // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
+  bool useDuplication = false;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
   unsigned clockPeriod = 5;
+  // Insert an II monitor per loop of the circuit.
+  bool instrumentII = false;
 
   // Results
   int simTime;
   int run();
+
+  /// Path of the simulation log, which also holds the II monitors' reports.
+  fs::path simReportPath() const {
+    return benchmarkPath / name / ("out_" + testName) / "sim" / "report.txt";
+  }
 };
 
 int IntegrationTest::run() {
@@ -110,6 +193,8 @@ int IntegrationTest::run() {
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
              << (this->useSpeculation ? " --speculation" : "")
+             << (this->useDuplication ? " --enable-duplication" : "")
+             << (this->instrumentII ? " --instrument-ii" : "")
              << " --milp-solver " << this->milpSolver << std::endl;
   // clang-format on
 
@@ -158,9 +243,7 @@ int IntegrationTest::run() {
 
   int status = system(cmd.c_str());
   if (status == 0) {
-    fs::path logFilePath =
-        cSourcePath.parent_path() / outputDirName / "sim" / "report.txt";
-    this->simTime = getSimulationTime(logFilePath);
+    this->simTime = getSimulationTime(simReportPath());
   }
 
   return status;
@@ -210,6 +293,7 @@ class MemoryFixture : public BaseFixture {};
 class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
+class DuplicationFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
@@ -379,14 +463,187 @@ TEST_P(SpecFixture, spec) {
       .useSharing = false,
       .useSpeculation = true,
       .milpSolver = "gurobi",
-      .bufferAlgorithm = "fpga20",
-      .clockPeriod = 7,
+      .bufferAlgorithm = "fpl22",
+      .clockPeriod = 20,
       .simTime = -1
       // clang-format on
   };
   EXPECT_EQ(config.run(), 0);
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
+}
+
+TEST_P(DuplicationFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useDuplication = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+/// Compiles benchmarks with '--instrument-ii' and checks the per-loop
+/// measurements aggregated from the II monitors' per-iteration reports.
+class IIMonitorFixture : public testing::Test {
+protected:
+  /// Compiles and simulates 'name' with II instrumentation and returns the
+  /// per-loop aggregates of the reported iterations.
+  std::vector<IISummary> runInstrumented(const std::string &name) {
+    IntegrationTest config{
+        .name = name,
+        .testName = "IIMonitorTests",
+        .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+        .testVerilog = false,
+        .instrumentII = true,
+    };
+    EXPECT_EQ(config.run(), 0);
+    return parseIISummaries(config.simReportPath());
+  }
+};
+
+// A single loop with a statically known iteration count, activated once.
+TEST_F(IIMonitorFixture, singleLoop) {
+  // 'fir' runs its only loop once, for exactly 1000 iterations.
+  std::vector<IISummary> summaries = runInstrumented("fir");
+  ASSERT_EQ(summaries.size(), 1u);
+  const IISummary &summary = summaries.front();
+  EXPECT_EQ(summary.depth, 1);
+  EXPECT_EQ(summary.maxDepth, 1);
+  EXPECT_EQ(summary.iterations, 1000);
+  EXPECT_EQ(summary.activations, 1);
+  // The loop pipelines perfectly.
+  EXPECT_EQ(summary.medianII, 1.0);
+}
+
+// A loop nest: both loops report, tagged with their nesting depth; the inner
+// one accumulates its iterations across one activation per outer iteration.
+TEST_F(IIMonitorFixture, nestedLoops) {
+  // 'matvec' iterates a 100x100 nest once.
+  std::vector<IISummary> summaries = runInstrumented("matvec");
+  ASSERT_EQ(summaries.size(), 2u);
+
+  for (const IISummary &summary : summaries)
+    EXPECT_EQ(summary.maxDepth, 2);
+  auto isOuter = [](const IISummary &summary) { return summary.depth == 1; };
+  auto outerIt = std::find_if(summaries.begin(), summaries.end(), isOuter);
+  auto innerIt = std::find_if_not(summaries.begin(), summaries.end(), isOuter);
+  ASSERT_NE(outerIt, summaries.end());
+  ASSERT_NE(innerIt, summaries.end());
+
+  EXPECT_EQ(outerIt->iterations, 100);
+  EXPECT_EQ(outerIt->activations, 1);
+
+  EXPECT_EQ(innerIt->depth, 2);
+  EXPECT_EQ(innerIt->iterations, 100 * 100);
+  EXPECT_EQ(innerIt->activations, 100);
+  EXPECT_EQ(innerIt->medianII, 1.0);
+  // An outer iteration contains a full inner activation.
+  EXPECT_GT(outerIt->medianII, innerIt->medianII);
+}
+
+// A while loop whose iteration count is only decided by the data at runtime.
+TEST_F(IIMonitorFixture, dataDependentTripCount) {
+  // 'while_loop_1' scans until a[i] + b[i] >= 1000, which its input data
+  // arranges to first happen at i == 900: 901 iterations.
+  std::vector<IISummary> summaries = runInstrumented("while_loop_1");
+  ASSERT_EQ(summaries.size(), 1u);
+  const IISummary &summary = summaries.front();
+  EXPECT_EQ(summary.iterations, 901);
+  EXPECT_EQ(summary.activations, 1);
+  // The comparison feeding the exit decision is on the loop's recurrence.
+  EXPECT_EQ(summary.medianII, 4.0);
+}
+
+// A program without loops gets no monitors and must still simulate cleanly.
+TEST_F(IIMonitorFixture, loopFree) {
+  std::vector<IISummary> summaries = runInstrumented("test_loop_free");
+  EXPECT_TRUE(summaries.empty());
+}
+
+// The monitor's boundary conditions: a loop that never runs prints nothing
+// (its iterations are the events being reported), a single iteration yields
+// no measurable II, and two iterations are the shortest activation that
+// does.
+TEST_F(IIMonitorFixture, iterationCountEdgeCases) {
+  std::vector<IISummary> summaries = runInstrumented("ii_edge_cases");
+  ASSERT_EQ(summaries.size(), 2u);
+  std::vector<int> iterations;
+  for (const IISummary &summary : summaries) {
+    EXPECT_EQ(summary.depth, 1);
+    EXPECT_EQ(summary.maxDepth, 1);
+    EXPECT_EQ(summary.activations, 1);
+    iterations.push_back(summary.iterations);
+    if (summary.iterations < 2) {
+      // A single iteration taken in: no interval to see.
+      EXPECT_EQ(summary.medianII, -1.0);
+    } else {
+      EXPECT_GE(summary.medianII, 1.0);
+    }
+  }
+  std::sort(iterations.begin(), iterations.end());
+  EXPECT_EQ(iterations, (std::vector<int>{1, 2}));
+}
+
+// A frequently re-entered inner loop whose recurrence takes many cycles: the
+// intervals bridging its activations are shorter than its II, so they must
+// not leak into the measurement and drag it down.
+TEST_F(IIMonitorFixture, nestedHighLatency) {
+  // 'ii_nested_float' re-enters its inner loop 20 times for only 5 iterations
+  // each, accumulating floats: a multi-cycle addf recurrence.
+  std::vector<IISummary> summaries = runInstrumented("ii_nested_float");
+  ASSERT_EQ(summaries.size(), 2u);
+
+  auto isOuter = [](const IISummary &summary) { return summary.depth == 1; };
+  auto outerIt = std::find_if(summaries.begin(), summaries.end(), isOuter);
+  auto innerIt = std::find_if_not(summaries.begin(), summaries.end(), isOuter);
+  ASSERT_NE(outerIt, summaries.end());
+  ASSERT_NE(innerIt, summaries.end());
+
+  EXPECT_EQ(innerIt->iterations, 20 * 5);
+  EXPECT_EQ(innerIt->activations, 20);
+  // The addf takes 6 cycles: a typical interval below that would mean
+  // intervals bridging two activations leaked into the measurement; one
+  // above it, that the loop did not actually pace on the addf.
+  EXPECT_EQ(innerIt->medianII, 6.0);
+
+  EXPECT_EQ(outerIt->iterations, 20);
+  EXPECT_EQ(outerIt->activations, 1);
+  // An outer iteration contains a full inner activation.
+  EXPECT_GT(outerIt->medianII, innerIt->medianII);
+}
+
+// The opposite extreme: an inner loop that pipelines perfectly. Its measured
+// II must come out as exactly 1, so any overshoot in the measurement shows.
+TEST_F(IIMonitorFixture, nestedIIOne) {
+  // 'ii_nested_int' re-enters its inner loop 8 times for 30 iterations each,
+  // accumulating integers: a combinational recurrence.
+  std::vector<IISummary> summaries = runInstrumented("ii_nested_int");
+  ASSERT_EQ(summaries.size(), 2u);
+
+  auto isOuter = [](const IISummary &summary) { return summary.depth == 1; };
+  auto outerIt = std::find_if(summaries.begin(), summaries.end(), isOuter);
+  auto innerIt = std::find_if_not(summaries.begin(), summaries.end(), isOuter);
+  ASSERT_NE(outerIt, summaries.end());
+  ASSERT_NE(innerIt, summaries.end());
+
+  EXPECT_EQ(innerIt->iterations, 8 * 30);
+  EXPECT_EQ(innerIt->activations, 8);
+  // A perfectly pipelined loop initiates every cycle; any overshoot in the
+  // measurement shows here.
+  EXPECT_EQ(innerIt->medianII, 1.0);
+
+  EXPECT_EQ(outerIt->iterations, 8);
+  EXPECT_EQ(outerIt->activations, 1);
 }
 
 // clang-format off
@@ -462,7 +719,8 @@ INSTANTIATE_TEST_SUITE_P(
       "unused_arg",
       "test_bool_array",
       "test_divui",
-      "test_fneg"
+      "test_fneg",
+      "interpolate"
       ),
       [](const auto &info) { return info.param; });
 
@@ -558,9 +816,22 @@ INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
       "nested_loop",
       "sparse",
       "subdiag",
-      "subdiag_fast"
+      "subdiag_fast",
+      "newton_raphson",
+      "backtrack"
       ),
     [](const auto &info) { return "spec_" + info.param; });
+
+INSTANTIATE_TEST_SUITE_P(DuplicationBenchmarks, DuplicationFixture,
+    testing::Values(
+      "divergent_paths",
+      "nested_conditionals_1",
+      "nested_conditionals_2",
+      "prediction",
+      "sparse",
+      "wrap_if"
+    ),
+    [](const auto &info) { return "dup_" + info.param; });
 
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 // clang-format on

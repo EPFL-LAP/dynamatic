@@ -23,11 +23,13 @@
 #include "mlir/Support/IndentedOstream.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <set>
 
 // NOTE: The code wrapped in LLVM_DEBUG(...) is executed when
@@ -49,6 +51,151 @@ static StringRef getSignalName(SignalType signalType) {
     return "valid";
   case SignalType::READY:
     return "ready";
+  }
+}
+
+void BufferPlacementMILP::addSpecUnitConstraints(Operation *op,
+                                                 ArrayRef<SignalType> signals,
+                                                 ChannelFilter filter) {
+  // get the timing model for this operation
+  const SpecTimingModel *specModel = timingDB.getSpecModel(op);
+  assert(specModel &&
+         "addSpecUnitConstraints: no spec timing model loaded for op");
+
+  // get the operand/result names of this operation
+  auto namedIO = dyn_cast<handshake::NamedIOInterface>(op);
+  assert(namedIO && "addSpecUnitConstraints: op does not implement "
+                    "NamedIOInterface");
+
+  // store mapping from operand/result name to operand/result
+  // since we don't have a native function to go name -> value
+  // only operand/result index -> name
+  std::map<std::string, Value> portNameToValue;
+  for (unsigned i = 0, e = op->getNumOperands(); i < e; ++i)
+    portNameToValue[namedIO.getOperandName(i)] = op->getOperand(i);
+  for (unsigned i = 0, e = op->getNumResults(); i < e; ++i)
+    portNameToValue[namedIO.getResultName(i)] = op->getResult(i);
+
+  // we need specific op objects to get bitwidths
+  // this is a bit hacky, probably an interface/trait would be better
+  // if there were more ops
+  Value bitwidthChannel =
+      llvm::TypeSwitch<Operation *, Value>(op)
+          .Case<handshake::SpeculatorOp>(
+              [](handshake::SpeculatorOp op) { return op.getDataIn(); })
+          .Case<handshake::SpecSaveCommitOp>(
+              [](handshake::SpecSaveCommitOp op) { return op.getDataIn(); })
+          .Default([](Operation *) -> Value {
+            llvm_unreachable("addSpecUnitConstraints called on op type "
+                             "with no bitwidth accessor registered");
+          });
+  // get the bitwidth of the operation
+  unsigned currentBitwidth = 0;
+  if (auto chTy = dyn_cast<handshake::ChannelType>(bitwidthChannel.getType()))
+    currentBitwidth = chTy.getDataBitWidth();
+
+  // get the name of the operation
+  StringRef opName = getUniqueName(op);
+  // index to make constraint names unique
+  unsigned idx = 0;
+  for (const SpecTimingPort2Port &edgeDelay : specModel->port2port) {
+
+    if (!llvm::is_contained(signals, edgeDelay.from.signal) ||
+        !llvm::is_contained(signals, edgeDelay.to.signal))
+      continue;
+
+    // beginning of path
+    Value fromVal = portNameToValue.at(edgeDelay.from.name);
+    // end of path
+    Value toVal = portNameToValue.at(edgeDelay.to.name);
+
+    // only adding delays for channels that pass the filter
+    if (!filter(fromVal) || !filter(toVal))
+      continue;
+
+    // we need to have real channel variables for these values
+    assert(vars.channelVars.find(fromVal) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+    assert(vars.channelVars.find(toVal) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+
+    // get the delay based on the bitwidth
+    double delay = edgeDelay.delayList.selectDelay(currentBitwidth);
+
+    // get the actual CPVars
+    CPVar &tFrom =
+        vars.channelVars[fromVal].signalVars[edgeDelay.from.signal].path.tOut;
+    CPVar &tTo =
+        vars.channelVars[toVal].signalVars[edgeDelay.to.signal].path.tIn;
+
+    // make constraint name
+    std::string consName =
+        "path_spec_p2p_" + opName.str() + "_" + std::to_string(idx++);
+
+    // add constraint
+    model->addConstr(tFrom + delay <= tTo, consName);
+  }
+
+  for (const SpecTimingPort2Reg &portDelay : specModel->port2reg) {
+
+    if (!llvm::is_contained(signals, portDelay.port.signal))
+      continue;
+
+    // the port of this delay
+    Value v = portNameToValue.at(portDelay.port.name);
+
+    // only adding delays for channels that pass the filter
+    if (!filter(v))
+      continue;
+
+    // we need to have a real channel variable for this value
+    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+
+    // get the delay based on the bitwidth
+    double delay = portDelay.delayList.selectDelay(currentBitwidth);
+
+    // make constraint name
+    std::string consName =
+        "path_spec_p2r_" + opName.str() + "_" + std::to_string(idx++);
+
+    // get the actual CPVar
+    CPVar &tInPort =
+        vars.channelVars[v].signalVars[portDelay.port.signal].path.tOut;
+
+    // add constraint
+    model->addConstr(tInPort + delay <= targetPeriod, consName);
+  }
+
+  for (const SpecTimingReg2Port &portDelay : specModel->reg2port) {
+
+    if (!llvm::is_contained(signals, portDelay.port.signal))
+      continue;
+
+    // the port of this delay
+    Value v = portNameToValue.at(portDelay.port.name);
+
+    // only adding delays for channels that pass the filter
+    if (!filter(v))
+      continue;
+
+    // we need to have a real channel variable for this value
+    assert(vars.channelVars.find(v) != vars.channelVars.end() &&
+           "value has no corresponding channel variable");
+
+    // get the delay based on the bitwidth
+    double delay = portDelay.delayList.selectDelay(currentBitwidth);
+
+    // make constraint name
+    std::string consName =
+        "path_spec_r2p_" + opName.str() + "_" + std::to_string(idx++);
+
+    // get the actual CPVar
+    CPVar &tOutPort =
+        vars.channelVars[v].signalVars[portDelay.port.signal].path.tIn;
+
+    // add constraint
+    model->addConstr(tOutPort >= delay, consName);
   }
 }
 
@@ -227,9 +374,9 @@ double BufferPlacementMILP::BufferingGroup::getCombinationalDelay(
     (void)bufModel->getTotalDataDelay(bitwidth, delay);
     return delay;
   case SignalType::VALID:
-    return bufModel->getTotalValidDelay();
+    return bufModel->validDelay;
   case SignalType::READY:
-    return bufModel->getTotalReadyDelay();
+    return bufModel->readyDelay;
   }
 }
 
@@ -237,10 +384,23 @@ BufferPlacementMILP::BufferPlacementMILP(CPSolver::SolverKind solverKind,
                                          int timeout, FuncInfo &funcInfo,
                                          const TimingDatabase &timingDB,
                                          double targetPeriod,
-                                         llvm::StringRef writeTo)
+                                         Algorithm algorithm,
+                                         llvm::StringRef writeTo, bool ftd)
     : MILP<BufferPlacement>(solverKind, timeout, writeTo), timingDB(timingDB),
-      targetPeriod(targetPeriod), funcInfo(funcInfo) {
+      targetPeriod(targetPeriod), algorithm(algorithm), funcInfo(funcInfo),
+      ftd(ftd) {
   initialize();
+}
+
+LogicalResult BufferPlacementMILP::solve(BufferPlacement &placement,
+                                         bool calculatePathDelays) {
+  if (failed(optimize()))
+    return failure();
+  if (calculatePathDelays && failed(this->calculatePathDelays()))
+    return failure();
+  if (failed(getResult(placement)))
+    return failure();
+  return success();
 }
 
 void BufferPlacementMILP::addChannelVars(Value channel,
@@ -1126,7 +1286,7 @@ unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {
   // number of executions. Backedges are executed one less time than "forward
   // edges" since they are only taken between executions of the cycle the CFDFC
   // represents
-  unsigned numExec = isBackedge(channel) ? 0 : 1;
+  unsigned numExec = isBackedge(channel, /*endpoints=*/nullptr, ftd) ? 0 : 1;
   for (auto &[cfdfc, _] : funcInfo.cfdfcs)
     if (cfdfc->channels.contains(channel))
       numExec += cfdfc->numExecs;
@@ -1662,4 +1822,52 @@ void BufferPlacementMILP::initialize() {
   // Initialize the large constant (for elasticity constraints)
   auto ops = funcInfo.funcOp.getOps();
   largeCst = std::distance(ops.begin(), ops.end()) + 2;
+}
+
+LogicalResult BufferPlacementMILP::calculatePathDelays() {
+  if (algorithm != Algorithm::FPGA20 && algorithm != Algorithm::FPL22) {
+    llvm::errs() << "BufferPlacementMILP::calculatePathDelays() only supports "
+                 << "FPGA20 and FPL22 buffering algorithms\n";
+    return failure();
+  }
+
+  // Pin all buffer-decision variables to their currently-solved values so the
+  // re-solve cannot move them.
+  // Currently pins only the variables used by FPGA'20 and FPL'22
+  auto pinVar = [&](CPVar &v) {
+    model->addConstr(v == model->getValue(v), "pin_buffers");
+  };
+  for (auto &[channel, chVars] : vars.channelVars) {
+    pinVar(chVars.bufPresent);
+    pinVar(chVars.bufNumSlots);
+    for (auto &[sigType, sigVars] : chVars.signalVars)
+      pinVar(sigVars.bufPresent);
+  }
+
+  // Replace objective with minimizing path delay
+  // since buffer positions are fixed this is equivalent to
+  // calculating path delays
+  LinExpr minSum;
+  for (auto &[channel, chVars] : vars.channelVars) {
+    for (auto &[sigType, sigVars] : chVars.signalVars) {
+      minSum += sigVars.path.tIn;
+      minSum += sigVars.path.tOut;
+    }
+  }
+  model->setMaximizeObjective(-minSum);
+
+  // actually solve
+  model->optimize();
+  if (model->status != CPSolver::OPTIMAL &&
+      model->status != CPSolver::NONOPTIMAL) {
+    llvm::errs() << "calculatePathDelays: re-solve failed status="
+                 << model->status << "\n";
+    return failure();
+  }
+
+  // and store the MILP solution but this time
+  // with accurate path delay numbers
+  if (!writeTo.empty())
+    model->writeSol(writeTo + "_accurate_delays.log");
+  return success();
 }

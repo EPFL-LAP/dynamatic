@@ -1,31 +1,26 @@
 #ifndef DYNAMATIC_HLS_FUZZER_TARGET_RANDOMCTYPESYSTEM
 #define DYNAMATIC_HLS_FUZZER_TARGET_RANDOMCTYPESYSTEM
 
-#include "BitwidthTypeSystem.h"
 #include "DynamaticTypeSystem.h"
+#include "TerminationTypeSystem.h"
 #include "hls-fuzzer/ConjunctionTypeSystem.h"
 #include "hls-fuzzer/LimitTypeSystem.h"
-#include "hls-fuzzer/OptionalTypeSystem.h"
 #include "hls-fuzzer/TypeSystem.h"
 
 namespace dynamatic::gen {
 /// Type system for the '--random-c' target.
-/// Uses a combination of the dynamatic type system and the limit type system.
-/// For loop bounds, the bitwidth type system is selectively enabled to generate
-/// reasonable loop bounds.
+/// Combines the dynamatic type system, the limit type system and the
+/// termination type system. The latter ensures generated programs always
+/// terminate by bounding loop counts and forbidding writes to loop iteration
+/// variables.
 class RandomCTypeSystem final
     : public ConjunctionTypeSystemBase<RandomCTypeSystem, DynamaticTypeSystem,
-                                       LimitTypeSystem,
-                                       OptionalTypeSystem<BitwidthTypeSystem>> {
+                                       LimitTypeSystem, TerminationTypeSystem> {
 public:
   explicit RandomCTypeSystem(Randomly &random)
-      : ConjunctionTypeSystemBase(DynamaticTypeSystem(), LimitTypeSystem(),
-                                  // Upper bound on what bitwidth can be
-                                  // generated in unrestricted contexts.
-                                  BitwidthTypeSystem(64, random)) {}
-
-  TransferFnArray<ast::StructuredForStatement>
-  getStructuredForStatementTransferFns() override;
+      : ConjunctionTypeSystemBase(DynamaticTypeSystem(),
+                                  LimitTypeSystem(random),
+                                  TerminationTypeSystem(random)) {}
 };
 } // namespace dynamatic::gen
 #endif

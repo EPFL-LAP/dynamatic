@@ -1,6 +1,7 @@
 set(LLVM_OPTIONAL_SOURCES
   MemDepAnalysis.cpp
   ArrayPartition.cpp
+  GuardLoadStore.cpp
 )
 
 
@@ -25,6 +26,18 @@ add_llvm_pass_plugin(ArrayPartition
   LLVMSupport
   LLVMAnalysis
   Polly
+
+  MLIRIR
+  MLIRSupport
+)
+
+# Link to required LLVM libraries
+add_llvm_pass_plugin(GuardLoadStore
+  GuardLoadStore.cpp
+  DEPENDS
+  LLVMCore
+  LLVMSupport
+  LLVMAnalysis
 
   MLIRIR
   MLIRSupport

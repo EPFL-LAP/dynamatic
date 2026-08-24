@@ -635,12 +635,12 @@ public:
   std::vector<Statement> takeVector() { return std::move(statements); }
 
   // Recursive statement list representation.
-  // The definition is left recursive, meaning the statement is always the tail
-  // statement after the list.
-  using SubElements = std::tuple<StatementList, Statement>;
+  // The definition is right recursive, meaning the statement is always the head
+  // statement before the rest of the list.
+  using SubElements = std::tuple<Statement, StatementList>;
 
-  constexpr static std::size_t STATEMENT_LIST = 0;
-  constexpr static std::size_t STATEMENT = 1;
+  constexpr static std::size_t STATEMENT = 0;
+  constexpr static std::size_t STATEMENT_LIST = 1;
 
 private:
   std::vector<Statement> statements;
@@ -679,12 +679,16 @@ public:
     friend bool operator<(const Tag &, const Tag &) { return false; }
   };
 
-  using SubElements =
-      std::tuple<Expression, Expression, Expression, StatementList>;
-  constexpr static std::size_t START = 0;
-  constexpr static std::size_t END = 1;
-  constexpr static std::size_t STEP = 2;
-  constexpr static std::size_t BODY = 3;
+  // The iteration variable's name is modeled as a (terminal) sub-element so
+  // that transfer functions (e.g., the one computing the body's context) can
+  // observe it.
+  using SubElements = std::tuple<std::string, Expression, Expression,
+                                 Expression, StatementList>;
+  constexpr static std::size_t ITER_VARIABLE = 0;
+  constexpr static std::size_t START = 1;
+  constexpr static std::size_t END = 2;
+  constexpr static std::size_t STEP = 3;
+  constexpr static std::size_t BODY = 4;
 
 private:
   std::string iterVariable;
@@ -753,8 +757,9 @@ public:
 
   std::size_t getDimension() const { return dimension; }
 
-  using SubElements = std::tuple<ScalarType>;
+  using SubElements = std::tuple<ScalarType, std::size_t>;
   constexpr static std::size_t ELEMENT_TYPE = 0;
+  constexpr static std::size_t DIMENSION = 1;
 
 private:
   ScalarType dataType;

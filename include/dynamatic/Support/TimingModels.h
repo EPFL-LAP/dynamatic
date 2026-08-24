@@ -269,16 +269,6 @@ public:
   /// bitwidth in the model. On success, sets the last argument to the data
   /// delay.
   LogicalResult getTotalDataDelay(unsigned bitwidth, double &delay) const;
-
-  /// Returns the total valid delay (input + internal + output delays).
-  double getTotalValidDelay() const {
-    return inputModel.validDelay + validDelay + outputModel.validDelay;
-  };
-
-  /// Returns the total ready delay (input + internal + output delays).
-  double getTotalReadyDelay() const {
-    return inputModel.readyDelay + readyDelay + outputModel.readyDelay;
-  };
 };
 
 /// Deserializes a JSON value into a TimingModel. See ::llvm::json::Value's
@@ -290,6 +280,110 @@ bool fromJSON(const llvm::json::Value &jsonValue, TimingModel &model,
 /// documentation for a longer description of this function's behavior.
 bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model,
               llvm::json::Path path);
+
+/// Input or output of a unit.
+/// signal is used to select which CPVar the delay applies to
+struct SpecTimingPort {
+  std::string name;
+  SignalType signal;
+};
+
+/// One measurement of an internal delay at one combination of unit parameters
+/// currently hardcoded to select only by bitwidth
+/// since that's what we actually do
+struct SpecTimingDelay {
+  unsigned bitwidth;
+  double delay;
+};
+
+struct SpecTimingDelayList {
+  // add a delay
+  void addDelay(SpecTimingDelay delay) { delays.push_back(std::move(delay)); }
+
+  // choose delay from list of delays based on bitwidth
+  double selectDelay(unsigned bitwidth) const {
+    // there must be at least one delay to choose a delay from
+    assert(!delays.empty() && "spec timing delays are empty");
+
+    // largest bitwidth and its delay, used as a fallback
+    unsigned widthMax = 0;
+    double maxDelay = 0.0;
+
+    // delay bitwidth closest
+    // that is also larger
+    std::optional<unsigned> widthCeil;
+    double ceilDelay;
+
+    // single pass over the delays computing both the ceiling and the maximum
+    for (const SpecTimingDelay &s : delays) {
+      unsigned delayBitwidth = s.bitwidth;
+
+      // check if we have found a closer bitwidth
+      // that is also larger
+      if (delayBitwidth >= bitwidth &&
+          (!widthCeil.has_value() || delayBitwidth < *widthCeil)) {
+        widthCeil = delayBitwidth;
+        ceilDelay = s.delay;
+      }
+
+      // largest bitwidth overall
+      if (delayBitwidth >= widthMax) {
+        widthMax = delayBitwidth;
+        maxDelay = s.delay;
+      }
+    }
+
+    // use the best bitwidth if one exists, otherwise fall back to the largest
+    // delay
+    if (widthCeil.has_value())
+      return ceilDelay;
+    return maxDelay;
+  }
+
+private:
+  std::vector<SpecTimingDelay> delays;
+};
+
+/// One characterised combinational path between two ports of an op,
+/// loaded from the spec-timing JSON.
+/// Used for ops whose internal timing requires more expressivity
+struct SpecTimingPort2Port {
+  /// input to the unit
+  SpecTimingPort from;
+
+  /// output of the unit
+  SpecTimingPort to;
+
+  /// delays by bitwidth
+  SpecTimingDelayList delayList;
+};
+
+/// port to register delay characterized by bitwidth
+struct SpecTimingPort2Reg {
+  /// input port
+  SpecTimingPort port;
+
+  SpecTimingDelayList delayList;
+};
+
+/// register to port delay characterized by bitwidth
+struct SpecTimingReg2Port {
+  /// output port
+  SpecTimingPort port;
+
+  /// delays by bitwidth
+  SpecTimingDelayList delayList;
+};
+
+/// A full timing model for an operation
+/// with full expressivity of
+/// internal, input, and output delay
+/// for parameterized units
+struct SpecTimingModel {
+  std::vector<SpecTimingPort2Port> port2port;
+  std::vector<SpecTimingPort2Reg> port2reg;
+  std::vector<SpecTimingReg2Port> reg2port;
+};
 
 /// Holds the timing models for a set of operations (internally identified by
 /// their unique timing model key), usually parsed from a JSON file. The class
@@ -341,10 +435,27 @@ public:
   static LogicalResult readFromJSON(std::string &jsonPath,
                                     TimingDatabase &timingDB);
 
+  /// Parses a JSON file whose path is given as argument and adds all the
+  /// spec timing models it contains to the passed timing database.
+  static LogicalResult readSpecTimingFromJSON(std::string &jsonPath,
+                                              TimingDatabase &timingDB);
+
+  /// Returns the spec timing model for the given op-name,
+  /// or nullptr if none was loaded.
+  const SpecTimingModel *getSpecModel(StringRef timingModelKey) const;
+
+  /// Convenience overload returning the spec timing model corresponding to
+  /// the op (looked up by op->getName().getStringRef()).
+  const SpecTimingModel *getSpecModel(Operation *op) const;
+
 private:
   /// Maps from an operation's timing key to their timing model.
   /// Timing keys are generated based on operation name and implementation
   llvm::StringMap<TimingModel> models;
+
+  /// Maps from an operation's timing key to their timing model.
+  /// for operations which require more expressivity
+  llvm::StringMap<SpecTimingModel> specModels;
 };
 
 /// Deserializes a JSON value into a TimingDatabase. See ::llvm::json::Value's

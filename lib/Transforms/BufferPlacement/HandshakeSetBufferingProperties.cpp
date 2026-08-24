@@ -95,13 +95,9 @@ setSpeculatorBufferingProperties(handshake::FuncOp funcOp) {
   Channel resolveChannel(historyCtrl, true);
   resolveChannel.props->minTrans = std::max(resolveChannel.props->minTrans, 1U);
 
-  // The speculator's KILL_ONLY_DATA state stalls the data input for
-  // 1 cycle during misspeculation recovery. A transparent buffer on
-  // the data input absorbs this stall and prevents it from propagating
-  // upstream and causing throughput loss.
-  Value dataIn = specOp.getDataIn();
-  Channel dataInChannel(dataIn, true);
-  dataInChannel.props->minTrans = std::max(dataInChannel.props->minTrans, 1U);
+  Value trigger = specOp.getTrigger();
+  Channel triggerChannel(trigger, true);
+  triggerChannel.props->minTrans = std::max(triggerChannel.props->minTrans, 1U);
 
   return success();
 }
@@ -183,6 +179,17 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
         if (isChannelOnCycle(mergeRes)) {
           channel.props->minSlots = std::max(channel.props->minSlots, 1U);
         }
+      }
+    }
+  }
+
+  // Init ops replace init-merge patterns on loop backedges, so their output
+  // also needs at least one buffer slot when it participates in a cycle.
+  for (handshake::InitOp initOp : funcOp.getOps<handshake::InitOp>()) {
+    for (OpResult initRes : initOp->getResults()) {
+      Channel channel(initRes, true);
+      if (isChannelOnCycle(initRes)) {
+        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
       }
     }
   }

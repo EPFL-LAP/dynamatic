@@ -272,6 +272,9 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"timingModels", "timing-models", "std::string", "",
     "Path to JSON-formatted file containing timing models for dataflow "
     "components.">,
+    Option<"specTimingModels", "spec-timing-models", "std::string", "",
+    "Path to JSON-formatted file containing per-port timing models for "
+    "speculative units.">,
     Option<"firstCFDFC", "first-cfdfc", "bool", "false",
     "If true, only extract the first CFDFC from the input file">,
     Option<"targetCP", "target-period", "double", "4.0",
@@ -280,6 +283,13 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
     Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
     "If true, dump MILP models into a directory named 'buffer-placement'.">,
+    Option<"ftd", "ftd", "bool", "false",
+    "If true, use FTD-specific CFDFC extraction and backedge "
+    "identification.">,
+    Option<"calculatePathDelays", "calculate-path-delays", "bool", "false",
+    "After buffer placement, re-run the MILP with the buffering decisions "
+    "locked in to calculate the path delays the MILP believes are present in "
+    "the circuit.">,
     Option<"blifFiles", "blif-files", "std::string", "",
     "Path to AND-Inverter Graphs of dataflow components in Berkeley "
     "Logic Interchange Format (BLIF).">,

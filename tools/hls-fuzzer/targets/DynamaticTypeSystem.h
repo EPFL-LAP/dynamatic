@@ -112,7 +112,8 @@ public:
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
-        copyFromInput<ast::ArrayParameter>(),
+        /*element type=*/copyFromInput<ast::ArrayParameter>(),
+        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
         copyToOutput<ast::ArrayParameter, ast::ArrayParameter::ELEMENT_TYPE>()};
   }
 
@@ -183,7 +184,9 @@ public:
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
     return {
-        /*start=*/TransferFn<ast::StructuredForStatement>(
+        /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
+        /*start=*/
+        TransferFn<ast::StructuredForStatement>(
             DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
         /*end=*/
         TransferFn<ast::StructuredForStatement>(

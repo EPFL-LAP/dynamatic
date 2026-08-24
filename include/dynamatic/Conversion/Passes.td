@@ -76,6 +76,11 @@ def HandshakeToHW
     Lowers Handshake IR into a "netlist-style" representation made up of HW
     instances of external modules interconnected by dataflow channels.
   }];
+  let options = [Option<
+      "instrumentII", "instrument-ii", "bool", "false",
+      "Instrument the generated netlist with a simulation-only monitor per "
+      "loop that reports the initiation of each of its iterations during "
+      "simulation.">];
 }
 
 //===----------------------------------------------------------------------===//

@@ -2,6 +2,7 @@
 #define DYNAMATIC_HLS_FUZZER_STATISTICS
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <string>
@@ -14,6 +15,10 @@ namespace dynamatic {
 /// * 'void merge(const ConcreteStatistic &other)' to merge multiple instances
 ///   into one.
 /// * 'void print(llvm::raw_ostream &os) const' to display it to the user.
+/// * 'llvm::json::Value toJSON() const' to serialize it for machine
+///   consumption.
+/// * 'bool fromJSON(const llvm::json::Value &value, llvm::json::Path path)' to
+///   parse back what 'toJSON' wrote.
 class Statistic {
 public:
   template <typename ConcreteStatistic>
@@ -59,6 +64,16 @@ public:
 
   void print(llvm::raw_ostream &os) const { value->print(os); }
 
+  /// Returns a JSON representation of the statistics.
+  llvm::json::Value toJSON() const { return value->toJSON(); }
+
+  /// Replaces the statistics with the ones contained in 'json', which must have
+  /// been created by 'toJSON' of a statistic of the same category. Returns
+  /// false if 'json' is not a valid representation, reporting why to 'path'.
+  bool fromJSON(const llvm::json::Value &json, llvm::json::Path path) {
+    return value->fromJSON(json, path);
+  }
+
 private:
   struct Base {
     virtual ~Base() = default;
@@ -70,6 +85,11 @@ private:
     virtual void merge(const Base &other) = 0;
 
     virtual void print(llvm::raw_ostream &os) const = 0;
+
+    virtual llvm::json::Value toJSON() const = 0;
+
+    virtual bool fromJSON(const llvm::json::Value &json,
+                          llvm::json::Path path) = 0;
   };
 
   template <typename T>
@@ -92,6 +112,13 @@ private:
     }
 
     void print(llvm::raw_ostream &os) const override { data.print(os); }
+
+    llvm::json::Value toJSON() const override { return data.toJSON(); }
+
+    bool fromJSON(const llvm::json::Value &json,
+                  llvm::json::Path path) override {
+      return data.fromJSON(json, path);
+    }
   };
 
   std::string category;

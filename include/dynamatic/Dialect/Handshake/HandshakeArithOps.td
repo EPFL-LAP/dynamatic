@@ -454,9 +454,9 @@ def Handshake_DivFOp : Handshake_Arith_FloatBinaryOp<"divf", [
 
 def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
   BinaryArithNamedIO,
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">,
+  IsIntChannel<"result">,
   LatencyInterface
 ]>{
     let summary = "Signed integer division.";
@@ -464,9 +464,9 @@ def Handshake_DivSIOp : Handshake_Arith_IntBinaryOp<"divsi", [
 
 def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
   BinaryArithNamedIO,
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">,
+  IsIntChannel<"result">,
   LatencyInterface
 ]> {
   let summary = "Signed integer remainder.";
@@ -474,9 +474,9 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
 
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
   BinaryArithNamedIO,
-  IsIntSizedChannel<32, "lhs">,
-  IsIntSizedChannel<32, "rhs">,
-  IsIntSizedChannel<32, "result">,
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">,
+  IsIntChannel<"result">,
   LatencyInterface
 ]>
 {
@@ -495,11 +495,15 @@ def Handshake_MaxUIOp : Handshake_Arith_IntBinaryOp<"maxui", [
   let summary = "Outputs the maximum between two input unsigned integers";
 }
 
-def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi"> {
+def Handshake_MinSIOp : Handshake_Arith_IntBinaryOp<"minsi", [
+  BinaryArithNamedIO
+]> {
   let summary = "Outputs the minimum between two input signed integers";
 }
 
-def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui"> {
+def Handshake_MinUIOp : Handshake_Arith_IntBinaryOp<"minui", [
+  BinaryArithNamedIO
+]> {
   let summary = "Outputs the minimum between two input unsigned integers";
 }
 
@@ -755,6 +759,14 @@ def Handshake_AbsFOp : Handshake_Arith_FToFCastOp<"absf", [
 ]> {
   let summary = "floating point absolute-value operation";
   // TODO: add folder
+}
+
+def Handshake_AbsIOp : Handshake_Arith_IToICastOp<"absi", [
+  SimpleNamedIO
+]> {
+  let summary = "integer absolute-value operation";
+  let hasFolder = 0;
+  let hasVerifier = 0;
 }
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_ARTIH_OPS_TD
