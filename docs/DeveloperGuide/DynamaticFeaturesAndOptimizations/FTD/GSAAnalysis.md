@@ -290,11 +290,11 @@ Once a candidate μ is identified, its operands (inputs) are divided into two gr
 
 A valid μ gate must have exactly two inputs: one from outside the loop and one from inside the loop. The grouping step above ensures we can identify these two roles.
 
-- If either group is empty → the ϕ cannot be a μ.
+- If either group is empty, the ϕ cannot be converted into a μ.
 
-- If a group has exactly one member → that value becomes the corresponding μ input (loop or initial).
+- If a group has exactly one member, that value becomes the corresponding μ input, either initial or loop-carried.
 
-- If a group has multiple members → an intermediate ϕ is created in the block to merge them, and the output of this generated ϕ becomes the corresponding μ input. This extra ϕ will later be replaced by a γ (or tree of γs) during the ϕ to γ conversion phase.
+- If a group has multiple members, an intermediate ϕ is created in the block to merge them. The output of this generated ϕ becomes the corresponding μ input. This extra ϕ will later be replaced by a γ gate or a tree of γ gates during the ϕ-to-γ conversion phase.
 
 The implementation does not create a new μ gate. Instead, it updates the original ϕ gate in place by changing its type to μ and replacing its operands with exactly two inputs: the initial input first, then the loop-carried input.
 
@@ -512,10 +512,10 @@ We will convert the ϕ in block bb3 (which merges values coming from bb0, bb1, a
 
 ### Step 1. Input Ordering
 
-For the first argument of `bb3`, the incoming values from `bb0`, `bb1`, and `bb2` are `%c0_i32`, `%c0_i32_0`, and `%9`. We refer to them as **x₀**, **x₁**, and **x₂**, respectively.
+For the first argument of `bb3`, the incoming values from `bb0`, `bb1`, and `bb2` are `%c0_i32`, `%c0_i32_0`, and `%9`. We refer to them as **x<sub>0</sub>**, **x<sub>1</sub>**, and **x<sub>2</sub>**, respectively.
 
 After dominance-based ordering, the operands are:
-`x₀ (bb0)`, `x₁ (bb1)`, `x₂ (bb2)`.
+x<sub>0</sub> (`bb0`), x<sub>1</sub> (`bb1`), x<sub>2</sub> (`bb2`).
 
 
 ### Step 2. Find Common Dominator
@@ -528,53 +528,53 @@ The nearest common dominator of all three input blocks is **bb0**. Therefore, pa
 
 For each input, all valid paths from the common dominator (`bb0`) to the ϕ’s block (`bb3`) are identified, while avoiding blocks corresponding to **later operand producers**:
 
-- **x₀:** search from `bb0` to `bb3`, passing through `bb0`, while avoiding `bb1` and `bb2`.
+- **x<sub>0</sub>:** search from `bb0` to `bb3`, passing through `bb0`, while avoiding `bb1` and `bb2`.
   The only valid path is `{bb0, bb3}`. Other paths such as `{bb0, bb1, bb3}` and `{bb0, bb1, bb2, bb3}` are rejected because they pass through later operand producer blocks.
 
-- **x₁:** search from `bb0` to `bb3`, passing through `bb1`, while avoiding `bb2`.
+- **x<sub>1</sub>:** search from `bb0` to `bb3`, passing through `bb1`, while avoiding `bb2`.
   The only valid path is `{bb0, bb1, bb3}`.
 
-- **x₂:** search from `bb0` to `bb3`, passing through `bb2`, with no later operand producer blocks to avoid.
+- **x<sub>2</sub>:** search from `bb0` to `bb3`, passing through `bb2`, with no later operand producer blocks to avoid.
   The valid path is `{bb0, bb1, bb2, bb3}`.
 
 In this example, sender filtering keeps the same paths because each operand has a different producer block and sender block. The recorded sender of each input matches the block immediately before `bb3` in its selected path:
 
 | Operand | Sender | Selected path |
 | --- | --- | --- |
-| `%c0_i32` (**x₀**) | `bb0` | `{bb0, bb3}` |
-| `%c0_i32_0` (**x₁**) | `bb1` | `{bb0, bb1, bb3}` |
-| `%9` (**x₂**) | `bb2` | `{bb0, bb1, bb2, bb3}` |
+| `%c0_i32` (**x<sub>0</sub>**) | `bb0` | `{bb0, bb3}` |
+| `%c0_i32_0` (**x<sub>1</sub>**) | `bb1` | `{bb0, bb1, bb3}` |
+| `%9` (**x<sub>2</sub>**) | `bb2` | `{bb0, bb1, bb2, bb3}` |
 
 
 ### Step 4. Boolean Conditions
 
 Compute a Boolean expression for each operand:
 
-- **x₀:** `!c0`  
-- **x₁:** `c0 & c1`  
-- **x₂:** `c0 & !c1`  
+- **x<sub>0</sub>:** `!c0`  
+- **x<sub>1</sub>:** `c0 & c1`  
+- **x<sub>2</sub>:** `c0 & !c1`  
 
 These expressions indicate under which conditions each input is selected.
 
 
 ### Step 5. Build the γ Tree
 
-1. **Pick the first cofactor (c0):**  
-   - Both x₁ and x₂ remain non-zero when `c0 = true` → more than one expression → recursive `expandGammaTree` call needed.  
+1. **Pick the first cofactor (`c0`):**  
+   Both **x<sub>1</sub>** and **x<sub>2</sub>** remain non-zero when `c0 = true`, so more than one expression remains and a recursive `expandGammaTree` call is needed.
 
-2. **Second cofactor (c1) inside recursion:**  
-   - x₁: non-zero for `c1 = true` → true input  
-   - x₂: non-zero for `c1 = false` → false input  
+2. **Second cofactor (`c1`) inside recursion:**  
+   - **x<sub>1</sub>** is non-zero when `c1 = true`, so it becomes the true input.
+   - **x<sub>2</sub>** is non-zero when `c1 = false`, so it becomes the false input.
 
-   Resulting γ gate: `γ(c1, x2, x1)`  
-   - Condition: c1  
-   - True input: x1  
-   - False input: x2  
+   Resulting γ gate: γ(c1, x<sub>2</sub>, x<sub>1</sub>)  
+   - Condition: `c1`
+   - True input: **x<sub>1</sub>**
+   - False input: **x<sub>2</sub>**
 
-3. **Top-level γ gate:**  `γ(c0, x0, γ(c1, x2, x1))`
-   - Condition: c0  
-   - True input: γ(c1, x2, x1) (from recursion)  
-   - False input: x0  
+3. **Top-level γ gate:** γ(c0, x<sub>0</sub>, γ(c1, x<sub>2</sub>, x<sub>1</sub>))
+   - Condition: `c0`
+   - True input: γ(c1, x<sub>2</sub>, x<sub>1</sub>) from recursion
+   - False input: **x<sub>0</sub>**
 
 This γ gate becomes the **root** of the tree.
 
