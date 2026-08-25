@@ -50,13 +50,15 @@ module {
 }
 ```
 ### Translation Process
-The conversion from SSA to GSA is done in three main steps:
+The conversion from SSA to GSA is done in four main steps:
 
 1. Identify implicit ϕ gates introduced by SSA form.
 
-2. Convert eligible loop-header ϕ gates into μ gates
+2. Convert eligible loop-header ϕ gates into μ gates.
 
 3. Convert remaining ϕ gates into γ gates.
+
+4. Remove remaining ϕ gates.
 
 The following sections explain these steps in order.
 
@@ -91,7 +93,6 @@ struct Gate {
   boolean::BoolExpression *condition;    // Boolean condition of the gate
   std::vector<std::string> cofactorList; // Condition cofactors
   Block *gateBlock;                      // Block where the gate is located
-  bool muGenerated;                      // True if generated from MU expansion
   unsigned index;                        // Unique gate index
   bool isRoot;                           // True if it’s a root gate
 };
@@ -126,18 +127,7 @@ These are useful when decomposing complex Boolean expressions into simpler compo
 
 `gateBlock`
 
-The block where this gate is logically placed.
-
-In most cases, `gateBlock` coincides with the block containing the gate’s output value (`result`).
-
-However, for γ gates generated during μ expansion, the gate is placed in the same block as its `conditionBlock`, following the rules described in [Placement rule section](#5-placement-rule).
-This ensures that the γ is evaluated under the same control context as its condition.
-
-`muGenerated`<!--TODO: check the new implementation , why mu generated is needed or not needed anymore"-->
-
-A flag that indicates whether this gate was created during the `convertPhiToMu` phase, specifically to resolve multiple loop-input cases.
-
-This flag later determines where the corresponding γ gates should be placed, as their `gateBlock` is adjusted according to the μ placement logic (see [Placement rule section](#5-placement-rule) for details).
+The block where this gate is logically placed. In the current implementation, this is the block containing the gate’s output value (`result`).
 
 `isRoot`
 
@@ -314,8 +304,10 @@ The μ gate outputs its initial value during the first iteration of the loop. On
 
 Therefore, the condition of a μ gate is defined as the **negation of the loop exit condition**.
 
-Later, during FTD implementation, the μ gate is replaced by a MUX whose condition comes from an INIT. The INIT functionality can be implemented either as a merge between a constant and the loop’s iterating condition, or as a one-entry buffer preloaded with an initial value. In both cases, the INIT first drives the MUX to select the initial input. After that, it forwards the loop condition, so the MUX selects between the initial input and the loop-carried input based on whether the loop exits or continues.
-<!--TODO: check with aya which implemntation to keep-->
+Later, during FTD implementation, the μ gate is lowered to a MUX whose select signal is produced by an INIT. The INIT first emits an initial token, forcing the MUX to select the initial input. After this first token, it forwards the loop condition, so the MUX selects either the initial input or the loop-carried input depending on whether the loop exits or continues.
+
+This INIT behavior used to be implemented with a merge between a constant and the loop’s iterating condition. This has now been replaced by a dedicated handshake.init, which behaves as a one-entry buffer preloaded with an initial token.
+<!--TODO: check with aya INIT implemntation -->
 
 #### Note:
 The `getLoopExitCondition` function computes the overall exit condition by OR-ing the conditions of all loop exiting blocks. This function relies on `getBlockLoopExitCondition`, which computes the exit condition for a single block.
@@ -477,34 +469,13 @@ A new γ gate is generated:
 
 - Its condition is the cofactor currently being expanded.
 
+- The γ gate is inserted in the same block as the original ϕ.
+
 - Internally, its output is temporarily set to the original ϕ’s result. If the γ is not the root, this output will later become a “true” or “false” input of another γ, and the connection is updated when that parent γ is created.
-
-#### 5. Placement rule:<!--TODO: check if it is still the case in code-->
-
-Normally, new γ gates are placed in the **same block as the original ϕ**.
-
-However, there is one special case: when the ϕ was introduced during `convertPhiToMu` to resolve multiple loop-carried inputs. These temporary ϕs (marked with muGenerated) cannot have their γ replacements placed in the loop header.
-
-**Why is this a problem?**
-
-When we later run direct path analysis for control dependencies, the control signal that drives such a γ is generated inside the loop body.
-If we place the γ in the loop header:
-
-- The γ would appear before its control signal producer.
-
-- In the direct path search from the function entry (bb0) to the γ, we would never encounter the block that generates the control signal.
-
-
-**The fix:**
-
-For γs created from these muGenerated phis, we instead place them **in the same block as their condition producer**. 
-<!--TODO: check if it is still the case in code-->
 
 ### Step 6. Reconnect Uses
 
-Once a ϕ is replaced by its γ tree, all gates that previously used the ϕ’s output are updated to use the root γ gate instead.
-
-After all γ trees are generated and the uses of the original ϕ gates are reconnected to the corresponding γ roots, the remaining ϕ gates are no longer needed. The analysis then calls `removePhiGates()` to remove them from `gatesPerBlock`. This is safe because the γ conversion creates new γ gates instead of modifying the original ϕ gates in place.
+Once a ϕ is replaced by its γ tree, all GSA gates that previously used the ϕ’s output are updated to use the root γ gate instead.
 
 ---
 ### Example:
@@ -609,6 +580,10 @@ This γ gate becomes the **root** of the tree.
 
 
 
-### Step 6. Connect Uses
+### Step 6. Reconnect Uses
 
-In this example, no other GSA gate uses the original ϕ, so no reconnection is needed. In general, any GSA gate that used the original ϕ is updated to use the root γ gate instead. After this step, the original ϕ is removed from `gatesPerBlock`.
+In this example, no other GSA gate uses the original ϕ, so no reconnection is needed. In general, any GSA gate that used the original ϕ is updated to use the root γ gate instead.
+
+## Remove Remaining ϕ Gates
+
+After all μ and γ gates are generated, the remaining ϕ gates are no longer needed. At this point, every remaining ϕ has already been represented by a γ tree, and any GSA gate that used the original ϕ has been reconnected to the corresponding γ root. The analysis then calls `removePhiGates()` to remove the leftover ϕ gates from `gatesPerBlock`.
