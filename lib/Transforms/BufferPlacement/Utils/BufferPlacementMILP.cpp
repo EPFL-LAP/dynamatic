@@ -1308,11 +1308,10 @@ void BufferPlacementMILP::addSyncCycleVars(
 }
 
 void BufferPlacementMILP::addOccupancyVars(
-    ArrayRef<Value> allChannels,
-    ArrayRef<CFDFC *> cfdfcs, 
-    llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy,
-    llvm::MapVector<Value, CPVar> &maxChannelOccupancy,
-    double maxOccupancy) {
+    ArrayRef<Value> allChannels, ArrayRef<CFDFC *> cfdfcs,
+    llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+        &cfdfcChannelOccupancy,
+    llvm::MapVector<Value, CPVar> &maxChannelOccupancy, double maxOccupancy) {
   for (Value channel : allChannels) {
     std::string name = getUniqueName(*channel.getUses().begin());
     maxChannelOccupancy[channel] =
@@ -1326,8 +1325,7 @@ void BufferPlacementMILP::addOccupancyVars(
 
       std::string name = getUniqueName(*channel.getUses().begin());
       cfdfcChannelOccupancy[cfdfc][channel] = model->addVar(
-        "n_" + name + "_cfdfc" + std::to_string(i), REAL, 0.0, maxOccupancy
-      );
+          "n_" + name + "_cfdfc" + std::to_string(i), REAL, 0.0, maxOccupancy);
     }
   }
 }
@@ -1345,61 +1343,67 @@ void BufferPlacementMILP::setOccupancyBalancingObjective(
 }
 
 void BufferPlacementMILP::addMinOccupancyConstraints(
-  ArrayRef<CFDFC *> cfdfcs,
-  const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
-  const llvm::MapVector<Value, unsigned> &channelExtraLatency,
-  llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy) {
+    ArrayRef<CFDFC *> cfdfcs, const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+    const llvm::MapVector<Value, unsigned> &channelExtraLatency,
+    llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+        &cfdfcChannelOccupancy) {
 
   for (auto [i, cfdfc] : llvm::enumerate(cfdfcs)) {
     double cfdfcII = cfdfcIIs.lookup(cfdfc);
-    if (cfdfcII < 1.0) continue;
+    if (cfdfcII < 1.0)
+      continue;
 
     auto *occIt = cfdfcChannelOccupancy.find(cfdfc);
-    if (occIt == cfdfcChannelOccupancy.end()) continue;
+    if (occIt == cfdfcChannelOccupancy.end())
+      continue;
 
     for (auto &[channel, nCfc] : occIt->second) {
       double lat = channelExtraLatency.lookup(channel);
       std::string name = getUniqueName(*channel.getUses().begin());
-      model->addConstr(nCfc >= lat / cfdfcII,
-                      "nCfc>=(L_c/II): " + name + "_cfdfc" + std::to_string(i));
+      model->addConstr(nCfc >= lat / cfdfcII, "nCfc>=(L_c/II): " + name +
+                                                  "_cfdfc" + std::to_string(i));
     }
   }
 }
 
 void BufferPlacementMILP::addMaxOccupancyConstraints(
-  llvm::MapVector<CFDFC* , llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy,
-  llvm::MapVector<Value, CPVar> &maxChannelOccupancy) {
+    llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+        &cfdfcChannelOccupancy,
+    llvm::MapVector<Value, CPVar> &maxChannelOccupancy) {
   for (auto [i, cfdfcAndOcc] : llvm::enumerate(cfdfcChannelOccupancy)) {
     auto &[cfdfc, occMap] = cfdfcAndOcc;
     for (auto &[channel, nCfc] : occMap) {
       auto *maxOccIt = maxChannelOccupancy.find(channel);
-      if (maxOccIt == maxChannelOccupancy.end()) continue;
+      if (maxOccIt == maxChannelOccupancy.end())
+        continue;
 
       std::string name = getUniqueName(*channel.getUses().begin());
       model->addConstr(maxOccIt->second >= nCfc,
-        "N_max>=N_c: " + name + "_cfdfc" + std::to_string(i));
+                       "N_max>=N_c: " + name + "_cfdfc" + std::to_string(i));
     }
   }
 }
 
 void BufferPlacementMILP::addCycleOccupancyConstraints(
-  ArrayRef<CFDFC *> cfdfcs,
-  const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
-  llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy) {
+    ArrayRef<CFDFC *> cfdfcs, const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+    llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+        &cfdfcChannelOccupancy) {
   // For dataflow circuits generated from sequential programs, B = 1,
   // i.e., there must be no more than one token per cyclic path during
-  // the steady state of the choice-free circuit. (Paper: Section 5, Equation 12)
+  // the steady state of the choice-free circuit. (Paper: Section 5, Equation
+  // 12)
   constexpr double maxTokensInCycle = 1.0;
 
   for (auto [i, cfdfc] : llvm::enumerate(cfdfcs)) {
     auto *occIt = cfdfcChannelOccupancy.find(cfdfc);
-    if (occIt == cfdfcChannelOccupancy.end()) continue;
+    if (occIt == cfdfcChannelOccupancy.end())
+      continue;
 
     double ii = std::max(1.0, cfdfcIIs.lookup(cfdfc));
     SynchronizingCyclesFinderGraph graph(funcInfo.funcOp, *cfdfc);
 
     for (auto [cycleIdx, cycle] : llvm::enumerate(graph.findAllCycles())) {
-      LinExpr occupancy; 
+      LinExpr occupancy;
 
       for (NodeIdType nodeId : cycle.nodes) {
         const DataflowGraphNode &node = graph.nodes[nodeId];
@@ -1427,9 +1431,9 @@ void BufferPlacementMILP::addCycleOccupancyConstraints(
           occupancy += chIt->second;
       }
 
-      model->addConstr(occupancy <= maxTokensInCycle,
-                  llvm::formatv("eq12_cfdfc{0}_cycle{1}", i, cycleIdx).str());
-
+      model->addConstr(
+          occupancy <= maxTokensInCycle,
+          llvm::formatv("eq12_cfdfc{0}_cycle{1}", i, cycleIdx).str());
     }
   }
 }
@@ -1453,35 +1457,35 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
     llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
         &cfdfcChannelOccupancy) {
 
-    // Helper function to compute the latency of a simple path.
-    auto unitLatency = [&](const SimplePath &path, const ReconvergentPath &rp,
+  // Helper function to compute the latency of a simple path.
+  auto unitLatency = [&](const SimplePath &path, const ReconvergentPath &rp,
                          const CFGTransitionSequenceSubgraph &graph) {
-      double sum = 0.0;
-      for (NodeIdType nodeId : path.nodes) {
-        if (nodeId == rp.forkNodeId || nodeId == rp.joinNodeId)
-          continue;
-        const DataflowGraphNode &node = graph.nodes[nodeId];
-        if (node.type != DataflowGraphNode::REGULAR)
-          continue;
-        auto lat = timingDB.getLatency(node.op, SignalType::DATA, targetPeriod);
-        if (succeeded(lat) && *lat > 0.0)
-          sum += *lat;
+    double sum = 0.0;
+    for (NodeIdType nodeId : path.nodes) {
+      if (nodeId == rp.forkNodeId || nodeId == rp.joinNodeId)
+        continue;
+      const DataflowGraphNode &node = graph.nodes[nodeId];
+      if (node.type != DataflowGraphNode::REGULAR)
+        continue;
+      auto lat = timingDB.getLatency(node.op, SignalType::DATA, targetPeriod);
+      if (succeeded(lat) && *lat > 0.0)
+        sum += *lat;
     }
     return sum;
   };
 
   // Helper function to compute the occupancy of a simple path.
-  auto channelOccupancy =
-      [&](const SimplePath &path, const CFGTransitionSequenceSubgraph &graph,
-          const llvm::MapVector<Value, CPVar> &occ) {
-        LinExpr sum;
-        for (EdgeIdType edgeId : path.edges) {
-          auto *chIt = occ.find(graph.edges[edgeId].channel);
-          if (chIt != occ.end())
-            sum += chIt->second;
-        }
-        return sum;
-      };
+  auto channelOccupancy = [&](const SimplePath &path,
+                              const CFGTransitionSequenceSubgraph &graph,
+                              const llvm::MapVector<Value, CPVar> &occ) {
+    LinExpr sum;
+    for (EdgeIdType edgeId : path.edges) {
+      auto *chIt = occ.find(graph.edges[edgeId].channel);
+      if (chIt != occ.end())
+        sum += chIt->second;
+    }
+    return sum;
+  };
 
   // We loop through all reconvergent paths.
   for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
@@ -1493,7 +1497,8 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
     std::vector<SimplePath> routes =
         enumerateSimplePaths(*graph, rp.forkNodeId, rp.joinNodeId, rp.nodeIds);
 
-    // If there are less than 2 simple paths, we skip. (It can't be a reconvergent path.)
+    // If there are less than 2 simple paths, we skip. (It can't be a
+    // reconvergent path.)
     if (routes.size() < 2)
       continue;
 
@@ -1503,7 +1508,7 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
       if (fork.type == DataflowGraphNode::REGULAR &&
           !cfdfc->units.contains(fork.op))
         continue;
-      
+
       auto *occIt = cfdfcChannelOccupancy.find(cfdfc);
       if (occIt == cfdfcChannelOccupancy.end())
         continue;
