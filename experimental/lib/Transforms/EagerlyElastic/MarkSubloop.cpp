@@ -186,7 +186,12 @@ void MarkSubloopPass::runOnOperation() {
 
     int outerHeaderBbIdx = std::distance(region.begin(), outerHeader->getIterator());
     bool storesInSubblock = false;
-    bool multSuccessors = (outerHeader->getNumSuccessors() > 1);
+
+    llvm::SmallVector<Attribute> successorAttrs;
+    for (mlir::Block *successor : outerHeader->getSuccessors()) {
+      int succIdx = std::distance(region.begin(), successor->getIterator());
+      successorAttrs.push_back(builder.getI64IntegerAttr(succIdx));
+    }
 
     // Collect the names and operandIDs of entry operations in exitBlock
     llvm::SmallVector<Attribute> entryOpAttrs;
@@ -263,8 +268,8 @@ void MarkSubloopPass::runOnOperation() {
       for (memref::StoreOp storeOp : storesToModify) {
         builder.setInsertionPoint(storeOp);
 
+        // predicate data
         Value incomingData = storeOp.getValueToStore();
-
         auto predOp = builder.create<dynamatic::cf_extra::PredicateOp>(
             storeOp.getLoc(),
             incomingData.getType(),
@@ -272,7 +277,6 @@ void MarkSubloopPass::runOnOperation() {
             incomingData
         );
         namer.setName(predOp);
-
         // Rewire the data operand safely using setOperand on its specific index
         storeOp.setOperand(0, predOp->getResult(0));
       }
@@ -282,6 +286,8 @@ void MarkSubloopPass::runOnOperation() {
     allLoopsMetadata.push_back(builder.getDictionaryAttr({
         builder.getNamedAttr("header_bb",
                              builder.getI64IntegerAttr(outerHeaderBbIdx)),
+        builder.getNamedAttr("successor_bbs", 
+                             builder.getArrayAttr(successorAttrs)),
         builder.getNamedAttr("stores", builder.getBoolAttr(storesInSubblock)),
         builder.getNamedAttr("entry_ops", builder.getArrayAttr(entryOpAttrs)),
     }));

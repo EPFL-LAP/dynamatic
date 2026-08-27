@@ -17,11 +17,26 @@ void setHandshakeAttrs(Attribute bbAttr, NameAnalysis &namer,
   }
 }
 
+/// Helper to trace a condition value back through NotIOps AND RepeatingInits
+static Value traceConditionRoot(Value val, bool &inverted) {
+  while (Operation *defOp = val.getDefiningOp()) {
+    if (auto notOp = dyn_cast<handshake::NotIOp>(defOp)) {
+      inverted = !inverted;
+      val = notOp.getOperand();
+    } else if (auto repInit = dyn_cast<handshake::RepeatingInitOp>(defOp)) {
+      val = repInit.getOperand();
+    } else {
+      break;
+    }
+  }
+  return val;
+}
+
 /// Checks whether two condition values originate from the same root source.
 bool checkConditionsMatch(Value valA, Value valB, bool expectSamePolarity) {
   bool invA = false, invB = false;
 
-  // Trace valA back through NotIOps
+  /* // Trace valA back through NotIOps
   while (auto notOp =
              dyn_cast_or_null<handshake::NotIOp>(valA.getDefiningOp())) {
     invA = !invA;
@@ -33,7 +48,9 @@ bool checkConditionsMatch(Value valA, Value valB, bool expectSamePolarity) {
              dyn_cast_or_null<handshake::NotIOp>(valB.getDefiningOp())) {
     invB = !invB;
     valB = notOp.getOperand();
-  }
+  }  */
+  valA = traceConditionRoot(valA, invA);
+  valB = traceConditionRoot(valB, invB);
 
   // They must originate from the exact same root wire
   if (valA != valB)
@@ -89,6 +106,11 @@ BypassResult isEligibleForBypass(handshake::ConditionalBranchOp branchOp,
     return BypassResult::Ineligible;
   }
 
+  // do not move past ors that guard the stores TODO: make sure other ones can be bypassed
+  if (isa<handshake::OrIOp>(targetOp)) {
+    return BypassResult::Ineligible;
+  }
+
   // ensure all other inputs to the target op match this suppressor's condition
   Value currentCond = branchOp.getConditionOperand();
   for (Value operand : targetOp->getOperands()) {
@@ -97,10 +119,7 @@ BypassResult isEligibleForBypass(handshake::ConditionalBranchOp branchOp,
             operand.getDefiningOp())) {
       if (siblingBranch == branchOp)
         continue;
-      // if the branch has more than one use, a fork needs to be created first
-      if (!siblingBranch.getFalseResult().hasOneUse()) {
-        return BypassResult::Ineligible;
-      }
+
       // check whether condition matches indirectly
       if (!checkConditionsMatch(currentCond,
                                 siblingBranch.getConditionOperand(), true)) {
@@ -126,6 +145,7 @@ void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
 
   Location loc = targetOp->getLoc();
   Value condition = branchOp.getConditionOperand();
+  mlir::Attribute headerBBAttr = nullptr;
 
   // rewire the suppressor
   for (OpOperand &use : targetOp->getOpOperands()) {
@@ -141,6 +161,9 @@ void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
 
     // rewire the target operand directly to the suppressor's input data
     use.set(incomingBranch.getDataOperand());
+    
+    if (!headerBBAttr)
+      headerBBAttr = branchOp->getAttr("subloop_header_bb");
 
     // check if the suppressor has any remaining downstream uses
     if (incomingBranch.getFalseResult().use_empty()) {
@@ -163,6 +186,9 @@ void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
     auto newBranch =
         builder.create<handshake::ConditionalBranchOp>(loc, condition, result);
     setHandshakeAttrs(targetOp->getAttr("handshake.bb"), namer, {newBranch});
+    if (headerBBAttr) {
+      newBranch->setAttr("subloop_header_bb", headerBBAttr);
+    }
 
     // reroute downstream consumers to look at the new branch's FalseResult
     result.replaceAllUsesExcept(newBranch.getFalseResult(), newBranch);
@@ -509,4 +535,66 @@ void applyRewriteH(handshake::MuxOp dataMux,
   }
 
   moveSuppressorPastOp(trueBranch, dataMux, frontier, namer);
+}
+
+void markMultiSuccessorHeaderBranches(
+    const llvm::DenseSet<handshake::ConditionalBranchOp> &frontier,
+    ModuleOp modOp) {
+  auto subloopInfoAttr = modOp->getAttrOfType<ArrayAttr>("handshake.subloop_info");
+  if (!subloopInfoAttr)
+    return;
+  OpBuilder builder(modOp.getContext());
+  
+  for (handshake::ConditionalBranchOp branchOp : frontier) {
+    // get the bb of the current branch
+    auto bbAttr = branchOp->getAttrOfType<IntegerAttr>("handshake.bb");
+    int64_t currentBB = bbAttr.getInt();
+
+    for (Attribute loopAttr : subloopInfoAttr) {
+      auto dict = cast<DictionaryAttr>(loopAttr);
+      auto headerBBAttr = dict.getAs<IntegerAttr>("header_bb");
+      auto successorBBsArray = dict.getAs<ArrayAttr>("successor_bbs");
+
+      if (!headerBBAttr || !successorBBsArray)
+        continue;
+
+      int64_t headerBB = headerBBAttr.getInt();
+
+      // Condition 1: Must belong to this header block
+      if (currentBB != headerBB)
+        continue;
+
+      // Condition 2: Header must have MULTIPLE successors
+      if (successorBBsArray.size() <= 1)
+        continue;
+
+      // Condition 3: Verify the branch targets one of the successor blocks
+      bool targetsSuccessor = false;
+      for (Operation *user : branchOp.getFalseResult().getUsers()) {
+        if (isa<handshake::ControlMergeOp>(user))
+          continue;
+          
+        auto userBBAttr = user->getAttrOfType<IntegerAttr>("handshake.bb");
+        int64_t userBB = userBBAttr.getInt();
+
+        // Check if userBB is in successor_bbs
+        for (Attribute succAttr : successorBBsArray) {
+          if (dyn_cast<IntegerAttr>(succAttr).getInt() == userBB) {
+            targetsSuccessor = true;
+            break;
+          }
+        }
+        if (targetsSuccessor)
+          break;
+      }
+
+      // mark the cond_branch with the header bb
+      if (targetsSuccessor) {
+        branchOp->setAttr("subloop_header_bb",
+                          builder.getI64IntegerAttr(headerBB));
+        branchOp.dump();
+        break; // match found for this branch
+      }
+    }
+  }
 }

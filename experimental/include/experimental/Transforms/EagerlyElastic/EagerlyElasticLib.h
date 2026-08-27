@@ -74,3 +74,7 @@ void applyRewriteH(handshake::MuxOp dataMux,
                    handshake::InitOp initOp,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer);
+
+void markMultiSuccessorHeaderBranches(
+    const llvm::DenseSet<handshake::ConditionalBranchOp> &frontier,
+    ModuleOp modOp);

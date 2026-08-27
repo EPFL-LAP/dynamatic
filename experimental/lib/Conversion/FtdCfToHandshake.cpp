@@ -455,48 +455,70 @@ struct FtdCfToHandshakePass
       shadow.destroy();
       llvm::errs() << "kinda done\n";
 
-      for (auto predOp : llvm::make_early_inc_range(
-         funcOp.getOps<dynamatic::cf_extra::PredicateOp>())) {
-        builder.setInsertionPoint(predOp);
+      for (auto storeOp : llvm::make_early_inc_range(
+              funcOp.getOps<handshake::StoreOp>())) {
+        storeOp.dump();
+        OpBuilder builder(storeOp);
 
-        Value currentData = predOp.getData();
-        Value currentCond = predOp.getCond();
+        Value currData = storeOp.getData();
+        auto firstPred = currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>();
+        if (!firstPred)
+          continue;
 
-        // Check if the input data is already coming from a suppressor branch
-        if (auto parentBranch = currentData.getDefiningOp<handshake::ConditionalBranchOp>()) {
-          if (parentBranch->hasAttr("store_suppressor") &&
-              currentData == parentBranch.getFalseResult()) {
+        std::string basePredName = "";
+        if (auto predNameAttr = firstPred->getAttrOfType<StringAttr>("handshake.name"))
+          basePredName = predNameAttr.getValue().str();
 
-            // Combine conditions using OrIOp
-            builder.setInsertionPoint(parentBranch);
-            auto combinedCond = builder.create<handshake::OrIOp>(
-                predOp.getLoc(), parentBranch.getConditionOperand(), currentCond);
-            inheritBB(predOp, combinedCond);
+        // 1. Unroll the predicate chain on the data operand
+        SmallVector<Value> conds;
+        SmallVector<dynamatic::cf_extra::PredicateOp> predsToErase;
+        while (auto predOp = currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>()) {
+          conds.push_back(predOp.getCond());
+          predsToErase.push_back(predOp);
+          currData = predOp.getData();
+          if (auto predNameAttr = predOp->getAttrOfType<StringAttr>("handshake.name"))
+            basePredName = predNameAttr.getValue().str();
+        }
+        Value rawData = currData;
 
-            // Update the existing branch condition
-            parentBranch.getConditionOperandMutable().assign(combinedCond.getResult());
-
-            // Replace predicate uses directly with the parent branch's false result
-            predOp.getResult().replaceAllUsesWith(parentBranch.getFalseResult());
-            predOp.erase();
-            continue;
-          }
+        // 2. Build ONE OrIOp tree combining all loop conditions
+        builder.setInsertionPoint(storeOp);
+        Value combinedCond = conds[0];
+        for (size_t i = 1; i < conds.size(); ++i) {
+          auto orOp = builder.create<handshake::OrIOp>(
+              storeOp.getLoc(), combinedCond, conds[i]);
+          inheritBB(storeOp, orOp);
+          combinedCond = orOp.getResult();
         }
 
-        // Create the first suppressor conditional branch using currentCond and currentData
-        auto condBranchOp = builder.create<handshake::ConditionalBranchOp>(
-            predOp.getLoc(), currentCond, currentData);
+        // 3. Create the Data suppressor branch using combinedCond
+        auto dataBranch = builder.create<handshake::ConditionalBranchOp>(
+            storeOp.getLoc(), combinedCond, rawData);
+        dataBranch->setAttr("store_suppressor", builder.getUnitAttr());
+        inheritBB(storeOp, dataBranch);
+        std::string dataBranchName = "cond_br_" + basePredName;
+        dataBranch->setAttr("handshake.name", builder.getStringAttr(dataBranchName));
 
-        condBranchOp->setAttr("store_suppressor", builder.getUnitAttr());
-        inheritBB(predOp, condBranchOp);
+        // Set the store's data operand
+        storeOp.getDataMutable().assign(dataBranch.getFalseResult());
 
-        StringAttr predNameAttr = predOp->getAttrOfType<StringAttr>("handshake.name");
-        std::string expectedName = "cond_br_" + (predNameAttr.getValue().str());
-        condBranchOp->setAttr("handshake.name", builder.getStringAttr(expectedName));
+        // 4. Create matching Address suppressor branch using the SAME combinedCond
+        Value currentAddr = storeOp.getAddress();
+        auto addrBranch = builder.create<handshake::ConditionalBranchOp>(
+            storeOp.getLoc(), combinedCond, currentAddr);
+        addrBranch->setAttr("store_suppressor", builder.getUnitAttr());
+        inheritBB(storeOp, addrBranch);
+        std::string addrBranchName = "cond_br_" + basePredName + "_addr";
+        addrBranch->setAttr("handshake.name", builder.getStringAttr(addrBranchName));
 
-        // Replace predicate result with falseResult and erase
-        predOp.getResult().replaceAllUsesWith(condBranchOp.getFalseResult());
-        predOp.erase();
+        // Set the store's address operand
+        storeOp.getAddressMutable().assign(addrBranch.getFalseResult());
+
+        
+
+        // 5. Erase all lowered PredicateOps
+        for (auto predOp : predsToErase)
+          predOp.erase();
       }
     }
   }
