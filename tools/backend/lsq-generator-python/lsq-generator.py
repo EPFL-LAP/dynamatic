@@ -798,6 +798,18 @@ class LSQWrapper:
         )
         self.lsq_wrapper_str += io_stData_bits.signalInit()
 
+        # io_stDone_valid: output
+        io_stDone_valid = VHDLLogicTypeArray(
+            "io_stDone_valid", "o", self.lsq_config.numStPorts
+        )
+        self.lsq_wrapper_str += io_stDone_valid.signalInit()
+
+        # io_stDone_ready: input
+        io_stDone_ready = VHDLLogicTypeArray(
+            "io_stDone_ready", "i", self.lsq_config.numStPorts
+        )
+        self.lsq_wrapper_str += io_stDone_ready.signalInit()
+
         # io_ldAddrToMC_ready: input
         io_ldAddrToMC_ready = VHDLLogicType("io_ldAddrToMC_ready", "i")
         self.lsq_wrapper_str += io_ldAddrToMC_ready.signalInit()
@@ -865,9 +877,9 @@ class LSQWrapper:
             "wreq_ready", "w", self.lsq_config.numStMem)
         self.lsq_wrapper_str += wreq_ready.signalInit()
 
-        wresp_valid = VHDLLogicTypeArray(
-            "wresp_valid", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wresp_valid.signalInit()
+        wresp_ready = VHDLLogicTypeArray(
+            "wresp_ready", "w", self.lsq_config.numStMem)
+        self.lsq_wrapper_str += wresp_ready.signalInit()
 
         wresp_id = VHDLLogicVecTypeArray(
             "wresp_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
@@ -927,18 +939,14 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
 
         # Define the process to update
-        # wresp_valid, wresp_id
+        # wresp_id
         self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
-        self.lsq_wrapper_str += (
-            "\t-- Process for wreq_ready, wresp_valid and wresp_id\n"
-        )
+        self.lsq_wrapper_str += "\t-- Process for wresp_id\n"
         self.lsq_wrapper_str += self.reg_init_str
         self.lsq_wrapper_str += "\t" * \
             (self.tab_level + 1) + "if reset = '1' then\n"
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 2), "'0'")
             self.lsq_wrapper_str += OpTab(
                 wresp_id[i], (self.tab_level +
                               2), "(", "others", "=>", "'0'", ")"
@@ -948,27 +956,22 @@ class LSQWrapper:
             "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         )
 
-        self.lsq_wrapper_str += "\t-- Signals the LSQ core that the store is completed if the MC is ready.\n"
-        self.lsq_wrapper_str += "\t-- NOTE: we assume that MC joins the addr and data, so here we only check the addr ready.\n"
+        self.lsq_wrapper_str += "\t-- Remember the ID of each store request accepted by the MC.\n"
         self.lsq_wrapper_str += (
             "\n"
             + "\t" * (self.tab_level + 2)
             + "if "
             + io_storeEn.getNameWrite()
-            + " = '1'" + " and " + io_stAddrToMC_ready.getNameRead() + " = '1' then\n"
+            + " = '1' and "
+            + io_stAddrToMC_ready.getNameRead()
+            + " = '1' and "
+            + io_stDataToMC_ready.getNameRead()
+            + " = '1' then\n"
         )
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 3), "'1'")
             self.lsq_wrapper_str += OpTab(wresp_id[i],
-                                          (self.tab_level + 3), rreq_id[i])
-
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + "else\n"
-
-        for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 3), "'0'")
+                                          (self.tab_level + 3), wreq_id[i])
 
         self.lsq_wrapper_str += (
             "\t" * (self.tab_level + 2)
@@ -997,6 +1000,8 @@ class LSQWrapper:
             "and",
             io_stDataToMC_ready,
         )
+        self.lsq_wrapper_str += OpTab(io_stDoneFromMC_ready,
+                                      self.tab_level, wresp_ready[0])
 
         ###
         # Instantiate the LSQ_core module
@@ -1102,11 +1107,11 @@ class LSQWrapper:
             )
             self.lsq_wrapper_str += (
                 "\t" * (self.tab_level + 2)
-                + f"stp_done_ready_{i}_i => {io_stDoneFromMC_ready[i].getNameRead()},\n"
+                + f"stp_done_ready_{i}_i => {io_stDone_ready[i].getNameRead()},\n"
             )
             self.lsq_wrapper_str += (
                 "\t" * (self.tab_level + 2)
-                + f"stp_done_valid_{i}_o => {io_stDoneFromMC_valid[i].getNameWrite()},\n"
+                + f"stp_done_valid_{i}_o => {io_stDone_valid[i].getNameWrite()},\n"
             )
 
         # Define all AXI ports, we assume there is only 1 channel
@@ -1139,7 +1144,7 @@ class LSQWrapper:
             )
             self.lsq_wrapper_str += (
                 "\t" * (self.tab_level + 2)
-                + f"wresp_valid_{i}_i => {wresp_valid[i].getNameRead()},\n"
+                + f"wresp_valid_{i}_i => {io_stDoneFromMC_valid.getNameRead()},\n"
             )
             self.lsq_wrapper_str += (
                 "\t" * (self.tab_level + 2)
@@ -1147,7 +1152,11 @@ class LSQWrapper:
             )
             self.lsq_wrapper_str += (
                 "\t" * (self.tab_level + 2)
-                + f"wreq_id_{i}_o => {wreq_id[i].getNameWrite()}\n"
+                + f"wreq_id_{i}_o => {wreq_id[i].getNameWrite()},\n"
+            )
+            self.lsq_wrapper_str += (
+                "\t" * (self.tab_level + 2)
+                + f"wresp_ready_{i}_o => {wresp_ready[i].getNameWrite()}\n"
             )
 
         self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + ");\n"
