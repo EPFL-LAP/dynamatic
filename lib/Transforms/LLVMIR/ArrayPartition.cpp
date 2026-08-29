@@ -9,6 +9,8 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/ISLTools.h"
 
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -16,8 +18,10 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -723,6 +727,124 @@ std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
   return result;
 }
 
+// Recovers index values of a possibly chained GEP without assuming a particular
+// shape to the GEPs themselves.
+//
+// C:
+//   int a[5][6][7];
+//   x = a[1][i + 3][j];
+//
+// This single access may be split across multiple chained GEPs by clang,
+// e.g.:
+//   %i3 = add i64 %i, 3
+//   %inner = getelementptr [5 x [6 x [7 x i32]]], ptr %a, i64 0, i64 1, i64 %i3
+//   %outer = getelementptr [7 x i32], ptr %inner, i64 0, i64 %j
+//
+// strides (from the array's declared type, outer to inner):
+//   strides = { 168, 28, 4 }   // 6*7*4, 7*4, 4
+//
+// PHASE 1 walks the chain (%outer, then %inner), decomposing each GEP via
+// collectOffset and accumulating into one flat description:
+//   constOff = 168             // the literal "1" for dim 0: 1 * 168
+//   varOff   = { %i3: 28, %j: 4 }
+//
+// PHASE 2 recovers indices[] per dimension from (constOff, varOff):
+//   (a) match live values to dimensions by exact stride equality:
+//         %i3 (scale 28) -> dimension 1 (stride 28)
+//         %j  (scale 4)  -> dimension 2 (stride 4)
+//   (b) resolve whatever's left of constOff for dimensions still unmatched:
+//         dimension 0: 168 / 168 = 1, remainder 0
+//
+// Result: indices = { ConstantInt(1), %i3, %j }
+std::vector<Value *> decomposeGEPIndices(GetElementPtrInst *gepInst,
+                                         Type *allocatedType, Type *idxTy) {
+
+  // Naming scheme for DL follows other LLVM Transforms
+  const DataLayout &DL = gepInst->getModule()->getDataLayout();
+  unsigned bitWidth = DL.getIndexSizeInBits(gepInst->getPointerAddressSpace());
+
+  APInt constOff(bitWidth, 0);
+
+  // llvm::MapVector preserves insertion order
+  llvm::MapVector<Value *, APInt> varOff;
+
+  Value *cur = gepInst;
+  while (auto *gepOp = dyn_cast<GEPOperator>(cur)) {
+
+    APInt localConstOff(bitWidth, 0);
+    llvm::MapVector<Value *, APInt> localVarOff;
+
+    if (!gepOp->collectOffset(DL, bitWidth, localVarOff, localConstOff)) {
+      llvm::report_fatal_error(
+          "__dyn_array_partition: could not flatten address computation");
+    }
+
+    constOff += localConstOff;
+
+    for (auto &[val, scale] : localVarOff) {
+      auto *it = varOff.find(val);
+      // Either append to the varOff or increase the scale depending if the
+      // value (i.e. index is reused)
+      if (it == varOff.end()) {
+        varOff.insert({val, scale});
+      } else {
+        it->second += scale;
+      }
+    }
+
+    cur = gepOp->getPointerOperand();
+  }
+
+  // Collect the strides from the array type
+  // Input:  allocatedType = [4 x [5 x i32]]
+  // Output: strides        = { 20, 4 }
+  //           strides[0] = 20 bytes  (outer dim, size 4)
+  //           strides[1] = 4  bytes  (inner dim, size 5)
+  std::vector<uint64_t> strides;
+  Type *ty = allocatedType;
+  while (auto *arrType = dyn_cast<ArrayType>(ty)) {
+    strides.push_back(
+        DL.getTypeAllocSize(arrType->getElementType()).getFixedValue());
+    ty = arrType->getElementType();
+  }
+
+  std::vector<Value *> indices(strides.size(), nullptr);
+  for (unsigned dim = 0; dim < strides.size(); dim++) {
+    for (auto *it = varOff.begin(); it != varOff.end(); it++) {
+      if (it->second == strides[dim]) {
+        indices[dim] = it->first;
+        varOff.erase(it);
+        break;
+      }
+    }
+  }
+
+  if (!varOff.empty()) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: could not attribute all address terms to "
+        "an array dimension");
+  }
+
+  // Handle all the remaminig constant offset by doing division and remainders:
+  // Example: arr[1][2][i] with strides = {168, 28, 4}, constOff = 224
+  // (dims 0 and 1 both literal, dim 2 already resolved to %i via matching):
+  //   dim 0: 224 / 168 = 1, remainder 224 % 168 = 56
+  //   dim 1: 56  / 28  = 2, remainder 56  % 28  = 0
+  // final indices = { ConstantInt(1), ConstantInt(2), %i }, i.e. arr[1][2][i]
+  for (unsigned dim = 0; dim < strides.size(); dim++) {
+    if (indices[dim]) {
+      continue;
+    }
+
+    APInt stride(constOff.getBitWidth(), strides[dim]);
+    indices[dim] =
+        ConstantInt::get(idxTy, constOff.udiv(stride).getZExtValue());
+    constOff = constOff.urem(stride);
+  }
+
+  return indices;
+}
+
 // Transforms the code by creating branches accessing different banks for every
 // array access.
 // Original code:
@@ -783,11 +905,20 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
                              "number of indices in this access");
   }
 
-  // For gep instruciton:
-  // %p = getelementptr [10 x [10 x i32]], ptr %arr, i64 0, i64 1, 5
-  // and dimension = 2 we'd want origIdx to have the value of the second index,
-  // i.e. 5 in this example
-  Value *origIdx = *(gepInst->idx_begin() + partInfo.dimension);
+  Function *f = inst->getParent()->getParent();
+  LLVMContext &ctx = inst->getContext();
+
+  Type *idxTy = Type::getInt64Ty(ctx);
+  std::vector<Value *> allIndices =
+      decomposeGEPIndices(gepInst, baseAlloca->getAllocatedType(), idxTy);
+
+  if (partInfo.dimension < 1 || partInfo.dimension > allIndices.size()) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: dimension exceeds the number of dimensions "
+        "in this array");
+  }
+
+  Value *origIdx = allIndices[partInfo.dimension - 1];
   Type *addrTy = origIdx->getType();
 
   unsigned factor = static_cast<unsigned>(banks.size());
@@ -797,9 +928,6 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
 
   unsigned chunkSize = totalSize / factor;
   unsigned remainder = totalSize % factor;
-
-  LLVMContext &ctx = inst->getContext();
-  Function *f = inst->getParent()->getParent();
 
   // Since LLVM might reuse gep instructions we have to insert duplicate ones to
   // ensure that the later split can happen correctly. Otherwise we might split
@@ -911,14 +1039,15 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
         ConstantInt::get(addrTy, step), "part.idx");
 
     std::vector<Value *> newIndices;
-    newIndices.reserve(gepInst->getNumIndices());
+    newIndices.reserve(allIndices.size() + 1);
+    newIndices.push_back(ConstantInt::get(idxTy, 0));
 
-    // GEP indices are either the same as before or transformed exactly in the
-    // case where they match the target dimension
-    for (unsigned i = 0; i < gepInst->getNumIndices(); ++i) {
-      auto *newIndex =
-          i == partInfo.dimension ? newTargetIdx : *(gepInst->idx_begin() + i);
-      newIndices.push_back(newIndex);
+    for (unsigned d = 0; d < allIndices.size(); ++d) {
+      // Either take the original index or the newTargetIdx based on the
+      // calculation
+      auto *nextIndex =
+          d == partInfo.dimension - 1 ? newTargetIdx : allIndices[d];
+      newIndices.push_back(nextIndex);
     }
 
     Value *newGEP = caseBuilder.CreateInBoundsGEP(
