@@ -33,6 +33,7 @@
 #include <boost/property_map/property_map.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <stdlib.h>
 
 #include <boost/graph/adjacency_list.hpp>
@@ -78,10 +79,12 @@ using DimInfoOfAllDimensions = std::vector<DimInfo>;
 
 namespace {
 
+enum PartitionStyle { BLOCK, CYCLIC, COMPLETE };
+
 struct PartitionInfo {
   unsigned dimension;
   unsigned factor;
-  std::string style;
+  PartitionStyle style;
 };
 
 struct AccessInfo {
@@ -184,6 +187,20 @@ std::optional<StringRef> extractStringLiteral(Value *v) {
     return std::nullopt;
 
   return cda->getAsCString();
+}
+
+std::optional<PartitionStyle> extractPartitionStyle(StringRef styleString) {
+  if (styleString == "block") {
+    return PartitionStyle::BLOCK;
+  }
+  if (styleString == "cyclic") {
+    return PartitionStyle::CYCLIC;
+  }
+  if (styleString == "complete") {
+    return PartitionStyle::COMPLETE;
+  }
+
+  return std::nullopt;
 }
 
 /// \brief: After shrinking the array to an optimal size, we also need to update
@@ -652,7 +669,7 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
 //
 // Pragma Syntax:
 // #pragma DYN array_partition array={array name} dimension={1..array depth}
-// style={block, cyclic, full} factor=int
+// style={block, cyclic, complete} factor=int
 //
 // Example for int arr[10][10];
 // #pragma DYN array_partition array=arr dimension=2 style=block factor=2
@@ -687,30 +704,36 @@ std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
       }
 
       auto arrName = extractStringLiteral(call->getArgOperand(0));
-      auto *dimConst = dyn_cast<ConstantInt>(call->getArgOperand(1));
-      auto *factorConst = dyn_cast<ConstantInt>(call->getArgOperand(2));
-      auto style = extractStringLiteral(call->getArgOperand(3));
-
       if (!arrName)
         llvm::report_fatal_error(
             "__dyn_array_partition: could not recover array name "
             "string literal");
+
+      auto *dimConst = dyn_cast<ConstantInt>(call->getArgOperand(1));
+      auto *factorConst = dyn_cast<ConstantInt>(call->getArgOperand(2));
       if (!dimConst || !factorConst)
         llvm::report_fatal_error(
             "__dyn_array_partition: dimension/factor must be "
             "constant integers");
-      if (!style)
+
+      auto styleString = extractStringLiteral(call->getArgOperand(3));
+      if (!styleString)
         llvm::report_fatal_error(
-            "__dyn_array_partition: could not recover style string"
-            "literal");
+            "__dyn_array_partition: could not recover style name "
+            "string literal");
+
+      auto styleOpt = extractPartitionStyle(styleString.value());
+      if (!styleOpt)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: invalid style string literal");
 
       LLVM_DEBUG(llvm::errs()
                  << "Partitioning: " << arrName << "\n\t" << dimConst << "\n\t"
-                 << factorConst << "\n\t" << style << "\n");
+                 << factorConst << "\n\t" << styleString.value() << "\n");
 
       result[arrName->str()] = PartitionInfo{
           static_cast<unsigned>(dimConst->getZExtValue()),
-          static_cast<unsigned>(factorConst->getZExtValue()), style->str()};
+          static_cast<unsigned>(factorConst->getZExtValue()), *styleOpt};
 
       callSites.push_back(call);
     }
@@ -970,7 +993,7 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
   // NOTE: Only block partitioning needs the tooLarge addition, since cyclic
   // automatically assign every index to a bin by using modular arithmetic
   Value *bankIdxNative;
-  if (partInfo.style == "cyclic") {
+  if (partInfo.style == CYCLIC) {
     bankIdxNative = preBuilder.CreateURem(
         origIdx, ConstantInt::get(addrTy, factor), "bank.idx");
   } else { // "block" or "complete"
@@ -1124,7 +1147,7 @@ createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
         "__dyn_array_partition: cannot partition a less than 1 length array");
   }
 
-  unsigned factor = info.style == "complete" ? totalSize : info.factor;
+  unsigned factor = info.style == COMPLETE ? totalSize : info.factor;
 
   if (factor == 0 || factor > totalSize) {
     llvm::report_fatal_error("__dyn_array_partition: factor must be in [1, N]");
@@ -1136,7 +1159,7 @@ createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
 
   std::vector<DimInfo> banks;
   banks.reserve(factor);
-  if (info.style == "block" || info.style == "complete") {
+  if (info.style == BLOCK || info.style == COMPLETE) {
     unsigned offset = 0;
     for (unsigned bank = 0; bank < factor; ++bank) {
       // Put all remaining elements into the last bank
@@ -1144,15 +1167,11 @@ createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
       banks.emplace_back(offset, 1, elems);
       offset += elems;
     }
-  } else if (info.style == "cyclic") {
+  } else if (info.style == CYCLIC) {
     for (unsigned bank = 0; bank < factor; ++bank) {
       unsigned elems = chunkSize + (bank < remainder ? 1u : 0u);
       banks.emplace_back(bank, factor, elems);
     }
-  } else {
-    llvm::report_fatal_error(Twine("__dyn_array_partition: unknown style '") +
-                             info.style +
-                             "' (expected block, cyclic, or complete)");
   }
 
   // Insertion of allocations
