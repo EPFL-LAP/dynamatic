@@ -109,6 +109,15 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.remui",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/remui.v",
+    "dependencies": ["join_type", "delay_buffer", "oehb_dataless"],
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.divf",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
