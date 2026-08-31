@@ -212,11 +212,12 @@ exit_on_fail "Failed to apply optimization to LLVM IR" \
 # bank partition.
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/ArrayPartition.so" \
-  -passes="function(loop-unroll,array-partition)" \
+  -passes="function(loop-unroll,array-partition,simplifycfg,adce,lowerswitch)" \
   -polly-process-unprofitable \
   "$F_CLANG_OPTIMIZED" \
   > "$F_CLANG_OPTIMIZED_PARTITIONED"
-exit_on_fail "Failed to perform array partitioning in LLVM IR"
+exit_on_fail "Failed to perform array partitioning in LLVM IR" \
+  "Applied memory partitioning pass to LLVM IR"
 
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
