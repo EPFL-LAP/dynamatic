@@ -50,8 +50,7 @@ F_C_REWRITTEN="$COMP_DIR/$KERNEL_NAME.c"
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_PARTITIONED="$COMP_DIR/clang.opt.part.ll"
-F_CLANG_OPTIMIZED_PARTITIONED_CLEANED="$COMP_DIR/clang.opt.part.clean.ll"
-F_CLANG_OPTIMIZED_PARTITIONED_CLEANED_DEPENDENCY="$COMP_DIR/clang.opt.part.clean.dep.ll"
+F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY="$COMP_DIR/clang.opt.part.dep.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
@@ -220,24 +219,16 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to perform array partitioning in LLVM IR"
 
 $LLVM_OPT -S \
-  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/GuardLoadStore.so" \
-  -passes="function(guard-load-store,instcombine),always-inline" \
-  -polly-process-unprofitable \
-  "$F_CLANG_OPTIMIZED_PARTITIONED" \
-  > "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED"
-exit_on_fail "Failed to clean up after array partitioning in LLVM IR"
-
-$LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   -polly-process-unprofitable \
-  "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED" \
-  > "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED_DEPENDENCY"
+  "$F_CLANG_OPTIMIZED_PARTITIONED" \
+  > "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY"
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
 $LLVM_TO_STD_TRANSLATION_BIN \
-  "$F_CLANG_OPTIMIZED_PARTITIONED_CLEANED_DEPENDENCY" \
+  "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
