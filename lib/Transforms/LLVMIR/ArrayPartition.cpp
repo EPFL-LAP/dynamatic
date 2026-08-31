@@ -987,7 +987,11 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
   Instruction *placeholderBr = origBB->getTerminator();
 
   IRBuilder<> preBuilder(placeholderBr);
-  Type *i64Ty = Type::getInt64Ty(ctx);
+  Type *bankIdxTy = Type::getInt32Ty(ctx);
+  Value *origIdx32 =
+      origIdx->getType() == bankIdxTy
+          ? origIdx
+          : preBuilder.CreateTrunc(origIdx, bankIdxTy, "bank.idx.src");
 
   // Computation of th bank that the index falls into
   // NOTE: Only block partitioning needs the tooLarge addition, since cyclic
@@ -995,12 +999,12 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
   Value *bankIdxNative;
   if (partInfo.style == CYCLIC) {
     bankIdxNative = preBuilder.CreateURem(
-        origIdx, ConstantInt::get(addrTy, factor), "bank.idx");
+        origIdx32, ConstantInt::get(bankIdxTy, factor), "bank.idx");
   } else { // "block" or "complete"
     Value *raw = preBuilder.CreateUDiv(
-        origIdx, ConstantInt::get(addrTy, chunkSize), "bank.raw");
+        origIdx32, ConstantInt::get(bankIdxTy, chunkSize), "bank.raw");
     if (remainder != 0) {
-      Value *maxBank = ConstantInt::get(addrTy, factor - 1);
+      Value *maxBank = ConstantInt::get(bankIdxTy, factor - 1);
       Value *tooLarge = preBuilder.CreateICmpUGT(raw, maxBank);
       bankIdxNative =
           preBuilder.CreateSelect(tooLarge, maxBank, raw, "bank.idx");
@@ -1011,10 +1015,10 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
 
   // Normalize to i64 for the comparison chain below, regardless of addrTy.
   // NOTE: I had issues with i32 vs i64 indices before
-  Value *bankIdx =
-      bankIdxNative->getType() == i64Ty
-          ? bankIdxNative
-          : preBuilder.CreateZExtOrTrunc(bankIdxNative, i64Ty, "bank.idx.64");
+  Value *bankIdx = bankIdxNative->getType() == bankIdxTy
+                       ? bankIdxNative
+                       : preBuilder.CreateZExtOrTrunc(bankIdxNative, bankIdxTy,
+                                                      "bank.idx.32");
 
   placeholderBr->eraseFromParent();
 
@@ -1034,7 +1038,7 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
     for (unsigned b = 0; b + 1 < factor; ++b) {
       IRBuilder<> checkBuilder(currentBB);
       Value *cmp = checkBuilder.CreateICmpEQ(
-          bankIdx, ConstantInt::get(i64Ty, b), "bank.cmp." + Twine(b));
+          bankIdx, ConstantInt::get(bankIdxTy, b), "bank.cmp." + Twine(b));
       bool isLastCheck = (b + 2 == factor);
       BasicBlock *elseBB =
           isLastCheck
