@@ -327,6 +327,7 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.divui" ||
       handshakeOp == "handshake.shrui" ||
       handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.remui" ||
       handshakeOp == "handshake.noti" ||
       handshakeOp == "handshake.ready_remover" ||
       handshakeOp == "handshake.maxsi" ||
@@ -485,6 +486,7 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.shrui" ||
       handshakeOp == "handshake.join" ||
       handshakeOp == "handshake.remsi" ||
+      handshakeOp == "handshake.remui" ||
       handshakeOp == "handshake.noti" ||
       handshakeOp == "handshake.valid_merger" ||
       handshakeOp == "handshake.ready_remover" ||
