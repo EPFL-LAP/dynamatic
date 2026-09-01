@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 570" font-family="Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+  </defs>
+
+  <!-- ===================== main chain ===================== -->
+  <g>
+    <rect x="40" y="30" width="340" height="58" rx="8" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+    <text x="210" y="54" text-anchor="middle" font-size="15" font-weight="bold">buildLocalCFGRegion</text>
+    <text x="210" y="74" text-anchor="middle" font-size="12.5" fill="#333">reconstruct the producer &#8594; consumer control flow</text>
+
+    <rect x="40" y="114" width="340" height="58" rx="8" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+    <text x="210" y="138" text-anchor="middle" font-size="15" font-weight="bold">buildDecisionGraph</text>
+    <text x="210" y="158" text-anchor="middle" font-size="12.5" fill="#333">keep only the branches that decide delivery</text>
+
+    <rect x="40" y="198" width="340" height="58" rx="8" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+    <text x="210" y="222" text-anchor="middle" font-size="15" font-weight="bold">CyclicGraphManager</text>
+    <text x="210" y="242" text-anchor="middle" font-size="12.5" fill="#333">extractLayeredCFG: one acyclic layer per loop level</text>
+
+    <rect x="40" y="282" width="340" height="58" rx="8" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+    <text x="210" y="306" text-anchor="middle" font-size="15" font-weight="bold">enumeratePaths</text>
+    <text x="210" y="326" text-anchor="middle" font-size="12.5" fill="#333">paths &#8594; f_cons ;&#160;&#160;f_supp = &#172;f_cons</text>
+
+    <rect x="40" y="366" width="340" height="58" rx="8" fill="#dae8fc" stroke="#6c8ebf" stroke-width="1.5"/>
+    <text x="210" y="390" text-anchor="middle" font-size="15" font-weight="bold">expressionToCircuit</text>
+    <text x="210" y="410" text-anchor="middle" font-size="12.5" fill="#333">buildBDD + bddToCircuit: Boolean &#8594; MUX tree</text>
+
+    <rect x="40" y="470" width="340" height="58" rx="8" fill="#d5e8d4" stroke="#82b366" stroke-width="1.5"/>
+    <text x="210" y="494" text-anchor="middle" font-size="15" font-weight="bold">insertDirectSuppression</text>
+    <text x="210" y="514" text-anchor="middle" font-size="12.5" fill="#333">compose f_sup, f_supDP, loop filter; emit the BRANCH</text>
+  </g>
+
+  <!-- main chain arrows -->
+  <g stroke="#333" stroke-width="1.5" fill="none">
+    <line x1="210" y1="88"  x2="210" y2="112" marker-end="url(#arr)"/>
+    <line x1="210" y1="172" x2="210" y2="196" marker-end="url(#arr)"/>
+    <line x1="210" y1="256" x2="210" y2="280" marker-end="url(#arr)"/>
+    <line x1="210" y1="340" x2="210" y2="364" marker-end="url(#arr)"/>
+    <line x1="210" y1="424" x2="210" y2="468" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ===================== condition-token plumbing ===================== -->
+  <g>
+    <rect x="600" y="170" width="340" height="58" rx="8" fill="#ffe6cc" stroke="#d79b00" stroke-width="1.5"/>
+    <text x="770" y="194" text-anchor="middle" font-size="15" font-weight="bold">CyclicDemotionHelper</text>
+    <text x="770" y="214" text-anchor="middle" font-size="12.5" fill="#333">one representative condition token per loop level</text>
+
+    <rect x="600" y="268" width="340" height="58" rx="8" fill="#ffe6cc" stroke="#d79b00" stroke-width="1.5"/>
+    <text x="770" y="292" text-anchor="middle" font-size="15" font-weight="bold">buildDistributionNetwork</text>
+    <text x="770" y="312" text-anchor="middle" font-size="12.5" fill="#333">per-path copies of condition tokens (read-once)</text>
+
+    <rect x="600" y="366" width="340" height="58" rx="8" fill="#f5f5f5" stroke="#666" stroke-width="1.5"/>
+    <text x="770" y="390" text-anchor="middle" font-size="15" font-weight="bold">SignalRegistry</text>
+    <text x="770" y="410" text-anchor="middle" font-size="12.5" fill="#333">(variable, PathContext) &#8594; signal, longest-prefix lookup</text>
+  </g>
+
+  <!-- plumbing arrows -->
+  <g stroke="#333" stroke-width="1.4" fill="none" stroke-dasharray="6,4">
+    <polyline points="380,227 520,227 520,199 598,199" marker-end="url(#arr)"/>
+    <line x1="770" y1="228" x2="770" y2="266" marker-end="url(#arr)"/>
+    <line x1="770" y1="326" x2="770" y2="364" marker-end="url(#arr)"/>
+    <polyline points="600,395 380,395" marker-end="url(#arr)"/>
+  </g>
+  <g font-size="12" font-style="italic" fill="#555">
+    <text x="455" y="190" text-anchor="middle">layered CFGs</text>
+    <text x="782" y="251" text-anchor="start">preRegisterDemotedValues</text>
+    <text x="782" y="349" text-anchor="start">registerSignal(var, path, value)</text>
+    <text x="490" y="388" text-anchor="middle">lookup(var, PathContext)</text>
+  </g>
+</svg>
