@@ -122,6 +122,7 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
                           << component.getName() << "\n";);
   if (name != component.getName()) {
     LLVM_DEBUG(llvm::dbgs() << "\t-> Names do not match.\n");
+
     return failure();
   }
 
@@ -154,6 +155,7 @@ RTLRequestFromOp::areParametersCompatible(const RTLComponent &component,
         break;
       }
     });
+
     if (paramMatch.state != ParamMatch::SUCCESS)
       return failure();
     mappings[paramName] = paramMatch.serialized;
@@ -329,7 +331,10 @@ LogicalResult RTLMatch::registerBitwidthParameter(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.remsi" ||
       handshakeOp == "handshake.remui" ||
       handshakeOp == "handshake.noti" ||
-      handshakeOp == "handshake.ready_remover" ||
+      handshakeOp == "handshake.ready_remover" || 
+      handshakeOp == "handshake.init" ||
+      handshakeOp == "handshake.gate" ||
+      handshakeOp == "handshake.ctrl_extractor" ||
       handshakeOp == "handshake.maxsi" ||
       handshakeOp == "handshake.maxui" ||
       handshakeOp == "handshake.minsi" ||
@@ -494,6 +499,9 @@ RTLMatch::registerExtraSignalParameters(hw::HWModuleExternOp &modOp,
       handshakeOp == "handshake.maxui" ||
       handshakeOp == "handshake.minsi" ||
       handshakeOp == "handshake.minui" ||
+      handshakeOp == "handshake.init" ||
+      handshakeOp == "handshake.gate" ||
+      handshakeOp == "handshake.ctrl_extractor" ||
       // the first input has extra signals
       handshakeOp == "handshake.load" ||
       handshakeOp == "handshake.store" ||
@@ -1089,6 +1097,7 @@ bool RTLConfiguration::hasMatchingComponent(const RTLRequest &request) {
 RTLMatch *RTLConfiguration::getMatchingComponent(const RTLRequest &request) {
   notifyRequest(request);
   std::vector<RTLMatch> matches;
+
   for (const RTLComponent &component : components) {
     if (RTLMatch *match = request.tryToMatch(component))
       return match;

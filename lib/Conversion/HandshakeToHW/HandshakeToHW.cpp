@@ -580,10 +580,17 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         addUnsigned("SIZE", op->getNumOperands());
         addType("DATA_TYPE", op->getResult(0));
       })
-      .Case<handshake::JoinOp, handshake::BlockerOp>([&](auto) {
+      .Case<handshake::JoinOp>([&](auto) {
         // Number of input channels
         addUnsigned("SIZE", op->getNumOperands());
       })
+      .Case<handshake::GateOp>([&](auto) {
+        // Number of input channels and data bitwidth
+        addUnsigned("SIZE", op->getNumOperands());
+        addType("DATA_TYPE", op->getOperand(0));
+      })
+      .Case<handshake::CtrlExtractorOp>(
+          [&](auto) { addType("DATA_TYPE", op->getOperand(0)); })
       .Case<handshake::BranchOp, handshake::SinkOp, handshake::NDWireOp>(
           [&](auto) {
             // Bitwidth
@@ -619,9 +626,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
           [&](handshake::SharingWrapperOp sharingWrapperOp) {
             addType("DATA_WIDTH", sharingWrapperOp.getDataOperands()[0]);
 
-            // In a sharing wrapper, we have the credits as a list of unsigned
-            // integers. This will be encoded as a space-separated string and
-            // passed to the sharing wrapper generator.
+            // In a sharing wrapper, we have the credits as a list of
+            // unsigned integers. This will be encoded as a space-separated
+            // string and passed to the sharing wrapper generator.
 
             auto addSpaceSeparatedListOfInt =
                 [&](StringRef name, ArrayRef<int64_t> array) -> void {
@@ -781,6 +788,28 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         } else
           addUnsigned("INITIAL_VALUE", 0);
       })
+      .Case<handshake::GateOp>([&](handshake::GateOp gateOp) {
+        // No parameters needed for these operations
+        addType("DATA_WIDTH", op->getOperand(0)
+                                  .getType()
+                                  .cast<handshake::ChannelType>()
+                                  .getDataType());
+      })
+      .Case<handshake::UnbundleOp>([&](handshake::UnbundleOp unbundleOp) {
+        // No parameters needed for these operations
+        addType("DATA_WIDTH", op->getOperand(0)
+                                  .getType()
+                                  .cast<handshake::ChannelType>()
+                                  .getDataType());
+      })
+      .Case<handshake::CtrlExtractorOp>(
+          [&](handshake::CtrlExtractorOp ctrlExtractorOp) {
+            // No parameters needed for these operations
+            addType("DATA_WIDTH", op->getOperand(0)
+                                      .getType()
+                                      .cast<handshake::ChannelType>()
+                                      .getDataType());
+          })
       .Default([&](auto) {
         op->emitError() << "This operation cannot be lowered to RTL "
                            "due to a lack of an RTL implementation for it.";
@@ -2422,6 +2451,9 @@ public:
         ConvertToHWInstance<handshake::MuxOp>,
         ConvertToHWInstance<handshake::JoinOp>,
         ConvertToHWInstance<handshake::BlockerOp>,
+        ConvertToHWInstance<handshake::GateOp>,
+        ConvertToHWInstance<handshake::UnbundleOp>,
+        ConvertToHWInstance<handshake::CtrlExtractorOp>,
         ConvertToHWInstance<handshake::InitOp>,
         ConvertToHWInstance<handshake::SourceOp>,
         ConvertToHWInstance<handshake::ConstantOp>,

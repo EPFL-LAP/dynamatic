@@ -140,5 +140,7 @@ if __name__ == "__main__":
     generators.add("handshake", "sharing_wrapper")
     generators.add("handshake", "init")
     generators.add("handshake", "ii_monitor")
+    generators.add("handshake", "gate")
+    generators.add("handshake", "ctrl_extractor")
 
     main(generators)

@@ -44,16 +44,18 @@ void finalizeCondPlaceholders(handshake::FuncOp funcOp);
 
 /// This function implements the regeneration mechanism over a pair made of a
 /// producer and a consumer (see `addRegen` description).
-void addRegenOperandConsumer(mlir::OpBuilder &builder,
-                             handshake::FuncOp &funcOp,
-                             mlir::Operation *consumerOp, mlir::Value operand,
-                             ShadowCFG &shadow);
+std::vector<Operation *> addRegenOperandConsumer(mlir::OpBuilder &builder,
+                                                 handshake::FuncOp &funcOp,
+                                                 mlir::Operation *consumerOp,
+                                                 mlir::Value operand,
+                                                 ShadowCFG &shadow);
 
 /// This function implements the suppression mechanism over a pair made of a
 /// producer and a consumer (see `addSupp` description).
-void addSuppOperandConsumer(mlir::OpBuilder &builder, handshake::FuncOp &funcOp,
-                            Operation *consumerOp, Value operand,
-                            ShadowCFG &shadow);
+std::vector<Operation *>
+addSuppOperandConsumer(mlir::OpBuilder &builder, handshake::FuncOp &funcOp,
+
+                       Operation *consumerOp, Value operand, ShadowCFG &shadow);
 
 /// When the consumer is in a loop while the producer is not, the value must
 /// be regenerated as many times as needed. This function is in charge of
@@ -77,13 +79,15 @@ void addSupp(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
 /// blocks.
 LogicalResult addGsaGates(
     Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
+    std::vector<Operation *> &newUnits,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands = nullptr,
     bool removeTerminators = true);
 
 /// For each non-init merge in the IR, run the GSA analysis to obtain its GSA
 /// equivalent, then use `addGsaGates` to instantiate such operations in the IR.
 LogicalResult replaceMergeToGSA(handshake::FuncOp &funcOp,
-                                PatternRewriter &rewriter);
+                                PatternRewriter &rewriter,
+                                std::vector<Operation *> &newUnits);
 
 /// Connect the values in `vals` by inserting some appropriate new SSA-nodes
 /// (merges) across the control flow graph of the function. The new

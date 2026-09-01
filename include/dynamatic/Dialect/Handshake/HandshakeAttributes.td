@@ -194,7 +194,9 @@ def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
     represents a RAW memory dependency. 
     
     The dependency is furthermore characterized by the loop depth at which the
-    dependency is (`loopDepth`).
+    dependency is (`loopDepth`). Also, there is a boolean (`isActive`) that demonstrates 
+    whether the dependency needs to be considered. An example of when there is
+    no need to consider a dependency is when it is guaranteed by data dependency.
   }];
   
   let parameters = (ins 
