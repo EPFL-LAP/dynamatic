@@ -214,6 +214,7 @@ exit_on_fail "Failed to apply optimization to LLVM IR" \
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
+  -use-dependence-analysis \
   -polly-process-unprofitable \
   "$F_CLANG_OPTIMIZED" \
   > "$F_CLANG_OPTIMIZED_DEPENDENCY"
