@@ -24,6 +24,10 @@ add_lit_testsuite(check-dynamatic "Running the Dynamatic regression tests"
   )
 set_target_properties(check-dynamatic PROPERTIES FOLDER "Tests")
 
+add_custom_target(check-dynamatic-all)
+add_dependencies(check-dynamatic-all check-dynamatic)
+set_target_properties(check-dynamatic-all PROPERTIES FOLDER "Tests")
+
 add_lit_testsuites(Dynamatic ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${DYNAMATIC_TEST_DEPENDS}
   )
