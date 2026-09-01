@@ -485,6 +485,60 @@ begin
 
 end architecture;
 
+Library IEEE;
+use IEEE.std_logic_1164.all;
+
+entity remui_vitis_hls_wrapper is
+    generic (
+        din0_width   : INTEGER :=32;
+        din1_width   : INTEGER :=32;
+        dout_width   : INTEGER :=32);
+    port (
+        clk : IN STD_LOGIC;
+        reset : IN STD_LOGIC;
+        ce : IN STD_LOGIC;
+        din0 : IN STD_LOGIC_VECTOR(din0_width - 1 DOWNTO 0);
+        din1 : IN STD_LOGIC_VECTOR(din1_width - 1 DOWNTO 0);
+        dout : OUT STD_LOGIC_VECTOR(dout_width - 1 DOWNTO 0));
+end entity;
+
+architecture arch of remui_vitis_hls_wrapper is
+    component dynamatic_units_urem_32ns_32ns_32_36_1_div is
+        generic (
+            in0_WIDTH : INTEGER;
+            in1_WIDTH : INTEGER;
+            out_WIDTH : INTEGER);
+        port (
+            dividend : IN STD_LOGIC_VECTOR;
+            divisor : IN STD_LOGIC_VECTOR;
+            remd : OUT STD_LOGIC_VECTOR;
+            quot : OUT STD_LOGIC_VECTOR;
+            clk : IN STD_LOGIC;
+            ce : IN STD_LOGIC;
+            reset : IN STD_LOGIC);
+    end component;
+
+    signal sig_quot : STD_LOGIC_VECTOR(dout_width - 1 DOWNTO 0);
+    signal sig_remd : STD_LOGIC_VECTOR(dout_width - 1 DOWNTO 0);
+
+
+begin
+    dynamatic_units_urem_32ns_32ns_32_36_1_div_U :  component dynamatic_units_urem_32ns_32ns_32_36_1_div
+    generic map (
+        in0_WIDTH => din0_width,
+        in1_WIDTH => din1_width,
+        out_WIDTH => dout_width)
+    port map (
+        dividend => din0,
+        divisor => din1,
+        remd => dout,
+        quot => sig_quot,
+        clk => clk,
+        ce => ce,
+        reset => reset);
+
+end architecture;
+
 -- ==============================================================
 -- Vivado(TM) HLS - High-Level Synthesis from C, C++ and SystemC v2019.1.1 (64-bit)
 -- Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
