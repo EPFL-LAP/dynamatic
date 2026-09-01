@@ -165,6 +165,12 @@ constexpr std::size_t unwrapWeak(std::size_t dependency) {
   return dependency & ~weak(0);
 }
 
+template <typename ASTNode>
+class OpaqueTransferFn;
+
+template <typename ASTNode>
+class OpaqueOutputTransferFn;
+
 /// Class responsible for telling the generator how to calculate the input
 /// 'TypingContext' for a given subelement of 'ASTNode'.
 /// The subelement whose input-context we are calculating for is given by its
@@ -281,6 +287,19 @@ public:
   template <typename... Args>
   TypingContext operator()(Args &&...args) const {
     return computationFn(std::forward<Args>(args)...);
+  }
+
+  /// Returns an 'OpaqueTransferFn' that runs 'f' in place of this transfer
+  /// function, handing it a callable computing this function's result so that
+  /// it can adjust what was computed. Exactly 'OpaqueTransferFn::wrap', with
+  /// the context type filled in from this class: only the extra dependencies
+  /// remain to be spelled out.
+  /// TODO: This should ideally return a 'TransferFn' to be able to easily chain
+  ///       'wrap's.
+  template <std::size_t... extraDependencies, typename F>
+  OpaqueTransferFn<ASTNode> wrap(F f) && {
+    return OpaqueTransferFn<ASTNode>(std::move(*this))
+        .template wrap<TypingContext, extraDependencies...>(std::move(f));
   }
 
 private:
@@ -592,6 +611,19 @@ public:
   template <typename... Args>
   TypingContext operator()(Args &&...args) const {
     return computationFn(std::forward<Args>(args)...);
+  }
+
+  /// Returns an 'OpaqueOutputTransferFn' that runs 'f' in place of this
+  /// output transfer function, handing it a callable computing this
+  /// function's result so that it can adjust what was computed. Exactly
+  /// 'OpaqueOutputTransferFn::wrap', with the context type filled in from
+  /// this class: only the extra dependencies remain to be spelled out.
+  /// TODO: This should ideally return a 'OutputTransferFn' to be able to easily
+  ///       chain 'wrap's.
+  template <std::size_t... extraDependencies, typename F>
+  OpaqueOutputTransferFn<ASTNode> wrap(F f) && {
+    return OpaqueOutputTransferFn<ASTNode>(std::move(*this))
+        .template wrap<TypingContext, extraDependencies...>(std::move(f));
   }
 
 private:
@@ -1067,24 +1099,57 @@ public:
   using Super = TypeSystem;
   using Context = TypingContext;
 
+  /// Returns the transfer function used for every subelement of 'ASTNode' by
+  /// default.
+  /// A derived class may override it to globally change the default.
+  ///
+  /// This implementation simply forwards the input context to the subelement.
+  template <typename ASTNode>
+  static auto defaultTransferFn() {
+    return copyFromInput<ASTNode>();
+  }
+
+  /// Output-context counterpart of 'defaultTransferFn'.
+  ///
+  /// This implementation copies the input context to the output.
+  template <typename ASTNode>
+  static auto defaultOutputTransferFn() {
+    return copyInputToOutput<ASTNode>();
+  }
+
+private:
+  /// Shorthands dispatching to the most derived class' 'defaultTransferFn'
+  /// and 'defaultOutputTransferFn'; they keep the default 'get*TransferFns'
+  /// implementations below readable.
+  template <typename ASTNode>
+  auto defaultFn() {
+    return self().template defaultTransferFn<ASTNode>();
+  }
+
+  template <typename ASTNode>
+  auto defaultOutputFn() {
+    return self().template defaultOutputTransferFn<ASTNode>();
+  }
+
+public:
   // Methods that can be overwritten in subclasses. Note these are not virtual
   // since we use CRTP-techniques to call these. They may be but are not
   // required to be static.
 
   TransferFnArray<ast::Function> getFunctionTransferFns() override {
     return {
-        /*return type=*/copyFromInput<ast::Function>(),
-        /*statement list=*/copyFromInput<ast::Function>(),
-        /*return statement=*/copyFromInput<ast::Function>(),
-        /*output=*/copyInputToOutput<ast::Function>(),
+        /*return type=*/defaultFn<ast::Function>(),
+        /*statement list=*/defaultFn<ast::Function>(),
+        /*return statement=*/defaultFn<ast::Function>(),
+        /*output=*/defaultOutputFn<ast::Function>(),
     };
   }
 
   TransferFnArray<ast::ReturnStatement>
   getReturnStatementTransferFns() override {
     return {
-        /*return value=*/copyFromInput<ast::ReturnStatement>(),
-        /*output=*/copyInputToOutput<ast::ReturnStatement>(),
+        /*return value=*/defaultFn<ast::ReturnStatement>(),
+        /*output=*/defaultOutputFn<ast::ReturnStatement>(),
     };
   }
 
@@ -1094,7 +1159,7 @@ public:
   }
 
   TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() override {
-    return /*output=*/copyInputToOutput<ast::ScalarType>();
+    return /*output=*/defaultOutputFn<ast::ScalarType>();
   }
 
   bool discardReturnType(const ast::ReturnType &returnType,
@@ -1108,7 +1173,7 @@ public:
   }
 
   TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() override {
-    return /*output=*/copyInputToOutput<ast::ReturnType>();
+    return /*output=*/defaultOutputFn<ast::ReturnType>();
   }
 
   static bool discardBinaryExpression(ast::BinaryExpression::Op,
@@ -1119,9 +1184,9 @@ public:
   TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
     // Default implementation: Simply propagates the context to the subelements.
-    return {/*lhs=*/copyFromInput<ast::BinaryExpression>(),
-            /*rhs=*/copyFromInput<ast::BinaryExpression>(),
-            /*output=*/copyInputToOutput<ast::BinaryExpression>()};
+    return {/*lhs=*/defaultFn<ast::BinaryExpression>(),
+            /*rhs=*/defaultFn<ast::BinaryExpression>(),
+            /*output=*/defaultOutputFn<ast::BinaryExpression>()};
   }
 
   static bool discardUnaryExpression(ast::UnaryExpression::Op,
@@ -1132,8 +1197,8 @@ public:
   TransferFnArray<ast::UnaryExpression>
   getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override {
     return {
-        /*operand=*/copyFromInput<ast::UnaryExpression>(),
-        /*output=*/copyInputToOutput<ast::UnaryExpression>(),
+        /*operand=*/defaultFn<ast::UnaryExpression>(),
+        /*output=*/defaultOutputFn<ast::UnaryExpression>(),
     };
   }
 
@@ -1141,8 +1206,8 @@ public:
 
   TransferFnArray<ast::Variable> getVariableTransferFns() override {
     return {
-        /*parameter=*/copyFromInput<ast::Variable>(),
-        /*output=*/copyInputToOutput<ast::Variable>(),
+        /*parameter=*/defaultFn<ast::Variable>(),
+        /*output=*/defaultOutputFn<ast::Variable>(),
     };
   }
 
@@ -1150,9 +1215,9 @@ public:
 
   TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
     return {
-        /*target type=*/copyFromInput<ast::CastExpression>(),
-        /*operand=*/copyFromInput<ast::CastExpression>(),
-        /*output=*/copyInputToOutput<ast::CastExpression>(),
+        /*target type=*/defaultFn<ast::CastExpression>(),
+        /*operand=*/defaultFn<ast::CastExpression>(),
+        /*output=*/defaultOutputFn<ast::CastExpression>(),
     };
   }
 
@@ -1165,10 +1230,10 @@ public:
     // Default implementation: Simply propagates the context to the
     // subelements.
     return {
-        /*condition=*/copyFromInput<ast::ConditionalExpression>(),
-        /*true value=*/copyFromInput<ast::ConditionalExpression>(),
-        /*false value=*/copyFromInput<ast::ConditionalExpression>(),
-        /*output=*/copyInputToOutput<ast::ConditionalExpression>(),
+        /*condition=*/defaultFn<ast::ConditionalExpression>(),
+        /*true value=*/defaultFn<ast::ConditionalExpression>(),
+        /*false value=*/defaultFn<ast::ConditionalExpression>(),
+        /*output=*/defaultOutputFn<ast::ConditionalExpression>(),
     };
   }
 
@@ -1181,7 +1246,7 @@ public:
   }
 
   TransferFnArray<ast::Constant> getConstantTransferFns() override {
-    return /*output=*/copyInputToOutput<ast::Constant>();
+    return /*output=*/defaultOutputFn<ast::Constant>();
   }
 
   bool discardExistingScalarParameter(const ast::ScalarParameter &parameter,
@@ -1192,7 +1257,7 @@ public:
   TransferFnArray<ast::ExistingScalarParameter>
   getExistingScalarParameterTransferFns() override {
     return {
-        /*output=*/copyInputToOutput<ast::ExistingScalarParameter>(),
+        /*output=*/defaultOutputFn<ast::ExistingScalarParameter>(),
     };
   }
 
@@ -1203,8 +1268,8 @@ public:
   TransferFnArray<ast::ScalarParameter>
   getFreshScalarParameterTransferFns() override {
     return {
-        /*data type=*/copyFromInput<ast::ScalarParameter>(),
-        /*output=*/copyInputToOutput<ast::ScalarParameter>(),
+        /*data type=*/defaultFn<ast::ScalarParameter>(),
+        /*output=*/defaultOutputFn<ast::ScalarParameter>(),
     };
   }
 
@@ -1214,9 +1279,9 @@ public:
 
   TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionTransferFns() override {
-    return {/*array parameter=*/copyFromInput<ast::ArrayReadExpression>(),
-            /*index=*/copyFromInput<ast::ArrayReadExpression>(),
-            /*output=*/copyInputToOutput<ast::ArrayReadExpression>()};
+    return {/*array parameter=*/defaultFn<ast::ArrayReadExpression>(),
+            /*index=*/defaultFn<ast::ArrayReadExpression>(),
+            /*output=*/defaultOutputFn<ast::ArrayReadExpression>()};
   }
 
   bool discardExistingArrayParameter(const ast::ArrayParameter &parameter,
@@ -1227,7 +1292,7 @@ public:
   TransferFnArray<ast::ExistingArrayParameter>
   getExistingArrayParameterTransferFns() override {
     return {
-        /*output=*/copyInputToOutput<ast::ExistingArrayParameter>(),
+        /*output=*/defaultOutputFn<ast::ExistingArrayParameter>(),
     };
   }
 
@@ -1243,9 +1308,9 @@ public:
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
-        /*element type=*/copyFromInput<ast::ArrayParameter>(),
-        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
-        /*output=*/copyInputToOutput<ast::ArrayParameter>(),
+        /*element type=*/defaultFn<ast::ArrayParameter>(),
+        /*dimension=*/defaultFn<ast::ArrayParameter>(),
+        /*output=*/defaultOutputFn<ast::ArrayParameter>(),
     };
   }
 
@@ -1256,10 +1321,10 @@ public:
   TransferFnArray<ast::ArrayAssignmentStatement>
   getArrayAssignmentStatementTransferFns() override {
     return TransferFnArray<ast::ArrayAssignmentStatement>{
-        /*array parameter=*/copyFromInput<ast::ArrayAssignmentStatement>(),
-        /*index=*/copyFromInput<ast::ArrayAssignmentStatement>(),
-        /*value=*/copyFromInput<ast::ArrayAssignmentStatement>(),
-        /*output=*/copyInputToOutput<ast::ArrayAssignmentStatement>(),
+        /*array parameter=*/defaultFn<ast::ArrayAssignmentStatement>(),
+        /*index=*/defaultFn<ast::ArrayAssignmentStatement>(),
+        /*value=*/defaultFn<ast::ArrayAssignmentStatement>(),
+        /*output=*/defaultOutputFn<ast::ArrayAssignmentStatement>(),
     };
   }
 
@@ -1270,9 +1335,9 @@ public:
   TransferFnArray<ast::ScalarAssignmentStatement>
   getScalarAssignmentStatementTransferFns() override {
     return TransferFnArray<ast::ScalarAssignmentStatement>{
-        /*target=*/copyFromInput<ast::ScalarAssignmentStatement>(),
-        /*value=*/copyFromInput<ast::ScalarAssignmentStatement>(),
-        /*output=*/copyInputToOutput<ast::ScalarAssignmentStatement>(),
+        /*target=*/defaultFn<ast::ScalarAssignmentStatement>(),
+        /*value=*/defaultFn<ast::ScalarAssignmentStatement>(),
+        /*output=*/defaultOutputFn<ast::ScalarAssignmentStatement>(),
     };
   }
 
@@ -1280,9 +1345,9 @@ public:
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
     return TransferFnArray<ast::StatementList>{
-        /*statement=*/copyFromInput<ast::StatementList>(),
-        /*statement list=*/copyFromInput<ast::StatementList>(),
-        /*output=*/copyInputToOutput<ast::StatementList>(),
+        /*statement=*/defaultFn<ast::StatementList>(),
+        /*statement list=*/defaultFn<ast::StatementList>(),
+        /*output=*/defaultOutputFn<ast::StatementList>(),
     };
   }
 
@@ -1293,12 +1358,12 @@ public:
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
     return {
-        /*iteration variable=*/copyFromInput<ast::StructuredForStatement>(),
-        /*start=*/copyFromInput<ast::StructuredForStatement>(),
-        /*end=*/copyFromInput<ast::StructuredForStatement>(),
-        /*step=*/copyFromInput<ast::StructuredForStatement>(),
-        /*statements=*/copyFromInput<ast::StructuredForStatement>(),
-        /*output=*/copyInputToOutput<ast::StructuredForStatement>(),
+        /*iteration variable=*/defaultFn<ast::StructuredForStatement>(),
+        /*start=*/defaultFn<ast::StructuredForStatement>(),
+        /*end=*/defaultFn<ast::StructuredForStatement>(),
+        /*step=*/defaultFn<ast::StructuredForStatement>(),
+        /*statements=*/defaultFn<ast::StructuredForStatement>(),
+        /*output=*/defaultOutputFn<ast::StructuredForStatement>(),
     };
   }
 
