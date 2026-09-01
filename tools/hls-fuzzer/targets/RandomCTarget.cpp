@@ -3,10 +3,9 @@
 #include "RandomCTypeSystem.h"
 #include "TargetUtils.h"
 #include "hls-fuzzer/BasicCGenerator.h"
-#include "hls-fuzzer/ConjunctionTypeSystem.h"
-#include "hls-fuzzer/LimitTypeSystem.h"
 #include "hls-fuzzer/TargetRegistry.h"
 #include "hls-fuzzer/statistics/ASTStatistic.h"
+#include "hls-fuzzer/statistics/IIStatistic.h"
 
 #include <mutex>
 
@@ -26,16 +25,19 @@ public:
   verify(const std::filesystem::path &sourceFile) const override;
 
   std::vector<Statistic> getStatistics() const override {
-    if (!isStatisticEnabled(ASTStatistic::CATEGORY))
-      return {};
-
     std::lock_guard<std::mutex> guard{statisticMutex};
-    return {Statistic(ASTStatistic::CATEGORY.str(), astStatistic)};
+    std::vector<Statistic> stats;
+    if (isStatisticEnabled(ASTStatistic::CATEGORY))
+      stats.emplace_back(ASTStatistic::CATEGORY.str(), astStatistic);
+    if (isStatisticEnabled(IIStatistic::CATEGORY))
+      stats.emplace_back(IIStatistic::CATEGORY.str(), iiStatistic);
+    return stats;
   }
 
 private:
   mutable std::mutex statisticMutex;
   ASTStatistic astStatistic;
+  mutable IIStatistic iiStatistic;
 };
 
 } // namespace
@@ -59,6 +61,17 @@ void RandomCWorker::generate(llvm::raw_ostream &os,
 
 AbstractWorker::VerificationResult
 RandomCWorker::verify(const std::filesystem::path &sourceFile) const {
-  return performDifferentialTesting(sourceFile, options.dynamaticExecutablePath,
-                                    20000);
+  bool instrumentII = isStatisticEnabled(IIStatistic::CATEGORY);
+  VerificationResult result = performDifferentialTesting(
+      sourceFile, options.dynamaticExecutablePath,
+      DynamaticOptions().withTimeout(20000).enableII(instrumentII));
+
+  // The simulation artifacts only exist if the flow ran to completion (i.e. no
+  // bug was found and the simulation produced a report).
+  if (result == Success && instrumentII) {
+    std::lock_guard<std::mutex> guard{statisticMutex};
+    iiStatistic.update(sourceFile.parent_path() / "out");
+  }
+
+  return result;
 }

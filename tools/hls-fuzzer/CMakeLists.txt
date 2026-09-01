@@ -29,6 +29,8 @@ add_llvm_executable(hls-fuzzer
         OptionsParser.cpp
         TargetRegistry.cpp
         statistics/ASTStatistic.cpp
+        statistics/IIReport.cpp
+        statistics/IIStatistic.cpp
         targets/BitwidthOptimizationsTarget.cpp
         targets/BitwidthTypeSystem.cpp
         targets/DynamaticTypeSystem.cpp
