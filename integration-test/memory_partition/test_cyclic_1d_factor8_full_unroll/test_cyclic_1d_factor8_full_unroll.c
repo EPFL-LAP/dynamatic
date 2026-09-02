@@ -2,15 +2,16 @@
 #define N 32
 #include "dynamatic/Integration.h"
 
-// NOTE: Simple test for 1d array halve partition
-void test_1d_partition(const int A[N], const int B[N], const int C[N],
-                       int result[N]) {
+void test_cyclic_1d_factor8_full_unroll(const int A[N], const int B[N],
+                                        const int C[N], int result[N]) {
 #pragma DYN array_partition array = intermediate dimension = 1 style =         \
-    block factor = 2
+    cyclic factor = 8
   int intermediate[N];
+#pragma clang loop unroll_count(8)
   for (int i = 0; i < N; ++i) {
     intermediate[i] = A[i] * B[i];
   }
+#pragma clang loop unroll_count(8)
   for (int i = 0; i < N; i++) {
     result[i] = intermediate[i] * C[i];
   }
@@ -26,6 +27,6 @@ int main(void) {
     B[i] = rand() % 100;
     C[i] = rand() % 100;
   }
-  CALL_KERNEL(test_1d_partition, A, B, C, result);
+  CALL_KERNEL(test_cyclic_1d_factor8_full_unroll, A, B, C, result);
   return 0;
 }

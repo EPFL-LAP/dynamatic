@@ -2,11 +2,10 @@
 #define N 32
 #include "dynamatic/Integration.h"
 
-// NOTE: Test for testing larger factors
-void test_1d_partition_f4(const int A[N], const int B[N], const int C[N],
-                          int result[N]) {
+void test_cyclic_1d_factor4_no_unroll(const int A[N], const int B[N],
+                                      const int C[N], int result[N]) {
 #pragma DYN array_partition array = intermediate dimension = 1 style =         \
-    block factor = 4
+    cyclic factor = 4
   int intermediate[N];
   for (int i = 0; i < N; ++i) {
     intermediate[i] = A[i] * B[i];
@@ -26,6 +25,6 @@ int main(void) {
     B[i] = rand() % 100;
     C[i] = rand() % 100;
   }
-  CALL_KERNEL(test_1d_partition_f4, A, B, C, result);
+  CALL_KERNEL(test_cyclic_1d_factor4_no_unroll, A, B, C, result);
   return 0;
 }

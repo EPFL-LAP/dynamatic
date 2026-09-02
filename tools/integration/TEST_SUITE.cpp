@@ -804,11 +804,21 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     MemoryPartitionBenchmarks, MemoryPartitionFixture,
     testing::Values(
-      "test_1d_partition",
-      "test_1d_partition_f4",
-      "test_1d_partition_fu",
-      "test_2d_partition_inner",
-      "test_2d_partition"
+      "test_cyclic_1d_factor2",
+      "test_cyclic_1d_factor3",
+      "test_cyclic_1d_factor4_no_unroll",
+      "test_cyclic_1d_factor5_partial_unroll",
+      "test_cyclic_1d_factor8_full_unroll",
+      "test_cyclic_1d_two_arrays_factor",
+      "test_cyclic_2d_inner",
+      "test_cyclic_2d_outer",
+      "test_block_1d_factor2",
+      "test_block_1d_factor4",
+      "test_block_1d_factor8",
+      "test_block_2d_outer",
+      "test_block_2d_inner",
+      "test_zero_elem",
+      "test_complete_1d"
     ),
     [](const auto &info) { return "memory_partition_" + info.param; });
 
