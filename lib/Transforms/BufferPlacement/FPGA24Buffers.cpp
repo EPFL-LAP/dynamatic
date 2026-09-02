@@ -158,19 +158,25 @@ void OccupancyBalancingLP::setup() {
 
   /// (Paper: Section 5, Table 2)
   /// N_c: Maximal token occupancy on channel c.
-  this->addOccupancyVars(allChannels, cfdfcs, cfdfcChannelOccupancy, maxChannelOccupancy, MAX_OCCUPANCY);
+  this->addOccupancyVars(allChannels, cfdfcs, cfdfcChannelOccupancy,
+                         cfdfcUnitOccupancy, maxChannelOccupancy,
+                         MAX_OCCUPANCY);
 
-  addMinOccupancyConstraints(cfdfcs, latencyResult.cfdfcTargetIIs, latencyResult.channelExtraLatency, cfdfcChannelOccupancy);
+  addMinOccupancyConstraints(cfdfcs, latencyResult.cfdfcTargetIIs,
+                             latencyResult.channelExtraLatency,
+                             cfdfcChannelOccupancy);
+  addUnitOccupancyConstraints(cfdfcs, latencyResult.cfdfcTargetIIs,
+                              cfdfcUnitOccupancy);
   addMaxOccupancyConstraints(cfdfcChannelOccupancy, maxChannelOccupancy);
   addBackedgeConstraints(cfdfcs, maxChannelOccupancy);
   addChannelPropertyOccupancyConstraints(maxChannelOccupancy);
 
   /// (Paper: Section 5, Equations 10-11): Path occupancy equality.
-  addPathOccupancyEqualityConstraints(reconvergentPaths, cfdfcs,
-                                      latencyResult.cfdfcTargetIIs,
-                                      cfdfcChannelOccupancy);
+  addPathOccupancyEqualityConstraints(
+      reconvergentPaths, cfdfcs, cfdfcChannelOccupancy, cfdfcUnitOccupancy);
 
-  addCycleOccupancyConstraints(cfdfcs, latencyResult.cfdfcTargetIIs, cfdfcChannelOccupancy);
+  addCycleOccupancyConstraints(cfdfcs, cfdfcChannelOccupancy,
+                               cfdfcUnitOccupancy);
 
   /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c).
   this->setOccupancyBalancingObjective(maxChannelOccupancy);
@@ -215,25 +221,51 @@ void OccupancyBalancingLP::addChannelPropertyOccupancyConstraints(
 }
 
 void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
+  /// Smallest CFC II; Case 2 slots must not be slower than this
+  /// (Paper: Section 6).
+  unsigned iiMin = 1;
+  bool haveII = false;
+  for (const auto &iiEntry : latencyResult.cfdfcTargetIIs) {
+    double ii = iiEntry.second;
+    if (ii < 1.0)
+      continue;
+    unsigned rounded = static_cast<unsigned>(ii + 0.5);
+    if (!haveII || rounded < iiMin) {
+      iiMin = std::max(1u, rounded);
+      haveII = true;
+    }
+  }
+  if (!haveII && latencyResult.targetII >= 1.0)
+    iiMin = static_cast<unsigned>(latencyResult.targetII + 0.5);
+
+  for (auto &[cfdfc, unitMap] : cfdfcUnitOccupancy) {
+    for (auto &[unit, var] : unitMap)
+      cfdfc->bufferOccupancy[unit] = model->getValue(var);
+  }
+
   for (auto &[channel, var] : maxChannelOccupancy) {
     double occupancy = model->getValue(var);
     unsigned numSlots = static_cast<unsigned>(std::ceil(occupancy));
 
-    /// Get L_c (latency) from the latency balancing's results.
     unsigned latencyCycles = 0;
     if (latencyResult.channelExtraLatency.count(channel)) {
       latencyCycles = latencyResult.channelExtraLatency.lookup(channel);
     }
 
-    /// Ensure at least 1 slot if there's latency
-    if (latencyCycles > 0 && numSlots == 0)
+    /// Case 1 (Paper: Section 6): N=0, L>0 — one slot with all of L, no II cap.
+    bool latencyOnly = latencyCycles > 0 && numSlots == 0;
+    if (latencyOnly)
       numSlots = 1;
 
-    /// Store occupancy in CFDFCs
     for (CFDFC *cfdfc : cfdfcs) {
-      if (cfdfc->channels.contains(channel)) {
-        cfdfc->channelOccupancy[channel] = occupancy;
-      }
+      if (!cfdfc->channels.contains(channel))
+        continue;
+      auto *cfcIt = cfdfcChannelOccupancy.find(cfdfc);
+      if (cfcIt == cfdfcChannelOccupancy.end())
+        continue;
+      auto *chIt = cfcIt->second.find(channel);
+      cfdfc->channelOccupancy[channel] =
+          chIt != cfcIt->second.end() ? model->getValue(chIt->second) : 0.0;
     }
 
     if (numSlots == 0 && latencyCycles == 0) {
@@ -242,22 +274,20 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
 
     PlacementResult result;
 
-    /// Buffer configuration with COUNTER_BUFFER:
-    /// L_c = latencyCycles (extra latency to add)
-    /// N_c = numSlots (occupancy/capacity needed)
-    ///
-    /// Counter Buffer Placement Logic:
-    /// - place K counter buffers where K is bounded by both latency and
-    ///   occupancy requirements;
-    /// - distribute total latency across these K buffers so that
-    ///   sum(dvLatency_i) = L_c;
-    /// - add FIFO_BREAK_NONE slots when occupancy requires more pure storage.
+    /// Buffer configuration (Paper: Section 6):
+    /// Case 1: L>0, N=0 → one L-cycle slot.
+    /// Case 2: 0 < N <= L → N slots, split L, each slot delay <= II_min.
+    /// Case 3: N > L → L slots of delay 1, plus N-L transparent slots.
     if (latencyCycles == 0 && numSlots > 0) {
-      /// Case 1: L=0, N>0 - No latency, just storage
       result.numFifoNone = numSlots;
     } else if (latencyCycles > 0) {
-      /// Case 2/3: L>0
       unsigned kCounter = std::max(1u, std::min(latencyCycles, numSlots));
+      if (!latencyOnly && numSlots <= latencyCycles) {
+        unsigned minSlotsForII = (latencyCycles + iiMin - 1) / iiMin;
+        kCounter = std::max(kCounter, minSlotsForII);
+        kCounter = std::min(kCounter, latencyCycles);
+      }
+
       unsigned baseDelay = latencyCycles / kCounter;
       unsigned remainder = latencyCycles % kCounter;
 
@@ -267,8 +297,6 @@ void OccupancyBalancingLP::extractResult(BufferPlacement &placement) {
           result.counterBufferLatencies.push_back(delay);
       }
 
-      /// If occupancy requires more one-token buffers than those used to carry
-      /// latency, add transparent slots for pure storage.
       if (numSlots > kCounter)
         result.numFifoNone = numSlots - kCounter;
     }

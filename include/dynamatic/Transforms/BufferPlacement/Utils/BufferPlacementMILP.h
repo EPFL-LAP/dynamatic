@@ -22,6 +22,7 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/MILP.h"
 #include "dynamatic/Support/TimingModels.h"
+#include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/UnitMILPVars.h"
@@ -32,6 +33,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -417,23 +419,51 @@ protected:
   /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
   void addSyncCycleVars(ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
-  /// [FPGA24] Creates occupancy variables (N_c) for the provided channels.
-  void addOccupancyVars(ValueRange channels,
-                        llvm::MapVector<Value, CPVar> &channelOccupancy,
-                        double maxOccupancy);
+  /// [FPGA24] Creates N^c_{CFC_i} (used in Equation 8), and N^u_{CFC_i} (used in Equation 9) occupancy variables.
+  void addOccupancyVars(
+      ArrayRef<Value> allChannels, ArrayRef<CFDFC *> cfdfcs,
+      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+          &cfdfcChannelOccupancy,
+      llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
+          &cfdfcUnitOccupancy,
+      llvm::MapVector<Value, CPVar> &maxChannelOccupancy, double maxOccupancy);
 
-  /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum.
+  /// [FPGA24] Unit occupancy bounds (Paper: Section 5, Equation 9):
+  /// D^u / II_i <= N^u_{CFC_i} <= Capacity^u.
+  void addUnitOccupancyConstraints(
+      ArrayRef<CFDFC *> cfdfcs, const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+      llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
+          &cfdfcUnitOccupancy);
+
+  /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum. (Paper: Section 5, Equation 14)
   void setOccupancyBalancingObjective(
-      llvm::MapVector<Value, CPVar> &channelOccupancy);
+      llvm::MapVector<Value, CPVar> &cfdfcChannelOccupancy);
 
   /// [FPGA24] Adds minimum occupancy constraints: N_c >= L_c / II.
-  /// (Paper: Section 5, Equation 8 and 15)
+  /// (Paper: Section 5, Equation 8)
   void addMinOccupancyConstraints(
-      const llvm::MapVector<Value, double> &requiredOccupancy,
-      llvm::MapVector<Value, CPVar> &channelOccupancy);
+      ArrayRef<CFDFC *> cfdfcs,
+      const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+      const llvm::MapVector<Value, unsigned> &channelExtraLatency,
+      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy);
+
+  /// [FPGA24] Take the maximum across per-CFDFC Occupancy:  N^c_max >= N^c_{CFC_i}.
+  /// (Paper: Section 5, Equation 13)
+  void addMaxOccupancyConstraints(llvm::MapVector<CFDFC* , llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy,
+                                  llvm::MapVector<Value, CPVar> &maxChannelOccupancy);
+
+  
+  /// [FPGA24] At most one token around each cycle of CFC i (sequential programs).
+  /// Occupancy = N^c_{CFC_i} + N^u_{CFC_i}.
+  void addCycleOccupancyConstraints(
+      ArrayRef<CFDFC *> cfdfcs,
+      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+          &cfdfcChannelOccupancy,
+      llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
+          &cfdfcUnitOccupancy);
 
   /// [FPGA24] Adds cycle capacity constraints ensuring each backedge carries at
-  /// least one token. (Paper: Section 5, Equation 12)
+  /// least one token.
   void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
                               llvm::MapVector<Value, CPVar> &channelOccupancy);
 
@@ -443,8 +473,10 @@ protected:
   void addPathOccupancyEqualityConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
       ArrayRef<CFDFC *> cfdfcs,
-      const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
-      llvm::MapVector<Value, CPVar> &channelOccupancy);
+      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+          &cfdfcChannelOccupancy,
+      llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
+          &cfdfcUnitOccupancy);
 
   /// [FPGA24] Adds imbalance constraints for reconvergent paths in LP1.
   void addReconvergentPathConstraints(
