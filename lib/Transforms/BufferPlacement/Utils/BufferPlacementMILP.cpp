@@ -127,6 +127,42 @@ static bool hasVariableLatencyPath(const SmallVector<NodeIdType> &nodeIds,
   });
 }
 
+/// [FPGA24] two reconvergent paths share nodes only at the fork
+/// and the join. Paths that share an intermediate unit are a nested pattern,
+/// not a pair (Paper: Section 4, Figure 2a).
+static bool areReconvergentPathPair(const SimplePath &p1, const SimplePath &p2,
+                                    NodeIdType forkId, NodeIdType joinId) {
+  std::set<NodeIdType> interior1;
+  for (NodeIdType nodeId : p1.nodes) {
+    if (nodeId != forkId && nodeId != joinId)
+      interior1.insert(nodeId);
+  }
+  for (NodeIdType nodeId : p2.nodes) {
+    if (nodeId != forkId && nodeId != joinId && interior1.count(nodeId))
+      return false;
+  }
+  return true;
+}
+
+/// [FPGA24] True if every regular unit and channel of the path sits in the
+/// CFC. Used by Equation 11, which only equates pairs p1, p2 in CFC.
+static bool pathBelongsToCFDFC(const SimplePath &path,
+                               const DataflowSubgraphBase &graph,
+                               const CFDFC &cfdfc) {
+  for (NodeIdType nodeId : path.nodes) {
+    const DataflowGraphNode &node = graph.nodes[nodeId];
+    if (node.type != DataflowGraphNode::REGULAR)
+      continue;
+    if (!cfdfc.units.contains(node.op))
+      return false;
+  }
+  for (EdgeIdType edgeId : path.edges) {
+    if (!cfdfc.channels.contains(graph.edges[edgeId].channel))
+      return false;
+  }
+  return true;
+}
+
 /// [FPGA24] Computes cycle latency expression.
 static LinExpr computeCycleLatency(const SimpleCycle &cycle,
                                    const SynchronizingCyclesFinderGraph &graph,
@@ -1543,7 +1579,6 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
   for (auto [pathIdx, pathWithGraph] : llvm::enumerate(reconvergentPaths)) {
     const ReconvergentPath &rp = pathWithGraph.path;
     const auto *graph = pathWithGraph.graph;
-    const DataflowGraphNode &fork = graph->nodes[rp.forkNodeId];
 
     // Get all simple paths between the fork and join nodes.
     std::vector<SimplePath> routes =
@@ -1556,11 +1591,6 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
 
     // We loop through all CFDFCs and add the occupancy constraints.
     for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {
-      // This pattern only matters for CFDFCs that actually contain the fork.
-      if (fork.type == DataflowGraphNode::REGULAR &&
-          !cfdfc->units.contains(fork.op))
-        continue;
-
       auto *occIt = cfdfcChannelOccupancy.find(cfdfc);
       if (occIt == cfdfcChannelOccupancy.end())
         continue;
@@ -1571,19 +1601,26 @@ void BufferPlacementMILP::addPathOccupancyEqualityConstraints(
       if (unitOccIt != cfdfcUnitOccupancy.end())
         unitOcc = &unitOccIt->second;
 
-      // Occupancy of a route = tokens on its channels + tokens in its units.
-      // Every route from this fork to this join must have the same occupancy
-      // for this CFDFC, or tokens pile up on the slower side.
-      LinExpr occ0 = channelOccupancy(routes[0], *graph, occIt->second) +
-                     unitOccupancy(routes[0], rp, *graph, *unitOcc);
-
-      for (size_t i = 1; i < routes.size(); ++i) {
-        LinExpr occi = channelOccupancy(routes[i], *graph, occIt->second) +
+      // Paper Section 5, Equation 11: Occupancy_CFC(p1) = Occupancy_CFC(p2)
+      // for each pair that lies entirely in this CFC.
+      for (size_t i = 0; i < routes.size(); ++i) {
+        if (!pathBelongsToCFDFC(routes[i], *graph, *cfdfc))
+          continue;
+        LinExpr occI = channelOccupancy(routes[i], *graph, occIt->second) +
                        unitOccupancy(routes[i], rp, *graph, *unitOcc);
-        model->addConstr(
-            occ0 == occi,
-            llvm::formatv("pathOccEq_{0}_cfdfc{1}_{2}", pathIdx, cfdfcIdx, i)
-                .str());
+        for (size_t j = i + 1; j < routes.size(); ++j) {
+          if (!areReconvergentPathPair(routes[i], routes[j], rp.forkNodeId,
+                                       rp.joinNodeId))
+            continue;
+          if (!pathBelongsToCFDFC(routes[j], *graph, *cfdfc))
+            continue;
+          LinExpr occJ = channelOccupancy(routes[j], *graph, occIt->second) +
+                         unitOccupancy(routes[j], rp, *graph, *unitOcc);
+          model->addConstr(occI == occJ,
+                           llvm::formatv("pathOccEq_{0}_cfdfc{1}_{2}_{3}",
+                                         pathIdx, cfdfcIdx, i, j)
+                               .str());
+        }
       }
     }
   }
@@ -1641,8 +1678,12 @@ void BufferPlacementMILP::addReconvergentPathConstraints(
     if (pathLatencies.empty())
       continue;
 
-    for (size_t i = 0; i < pathLatencies.size(); ++i) {
-      for (size_t j = i + 1; j < pathLatencies.size(); ++j) {
+    // Paper Section 4, Equation 2: only Definition 1 pairs (paths that share
+    // nodes only at the fork and the join) define pattern imbalance.
+    for (size_t i = 0; i < allPaths.size(); ++i) {
+      for (size_t j = i + 1; j < allPaths.size(); ++j) {
+        if (!areReconvergentPathPair(allPaths[i], allPaths[j], forkId, joinId))
+          continue;
         std::string baseName =
             llvm::formatv("imbalance_rp_{0}_{1}_{2}", pathIdx, i, j).str();
         model->addConstr(pathLatencies[i] - pathLatencies[j] <=
@@ -1776,7 +1817,8 @@ void BufferPlacementMILP::addCycleTimeConstraints(
       std::string baseName =
           llvm::formatv("cycleTime_cfdfc{0}_cycle{1}", cfdfcIdx, cycleIdx)
               .str();
-      model->addConstr(cycleLatency >= iiCFC, baseName + "_min");
+      // Paper Section 4, Equation 5: 1 <= Latency(l) <= II_CFC.
+      model->addConstr(cycleLatency >= 1.0, baseName + "_min");
       model->addConstr(cycleLatency <= iiCFC, baseName + "_max");
     }
   }

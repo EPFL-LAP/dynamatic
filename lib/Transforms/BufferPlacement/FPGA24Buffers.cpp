@@ -171,7 +171,8 @@ void OccupancyBalancingLP::setup() {
   addBackedgeConstraints(cfdfcs, maxChannelOccupancy);
   addChannelPropertyOccupancyConstraints(maxChannelOccupancy);
 
-  /// (Paper: Section 5, Equations 10-11): Path occupancy equality.
+  /// (Paper: Section 5, Equations 10-11): Path occupancy equality for
+  /// reconvergent-path pairs inside each CFDFC.
   addPathOccupancyEqualityConstraints(
       reconvergentPaths, cfdfcs, cfdfcChannelOccupancy, cfdfcUnitOccupancy);
 

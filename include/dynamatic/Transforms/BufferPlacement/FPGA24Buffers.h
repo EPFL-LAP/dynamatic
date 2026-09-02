@@ -105,11 +105,11 @@ private:
   /// CFDFCs needed for cylce constraints.
   std::vector<CFDFC *> cfdfcs;
 
-  /// Computed minimum feasible Initiation Interval across all CFDFCs (set by
-  /// addCycleTimeConstraints).
+  /// Best-possible II across all CFDFCs (Equation 5 upper bound; set by
+  /// addCycleTimeConstraints). Not a forced common cycle latency.
   double computedII = 1.0;
 
-  /// Computed minimum feasible Initiation Interval per CFDFC.
+  /// Best-possible II per CFDFC, passed to occupancy LP2 as II_CFC.
   llvm::MapVector<CFDFC *, double> computedCFDFCIIs;
 
   /// Setups the entire MILP, creating all variables, constraints, and setting

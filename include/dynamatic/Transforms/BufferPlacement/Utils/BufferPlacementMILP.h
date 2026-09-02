@@ -467,9 +467,10 @@ protected:
   void addBackedgeConstraints(ArrayRef<CFDFC *> cfdfcs,
                               llvm::MapVector<Value, CPVar> &channelOccupancy);
 
-  /// [FPGA24] Adds path-level occupancy equality constraints for reconvergent
-  /// paths that are entirely within a CFDFC (Paper: Section 5, Equations
-  /// 10-11). We skip paths with forks outside all CFDFC's.
+  /// [FPGA24] Adds path-level occupancy equality constraints for Definition 1
+  /// reconvergent-path pairs that lie entirely in a CFDFC (Paper: Section 5,
+  /// Equations 10-11). Nested paths that share an intermediate unit are not
+  /// a pair (Paper: Section 4, Definition 1 / Figure 2a).
   void addPathOccupancyEqualityConstraints(
       ArrayRef<fpga24::ReconvergentPathWithGraph> reconvergentPaths,
       ArrayRef<CFDFC *> cfdfcs,
@@ -500,7 +501,10 @@ protected:
       const SimpleCycle &cycle,
       const SynchronizingCyclesFinderGraph &graph) const;
 
-  /// [FPGA24] Adds cycle-time constraints and computes required II values.
+  /// [FPGA24] Adds cycle-time constraints (Paper: Section 4, Equation 5):
+  /// 1 <= Latency(l) <= II_CFC for each cycle of a performance-critical CFC.
+  /// II_CFC is inferred as the best-possible II (max cycle latency lower
+  /// bound) and is returned for occupancy LP2 (Table 2).
   void addCycleTimeConstraints(ArrayRef<CFDFC *> cfdfcs, double &computedII,
                                llvm::MapVector<CFDFC *, double> &iiMap);
 
