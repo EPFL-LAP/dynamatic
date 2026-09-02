@@ -1347,7 +1347,7 @@ void BufferPlacementMILP::addOccupancyVars(
     ArrayRef<Value> allChannels, ArrayRef<CFDFC *> cfdfcs,
     llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
         &cfdfcChannelOccupancy,
-    llvm::MapVector<CFDFC * , llvm::MapVector<Operation *, CPVar>>
+    llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
         &cfdfcUnitOccupancy,
     llvm::MapVector<Value, CPVar> &maxChannelOccupancy, double maxOccupancy) {
   for (Value channel : allChannels) {
@@ -1407,7 +1407,8 @@ void BufferPlacementMILP::addUnitOccupancyConstraints(
       // The lower bound is the latency divided by the CFC's II.
       model->addConstr(nU >= d / ii,
                        "eq9_lo_" + name + "_cfdfc" + std::to_string(i));
-      // The upper bound is the capacity of the unit. (For now, we use a constant value.)
+      // The upper bound is the capacity of the unit. (For now, we use a
+      // constant value.)
       model->addConstr(nU <= fpga24::MAX_OCCUPANCY,
                        "eq9_hi_" + name + "_cfdfc" + std::to_string(i));
     }

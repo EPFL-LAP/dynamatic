@@ -144,14 +144,16 @@ private:
   /// N^c_max (Paper: Section 5, Table 2): Maximal token occupancy on channel c.
   llvm::MapVector<Value, CPVar> maxChannelOccupancy;
 
-  /// N^c_{CFC_i} (Paper: Section 5, Table 2 / Equation 8): 
-  /// Token occupancy on channel c required by CFDFC i. 
-  /// In equation 13, we take the maximum across all CFDFCs and put them into maxChannelOccupancy.
+  /// N^c_{CFC_i} (Paper: Section 5, Table 2 / Equation 8):
+  /// Token occupancy on channel c required by CFDFC i.
+  /// In equation 13, we take the maximum across all CFDFCs and put them into
+  /// maxChannelOccupancy.
   llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> cfdfcChannelOccupancy;
 
   /// N^u_{CFC_i} (Paper: Section 5, Equation 9):
   /// Token occupancy on unit u required by CFDFC i.
-  llvm::MapVector<CFDFC * , llvm::MapVector<Operation *, CPVar>> cfdfcUnitOccupancy;
+  llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
+      cfdfcUnitOccupancy;
 
   void setup();
 

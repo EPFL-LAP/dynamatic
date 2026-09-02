@@ -419,23 +419,27 @@ protected:
   /// [FPGA24] Creates binary imbalance variables for synchronizing cycle pairs.
   void addSyncCycleVars(ArrayRef<SynchronizingCyclePair> syncCyclePairs);
 
-  /// [FPGA24] Creates N^c_{CFC_i} (used in Equation 8), and N^u_{CFC_i} (used in Equation 9) occupancy variables.
-  void addOccupancyVars(
-      ArrayRef<Value> allChannels, ArrayRef<CFDFC *> cfdfcs,
-      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
-          &cfdfcChannelOccupancy,
-      llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
-          &cfdfcUnitOccupancy,
-      llvm::MapVector<Value, CPVar> &maxChannelOccupancy, double maxOccupancy);
+  /// [FPGA24] Creates N^c_{CFC_i} (used in Equation 8), and N^u_{CFC_i} (used
+  /// in Equation 9) occupancy variables.
+  void
+  addOccupancyVars(ArrayRef<Value> allChannels, ArrayRef<CFDFC *> cfdfcs,
+                   llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+                       &cfdfcChannelOccupancy,
+                   llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
+                       &cfdfcUnitOccupancy,
+                   llvm::MapVector<Value, CPVar> &maxChannelOccupancy,
+                   double maxOccupancy);
 
   /// [FPGA24] Unit occupancy bounds (Paper: Section 5, Equation 9):
   /// D^u / II_i <= N^u_{CFC_i} <= Capacity^u.
   void addUnitOccupancyConstraints(
-      ArrayRef<CFDFC *> cfdfcs, const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
+      ArrayRef<CFDFC *> cfdfcs,
+      const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
       llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
           &cfdfcUnitOccupancy);
 
-  /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum. (Paper: Section 5, Equation 14)
+  /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum. (Paper:
+  /// Section 5, Equation 14)
   void setOccupancyBalancingObjective(
       llvm::MapVector<Value, CPVar> &cfdfcChannelOccupancy);
 
@@ -445,16 +449,18 @@ protected:
       ArrayRef<CFDFC *> cfdfcs,
       const llvm::MapVector<CFDFC *, double> &cfdfcIIs,
       const llvm::MapVector<Value, unsigned> &channelExtraLatency,
-      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy);
+      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+          &cfdfcChannelOccupancy);
 
-  /// [FPGA24] Take the maximum across per-CFDFC Occupancy:  N^c_max >= N^c_{CFC_i}.
-  /// (Paper: Section 5, Equation 13)
-  void addMaxOccupancyConstraints(llvm::MapVector<CFDFC* , llvm::MapVector<Value, CPVar>> &cfdfcChannelOccupancy,
-                                  llvm::MapVector<Value, CPVar> &maxChannelOccupancy);
+  /// [FPGA24] Take the maximum across per-CFDFC Occupancy:  N^c_max >=
+  /// N^c_{CFC_i}. (Paper: Section 5, Equation 13)
+  void addMaxOccupancyConstraints(
+      llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
+          &cfdfcChannelOccupancy,
+      llvm::MapVector<Value, CPVar> &maxChannelOccupancy);
 
-  
-  /// [FPGA24] At most one token around each cycle of CFC i (sequential programs).
-  /// Occupancy = N^c_{CFC_i} + N^u_{CFC_i}.
+  /// [FPGA24] At most one token around each cycle of CFC i (sequential
+  /// programs). Occupancy = N^c_{CFC_i} + N^u_{CFC_i}.
   void addCycleOccupancyConstraints(
       ArrayRef<CFDFC *> cfdfcs,
       llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>>
