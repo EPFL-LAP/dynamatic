@@ -1416,13 +1416,13 @@ void BufferPlacementMILP::addUnitOccupancyConstraints(
 }
 
 void BufferPlacementMILP::setOccupancyBalancingObjective(
-    llvm::MapVector<Value, CPVar> &channelOccupancy) {
-  /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N_c)
+    llvm::MapVector<Value, CPVar> &maxChannelOccupancy) {
+  /// (Paper: Section 5, Equation 14): Minimize sum(B_c * N^c_max)
   LinExpr objective;
-  for (auto &[channel, occupancy] : channelOccupancy) {
+  for (auto &[channel, maxOccupancy] : maxChannelOccupancy) {
     unsigned bitwidth = handshake::getHandshakeTypeBitWidth(channel.getType());
     // Control channels may have bitwidth 0, weight them with 1.
-    objective += (bitwidth == 0 ? 1 : bitwidth) * occupancy;
+    objective += (bitwidth == 0 ? 1 : bitwidth) * maxOccupancy;
   }
   model->setMaximizeObjective(-objective);
 }

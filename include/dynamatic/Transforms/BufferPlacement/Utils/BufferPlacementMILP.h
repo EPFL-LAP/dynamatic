@@ -441,7 +441,7 @@ protected:
   /// [FPGA24] Sets LP2 objective minimizing weighted occupancy sum. (Paper:
   /// Section 5, Equation 14)
   void setOccupancyBalancingObjective(
-      llvm::MapVector<Value, CPVar> &cfdfcChannelOccupancy);
+      llvm::MapVector<Value, CPVar> &maxChannelOccupancy);
 
   /// [FPGA24] Adds minimum occupancy constraints: N_c >= L_c / II.
   /// (Paper: Section 5, Equation 8)
