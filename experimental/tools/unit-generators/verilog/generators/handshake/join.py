@@ -5,6 +5,8 @@ def generate_join(name, params):
     verilogjoin = f"""
 // Module of join
 module {name}(
+  input clk,
+  input rst,
   input [{size} - 1 : 0] ins_valid,
   input outs_ready,
 
