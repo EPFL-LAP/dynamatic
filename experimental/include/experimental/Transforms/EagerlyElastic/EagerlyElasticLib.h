@@ -49,6 +49,11 @@ void applyRewriteD(handshake::MuxOp dataMux,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer);
 
+void applyRewriteDMerged(handshake::ControlMergeOp mergeOp,
+                   handshake::ConditionalBranchOp branchOp,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer);
+
 void applyRewriteE(handshake::MuxOp dataMux,
                    handshake::ConditionalBranchOp trueBranch,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,

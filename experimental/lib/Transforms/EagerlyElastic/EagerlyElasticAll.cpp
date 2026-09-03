@@ -29,6 +29,7 @@ enum class RewriteStrategy {
   RewriteB,
   RewriteC,
   RewriteD,
+  RewriteD2,
   RewriteE,
   RewriteF,
   RewriteG,
@@ -298,7 +299,7 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
   for (auto branchOp : initialFrontier) {
     for (auto *user : branchOp.getFalseResult().getUsers()) {
       if (auto mux = dyn_cast<handshake::MuxOp>(user)) {
-
+        // continue;
         switch (rewrite) {
         case RewriteStrategy::RewriteB: {
           if (!checkConditionsMatch(branchOp.getConditionOperand(),
@@ -362,6 +363,12 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
           llvm::errs() << static_cast<int>(rewrite)
                        << " should not be applied only once\n";
           break;
+        }
+      } else if (auto merge = dyn_cast<handshake::ControlMergeOp>(user)) {
+        auto nameAttr = merge->getAttrOfType<mlir::StringAttr>("handshake.name");
+        if (nameAttr && nameAttr.getValue() == "control_merge1" && rewrite == RewriteStrategy::RewriteD2) { // mux18
+          applyRewriteDMerged(merge, branchOp, frontier, namer);
+          return;
         }
       }
     }
@@ -489,8 +496,11 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
       
       } 
       } else {
+        // check whether all branches with the correct subloop_header_bb attribute have a cond_br
+        // in front of them with the same condition as the branchOp. They have to be deleted later
         Value currentCond = branchOp.getConditionOperand();
         for (auto otherBranch : initialFrontier) {
+          // make sure the branch I'm looking at has a subloop_header_bb attribute of correct no.
           auto headerBBAttr = otherBranch->getAttrOfType<IntegerAttr>("subloop_header_bb");
           if (!headerBBAttr || headerBBAttr.getInt() != targetHeaderBB)
             continue;
@@ -522,11 +532,11 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
               }
               branchesToDelete.insert(siblingBranch);
             } else if (!isSourced(dataVal)) {
-              if (!isa<handshake::ConstantOp>(dataVal.getDefiningOp())) {
+              // if (!isa<handshake::ConstantOp>(dataVal.getDefiningOp())) {
               llvm::errs() << "not sourced\n";
               otherBranch.dump();
               frontierValid = false;
-              break; }
+              break; // }
             }
           }
           if (!frontierValid) break;
@@ -669,6 +679,7 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
           muxBranchOp.erase();
         }
       }
+      llvm::errs() << "finished movePastFunctionBlock\n";
       return;
     }
   }
@@ -696,9 +707,11 @@ void EagerlyElasticAllPass::runOnOperation() {
     // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteG);
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   }
-
-  movePastFunctionBlock(frontier, namer, modOp);
+  applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD2);
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
+
+  // movePastFunctionBlock(frontier, namer, modOp);
+  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   // applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
   // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   // movePastFunctionBlock(frontier, namer, modOp);

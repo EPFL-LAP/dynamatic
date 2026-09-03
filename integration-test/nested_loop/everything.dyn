@@ -1,0 +1,6 @@
+set-src integration-test/nested_loop/nested_loop.c
+compile --fast-token-delivery --buffer-algorithm fpga20 --eagerlyelastic
+write-hdl
+simulate --timeout 150000
+visualize
+exit

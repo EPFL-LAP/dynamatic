@@ -25,6 +25,10 @@ static Value traceConditionRoot(Value val, bool &inverted) {
       val = notOp.getOperand();
     } else if (auto repInit = dyn_cast<handshake::RepeatingInitOp>(defOp)) {
       val = repInit.getOperand();
+    } else if (auto mux = dyn_cast<handshake::MuxOp>(defOp)) {
+      if (mux->hasAttr("cmerge_mux")) {
+        val = mux.getDataOperands()[1];
+      } else break;
     } else {
       break;
     }
@@ -338,6 +342,71 @@ void applyRewriteD(handshake::MuxOp dataMux,
   moveSuppressorPastOp(branchOp, dataMux, frontier, namer, 1);
 }
 
+void applyRewriteDMerged(handshake::ControlMergeOp mergeOp,
+                   handshake::ConditionalBranchOp branchOp,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer) {
+
+  Location loc = mergeOp->getLoc();
+  auto bbAttr = mergeOp->getAttr("handshake.bb");
+  llvm::errs() << "Perform Rewrite D for: "
+               << mergeOp->getAttr("handshake.name") << '\n';
+
+  Value branchOut = branchOp.getFalseResult();
+  int suppressedIdx = -1;
+  for (auto [idx, operand] : llvm::enumerate(mergeOp.getDataOperands())) {
+    if (operand == branchOut) {
+      suppressedIdx = static_cast<int>(idx);
+      break;
+    }
+  }
+
+  // Extract the original input condition driving the suppressor
+  Value suppCond = branchOp.getConditionOperand();
+  auto notOp = dyn_cast_or_null<handshake::NotIOp>(suppCond.getDefiningOp());
+  Value conditionC = notOp ? notOp.getOperand() : suppCond;
+
+  Value rawData = branchOp.getDataOperand();
+  mergeOp->getOpOperand(suppressedIdx).set(rawData);
+
+  // 4. Create a constant false (<i1>) in the same basic block
+  OpBuilder builder(mergeOp);
+  builder.setInsertionPointAfter(mergeOp);
+
+  auto sourceOp = builder.create<handshake::SourceOp>(loc);
+  auto constFalse = builder.create<handshake::ConstantOp>(
+      loc, builder.getBoolAttr(true), sourceOp.getResult());
+  setHandshakeAttrs(bbAttr, namer, {sourceOp, constFalse});
+
+  // 5. Construct Mux data inputs: conditionC at suppressedIdx, false elsewhere
+  unsigned numOperands = mergeOp.getDataOperands().size();
+  SmallVector<Value> muxInputs(numOperands, constFalse.getResult());
+  muxInputs[suppressedIdx] = conditionC;
+
+  // 6. Create the Mux driven by the cmerge index output
+  Value cmergeIndex = mergeOp.getIndex();
+  auto condMux = builder.create<handshake::MuxOp>(loc, conditionC.getType(), cmergeIndex, muxInputs);
+  setHandshakeAttrs(bbAttr, namer, {condMux});
+  condMux->setAttr("cmerge_mux", builder.getUnitAttr());
+
+  // 7. Update and move the NOT operation after the Mux
+  notOp->moveAfter(condMux);
+  notOp.getOperandMutable().assign(condMux.getResult());
+  notOp->setAttr("handshake.bb", bbAttr);
+
+  // 8. Move the suppressor branchOp after the NOT operation
+  branchOp->moveAfter(notOp);
+  branchOp.getConditionOperandMutable().assign(notOp.getResult());
+  branchOp->setAttr("handshake.bb", bbAttr);
+
+  // 9. Attach the cmerge result to branchOp and rewire downstream consumers
+  Value rawCmergeRes = mergeOp.getResult();
+  branchOp.getDataOperandMutable().assign(rawCmergeRes);
+  rawCmergeRes.replaceAllUsesExcept(branchOp.getFalseResult(), branchOp);
+
+  frontier.insert(branchOp);
+}
+
 void applyRewriteE(handshake::MuxOp dataMux,
                    handshake::ConditionalBranchOp trueBranch,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
@@ -592,7 +661,7 @@ void markMultiSuccessorHeaderBranches(
       if (targetsSuccessor) {
         branchOp->setAttr("subloop_header_bb",
                           builder.getI64IntegerAttr(headerBB));
-        branchOp.dump();
+        // branchOp.dump();
         break; // match found for this branch
       }
     }

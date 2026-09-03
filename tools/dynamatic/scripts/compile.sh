@@ -260,6 +260,7 @@ fi
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   echo_info "Running FTD algorithm for handshake conversion"
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --mark-subloop \
     --ftd-lower-cf-to-handshake \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"

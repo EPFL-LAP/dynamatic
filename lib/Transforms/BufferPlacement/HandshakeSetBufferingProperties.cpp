@@ -187,6 +187,22 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
+  // Control merge: buffer both outputs (data and index) if on a cycle
+  for (handshake::ControlMergeOp cmergeOp : funcOp.getOps<handshake::ControlMergeOp>()) {
+    if (cmergeOp->getNumOperands() > 1) {
+      bool onCycle = llvm::any_of(cmergeOp->getResults(), [&](OpResult res) {
+        return isChannelOnCycle(res);
+      });
+
+      if (onCycle) {
+        for (OpResult cmergeRes : cmergeOp->getResults()) {
+          Channel channel(cmergeRes, true);
+          channel.props->minSlots = std::max(channel.props->minSlots, 1U);
+        }
+      }
+    }
+  }
+
   // See docs/Specs/Buffering.md
   // To mitigate the latency asymmetry between LSQ group allocation
   // and the Store/Load operations, we set a minimum number of buffer
