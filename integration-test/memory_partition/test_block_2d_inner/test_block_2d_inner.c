@@ -6,7 +6,7 @@
 // NOTE: Test for inner partition of 2d array, i.e. A[N][M] -> A1[N][M/2],
 // A2[N][M/2]
 void test_block_2d_inner(const int A[ROWS][COLS], const int B[ROWS][COLS],
-                             const int C[ROWS][COLS], int result[ROWS][COLS]) {
+                         const int C[ROWS][COLS], int result[ROWS][COLS]) {
 #pragma DYN array_partition array = intermediate dimension = 2 style =         \
     block factor = 2
   int intermediate[ROWS][COLS];

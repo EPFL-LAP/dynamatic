@@ -4,7 +4,7 @@
 
 // NOTE: Test for division with remainder after doing N / factor
 void test_block_1d_factor8(const int A[N], const int B[N], const int C[N],
-                          int result[N]) {
+                           int result[N]) {
 #pragma DYN array_partition array = intermediate dimension = 1 style =         \
     block factor = 8
   int intermediate[N];

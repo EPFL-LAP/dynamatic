@@ -63,10 +63,10 @@ static std::string typeSuffix(Type *ty) {
   return s;
 }
 
-static CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
-                            OpaqueGuardBodyFn buildBody,
-                            IRBuilder<> &callSiteBuilder,
-                            const Twine &callName = "") {
+static CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args,
+                                   Type *retTy, OpaqueGuardBodyFn buildBody,
+                                   IRBuilder<> &callSiteBuilder,
+                                   const Twine &callName = "") {
   Module *mod = callSiteBuilder.GetInsertBlock()->getModule();
   LLVMContext &ctx = mod->getContext();
 
@@ -86,7 +86,8 @@ static CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type 
     FunctionType *fnTy = FunctionType::get(retTy, argTypes, false);
     fn = Function::Create(fnTy, GlobalValue::InternalLinkage, name, mod);
     fn->addFnAttr(Attribute::AlwaysInline);
-    fn->addFnAttr(Attribute::getWithMemoryEffects(ctx, MemoryEffects::unknown()));
+    fn->addFnAttr(
+        Attribute::getWithMemoryEffects(ctx, MemoryEffects::unknown()));
 
     BasicBlock *entry = BasicBlock::Create(ctx, "entry", fn);
     IRBuilder<> b(entry);
@@ -132,7 +133,8 @@ static void guardedStore(IRBuilder<> &b, StoreInst *store) {
       b);
 }
 
-PreservedAnalyses GuardLoadStorePass::run(Function &f, FunctionAnalysisManager &) {
+PreservedAnalyses GuardLoadStorePass::run(Function &f,
+                                          FunctionAnalysisManager &) {
 
   if (f.getName() == "main") {
     return PreservedAnalyses::all();
