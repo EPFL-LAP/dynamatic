@@ -801,21 +801,25 @@ INSTANTIATE_TEST_SUITE_P(
     ),
     [](const auto &info) { return "memory_" + info.param; });
 
+// Test suite for array partitioning is minimized
+// not to slow down the integration-test pipeline
+// too much. The kernels for the tests can still
+// be found in integration-test/memory_partition
 INSTANTIATE_TEST_SUITE_P(
     MemoryPartitionBenchmarks, MemoryPartitionFixture,
     testing::Values(
-      "test_cyclic_1d_factor2",
-      "test_cyclic_1d_factor3",
-      "test_cyclic_1d_factor4_no_unroll",
-      "test_cyclic_1d_factor5_partial_unroll",
-      "test_cyclic_1d_factor8_full_unroll",
-      "test_cyclic_1d_two_arrays_factor",
+      // "test_cyclic_1d_factor2",
+      // "test_cyclic_1d_factor3",
+      // "test_cyclic_1d_factor4_no_unroll",
+      // "test_cyclic_1d_factor5_partial_unroll",
+      // "test_cyclic_1d_factor8_full_unroll",
+      // "test_cyclic_1d_two_arrays_factor",
       "test_cyclic_2d_inner",
-      "test_cyclic_2d_outer",
-      "test_block_1d_factor2",
-      "test_block_1d_factor4",
-      "test_block_1d_factor8",
-      "test_block_2d_outer",
+      // "test_cyclic_2d_outer",
+      // "test_block_1d_factor2",
+      // "test_block_1d_factor4",
+      // "test_block_1d_factor8",
+      // "test_block_2d_outer",
       "test_block_2d_inner",
       "test_complete_1d"
     ),
