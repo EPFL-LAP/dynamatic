@@ -19,15 +19,26 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "dynamatic/Transforms/LLVMIR/GuardLoadStore.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/IndVarSimplify.h"
+#include "llvm/Transforms/Scalar/LoopPassManager.h"
+#include "llvm/Transforms/Scalar/LoopUnrollPass.h"
+#include "llvm/Transforms/Scalar/SCCP.h"
+#include "llvm/Transforms/Scalar/SROA.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <boost/graph/connected_components.hpp>
 #include <boost/property_map/property_map.hpp>
@@ -40,6 +51,9 @@
 #include <boost/graph/detail/adjacency_list.hpp>
 
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/LowerSwitch.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include <polly/Support/ISLOStream.h>
 
 #define DEBUG_TYPE "array-partition"
@@ -1197,6 +1211,37 @@ createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
 
 } // namespace
 
+// NOTE: Simply inlines all functions that have the AlwaysInline attribute
+// Was previously done via a module pass, but since ArrayPartition is a function
+// pass we don't have the capability to run functions passes without much
+// boilerplate overhead, this could be reformed to a inlineAlwaysInline function
+// pass for uniformity
+static void inlineAlwaysInline(Function &f) {
+  bool inlinedSomething = true;
+  while (inlinedSomething) {
+    inlinedSomething = false;
+    for (auto &bb : f) {
+      for (auto &inst : bb) {
+        auto *call = dyn_cast<CallInst>(&inst);
+        if (!call) {
+          continue;
+        }
+        Function *callee = call->getCalledFunction();
+        if (!callee || !callee->hasFnAttribute(Attribute::AlwaysInline)) {
+          continue;
+        }
+        InlineFunctionInfo ifi;
+        InlineFunction(*call, ifi);
+        inlinedSomething = true;
+        break;
+      }
+      if (inlinedSomething) {
+        break;
+      }
+    }
+  }
+}
+
 struct ArrayPartition : PassInfoMixin<ArrayPartition> {
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
 };
@@ -1212,6 +1257,23 @@ PreservedAnalyses ArrayPartition::run(Function &f,
 
   auto pragmaInfo = collectAndErasePragmaMarkers(f);
 
+  // Early return not to trigger all of the other opmtimizations
+  if (pragmaInfo.empty()) {
+    return PreservedAnalyses::all();
+  }
+
+  // Pre partition passes
+  // indvars -> loop-unrolling
+  // in order to benefit from the multiple banks
+  // NOTE: Loop unrolling is done with OnlyWhenForced = true, which deactivates
+  // llvm heuristics that might unroll loops it shouldn't, i.e. urolling loops
+  // without the unroll_count(N) attribute
+  FunctionPassManager preFPM;
+  preFPM.addPass(createFunctionToLoopPassAdaptor(IndVarSimplifyPass()));
+  preFPM.addPass(LoopUnrollPass(LoopUnrollOptions(2, true, false)));
+  preFPM.run(f, fam);
+  fam.invalidate(f, PreservedAnalyses::none());
+
   AccessInfo info;
 
   for (auto &bb : f) {
@@ -1223,6 +1285,7 @@ PreservedAnalyses ArrayPartition::run(Function &f,
     }
   }
 
+  // Partition passes
   for (auto [base, insts] : info.baseToInsts) {
     auto it = pragmaInfo.find(base->getName().str());
     if (it != pragmaInfo.end()) {
@@ -1247,6 +1310,34 @@ PreservedAnalyses ArrayPartition::run(Function &f,
       continue;
     }
   }
+
+  // Passes for guarded instcombine followed by inline to remove the guards.
+  // Guards are used here since instcombine might create GEP chains that are
+  // incompatible with the current llvm to mlir initial translation
+  FunctionPassManager guardedInstcombineFPM;
+  guardedInstcombineFPM.addPass(dynamatic::GuardLoadStorePass());
+  guardedInstcombineFPM.addPass(InstCombinePass());
+  guardedInstcombineFPM.run(f, fam);
+  inlineAlwaysInline(f);
+  fam.invalidate(f, PreservedAnalyses::none());
+
+  // Cleanup passes
+  // SSCP, SimplyfyCFG, SROA, ADCE
+  // all for simpler bank accesses, code elimination, optimizations
+  //
+  // PromotePass (mem2reg) for the complete partition scheme to eliminate sinlge
+  // element allocas
+  //
+  // LowerSwitchPass to ensure that there are now swtich statements remaining
+  // for the MLIR translation
+  FunctionPassManager cleanupFPM;
+  cleanupFPM.addPass(SCCPPass());
+  cleanupFPM.addPass(SimplifyCFGPass());
+  cleanupFPM.addPass(SROAPass(SROAOptions::ModifyCFG));
+  cleanupFPM.addPass(PromotePass());
+  cleanupFPM.addPass(ADCEPass());
+  cleanupFPM.addPass(LowerSwitchPass());
+  cleanupFPM.run(f, fam);
 
   return PreservedAnalyses::all();
 }

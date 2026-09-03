@@ -91,6 +91,11 @@ def _to_twos_complement(n, bitwidth, addr):
 
 
 def _gen_intial_block(data_width: int, size: int, init_vals: List[int]):
+    # May occur if only single element is contained in RAM module -> only int instead of list[int]
+    if isinstance(init_vals, int):
+        init_vals = [init_vals]
+    elif isinstance(init_vals, tuple):
+        init_vals = list(init_vals)
 
     if init_vals == []:
         return "  signal ram : ram_type;\n"

@@ -210,9 +210,15 @@ exit_on_fail "Failed to apply optimization to LLVM IR" \
 # - ArrayParititon pass currently breaks the SCoP analysis in Polly. Therefore,
 # we need to first attach analysis results to memory ops and then apply memory
 # bank partition.
+
+# NOTE: Currently array-partition is a super pass, performing multiple transforms, 
+# as seen in lib/Transforms/LLVMIR/ArrayPartition.cpp.
+# This was done to ensure that these additional transforms may happen conditionally,
+# if and only if the array partition pragma was actually used. As some transforms broke
+# assumptions that translate-llvm-to-std needs to make.
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/ArrayPartition.so" \
-  -passes="function(loop-unroll,array-partition,simplifycfg,adce,lowerswitch)" \
+  -passes="array-partition" \
   -polly-process-unprofitable \
   "$F_CLANG_OPTIMIZED" \
   > "$F_CLANG_OPTIMIZED_PARTITIONED"

@@ -28,7 +28,9 @@
 //
 // NOTE:: GEP operations are unchanged
 // -----------------------------------------------------------------------
+#include "dynamatic/Transforms/LLVMIR/GuardLoadStore.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
@@ -36,20 +38,21 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
+#include "llvm/Support/ModRef.h"
 #include <vector>
 
 #define DEBUG_TYPE "guard-load-store"
 
 using namespace llvm;
 
-namespace {
+namespace dynamatic {
 
 using OpaqueGuardBodyFn =
     llvm::function_ref<Value *(IRBuilder<> &, ArrayRef<Value *>)>;
 
 // NOTE: keep in sync with whatever you already use elsewhere for naming
 // guard functions distinctly per (arg types -> ret type).
-std::string typeSuffix(Type *ty) {
+static std::string typeSuffix(Type *ty) {
   std::string s;
   raw_string_ostream os(s);
   ty->print(os);
@@ -60,7 +63,7 @@ std::string typeSuffix(Type *ty) {
   return s;
 }
 
-CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
+static CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
                             OpaqueGuardBodyFn buildBody,
                             IRBuilder<> &callSiteBuilder,
                             const Twine &callName = "") {
@@ -83,6 +86,7 @@ CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
     FunctionType *fnTy = FunctionType::get(retTy, argTypes, false);
     fn = Function::Create(fnTy, GlobalValue::InternalLinkage, name, mod);
     fn->addFnAttr(Attribute::AlwaysInline);
+    fn->addFnAttr(Attribute::getWithMemoryEffects(ctx, MemoryEffects::unknown()));
 
     BasicBlock *entry = BasicBlock::Create(ctx, "entry", fn);
     IRBuilder<> b(entry);
@@ -99,7 +103,7 @@ CallInst *createOpaqueGuard(StringRef kind, ArrayRef<Value *> args, Type *retTy,
   return callSiteBuilder.CreateCall(fn, args, callName);
 }
 
-Value *guardedLoad(IRBuilder<> &b, LoadInst *load) {
+static Value *guardedLoad(IRBuilder<> &b, LoadInst *load) {
   std::string kind = "load.align" + Twine(load->getAlign().value()).str();
   std::string name = load->hasName() ? load->getName().str() : "ld";
   return createOpaqueGuard(
@@ -113,7 +117,7 @@ Value *guardedLoad(IRBuilder<> &b, LoadInst *load) {
       b, name + ".g");
 }
 
-void guardedStore(IRBuilder<> &b, StoreInst *store) {
+static void guardedStore(IRBuilder<> &b, StoreInst *store) {
   std::string kind = ("store.align" + Twine(store->getAlign().value())).str();
   createOpaqueGuard(
       kind, {store->getValueOperand(), store->getPointerOperand()},
@@ -128,13 +132,7 @@ void guardedStore(IRBuilder<> &b, StoreInst *store) {
       b);
 }
 
-} // namespace
-
-struct GuardLoadStore : PassInfoMixin<GuardLoadStore> {
-  PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
-};
-
-PreservedAnalyses GuardLoadStore::run(Function &f, FunctionAnalysisManager &) {
+PreservedAnalyses GuardLoadStorePass::run(Function &f, FunctionAnalysisManager &) {
 
   if (f.getName() == "main") {
     return PreservedAnalyses::all();
@@ -165,19 +163,21 @@ PreservedAnalyses GuardLoadStore::run(Function &f, FunctionAnalysisManager &) {
 
   for (LoadInst *load : loads) {
     IRBuilder<> b(load);
-    Value *guarded = guardedLoad(b, load);
+    Value *guarded = dynamatic::guardedLoad(b, load);
     load->replaceAllUsesWith(guarded);
     load->eraseFromParent();
   }
 
   for (StoreInst *store : stores) {
     IRBuilder<> b(store);
-    guardedStore(b, store);
+    dynamatic::guardedStore(b, store);
     store->eraseFromParent();
   }
 
   return PreservedAnalyses::all();
 }
+
+} // namespace dynamatic
 
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
@@ -187,7 +187,7 @@ llvmGetPassPluginInfo() {
                 [](StringRef name, FunctionPassManager &fpm,
                    ArrayRef<PassBuilder::PipelineElement>) {
                   if (name == "guard-load-store") {
-                    fpm.addPass(GuardLoadStore());
+                    fpm.addPass(dynamatic::GuardLoadStorePass());
                     return true;
                   }
                   return false;
