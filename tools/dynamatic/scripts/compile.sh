@@ -213,9 +213,15 @@ exit_on_fail "Failed to apply optimization to LLVM IR" \
 
 # NOTE: Currently array-partition is a super pass, performing multiple transforms, 
 # as seen in lib/Transforms/LLVMIR/ArrayPartition.cpp.
-# This was done to ensure that these additional transforms may happen conditionally,
-# if and only if the array partition pragma was actually used. As some transforms broke
-# assumptions that translate-llvm-to-std needs to make.
+# The passes performed are: 
+# indvars,loop-unroll,array-partition,guard-load-store,\
+# instcombine,always-inline,sccp,simplifycfg,sroa,mem2reg,adce,lower-switch
+#
+# NOTE: This was done to ensure that these additional transforms may happen conditionally,
+# i.e. if and only if the array partition pragma was actually used. Performing the
+# passes unconditionally broke performance tests (due to unexpected unrolling, 
+# select instead of branches, etc.) or created issues for the llvm -> mlir translation
+# by introducing unsupported instructions.
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/ArrayPartition.so" \
   -passes="array-partition" \

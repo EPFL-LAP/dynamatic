@@ -777,13 +777,24 @@ std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
 //   %inner = getelementptr [5 x [6 x [7 x i32]]], ptr %a, i64 0, i64 1, i64 %i3
 //   %outer = getelementptr [7 x i32], ptr %inner, i64 0, i64 %j
 //
-// strides (from the array's declared type, outer to inner):
-//   strides = { 168, 28, 4 }   // 6*7*4, 7*4, 4
+// strides in bytes (from the array's declared type, outer to inner):
+//   Every dimension of the has a corresponding stride, which is the numer of
+//   bytes between elements of that dimension. So for the example above:
+//   int a[5][6][7];
+//   distance between a[i][j][0] and a[i][j][1] = 4 B
+//   distance between a[i][0][j] and a[i][1][j] = 7 * 4 B
+//   distance between a[0][i][j] and a[1][i][j] = 6 * 7 * 4 B
+//
+//   or in short:
+//   strides = { 168b, 28b, 4b }   // 6*7*4, 7*4, 4
 //
 // PHASE 1 walks the chain (%outer, then %inner), decomposing each GEP via
-// collectOffset and accumulating into one flat description:
-//   constOff = 168             // the literal "1" for dim 0: 1 * 168
-//   varOff   = { %i3: 28, %j: 4 }
+// collectOffset and accumulating into one flat description. The resulting
+// offset is then the composition of constant and variable number of bytes to
+// arrive at the specified index by the access chain:
+//   x = a[1][i + 3][j]
+//   constOff = 168                  // the literal "1" for dim 0: 1 * 168
+//   varOff   = { %i3: 28, %j: 4 }   // the variable offsets from i and j
 //
 // PHASE 2 recovers indices[] per dimension from (constOff, varOff):
 //   (a) match live values to dimensions by exact stride equality:
@@ -901,6 +912,26 @@ std::vector<Value *> decomposeGEPIndices(GetElementPtrInst *gepInst,
 //    sum += arr1[i - 10];
 //  } else {
 //    sum += arr2[i - 20];
+//  }
+//
+// OR for cyclic accesses:
+//
+// #pragma DYN array_partition array=arr dimension=1 style=cyclic factor=3
+// int arr[32];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  sum += arr[i];
+//
+// Transformed code:
+// int arr0[10], arr1[10], arr2[12];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  if (i % 3 == 0){
+//    sum += arr0[i];
+//  } else if (i % 3 == 1){
+//    sum += arr1[i];
+//  } else { // i % 3 == 2
+//    sum += arr2[i];
 //  }
 //  NOTE: This is should be resolved/unrolled later on by LLVM automiatically
 //  via opitmization such that there is no branching logic remaining
@@ -1267,10 +1298,12 @@ PreservedAnalyses ArrayPartition::run(Function &f,
   // in order to benefit from the multiple banks
   // NOTE: Loop unrolling is done with OnlyWhenForced = true, which deactivates
   // llvm heuristics that might unroll loops it shouldn't, i.e. urolling loops
-  // without the unroll_count(N) attribute
+  // without the unroll_count(N) attribute. Other parameters are taken from
+  // default LoopUnrollOptions used by the LLVM loop-unroll pass
   FunctionPassManager preFPM;
   preFPM.addPass(createFunctionToLoopPassAdaptor(IndVarSimplifyPass()));
-  preFPM.addPass(LoopUnrollPass(LoopUnrollOptions(2, true, false)));
+  preFPM.addPass(LoopUnrollPass(LoopUnrollOptions(
+      /*OptLevel=*/2, /*OnlyWhenForced=*/true, /*ForgetSCEV=*/false)));
   preFPM.run(f, fam);
   fam.invalidate(f, PreservedAnalyses::none());
 
