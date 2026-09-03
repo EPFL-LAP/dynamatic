@@ -110,4 +110,4 @@ def _gen_intial_block(data_width: int, size: int, init_vals: List[int]):
         for _ in range(int(size) - len(init_vals)):
             init_strings.append('"' + f"{0:0{data_width}b}" + '"')
 
-    return "signal ram : ram_type := (" + ",\n".join(init_strings)  + ");"
+    return "signal ram : ram_type := (" + ",\n".join(init_strings) + ");"
