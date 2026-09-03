@@ -4,7 +4,7 @@
 
 // NOTE: Test for testing larger factors
 void test_block_1d_factor4(const int A[N], const int B[N], const int C[N],
-                          int result[N]) {
+                           int result[N]) {
 #pragma DYN array_partition array = intermediate dimension = 1 style =         \
     block factor = 4
   int intermediate[N];
