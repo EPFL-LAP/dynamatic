@@ -1407,8 +1407,8 @@ void BufferPlacementMILP::addUnitOccupancyConstraints(
       // The lower bound is the latency divided by the CFC's II.
       model->addConstr(nU >= d / ii,
                        "eq9_lo_" + name + "_cfdfc" + std::to_string(i));
-      // The upper bound is the capacity of the unit. (For now, we use a
-      // constant value.)
+      // The upper bound is the unit's latency. (Denoted as Capacity in the
+      // paper)
       model->addConstr(nU <= d,
                        "eq9_hi_" + name + "_cfdfc" + std::to_string(i));
     }
