@@ -1409,7 +1409,7 @@ void BufferPlacementMILP::addUnitOccupancyConstraints(
                        "eq9_lo_" + name + "_cfdfc" + std::to_string(i));
       // The upper bound is the capacity of the unit. (For now, we use a
       // constant value.)
-      model->addConstr(nU <= fpga24::MAX_OCCUPANCY,
+      model->addConstr(nU <= d,
                        "eq9_hi_" + name + "_cfdfc" + std::to_string(i));
     }
   }
