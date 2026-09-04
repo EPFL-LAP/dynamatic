@@ -286,6 +286,9 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"ftd", "ftd", "bool", "false",
     "If true, use FTD-specific CFDFC extraction and backedge "
     "identification.">,
+    Option<"optimizeSteeringRewrites", "optimize-steering-rewrites", "bool",
+    "false", "If true, use the same CFDFC extraction and backedge "
+    "identification as FTD-generated circuits.">,
     Option<"calculatePathDelays", "calculate-path-delays", "bool", "false",
     "After buffer placement, re-run the MILP with the buffering decisions "
     "locked in to calculate the path delays the MILP believes are present in "

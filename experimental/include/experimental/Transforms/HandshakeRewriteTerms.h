@@ -1,4 +1,5 @@
-//===- Passes.h - Exp. transformation passes registration -------*- C++ -*-===//
+//===- HandshakeRewriteTerms.h - Rewrite Terms in Handshake Operation Sequences
+//-----*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,27 +7,29 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the registration code for all experimental transformation
-// passes.
+// This file declares the --handshake-rewrite-terms pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_TRANSFORMS_PASSES_H
-#define EXPERIMENTAL_TRANSFORMS_PASSES_H
+#ifndef EXPERIMENTAL_TRANSFORMS_HANDSHAKEREWRITETERMS_H
+#define EXPERIMENTAL_TRANSFORMS_HANDSHAKEREWRITETERMS_H
 
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/DialectRegistry.h"
 #include "mlir/Pass/Pass.h"
-
-#include "experimental/Transforms/HandshakeRewriteTerms.h"
 
 namespace dynamatic {
 namespace experimental {
-/// Generate the code for registering passes.
-#define GEN_PASS_DECL
-#define GEN_PASS_REGISTRATION
+
+#define GEN_PASS_DECL_HANDSHAKEREWRITETERMS
+#define GEN_PASS_DEF_HANDSHAKEREWRITETERMS
 #include "experimental/Transforms/Passes.h.inc"
+
+std::unique_ptr<dynamatic::DynamaticPass> rewriteHandshakeTerms();
+
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_TRANSFORMS_PASSES_H
+#endif // EXPERIMENTAL_TRANSFORMS_HANDSHAKEREWRITETERMS_H

@@ -309,8 +309,11 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
 Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
   Value val = muxOp.getDataOperands()[idx];
   Operation *prod = val.getDefiningOp();
-  if (isa_and_nonnull<handshake::MuxOp>(prod))
-    return returnNonMuxProducerVal(cast<handshake::MuxOp>(prod), idx);
+  if (auto prodMux = dyn_cast_or_null<handshake::MuxOp>(prod)) {
+    int cycleIdx;
+    if (isSelfRegenerateMux(prodMux, cycleIdx))
+      return returnNonMuxProducerVal(prodMux, idx);
+  }
   return val;
 }
 
@@ -318,15 +321,20 @@ Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
 // of referenceMuxOp
 Operation *returnMuxAtSameDepth(Operation *op,
                                 handshake::MuxOp referenceMuxOp) {
-  if (!isa_and_nonnull<handshake::MuxOp>(op) || op == referenceMuxOp)
+  auto muxOp = dyn_cast_or_null<handshake::MuxOp>(op);
+  if (!muxOp || muxOp == referenceMuxOp)
     return nullptr;
 
   if (op->getAttr("handshake.bb") == referenceMuxOp->getAttr("handshake.bb"))
     return op;
 
+  int cycleIdx;
+  if (!isSelfRegenerateMux(muxOp, cycleIdx))
+    return nullptr;
+
   // Otherwise, explore all users in DFS-like traversal until you hit a match
   Operation *finalOp = nullptr;
-  for (auto *cons : cast<handshake::MuxOp>(op).getResult().getUsers()) {
+  for (auto *cons : muxOp.getResult().getUsers()) {
     Operation *potentialOp = returnMuxAtSameDepth(cons, referenceMuxOp);
     if (potentialOp != nullptr) {
       finalOp = potentialOp;
