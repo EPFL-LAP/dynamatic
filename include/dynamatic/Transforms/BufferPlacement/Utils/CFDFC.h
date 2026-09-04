@@ -58,11 +58,16 @@ struct CFDFC {
   mlir::DenseMap<Value, double> channelOccupancy;
 
   /// Constructs a CFDFC from a set of selected archs and basic blocks in the
-  /// function. Assumes that every value in the function is used exactly once.
-  /// When `backwardChannels` is null, uses the standard CFDFC construction.
-  /// Otherwise, uses the FTD-specific channel selection.
-  CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
-        const DenseSet<Value> *backwardChannels = nullptr);
+  /// function using the traditional channel selection.
+  static CFDFC create(handshake::FuncOp funcOp, ArchSet &archs,
+                      unsigned numExec);
+
+  /// Constructs a CFDFC from a set of selected archs and basic blocks in the
+  /// function using the FTD-specific channel selection, which additionally
+  /// requires backedges to be specified.
+  static CFDFC createFTD(handshake::FuncOp funcOp, ArchSet &archs,
+                         unsigned numExec,
+                         const DenseSet<Value> &backwardChannels);
 
   /// Returns whether the channel between the two blocks has a corresponding
   /// edge in this CFDFC's CFG cycle.
@@ -73,6 +78,20 @@ struct CFDFC {
   // block. The distinction is important for the buffer placement MILP, which
   // uses backedges to determine where to insert "tokens" in the circuit.
   static bool isCFDFCBackedge(Value val);
+
+private:
+  /// Builds the block cycle from the selected archs and collects the units
+  /// belonging to it. Channels are collected afterwards by one of the
+  /// collect functions.
+  CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec);
+
+  /// Collects the channels and backedges of the units using the traditional
+  /// channel selection.
+  void collectChannels();
+
+  /// Collects the channels and backedges of the units using the FTD-specific
+  /// channel selection.
+  void collectChannelsFTD(const DenseSet<Value> &backwardChannels);
 };
 
 /// Represents a union of CFDFCs. Its blocks, units, channels, and backedges are

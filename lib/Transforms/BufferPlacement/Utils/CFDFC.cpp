@@ -155,8 +155,22 @@ static void setBBConstraints(std::unique_ptr<CPSolver> &model, MILPVars &vars) {
   }
 }
 
-CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
-             const DenseSet<Value> *backwardChannels)
+CFDFC CFDFC::create(handshake::FuncOp funcOp, ArchSet &archs,
+                    unsigned numExec) {
+  CFDFC cfdfc(funcOp, archs, numExec);
+  cfdfc.collectChannels();
+  return cfdfc;
+}
+
+CFDFC CFDFC::createFTD(handshake::FuncOp funcOp, ArchSet &archs,
+                       unsigned numExec,
+                       const DenseSet<Value> &backwardChannels) {
+  CFDFC cfdfc(funcOp, archs, numExec);
+  cfdfc.collectChannelsFTD(backwardChannels);
+  return cfdfc;
+}
+
+CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec)
     : numExecs(numExec) {
 
   // Identify the block that starts the CFDFC; it's the only one that is both
@@ -201,62 +215,101 @@ CFDFC::CFDFC(handshake::FuncOp funcOp, ArchSet &archs, unsigned numExec,
     if (!cycle.contains(srcBB))
       continue;
 
-    // Add the unit and valid outgoing channels to the CFDFC
+    // Add the unit to the CFDFC
     units.insert(&op);
-    for (OpResult res : op.getResults()) {
+  }
+}
+
+void CFDFC::collectChannels() {
+  // Iterate over the pre-collected units which have been filtered to just
+  // this CFDFC
+  for (Operation *op : units) {
+    unsigned srcBB = *getLogicBB(op);
+
+    // Add each handshake channel to the CFDFC, and additionally to backedges
+    // if the handshake channel is part of a backedge
+    for (OpResult res : op->getResults()) {
       assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
              "value must have unique user");
 
       // Get the value's unique user and its basic block
       Operation *user = *res.getUsers().begin();
-      unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
-        continue;
-      else
-        dstBB = *optBB;
+      std::optional<unsigned> optDstBB = getLogicBB(user);
 
-      if (backwardChannels) {
-        if (!cycle.contains(dstBB))
-          continue;
+      // Channels to users without a basic block are not added to the CFDFC
+      if (optDstBB.has_value()) {
+        unsigned dstBB = *optDstBB;
 
-        // FTD circuits may contain channels between blocks without a matching
-        // CFG edge. Include every non-backward channel whose endpoints belong
-        // to the cycle. Include backward channels only when they correspond to
-        // an edge in the CFG cycle currently being modeled.
-        if (!backwardChannels->contains(res))
+        if (srcBB != dstBB) {
+          // The channel is in the CFDFC if it belongs belong to a selected arch
+          // between two basic blocks
+
+          // check each arch in the CFDFC
+          for (size_t i = 0; i < cycle.size(); ++i) {
+            unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
+
+            // check if a matching arch is found
+            if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
+              channels.insert(res);
+              if (isCFDFCBackedge(res))
+                backedges.insert(res);
+
+              // stop if a matching arch is found
+              break;
+            }
+          }
+        } else if (cycle.size() == 1) {
+          // The channel is in the CFDFC if its producer/consumer belong to the
+          // same basic block and the CFDFC is just a block looping to itself
           channels.insert(res);
-        else {
-          // Record all identified backward channels as backedges, but include
-          // them as CFDFC channels only if they are compliant with the CFG.
-          backedges.insert(res);
-          if (isCFGCompliant(srcBB, dstBB))
-            channels.insert(res);
+          if (isCFDFCBackedge(res))
+            backedges.insert(res);
+        } else if (!isBackedge(res)) {
+          // The channel is in the CFDFC if its producer/consumer belong to the
+          // same basic block and the channel is not a backedge
+          channels.insert(res);
         }
-        continue;
       }
+    }
+  }
+}
 
-      if (srcBB != dstBB) {
-        // The channel is in the CFDFC if it belongs belong to a selected arch
-        // between two basic blocks
-        for (size_t i = 0; i < cycle.size(); ++i) {
-          unsigned nextBB = i == cycle.size() - 1 ? 0 : i + 1;
-          if (srcBB == cycle[i] && dstBB == cycle[nextBB]) {
+void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
+  // Iterate over the pre-collected units which have been filtered to just
+  // this CFDFC
+  for (Operation *op : units) {
+    unsigned srcBB = *getLogicBB(op);
+
+    // Add each handshake channel to the CFDFC, and additionally to backedges
+    // if the handshake channel is part of a backedge
+    for (OpResult res : op->getResults()) {
+      assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
+             "value must have unique user");
+
+      // Get the value's unique user and its basic block
+      Operation *user = *res.getUsers().begin();
+      std::optional<unsigned> optDstBB = getLogicBB(user);
+
+      // Channels to users without a basic block are not added to the CFDFC
+      if (optDstBB.has_value()) {
+        unsigned dstBB = *optDstBB;
+
+        // Channels to users outside the cycle are not added to the CFDFC
+        if (cycle.contains(dstBB)) {
+          // FTD circuits may contain channels between blocks without a matching
+          // CFG edge. Include every non-backward channel whose endpoints belong
+          // to the cycle. Include backward channels only when they correspond to
+          // an edge in the CFG cycle currently being modeled.
+          if (!backwardChannels.contains(res))
             channels.insert(res);
-            if (isCFDFCBackedge(res))
-              backedges.insert(res);
-            break;
+          else {
+            // Record all identified backward channels as backedges, but include
+            // them as CFDFC channels only if they are compliant with the CFG.
+            backedges.insert(res);
+            if (isCFGCompliant(srcBB, dstBB))
+              channels.insert(res);
           }
         }
-      } else if (cycle.size() == 1) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the CFDFC is just a block looping to itself
-        channels.insert(res);
-        if (isCFDFCBackedge(res))
-          backedges.insert(res);
-      } else if (!isBackedge(res)) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the channel is not a backedge
-        channels.insert(res);
       }
     }
   }
