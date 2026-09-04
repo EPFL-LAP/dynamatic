@@ -9,30 +9,51 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/ISLTools.h"
 
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/IR/Operator.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "dynamatic/Transforms/LLVMIR/GuardLoadStore.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/IndVarSimplify.h"
+#include "llvm/Transforms/Scalar/LoopPassManager.h"
+#include "llvm/Transforms/Scalar/LoopUnrollPass.h"
+#include "llvm/Transforms/Scalar/SCCP.h"
+#include "llvm/Transforms/Scalar/SROA.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <boost/graph/connected_components.hpp>
 #include <boost/property_map/property_map.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <stdlib.h>
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/detail/adjacency_list.hpp>
 
 #include "llvm/Support/Debug.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/LowerSwitch.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include <polly/Support/ISLOStream.h>
 
 #define DEBUG_TYPE "array-partition"
@@ -72,13 +93,23 @@ using DimInfoOfAllDimensions = std::vector<DimInfo>;
 
 namespace {
 
+enum PartitionStyle { BLOCK, CYCLIC, COMPLETE };
+
+struct PartitionInfo {
+  unsigned dimension;
+  unsigned factor;
+  PartitionStyle style;
+};
+
 struct AccessInfo {
   std::map<Instruction *, isl::set> accessMaps;
 
   std::map<Instruction *, unsigned> instToScopId;
 
   // Base to the set of instructions storing to this base
-  std::map<Value *, std::set<Instruction *>> baseToInsts;
+  // NOTE: llvm::SetVector here  since it preserves the order in which
+  // instructions are inserted as well as functioning like a set
+  std::map<Value *, llvm::SetVector<Instruction *>> baseToInsts;
 
   bool sameScop(Instruction *i, Instruction *j) const {
     if (!instToScopId.count(i))
@@ -157,6 +188,33 @@ Instruction *findBaseGEP(Instruction *inst) {
   }
 
   return findBaseGEPInternal(addr, inst);
+}
+
+// Helper function for getting StringLiterals from LLVM value
+std::optional<StringRef> extractStringLiteral(Value *v) {
+  auto *gv = dyn_cast<GlobalVariable>(v->stripPointerCasts());
+  if (!gv || !gv->hasInitializer())
+    return std::nullopt;
+
+  auto *cda = dyn_cast<ConstantDataArray>(gv->getInitializer());
+  if (!cda || !cda->isCString())
+    return std::nullopt;
+
+  return cda->getAsCString();
+}
+
+std::optional<PartitionStyle> extractPartitionStyle(StringRef styleString) {
+  if (styleString == "block") {
+    return PartitionStyle::BLOCK;
+  }
+  if (styleString == "cyclic") {
+    return PartitionStyle::CYCLIC;
+  }
+  if (styleString == "complete") {
+    return PartitionStyle::COMPLETE;
+  }
+
+  return std::nullopt;
 }
 
 /// \brief: After shrinking the array to an optimal size, we also need to update
@@ -619,12 +677,604 @@ void partitionGlobalAlloca(Module *mod, llvm::GlobalVariable *gblConstant,
   }
 }
 
+// Function that returns map of arrayNames -> partitionInfo for later partition
+// has side effect of removing all call sites of pragma markers and deleting the
+// pragma marker function.
+//
+// Pragma Syntax:
+// #pragma DYN array_partition array={array name} dimension={1..array depth}
+// style={block, cyclic, complete} factor=int
+//
+// Example for int arr[10][10];
+// #pragma DYN array_partition array=arr dimension=2 style=block factor=2
+//
+// NOTE: This could be made more general, i.e. providing the name of the pragma
+// marker function and parsing out the function arguemnts and naming them
+// later/providing a handler function that maps from argument index to struct
+// field. Overkill if this is the only occurance for this
+std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
+  std::map<std::string, PartitionInfo> result;
+  std::vector<CallInst *> callSites;
+  Function *markerFn = nullptr;
+
+  for (auto &bb : f) {
+    for (auto &inst : bb) {
+      auto *call = dyn_cast<CallInst>(&inst);
+      if (!call) {
+        continue;
+      }
+
+      Function *callee = call->getCalledFunction();
+      if (!callee || callee->getName() != "__dyn_array_partition") {
+        continue;
+      }
+
+      markerFn = callee;
+
+      if (call->arg_size() != 4) {
+        llvm::report_fatal_error(
+            Twine("__dyn_array_partition: expected 4 arguments, got ") +
+            Twine(call->arg_size()));
+      }
+
+      auto arrName = extractStringLiteral(call->getArgOperand(0));
+      if (!arrName)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: could not recover array name "
+            "string literal");
+
+      auto *dimConst = dyn_cast<ConstantInt>(call->getArgOperand(1));
+      auto *factorConst = dyn_cast<ConstantInt>(call->getArgOperand(2));
+      if (!dimConst || !factorConst)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: dimension/factor must be "
+            "constant integers");
+
+      auto styleString = extractStringLiteral(call->getArgOperand(3));
+      if (!styleString)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: could not recover style name "
+            "string literal");
+
+      auto styleOpt = extractPartitionStyle(styleString.value());
+      if (!styleOpt)
+        llvm::report_fatal_error(
+            "__dyn_array_partition: invalid style string literal");
+
+      LLVM_DEBUG(llvm::errs()
+                 << "Partitioning: " << arrName << "\n\t" << dimConst << "\n\t"
+                 << factorConst << "\n\t" << styleString.value() << "\n");
+
+      result[arrName->str()] = PartitionInfo{
+          static_cast<unsigned>(dimConst->getZExtValue()),
+          static_cast<unsigned>(factorConst->getZExtValue()), *styleOpt};
+
+      callSites.push_back(call);
+    }
+  }
+
+  // Finally remove all found call sites from the function
+  for (auto *call : callSites)
+    call->eraseFromParent();
+
+  // Finally remove the external function declaration
+  if (markerFn && markerFn->use_empty())
+    markerFn->eraseFromParent();
+
+  return result;
+}
+
+// Recovers index values of a possibly chained GEP without assuming a particular
+// shape to the GEPs themselves. This collection of indices is used to create
+// the branching logic for the bank accesses.
+//
+// C:
+//   int a[5][6][7];
+//   x = a[1][i + 3][j];
+//
+// This single access may be split across multiple chained GEPs by clang,
+// e.g.:
+//   %i3 = add i64 %i, 3
+//   %inner = getelementptr [5 x [6 x [7 x i32]]], ptr %a, i64 0, i64 1, i64 %i3
+//   %outer = getelementptr [7 x i32], ptr %inner, i64 0, i64 %j
+//
+// strides in bytes (from the array's declared type, outer to inner):
+//   Every dimension of the has a corresponding stride, which is the numer of
+//   bytes between elements of that dimension. So for the example above:
+//   int a[5][6][7];
+//   distance between a[i][j][0] and a[i][j][1] = 4 B
+//   distance between a[i][0][j] and a[i][1][j] = 7 * 4 B
+//   distance between a[0][i][j] and a[1][i][j] = 6 * 7 * 4 B
+//
+//   or in short:
+//   strides = { 168b, 28b, 4b }   // 6*7*4, 7*4, 4
+//
+// PHASE 1 walks the chain (%outer, then %inner), decomposing each GEP via
+// collectOffset and accumulating into one flat description. The resulting
+// offset is then the composition of constant and variable number of bytes to
+// arrive at the specified index by the access chain:
+//   x = a[1][i + 3][j]
+//   constOff = 168                  // the literal "1" for dim 0: 1 * 168
+//   varOff   = { %i3: 28, %j: 4 }   // the variable offsets from i and j
+//
+// PHASE 2 recovers indices[] per dimension from (constOff, varOff):
+//   (a) match live values to dimensions by exact stride equality:
+//         %i3 (scale 28) -> dimension 1 (stride 28)
+//         %j  (scale 4)  -> dimension 2 (stride 4)
+//   (b) resolve whatever's left of constOff for dimensions still unmatched:
+//         dimension 0: 168 / 168 = 1, remainder 0
+//
+// Result: indices = { ConstantInt(1), %i3, %j }
+std::vector<Value *> decomposeGEPIndices(GetElementPtrInst *gepInst,
+                                         Type *allocatedType, Type *idxTy) {
+
+  // Naming scheme for DL follows other LLVM Transforms
+  const DataLayout &DL = gepInst->getModule()->getDataLayout();
+  unsigned bitWidth = DL.getIndexSizeInBits(gepInst->getPointerAddressSpace());
+
+  APInt constOff(bitWidth, 0);
+
+  // llvm::MapVector preserves insertion order
+  llvm::MapVector<Value *, APInt> varOff;
+
+  Value *cur = gepInst;
+  while (auto *gepOp = dyn_cast<GEPOperator>(cur)) {
+
+    APInt localConstOff(bitWidth, 0);
+    llvm::MapVector<Value *, APInt> localVarOff;
+
+    if (!gepOp->collectOffset(DL, bitWidth, localVarOff, localConstOff)) {
+      llvm::report_fatal_error(
+          "__dyn_array_partition: could not flatten address computation");
+    }
+
+    constOff += localConstOff;
+
+    for (auto &[val, scale] : localVarOff) {
+      auto *it = varOff.find(val);
+      // Either append to the varOff or increase the scale depending if the
+      // value (i.e. index is reused)
+      if (it == varOff.end()) {
+        varOff.insert({val, scale});
+      } else {
+        it->second += scale;
+      }
+    }
+
+    cur = gepOp->getPointerOperand();
+  }
+
+  // Collect the strides from the array type
+  // Input:  allocatedType = [4 x [5 x i32]]
+  // Output: strides        = { 20, 4 }
+  //           strides[0] = 20 bytes  (outer dim, size 4)
+  //           strides[1] = 4  bytes  (inner dim, size 5)
+  std::vector<uint64_t> strides;
+  Type *ty = allocatedType;
+  while (auto *arrType = dyn_cast<ArrayType>(ty)) {
+    strides.push_back(
+        DL.getTypeAllocSize(arrType->getElementType()).getFixedValue());
+    ty = arrType->getElementType();
+  }
+
+  std::vector<Value *> indices(strides.size(), nullptr);
+  for (unsigned dim = 0; dim < strides.size(); dim++) {
+    for (auto *it = varOff.begin(); it != varOff.end(); it++) {
+      if (it->second == strides[dim]) {
+        indices[dim] = it->first;
+        varOff.erase(it);
+        break;
+      }
+    }
+  }
+
+  if (!varOff.empty()) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: could not attribute all address terms to "
+        "an array dimension");
+  }
+
+  // Handle all the remaminig constant offset by doing division and remainders:
+  // Example: arr[1][2][i] with strides = {168, 28, 4}, constOff = 224
+  // (dims 0 and 1 both literal, dim 2 already resolved to %i via matching):
+  //   dim 0: 224 / 168 = 1, remainder 224 % 168 = 56
+  //   dim 1: 56  / 28  = 2, remainder 56  % 28  = 0
+  // final indices = { ConstantInt(1), ConstantInt(2), %i }, i.e. arr[1][2][i]
+  for (unsigned dim = 0; dim < strides.size(); dim++) {
+    if (indices[dim]) {
+      continue;
+    }
+
+    APInt stride(constOff.getBitWidth(), strides[dim]);
+    indices[dim] =
+        ConstantInt::get(idxTy, constOff.udiv(stride).getZExtValue());
+    constOff = constOff.urem(stride);
+  }
+
+  return indices;
+}
+
+// Transforms the code by creating branches accessing different banks for every
+// array access.
+// Original code:
+// #pragma DYN array_partition array=arr dimension=1 style=block factor=3
+// int arr[32];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  sum += arr[i];
+//
+// Transformed code:
+// int arr0[10], arr1[10], arr2[12];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  if (i / 10 == 0){
+//    sum += arr0[i];
+//  } else if (i / 10 == 1){
+//    sum += arr1[i - 10];
+//  } else {
+//    sum += arr2[i - 20];
+//  }
+//
+// OR for cyclic accesses:
+//
+// #pragma DYN array_partition array=arr dimension=1 style=cyclic factor=3
+// int arr[32];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  sum += arr[i];
+//
+// Transformed code:
+// int arr0[10], arr1[10], arr2[12];
+// int sum = 0;
+// for (int i = 0; i < 32; i++)
+//  if (i % 3 == 0){
+//    sum += arr0[i];
+//  } else if (i % 3 == 1){
+//    sum += arr1[i];
+//  } else { // i % 3 == 2
+//    sum += arr2[i];
+//  }
+//  NOTE: This is should be resolved/unrolled later on by LLVM automiatically
+//  via opitmization such that there is no branching logic remaining
+void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
+                                ArrayRef<AllocaInst *> banks,
+                                ArrayRef<DimInfo> bankInfo,
+                                const PartitionInfo &partInfo,
+                                unsigned accessIdx) {
+
+  StringRef arrName = baseAlloca->getName();
+
+  Instruction *baseGEPOrInst = findBaseGEP(inst);
+  auto *gepInst = dyn_cast<GetElementPtrInst>(baseGEPOrInst);
+
+  auto *load = dyn_cast<LoadInst>(inst);
+  auto *store = dyn_cast<StoreInst>(inst);
+  StringRef opKind = load ? "load" : "store";
+
+  if (!gepInst) {
+    if (baseGEPOrInst != inst) {
+      llvm::report_fatal_error(
+          "__dyn_array_partition: expected a GEP for this access");
+    }
+
+    // Early return in case we have a 0 access in to an array. i.e. there is no
+    // gep construction. In this case we also do not need to change the access
+    // pattern since the 0th element is always in the 0th bank
+    if (load)
+      load->setOperand(0, banks[0]);
+    else if (store)
+      store->setOperand(1, banks[0]);
+    return;
+  }
+
+  // If the wanted dimension to partition from exceeds the available indices in
+  // the gep instruction we can not change the indices accordingly
+  if (partInfo.dimension >= gepInst->getNumIndices()) {
+    llvm::report_fatal_error("__dyn_array_partition: dimension exceeds the "
+                             "number of indices in this access");
+  }
+
+  Function *f = inst->getParent()->getParent();
+  LLVMContext &ctx = inst->getContext();
+
+  Type *idxTy = Type::getInt64Ty(ctx);
+  std::vector<Value *> allIndices =
+      decomposeGEPIndices(gepInst, baseAlloca->getAllocatedType(), idxTy);
+
+  if (partInfo.dimension < 1 || partInfo.dimension > allIndices.size()) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: dimension exceeds the number of dimensions "
+        "in this array");
+  }
+
+  Value *origIdx = allIndices[partInfo.dimension - 1];
+  Type *addrTy = origIdx->getType();
+
+  unsigned factor = static_cast<unsigned>(banks.size());
+  unsigned totalSize = 0;
+  for (auto &[firstIndex, step, elems] : bankInfo)
+    totalSize += elems;
+
+  unsigned chunkSize = totalSize / factor;
+  unsigned remainder = totalSize % factor;
+
+  // Since LLVM might reuse gep instructions we have to insert duplicate ones to
+  // ensure that the later split can happen correctly. Otherwise we might split
+  // well before the current instruction that we'd like to split on
+  if (gepInst->getNextNode() != inst) {
+    gepInst = cast<GetElementPtrInst>(gepInst->clone());
+    gepInst->insertBefore(inst);
+  }
+
+  // Splits origBB right before the GEP: everything from the GEP onward
+  // moves into mergeBB.
+  //
+  // origBB:
+  //  ...
+  //  %gep = getelementptr ...;
+  //  %v = load ...;
+  //  br %next
+  //
+  // ->
+  //
+  // origBB:
+  //  ...
+  //  br %mergeBB
+  //
+  // mergeBB:
+  //  %gep = getelementptr ...;
+  //  %v = load ...;
+  //  br %next
+  BasicBlock *origBB = gepInst->getParent();
+  BasicBlock *mergeBB =
+      SplitBlock(origBB, gepInst->getIterator(), (DominatorTree *)nullptr,
+                 (LoopInfo *)nullptr, (MemorySSAUpdater *)nullptr,
+                 "partition." + arrName + ".merge" + Twine(accessIdx));
+  Instruction *placeholderBr = origBB->getTerminator();
+
+  IRBuilder<> preBuilder(placeholderBr);
+  Type *bankIdxTy = Type::getInt32Ty(ctx);
+  Value *origIdx32 =
+      origIdx->getType() == bankIdxTy
+          ? origIdx
+          : preBuilder.CreateTrunc(origIdx, bankIdxTy, "bank.idx.src");
+
+  // Computation of th bank that the index falls into
+  // NOTE: Only block partitioning needs the tooLarge addition, since cyclic
+  // automatically assign every index to a bin by using modular arithmetic
+  Value *bankIdxNative;
+  if (partInfo.style == CYCLIC) {
+    bankIdxNative = preBuilder.CreateURem(
+        origIdx32, ConstantInt::get(bankIdxTy, factor), "bank.idx");
+  } else { // "block" or "complete"
+    Value *raw = preBuilder.CreateUDiv(
+        origIdx32, ConstantInt::get(bankIdxTy, chunkSize), "bank.raw");
+    if (remainder != 0) {
+      Value *maxBank = ConstantInt::get(bankIdxTy, factor - 1);
+      Value *tooLarge = preBuilder.CreateICmpUGT(raw, maxBank);
+      bankIdxNative =
+          preBuilder.CreateSelect(tooLarge, maxBank, raw, "bank.idx");
+    } else {
+      bankIdxNative = raw;
+    }
+  }
+
+  // Normalize to i64 for the comparison chain below, regardless of addrTy.
+  // NOTE: I had issues with i32 vs i64 indices before
+  Value *bankIdx = bankIdxNative->getType() == bankIdxTy
+                       ? bankIdxNative
+                       : preBuilder.CreateZExtOrTrunc(bankIdxNative, bankIdxTy,
+                                                      "bank.idx.32");
+
+  placeholderBr->eraseFromParent();
+
+  // One basic block per bank for either load/store
+  std::vector<BasicBlock *> bankBBs;
+  bankBBs.reserve(factor);
+  for (unsigned bank = 0; bank < factor; ++bank)
+    bankBBs.push_back(BasicBlock::Create(
+        ctx, "partition." + arrName + "." + opKind + "." + Twine(bank), f));
+
+  if (factor == 1) {
+    IRBuilder<>(origBB).CreateBr(bankBBs[0]);
+  } else {
+    // if/else-if chain:
+    //   bankIdx == 0 ? bank0 : (bankIdx == 1 ? bank1 : ... : bank[factor-1])
+    BasicBlock *currentBB = origBB;
+    for (unsigned b = 0; b + 1 < factor; ++b) {
+      IRBuilder<> checkBuilder(currentBB);
+      Value *cmp = checkBuilder.CreateICmpEQ(
+          bankIdx, ConstantInt::get(bankIdxTy, b), "bank.cmp." + Twine(b));
+      bool isLastCheck = (b + 2 == factor);
+      BasicBlock *elseBB =
+          isLastCheck
+              ? bankBBs[factor - 1]
+              : BasicBlock::Create(
+                    ctx, "partition." + arrName + ".cmp." + Twine(b + 1), f);
+      checkBuilder.CreateCondBr(cmp, bankBBs[b], elseBB);
+      currentBB = elseBB;
+    }
+  }
+
+  // Body for the load/store basic blocks
+  std::vector<std::pair<BasicBlock *, Value *>> incoming;
+  for (unsigned b = 0; b < factor; ++b) {
+    IRBuilder<> caseBuilder(bankBBs[b]);
+    auto [firstIndex, step, elems] = bankInfo[b];
+
+    // Creation of bank specific target index
+    //   newTargetIdx = (origIdx - firstIndex) / step
+    // e.g. firstIndex=50, step=1 (block bank covering global 50..99):
+    //   %sub = sub i64 %origIdx, 50
+    //   %part.idx = udiv i64 %sub, 1        ; a[73] -> bank[23]
+    Value *newTargetIdx = caseBuilder.CreateUDiv(
+        caseBuilder.CreateSub(origIdx, ConstantInt::get(addrTy, firstIndex)),
+        ConstantInt::get(addrTy, step), "part.idx");
+
+    std::vector<Value *> newIndices;
+    newIndices.reserve(allIndices.size() + 1);
+    newIndices.push_back(ConstantInt::get(idxTy, 0));
+
+    for (unsigned d = 0; d < allIndices.size(); ++d) {
+      // Either take the original index or the newTargetIdx based on the
+      // calculation
+      auto *nextIndex =
+          d == partInfo.dimension - 1 ? newTargetIdx : allIndices[d];
+      newIndices.push_back(nextIndex);
+    }
+
+    Value *newGEP = caseBuilder.CreateInBoundsGEP(
+        banks[b]->getAllocatedType(), banks[b], newIndices, "part.gep");
+
+    if (load) {
+      LoadInst *newLoad = caseBuilder.CreateLoad(load->getType(), newGEP,
+                                                 load->getName() + ".part");
+      newLoad->setAlignment(load->getAlign());
+      incoming.emplace_back(bankBBs[b], newLoad);
+    } else if (store) {
+      StoreInst *newStore =
+          caseBuilder.CreateStore(store->getValueOperand(), newGEP);
+      newStore->setAlignment(store->getAlign());
+    }
+    caseBuilder.CreateBr(mergeBB);
+  }
+
+  // In case we were working with a load we need to unify using phi nodes
+  if (load) {
+    IRBuilder<> mergeBuilder(&mergeBB->front());
+    PHINode *phi = mergeBuilder.CreatePHI(load->getType(), factor,
+                                          load->getName() + ".merged");
+    for (auto &[bb, val] : incoming)
+      phi->addIncoming(val, bb);
+    load->replaceAllUsesWith(phi);
+  }
+
+  inst->eraseFromParent();
+  // Only conditionally delete the gep instruction. LLVM may reuse previous gep
+  // instructions to access different parts of the array, as such we should only
+  // delete once there is no use left for the calculated gep
+  if (gepInst->use_empty()) {
+    gepInst->eraseFromParent();
+  }
+}
+
+// Helper function for gathering type of inner arrays in multidimensional arrays
+ArrayType *getTargetDimType(Type *ty, unsigned dimension) {
+  for (unsigned i = 1; i < dimension; ++i) {
+    auto *at = dyn_cast<ArrayType>(ty);
+    if (!at)
+      llvm::report_fatal_error(
+          "__dyn_array_partition: dimension exceeds array rank");
+    ty = at->getElementType();
+  }
+  auto *at = dyn_cast<ArrayType>(ty);
+  if (!at)
+    llvm::report_fatal_error(
+        "__dyn_array_partition: dimension exceeds array rank");
+  return at;
+}
+
+// Recursive funtion for rebuilding the array type. Go through each dimension
+// and generate the corresponding array type
+Type *getPartitionedArrayType(Type *ty, unsigned dimension, unsigned numElems) {
+  auto *at = cast<ArrayType>(ty);
+  if (dimension == 1)
+    return ArrayType::get(at->getElementType(), numElems);
+  return ArrayType::get(
+      getPartitionedArrayType(at->getElementType(), dimension - 1, numElems),
+      at->getNumElements());
+}
+
+std::tuple<std::vector<AllocaInst *>, std::vector<DimInfo>>
+createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
+  // Get total size of the dimension we'd like to partition accross
+  unsigned totalSize =
+      getTargetDimType(baseAlloca->getAllocatedType(), info.dimension)
+          ->getArrayNumElements();
+
+  if (totalSize < 1) {
+    llvm::report_fatal_error(
+        "__dyn_array_partition: cannot partition a less than 1 length array");
+  }
+
+  unsigned factor = info.style == COMPLETE ? totalSize : info.factor;
+
+  if (factor == 0 || factor > totalSize) {
+    llvm::report_fatal_error("__dyn_array_partition: factor must be in [1, N]");
+  }
+
+  // Logic for determining bank partition numbers
+  unsigned chunkSize = totalSize / factor;
+  unsigned remainder = totalSize % factor;
+
+  std::vector<DimInfo> banks;
+  banks.reserve(factor);
+  if (info.style == BLOCK || info.style == COMPLETE) {
+    unsigned offset = 0;
+    for (unsigned bank = 0; bank < factor; ++bank) {
+      // Put all remaining elements into the last bank
+      unsigned elems = chunkSize + (bank + 1 == factor ? remainder : 0);
+      banks.emplace_back(offset, 1, elems);
+      offset += elems;
+    }
+  } else if (info.style == CYCLIC) {
+    for (unsigned bank = 0; bank < factor; ++bank) {
+      unsigned elems = chunkSize + (bank < remainder ? 1u : 0u);
+      banks.emplace_back(bank, factor, elems);
+    }
+  }
+
+  // Insertion of allocations
+  std::vector<AllocaInst *> bankAllocas;
+  bankAllocas.reserve(banks.size());
+
+  IRBuilder<> builder(baseAlloca->getNextNode());
+  for (auto &[firstIndex, step, elems] : banks) {
+    Type *bankType = getPartitionedArrayType(baseAlloca->getAllocatedType(),
+                                             info.dimension, elems);
+    AllocaInst *newAlloca = builder.CreateAlloca(
+        bankType, baseAlloca->getArraySize(), baseAlloca->getName());
+    newAlloca->setAlignment(baseAlloca->getAlign());
+    bankAllocas.push_back(newAlloca);
+  }
+
+  return {bankAllocas, banks};
+}
+
 } // namespace
 
+// NOTE: Simply inlines all functions that have the AlwaysInline attribute
+// Was previously done via a module pass, but since ArrayPartition is a function
+// pass we don't have the capability to run functions passes without much
+// boilerplate overhead, this could be reformed to a inlineAlwaysInline function
+// pass for uniformity
+static void inlineAlwaysInline(Function &f) {
+  bool inlinedSomething = true;
+  while (inlinedSomething) {
+    inlinedSomething = false;
+    for (auto &bb : f) {
+      for (auto &inst : bb) {
+        auto *call = dyn_cast<CallInst>(&inst);
+        if (!call) {
+          continue;
+        }
+        Function *callee = call->getCalledFunction();
+        if (!callee || !callee->hasFnAttribute(Attribute::AlwaysInline)) {
+          continue;
+        }
+        InlineFunctionInfo ifi;
+        InlineFunction(*call, ifi);
+        inlinedSomething = true;
+        break;
+      }
+      if (inlinedSomething) {
+        break;
+      }
+    }
+  }
+}
+
 struct ArrayPartition : PassInfoMixin<ArrayPartition> {
-
-  unsigned memCount = 0;
-
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &fam);
 };
 
@@ -632,26 +1282,33 @@ PreservedAnalyses ArrayPartition::run(Function &f,
                                       FunctionAnalysisManager &fam) {
 
   if (f.getName() == "main") {
-    llvm::errs()
-        << "Skipping main function for automatic array partitioning!\n";
+    LLVM_DEBUG(llvm::errs()
+               << "Skipping main function for automatic array partitioning!\n");
     return PreservedAnalyses::all();
   }
 
-  auto islCtx = isl::ctx(isl_ctx_alloc());
+  auto pragmaInfo = collectAndErasePragmaMarkers(f);
 
-  auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(f);
+  // Early return not to trigger all of the other opmtimizations
+  if (pragmaInfo.empty()) {
+    return PreservedAnalyses::all();
+  }
 
-  auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(f);
-
-  auto &aliasAnalysis = fam.getResult<AAManager>(f);
-
-  // Needed for constructing the global constants
-  Module *mod = f.getParent();
+  // Pre partition passes
+  // indvars -> loop-unrolling
+  // in order to benefit from the multiple banks
+  // NOTE: Loop unrolling is done with OnlyWhenForced = true, which deactivates
+  // llvm heuristics that might unroll loops it shouldn't, i.e. urolling loops
+  // without the unroll_count(N) attribute. Other parameters are taken from
+  // default LoopUnrollOptions used by the LLVM loop-unroll pass
+  FunctionPassManager preFPM;
+  preFPM.addPass(createFunctionToLoopPassAdaptor(IndVarSimplifyPass()));
+  preFPM.addPass(LoopUnrollPass(LoopUnrollOptions(
+      /*OptLevel=*/2, /*OnlyWhenForced=*/true, /*ForgetSCEV=*/false)));
+  preFPM.run(f, fam);
+  fam.invalidate(f, PreservedAnalyses::none());
 
   AccessInfo info;
-
-  std::deque<Region *> rq;
-  getAllRegions(*regionInfoAnalysis.getTopLevelRegion(), rq);
 
   for (auto &bb : f) {
     for (auto &inst : bb) {
@@ -662,67 +1319,60 @@ PreservedAnalyses ArrayPartition::run(Function &f,
     }
   }
 
-  Scop *s;
-  unsigned scopId = 0;
-  for (Region *r : rq) {
-    if ((s = scopInfoAnalysis.getScop(r))) {
-      for (auto &stmt : *s) {
-        for (auto *memAccess : stmt) {
-          auto *inst = memAccess->getAccessInstruction();
-
-          info.instToScopId[inst] = scopId;
-
-          // Find the access
-          auto *memoryAccess = stmt.getArrayAccessOrNULLFor(inst);
-
-          if (!memoryAccess) {
-            continue;
-          }
-
-          // Maps iteration indices to array access indices:
-          // example:
-          // stmt[i, j] -> A[i, j]
-          // stmt[i, j] -> B[i, j - 1]
-          // NOTE:
-          // - The base address might be different for different maps.
-          isl::map currentMap = memoryAccess->getLatestAccessRelation();
-
-          // The domain of the map, e.g., the loop bounds for the iterators.
-          isl::set domain = stmt.getDomain();
-
-          // The range of the map over the domain
-          // e.g.,
-          // - input: stmt[i, j] -> A[i, j] | i \in [0, N] and j \in [0, M]
-          // - output: A[i, j] | i \in [0, N] and j \in [0, M]
-          isl::set range = currentMap.intersect_domain(domain).range();
-          info.accessMaps[inst] = range;
-        }
-      }
-      scopId += 1;
-    }
-  }
-
-  // For each base address of the GEPs that are allocas (i.e., a separate RAM in
-  // HLS circuit), compute the optimal partitioning and create separate alloca
-  // instructions.
+  // Partition passes
   for (auto [base, insts] : info.baseToInsts) {
-    if (isa<Instruction>(base)) {
-      if (auto *allocaInst = dyn_cast<AllocaInst>(base)) {
-        // If the base is an alloca, we can partition it
-        partitionVariableAlloca(allocaInst, insts, info, aliasAnalysis, islCtx);
-      } else {
-        assert(false &&
-               "Base address of the GEP is not an alloca, cannot partition!");
+    auto it = pragmaInfo.find(base->getName().str());
+    if (it != pragmaInfo.end()) {
+      auto *baseAlloca = dyn_cast<AllocaInst>(base);
+      if (!baseAlloca) {
+        llvm::report_fatal_error(
+            Twine("__dyn_array_partition: only local (alloca) arrays are "
+                  "supported so far '") +
+            base->getName() + "' is not one");
       }
-    }
 
-    if (isa<Constant>(base)) {
-      if (auto *globVar = dyn_cast<GlobalVariable>(base)) {
-        // If the base is a global variable, we can partition it
-        partitionGlobalAlloca(mod, globVar, insts, info, aliasAnalysis, islCtx);
+      const PartitionInfo &partInfo = it->second;
+      auto [bankAllocas, bankInfo] =
+          createPartitionBankAllocas(baseAlloca, partInfo);
+
+      unsigned accessIdx = 0;
+      for (Instruction *inst : insts) {
+        rewriteAccessWithBranching(inst, baseAlloca, bankAllocas, bankInfo,
+                                   partInfo, accessIdx);
+        ++accessIdx;
       }
+      continue;
     }
   }
+
+  // Passes for guarded instcombine followed by inline to remove the guards.
+  // Guards are used here since instcombine might create GEP chains that are
+  // incompatible with the current llvm to mlir initial translation
+  FunctionPassManager guardedInstcombineFPM;
+  guardedInstcombineFPM.addPass(dynamatic::GuardLoadStorePass());
+  guardedInstcombineFPM.addPass(InstCombinePass());
+  guardedInstcombineFPM.run(f, fam);
+  inlineAlwaysInline(f);
+  fam.invalidate(f, PreservedAnalyses::none());
+
+  // Cleanup passes
+  // SSCP, SimplyfyCFG, SROA, ADCE
+  // all for simpler bank accesses, code elimination, optimizations
+  //
+  // PromotePass (mem2reg) for the complete partition scheme to eliminate sinlge
+  // element allocas
+  //
+  // LowerSwitchPass to ensure that there are now swtich statements remaining
+  // for the MLIR translation
+  FunctionPassManager cleanupFPM;
+  cleanupFPM.addPass(SCCPPass());
+  cleanupFPM.addPass(SimplifyCFGPass());
+  cleanupFPM.addPass(SROAPass(SROAOptions::ModifyCFG));
+  cleanupFPM.addPass(PromotePass());
+  cleanupFPM.addPass(ADCEPass());
+  cleanupFPM.addPass(LowerSwitchPass());
+  cleanupFPM.run(f, fam);
+
   return PreservedAnalyses::all();
 }
 

@@ -290,6 +290,7 @@ class CBCSolverFixture : public BaseFixture {};
 // Use FPL22 placement algorithm on a small subset of MiscBenchmarks
 class FPL22Fixture : public BaseFixture {};
 class MemoryFixture : public BaseFixture {};
+class MemoryPartitionFixture : public BaseFixture {};
 class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
@@ -361,6 +362,24 @@ TEST_P(MemoryFixture, basic) {
       .name = GetParam(),
       .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory",
+      .testVerilog = true,
+      .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+TEST_P(MemoryPartitionFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test" / "memory_partition",
       .testVerilog = true,
       .useSharing = false,
       .milpSolver = "gurobi",
@@ -781,6 +800,30 @@ INSTANTIATE_TEST_SUITE_P(
       "test_constant_array"
     ),
     [](const auto &info) { return "memory_" + info.param; });
+
+// Test suite for array partitioning is minimized
+// not to slow down the integration-test pipeline
+// too much. The kernels for the tests can still
+// be found in integration-test/memory_partition
+INSTANTIATE_TEST_SUITE_P(
+    MemoryPartitionBenchmarks, MemoryPartitionFixture,
+    testing::Values(
+      // "test_cyclic_1d_factor2",
+      // "test_cyclic_1d_factor3",
+      // "test_cyclic_1d_factor4_no_unroll",
+      // "test_cyclic_1d_factor5_partial_unroll",
+      // "test_cyclic_1d_factor8_full_unroll",
+      // "test_cyclic_1d_two_arrays_factor",
+      "test_cyclic_2d_inner",
+      // "test_cyclic_2d_outer",
+      // "test_block_1d_factor2",
+      // "test_block_1d_factor4",
+      // "test_block_1d_factor8",
+      // "test_block_2d_outer",
+      "test_block_2d_inner",
+      "test_complete_1d"
+    ),
+    [](const auto &info) { return "memory_partition_" + info.param; });
 
 INSTANTIATE_TEST_SUITE_P(SharingUnitTests, SharingUnitTestFixture,
     testing::Values(
