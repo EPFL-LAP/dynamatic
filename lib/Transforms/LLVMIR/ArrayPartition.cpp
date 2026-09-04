@@ -765,8 +765,8 @@ std::map<std::string, PartitionInfo> collectAndErasePragmaMarkers(Function &f) {
 }
 
 // Recovers index values of a possibly chained GEP without assuming a particular
-// shape to the GEPs themselves. This collection of indices is used to create the
-// branching logic for the bank accesses.
+// shape to the GEPs themselves. This collection of indices is used to create
+// the branching logic for the bank accesses.
 //
 // C:
 //   int a[5][6][7];
