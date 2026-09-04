@@ -14,6 +14,8 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -121,6 +123,60 @@ struct AccessInfo {
     return instToScopId.count(i) == instToScopId.count(j);
   }
 };
+
+// Simple helper function to determine if base pointer belongs to local array or
+// global
+Type *getStorageType(Value *base) {
+  if (auto *allocaInst = dyn_cast<AllocaInst>(base)) {
+    return allocaInst->getAllocatedType();
+  }
+  if (auto *globalVariable = dyn_cast<GlobalVariable>(base)) {
+    return globalVariable->getValueType();
+  }
+  llvm::report_fatal_error("__dyn_array_partition: Unsupported storage type");
+}
+
+// Recursively descends nested ConstantArrays until reaching targetDim (0
+// depth = outermost), then slices that dimension to the given
+// (firstIndex, step, elems), leaving all other dimensions untouched:
+//
+// int A[3][4] = {{1,2,3,4}, {5,6,7,8}, {9,10,11,12}};
+//
+// sliceGlobalInitializer(init, depth=0, targetDim=0, firstIndex=1, step=1,
+// elems=2)
+// =>
+// {{5,6,7,8}, {9,10,11,12}}
+//
+// sliceGlobalInitializer(init, depth=0, targetDim=1, firstIndex=1, step=2,
+// elems=2)
+// =>
+// {{2,4}, {6,8}, {10,12}}
+Constant *sliceGlobalInitializer(Constant *init, unsigned depth,
+                                 unsigned targetDim, unsigned firstIndex,
+                                 unsigned step, unsigned elems) {
+  auto *arrType = cast<ArrayType>(init->getType());
+  if (depth == targetDim) {
+    std::vector<Constant *> sliced;
+    sliced.reserve(elems);
+    for (unsigned i = 0; i < elems; i++) {
+      sliced.push_back(init->getAggregateElement(firstIndex + step * i));
+    }
+    Type *elemType = sliced.front()->getType();
+    return ConstantArray::get(ArrayType::get(elemType, elems), sliced);
+  }
+
+  std::vector<Constant *> rebuilt;
+  rebuilt.reserve(arrType->getNumElements());
+
+  for (unsigned i = 0; i < arrType->getNumElements(); i++) {
+    rebuilt.push_back(sliceGlobalInitializer(init->getAggregateElement(i),
+                                             depth + 1, targetDim, firstIndex,
+                                             step, elems));
+  }
+  Type *innterType = rebuilt.front()->getType();
+  return ConstantArray::get(ArrayType::get(innterType, rebuilt.size()),
+                            rebuilt);
+}
 
 Value *findBaseInternal(Value *addr) {
   if (auto *arg = dyn_cast<Argument>(addr)) {
@@ -535,8 +591,7 @@ void partitionVariableAlloca(llvm::AllocaInst *baseAlloca,
       range = range.unite(instRange);
     }
 
-    auto dimInfo =
-        extractDimInfo(range.as_set(), baseAlloca->getAllocatedType());
+    auto dimInfo = extractDimInfo(range.as_set(), getStorageType(baseAlloca));
 
     auto *newAlloca = createAlloca(baseAlloca, dimInfo);
 
@@ -936,13 +991,13 @@ std::vector<Value *> decomposeGEPIndices(GetElementPtrInst *gepInst,
 //  }
 //  NOTE: This is should be resolved/unrolled later on by LLVM automiatically
 //  via opitmization such that there is no branching logic remaining
-void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
-                                ArrayRef<AllocaInst *> banks,
+void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
+                                ArrayRef<Value *> banks,
                                 ArrayRef<DimInfo> bankInfo,
                                 const PartitionInfo &partInfo,
                                 unsigned accessIdx) {
 
-  StringRef arrName = baseAlloca->getName();
+  StringRef arrName = baseStorage->getName();
 
   Instruction *baseGEPOrInst = findBaseGEP(inst);
   auto *gepInst = dyn_cast<GetElementPtrInst>(baseGEPOrInst);
@@ -979,7 +1034,7 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
 
   Type *idxTy = Type::getInt64Ty(ctx);
   std::vector<Value *> allIndices =
-      decomposeGEPIndices(gepInst, baseAlloca->getAllocatedType(), idxTy);
+      decomposeGEPIndices(gepInst, getStorageType(baseStorage), idxTy);
 
   if (partInfo.dimension < 1 || partInfo.dimension > allIndices.size()) {
     llvm::report_fatal_error(
@@ -1124,7 +1179,7 @@ void rewriteAccessWithBranching(Instruction *inst, AllocaInst *baseAlloca,
     }
 
     Value *newGEP = caseBuilder.CreateInBoundsGEP(
-        banks[b]->getAllocatedType(), banks[b], newIndices, "part.gep");
+        getStorageType(banks[b]), banks[b], newIndices, "part.gep");
 
     if (load) {
       LoadInst *newLoad = caseBuilder.CreateLoad(load->getType(), newGEP,
@@ -1185,12 +1240,22 @@ Type *getPartitionedArrayType(Type *ty, unsigned dimension, unsigned numElems) {
       at->getNumElements());
 }
 
-std::tuple<std::vector<AllocaInst *>, std::vector<DimInfo>>
-createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
-  // Get total size of the dimension we'd like to partition accross
-  unsigned totalSize =
-      getTargetDimType(baseAlloca->getAllocatedType(), info.dimension)
-          ->getArrayNumElements();
+// Given the base of the storage type (either global or local array) and
+// partition information produces information about all banks:
+//
+// Each entry is a DimInfo = (firstIndex, step, elems)
+//
+// Block partition factor 4 array with 15 elements
+// =>
+// banks = [(0, 1, 3), (3, 1, 3), (6, 1, 3), (9, 1, 6)]
+//
+// Cyclic partition factor 4 array with 15 elements
+// =>
+// banks = [(0, 4, 4), (1, 4, 4), (2, 4, 4), (3, 4, 3)]
+//
+std::vector<DimInfo> banksFromStorage(Value *base, const PartitionInfo &info) {
+  unsigned totalSize = getTargetDimType(getStorageType(base), info.dimension)
+                           ->getArrayNumElements();
 
   if (totalSize < 1) {
     llvm::report_fatal_error(
@@ -1203,7 +1268,6 @@ createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
     llvm::report_fatal_error("__dyn_array_partition: factor must be in [1, N]");
   }
 
-  // Logic for determining bank partition numbers
   unsigned chunkSize = totalSize / factor;
   unsigned remainder = totalSize % factor;
 
@@ -1223,14 +1287,68 @@ createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
       banks.emplace_back(bank, factor, elems);
     }
   }
+  return banks;
+}
 
+// Create the different banks for a global array:
+// LLVMIR:
+// @A = dso_local constant [4 x i32] [i32 1, i32 2, i32 3, i32 4], align 16
+//
+// With factor 2 cyclic partition
+// =>
+// @A.bank.0 = internal constant [2 x i32] [i32 1, i32 3], align 16
+// @A.bank.1 = internal constant [2 x i32] [i32 2, i32 4], align 16
+std::tuple<std::vector<GlobalVariable *>, std::vector<DimInfo>>
+createPartitionBankGlobals(GlobalVariable *baseGlobal,
+                           const PartitionInfo &info) {
+
+  std::vector<DimInfo> banks = banksFromStorage(baseGlobal, info);
+
+  Module *mod = baseGlobal->getParent();
+  Constant *origInit =
+      baseGlobal->hasInitializer() ? baseGlobal->getInitializer() : nullptr;
+
+  std::vector<GlobalVariable *> bankGlobals;
+  unsigned bankIdx = 0;
+  for (auto &[firstIndex, step, elems] : banks) {
+    Type *bankType = getPartitionedArrayType(baseGlobal->getValueType(),
+                                             info.dimension, elems);
+    Constant *bankInit =
+        origInit
+            ? sliceGlobalInitializer(origInit, /*depth=*/0, info.dimension - 1,
+                                     firstIndex, step, elems)
+            : nullptr;
+    auto *newGV = new GlobalVariable(
+        *mod, bankType, baseGlobal->isConstant(), GlobalValue::InternalLinkage,
+        bankInit, baseGlobal->getName() + ".bank." + Twine(bankIdx));
+    newGV->setAlignment(baseGlobal->getAlign().valueOrOne());
+    bankGlobals.push_back(newGV);
+    bankIdx++;
+  }
+  return {bankGlobals, banks};
+}
+
+// Create the different banks for a local array called intermediate:
+// LLVMIR:
+// entry:
+//    %intermediate = alloca [4 x i32], align 16
+//
+// With factor 2 cyclic partition
+// =>
+// entry:
+//   %intermediate1 = alloca [2 x i32], align 16
+//   %intermediate2 = alloca [2 x i32], align 16
+std::tuple<std::vector<AllocaInst *>, std::vector<DimInfo>>
+createPartitionBankAllocas(AllocaInst *baseAlloca, const PartitionInfo &info) {
+
+  std::vector<DimInfo> banks = banksFromStorage(baseAlloca, info);
   // Insertion of allocations
   std::vector<AllocaInst *> bankAllocas;
   bankAllocas.reserve(banks.size());
 
   IRBuilder<> builder(baseAlloca->getNextNode());
   for (auto &[firstIndex, step, elems] : banks) {
-    Type *bankType = getPartitionedArrayType(baseAlloca->getAllocatedType(),
+    Type *bankType = getPartitionedArrayType(getStorageType(baseAlloca),
                                              info.dimension, elems);
     AllocaInst *newAlloca = builder.CreateAlloca(
         bankType, baseAlloca->getArraySize(), baseAlloca->getName());
@@ -1322,26 +1440,54 @@ PreservedAnalyses ArrayPartition::run(Function &f,
   // Partition passes
   for (auto [base, insts] : info.baseToInsts) {
     auto it = pragmaInfo.find(base->getName().str());
-    if (it != pragmaInfo.end()) {
-      auto *baseAlloca = dyn_cast<AllocaInst>(base);
-      if (!baseAlloca) {
-        llvm::report_fatal_error(
-            Twine("__dyn_array_partition: only local (alloca) arrays are "
-                  "supported so far '") +
-            base->getName() + "' is not one");
-      }
-
-      const PartitionInfo &partInfo = it->second;
-      auto [bankAllocas, bankInfo] =
-          createPartitionBankAllocas(baseAlloca, partInfo);
-
-      unsigned accessIdx = 0;
-      for (Instruction *inst : insts) {
-        rewriteAccessWithBranching(inst, baseAlloca, bankAllocas, bankInfo,
-                                   partInfo, accessIdx);
-        ++accessIdx;
-      }
+    // If the array name can't be found continue to next array name
+    if (it == pragmaInfo.end()) {
       continue;
+    }
+
+    const PartitionInfo &partInfo = it->second;
+    std::vector<Value *> bankStorage;
+    std::vector<DimInfo> bankInfo;
+    // Either the base corresponds to a global array or an alloca of a local
+    // array.
+    if (auto *baseAlloca = dyn_cast<AllocaInst>(base)) {
+      auto [bankAllocas, info] =
+          createPartitionBankAllocas(baseAlloca, partInfo);
+      bankStorage.assign(bankAllocas.begin(), bankAllocas.end());
+      bankInfo = std::move(info);
+    } else if (auto *baseGlobal = dyn_cast<GlobalVariable>(base)) {
+      auto [bankGlobals, info] =
+          createPartitionBankGlobals(baseGlobal, partInfo);
+      bankStorage.assign(bankGlobals.begin(), bankGlobals.end());
+      bankInfo = std::move(info);
+    } else {
+      llvm::report_fatal_error(
+          Twine(
+              "__dyn_array_partition: only local (alloca) or global arrays are "
+              "supported so far '") +
+          base->getName() + "' is neither");
+    }
+
+    unsigned accessIdx = 0;
+    for (Instruction *inst : insts) {
+      rewriteAccessWithBranching(inst, base, bankStorage, bankInfo, partInfo,
+                                 accessIdx);
+      ++accessIdx;
+    }
+
+    // Erasure of unused arrays.
+    // NOTE: Adding a module pass of the form
+    // function(array-partition),globaldce did not work as we need the global
+    // arrays to be internalized first (pass called internalize). This breaks
+    // the form expected by translate to std though because the kernel entry
+    // might be reformed. Simpyly deleting unused arrays of globalor local
+    // variant here is easiest but has to be documented as a side effect.
+    if (base->use_empty()) {
+      if (auto *gv = dyn_cast<GlobalVariable>(base)) {
+        gv->eraseFromParent();
+      } else if (auto *ai = dyn_cast<AllocaInst>(base)) {
+        ai->eraseFromParent();
+      }
     }
   }
 
