@@ -46,6 +46,8 @@ architecture arch_32_2_034000 of mulf_arch_32_2_034000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -181,6 +183,8 @@ architecture arch_32_2_783000 of mulf_arch_32_2_783000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -295,6 +299,8 @@ architecture arch_32_2_875333 of mulf_arch_32_2_875333 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -406,6 +412,8 @@ architecture arch_64_2_046000 of mulf_arch_64_2_046000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -572,6 +580,8 @@ architecture arch_64_2_758000 of mulf_arch_64_2_758000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -687,6 +697,8 @@ architecture arch_64_4_242333 of mulf_arch_64_4_242333 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
