@@ -59,7 +59,8 @@ using namespace dynamatic::experimental::ftd;
 struct ConvertPredicateOp
     : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::PredicateOp> {
   using DynOpConversionPattern<dynamatic::cf_extra::PredicateOp>::DynOpConversionPattern;
-
+  
+  // Convert the inputs and outputs of all PredicateOps into handshake channels
   mlir::LogicalResult
   matchAndRewrite(dynamatic::cf_extra::PredicateOp srcOp, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
@@ -453,13 +454,13 @@ struct FtdCfToHandshakePass
       ftd::finalizeCondPlaceholders(funcOp);
 
       shadow.destroy();
-      llvm::errs() << "kinda done\n";
 
+      // Iterate over all store operations
       for (auto storeOp : llvm::make_early_inc_range(
               funcOp.getOps<handshake::StoreOp>())) {
-        storeOp.dump();
         OpBuilder builder(storeOp);
 
+        // We only care about store operations that have a predicateOp in front
         Value currData = storeOp.getData();
         auto firstPred = currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>();
         if (!firstPred)
@@ -469,7 +470,7 @@ struct FtdCfToHandshakePass
         if (auto predNameAttr = firstPred->getAttrOfType<StringAttr>("handshake.name"))
           basePredName = predNameAttr.getValue().str();
 
-        // 1. Unroll the predicate chain on the data operand
+        // collect the chained predicate conditions
         SmallVector<Value> conds;
         SmallVector<dynamatic::cf_extra::PredicateOp> predsToErase;
         while (auto predOp = currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>()) {
@@ -481,7 +482,7 @@ struct FtdCfToHandshakePass
         }
         Value rawData = currData;
 
-        // 2. Build ONE OrIOp tree combining all loop conditions
+        // combine multiple nested conditions into a single condition with Ors
         builder.setInsertionPoint(storeOp);
         Value combinedCond = conds[0];
         for (size_t i = 1; i < conds.size(); ++i) {
@@ -491,7 +492,7 @@ struct FtdCfToHandshakePass
           combinedCond = orOp.getResult();
         }
 
-        // 3. Create the Data suppressor branch using combinedCond
+        // create the data suppressor branch using combinedCond
         auto dataBranch = builder.create<handshake::ConditionalBranchOp>(
             storeOp.getLoc(), combinedCond, rawData);
         dataBranch->setAttr("store_suppressor", builder.getUnitAttr());
@@ -502,7 +503,7 @@ struct FtdCfToHandshakePass
         // Set the store's data operand
         storeOp.getDataMutable().assign(dataBranch.getFalseResult());
 
-        // 4. Create matching Address suppressor branch using the SAME combinedCond
+        // create the matching Address suppressor branch using the same condition
         Value currentAddr = storeOp.getAddress();
         auto addrBranch = builder.create<handshake::ConditionalBranchOp>(
             storeOp.getLoc(), combinedCond, currentAddr);
@@ -512,11 +513,9 @@ struct FtdCfToHandshakePass
         addrBranch->setAttr("handshake.name", builder.getStringAttr(addrBranchName));
 
         // Set the store's address operand
-        storeOp.getAddressMutable().assign(addrBranch.getFalseResult());
+        storeOp.getAddressMutable().assign(addrBranch.getFalseResult());        
 
-        
-
-        // 5. Erase all lowered PredicateOps
+        // erase all cf_extra::PredicateOps
         for (auto predOp : predsToErase)
           predOp.erase();
       }
