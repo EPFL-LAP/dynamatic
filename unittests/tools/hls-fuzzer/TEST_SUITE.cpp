@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "hls-fuzzer/BasicCGenerator.h"
+#include "hls-fuzzer/ConjunctionTypeSystem.h"
+#include "hls-fuzzer/OptionalTypeSystem.h"
 #include "hls-fuzzer/TypeSystem.h"
 
 using namespace dynamatic;
@@ -317,10 +319,156 @@ public:
   constexpr static auto entryContext = ForwardStatementsState{};
 };
 
+/// Type system whose typing context is the value that a generated constant is
+/// required to have. Constants are the only AST node it allows.
+///
+/// It is therefore only usable in conjunction with a type system generating the
+/// rest of the program, such as 'PlusExpressionTypeSystem'.
+class SpecificConstantTypeSystem final
+    : public gen::DisallowByDefaultTypeSystem</*requiredValue=*/std::uint32_t,
+                                              SpecificConstantTypeSystem> {
+public:
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
+
+  /// Replaces whatever constant the generator suggested with the one required
+  /// by the context.
+  static std::optional<ast::Constant>
+  discardConstant(const ast::Constant &, std::uint32_t requiredValue) {
+    return ast::Constant{requiredValue};
+  }
+};
+
+// State denoting whether a plus expression still has to be generated or
+// whether one of its operands is currently being generated.
+enum class PlusExpressionState {
+  PlusNeeded,
+  OperandNeeded,
+};
+
+/// Type system generating a single 'uint32_t' plus expression whose operands
+/// are constants.
+///
+/// Note that this type system does not constrain the value of the operands. It
+/// is meant to be used in conjunction with a type system doing so, such as
+/// 'SpecificConstantTypeSystem'.
+class PlusExpressionTypeSystem final
+    : public gen::DisallowByDefaultTypeSystem<PlusExpressionState,
+                                              PlusExpressionTypeSystem> {
+public:
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
+
+  static bool discardBinaryExpression(ast::BinaryExpression::Op op,
+                                      PlusExpressionState state) {
+    return op != ast::BinaryExpression::Plus ||
+           state != PlusExpressionState::PlusNeeded;
+  }
+
+  gen::TransferFnArray<ast::BinaryExpression>
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op) override {
+    return {
+        /*lhs=*/TransferFn<ast::BinaryExpression>(
+            PlusExpressionState::OperandNeeded),
+        /*rhs=*/
+        TransferFn<ast::BinaryExpression>(PlusExpressionState::OperandNeeded),
+        /*output=*/copyInputToOutput<ast::BinaryExpression>(),
+    };
+  }
+
+  /// Constants are only legal as operands of the plus expression. This forces
+  /// the plus expression to be generated first.
+  static std::optional<ast::Constant>
+  discardConstant(const ast::Constant &constant, PlusExpressionState state) {
+    if (state == PlusExpressionState::PlusNeeded)
+      return std::nullopt;
+
+    return constant;
+  }
+
+  static bool discardScalarType(const ast::ScalarType &scalarType,
+                                PlusExpressionState) {
+    return scalarType != ast::PrimitiveType::UInt32;
+  }
+
+  bool discardReturnType(const ast::ReturnType &returnType,
+                         PlusExpressionState state) {
+    if (llvm::isa<ast::VoidType>(returnType))
+      return true;
+
+    return TypeSystem::discardReturnType(returnType, state);
+  }
+
+  constexpr static auto entryContext = PlusExpressionState::PlusNeeded;
+};
+
+/// Conjunction of 'PlusExpressionTypeSystem' and an optional
+/// 'SpecificConstantTypeSystem'.
+/// The former decides the shape of the program, the latter the value of the
+/// constants within it. The constant type system is disabled outside the
+/// operands of the plus expression, where it is enabled by transfer functions
+/// of this type system: the left-hand side is required to be '0', the
+/// right-hand side that value plus one.
+/// The constant type system is disabled by default and only enabled where a
+/// constant with a specific value is required.
+using OptionalConstantTypeSystem =
+    gen::OptionalTypeSystem<SpecificConstantTypeSystem>;
+
+class ZeroPlusOneTypeSystem final
+    : public gen::ConjunctionTypeSystemBase<ZeroPlusOneTypeSystem,
+                                            OptionalConstantTypeSystem,
+                                            PlusExpressionTypeSystem> {
+
+public:
+  ZeroPlusOneTypeSystem()
+      : ConjunctionTypeSystemBase(SpecificConstantTypeSystem(),
+                                  PlusExpressionTypeSystem()) {}
+
+  gen::TransferFnArray<ast::BinaryExpression>
+  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
+    gen::TransferFnArray<ast::BinaryExpression> transferFns =
+        ConjunctionTypeSystemBase::getBinaryExpressionTransferFns(op);
+
+    // Enable the constant type system for both operands: the left-hand side
+    // is required to be '0'...
+    crossTransferFns<ast::BinaryExpression::LHS, OptionalConstantTypeSystem>(
+        transferFns, [] { return 0; });
+    // ...while the right-hand side derives its required value from the one of
+    // the left-hand side, forcing the latter to be generated first.
+    crossTransferFns<
+        ast::BinaryExpression::RHS, OptionalConstantTypeSystem,
+        Dep<OptionalConstantTypeSystem, ast::BinaryExpression::LHS>,
+        // Note: Redundant contexts that are not used, but used to test that it
+        // can also depend on the RHS of another typesystem and its own!
+        Dep<PlusExpressionTypeSystem, ast::BinaryExpression::RHS>,
+        Dep<OptionalConstantTypeSystem, ast::BinaryExpression::RHS>>(
+        transferFns,
+        [](const OptionalConstantTypeSystem::Context &lhsContext,
+           const PlusExpressionTypeSystem::Context &rhsContext,
+           const OptionalConstantTypeSystem::Context &rhsContextAgain) {
+          (void)rhsContext;
+          (void)rhsContextAgain;
+
+          return *lhsContext + 1;
+        });
+
+    return transferFns;
+  }
+
+  constexpr static std::string_view result =
+      R"(uint32_t test() {
+  return ((0u) + (1u));
+}
+)";
+
+  /// The constant type system is initially disabled.
+  constexpr static Context entryContext = {
+      std::nullopt, PlusExpressionTypeSystem::entryContext};
+};
+
 } // namespace
 
-using MyTypes = ::testing::Types<PlusOfTwoParamOnlyTypeSystem,
-                                 ReturnArrayConstantOnlyTypeSystem,
-                                 ForwardStatementsTypeSystem>;
+using MyTypes =
+    ::testing::Types<PlusOfTwoParamOnlyTypeSystem,
+                     ReturnArrayConstantOnlyTypeSystem,
+                     ForwardStatementsTypeSystem, ZeroPlusOneTypeSystem>;
 #pragma clang diagnostic ignored "-Wvariadic-macro-arguments-omitted"
 INSTANTIATE_TYPED_TEST_SUITE_P(All, TypeSystemTest, MyTypes);

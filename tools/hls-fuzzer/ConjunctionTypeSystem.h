@@ -39,13 +39,13 @@ public:
       : typeSystems(std::move(subTypeSystems)...) {}
 
   TransferFnArray<ast::Function> getFunctionTransferFns() override {
-    return combineGetTransferFns<ast::Function>(
+    return combineGetTransferFns(
         [&](auto &&typeSystem) { return typeSystem.getFunctionTransferFns(); });
   }
 
   TransferFnArray<ast::ReturnStatement>
   getReturnStatementTransferFns() override {
-    return combineGetTransferFns<ast::ReturnStatement>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getReturnStatementTransferFns();
     });
   }
@@ -60,7 +60,7 @@ public:
   }
 
   TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() override {
-    return combineGetTransferFns<ast::ScalarType>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getScalarTypeTransferFns();
     });
   }
@@ -75,7 +75,7 @@ public:
   }
 
   TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() override {
-    return combineGetTransferFns<ast::ReturnType>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getReturnTypeTransferFns();
     });
   }
@@ -91,7 +91,7 @@ public:
 
   TransferFnArray<ast::BinaryExpression>
   getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
-    return combineGetTransferFns<ast::BinaryExpression>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getBinaryExpressionTransferFns(op);
     });
   }
@@ -107,7 +107,7 @@ public:
 
   TransferFnArray<ast::UnaryExpression>
   getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override {
-    return combineGetTransferFns<ast::UnaryExpression>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getUnaryExpressionTransferFns(op);
     });
   }
@@ -121,7 +121,7 @@ public:
   }
 
   TransferFnArray<ast::Variable> getVariableTransferFns() override {
-    return combineGetTransferFns<ast::Variable>(
+    return combineGetTransferFns(
         [&](auto &&typeSystem) { return typeSystem.getVariableTransferFns(); });
   }
 
@@ -134,7 +134,7 @@ public:
   }
 
   TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
-    return combineGetTransferFns<ast::CastExpression>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getCastExpressionTransferFns();
     });
   }
@@ -149,10 +149,9 @@ public:
 
   TransferFnArray<ast::ConditionalExpression>
   getConditionalExpressionTransferFns() override {
-    return combineGetTransferFns<ast::ConditionalExpression>(
-        [&](auto &&typeSystem) {
-          return typeSystem.getConditionalExpressionTransferFns();
-        });
+    return combineGetTransferFns([&](auto &&typeSystem) {
+      return typeSystem.getConditionalExpressionTransferFns();
+    });
   }
 
   std::optional<ast::Constant> discardConstant(const ast::Constant &constant,
@@ -166,7 +165,7 @@ public:
   }
 
   TransferFnArray<ast::Constant> getConstantTransferFns() override {
-    return combineGetTransferFns<ast::Constant>(
+    return combineGetTransferFns(
         [&](auto &&typeSystem) { return typeSystem.getConstantTransferFns(); });
   }
 
@@ -181,10 +180,9 @@ public:
 
   TransferFnArray<ast::ExistingScalarParameter>
   getExistingScalarParameterTransferFns() override {
-    return combineGetTransferFns<ast::ExistingScalarParameter>(
-        [&](auto &&typeSystem) {
-          return typeSystem.getExistingScalarParameterTransferFns();
-        });
+    return combineGetTransferFns([&](auto &&typeSystem) {
+      return typeSystem.getExistingScalarParameterTransferFns();
+    });
   }
 
   bool discardFreshScalarParameter(const Context &context) {
@@ -197,7 +195,7 @@ public:
 
   TransferFnArray<ast::ScalarParameter>
   getFreshScalarParameterTransferFns() override {
-    return combineGetTransferFns<ast::ScalarParameter>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getFreshScalarParameterTransferFns();
     });
   }
@@ -212,10 +210,9 @@ public:
 
   TransferFnArray<ast::ArrayReadExpression>
   getArrayReadExpressionTransferFns() override {
-    return combineGetTransferFns<ast::ArrayReadExpression>(
-        [&](auto &&typeSystem) {
-          return typeSystem.getArrayReadExpressionTransferFns();
-        });
+    return combineGetTransferFns([&](auto &&typeSystem) {
+      return typeSystem.getArrayReadExpressionTransferFns();
+    });
   }
 
   bool discardExistingArrayParameter(const ast::ArrayParameter &parameter,
@@ -229,10 +226,9 @@ public:
 
   TransferFnArray<ast::ExistingArrayParameter>
   getExistingArrayParameterTransferFns() override {
-    return combineGetTransferFns<ast::ExistingArrayParameter>(
-        [&](auto &&typeSystem) {
-          return typeSystem.getExistingArrayParameterTransferFns();
-        });
+    return combineGetTransferFns([&](auto &&typeSystem) {
+      return typeSystem.getExistingArrayParameterTransferFns();
+    });
   }
 
   bool discardFreshArrayParameter(const Context &context) {
@@ -255,17 +251,16 @@ public:
 
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
-    return combineGetTransferFns<ast::ArrayParameter>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getFreshArrayParameterTransferFns();
     });
   }
 
   TransferFnArray<ast::ArrayAssignmentStatement>
   getArrayAssignmentStatementTransferFns() override {
-    return combineGetTransferFns<ast::ArrayAssignmentStatement>(
-        [&](auto &&typeSystem) {
-          return typeSystem.getArrayAssignmentStatementTransferFns();
-        });
+    return combineGetTransferFns([&](auto &&typeSystem) {
+      return typeSystem.getArrayAssignmentStatementTransferFns();
+    });
   }
 
   bool discardScalarAssignmentStatement(const Context &context) {
@@ -278,10 +273,9 @@ public:
 
   TransferFnArray<ast::ScalarAssignmentStatement>
   getScalarAssignmentStatementTransferFns() override {
-    return combineGetTransferFns<ast::ScalarAssignmentStatement>(
-        [&](auto &&typeSystem) {
-          return typeSystem.getScalarAssignmentStatementTransferFns();
-        });
+    return combineGetTransferFns([&](auto &&typeSystem) {
+      return typeSystem.getScalarAssignmentStatementTransferFns();
+    });
   }
 
   bool discardStatementList(const Context &context) {
@@ -293,7 +287,7 @@ public:
   }
 
   TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
-    return combineGetTransferFns<ast::StatementList>([&](auto &&typeSystem) {
+    return combineGetTransferFns([&](auto &&typeSystem) {
       return typeSystem.getStatementListTransferFns();
     });
   }
@@ -308,10 +302,9 @@ public:
 
   TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() override {
-    return combineGetTransferFns<ast::StructuredForStatement>(
-        [&](auto &&typeSystem) {
-          return typeSystem.getStructuredForStatementTransferFns();
-        });
+    return combineGetTransferFns([&](auto &&typeSystem) {
+      return typeSystem.getStructuredForStatementTransferFns();
+    });
   }
 
   ProbabilityTable<AbstractTypeSystem::ExpressionKey>
@@ -333,6 +326,195 @@ public:
   }
 
 protected:
+  /// Class used to denote dependencies on both other sub elements and a
+  /// specific type system of theirs.
+  template <typename TypeSystem, std::size_t i>
+  struct Dep {
+    using type = TypeSystem;
+    constexpr static std::size_t index = i;
+  };
+
+  /// Utility function that can be used to cross transfer function dependencies
+  /// between different type systems.
+  /// By default, every type system is run independently from each other with
+  /// contexts of each having no influence on any others.
+  ///
+  /// This method makes it possible for the class implementing the conjunction
+  /// to implement logic that modifies the input context of 'subElement'
+  /// of an 'ASTNode' (deduced from its transfer functions).
+  ///
+  /// One call crosses exactly one sub element ('subElement') of exactly one sub
+  /// type system ('SubTypeSystem'): only the context of 'SubTypeSystem' for
+  /// 'subElement' is replaced, all other contexts are left as calculated by
+  /// their own type systems.
+  /// Crossing multiple type systems or multiple sub elements is done by simply
+  /// calling this function once for each of them. Calls compose, i.e. a later
+  /// call for the same 'subElement' sees the contexts calculated by all
+  /// previous calls.
+  ///
+  /// Use cases e.g. include being able to enable an optional type system for
+  /// 'subElement' based on a context value of another type system or having one
+  /// type system that performs analysis, another that heavily restricts the
+  /// generated program and letting the analysis inform the latter how to now
+  /// restrict the generation of 'subElement'.
+  ///
+  /// 'conjunctionTransferFns' is the transfer function array of the conjunction
+  /// (i.e. whatever the corresponding 'ConjunctionTypeSystemBase::get*
+  /// TransferFns' returned) and is modified in place.
+  ///
+  /// 'crossingFunc' is the callable implementing the crossing. It is of the
+  /// form:
+  ///   SubTypeSystem::Context(const DepTypeSystemContext&...).
+  /// where 'SubTypeSystem' is the type system whose context should be modified.
+  /// The arguments are deduced from 'dependencies' which must be instances
+  /// of 'Dep'.
+  /// It allows adding extra dependencies on other 'ASTNode's context of a
+  /// specific type system.
+  ///
+  /// Example:
+  ///   crossTransferFns<ast::ScalarAssignment::VALUE, BitWidthTypeSystem,
+  ///                    Dep<LoopRecognitionTypeSystem, INPUT_DEPENDENCY>>
+  ///                    (scalarAssignmentTransferFns,
+  ///                     [](const LoopRecognitionContext& context) {
+  ///                       if (context.isInnerMostLoop)
+  ///                         return BitWidthContext{.bitwidth = 5};
+  ///                       return BitWidthContext{.bitwidth = 10};
+  ///                    });
+  ///
+  /// This transfer function crossing e.g. makes it such that the bitwidth of
+  /// expressions within values of a scalar assignment is 5 iff in an innermost
+  /// loop (as determined by the 'LoopRecognitionTypeSystem'), 10 otherwise.
+  ///
+  /// Unlike in e.g. 'TransferFn's, the dependencies:
+  /// * Do not capture the AST elements (this should be done by the sub type
+  ///   systems)
+  /// * May depend on themselves (e.g. the example above is allowed to have a
+  ///   Dep<..., ast::ScalarAssignment::VALUE> without causing a cycle).
+  ///   In that case the input context that the given type system calculated
+  ///   for 'subElement' is returned.
+  ///
+  /// It's the users responsibility to make sure no cyclic dependencies are
+  /// introduced and that the contexts are modified in a way that holds up the
+  /// given type systems invariants.
+  template <std::size_t subElement, typename SubTypeSystem,
+            typename... dependencies, typename TransferFns,
+            typename CrossingFunc>
+  static void crossTransferFns(TransferFns &conjunctionTransferFns,
+                               CrossingFunc &&crossingFunc) {
+    using ASTNode = TransferFnArrayASTNode<TransferFns>;
+    static_assert(subElement < std::tuple_size_v<typename ASTNode::SubElements>,
+                  "'subElement' must refer to a subelement of 'ASTNode'");
+
+    // Self-references in dependencies are not legal in 'wrap' as the resulting
+    // node would depend on itself and cause a cycle!
+    // For that reason we filter them out here and reinsert them later.
+    // 'CalcFilter::value' is the tuple of all 'Dep's except the self references
+    // (i.e. the 'Dep<..., subElement>'s) while 'CalcFilter::matches(i)' returns
+    // true iff the i-th entry of 'dependencies' was such a self reference.
+    using CalcFilter = FilterDeps<subElement, dependencies...>;
+    // Filtered 'Dep' instances without 'subElement'.
+    using Tuple = typename CalcFilter::value;
+
+    // Transfer function of the conjunction calculating the input context of
+    // 'subElement' prior to any crossing. It is replaced below by a wrapped
+    // version that additionally applies 'crossingFunc' to its result.
+    auto &transferFn = std::get<subElement>(conjunctionTransferFns);
+
+    // 'newDeps' are the filtered 'Dep' instances of 'Tuple', used purely to get
+    // hold of their indices for 'wrap' below.
+    std::apply(
+        [&](auto &&...newDeps) {
+          // Computes the input context of 'subElement' by first running the
+          // original transfer function and then overwriting the context of
+          // 'SubTypeSystem' with the result of 'crossingFunc'.
+          // 'deps' consists of the AST nodes and contexts that 'wrap' added as
+          // extra dependencies, in the order of 'newDeps'.
+          auto crossing = [crossingFunc =
+                               std::forward<CrossingFunc>(crossingFunc)](
+                              llvm::function_ref<Context()> originalTransferFn,
+                              const auto &...deps) {
+            // Context prior to the crossing.
+            Context context = originalTransferFn();
+
+            // First remove the 'ASTNode's from the argument list.
+            // This is now equal to just the context's without
+            // the self references.
+            auto contextsOnly = mapTuplesInto(
+                [&](auto &&...args) {
+                  // Create one flat tuple out of the tuples.
+                  return std::tuple_cat(std::forward<decltype(args)>(args)...);
+                },
+                [&](auto &&arg) {
+                  using T = std::decay_t<decltype(arg)>;
+                  if constexpr (std::is_same_v<Context, T>) {
+
+                    return std::forward_as_tuple(arg);
+                  } else {
+                    return std::make_tuple();
+                  }
+                },
+                std::forward_as_tuple(deps...));
+
+            struct Sentinel {};
+
+            // Now reinsert 'context' at the corresponding indices
+            // of where the original dep was prior to it being
+            // filtered.
+            // Note that we pad the context tuple to contain some
+            // extra sentinel values such that its length is equal
+            // to 'depdencies' again, creating a one to one
+            // correspondence.
+            auto withSelfRefs = enumerateTuplesInto(
+                [&](auto &&...args) {
+                  // Create one flat tuple out of the tuples.
+                  return std::tuple_cat(std::forward<decltype(args)>(args)...);
+                },
+                [&](auto &&indexT, auto &&arg) {
+                  constexpr std::size_t index =
+                      std::decay_t<decltype(indexT)>{};
+                  using T = std::decay_t<decltype(arg)>;
+                  if constexpr (CalcFilter::matches(index)) {
+                    if constexpr (std::is_same_v<Sentinel, T>)
+                      return std::forward_as_tuple(context);
+                    else
+                      return std::forward_as_tuple(context, arg);
+                  } else {
+                    return std::forward_as_tuple(arg);
+                  }
+                },
+                std::tuple_cat(
+                    std::move(contextsOnly),
+                    // Padding.
+                    repeatInTuple<(sizeof...(dependencies) -
+                                   std::tuple_size_v<decltype(contextsOnly)>)>(
+                        Sentinel{})));
+
+            std::get<typename SubTypeSystem::Context>(context) = std::apply(
+                crossingFunc,
+                // Finally, return the context of just the
+                // requested type systems.
+                mapTuplesInto(
+                    [](auto &&...args) {
+                      return std::forward_as_tuple(
+                          std::forward<decltype(args)>(args)...);
+                    },
+                    [](const Context &context, auto &&dep) -> decltype(auto) {
+                      using Dep = std::decay_t<decltype(dep)>;
+                      return std::get<typename Dep::type::Context>(context);
+                    },
+                    withSelfRefs, std::make_tuple(dependencies{}...)));
+            return context;
+          };
+
+          transferFn =
+              std::move(transferFn)
+                  .template wrap<Context,
+                                 std::decay_t<decltype(newDeps)>::index...>(
+                      std::move(crossing));
+        },
+        Tuple{});
+  }
+
   /// Calls 'discardCallback' for every typesystem and corresponding context.
   /// Returns true if any of the typesystems discarded the AST node.
   template <typename F>
@@ -378,10 +560,12 @@ protected:
   /// Calls 'transferFnsCallback' on every typesystem and combines all
   /// 'TransferFnArray<ASTNode>' returned into one single
   /// 'TransferFnArray<ASTNode>'.
-  template <typename ASTNode, typename F>
-  TransferFnArray<ASTNode> combineGetTransferFns(F &&transferFnsCallback) {
+  template <typename F>
+  auto combineGetTransferFns(F &&transferFnsCallback) {
     // Tuple of 'TransferFnArray<ASTNode>'s, one for each typeSystem.
     auto transferFnsPerTypeSystem = mapTuples(transferFnsCallback, typeSystems);
+    using ASTNode = TransferFnArrayASTNode<
+        std::tuple_element_t<0, decltype(transferFnsPerTypeSystem)>>;
     auto outputTransferFns = mapTuplesIntoArray(
         [](auto &&dep) {
           return std::move(std::get<OpaqueOutputTransferFn<ASTNode>>(dep));
@@ -413,6 +597,60 @@ protected:
   }
 
 private:
+  /// Filters out instances of 'Dep<..., subElement>' (i.e. the dependencies of
+  /// 'crossTransferFns' referring to the very sub element whose context is
+  /// being crossed).
+  /// Returns the result as a tuple of the remaining 'Dep' instances within
+  /// 'value'.
+  /// The constexpr function 'matches' returns true iff the given index used
+  /// to be a 'Dep<..., subElement>'.
+  ///
+  /// Example: For 'subElement' 1 and the dependency list
+  ///   Dep<A, 1>, Dep<B, 0>, Dep<C, 1>
+  /// 'value' is 'std::tuple<Dep<B, 0>>' while 'matches' returns true for the
+  /// indices 0 and 2 and false for 1.
+  template <std::size_t subElement, typename... dependencies>
+  struct FilterDeps;
+
+  // End of recursion.
+  template <std::size_t subElement>
+  struct FilterDeps<subElement> {
+    using value = std::tuple<>;
+
+    constexpr static bool matches(std::size_t) { return false; }
+  };
+
+  // Front of the list is a 'Dep<..., subElement>'.
+  template <std::size_t subElement, typename TypeSystem,
+            typename... dependencies>
+  struct FilterDeps<subElement, Dep<TypeSystem, subElement>, dependencies...> {
+    // Get the value from the rest of the list, deliberately skipping
+    // 'Dep<..., subElement>'.
+    using value = typename FilterDeps<subElement, dependencies...>::value;
+
+    constexpr static bool matches(std::size_t index) {
+      // If index is 0 at this point its a match.
+      return index == 0 ||
+             // Otherwise we recurse into the sublist.
+             FilterDeps<subElement, dependencies...>::matches(index - 1);
+    }
+  };
+
+  // No instance found default case.
+  template <std::size_t subElement, typename Front, typename... dependencies>
+  struct FilterDeps<subElement, Front, dependencies...> {
+    // Prepend 'Front'.
+    using value = decltype(std::tuple_cat(
+        std::declval<std::tuple<Front>>(),
+        std::declval<
+            typename FilterDeps<subElement, dependencies...>::value>()));
+
+    // Check whether index matches the sub list.
+    constexpr static bool matches(std::size_t index) {
+      return FilterDeps<subElement, dependencies...>::matches(index - 1);
+    }
+  };
+
   /// Combines all 'OpaqueTransferFn' in 'transferFnPerTypeSystem' into a single
   /// 'OpaqueTransferFn'.
   template <typename ASTNode>
