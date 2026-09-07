@@ -151,31 +151,34 @@ Type *getStorageType(Value *base) {
 // elems=2)
 // =>
 // {{2,4}, {6,8}, {10,12}}
-Constant *sliceGlobalInitializer(Constant *init, unsigned depth,
-                                 unsigned targetDim, unsigned firstIndex,
-                                 unsigned step, unsigned elems) {
-  auto *arrType = cast<ArrayType>(init->getType());
-  if (depth == targetDim) {
-    std::vector<Constant *> sliced;
-    sliced.reserve(elems);
-    for (unsigned i = 0; i < elems; i++) {
-      sliced.push_back(init->getAggregateElement(firstIndex + step * i));
+Constant *sliceGlobalInitializer(Constant *init, unsigned targetDim,
+                                 unsigned firstIndex, unsigned step,
+                                 unsigned elems) {
+  std::function<Constant *(Constant *, unsigned)> sliceInitializerRecur =
+      [&](Constant *cur, unsigned depth) -> Constant * {
+    auto *arrType = cast<ArrayType>(cur->getType());
+    if (depth == targetDim) {
+      std::vector<Constant *> sliced;
+      sliced.reserve(elems);
+      for (unsigned i = 0; i < elems; i++) {
+        sliced.push_back(cur->getAggregateElement(firstIndex + step * i));
+      }
+      Type *elemType = sliced.front()->getType();
+      return ConstantArray::get(ArrayType::get(elemType, elems), sliced);
     }
-    Type *elemType = sliced.front()->getType();
-    return ConstantArray::get(ArrayType::get(elemType, elems), sliced);
-  }
 
-  std::vector<Constant *> rebuilt;
-  rebuilt.reserve(arrType->getNumElements());
+    std::vector<Constant *> rebuilt;
+    rebuilt.reserve(arrType->getNumElements());
+    for (unsigned i = 0; i < arrType->getNumElements(); i++) {
+      rebuilt.push_back(
+          sliceInitializerRecur(cur->getAggregateElement(i), depth + 1));
+    }
+    Type *innerType = rebuilt.front()->getType();
+    return ConstantArray::get(ArrayType::get(innerType, rebuilt.size()),
+                              rebuilt);
+  };
 
-  for (unsigned i = 0; i < arrType->getNumElements(); i++) {
-    rebuilt.push_back(sliceGlobalInitializer(init->getAggregateElement(i),
-                                             depth + 1, targetDim, firstIndex,
-                                             step, elems));
-  }
-  Type *innterType = rebuilt.front()->getType();
-  return ConstantArray::get(ArrayType::get(innterType, rebuilt.size()),
-                            rebuilt);
+  return sliceInitializerRecur(init, /*depth=*/1);
 }
 
 Value *findBaseInternal(Value *addr) {
@@ -1313,11 +1316,10 @@ createPartitionBankGlobals(GlobalVariable *baseGlobal,
   for (auto &[firstIndex, step, elems] : banks) {
     Type *bankType = getPartitionedArrayType(baseGlobal->getValueType(),
                                              info.dimension, elems);
-    Constant *bankInit =
-        origInit
-            ? sliceGlobalInitializer(origInit, /*depth=*/0, info.dimension - 1,
-                                     firstIndex, step, elems)
-            : nullptr;
+    Constant *bankInit = origInit
+                             ? sliceGlobalInitializer(origInit, info.dimension,
+                                                      firstIndex, step, elems)
+                             : nullptr;
     auto *newGV = new GlobalVariable(
         *mod, bankType, baseGlobal->isConstant(), GlobalValue::InternalLinkage,
         bankInit, baseGlobal->getName() + ".bank." + Twine(bankIdx));
