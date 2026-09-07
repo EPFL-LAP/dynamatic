@@ -298,8 +298,8 @@ void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
         if (cycle.contains(dstBB)) {
           // FTD circuits may contain channels between blocks without a matching
           // CFG edge. Include every non-backward channel whose endpoints belong
-          // to the cycle. Include backward channels only when they correspond to
-          // an edge in the CFG cycle currently being modeled.
+          // to the cycle. Include backward channels only when they correspond
+          // to an edge in the CFG cycle currently being modeled.
           if (!backwardChannels.contains(res))
             channels.insert(res);
           else {
