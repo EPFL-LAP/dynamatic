@@ -3,6 +3,7 @@
 #include "hls-fuzzer/BasicCGenerator.h"
 #include "hls-fuzzer/ConjunctionTypeSystem.h"
 #include "hls-fuzzer/OptionalTypeSystem.h"
+#include "hls-fuzzer/TemplateTypeSystem.h"
 #include "hls-fuzzer/TypeSystem.h"
 
 using namespace dynamatic;

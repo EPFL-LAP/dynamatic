@@ -1,6 +1,7 @@
 #ifndef HLS_FUZZER_CONJUNCTION_TYPE_SYSTEM
 #define HLS_FUZZER_CONJUNCTION_TYPE_SYSTEM
 
+#include "TemplateTypeSystem.h"
 #include "TypeSystem.h"
 #include <tuple>
 
@@ -25,10 +26,11 @@ namespace dynamatic::gen {
 /// occur in any transfer function due to the conjunction of type systems.
 template <typename Self, class... SubTypeSystems>
 class ConjunctionTypeSystemBase
-    : public TypeSystem<std::tuple<typename SubTypeSystems::Context...>, Self> {
+    : public TemplateTypeSystem<std::tuple<typename SubTypeSystems::Context...>,
+                                Self> {
 public:
   using Base =
-      TypeSystem<std::tuple<typename SubTypeSystems::Context...>, Self>;
+      TemplateTypeSystem<std::tuple<typename SubTypeSystems::Context...>, Self>;
   using Context = typename Base::Context;
 
   ConjunctionTypeSystemBase() = default;
@@ -38,122 +40,27 @@ public:
   explicit ConjunctionTypeSystemBase(SubTypeSystems &&...subTypeSystems)
       : typeSystems(std::move(subTypeSystems)...) {}
 
-  TransferFnArray<ast::Function> getFunctionTransferFns() override {
-    return combineGetTransferFns(
-        [&](auto &&typeSystem) { return typeSystem.getFunctionTransferFns(); });
-  }
-
-  TransferFnArray<ast::ReturnStatement>
-  getReturnStatementTransferFns() override {
+  /// Every AST node is treated the same way: the transfer functions of all
+  /// sub type systems for that AST node are combined into one.
+  template <typename ASTNode, typename... Args>
+  TransferFnArray<ASTNode> getTransferFnImpl(const Args &...args) {
     return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getReturnStatementTransferFns();
+      return typeSystem.template getTransferFn<ASTNode>(args...);
     });
   }
 
-  bool discardScalarType(const ast::ScalarType &scalarType,
-                         const Context &context) {
+  /// Every terminal is discarded if any of the sub type systems discards it.
+  template <typename ASTNode>
+  bool discardTerminalImpl(const ASTNode &node, const Context &context) {
     return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardScalarType(scalarType, context);
+        [&](auto &&typeSystem, auto &&subContext) {
+          return typeSystem.discardTerminal(node, subContext);
         },
         context);
   }
 
-  TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getScalarTypeTransferFns();
-    });
-  }
-
-  bool discardReturnType(const ast::ReturnType &returnType,
-                         const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardReturnType(returnType, context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getReturnTypeTransferFns();
-    });
-  }
-
-  bool discardBinaryExpression(ast::BinaryExpression::Op op,
-                               const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardBinaryExpression(op, context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getBinaryExpressionTransferFns(op);
-    });
-  }
-
-  bool discardUnaryExpression(ast::UnaryExpression::Op op,
-                              const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardUnaryExpression(op, context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::UnaryExpression>
-  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getUnaryExpressionTransferFns(op);
-    });
-  }
-
-  bool discardVariable(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardVariable(context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::Variable> getVariableTransferFns() override {
-    return combineGetTransferFns(
-        [&](auto &&typeSystem) { return typeSystem.getVariableTransferFns(); });
-  }
-
-  bool discardCastExpression(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardCastExpression(context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getCastExpressionTransferFns();
-    });
-  }
-
-  bool discardConditionalExpression(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardConditionalExpression(context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::ConditionalExpression>
-  getConditionalExpressionTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getConditionalExpressionTransferFns();
-    });
-  }
-
+  /// Spelled out as a sub type system may replace the constant with another
+  /// one, which a terminal cannot express.
   std::optional<ast::Constant> discardConstant(const ast::Constant &constant,
                                                const Context &context) {
     return combineDiscardOptional(
@@ -164,81 +71,7 @@ public:
         context);
   }
 
-  TransferFnArray<ast::Constant> getConstantTransferFns() override {
-    return combineGetTransferFns(
-        [&](auto &&typeSystem) { return typeSystem.getConstantTransferFns(); });
-  }
-
-  bool discardExistingScalarParameter(const ast::ScalarParameter &parameter,
-                                      const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardExistingScalarParameter(parameter, context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::ExistingScalarParameter>
-  getExistingScalarParameterTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getExistingScalarParameterTransferFns();
-    });
-  }
-
-  bool discardFreshScalarParameter(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardFreshScalarParameter(context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::ScalarParameter>
-  getFreshScalarParameterTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getFreshScalarParameterTransferFns();
-    });
-  }
-
-  bool discardArrayReadExpression(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardArrayReadExpression(context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getArrayReadExpressionTransferFns();
-    });
-  }
-
-  bool discardExistingArrayParameter(const ast::ArrayParameter &parameter,
-                                     const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardExistingArrayParameter(parameter, context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::ExistingArrayParameter>
-  getExistingArrayParameterTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getExistingArrayParameterTransferFns();
-    });
-  }
-
-  bool discardFreshArrayParameter(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardFreshArrayParameter(context);
-        },
-        context);
-  }
-
+  /// Spelled out for the same reason as 'discardConstant'.
   std::optional<std::size_t> discardArrayDimension(std::size_t dimension,
                                                    const Context &context) {
     return combineDiscardOptional(
@@ -249,78 +82,25 @@ public:
         context);
   }
 
-  TransferFnArray<ast::ArrayParameter>
-  getFreshArrayParameterTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getFreshArrayParameterTransferFns();
-    });
-  }
-
-  TransferFnArray<ast::ArrayAssignmentStatement>
-  getArrayAssignmentStatementTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getArrayAssignmentStatementTransferFns();
-    });
-  }
-
-  bool discardScalarAssignmentStatement(const Context &context) {
+  /// Every non-terminal is discarded if any of the sub type systems discards
+  /// it.
+  template <typename ASTNode, typename... Args>
+  bool discardNonTerminalImpl(const Context &context, const Args &...args) {
     return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardScalarAssignmentStatement(context);
+        [&](auto &&typeSystem, auto &&subContext) {
+          return typeSystem.template discardNonTerminal<ASTNode>(subContext,
+                                                                 args...);
         },
         context);
   }
 
-  TransferFnArray<ast::ScalarAssignmentStatement>
-  getScalarAssignmentStatementTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getScalarAssignmentStatementTransferFns();
-    });
-  }
-
-  bool discardStatementList(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardStatementList(context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getStatementListTransferFns();
-    });
-  }
-
-  bool discardStructuredForStatement(const Context &context) {
-    return combineDiscard(
-        [&](auto &&typeSystem, auto &&context) {
-          return typeSystem.discardStructuredForStatement(context);
-        },
-        context);
-  }
-
-  TransferFnArray<ast::StructuredForStatement>
-  getStructuredForStatementTransferFns() override {
-    return combineGetTransferFns([&](auto &&typeSystem) {
-      return typeSystem.getStructuredForStatementTransferFns();
-    });
-  }
-
-  ProbabilityTable<AbstractTypeSystem::ExpressionKey>
-  getExpressionProbabilityTable(const Context &context) {
-    return combineExpressionProbabilityTable(
-        [](auto &&typeSystem, auto &&context) {
-          return typeSystem.getExpressionProbabilityTable(context);
-        },
-        context);
-  }
-
-  ProbabilityTable<AbstractTypeSystem::StatementKey>
-  getStatementProbabilityTable(const Context &context) {
-    return combineExpressionProbabilityTable(
-        [](auto &&typeSystem, auto &&context) {
-          return typeSystem.getStatementProbabilityTable(context);
+  /// Every probability table is the merge of the tables of all sub type
+  /// systems.
+  template <typename Key>
+  ProbabilityTable<Key> getProbabilityTableImpl(const Context &context) {
+    return combineProbabilityTable(
+        [](auto &&typeSystem, auto &&subContext) {
+          return typeSystem.template getProbabilityTable<Key>(subContext);
         },
         context);
   }
@@ -547,8 +327,8 @@ protected:
   /// context and returns a new probability table that is the combination of
   /// all returned probability tables.
   template <typename F>
-  auto combineExpressionProbabilityTable(F &&probabilityTableCallback,
-                                         const Context &context) {
+  auto combineProbabilityTable(F &&probabilityTableCallback,
+                               const Context &context) {
     std::array probabilityTables =
         mapTuplesIntoArray(probabilityTableCallback, typeSystems, context);
     for (auto &iter : llvm::drop_begin(probabilityTables))
