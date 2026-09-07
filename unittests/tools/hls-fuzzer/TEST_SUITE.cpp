@@ -5,9 +5,11 @@
 #include "hls-fuzzer/OptionalTypeSystem.h"
 #include "hls-fuzzer/TemplateTypeSystem.h"
 #include "hls-fuzzer/TypeSystem.h"
+#include "hls-fuzzer/VariableTrackingTypeSystem.h"
 
 using namespace dynamatic;
 
+namespace {
 template <typename TypeSystem>
 class TypeSystemTest : public testing::Test {};
 
@@ -26,8 +28,6 @@ TYPED_TEST_P(TypeSystemTest, OutputCheck) {
 }
 
 REGISTER_TYPED_TEST_SUITE_P(TypeSystemTest, OutputCheck);
-
-namespace {
 
 enum class PlusOfTwoState {
   PlusNeeded,
@@ -465,11 +465,304 @@ public:
       std::nullopt, PlusExpressionTypeSystem::entryContext};
 };
 
+/// Typing context of the 'LinearTypeSystem'. Which variables are tracked is
+/// the entirety of the analysis.
+struct LinearContext : gen::VariableTrackingTypingContext<gen::NoValue> {
+  /// True while the scalar parameter being generated is the target of an
+  /// assignment rather than a read of it. Assigning to a variable is what
+  /// makes it usable again and therefore has to stay legal no matter whether
+  /// it was already used.
+  bool isAssignmentTarget = false;
+};
+
+/// Variable tracking type system implementing a linear discipline on scalar
+/// variables: a variable may be used (i.e. read) at most once per assignment
+/// to it. Using it again only becomes legal once it has been assigned to.
+///
+/// A variable is tracked exactly while it is *unused*, i.e. while reading it
+/// is legal:
+/// * defining it tracks it,
+/// * reading it untracks it again.
+/// 'discardExistingScalarParameter' then rejects every variable that is not
+/// tracked in a reading position, which is what enforces the discipline.
+///
+/// Being a dataflow analysis, the type system additionally has to see the
+/// program in execution order wherever one operation's legality depends on a
+/// previous one. Its transfer functions therefore constrain the generation
+/// order: statements are generated front to back, an assignment's value
+/// before its target, and the function's return statement after its body.
+class LinearTypeSystem final
+    : public gen::VariableTrackingTypeSystemBase<LinearContext,
+                                                 LinearTypeSystem> {
+public:
+  /// A variable may only be read while it is unused. Writing to it is always
+  /// legal and is precisely what makes it readable again.
+  static bool
+  discardExistingScalarParameter(const ast::ScalarParameter &parameter,
+                                 const LinearContext &context) {
+    return !context.isAssignmentTarget &&
+           !context.isTracked(parameter.getName());
+  }
+
+  /// The returned expression must see the variables in the state the last
+  /// statement of the body left them in.
+  gen::TransferFnArray<ast::Function> getFunctionTransferFns() override {
+    return {
+        /*return type=*/defaultTransferFn<ast::Function>(),
+        /*statements=*/defaultTransferFn<ast::Function>(),
+        /*return statement=*/
+        transferFnAfter<ast::Function, ast::Function::STATEMENTS>(),
+        /*output=*/defaultOutputTransferFn<ast::Function>(),
+    };
+  }
+
+  /// A statement list holds its statement *before* the ones of the statement
+  /// list nested in it, so generating the statement first is what walks the
+  /// body front to back.
+  gen::TransferFnArray<ast::StatementList>
+  getStatementListTransferFns() override {
+    return {
+        /*statement=*/defaultTransferFn<ast::StatementList>(),
+        /*statement list=*/
+        transferFnAfter<ast::StatementList, ast::StatementList::STATEMENT>(),
+        /*output=*/defaultOutputTransferFn<ast::StatementList>(),
+    };
+  }
+
+  /// 'x = <value>' reads its value before it writes to 'x', so the value is
+  /// generated first. This is what makes 'x = x' legal for a tracked 'x': the
+  /// read uses it up, the assignment makes it usable again.
+  gen::TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return {
+        /*target=*/
+        defaultTransferFn<ast::ScalarAssignmentStatement>()
+            .wrap<ast::ScalarAssignmentStatement::VALUE>(
+                [](llvm::function_ref<LinearContext()> wrapped,
+                   const LinearContext &, const ast::Expression &) {
+                  LinearContext context = wrapped();
+                  context.isAssignmentTarget = true;
+                  return context;
+                }),
+        /*value=*/defaultTransferFn<ast::ScalarAssignmentStatement>(),
+        /*output=*/
+        // The assignment defines its target, which may therefore be read once
+        // again.
+        defaultOutputTransferFn<ast::ScalarAssignmentStatement>().wrap(
+            [this](llvm::function_ref<LinearContext()> wrapped,
+                   const ast::ScalarAssignmentStatement &node) {
+              return track(wrapped(), node.getVariable(), {});
+            }),
+    };
+  }
+
+  /// Creating a variable defines it: it may be read once.
+  gen::TransferFnArray<ast::ScalarParameter>
+  getFreshScalarParameterTransferFns() override {
+    return {
+        /*data type=*/defaultTransferFn<ast::ScalarParameter>(),
+        /*output=*/
+        defaultOutputTransferFn<ast::ScalarParameter>().wrap(
+            [this](llvm::function_ref<LinearContext()> wrapped,
+                   const ast::ScalarParameter &node) {
+              return track(wrapped(), node.getName(), {});
+            }),
+    };
+  }
+
+  /// Reading a variable uses it up. Note that this is the one and only way a
+  /// scalar variable is read, no matter whether it was just created or
+  /// already existed.
+  gen::TransferFnArray<ast::Variable> getVariableTransferFns() override {
+    return {
+        /*parameter=*/defaultTransferFn<ast::Variable>(),
+        /*output=*/
+        defaultOutputTransferFn<ast::Variable>().wrap(
+            [this](llvm::function_ref<LinearContext()> wrapped,
+                   const ast::Variable &node) {
+              return untrack(wrapped(), node.name);
+            }),
+    };
+  }
+
+private:
+  /// Returns the default (merging) transfer function of 'ASTNode' with an
+  /// additional non-weak dependency on each of the 'subElements', forcing the
+  /// generator to generate those first.
+  template <typename ASTNode, std::size_t... subElements>
+  static gen::OpaqueTransferFn<ASTNode> transferFnAfter() {
+    return defaultTransferFn<ASTNode>().template wrap<subElements...>(
+        [](llvm::function_ref<LinearContext()> wrapped, const auto &...) {
+          return wrapped();
+        });
+  }
+};
+
+/// What the 'AssignmentChainTypeSystem' requires to be generated next.
+enum class ChainState {
+  /// A statement of the function body, which may only be an assignment.
+  Statement,
+  /// The value an assignment assigns: a read of an existing variable.
+  AssignedValue,
+  /// The same for the very first assignment. As no variable exists at that
+  /// point yet, its value has to create the one the chain starts with.
+  FirstAssignedValue,
+  /// The target of an assignment: a freshly created variable.
+  AssignmentTarget,
+  /// The value the function returns: a read of an existing variable.
+  ReturnValue,
+};
+
+/// Typing context of the 'AssignmentChainTypeSystem'.
+struct ChainContext {
+  ChainState state = ChainState::Statement;
+
+  /// Number of statements that still have to be generated, the statement of
+  /// the statement list this context belongs to included.
+  std::size_t statementsToGo = 0;
+};
+
+/// Number of assignment statements the 'AssignmentChainTypeSystem' generates.
+constexpr std::size_t numAssignments = 4;
+
+/// Type system generating a function body of exactly 'numAssignments'
+/// statements, each of which is an assignment of one scalar variable to
+/// a fresh one, followed by a return statement returning a variable.
+///
+/// It only decides the *shape* of the program: which variable an assignment
+/// or the return statement reads is left entirely to the 'LinearTypeSystem'
+/// it is conjoined with.
+class AssignmentChainTypeSystem final
+    : public gen::DisallowByDefaultTypeSystem<ChainContext,
+                                              AssignmentChainTypeSystem> {
+public:
+  using DisallowByDefaultTypeSystem::DisallowByDefaultTypeSystem;
+
+  gen::TransferFnArray<ast::Function> getFunctionTransferFns() override {
+    return {
+        /*return type=*/copyFromInput<ast::Function>(),
+        /*statements=*/
+        TransferFn<ast::Function>(
+            ChainContext{ChainState::Statement, numAssignments}),
+        /*return statement=*/
+        TransferFn<ast::Function>(ChainContext{ChainState::ReturnValue}),
+        /*output=*/copyInputToOutput<ast::Function>(),
+    };
+  }
+
+  /// The body ends once no statement is left to generate.
+  static bool discardStatementList(const ChainContext &context) {
+    return context.state != ChainState::Statement ||
+           context.statementsToGo == 0;
+  }
+
+  gen::TransferFnArray<ast::StatementList>
+  getStatementListTransferFns() override {
+    return {
+        /*statement=*/copyFromInput<ast::StatementList>(),
+        /*statement list=*/
+        TransferFn<ast::StatementList, gen::INPUT_DEPENDENCY>(
+            [](const ChainContext &context) {
+              // The nested list holds all statements following this one.
+              return ChainContext{context.state, context.statementsToGo - 1};
+            }),
+        /*output=*/copyInputToOutput<ast::StatementList>(),
+    };
+  }
+
+  static bool discardScalarAssignmentStatement(const ChainContext &context) {
+    return context.state != ChainState::Statement;
+  }
+
+  gen::TransferFnArray<ast::ScalarAssignmentStatement>
+  getScalarAssignmentStatementTransferFns() override {
+    return {
+        /*target=*/
+        TransferFn<ast::ScalarAssignmentStatement>(
+            ChainContext{ChainState::AssignmentTarget}),
+        /*value=*/
+        TransferFn<ast::ScalarAssignmentStatement, gen::INPUT_DEPENDENCY>(
+            [](const ChainContext &context) {
+              return ChainContext{context.statementsToGo == numAssignments
+                                      ? ChainState::FirstAssignedValue
+                                      : ChainState::AssignedValue};
+            }),
+        /*output=*/copyInputToOutput<ast::ScalarAssignmentStatement>(),
+    };
+  }
+
+  /// Assigned and returned values are reads of a variable and nothing else.
+  static bool discardVariable(const ChainContext &context) {
+    return context.state != ChainState::AssignedValue &&
+           context.state != ChainState::FirstAssignedValue &&
+           context.state != ChainState::ReturnValue;
+  }
+
+  /// The target of an assignment, as well as the value the chain starts with,
+  /// is a freshly created variable.
+  static bool discardFreshScalarParameter(const ChainContext &context) {
+    return context.state != ChainState::AssignmentTarget &&
+           context.state != ChainState::FirstAssignedValue;
+  }
+
+  /// Every other value read is an already existing variable. *Which* one is
+  /// up to the 'LinearTypeSystem'.
+  static bool discardExistingScalarParameter(const ast::ScalarParameter &,
+                                             const ChainContext &context) {
+    return context.state != ChainState::AssignedValue &&
+           context.state != ChainState::ReturnValue;
+  }
+
+  static bool discardScalarType(const ast::ScalarType &scalarType,
+                                const ChainContext &) {
+    return scalarType != ast::PrimitiveType::Double;
+  }
+
+  bool discardReturnType(const ast::ReturnType &returnType,
+                         const ChainContext &context) {
+    if (llvm::isa<ast::VoidType>(returnType))
+      return true;
+
+    return TypeSystem::discardReturnType(returnType, context);
+  }
+};
+
+/// Conjunction of the 'AssignmentChainTypeSystem' and the 'LinearTypeSystem':
+/// the former decides the shape of the program, the latter which variable
+/// every read within it may name.
+///
+/// The two together leave exactly one program generatable. Every assignment
+/// consumes the variable it reads and defines the freshly created one it
+/// writes to, so at any point exactly one variable is unused and therefore
+/// readable.
+class LinearAssignmentChainTypeSystem final
+    : public gen::ConjunctionTypeSystemBase<LinearAssignmentChainTypeSystem,
+                                            LinearTypeSystem,
+                                            AssignmentChainTypeSystem> {
+public:
+  LinearAssignmentChainTypeSystem()
+      : ConjunctionTypeSystemBase(LinearTypeSystem(),
+                                  AssignmentChainTypeSystem()) {}
+
+  constexpr static std::string_view result =
+      R"(double test(double var0, double var1, double var2, double var3, double var4) {
+  var1 = var0;
+  var2 = var1;
+  var3 = var2;
+  var4 = var3;
+  return var4;
+}
+)";
+
+  const Context entryContext{};
+};
+
 } // namespace
 
 using MyTypes =
     ::testing::Types<PlusOfTwoParamOnlyTypeSystem,
                      ReturnArrayConstantOnlyTypeSystem,
-                     ForwardStatementsTypeSystem, ZeroPlusOneTypeSystem>;
+                     ForwardStatementsTypeSystem, ZeroPlusOneTypeSystem,
+                     LinearAssignmentChainTypeSystem>;
 #pragma clang diagnostic ignored "-Wvariadic-macro-arguments-omitted"
 INSTANTIATE_TYPED_TEST_SUITE_P(All, TypeSystemTest, MyTypes);

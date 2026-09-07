@@ -24,7 +24,20 @@ template <typename TypingContext, typename Self>
 class CounterTypeSystem : public TemplateTypeSystem<TypingContext, Self> {
 
 public:
-  using Base = TemplateTypeSystem<TypingContext, Self>;
+  /// A counter's default transfer function merges all present contexts, so
+  /// whatever state a subelement's subtree accumulated flows onwards no
+  /// matter in which order the generator walks the AST.
+  template <typename ASTNode>
+  static auto defaultTransferFn() {
+    return getMergingTransferFn<ASTNode>();
+  }
+
+  /// Same for the default output transfer function: the node's output is the
+  /// merge of its input and all its subelements' outputs.
+  template <typename ASTNode>
+  static auto defaultOutputTransferFn() {
+    return getMergingOutputTransferFn<ASTNode>();
+  }
 
 protected:
   /// Returns a 'TransferFn' which merges all present contexts of 'indices' and
@@ -86,27 +99,6 @@ protected:
     return getMergingOutputTransferFn<ASTNode>(
         std::make_index_sequence<
             std::tuple_size_v<typename ASTNode::SubElements>>{});
-  }
-
-  /// Returns a transfer array only consisting of merging transfer functions
-  /// and output functions.
-  template <typename ASTNode>
-  static TransferFnArray<ASTNode> getMergingTransferFnArray() {
-    return std::tuple_cat(
-        mapTuples([](auto &&) { return getMergingTransferFn<ASTNode>(); },
-                  getTupleOfIndices(
-                      std::make_index_sequence<
-                          std::tuple_size_v<typename ASTNode::SubElements>>{})),
-        std::tuple(getMergingOutputTransferFn<ASTNode>()));
-  }
-
-public:
-  /// Every AST node is treated the same way: its transfer functions merge, and
-  /// nothing else. The extra arguments some AST nodes come with (e.g. the
-  /// operator of a binary expression) are of no interest to a counter.
-  template <typename ASTNode, typename... Args>
-  static TransferFnArray<ASTNode> getTransferFnImpl(const Args &...) {
-    return getMergingTransferFnArray<ASTNode>();
   }
 };
 
