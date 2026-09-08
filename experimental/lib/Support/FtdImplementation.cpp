@@ -15,6 +15,8 @@
 #include "experimental/Support/FtdImplementation.h"
 #include "dynamatic/Analysis/ControlDependenceAnalysis.h"
 #include "dynamatic/Support/Backedge.h"
+#include "dynamatic/Support/CFG.h"
+#include "dynamatic/Transforms/HandshakeCreateOutWithLSQsCircuit.h"
 #include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "experimental/Support/FtdSupport.h"
@@ -289,6 +291,7 @@ LogicalResult experimental::ftd::createPhiNetwork(
   // get only the last input value for each block. This is necessary in case in
   // the input sets there is more than one value per blocks
   for (auto &[bb, vals] : valuesPerBlock) {
+
     std::sort(vals.begin(), vals.end(), [&](Value a, Value b) -> bool {
       if (!a.getDefiningOp())
         return false;
@@ -401,7 +404,22 @@ LogicalResult ftd::createPhiNetworkDeps(
   for (auto &[operand, dependencies] : dependenciesMap) {
 
     Operation *operandOwner = operand->getOwner();
-    auto startValue = (Value)funcRegion.getArguments().back();
+
+    Value startSignal = (Value)funcRegion.getArguments().back();
+    Value startValue = startSignal;
+
+    if (!isa<handshake::ControlType>(dependencies[0].getType())) {
+
+      // set the rewriter insertion point to bb = 0
+      rewriter.setInsertionPointToStart(&funcRegion.front());
+      handshake::ConstantOp constOp = rewriter.create<handshake::ConstantOp>(
+          startSignal.getLoc(),
+          rewriter.getIntegerAttr(rewriter.getI32Type(), 1000), startSignal);
+      // constOp->moveBefore(operandOwner);
+      setBB(constOp, 0);
+
+      startValue = constOp.getResult();
+    }
 
     /// Lambda to run the SSA analysis over the pair of values {dep, startValue}
     /// and properly connect the operand `op` to the correct value in the
@@ -413,6 +431,7 @@ LogicalResult ftd::createPhiNetworkDeps(
       // producer properly dominates the consumer (i.e. comes before in a linear
       // sense) then the consumer is directly connected to the producer without
       // further mechanism.
+
       if (dep.getParentBlock() == operandOwner->getBlock() &&
           domInfo.properlyDominates(depOwner, operandOwner)) {
         op->set(dep);
@@ -468,10 +487,12 @@ LogicalResult ftd::createPhiNetworkDeps(
 // Regeneration
 // ===--------------------------------------------------------------------=== //
 
-void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
-                                  handshake::FuncOp &funcOp,
-                                  Operation *consumerOp, Value operand,
-                                  ftd::ShadowCFG &shadow) {
+std::vector<Operation *> ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
+                                                      handshake::FuncOp &funcOp,
+                                                      Operation *consumerOp,
+                                                      Value operand,
+                                                      ftd::ShadowCFG &shadow) {
+  std::vector<Operation *> newUnits;
 
   // All analysis runs on the shadow Region (multi-block, real CF terminators)
   Region &shadowRegion = shadow.getRegion();
@@ -487,14 +508,16 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
       consumerOp->hasAttr(FTD_EXPLICIT_MU) ||
       consumerOp->hasAttr(FTD_INIT_MERGE) ||
       consumerOp->hasAttr(FTD_OP_TO_SKIP))
-    return;
+    return newUnits;
 
   // Skip if the consumer has to do with memory operations, cmerge networks or
   // if it is a conditional branch.
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(consumerOp) ||
       llvm::isa_and_nonnull<handshake::ControlMergeOp>(consumerOp) ||
-      llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp))
-    return;
+      (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
+       (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+        !consumerOp->hasAttr(SKIP_COND_SEQ))))
+    return newUnits;
 
   mlir::Operation *producerOp = operand.getDefiningOp();
 
@@ -512,12 +535,12 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
   // Skip if the producer was added by this function or if it is an op to skip
   if (producerOp &&
       (producerOp->hasAttr(FTD_REGEN) || producerOp->hasAttr(FTD_OP_TO_SKIP)))
-    return;
+    return newUnits;
 
   // Skip if the producer has to do with memory operations
   if (llvm::isa_and_nonnull<handshake::MemoryOpInterface>(producerOp) ||
       llvm::isa_and_nonnull<MemRefType>(operand.getType()))
-    return;
+    return newUnits;
 
   // Map BB indices to shadow blocks for loop analysis
   Block *prodBlock = shadow.getBlock(prodId);
@@ -530,7 +553,7 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
   unsigned numberOfLoops = loops.size();
 
   if (numberOfLoops == 0)
-    return;
+    return newUnits;
 
   Value regeneratedValue = operand;
 
@@ -585,32 +608,41 @@ void ftd::addRegenOperandConsumer(mlir::OpBuilder &builder,
 
     auto muxOp = createRegenMux(loops[i]);
     regeneratedValue = muxOp.getResult();
+
+    newUnits.push_back(muxOp);
   }
 
   // Final replace the usage of the operand in the consumer with the output of
   // the last regen multiplexer created.
   consumerOp->replaceUsesOfWith(operand, regeneratedValue);
+
+  return newUnits;
 }
 
 // ===--------------------------------------------------------------------=== //
 // Suppression dispatch
 // ===--------------------------------------------------------------------=== //
 
-void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
-                                 handshake::FuncOp &funcOp,
-                                 Operation *consumerOp, Value operand,
-                                 ShadowCFG &shadow) {
+std::vector<Operation *> ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
+                                                     handshake::FuncOp &funcOp,
+                                                     Operation *consumerOp,
+                                                     Value operand,
+                                                     ShadowCFG &shadow) {
+
+  std::vector<Operation *> newUnits;
 
   // Skip the prod-cons if the consumer is part of the operations related to
   // the BDD expansion or INIT merges
   if (consumerOp->hasAttr(FTD_OP_TO_SKIP) ||
       consumerOp->hasAttr(FTD_INIT_MERGE))
-    return;
+    return newUnits;
 
   // Do not take into account conditional branch
   if (llvm::isa<handshake::ConditionalBranchOp>(consumerOp) &&
+      (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+       !consumerOp->hasAttr(SKIP_COND_SEQ)) &&
       consumerOp->getOperand(0) != operand)
-    return;
+    return newUnits;
 
   // Read BB indices from handshake.bb attributes
   unsigned consBBIdx = 0;
@@ -631,21 +663,23 @@ void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
   if (consumerBlock == producerBlock &&
       (!llvm::isa<handshake::MuxOp>(consumerOp) ||
        operand.getDefiningOp()->hasAttr(FTD_EXPLICIT_GAMMA))) {
-    return;
+    return newUnits;
   }
 
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
     // A conditional branch already performs suppression on the value.
     // Do not insert another suppression unit after it.
-    if (llvm::isa<handshake::ConditionalBranchOp>(producerOp))
-      return;
+    if (llvm::isa<handshake::ConditionalBranchOp>(producerOp) &&
+        (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+         !consumerOp->hasAttr(SKIP_COND_SEQ)))
+      return newUnits;
 
     // Skip the prod-cons if the producer is part of the operations
     // related to the BDD expansion or INIT merges
     if (producerOp->hasAttr(FTD_OP_TO_SKIP) ||
         producerOp->hasAttr(FTD_INIT_MERGE))
-      return;
+      return newUnits;
 
     // Skip if either the producer or the consumer are
     // related to memory operations, or if the consumer is a conditional
@@ -663,19 +697,25 @@ void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
         (llvm::isa<memref::StoreOp>(consumerOp) &&
          !llvm::isa<handshake::StoreOp>(consumerOp)) ||
         llvm::isa<mlir::MemRefType>(operand.getType()))
-      return;
+      return newUnits;
+
+    if (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(consumerOp) &&
+        (!consumerOp->hasAttr(SKIP_COND_GEN) &&
+         !consumerOp->hasAttr(SKIP_COND_SEQ)))
+      return newUnits;
 
     // Skip cf::CondBranchOp consumers unless this operand is the condition
     // input (operand 0) of the block's terminator.
     if (llvm::isa_and_nonnull<cf::CondBranchOp>(consumerOp) &&
         (consumerOp != consumerBlock->getTerminator() ||
          operand != consumerOp->getOperand(0)))
-      return;
+      return newUnits;
 
     // Handle the suppression in all the other cases (including the operand
     // being a function argument)
     insertDirectSuppression(builder, funcOp, consumerOp, operand, shadow);
   }
+  return newUnits;
 }
 
 void ftd::addSupp(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
@@ -713,6 +753,7 @@ void ftd::addRegen(handshake::FuncOp &funcOp, mlir::OpBuilder &builder,
 
 LogicalResult experimental::ftd::addGsaGates(
     Region &region, PatternRewriter &rewriter, const gsa::GSAAnalysis &gsa,
+    std::vector<Operation *> &newUnits,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
     bool removeTerminators) {
 
@@ -885,6 +926,7 @@ LogicalResult experimental::ftd::addGsaGates(
       auto mux = rewriter.create<handshake::MuxOp>(
           loc, ftd::channelifyType(gate->result.getType()), conditionValue,
           operands);
+      setBBAttr(mux, gate->getBlock(), rewriter);
 
       // The one input gamma is marked as an operation to skip in the IR and
       // later removed
@@ -1032,6 +1074,15 @@ LogicalResult experimental::ftd::addGsaGates(
     }
   }
 
+  // Report the gates that survived to the caller. Entries of `gsaList` are set
+  // to nullptr above whenever a mux is erased by the one-input-gamma removal or
+  // by the simplification loop, so reading the map here rather than pushing at
+  // creation time is what keeps erased operations out of `newUnits`.
+  for (const auto &entry : gsaList) {
+    if (entry.second)
+      newUnits.push_back(entry.second);
+  }
+
   if (!removeTerminators)
     return success();
 
@@ -1060,7 +1111,8 @@ LogicalResult experimental::ftd::addGsaGates(
 }
 
 LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
-                                     PatternRewriter &rewriter) {
+                                     PatternRewriter &rewriter,
+                                     std::vector<Operation *> &newUnits) {
 
   // For each merge that was signed with the `NEW_PHI` attribute, substitute
   // it with its GSA equivalent
@@ -1068,9 +1120,12 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
        llvm::make_early_inc_range(funcOp.getOps<handshake::MergeOp>())) {
     if (!merge->hasAttr(NEW_PHI))
       continue;
+
+    // Aya: temporarily added the newUnits vector to export the newly added
+    // Muxes to the outside, which is needed in Rouzbeh's pass
     gsa::GSAAnalysis gsa(merge, funcOp.getRegion());
-    if (failed(ftd::addGsaGates(funcOp.getRegion(), rewriter, gsa, nullptr,
-                                false)))
+    if (failed(ftd::addGsaGates(funcOp.getRegion(), rewriter, gsa, newUnits,
+                                nullptr, false)))
       return failure();
 
     // Get rid of the merge

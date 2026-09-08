@@ -586,6 +586,10 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
       memrefToArgIdx.insert({arg, idx});
   }
 
+  // Aya: Added this to export the newly added Muxes to the outside,
+  // which is needed in Rouzbeh's pass
+  std::vector<Operation *> newUnits;
+
   ftd::createAllCondPlaceholders(lowerFuncOp.getRegion(), rewriter);
 
   // Structure used inside addGsaGates to temporarily map a cf value to a
@@ -595,7 +599,7 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
 
   // Add the muxes as obtained by the GSA analysis pass.
   if (failed(addGsaGates(lowerFuncOp.getRegion(), rewriter, gsaAnalysis,
-                         &pendingMuxOperands)))
+                         newUnits, &pendingMuxOperands)))
     return failure();
 
   // First lower the parent function itself, without modifying its body

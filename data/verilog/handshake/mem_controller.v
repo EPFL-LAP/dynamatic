@@ -37,6 +37,9 @@ module mem_controller #(
   input  [(NUM_STORES * DATA_TYPE) - 1 : 0] stData,
   input  [               NUM_STORES - 1 : 0] stData_valid,
   output [               NUM_STORES - 1 : 0] stData_ready,
+  // Store Done Output Channels
+  output [               NUM_STORES - 1 : 0] stDone_valid,
+  input  [               NUM_STORES - 1 : 0] stDone_ready,
   // Interface to Dual-port BRAM
   input  [               DATA_TYPE - 1 : 0] loadData,
   output                                     loadEn,
@@ -73,6 +76,8 @@ module mem_controller #(
     .stData        (stData),
     .stData_valid  (stData_valid),
     .stData_ready  (stData_ready),
+    .stDone_valid  (stDone_valid),
+    .stDone_ready  (stDone_ready),
     .loadData      (dropLoadData),
     .loadEn        (dropLoadEn),
     .loadAddr      (dropLoadAddr),

@@ -13,6 +13,9 @@ module store #(
   input  [ADDR_TYPE - 1 : 0] addrIn,
   input  addrIn_valid,
   output addrIn_ready,
+  // Done signal from Interface Channel
+  input  doneFromMem_valid,
+  output doneFromMem_ready,
   // Data to Interface Channel
   output [DATA_TYPE - 1 : 0] dataToMem,
   output dataToMem_valid,
@@ -20,7 +23,10 @@ module store #(
   // Address to Interface Channel
   output [ADDR_TYPE - 1 : 0] addrOut,
   output addrOut_valid,
-  input  addrOut_ready 
+  input  addrOut_ready,
+  // Done signal to Circuit Channel
+  output doneOut_valid,
+  input  doneOut_ready
 );
 
   // Data assignment
@@ -32,5 +38,9 @@ module store #(
   assign addrOut = addrIn;
   assign addrOut_valid = addrIn_valid;
   assign addrIn_ready = addrOut_ready;
+
+  // Done signal assignment
+  assign doneFromMem_ready = doneOut_ready;
+  assign doneOut_valid = doneFromMem_valid;
 
 endmodule

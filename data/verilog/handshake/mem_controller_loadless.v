@@ -28,6 +28,9 @@ module mem_controller_loadless #(
   input  [(NUM_STORES * DATA_TYPE) - 1 : 0] stData,
   input  [               NUM_STORES - 1 : 0] stData_valid,
   output [               NUM_STORES - 1 : 0] stData_ready,
+  // Store Done Output Channels
+  output [               NUM_STORES - 1 : 0] stDone_valid,
+  input  [               NUM_STORES - 1 : 0] stDone_ready,
   // Interface to Dual-port BRAM
   input  [               DATA_TYPE - 1 : 0] loadData,
   output                                     loadEn,
@@ -54,6 +57,8 @@ module mem_controller_loadless #(
   // Indicating the store port is selected by the arbiter.
   wire [NUM_STORES - 1 : 0] store_access_port_selected;
   wire allRequestsDone;
+  // Holds each completion until its consumer accepts it.
+  reg [NUM_STORES - 1 : 0] store_complete;
 
   // Local Parameter
   localparam [WIDTH_COUNTER_PENDING_STORES - 1:0] zeroStore = {WIDTH_COUNTER_PENDING_STORES{1'b0}};
@@ -89,8 +94,25 @@ module mem_controller_loadless #(
   assign stAddr_ready = store_access_port_selected;
   assign ctrl_ready   = {NUM_CONTROLS{1'b1}};
 
-  integer          i;
+  integer i;
+  integer store_idx;
   reg     [WIDTH_COUNTER_PENDING_STORES-1 : 0] counter = {WIDTH_COUNTER_PENDING_STORES{1'b0}};
+
+  // Store done logic
+  always @(posedge clk) begin
+    if (rst) begin
+      store_complete <= {NUM_STORES{1'b0}};
+    end else begin
+      for (store_idx = 0; store_idx < NUM_STORES; store_idx = store_idx + 1) begin
+        if (store_access_port_selected[store_idx])
+          store_complete[store_idx] <= 1'b1;
+        else if (stDone_ready[store_idx])
+          store_complete[store_idx] <= 1'b0;
+      end
+    end
+  end
+
+  assign stDone_valid = store_complete;
 
   // Counting Stores
   always @(posedge clk) begin

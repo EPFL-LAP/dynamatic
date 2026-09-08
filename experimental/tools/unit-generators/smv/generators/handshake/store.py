@@ -10,14 +10,16 @@ def generate_store(name, params):
 
 def _generate_store(name, data_type, addr_type):
     return f"""
-MODULE {name}(addrIn, addrIn_valid, dataIn, dataIn_valid, addrOut_ready, dataToMem_ready)
+MODULE {name}(addrIn, addrIn_valid, dataIn, dataIn_valid, doneFromMem_valid, addrOut_ready, dataToMem_ready, doneOut_ready)
 
   -- outputs
   DEFINE
   dataIn_ready := dataToMem_ready;
   addrIn_ready := addrOut_ready;
+  doneFromMem_ready := doneOut_ready;
   dataToMem := dataIn;
   dataToMem_valid := dataIn_valid;
   addrOut := addrIn;
   addrOut_valid := addrIn_valid;
+  doneOut_valid := doneFromMem_valid;
 """

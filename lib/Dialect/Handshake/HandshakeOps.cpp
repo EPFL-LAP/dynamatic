@@ -743,6 +743,20 @@ static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
            << " bits but got signal with " << inputWidth << " bits.";
   }
   return success();
+};
+
+static void
+addTypesBasedOnLoadAndStorePorts(OperationState &odsState, Type dataType,
+                                 Type control,
+                                 SmallVector<bool> &loadAndStorePorts) {
+  // for every load add a data output and for every store add a control output.
+  for (auto &loadAndStorePort : loadAndStorePorts) {
+    if (loadAndStorePort) {
+      odsState.addTypes(dataType);
+    } else {
+      odsState.addTypes(control);
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -757,7 +771,7 @@ static handshake::ChannelType wrapChannel(Type type) {
 void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                                Value memRef, Value memStart, ValueRange inputs,
                                Value ctrlEnd, ArrayRef<unsigned> blocks,
-                               unsigned numLoads) {
+                               SmallVector<bool> loadAndStorePorts) {
   // Memory operands
   odsState.addOperands({memRef, memStart});
   odsState.addOperands(inputs);
@@ -766,8 +780,13 @@ void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   // Data outputs (get their type from memref)
   MemRefType memrefType = memRef.getType().cast<MemRefType>();
   MLIRContext *ctx = odsBuilder.getContext();
-  odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
-  odsState.types.push_back(handshake::ControlType::get(ctx));
+  Type control = handshake::ControlType::get(ctx);
+  Type dataType = wrapChannel(memrefType.getElementType());
+
+  addTypesBasedOnLoadAndStorePorts(odsState, dataType, control,
+                                   loadAndStorePorts);
+
+  odsState.types.push_back(control);
 
   // Set "connectedBlocks" attribute
   SmallVector<int> blocksAttribute;
@@ -872,7 +891,8 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
         return failure();
 
       // Add a store port to the block
-      currentGroup->accessPorts.push_back(StorePort(storeOp, input.index()));
+      currentGroup->accessPorts.push_back(
+          StorePort(storeOp, input.index(), resIdx++));
       return success();
     };
 
@@ -888,7 +908,8 @@ static LogicalResult getMCPorts(MCPorts &mcPorts) {
       // Add the port to the list of ports from other memory
       // interfaces
       mcPorts.interfacePorts.push_back(
-          LSQLoadStorePort(lsqOp, input.index(), resIdx++));
+          LSQLoadStorePort(lsqOp, input.index(), resIdx));
+      resIdx += 2;
       return success();
     };
 
@@ -1022,9 +1043,11 @@ static void buildLSQGroupSizes(OpBuilder &odsBuilder, OperationState &odsState,
                         odsBuilder.getI32ArrayAttr(sizesAttribute));
 }
 
+/// In this case the LSQ is a Master.
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
                   Value memStart, ValueRange inputs, Value ctrlEnd,
-                  ArrayRef<unsigned> groupSizes, unsigned numLoads) {
+                  ArrayRef<unsigned> groupSizes,
+                  SmallVector<bool> loadAndStorePorts) {
   // Memory operands
   odsState.addOperands({memref, memStart});
   odsState.addOperands(inputs);
@@ -1033,14 +1056,22 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
   // Data outputs (get their type from memref)
   MemRefType memrefType = memref.getType().cast<MemRefType>();
   MLIRContext *ctx = odsBuilder.getContext();
-  odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
-  odsState.types.push_back(handshake::ControlType::get(ctx));
+  Type control = handshake::ControlType::get(ctx);
+  Type dataType = wrapChannel(memrefType.getElementType());
+
+  addTypesBasedOnLoadAndStorePorts(odsState, dataType, control,
+                                   loadAndStorePorts);
+
+  // This is the completion signal of the LSQ
+  odsState.types.push_back(control);
   buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
 }
 
+/// In this case the LSQ is a Slave.
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                   handshake::MemoryControllerOp mcOp, ValueRange inputs,
-                  ArrayRef<unsigned> groupSizes, unsigned numLoads) {
+                  ArrayRef<unsigned> groupSizes,
+                  SmallVector<bool> loadAndStorePorts) {
   // Memory operands
   odsState.addOperands(inputs);
 
@@ -1048,7 +1079,9 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   MemRefType memrefType = mcOp.getMemRefType();
   MLIRContext *ctx = odsBuilder.getContext();
   Type dataType = wrapChannel(memrefType.getElementType());
-  odsState.types.append(numLoads, dataType);
+  Type control = handshake::ControlType::get(ctx);
+  addTypesBasedOnLoadAndStorePorts(odsState, dataType, control,
+                                   loadAndStorePorts);
 
   // Add results for load/store address and store data
   Type addrType = handshake::ChannelType::getAddrChannel(ctx);
@@ -1193,12 +1226,14 @@ static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
         return failure();
 
       // Add a store port to the group and decrement our group size by one
-      currentGroup->accessPorts.push_back(StorePort(storeOp, input.index()));
+      currentGroup->accessPorts.push_back(
+          StorePort(storeOp, input.index(), resIdx++));
       --(*currentGroupRemaining);
       return success();
     };
 
     auto handleMC = [&](handshake::MemoryControllerOp mcOp) -> LogicalResult {
+      ++currentIt; // Skip the store done signal
       if (failed(checkAndSetBitwidth(input.value(), lsqPorts.dataWidth)) ||
           failed(checkAndSetBitwidth(memResults[resIdx], lsqPorts.addrWidth)) ||
           failed(checkAndSetBitwidth(memResults[resIdx + 1],
@@ -1397,18 +1432,23 @@ dynamatic::getMemoryPorts(handshake::MemoryOpInterface memOp) {
 }
 
 handshake::MemoryOpInterface dynamatic::findMemInterface(Value val) {
-  llvm::SmallDenseSet<Operation *, 2> explore(val.getUsers().begin(),
-                                              val.getUsers().end());
   llvm::SmallDenseSet<Operation *, 2> visited;
-  for (Operation *op : explore) {
-    if (auto [_, newOp] = visited.insert(op); !newOp)
+  llvm::SmallVector<Operation *, 4> worklist(val.getUsers().begin(),
+                                             val.getUsers().end());
+
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+    if (!visited.insert(op).second)
       continue;
     if (auto memOp = dyn_cast<handshake::MemoryOpInterface>(op))
       return memOp;
     if (isa<handshake::ExtSIOp, handshake::ExtUIOp, handshake::TruncIOp,
-            handshake::ForkOp, handshake::LazyForkOp>(op))
-      explore.insert(op->getUsers().begin(), op->getUsers().end());
+            handshake::ForkOp, handshake::LazyForkOp>(op)) {
+      for (auto *user : op->getUsers())
+        worklist.push_back(user);
+    }
   }
+
   return nullptr;
 }
 
@@ -1428,8 +1468,10 @@ handshake::LoadOp LoadPort::getLoadOp() const {
   return cast<handshake::LoadOp>(portOp);
 }
 
-StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {}
+StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx,
+                     unsigned doneOutputIdx)
+    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {doneOutputIdx},
+                 Kind::STORE) {};
 
 handshake::StoreOp StorePort::getStoreOp() const {
   return cast<handshake::StoreOp>(portOp);
@@ -1438,9 +1480,9 @@ handshake::StoreOp StorePort::getStoreOp() const {
 LSQLoadStorePort::LSQLoadStorePort(dynamatic::handshake::LSQOp lsqOp,
                                    unsigned loadAddrInputIdx,
                                    unsigned loadDataOutputIdx)
-    : MemoryPort(lsqOp,
-                 {loadAddrInputIdx, loadAddrInputIdx + 1, loadAddrInputIdx + 2},
-                 {loadDataOutputIdx}, Kind::LSQ_LOAD_STORE) {}
+    : MemoryPort(
+          lsqOp, {loadAddrInputIdx, loadAddrInputIdx + 1, loadAddrInputIdx + 2},
+          {loadDataOutputIdx, loadDataOutputIdx + 1}, Kind::LSQ_LOAD_STORE) {}
 
 handshake::LSQOp LSQLoadStorePort::getLSQOp() const {
   return cast<handshake::LSQOp>(portOp);
@@ -1450,7 +1492,7 @@ MCLoadStorePort::MCLoadStorePort(dynamatic::handshake::MemoryControllerOp mcOp,
                                  unsigned loadAddrOutputIdx,
                                  unsigned loadDataInputIdx)
     : MemoryPort(
-          mcOp, {loadDataInputIdx},
+          mcOp, {loadDataInputIdx, loadDataInputIdx + 1},
           {loadAddrOutputIdx, loadAddrOutputIdx + 1, loadAddrOutputIdx + 2},
           Kind::MC_LOAD_STORE) {}
 
@@ -1462,28 +1504,8 @@ handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
 // GroupMemoryPorts
 //===----------------------------------------------------------------------===//
 
-GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort) : ctrlPort(ctrlPort) {}
-
-unsigned GroupMemoryPorts::getNumInputs() const {
-  unsigned numInputs = hasControl() ? 1 : 0;
-  for (const MemoryPort &port : accessPorts) {
-    if (isa<LoadPort>(port))
-      numInputs += 1;
-    else if (isa<StorePort>(port))
-      numInputs += 2;
-  }
-  return numInputs;
-}
-
-unsigned GroupMemoryPorts::getNumResults() const {
-  unsigned numResults = 0;
-  for (const MemoryPort &port : accessPorts) {
-    // There is one data output per load port
-    if (isa<LoadPort>(port))
-      numResults += 1;
-  }
-  return numResults;
-}
+GroupMemoryPorts::GroupMemoryPorts(ControlPort ctrlPort)
+    : ctrlPort(ctrlPort) {};
 
 size_t GroupMemoryPorts::getFirstOperandIndex() const {
   if (ctrlPort)
@@ -2084,7 +2106,7 @@ LogicalResult TruncIOp::verify() {
 /// Load/Store base signal names common to all memory interfaces
 static constexpr llvm::StringLiteral MEMREF("memref"), MEM_START("memStart"),
     MEM_END("memEnd"), CTRL_END("ctrlEnd"), CTRL("ctrl"), LD_ADDR("ldAddr"),
-    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData");
+    LD_DATA("ldData"), ST_ADDR("stAddr"), ST_DATA("stData"), ST_DONE("stDone");
 
 static inline std::string getArrayElemName(const Twine &name, unsigned idx) {
   return name.str() + "_" + std::to_string(idx);
@@ -2144,13 +2166,19 @@ inline static std::string getMemOperandName(const FuncMemoryPorts &ports,
 static std::string getMemResultName(FuncMemoryPorts &ports, unsigned idx) {
   // Iterate through all memory ports to find out the type of the
   // operand
-  unsigned loadIdx = 0;
+  unsigned loadIdx = 0, storeIdx = 0;
   for (const GroupMemoryPorts &blockPorts : ports.groups) {
     for (const MemoryPort &accessPort : blockPorts.accessPorts) {
       if (std::optional<LoadPort> loadPort = dyn_cast<LoadPort>(accessPort)) {
         if (loadPort->getDataOutputIndex() == idx)
           return getArrayElemName(LD_DATA, loadIdx);
         ++loadIdx;
+      }
+      if (std::optional<StorePort> storePort =
+              dyn_cast<StorePort>(accessPort)) {
+        if (storePort->getDoneOutputIndex() == idx)
+          return getArrayElemName(ST_DONE, storeIdx);
+        ++storeIdx;
       }
     }
   }
@@ -2171,12 +2199,15 @@ std::string LSQOp::getOperandName(unsigned idx) {
 
   // Get the operand name from a port to a memory controller
   assert(lsqPorts.connectsToMC() && "expected LSQ to connect to MC");
-  assert(lsqPorts.getMCPort().getLoadDataInputIndex() == idx &&
-         "unknown LSQ/MC operand");
-  return "ldDataFromMC";
+  if (lsqPorts.getMCPort().getLoadDataInputIndex() == idx)
+    return "ldDataFromMC";
+  assert(lsqPorts.getMCPort().getStoreDoneInputIndex() == idx &&
+         "unknown LSQ/MC result");
+  return "stDoneFromMC";
 }
 
 std::string LSQOp::getResultName(unsigned idx) {
+
   assert(idx < getOperation()->getNumResults() && "index too high");
 
   if (StringRef name = getIfControlRes(*this, idx); !name.empty())
@@ -2234,8 +2265,10 @@ std::string MemoryControllerOp::getResultName(unsigned idx) {
   // Get the operand name from a port to an LSQ
   assert(mcPorts.connectsToLSQ() && "expected MC to connect to LSQ");
   LSQLoadStorePort lsqPort = mcPorts.getLSQPort();
-  assert(lsqPort.getLoadDataOutputIndex() == idx && "unknown MC/LSQ result");
-  return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
+  if (lsqPort.getLoadDataOutputIndex() == idx)
+    return getArrayElemName(LD_DATA, mcPorts.getNumPorts<LoadPort>());
+  assert(lsqPort.getStoreDoneOutputIndex() == idx && "unknown MC/LSQ result");
+  return getArrayElemName(ST_DONE, mcPorts.getNumPorts<StorePort>());
 }
 
 #define GET_OP_CLASSES

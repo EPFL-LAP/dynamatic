@@ -51,7 +51,7 @@ TypedValue<ControlType> LSQOp::getMemStart() {
 
 TypedValue<ControlType> LSQOp::getMemEnd() {
   if (MemoryControllerOp mcOp = getConnectedMC())
-    return mcOp.getMemStart();
+    return mcOp.getMemEnd();
   return cast<TypedValue<ControlType>>(getResults().back());
 }
 
