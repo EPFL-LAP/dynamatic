@@ -55,9 +55,22 @@ public:
       : DynOpConversionPattern<mlir::func::FuncOp>(namer, typeConverter, ctx,
                                                    benefit) {};
 
+  LowerFuncToHandshake(NameAnalysis &namer, const TypeConverter &typeConverter,
+                       MLIRContext *ctx, bool annotateCFG,
+                       mlir::PatternBenefit benefit = 1)
+      : DynOpConversionPattern<mlir::func::FuncOp>(namer, typeConverter, ctx,
+                                                   benefit),
+        shouldAnnotateCFG(annotateCFG) {};
+
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override;
+
+private:
+  /// Whether to preserve the original CFG as an annotation before flattening.
+  bool shouldAnnotateCFG = false;
+
+public:
 
   /// Groups memory operations by interface and group for a given memory region.
   struct MemAccesses {
