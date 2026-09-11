@@ -345,6 +345,9 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
   } else if (inst->getOpcode() == Instruction::FNeg) {
     naiveTranslation<arith::NegFOp>(getMLIRType(inst->getType(), ctx),
                                     valueMap[inst->getOperand(0)], inst);
+  } else if (auto *freezeInst = dyn_cast<FreezeInst>(inst)) {
+    // Freeze instruction is a NOP for us as we don't propagate poison values
+    valueMap[inst] = valueMap[freezeInst->getOperand(0)];
   } else {
     llvm_unreachable("Not implemented");
   }
