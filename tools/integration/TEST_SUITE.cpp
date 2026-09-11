@@ -821,6 +821,8 @@ INSTANTIATE_TEST_SUITE_P(
       // "test_block_1d_factor8",
       // "test_block_2d_outer",
       "test_block_2d_inner",
+      "test_cyclic_2d_global",
+      // "test_cyclic_1d_global",
       "test_complete_1d"
     ),
     [](const auto &info) { return "memory_partition_" + info.param; });
