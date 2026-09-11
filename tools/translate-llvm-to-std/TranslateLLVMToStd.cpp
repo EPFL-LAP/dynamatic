@@ -184,7 +184,6 @@ void convertInitializerToDenseElemAttrRecursive(
       convertInitializerToDenseElemAttrRecursive(elem, values,
                                                  baseMLIRElemType);
     } else {
-      elem->getType()->dump();
       llvm::report_fatal_error("Unhandled base element type.");
     }
   }
