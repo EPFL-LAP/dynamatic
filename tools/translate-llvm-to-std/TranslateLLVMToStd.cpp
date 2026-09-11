@@ -176,11 +176,15 @@ void convertInitializerToDenseElemAttrRecursive(
     } else if (auto *constFloat = llvm::dyn_cast<llvm::ConstantFP>(elem)) {
       values.push_back(
           mlir::FloatAttr::get(baseMLIRElemType, constFloat->getValueAPF()));
-    } else if (llvm::isa<llvm::ConstantDataArray>(elem)) {
+    } else if (llvm::isa<llvm::ConstantDataArray, llvm::ConstantAggregateZero>(
+                   elem)) {
+      // NOTE: llvm might use ConstantAggregateZero when the whole array is
+      // initialized as 0, which is why we need to allow for both a
+      // ConstantDataArray or ConstantAggregateZero
       convertInitializerToDenseElemAttrRecursive(elem, values,
                                                  baseMLIRElemType);
     } else {
-      llvm::errs() << "Unhandled constant element type:\n";
+      elem->getType()->dump();
       llvm::report_fatal_error("Unhandled base element type.");
     }
   }
