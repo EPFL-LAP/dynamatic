@@ -136,19 +136,17 @@ Type *getStorageType(Value *base) {
   llvm::report_fatal_error("__dyn_array_partition: Unsupported storage type");
 }
 
-// Recursively descends nested ConstantArrays until reaching targetDim (0
-// depth = outermost), then slices that dimension to the given
-// (firstIndex, step, elems), leaving all other dimensions untouched:
+// Recursively descends nested ConstantArrays until reaching targetDim, then
+// slices that dimension to the given (firstIndex, step, elems), leaving all
+// other dimensions untouched:
 //
 // int A[3][4] = {{1,2,3,4}, {5,6,7,8}, {9,10,11,12}};
 //
-// sliceGlobalInitializer(init, depth=0, targetDim=0, firstIndex=1, step=1,
-// elems=2)
+// sliceGlobalInitializer(init, targetDim=0, firstIndex=1, step=1, elems=2)
 // =>
 // {{5,6,7,8}, {9,10,11,12}}
 //
-// sliceGlobalInitializer(init, depth=0, targetDim=1, firstIndex=1, step=2,
-// elems=2)
+// sliceGlobalInitializer(init, targetDim=1, firstIndex=1, step=2, elems=2)
 // =>
 // {{2,4}, {6,8}, {10,12}}
 Constant *sliceGlobalInitializer(Constant *init, unsigned targetDim,
@@ -171,6 +169,8 @@ Constant *sliceGlobalInitializer(Constant *init, unsigned targetDim,
     rebuilt.reserve(arrType->getNumElements());
     for (unsigned i = 0; i < arrType->getNumElements(); i++) {
       rebuilt.push_back(
+          // NOTE: Continue recursion by capturing all arrays of the next depth.
+          // Recursion is continued until depth is equal to the targetDime
           sliceInitializerRecur(cur->getAggregateElement(i), depth + 1));
     }
     Type *innerType = rebuilt.front()->getType();
