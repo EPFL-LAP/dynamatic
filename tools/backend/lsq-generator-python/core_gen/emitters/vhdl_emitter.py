@@ -313,7 +313,7 @@ class VHDLEmitter(Emitter):
         if init != None:
             self.add_reg_str(f"\t\tif ({self.reset_name} = '1') then\n")
             self.add_reg_str(
-                f"\t\t\t{logic.getNameRead()} <= {self.in_to_bits(init)};\n"
+                f"\t\t\t{logic.getNameRead()} <= {self.int_to_str(init)};\n"
             )
             self.add_reg_str(f"\t\telsif (rising_edge({self.clock_name})) then\n")
         else:
@@ -455,6 +455,9 @@ class VHDLEmitter(Emitter):
         Generate a VHDL array-index expression for selecting an element
         """
         return f"{din.getNameRead()}(to_integer(unsigned({sel.getNameRead()})))"
+
+    def print_custom_str(self, custom_statement) -> str:
+        return custom_statement.vhdl_str
 
     def add_custom_statement(self, custom_statement):
         for line in custom_statement.vhdl_str.splitlines():
