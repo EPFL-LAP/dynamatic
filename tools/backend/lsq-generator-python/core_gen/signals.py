@@ -108,7 +108,6 @@ class Logic:
         elif (self.type == 'o'):
             return self.add_sufix(sufix) + ('_o' if not self.dyn_comp else '')
 
-
     def signalInit(self, sufix='') -> None:
         """
         Appends the appropriate declaration or port line for this signal to a global buffer.
@@ -291,16 +290,20 @@ class LogicArray(Logic):
 
     def getNameRead(self, i) -> str:
         assert i in range(0, self.length)
-        if self.dyn_comp and i == 0: suffix = ''
-        else: suffix = f'_{i}'
+        if self.dyn_comp and i == 0:
+            suffix = ''
+        else:
+            suffix = f'_{i}'
 
         return Logic.getNameRead(self, suffix)
 
     def getNameWrite(self, i) -> str:
         assert i in range(0, self.length)
-        if self.dyn_comp and i == 0: suffix = ''
-        else: suffix = f'_{i}'
-        return Logic.getNameWrite(self, f'_{i}')
+        if self.dyn_comp and i == 0:
+            suffix = ''
+        else:
+            suffix = f'_{i}'
+        return Logic.getNameWrite(self, suffix)
 
     def signalInit(self) -> None:
         for i in range(0, self.length):
@@ -366,14 +369,18 @@ class LogicVecArray(LogicVec):
 
     def getNameRead(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        if self.dyn_comp and i == 0: suffix = ''
-        else: suffix = f'_{i}'
+        if self.dyn_comp and i == 0:
+            suffix = ''
+        else:
+            suffix = f'_{i}'
         return LogicVec.getNameRead(self, j, suffix)
 
     def getNameWrite(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        if self.dyn_comp and i == 0: suffix = ''
-        else: suffix = f'_{i}'
+        if self.dyn_comp and i == 0:
+            suffix = ''
+        else:
+            suffix = f'_{i}'
         return LogicVec.getNameWrite(self, j, suffix)
 
     def signalInit(self) -> None:
