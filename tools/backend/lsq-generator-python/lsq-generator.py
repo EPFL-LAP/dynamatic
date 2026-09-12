@@ -327,17 +327,25 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t" * \
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += Op(ctx, rreq_ready[i], "'0'")
             self.lsq_wrapper_str += Op(ctx, rresp_valid[i], "'0'")
             self.lsq_wrapper_str += Op(ctx, rresp_id[i], "(", "others", "=>", "'0'", ")")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
         )
 
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += Op(ctx, rreq_ready[i], "'1'")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\n"
@@ -347,14 +355,26 @@ class LSQWrapper:
             + " = '1' then\n"
         )
 
+        ctx.increase_indent()
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += Op(ctx, rresp_valid[i], "'1'")
             self.lsq_wrapper_str += Op(ctx, rresp_id[i], rreq_id[i])
+        ctx.decrease_indent()
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += "\t" * (ctx.tabLevel + 2) + "else\n"
 
+        ctx.increase_indent()
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += Op(ctx, rresp_valid[i], "'0'")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
@@ -376,17 +396,25 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t" * \
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += Op(ctx, wreq_ready[i], "'0'")
             self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
             self.lsq_wrapper_str += Op(ctx, wresp_id[i], "(", "others", "=>", "'0'", ")")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
         )
 
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += Op(ctx, wreq_ready[i], "'1'")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\n"
@@ -396,14 +424,26 @@ class LSQWrapper:
             + " = '1' then\n"
         )
 
+        ctx.increase_indent()
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'1'")
             self.lsq_wrapper_str += Op(ctx, wresp_id[i], rreq_id[i])
+        ctx.decrease_indent()
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += "\t" * (ctx.tabLevel + 2) + "else\n"
 
+        ctx.increase_indent()
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
@@ -594,14 +634,18 @@ class LSQWrapper:
     def genWrapperSlave(self):
         """This function generates the desired wrapper for the LSQ"""
 
+        ctx = VHDLContext()
+        ctx.tabLevel = 1
+        ctx.tempCount = 0
+        ctx.signalInitString = ''
+        ctx.portInitString = '\tport(\n\t\treset : in std_logic;\n\t\tclock : in std_logic'
+        ctx.regInitString = '\tprocess (clock, reset) is\n' + '\tbegin\n'
+
         # PART 1: Add library information to the module
         self.lsq_wrapper_str += ctx.library
 
         # PART 2: Define the entity
         self.lsq_wrapper_str += f"entity {self.lsq_name} is\n"
-
-        # PART 3: Add the module port definition
-        self.lsq_wrapper_str += ctx.portInitString
 
         ##
         # Define all the IOs
@@ -723,6 +767,8 @@ class LSQWrapper:
         ##
         # IO Definition finished
         ##
+        # PART 3: Add the module port definition
+        self.lsq_wrapper_str += ctx.portInitString
         self.lsq_wrapper_str += "\n\t);"
         self.lsq_wrapper_str += "\nend entity;\n\n"
 
@@ -756,9 +802,11 @@ class LSQWrapper:
             "rreq_id", 'w', self.lsq_config.numLdMem, self.lsq_config.idW, dyn_comp=True
         )
 
-        wreq_id = LogicVecArray(ctx, 
+        wreq_id = LogicVecArray(ctx,
             "wreq_id", 'w', self.lsq_config.numStMem, self.lsq_config.idW, dyn_comp=True
         )
+
+        self.lsq_wrapper_str += ctx.signalInitString
 
         # Begin actual arch logic definition
         self.lsq_wrapper_str += "begin\n"
@@ -771,8 +819,12 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t" * \
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += Op(ctx, rresp_id[i], "(", "others", "=>", "'0'", ")")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
@@ -785,8 +837,14 @@ class LSQWrapper:
             + " = '1' then\n"
         )
 
+        ctx.increase_indent()
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numLdMem):
             self.lsq_wrapper_str += Op(ctx, rresp_id[i], rreq_id[i])
+        ctx.decrease_indent()
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
@@ -808,9 +866,13 @@ class LSQWrapper:
         self.lsq_wrapper_str += "\t" * \
             (ctx.tabLevel + 1) + "if reset = '1' then\n"
 
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
             self.lsq_wrapper_str += Op(ctx, wresp_id[i], "(", "others", "=>", "'0'", ")")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 1) + "elsif rising_edge(clock) then\n"
         )
@@ -825,14 +887,26 @@ class LSQWrapper:
             + " = '1'" + " and " + io_stAddrToMC_ready.getNameRead() + " = '1' then\n"
         )
 
+        ctx.increase_indent()
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'1'")
             self.lsq_wrapper_str += Op(ctx, wresp_id[i], rreq_id[i])
+        ctx.decrease_indent()
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += "\t" * (ctx.tabLevel + 2) + "else\n"
 
+        ctx.increase_indent()
+        ctx.increase_indent()
+        ctx.increase_indent()
         for i in range(self.lsq_config.numStMem):
             self.lsq_wrapper_str += Op(ctx, wresp_valid[i], "'0'")
+        ctx.decrease_indent()
+        ctx.decrease_indent()
+        ctx.decrease_indent()
 
         self.lsq_wrapper_str += (
             "\t" * (ctx.tabLevel + 2)
