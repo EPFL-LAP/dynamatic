@@ -96,20 +96,19 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
   - **\_\_init__.py**  
     Re-exports a curated list of public API symbols (e.g. `main`, `generate`, `Logic`, `LSQ`).
 
-  - **cli.py**  
-    Parses command-line arguments (with `argparse`), converts them into a `Configs` instance, and calls the core generator.
-
   - **codegen.py**  
     Implements the `codeGen(config: Configs)` function.
 
   - **configs.py**  
     Defines the `Configs` class.
 
-  - **context.py**  
-    Defines the `VHDLContext` class. It substitutes the previous `global` context variables.
+  - **ir.py**  
+    Defines the language-agnostic intermediate representation that the generators
+    build: `Statement`, `Type`, `Val`, `BinOp`, `Bin`, `UnOp`, `Un`, `Bit`,
+    `CustomStatement`, `WhenElse`.
 
   - **utils.py**  
-    - `IntToBits`, `Zero`, `GetValue`, `MaskLess`, `isPow2`, `log2Ceil` helper functions.
+    - `GetValue`, `isPow2`, `log2Ceil` helper functions.
 
   - **signals.py**  
     Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
@@ -117,12 +116,11 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     wrapper needs to match the port names used by Dynamatic.
 
   - **core_gen/operators/**  
-    Low-level functions that generate snippets:  
-    - `assign.py`: `Op`  
+    Low-level functions that build the intermediate representation:  
     - `arithmetic.py`: `WrapAdd`, `WrapAddConst`, `WrapSub`
     - `conversions.py`: `VecToArray`, `BitsToOH`, `BitsToOHSub1`, `OHToBits`
     - `masking.py`: `CyclicPriorityMasking`  
-    - `mux.py`: `Mux1H`, `Mux1HROM`, `MuxIndex`, `MuxLookUp`
+    - `mux.py`: `Mux1H`, `Mux1HROM`, `MuxLookUp`
     - `reduction.py`: `ReduceLogicVec`, `ReduceLogicArray`, `ReduceLogicVecArray`, `Reduce`
     - `shifts.py`: `RotateLogicVec`, `RotateLogicArray`, `RotateLogicVecArray`, `CyclicLeftShift`
 
@@ -131,5 +129,12 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     - `dispatchers.py` : `PortToQueueDispatcher`, `QueueToPortDispatcher`, `PortToQueueDispatcherInit`, `QueueToPortDispatcherInit`
     - `group_allocator.py` : `GroupAllocator`, `GroupAllocatorInit`
     - `lsq.py` : `LSQ`
+
+  - **core_gen/emitters/**  
+    Render the intermediate representation into a concrete HDL. The generators
+    only talk to the abstract `Emitter`, so adding a language means adding a
+    subclass here.  
+    - `emitter.py` : abstract base class `Emitter`, plus `Meta`
+    - `vhdl_emitter.py` : `VHDLEmitter`
 
  
