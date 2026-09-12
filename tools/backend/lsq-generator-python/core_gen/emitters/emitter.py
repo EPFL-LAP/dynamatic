@@ -75,6 +75,63 @@ class Emitter:
     def un_to_str(self, un, meta: "Meta") -> str:
         raise NotImplementedError("Emitter subclasses must implement un_to_str()")
 
+    def when_else_to_str(self, when_else, meta: "Meta") -> str:
+        raise NotImplementedError(
+            "Emitter subclasses must implement when_else_to_str()"
+        )
+
+    def print_custom_str(self, custom_statement) -> str:
+        raise NotImplementedError(
+            "Emitter subclasses must implement print_custom_str()"
+        )
+
+    def add_custom_statement(self, custom_statement) -> None:
+        raise NotImplementedError(
+            "Emitter subclasses must implement add_custom_statement()"
+        )
+
+    def int_to_str(din: int, size=None, meta: "Meta" = None) -> str:
+        raise NotImplementedError("Emitter subclasses must implement int_to_str()")
+
+    def mask_less(din, size) -> str:
+        raise NotImplementedError("Emitter subclasses must implement mask_less()")
+
+    def mux_index(din, sel) -> str:
+        raise NotImplementedError("Emitter subclasses must implement mux_index()")
+
+    def slice_var(self, var_name, high, low):
+        raise NotImplementedError("Emitter subclasses must implement slice_var()")
+
+    def get_file_suffix(self) -> str:
+        raise NotImplementedError("Emitter subclasses must implement get_file_suffix()")
+
+    def get_reg_init_str(self) -> str:
+        raise NotImplementedError(
+            "Emitter subclasses must implement get_reg_init_str()"
+        )
+
+    def get_definition_str(self, module_name: str, write_regs: bool = True) -> str:
+        raise NotImplementedError(
+            "Emitter subclasses must implement get_definition_str()"
+        )
+
+    def start_instantiation(self, module_name: str, instance_name: str = None) -> str:
+        raise NotImplementedError(
+            "Emitter subclasses must implement start_instantiation()"
+        )
+
+    def add_map(self, port_name: str, signal_name: str = "open") -> str:
+        raise NotImplementedError("Emitter subclasses must implement add_map()")
+
+    def complete_instantiation(self) -> str:
+        raise NotImplementedError(
+            "Emitter subclasses must implement complete_instantiation()"
+        )
+
+    @staticmethod
+    def new() -> "Emitter":
+        raise NotImplementedError("Emitter subclasses must implement new()")
+
     def assigned_var_to_str(self, var):
         from core_gen.signals import Logic
 

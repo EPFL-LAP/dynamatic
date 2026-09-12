@@ -1724,7 +1724,7 @@ class LSQ:
 
             # Write Request
             em.add_assignment(wreq_valid_o[0], store_en_p1)
-            em.add_assignment(wreq_id_o[0], 0)
+            em.add_assignment(wreq_id_o[0], Val(0))
             MuxLookUp(em, wreq_addr_o[0], stq_addr, store_idx_p1)
             MuxLookUp(em, wreq_data_o[0], stq_data, store_idx_p1)
             em.add_assignment(stq_issue_en, store_en & store_p1_ready)
@@ -1740,9 +1740,9 @@ class LSQ:
                 for w in range(0, self.configs.numLdMem):
                     em.add_assignment(
                         read_idx_oh[w],
-                        rresp_valid_i[w].when(
-                            (rresp_id_i[w] == Val(i, self.configs.idW)).else_(Bit(0))
-                        ),
+                        rresp_valid_i[w]
+                        .when(rresp_id_i[w] == Val(i, self.configs.idW))
+                        .else_(Bit(0)),
                     )
                 Mux1H(em, read_data, rresp_data_i, read_idx_oh)
                 Reduce(em, read_valid, read_idx_oh, BinOp.OR)
