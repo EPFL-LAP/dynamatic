@@ -109,12 +109,12 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     Defines the `VHDLContext` class. It substitutes the previous `global` context variables.
 
   - **utils.py**  
-    - Defines `VHDLLogicType`, `VHDLLogicVecType`, `VHDLLogicTypeArray`, `VHDLLogicVecTypeArray`, `OpTab`.
     - `IntToBits`, `Zero`, `GetValue`, `MaskLess`, `isPow2`, `log2Ceil` helper functions.
-    - Classes and functions need to be relocated into other files later.
 
   - **signals.py**  
     Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
+    Pass `dyn_comp=True` to drop the `_i`/`_o` port suffixes, which the LSQ
+    wrapper needs to match the port names used by Dynamatic.
 
   - **core_gen/operators/**  
     Low-level functions that generate snippets:  
