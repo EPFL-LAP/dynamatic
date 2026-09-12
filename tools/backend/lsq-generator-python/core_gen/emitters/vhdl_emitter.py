@@ -253,47 +253,47 @@ class VHDLEmitter(Emitter):
         """
         if signal.type == "w":
             self.add_signal_str(
-                f"\tsignal {signal.get_base_name(sufix)} : std_logic;\n"
+                f"\tsignal {signal.getBaseNameWrite(sufix)} : std_logic;\n"
             )
         elif signal.type == "r":
             self.add_signal_str(
-                f"\tsignal {signal.get_base_name(sufix)}_d : std_logic;\n"
+                f"\tsignal {signal.getBaseNameWrite(sufix)} : std_logic;\n"
             )
             self.add_signal_str(
-                f"\tsignal {signal.get_base_name(sufix)}_q : std_logic;\n"
+                f"\tsignal {signal.getBaseNameRead(sufix)} : std_logic;\n"
             )
         elif signal.type == "i":
             self.add_port_str(";\n")
             self.add_port_str(
-                f'\t\t{signal.get_base_name(sufix)}{"_i" if not signal.dyn_comp else ""} : in std_logic'
+                f"\t\t{signal.getBaseNameRead(sufix)} : in std_logic"
             )
         elif signal.type == "o":
             self.add_port_str(";\n")
             self.add_port_str(
-                f'\t\t{signal.get_base_name(sufix)}{"_o" if not signal.dyn_comp else ""} : out std_logic'
+                f"\t\t{signal.getBaseNameWrite(sufix)} : out std_logic"
             )
 
     def logicvec_signal_init(self, vec: LogicVec, sufix: str):
         if vec.type == "w":
             self.add_signal_str(
-                f"\tsignal {vec.get_base_name(sufix)} : std_logic_vector({vec.size-1} downto 0);\n"
+                f"\tsignal {vec.getBaseNameWrite(sufix)} : std_logic_vector({vec.size-1} downto 0);\n"
             )
         elif vec.type == "r":
             self.add_signal_str(
-                f"\tsignal {vec.get_base_name(sufix)}_d : std_logic_vector({vec.size-1} downto 0);\n"
+                f"\tsignal {vec.getBaseNameWrite(sufix)} : std_logic_vector({vec.size-1} downto 0);\n"
             )
             self.add_signal_str(
-                f"\tsignal {vec.get_base_name(sufix)}_q : std_logic_vector({vec.size-1} downto 0);\n"
+                f"\tsignal {vec.getBaseNameRead(sufix)} : std_logic_vector({vec.size-1} downto 0);\n"
             )
         elif vec.type == "i":
             self.add_port_str(";\n")
             self.add_port_str(
-                f'\t\t{vec.get_base_name(sufix)}{'_i' if not vec.dyn_comp else ""} : in std_logic_vector({vec.size-1} downto 0)'
+                f"\t\t{vec.getBaseNameRead(sufix)} : in std_logic_vector({vec.size-1} downto 0)"
             )
         elif vec.type == "o":
             self.add_port_str(";\n")
             self.add_port_str(
-                f'\t\t{vec.get_base_name(sufix)}{'_o' if not vec.dyn_comp else ""} : out std_logic_vector({vec.size-1} downto 0)'
+                f"\t\t{vec.getBaseNameWrite(sufix)} : out std_logic_vector({vec.size-1} downto 0)"
             )
 
     def logic_reg_init(self, logic: Logic, enable=None, init=None) -> None:
