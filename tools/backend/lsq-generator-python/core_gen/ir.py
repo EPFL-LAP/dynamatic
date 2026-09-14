@@ -260,15 +260,12 @@ class WhenElse(Statement):
         return em.when_else_to_str(self, meta)
 
     def get_type(self) -> str:
-        if (
-            self.true_statement.get_type() != self.false_statement.get_type()
-            and self.true_statement.get_type() != Type.ANY
-            and self.false_statement.get_type() != Type.ANY
-        ):
-            raise ValueError(
-                f"true_statement and false_statement must have the same type, got {self.true_statement.get_type()} and {self.false_statement.get_type()}"
-            )
-        return self.true_statement.get_type()
+        # A when-else only ever forms the whole right-hand side of an
+        # assignment, so the result is a logic value. The branches may still be
+        # arithmetic (e.g. a wrapping add); each one is converted individually
+        # by the emitter, since a conditional expression cannot sit inside a
+        # type conversion.
+        return Type.LOGIC
 
 
 def reduce_bin(op: BinOp, statements: list) -> Statement:

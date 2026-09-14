@@ -243,6 +243,12 @@ class VHDLEmitter(Emitter):
         )
         cond_str = when_else.condition.to_str(self, meta)
 
+        true_str = self.fix_type(
+            when_else.get_type(), when_else.true_statement.get_type(), true_str
+        )
+        false_str = self.fix_type(
+            when_else.get_type(), when_else.false_statement.get_type(), false_str
+        )
         cond_str = self.fix_type(Type.BOOL, when_else.condition.get_type(), cond_str)
 
         return f"{true_str} when {cond_str} else{enter}{false_str}"

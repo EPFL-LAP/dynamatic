@@ -30,7 +30,7 @@ def WrapAdd(em: Emitter, out, in_a, in_b, max: int) -> str:
         res = LogicVec(em, em.get_temp("res"), "w", out.size + 1)
         em.add_assignment(sum, Bit(0).concat(in_a) + Bit(0).concat(in_b))
         em.add_assignment(res, (sum - Val(max)).when(sum >= Val(max)).else_(sum))
-        em.add_assignment(out, em.slice_var(res.getNameRead(), out_size - 1, 0))
+        em.add_assignment(out, Val(em.slice_var(res.getNameRead(), out.size - 1, 0)))
     em.add_comment("WrapAdd End\n")
 
 
@@ -77,6 +77,6 @@ def WrapSub(em: Emitter, out, in_a, in_b, max: int) -> str:
         em.add_assignment(out, in_a - in_b)
     else:
         em.add_assignment(
-            out, (in_a - in_b).when(in_a >= in_b).else_(in_a + Val(max) - in_b)
+            out, (in_a - in_b).when(in_a >= in_b).else_(Val(max) - in_b + in_a)
         )
     em.add_comment("WrapSub End")
