@@ -361,39 +361,46 @@ class LSQ:
 
         BitsToOH(em, ldq_head_oh, ldq_head)
         BitsToOH(em, stq_head_oh, stq_head)
+        # indicates tail pointer was just updated (i.e., new stores were allocated)
+        stq_tail_update = Logic(em, "stq_tail_update", "r")
+        stq_tail_update.regInit()
+        Reduce(em, stq_tail_update, num_stores, BinOp.OR)
+
+        # Pipelining Strategy:
+        # The signals are always passed through the pipeline stages (*_pcomp,
+        # *_p0, *_p1). If the pipeline stage is enabled, the signal will be
+        # registered (the signal type is 'r' for register). Otherwise, the
+        # signal type is 'w' for wire, and the pipeline stage is effectively
+        # bypassed. If the signals are registers, we need to conditionally call
+        # regInit().
+        pipe_comp_type = "r" if self.configs.pipeComp else "w"
+        pipe0_type = "r" if self.configs.pipe0 else "w"
+        pipe1_type = "r" if self.configs.pipe1 else "w"
 
         # update queue entries
         # load queue
-        if self.configs.pipe0 or self.configs.pipeComp:
-            ldq_wen_p0 = LogicArray(em, "ldq_wen_p0", "r", self.configs.numLdqEntries)
-            ldq_wen_p0.regInit()
-            if self.configs.pipe0 and self.configs.pipeComp:
-                ldq_wen_p1 = LogicArray(
-                    em, "ldq_wen_p1", "r", self.configs.numLdqEntries
-                )
-                ldq_wen_p1.regInit()
+        ldq_wen_pcomp = LogicArray(
+            em, "ldq_wen_pcomp", pipe_comp_type, self.configs.numLdqEntries
+        )
+        ldq_wen_p0 = LogicArray(
+            em, "ldq_wen_p0", pipe0_type, self.configs.numLdqEntries
+        )
         ldq_alloc_next = LogicArray(
             em, "ldq_alloc_next", "w", self.configs.numLdqEntries
         )
+        if self.configs.pipeComp:
+            ldq_wen_pcomp.regInit()
+        if self.configs.pipe0:
+            ldq_wen_p0.regInit()
+
         for i in range(0, self.configs.numLdqEntries):
             em.add_assignment(ldq_alloc_next[i], ~ldq_reset[i] & ldq_alloc[i])
             em.add_assignment(ldq_alloc[i], ldq_wen[i] | ldq_alloc_next[i])
-            if self.configs.pipe0 or self.configs.pipeComp:
-                em.add_assignment(ldq_wen_p0[i], ldq_wen[i])
-                if self.configs.pipe0 and self.configs.pipeComp:
-                    em.add_assignment(ldq_wen_p1[i], ldq_wen[i])
-                    em.add_assignment(
-                        ldq_issue[i], ~ldq_wen_p1[i] & (ldq_issue_set[i] | ldq_issue[i])
-                    )
-                else:
-                    em.add_assignment(
-                        ldq_issue[i], ~ldq_wen_p0[i] & (ldq_issue_set[i] | ldq_issue[i])
-                    )
-            else:
-                em.add_assignment(
-                    ldq_issue[i], ~ldq_wen[i] & (ldq_issue_set[i] | ldq_issue[i])
-                )
-
+            em.add_assignment(ldq_wen_pcomp[i], ldq_wen[i])
+            em.add_assignment(ldq_wen_p0[i], ldq_wen_pcomp[i])
+            em.add_assignment(
+                ldq_issue[i], ~ldq_wen_p0[i] & (ldq_issue_set[i] | ldq_issue[i])
+            )
             em.add_assignment(
                 ldq_addr_valid[i], ~ldq_wen[i] & (ldq_addr_wen[i] | ldq_addr_valid[i])
             )
@@ -626,1236 +633,532 @@ class LSQ:
                 stq_head_oh,
             )
 
+        ###### Dependency Check ######
+        load_idx_oh = LogicVecArray(
+            em, "load_idx_oh", "w", self.configs.numLdMem, self.configs.numLdqEntries
+        )
+        load_en = LogicArray(em, "load_en", "w", self.configs.numLdMem)
+
+        # Multiple store channels not yet implemented
+        assert self.configs.numStMem == 1
+        store_idx = LogicVec(em, "store_idx", "w", self.configs.stqAddrW)
+        store_en = Logic(em, "store_en", "w")
+
+        # Matrix Generation
+        ld_st_conflict = LogicVecArray(
+            em,
+            "ld_st_conflict",
+            "w",
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
+        can_bypass = LogicVecArray(
+            em,
+            "can_bypass",
+            "w",
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
+        can_bypass_p0 = LogicVecArray(
+            em,
+            "can_bypass_p0",
+            pipe0_type,
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
         if self.configs.pipe0:
-            ###### Dependency Check ######
-            load_idx_oh = LogicVecArray(
-                em,
-                "load_idx_oh",
-                "w",
-                self.configs.numLdMem,
-                self.configs.numLdqEntries,
-            )
-            load_en = LogicArray(em, "load_en", "w", self.configs.numLdMem)
-
-            # Multiple store channels not yet implemented
-            assert self.configs.numStMem == 1
-            store_idx = LogicVec(em, "store_idx", "w", self.configs.stqAddrW)
-            store_en = Logic(em, "store_en", "w")
-
-            bypass_idx_oh_p0 = LogicVecArray(
-                em,
-                "bypass_idx_oh_p0",
-                "r",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
-            bypass_idx_oh_p0.regInit()
-            bypass_en = LogicArray(em, "bypass_en", "w", self.configs.numLdqEntries)
-
-            # Matrix Generation
-            ld_st_conflict = LogicVecArray(
-                em,
-                "ld_st_conflict",
-                "w",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
-            can_bypass = LogicVecArray(
-                em,
-                "can_bypass",
-                "w",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
-            can_bypass_p0 = LogicVecArray(
-                em,
-                "can_bypass_p0",
-                "r",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
             can_bypass_p0.regInit(init=[0] * self.configs.numLdqEntries)
 
-            if self.configs.pipeComp:
-                ldq_head_oh_pcomp = LogicVec(
-                    em, "ldq_head_oh_pcomp", "r", self.configs.numLdqEntries
-                )
-                ldq_alloc_pcomp = LogicArray(
-                    em, "ldq_alloc_pcomp", "r", self.configs.numLdqEntries
-                )
-                ldq_addr_valid_pcomp = LogicArray(
-                    em, "ldq_addr_valid_pcomp", "r", self.configs.numLdqEntries
-                )
-                stq_alloc_pcomp = LogicArray(
-                    em, "stq_alloc_pcomp", "r", self.configs.numStqEntries
-                )
-                stq_addr_valid_pcomp = LogicArray(
-                    em, "stq_addr_valid_pcomp", "r", self.configs.numStqEntries
-                )
-                stq_data_valid_pcomp = LogicArray(
-                    em, "stq_data_valid_pcomp", "r", self.configs.numStqEntries
-                )
-                addr_valid_pcomp = LogicVecArray(
-                    em,
-                    "addr_valid_pcomp",
-                    "w",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
-                addr_same_pcomp = LogicVecArray(
-                    em,
-                    "addr_same_pcomp",
-                    "r",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
-                store_is_older_pcomp = LogicVecArray(
-                    em,
-                    "store_is_older_pcomp",
-                    "r",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
+        ldq_head_oh_pcomp = LogicVec(
+            em, "ldq_head_oh_pcomp", pipe_comp_type, self.configs.numLdqEntries
+        )
+        ldq_alloc_pcomp = LogicArray(
+            em, "ldq_alloc_pcomp", pipe_comp_type, self.configs.numLdqEntries
+        )
+        ldq_addr_valid_pcomp = LogicArray(
+            em, "ldq_addr_valid_pcomp", pipe_comp_type, self.configs.numLdqEntries
+        )
+        stq_alloc_pcomp = LogicArray(
+            em, "stq_alloc_pcomp", pipe_comp_type, self.configs.numStqEntries
+        )
+        stq_addr_valid_pcomp = LogicArray(
+            em, "stq_addr_valid_pcomp", pipe_comp_type, self.configs.numStqEntries
+        )
+        stq_data_valid_pcomp = LogicArray(
+            em, "stq_data_valid_pcomp", pipe_comp_type, self.configs.numStqEntries
+        )
+        stq_tail_update_pcomp = Logic(em, "stq_tail_update_pcomp", pipe_comp_type)
+        # addr_valid_pcomp is always a wire: combines other registers signals
+        addr_valid_pcomp = LogicVecArray(
+            em,
+            "addr_valid_pcomp",
+            "w",
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
+        addr_same_pcomp = LogicVecArray(
+            em,
+            "addr_same_pcomp",
+            pipe_comp_type,
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
+        store_is_older_pcomp = LogicVecArray(
+            em,
+            "store_is_older_pcomp",
+            pipe_comp_type,
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
 
-                ldq_head_oh_pcomp.regInit(init=0)
-                ldq_alloc_pcomp.regInit(init=[0] * self.configs.numLdqEntries)
-                ldq_addr_valid_pcomp.regInit()
-                stq_alloc_pcomp.regInit(init=[0] * self.configs.numStqEntries)
-                stq_addr_valid_pcomp.regInit()
-                stq_data_valid_pcomp.regInit()
-                addr_same_pcomp.regInit()
-                store_is_older_pcomp.regInit()
+        # combinational signal indicating whether a load has already completed (assuming it is allocated), meaning the
+        # data (= read response) from memory has been received
+        load_completed = LogicArray(
+            em, "load_completed", "w", self.configs.numLdqEntries
+        )
+        # combinational signal indicating whether a store has already completed (assuming it is allocated), meaning the
+        # write response from memory has been received
+        store_completed = LogicArray(
+            em, "store_completed", "w", self.configs.numStqEntries
+        )
 
-                em.add_assignment(ldq_head_oh_pcomp, ldq_head_oh)
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment((ldq_alloc_pcomp, i), Val(ldq_alloc, i))
-                    em.add_assignment((ldq_addr_valid_pcomp, i), Val(ldq_addr_valid, i))
-                for j in range(0, self.configs.numStqEntries):
-                    em.add_assignment((stq_alloc_pcomp, j), Val(stq_alloc, j))
-                    em.add_assignment((stq_addr_valid_pcomp, j), Val(stq_addr_valid, j))
-                    em.add_assignment((stq_data_valid_pcomp, j), Val(stq_data_valid, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (store_is_older_pcomp, i, j), Val(store_is_older, i, j)
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_valid_pcomp, i, j),
-                            Val(ldq_addr_valid_pcomp, i) & Val(stq_addr_valid_pcomp, j),
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_same_pcomp, i, j),
-                            Bit(1)
-                            .when(Val(ldq_addr, i) == Val(stq_addr, j))
-                            .else_(Bit(0)),
-                        )
+        if self.configs.pipeComp:
+            ldq_head_oh_pcomp.regInit(init=0)
+            ldq_alloc_pcomp.regInit(init=[0] * self.configs.numLdqEntries)
+            ldq_addr_valid_pcomp.regInit()
+            stq_alloc_pcomp.regInit(init=[0] * self.configs.numStqEntries)
+            stq_addr_valid_pcomp.regInit()
+            stq_data_valid_pcomp.regInit()
+            stq_tail_update_pcomp.regInit()
+            addr_same_pcomp.regInit()
+            store_is_older_pcomp.regInit()
 
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (ld_st_conflict, i, j),
-                            Val(stq_alloc_pcomp, j)
-                            & Val(store_is_older_pcomp, i, j)
-                            & (
-                                Val(addr_same_pcomp, i, j)
-                                | ~Val(stq_addr_valid_pcomp, j)
-                            ),
-                        )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (can_bypass_p0, i, j),
-                            Val(ldq_alloc_pcomp, i)
-                            & Val(stq_data_valid_pcomp, j)
-                            & Val(addr_same_pcomp, i, j)
-                            & Val(addr_valid_pcomp, i, j),
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (can_bypass, i, j),
-                            ~Val(ldq_issue, i) & Val(can_bypass_p0, i, j),
-                        )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    em, "load_conflict", "w", self.configs.numLdqEntries
-                )
-                load_req_valid = LogicArray(
-                    em, "load_req_valid", "w", self.configs.numLdqEntries
-                )
-                can_load = LogicArray(em, "can_load", "w", self.configs.numLdqEntries)
-                can_load_p0 = LogicArray(
-                    em, "can_load_p0", "r", self.configs.numLdqEntries
-                )
-                can_load_p0.regInit(init=[0] * self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    Reduce(em, load_conflict[i], ld_st_conflict[i], BinOp.OR)
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        load_req_valid[i], ldq_alloc_pcomp[i] & ldq_addr_valid_pcomp[i]
-                    )
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        can_load_p0[i], ~load_conflict[i] & load_req_valid[i]
-                    )
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(can_load[i], ~ldq_issue[i] & can_load_p0[i])
-
-                ldq_head_oh_p0 = LogicVec(
-                    em, "ldq_head_oh_p0", "r", self.configs.numLdqEntries
-                )
-                ldq_head_oh_p0.regInit()
-                em.add_assignment(ldq_head_oh_p0, ldq_head_oh_pcomp)
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    CyclicPriorityMasking(
-                        em, load_idx_oh[w], can_load_list[w], ldq_head_oh_p0
-                    )
-                    Reduce(em, load_en[w], can_load_list[w], BinOp.OR)
-                    if w + 1 != self.configs.numLdMem:
-                        load_idx_oh_LogicArray = LogicArray(
-                            em,
-                            f"load_idx_oh_Array_{w+1}",
-                            "w",
-                            self.configs.numLdqEntries,
-                        )
-                        VecToArray(em, load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(
-                            LogicArray(
-                                em,
-                                f"can_load_list_{w+1}",
-                                "w",
-                                self.configs.numLdqEntries,
-                            )
-                        )
-                        for i in range(0, self.configs.numLdqEntries):
-                            em.add_assignment(
-                                can_load_list[w + 1][i],
-                                ~load_idx_oh_LogicArray[i] & can_load_list[w][i],
-                            )
-
-                # Store
-                stq_issue_en_p0 = Logic(em, "stq_issue_en_p0", "r")
-                stq_issue_next = LogicVec(
-                    em, "stq_issue_next", "w", self.configs.stqAddrW
-                )
-
-                store_conflict = Logic(em, "store_conflict", "w")
-
-                can_store_curr = Logic(em, "can_store_curr", "w")
-                st_ld_conflict_curr = LogicVec(
-                    em, "st_ld_conflict_curr", "w", self.configs.numLdqEntries
-                )
-                store_valid_curr = Logic(em, "store_valid_curr", "w")
-                store_data_valid_curr = Logic(em, "store_data_valid_curr", "w")
-                store_addr_valid_curr = Logic(em, "store_addr_valid_curr", "w")
-
-                can_store_next = Logic(em, "can_store_next", "w")
-                st_ld_conflict_next = LogicVec(
-                    em, "st_ld_conflict_next", "w", self.configs.numLdqEntries
-                )
-                store_valid_next = Logic(em, "store_valid_next", "w")
-                store_data_valid_next = Logic(em, "store_data_valid_next", "w")
-                store_addr_valid_next = Logic(em, "store_addr_valid_next", "w")
-
-                can_store_p0 = Logic(em, "can_store_p0", "r")
-                st_ld_conflict_p0 = LogicVec(
-                    em, "st_ld_conflict_p0", "r", self.configs.numLdqEntries
-                )
-
-                stq_issue_en_p0.regInit(init=0)
-                can_store_p0.regInit(init=0)
-                st_ld_conflict_p0.regInit()
-
-                em.add_assignment(stq_issue_en_p0, stq_issue_en)
-                WrapAddConst(
-                    em, stq_issue_next, stq_issue, 1, self.configs.numStqEntries
-                )
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        (st_ld_conflict_curr, i),
-                        Val(ldq_alloc_pcomp, i)
-                        & ~Val(em.mux_index(store_is_older_pcomp[i], stq_issue))
-                        & (
-                            Val(em.mux_index(addr_same_pcomp[i], stq_issue))
-                            | ~Val(ldq_addr_valid_pcomp, i)
-                        ),
-                    )
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        (st_ld_conflict_next, i),
-                        Val(ldq_alloc_pcomp, i)
-                        & ~Val(em.mux_index(store_is_older_pcomp[i], stq_issue_next))
-                        & (
-                            Val(em.mux_index(addr_same_pcomp[i], stq_issue_next))
-                            | ~Val(ldq_addr_valid_pcomp, i)
-                        ),
-                    )
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                MuxLookUp(em, store_valid_curr, stq_alloc_pcomp, stq_issue)
-                MuxLookUp(em, store_data_valid_curr, stq_data_valid_pcomp, stq_issue)
-                MuxLookUp(em, store_addr_valid_curr, stq_addr_valid_pcomp, stq_issue)
+        em.add_assignment(ldq_head_oh_pcomp, ldq_head_oh)
+        for i in range(0, self.configs.numLdqEntries):
+            em.add_assignment((ldq_alloc_pcomp, i), Val(ldq_alloc, i))
+            em.add_assignment((ldq_addr_valid_pcomp, i), Val(ldq_addr_valid, i))
+        for j in range(0, self.configs.numStqEntries):
+            em.add_assignment((stq_alloc_pcomp, j), Val(stq_alloc, j))
+            em.add_assignment((stq_addr_valid_pcomp, j), Val(stq_addr_valid, j))
+            em.add_assignment((stq_data_valid_pcomp, j), Val(stq_data_valid, j))
+        em.add_assignment(stq_tail_update_pcomp, stq_tail_update)
+        for i in range(0, self.configs.numLdqEntries):
+            for j in range(0, self.configs.numStqEntries):
                 em.add_assignment(
-                    can_store_curr,
-                    store_valid_curr & store_data_valid_curr & store_addr_valid_curr,
+                    (store_is_older_pcomp, i, j), Val(store_is_older, i, j)
                 )
-                MuxLookUp(em, store_valid_next, stq_alloc_pcomp, stq_issue_next)
-                MuxLookUp(
-                    em, store_data_valid_next, stq_data_valid_pcomp, stq_issue_next
-                )
-                MuxLookUp(
-                    em, store_addr_valid_next, stq_addr_valid_pcomp, stq_issue_next
-                )
+        for i in range(0, self.configs.numLdqEntries):
+            for j in range(0, self.configs.numStqEntries):
                 em.add_assignment(
-                    can_store_next,
-                    store_valid_next & store_data_valid_next & store_addr_valid_next,
+                    (addr_valid_pcomp, i, j),
+                    Val(ldq_addr_valid_pcomp, i) & Val(stq_addr_valid_pcomp, j),
                 )
-                # Multiplex from current and next
+        for i in range(0, self.configs.numLdqEntries):
+            for j in range(0, self.configs.numStqEntries):
                 em.add_assignment(
-                    st_ld_conflict_p0,
-                    st_ld_conflict_next.when(stq_issue_en).else_(st_ld_conflict_curr),
+                    (addr_same_pcomp, i, j),
+                    Bit(1).when(Val(ldq_addr, i) == Val(stq_addr, j)).else_(Bit(0)),
                 )
-                em.add_assignment(
-                    can_store_p0,
-                    can_store_next.when(stq_issue_en).else_(can_store_curr),
-                )
-                # The store conflicts with any load
-                Reduce(em, store_conflict, st_ld_conflict_p0, BinOp.OR)
-                em.add_assignment(store_en, ~store_conflict & can_store_p0)
 
-                em.add_assignment(store_idx, stq_issue)
-
-                # Bypass
-                stq_last_oh = LogicVec(
-                    em, "stq_last_oh", "w", self.configs.numStqEntries
-                )
-                BitsToOHSub1(em, stq_last_oh, stq_tail)
-                for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        em, f"bypass_en_vec_{i}", "w", self.configs.numStqEntries
-                    )
-                    # Search for the youngest store that is older than the load and conflicts
-                    CyclicPriorityMasking(
-                        em, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True
-                    )
-                    # Check if the youngest conflict store can bypass with the load
-                    em.add_assignment(
-                        bypass_en_vec, bypass_idx_oh_p0[i] & can_bypass[i]
-                    )
-                    Reduce(em, bypass_en[i], bypass_en_vec, BinOp.OR)
+        for i in range(self.configs.numLdqEntries):
+            # No need to use pipelined ldq_data_valid here: As soon as the load entry has valid data (in the queue
+            # itself, not the pipeline), the load is considered completed.
+            em.add_assignment(load_completed[i], ldq_data_valid[i])
+        for i in range(self.configs.numStqEntries):
+            if self.configs.stResp:
+                # No need to use pipelined stq_exec here: As soon as the store response has been received from memory,
+                # the store is considered completed.
+                em.add_assignment(store_completed[i], stq_exec[i])
             else:
-                addr_valid = LogicVecArray(
-                    em,
-                    "addr_valid",
-                    "w",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
-                addr_same = LogicVecArray(
-                    em,
-                    "addr_same",
-                    "w",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
+                # If the store queue entry is not valid (anymore), the store has completed.
+                em.add_assignment(store_completed[i], ~stq_alloc[i])
 
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_valid, i, j),
-                            Val(ldq_addr_valid, i) & Val(stq_addr_valid, j),
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_same, i, j),
-                            Bit(1)
-                            .when(Val(ldq_addr, i) == Val(stq_addr, j))
-                            .else_(Bit(0)),
-                        )
-
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (ld_st_conflict, i, j),
-                            Val(stq_alloc, j)
-                            & Val(store_is_older, i, j)
-                            & (Val(addr_same, i, j) | ~Val(stq_addr_valid, j)),
-                        )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (can_bypass_p0, i, j),
-                            Val(ldq_alloc, i)
-                            & Val(stq_data_valid, j)
-                            & Val(addr_same, i, j)
-                            & Val(addr_valid, i, j),
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (can_bypass, i, j),
-                            ~Val(ldq_issue, i) & Val(can_bypass_p0, i, j),
-                        )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    em, "load_conflict", "w", self.configs.numLdqEntries
-                )
-                load_req_valid = LogicArray(
-                    em, "load_req_valid", "w", self.configs.numLdqEntries
-                )
-                can_load = LogicArray(em, "can_load", "w", self.configs.numLdqEntries)
-                can_load_p0 = LogicArray(
-                    em, "can_load_p0", "r", self.configs.numLdqEntries
-                )
-                can_load_p0.regInit(init=[0] * self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    Reduce(em, load_conflict[i], ld_st_conflict[i], BinOp.OR)
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        load_req_valid[i], ldq_alloc[i] & ldq_addr_valid[i]
-                    )
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        can_load_p0[i], ~load_conflict[i] & load_req_valid[i]
-                    )
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(can_load[i], ~ldq_issue[i] & can_load_p0[i])
-                ldq_head_oh_p0 = LogicVec(
-                    em, "ldq_head_oh_p0", "r", self.configs.numLdqEntries
-                )
-                ldq_head_oh_p0.regInit()
-                em.add_assignment(ldq_head_oh_p0, ldq_head_oh)
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    CyclicPriorityMasking(
-                        em, load_idx_oh[w], can_load_list[w], ldq_head_oh_p0
-                    )
-                    Reduce(em, load_en[w], can_load_list[w], BinOp.OR)
-                    if w + 1 != self.configs.numLdMem:
-                        load_idx_oh_LogicArray = LogicArray(
-                            em,
-                            f"load_idx_oh_Array_{w+1}",
-                            "w",
-                            self.configs.numLdqEntries,
-                        )
-                        arch += VecToArray(em, load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(
-                            LogicArray(
-                                em,
-                                f"can_load_list_{w+1}",
-                                "w",
-                                self.configs.numLdqEntries,
-                            )
-                        )
-                        for i in range(0, self.configs.numLdqEntries):
-                            em.add_assignment(
-                                can_load_list[w + 1][i],
-                                ~load_idx_oh_LogicArray[i] & can_load_list[w][i],
-                            )
-
-                # Store
-                stq_issue_en_p0 = Logic(em, "stq_issue_en_p0", "r")
-                stq_issue_next = LogicVec(
-                    em, "stq_issue_next", "w", self.configs.stqAddrW
-                )
-
-                store_conflict = Logic(em, "store_conflict", "w")
-
-                can_store_curr = Logic(em, "can_store_curr", "w")
-                st_ld_conflict_curr = LogicVec(
-                    em, "st_ld_conflict_curr", "w", self.configs.numLdqEntries
-                )
-                store_valid_curr = Logic(em, "store_valid_curr", "w")
-                store_data_valid_curr = Logic(em, "store_data_valid_curr", "w")
-                store_addr_valid_curr = Logic(em, "store_addr_valid_curr", "w")
-
-                can_store_next = Logic(em, "can_store_next", "w")
-                st_ld_conflict_next = LogicVec(
-                    em, "st_ld_conflict_next", "w", self.configs.numLdqEntries
-                )
-                store_valid_next = Logic(em, "store_valid_next", "w")
-                store_data_valid_next = Logic(em, "store_data_valid_next", "w")
-                store_addr_valid_next = Logic(em, "store_addr_valid_next", "w")
-
-                can_store_p0 = Logic(em, "can_store_p0", "r")
-                st_ld_conflict_p0 = LogicVec(
-                    em, "st_ld_conflict_p0", "r", self.configs.numLdqEntries
-                )
-
-                stq_issue_en_p0.regInit(init=0)
-                can_store_p0.regInit(init=0)
-                st_ld_conflict_p0.regInit()
-
-                em.add_assignment(stq_issue_en_p0, stq_issue_en)
-                WrapAddConst(
-                    em, stq_issue_next, stq_issue, 1, self.configs.numStqEntries
-                )
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        (st_ld_conflict_curr, i),
-                        Val(ldq_alloc, i)
-                        & ~Val(em.mux_index(store_is_older[i], stq_issue))
-                        & (
-                            Val(em.mux_index(addr_same[i], stq_issue))
-                            | ~Val(ldq_addr_valid, i)
-                        ),
-                    )
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        (st_ld_conflict_next, i),
-                        Val(ldq_alloc, i)
-                        & ~Val(em.mux_index(store_is_older[i], stq_issue_next))
-                        & (
-                            Val(em.mux_index(addr_same[i], stq_issue_next))
-                            | ~Val(ldq_addr_valid, i)
-                        ),
-                    )
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                MuxLookUp(em, store_valid_curr, stq_alloc, stq_issue)
-                MuxLookUp(em, store_data_valid_curr, stq_data_valid, stq_issue)
-                MuxLookUp(em, store_addr_valid_curr, stq_addr_valid, stq_issue)
+        # A load conflicts with a store when:
+        # 1. The store entry is valid, and
+        # 2. The store entry hasn't completed (received write response from memory), and
+        # 3. The store is older than the load, and
+        # 4. The address conflicts(same or invalid store address).
+        # NOTE: Because we only consider non-completed stores to conflict with a load, bypass will
+        # not forward from any stores which are already completed (but still allocated). However,
+        # such loads only exist if store responses or pipe0 are enabled, which is not the case by
+        # default.
+        for i in range(0, self.configs.numLdqEntries):
+            for j in range(0, self.configs.numStqEntries):
                 em.add_assignment(
-                    can_store_curr,
-                    store_valid_curr & store_data_valid_curr & store_addr_valid_curr,
+                    (ld_st_conflict, i, j),
+                    Val(stq_alloc_pcomp, j)
+                    & ~Val(store_completed, j)
+                    & Val(store_is_older_pcomp, i, j)
+                    & (Val(addr_same_pcomp, i, j) | ~Val(stq_addr_valid_pcomp, j)),
                 )
-                MuxLookUp(em, store_valid_next, stq_alloc, stq_issue_next)
-                MuxLookUp(em, store_data_valid_next, stq_data_valid, stq_issue_next)
-                MuxLookUp(em, store_addr_valid_next, stq_addr_valid, stq_issue_next)
-                em.add_assignment(
-                    can_store_next,
-                    store_valid_next & store_data_valid_next & store_addr_valid_next,
-                )
-                # Multiplex from current and next
-                em.add_assignment(
-                    st_ld_conflict_p0,
-                    st_ld_conflict_next.when(stq_issue_en).else_(st_ld_conflict_curr),
-                )
-                em.add_assignment(
-                    can_store_p0,
-                    can_store_next.when(stq_issue_en).else_(can_store_curr),
-                )
-                # The store conflicts with any load
-                Reduce(em, store_conflict, st_ld_conflict_p0, BinOp.OR)
-                em.add_assignment(store_en, ~store_conflict & can_store_p0)
 
-                em.add_assignment(store_idx, stq_issue)
-
-                # Bypass
-                stq_last_oh = LogicVec(
-                    em, "stq_last_oh", "w", self.configs.numStqEntries
+        # A conflicting store entry can be bypassed to a load entry when:
+        # 1. The load entry is valid, and
+        # 2. The load entry is not issued yet, and
+        # 3. The address of the load-store pair are both valid and values the same.
+        for i in range(0, self.configs.numLdqEntries):
+            for j in range(0, self.configs.numStqEntries):
+                em.add_assignment(
+                    (can_bypass_p0, i, j),
+                    Val(ldq_alloc_pcomp, i)
+                    & Val(stq_data_valid_pcomp, j)
+                    & Val(addr_same_pcomp, i, j)
+                    & Val(addr_valid_pcomp, i, j),
                 )
-                BitsToOHSub1(em, stq_last_oh, stq_tail)
+        for i in range(0, self.configs.numLdqEntries):
+            for j in range(0, self.configs.numStqEntries):
+                em.add_assignment(
+                    (can_bypass, i, j),
+                    ~Val(ldq_issue, i) & Val(can_bypass_p0, i, j),
+                )
+
+        # Load
+
+        load_conflict = LogicArray(em, "load_conflict", "w", self.configs.numLdqEntries)
+        load_req_valid = LogicArray(
+            em, "load_req_valid", "w", self.configs.numLdqEntries
+        )
+        can_load = LogicArray(em, "can_load", "w", self.configs.numLdqEntries)
+        can_load_p0 = LogicArray(
+            em, "can_load_p0", pipe0_type, self.configs.numLdqEntries
+        )
+        if self.configs.pipe0:
+            can_load_p0.regInit(init=[0] * self.configs.numLdqEntries)
+
+        # The load conflicts with any store
+        for i in range(0, self.configs.numLdqEntries):
+            Reduce(em, load_conflict[i], ld_st_conflict[i], BinOp.OR)
+        # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
+        # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
+        for i in range(0, self.configs.numLdqEntries):
+            em.add_assignment(
+                load_req_valid[i], ldq_alloc_pcomp[i] & ldq_addr_valid_pcomp[i]
+            )
+        # Generate list for loads that does not face dependency issue
+        for i in range(0, self.configs.numLdqEntries):
+            em.add_assignment(can_load_p0[i], ~load_conflict[i] & load_req_valid[i])
+        for i in range(0, self.configs.numLdqEntries):
+            em.add_assignment(can_load[i], ~ldq_issue[i] & can_load_p0[i])
+
+        ldq_head_oh_p0 = LogicVec(
+            em, "ldq_head_oh_p0", pipe0_type, self.configs.numLdqEntries
+        )
+        if self.configs.pipe0:
+            ldq_head_oh_p0.regInit()
+        em.add_assignment(ldq_head_oh_p0, ldq_head_oh_pcomp)
+
+        can_load_list = []
+        can_load_list.append(can_load)
+        for w in range(0, self.configs.numLdMem):
+            CyclicPriorityMasking(em, load_idx_oh[w], can_load_list[w], ldq_head_oh_p0)
+            Reduce(em, load_en[w], can_load_list[w], BinOp.OR)
+            if w + 1 != self.configs.numLdMem:
+                load_idx_oh_LogicArray = LogicArray(
+                    em, f"load_idx_oh_Array_{w+1}", "w", self.configs.numLdqEntries
+                )
+                VecToArray(em, load_idx_oh_LogicArray, load_idx_oh[w])
+                can_load_list.append(
+                    LogicArray(
+                        em, f"can_load_list_{w+1}", "w", self.configs.numLdqEntries
+                    )
+                )
                 for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        em, f"bypass_en_vec_{i}", "w", self.configs.numStqEntries
-                    )
-                    # Search for the youngest store that is older than the load and conflicts
-                    CyclicPriorityMasking(
-                        em, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True
-                    )
-                    # Check if the youngest conflict store can bypass with the load
                     em.add_assignment(
-                        bypass_en_vec, bypass_idx_oh_p0[i] & can_bypass[i]
+                        can_load_list[w + 1][i],
+                        ~load_idx_oh_LogicArray[i] & can_load_list[w][i],
                     )
-                    Reduce(em, bypass_en[i], bypass_en_vec, BinOp.OR)
+
+        # Store
+        # When pipelining (pipe0) is enabled, this uses look-ahead to the next store entry to reduce the critical path.
+        # Both the current and next stores are checked for validity and conflicts, and the result is multiplexed "late
+        # in the clock cycle" to reduce the critical path. When pipelining is disabled, only the current store entry is
+        # checked, so there is no need for computing the signals for the next store entry, and for the multiplexing.
+
+        # Store request is valid if the entry is allocated and has valid address+data.
+        store_req_valid_arr = LogicArray(
+            em, "store_req_valid_arr", "w", self.configs.numStqEntries
+        )
+        for i in range(self.configs.numStqEntries):
+            em.add_assignment(
+                store_req_valid_arr[i],
+                stq_alloc_pcomp[i] & stq_addr_valid_pcomp[i] & stq_data_valid_pcomp[i],
+            )
+
+        store_conflict = Logic(em, "store_conflict", "w")
+        store_req_valid_p0 = Logic(em, "store_req_valid_p0", pipe0_type)
+        st_ld_conflict_p0 = LogicVec(
+            em, "st_ld_conflict_p0", pipe0_type, self.configs.numLdqEntries
+        )
+        if self.configs.pipe0:
+            store_req_valid_p0.regInit(init=0)
+            st_ld_conflict_p0.regInit()
+
+        # next issue pointer (needed for look-ahead when pipelining is enabled and for stalling store issue)
+        stq_issue_next = LogicVec(em, "stq_issue_next", "w", self.configs.stqAddrW)
+        WrapAddConst(em, stq_issue_next, stq_issue, 1, self.configs.numStqEntries)
+
+        # checks for current and next (if needed) store entry
+        store_req_valid_curr = Logic(em, "store_req_valid_curr", "w")
+        st_ld_conflict_curr = LogicVec(
+            em, "st_ld_conflict_curr", "w", self.configs.numLdqEntries
+        )
+        if self.configs.pipe0:
+            # with pipelining: also compute for the next entry
+            store_req_valid_next = Logic(em, "store_req_valid_next", "w")
+            st_ld_conflict_next = LogicVec(
+                em, "st_ld_conflict_next", "w", self.configs.numLdqEntries
+            )
+
+        # validity lookup
+        MuxLookUp(em, store_req_valid_curr, store_req_valid_arr, stq_issue)
+        if self.configs.pipe0:
+            # with pipelining: also compute for the next entry
+            MuxLookUp(em, store_req_valid_next, store_req_valid_arr, stq_issue_next)
+
+        # A store conflicts with a load when:
+        # 1. The load entry is valid, and
+        # 2. The load entry hasn't completed (received data from memory), and
+        # 3. The load is older than the store, and
+        # 4. The address conflicts(same or invalid store address).
+        # Index order are reversed for store matrix.
+        for i in range(self.configs.numLdqEntries):
+            em.add_assignment(
+                (st_ld_conflict_curr, i),
+                Val(ldq_alloc_pcomp, i)
+                & ~Val(load_completed, i)
+                & ~Val(em.mux_index(store_is_older_pcomp[i], stq_issue))
+                & (
+                    Val(em.mux_index(addr_same_pcomp[i], stq_issue))
+                    | ~Val(ldq_addr_valid_pcomp, i)
+                ),
+            )
+        if self.configs.pipe0:
+            # with pipelining: also compute for the next entry
+            for i in range(self.configs.numLdqEntries):
+                em.add_assignment(
+                    (st_ld_conflict_next, i),
+                    Val(ldq_alloc_pcomp, i)
+                    & ~Val(load_completed, i)
+                    & ~Val(em.mux_index(store_is_older_pcomp[i], stq_issue_next))
+                    & (
+                        Val(em.mux_index(addr_same_pcomp[i], stq_issue_next))
+                        | ~Val(ldq_addr_valid_pcomp, i)
+                    ),
+                )
+
+        if self.configs.pipe0:
+            # with pipelining: multiplex between current and next store entry
+            # Multiplex from current and next
+            em.add_assignment(
+                st_ld_conflict_p0,
+                st_ld_conflict_next.when(stq_issue_en).else_(st_ld_conflict_curr),
+            )
+            em.add_assignment(
+                store_req_valid_p0,
+                store_req_valid_next.when(stq_issue_en).else_(store_req_valid_curr),
+            )
         else:
-            ###### Dependency Check ######
+            # without pipelining: only consider current store entry
+            em.add_assignment(st_ld_conflict_p0, st_ld_conflict_curr)
+            em.add_assignment(store_req_valid_p0, store_req_valid_curr)
 
-            load_idx_oh = LogicVecArray(
-                em,
-                "load_idx_oh",
-                "w",
-                self.configs.numLdMem,
-                self.configs.numLdqEntries,
-            )
-            load_en = LogicArray(em, "load_en", "w", self.configs.numLdMem)
+        # Stalling Store Issue
+        # For small queues relative to the memory latency, it is possible that all store entries
+        # have been allocated and are in-flight to the memory. In this case, the store issue
+        # pointer would wrap around and re-issue the same stores a second time. To avoid this, we
+        # stall store issue once the issue pointer catches up to the tail pointer (i.e., when all
+        # store entries are in-flight), and only allow store issue to proceed when the tail pointer
+        # moves (indicating a store entry has been freed up and subsequently allocated again).
+        store_issue_stall_p0 = Logic(em, "store_issue_stall", "r")
+        store_issue_stall_set = Logic(em, "store_issue_stall_set", "w")
+        store_issue_stall_reset = Logic(em, "store_issue_stall_reset", "w")
+        store_issue_stall_p0.regInit(init=0)
+        em.add_assignment(
+            store_issue_stall_set,
+            stq_issue_en.when(stq_issue_next == stq_tail).else_(Bit(0)),
+        )
+        em.add_assignment(store_issue_stall_reset, stq_tail_update_pcomp)
+        em.add_assignment(
+            store_issue_stall_p0,
+            ~store_issue_stall_reset & (store_issue_stall_p0 | store_issue_stall_set),
+        )
 
-            # Multiple store channels not yet implemented
-            assert self.configs.numStMem == 1
-            store_idx = LogicVec(em, "store_idx", "w", self.configs.stqAddrW)
-            store_en = Logic(em, "store_en", "w")
+        # The store conflicts with any load
+        Reduce(em, store_conflict, st_ld_conflict_p0, BinOp.OR)
+        em.add_assignment(
+            store_en,
+            ~store_conflict & store_req_valid_p0 & ~store_issue_stall_p0,
+        )
+        em.add_assignment(store_idx, stq_issue)
 
-            bypass_idx_oh = LogicVecArray(
-                em,
-                "bypass_idx_oh",
-                "w",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
-            bypass_en = LogicArray(em, "bypass_en", "w", self.configs.numLdqEntries)
-
-            # Matrix Generation
-            ld_st_conflict = LogicVecArray(
-                em,
-                "ld_st_conflict",
-                "w",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
-            can_bypass = LogicVecArray(
-                em,
-                "can_bypass",
-                "w",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
-
-            if self.configs.pipeComp:
-                ldq_head_oh_pcomp = LogicVec(
-                    em, "ldq_head_oh_pcomp", "r", self.configs.numLdqEntries
+        # Bypass
+        bypass_idx_oh_p0 = LogicVecArray(
+            em,
+            "bypass_idx_oh_p0",
+            pipe0_type,
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
+        bypass_en = LogicArray(em, "bypass_en", "w", self.configs.numLdqEntries)
+        if self.configs.pipe0:
+            bypass_idx_oh_p0.regInit()
+        if self.configs.bypass:
+            stq_last_oh = LogicVec(em, "stq_last_oh", "w", self.configs.numStqEntries)
+            BitsToOHSub1(em, stq_last_oh, stq_tail)
+            for i in range(0, self.configs.numLdqEntries):
+                bypass_en_vec = LogicVec(
+                    em, f"bypass_en_vec_{i}", "w", self.configs.numStqEntries
                 )
-                ldq_alloc_pcomp = LogicArray(
-                    em, "ldq_alloc_pcomp", "r", self.configs.numLdqEntries
+                # Search for the youngest store that is older than the load and conflicts
+                CyclicPriorityMasking(
+                    em, bypass_idx_oh_p0[i], ld_st_conflict[i], stq_last_oh, True
                 )
-                ldq_addr_valid_pcomp = LogicArray(
-                    em, "ldq_addr_valid_pcomp", "r", self.configs.numLdqEntries
-                )
-                stq_alloc_pcomp = LogicArray(
-                    em, "stq_alloc_pcomp", "r", self.configs.numStqEntries
-                )
-                stq_addr_valid_pcomp = LogicArray(
-                    em, "stq_addr_valid_pcomp", "r", self.configs.numStqEntries
-                )
-                stq_data_valid_pcomp = LogicArray(
-                    em, "stq_data_valid_pcomp", "r", self.configs.numStqEntries
-                )
-                addr_valid_pcomp = LogicVecArray(
-                    em,
-                    "addr_valid_pcomp",
-                    "w",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
-                addr_same_pcomp = LogicVecArray(
-                    em,
-                    "addr_same_pcomp",
-                    "r",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
-                store_is_older_pcomp = LogicVecArray(
-                    em,
-                    "store_is_older_pcomp",
-                    "r",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
+                # Check if the youngest conflict store can bypass with the load
+                em.add_assignment(bypass_en_vec, bypass_idx_oh_p0[i] & can_bypass[i])
+                Reduce(em, bypass_en[i], bypass_en_vec, BinOp.OR)
+        else:
+            # bypass disabled: tie bypass signals low
+            for i in range(0, self.configs.numLdqEntries):
+                em.add_assignment(bypass_en[i], Bit(0))
+            for i in range(0, self.configs.numLdqEntries):
+                em.add_assignment(bypass_idx_oh_p0[i], Val(0))
 
-                ldq_head_oh_pcomp.regInit(init=0)
-                ldq_alloc_pcomp.regInit(init=[0] * self.configs.numLdqEntries)
-                ldq_addr_valid_pcomp.regInit()
-                stq_alloc_pcomp.regInit(init=[0] * self.configs.numStqEntries)
-                stq_addr_valid_pcomp.regInit()
-                stq_data_valid_pcomp.regInit()
-                addr_same_pcomp.regInit()
-                store_is_older_pcomp.regInit()
+        # Pipeline Stage 1
 
-                em.add_assignment(ldq_head_oh_pcomp, ldq_head_oh)
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment((ldq_alloc_pcomp, i), Val(ldq_alloc, i))
-                    em.add_assignment((ldq_addr_valid_pcomp, i), Val(ldq_addr_valid, i))
-                for j in range(0, self.configs.numStqEntries):
-                    em.add_assignment((stq_alloc_pcomp, j), Val(stq_alloc, j))
-                    em.add_assignment((stq_addr_valid_pcomp, j), Val(stq_addr_valid, j))
-                    em.add_assignment((stq_data_valid_pcomp, j), Val(stq_data_valid, j))
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (store_is_older_pcomp, i, j), Val(store_is_older, i, j)
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_valid_pcomp, i, j),
-                            Val(ldq_addr_valid_pcomp, i) & Val(stq_addr_valid_pcomp, j),
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_same_pcomp, i, j),
-                            Bit(1)
-                            .when(Val(ldq_addr, i) == Val(stq_addr, j))
-                            .else_(Bit(0)),
-                        )
+        # load registers (if enabled, w/ backpressure)
+        load_idx_oh_p1 = LogicVecArray(
+            em,
+            "load_idx_oh_p1",
+            pipe1_type,
+            self.configs.numLdMem,
+            self.configs.numLdqEntries,
+        )
+        load_en_p1 = LogicArray(em, "load_en_p1", pipe1_type, self.configs.numLdMem)
+        # store registers (if enabled, w/ backpressure)
+        store_idx_p1 = LogicVec(em, "store_idx_p1", pipe1_type, self.configs.stqAddrW)
+        store_en_p1 = Logic(em, "store_en_p1", pipe1_type)
+        # bypass registers (if enabled, w/o backpressure)
+        bypass_idx_oh_p1 = LogicVecArray(
+            em,
+            "bypass_idx_oh_p1",
+            pipe1_type,
+            self.configs.numLdqEntries,
+            self.configs.numStqEntries,
+        )
+        bypass_en_p1 = LogicArray(
+            em, "bypass_en_p1", pipe1_type, self.configs.numLdqEntries
+        )
 
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (ld_st_conflict, i, j),
-                            Val(stq_alloc_pcomp, j)
-                            & Val(store_is_older_pcomp, i, j)
-                            & (
-                                Val(addr_same_pcomp, i, j)
-                                | ~Val(stq_addr_valid_pcomp, j)
-                            ),
-                        )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (can_bypass, i, j),
-                            Val(ldq_alloc_pcomp, i)
-                            & ~Val(ldq_issue, i)
-                            & Val(stq_data_valid_pcomp, j)
-                            & Val(addr_same_pcomp, i, j)
-                            & Val(addr_valid_pcomp, i, j),
-                        )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    em, "load_conflict", "w", self.configs.numLdqEntries
-                )
-                load_req_valid = LogicArray(
-                    em, "load_req_valid", "w", self.configs.numLdqEntries
-                )
-                can_load = LogicArray(em, "can_load", "w", self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    Reduce(em, load_conflict[i], ld_st_conflict[i], BinOp.OR)
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        load_req_valid[i],
-                        ldq_alloc_pcomp[i] & ~ldq_issue[i] & ldq_addr_valid_pcomp[i],
-                    )
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        can_load[i], ~load_conflict[i] & load_req_valid[i]
-                    )
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    CyclicPriorityMasking(
-                        em, load_idx_oh[w], can_load_list[w], ldq_head_oh_pcomp
-                    )
-                    Reduce(em, load_en[w], can_load_list[w], BinOp.OR)
-                    if w + 1 != self.configs.numLdMem:
-                        load_idx_oh_LogicArray = LogicArray(
-                            em,
-                            f"load_idx_oh_Array_{w+1}",
-                            "w",
-                            self.configs.numLdqEntries,
-                        )
-                        VecToArray(em, load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(
-                            LogicArray(
-                                em,
-                                f"can_load_list_{w+1}",
-                                "w",
-                                self.configs.numLdqEntries,
-                            )
-                        )
-                        for i in range(0, self.configs.numLdqEntries):
-                            em.add_assignment(
-                                can_load_list[w + 1][i],
-                                ~load_idx_oh_LogicArray[i] & can_load_list[w][i],
-                            )
-
-                # Store
-
-                st_ld_conflict = LogicVec(
-                    em, "st_ld_conflict", "w", self.configs.numLdqEntries
-                )
-                store_conflict = Logic(em, "store_conflict", "w")
-                store_valid = Logic(em, "store_valid", "w")
-                store_data_valid = Logic(em, "store_data_valid", "w")
-                store_addr_valid = Logic(em, "store_addr_valid", "w")
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        (st_ld_conflict, i),
-                        Val(ldq_alloc_pcomp, i)
-                        & ~Val(em.mux_index(store_is_older_pcomp[i], stq_issue))
-                        & (
-                            Val(em.mux_index(addr_same_pcomp[i], stq_issue))
-                            | ~Val(ldq_addr_valid_pcomp, i)
-                        ),
-                    )
-                # The store conflicts with any load
-                Reduce(em, store_conflict, st_ld_conflict, BinOp.OR)
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                MuxLookUp(em, store_valid, stq_alloc_pcomp, stq_issue)
-                MuxLookUp(em, store_data_valid, stq_data_valid_pcomp, stq_issue)
-                MuxLookUp(em, store_addr_valid, stq_addr_valid_pcomp, stq_issue)
-                em.add_assignment(
-                    store_en,
-                    ~store_conflict & store_valid & store_data_valid & store_addr_valid,
-                )
-                em.add_assignment(store_idx, stq_issue)
-
-                stq_last_oh = LogicVec(
-                    em, "stq_last_oh", "w", self.configs.numStqEntries
-                )
-                BitsToOHSub1(em, stq_last_oh, stq_tail)
-                for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        em, f"bypass_en_vec_{i}", "w", self.configs.numStqEntries
-                    )
-                    # Search for the youngest store that is older than the load and conflicts
-                    CyclicPriorityMasking(
-                        em, bypass_idx_oh[i], ld_st_conflict[i], stq_last_oh, True
-                    )
-                    # Check if the youngest conflict store can bypass with the load
-                    em.add_assignment(bypass_en_vec, bypass_idx_oh[i] & can_bypass[i])
-                    Reduce(em, bypass_en[i], bypass_en_vec, BinOp.OR)
-            else:
-                addr_valid = LogicVecArray(
-                    em,
-                    "addr_valid",
-                    "w",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
-                addr_same = LogicVecArray(
-                    em,
-                    "addr_same",
-                    "w",
-                    self.configs.numLdqEntries,
-                    self.configs.numStqEntries,
-                )
-
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_valid, i, j),
-                            Val(ldq_addr_valid, i) & Val(stq_addr_valid, j),
-                        )
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (addr_same, i, j),
-                            Bit(1)
-                            .when(Val(ldq_addr, i) == Val(stq_addr, j))
-                            .else_(Bit(0)),
-                        )
-
-                # A load conflicts with a store when:
-                # 1. The store entry is valid, and
-                # 2. The store is older than the load, and
-                # 3. The address conflicts(same or invalid store address).
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (ld_st_conflict, i, j),
-                            Val(stq_alloc, j)
-                            & Val(store_is_older, i, j)
-                            & (Val(addr_same, i, j) | ~Val(stq_addr_valid, j)),
-                        )
-
-                # A conflicting store entry can be bypassed to a load entry when:
-                # 1. The load entry is valid, and
-                # 2. The load entry is not issued yet, and
-                # 3. The address of the load-store pair are both valid and values the same.
-                for i in range(0, self.configs.numLdqEntries):
-                    for j in range(0, self.configs.numStqEntries):
-                        em.add_assignment(
-                            (can_bypass, i, j),
-                            Val(ldq_alloc, i)
-                            & ~Val(ldq_issue, i)
-                            & Val(stq_data_valid, j)
-                            & Val(addr_same, i, j)
-                            & Val(addr_valid, i, j),
-                        )
-
-                # Load
-
-                load_conflict = LogicArray(
-                    em, "load_conflict", "w", self.configs.numLdqEntries
-                )
-                load_req_valid = LogicArray(
-                    em, "load_req_valid", "w", self.configs.numLdqEntries
-                )
-                can_load = LogicArray(em, "can_load", "w", self.configs.numLdqEntries)
-
-                # The load conflicts with any store
-                for i in range(0, self.configs.numLdqEntries):
-                    Reduce(em, load_conflict[i], ld_st_conflict[i], BinOp.OR)
-                # The load is valid when the entry is valid and not yet issued, the load address should also be valid.
-                # We do not need to check ldq_data_valid, since unissued load request cannot have valid data.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        load_req_valid[i],
-                        ldq_alloc[i] & ~ldq_issue[i] & ldq_addr_valid[i],
-                    )
-                # Generate list for loads that does not face dependency issue
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        can_load[i], ~load_conflict[i] & load_req_valid[i]
-                    )
-
-                can_load_list = []
-                can_load_list.append(can_load)
-                for w in range(0, self.configs.numLdMem):
-                    CyclicPriorityMasking(
-                        em, load_idx_oh[w], can_load_list[w], ldq_head_oh
-                    )
-                    Reduce(em, load_en[w], can_load_list[w], BinOp.OR)
-                    if w + 1 != self.configs.numLdMem:
-                        load_idx_oh_LogicArray = LogicArray(
-                            em,
-                            f"load_idx_oh_Array_{w+1}",
-                            "w",
-                            self.configs.numLdqEntries,
-                        )
-                        VecToArray(em, load_idx_oh_LogicArray, load_idx_oh[w])
-                        can_load_list.append(
-                            LogicArray(
-                                em,
-                                f"can_load_list_{w+1}",
-                                "w",
-                                self.configs.numLdqEntries,
-                            )
-                        )
-                        for i in range(0, self.configs.numLdqEntries):
-                            em.add_assignment(
-                                can_load_list[w + 1][i],
-                                ~load_idx_oh_LogicArray[i] & can_load_list[w][i],
-                            )
-                # Store
-
-                st_ld_conflict = LogicVec(
-                    em, "st_ld_conflict", "w", self.configs.numLdqEntries
-                )
-                store_conflict = Logic(em, "store_conflict", "w")
-                store_valid = Logic(em, "store_valid", "w")
-                store_data_valid = Logic(em, "store_data_valid", "w")
-                store_addr_valid = Logic(em, "store_addr_valid", "w")
-
-                # A store conflicts with a load when:
-                # 1. The load entry is valid, and
-                # 2. The load is older than the store, and
-                # 3. The address conflicts(same or invalid store address).
-                # Index order are reversed for store matrix.
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(
-                        (st_ld_conflict, i),
-                        Val(ldq_alloc, i)
-                        & ~Val(em.mux_index(store_is_older[i], stq_issue))
-                        & (
-                            Val(em.mux_index(addr_same[i], stq_issue))
-                            | ~Val(ldq_addr_valid, i)
-                        ),
-                    )
-                # The store conflicts with any load
-                Reduce(em, store_conflict, st_ld_conflict, BinOp.OR)
-                # The store is valid whe the entry is valid and the data is also valid,
-                # the store address should also be valid
-                MuxLookUp(em, store_valid, stq_alloc, stq_issue)
-                MuxLookUp(em, store_data_valid, stq_data_valid, stq_issue)
-                MuxLookUp(em, store_addr_valid, stq_addr_valid, stq_issue)
-                em.add_assignment(
-                    store_en,
-                    ~store_conflict & store_valid & store_data_valid & store_addr_valid,
-                )
-                em.add_assignment(store_idx, stq_issue)
-
-                stq_last_oh = LogicVec(
-                    em, "stq_last_oh", "w", self.configs.numStqEntries
-                )
-                BitsToOHSub1(em, stq_last_oh, stq_tail)
-                for i in range(0, self.configs.numLdqEntries):
-                    bypass_en_vec = LogicVec(
-                        em, f"bypass_en_vec_{i}", "w", self.configs.numStqEntries
-                    )
-                    # Search for the youngest store that is older than the load and conflicts
-                    CyclicPriorityMasking(
-                        em, bypass_idx_oh[i], ld_st_conflict[i], stq_last_oh, True
-                    )
-                    # Check if the youngest conflict store can bypass with the load
-                    em.add_assignment(bypass_en_vec, bypass_idx_oh[i] & can_bypass[i])
-                    Reduce(em, bypass_en[i], bypass_en_vec, BinOp.OR)
+        load_p1_ready = LogicArray(em, "load_p1_ready", "w", self.configs.numLdMem)
+        store_p1_ready = Logic(em, "store_p1_ready", "w")
 
         if self.configs.pipe1:
-            # Pipeline Stage 1
-            load_idx_oh_p1 = LogicVecArray(
-                em,
-                "load_idx_oh_p1",
-                "r",
-                self.configs.numLdMem,
-                self.configs.numLdqEntries,
-            )
-            load_en_p1 = LogicArray(em, "load_en_p1", "r", self.configs.numLdMem)
-
+            # pipeline register control signals (load_*_p1, store_*_p1)
+            # This implements a pipeline register stage with backpressure and
+            # with a # combinational path from output ready to input ready. We
+            # are ready # for new data if either there is a handshake at the
+            # output (*_hs), # or the register is currently empty (not *_en_p1).
             load_hs = LogicArray(em, "load_hs", "w", self.configs.numLdMem)
-            load_p1_ready = LogicArray(em, "load_p1_ready", "w", self.configs.numLdMem)
-
-            store_idx_p1 = LogicVec(em, "store_idx_p1", "r", self.configs.stqAddrW)
-            store_en_p1 = Logic(em, "store_en_p1", "r")
-
-            store_hs = Logic(em, "store_hs", "w")
-            store_p1_ready = Logic(em, "store_p1_ready", "w")
-
-            bypass_idx_oh_p1 = LogicVecArray(
-                em,
-                "bypass_idx_oh_p1",
-                "r",
-                self.configs.numLdqEntries,
-                self.configs.numStqEntries,
-            )
-            bypass_en_p1 = LogicArray(
-                em, "bypass_en_p1", "r", self.configs.numLdqEntries
-            )
-
-            load_idx_oh_p1.regInit(enable=load_p1_ready)
-            load_en_p1.regInit(init=[0] * self.configs.numLdMem, enable=load_p1_ready)
-
-            store_idx_p1.regInit(enable=store_p1_ready)
-            store_en_p1.regInit(init=0, enable=store_p1_ready)
-
-            bypass_idx_oh_p1.regInit()
-            bypass_en_p1.regInit(init=[0] * self.configs.numLdqEntries)
-
             for w in range(0, self.configs.numLdMem):
                 em.add_assignment(load_hs[w], load_en_p1[w] & rreq_ready_i[w])
                 em.add_assignment(load_p1_ready[w], load_hs[w] | ~load_en_p1[w])
-
-            for w in range(0, self.configs.numLdMem):
-                em.add_assignment(load_idx_oh_p1[w], load_idx_oh[w])
-                em.add_assignment(load_en_p1[w], load_en[w])
-
+            store_hs = Logic(em, "store_hs", "w")
             em.add_assignment(store_hs, store_en_p1 & wreq_ready_i[0])
             em.add_assignment(store_p1_ready, store_hs | ~store_en_p1)
-
-            em.add_assignment(store_idx_p1, store_idx)
-            em.add_assignment(store_en_p1, store_en)
-
-            if self.configs.pipe0:
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(bypass_idx_oh_p1[i], bypass_idx_oh_p0[i])
-            else:
-                for i in range(0, self.configs.numLdqEntries):
-                    em.add_assignment(bypass_idx_oh_p1[i], bypass_idx_oh[i])
-
-            for i in range(0, self.configs.numLdqEntries):
-                em.add_assignment(bypass_en_p1[i], bypass_en[i])
-
-            ######    Read/Write    ######
-            # Read Request
-            for w in range(0, self.configs.numLdMem):
-                em.add_assignment(rreq_valid_o[w], load_en_p1[w])
-                OHToBits(em, rreq_id_o[w], load_idx_oh_p1[w])
-                Mux1H(em, rreq_addr_o[w], ldq_addr, load_idx_oh_p1[w])
-
-            for i in range(0, self.configs.numLdqEntries):
-                ldq_issue_set_vec = LogicVec(
-                    em, f"ldq_issue_set_vec_{i}", "w", self.configs.numLdMem
-                )
-                for w in range(0, self.configs.numLdMem):
-                    em.add_assignment(
-                        (ldq_issue_set_vec, w),
-                        (Val(load_idx_oh, w, i) & Val(load_p1_ready, w))
-                        | Val(bypass_en, i),
-                    )
-                Reduce(em, ldq_issue_set[i], ldq_issue_set_vec, BinOp.OR)
-
-            # Write Request
-            em.add_assignment(wreq_valid_o[0], store_en_p1)
-            em.add_assignment(wreq_id_o[0], Val(0))
-            MuxLookUp(em, wreq_addr_o[0], stq_addr, store_idx_p1)
-            MuxLookUp(em, wreq_data_o[0], stq_data, store_idx_p1)
-            em.add_assignment(stq_issue_en, store_en & store_p1_ready)
-
-            # Read Response and Bypass
-            for i in range(0, self.configs.numLdqEntries):
-                # check each read response channel for each load
-                read_idx_oh = LogicArray(
-                    em, f"read_idx_oh_{i}", "w", self.configs.numLdMem
-                )
-                read_valid = Logic(em, f"read_valid_{i}", "w")
-                read_data = LogicVec(em, f"read_data_{i}", "w", self.configs.dataW)
-                for w in range(0, self.configs.numLdMem):
-                    em.add_assignment(
-                        read_idx_oh[w],
-                        rresp_valid_i[w]
-                        .when(rresp_id_i[w] == Val(i, self.configs.idW))
-                        .else_(Bit(0)),
-                    )
-                Mux1H(em, read_data, rresp_data_i, read_idx_oh)
-                Reduce(em, read_valid, read_idx_oh, BinOp.OR)
-                # multiplex from store queue data
-                bypass_data = LogicVec(em, f"bypass_data_{i}", "w", self.configs.dataW)
-                Mux1H(em, bypass_data, stq_data, bypass_idx_oh_p1[i])
-                # multiplex from read and bypass data
-                em.add_assignment(ldq_data[i], read_data | bypass_data)
-                em.add_assignment(ldq_data_wen[i], bypass_en_p1[i] | read_valid)
-            for w in range(0, self.configs.numLdMem):
-                em.add_assignment(rresp_ready_o[w], Bit(1))
-
-            # Write Response
-            if self.configs.stResp:
-                for i in range(0, self.configs.numStqEntries):
-                    em.add_assignment(
-                        stq_exec_set[i],
-                        wresp_valid_i[0]
-                        .when((stq_resp == Val(i, self.configs.stqAddrW)))
-                        .else_(Bit(0)),
-                    )
-            else:
-                for i in range(0, self.configs.numStqEntries):
-                    em.add_assignment(
-                        stq_reset[i],
-                        wresp_valid_i[0]
-                        .when((stq_resp == Val(i, self.configs.stqAddrW)))
-                        .else_(Bit(0)),
-                    )
-
-            em.add_assignment(stq_resp_en, wresp_valid_i[0])
-            em.add_assignment(wresp_ready_o[0], Bit(1))
+            # register init
+            load_idx_oh_p1.regInit(enable=load_p1_ready)
+            load_en_p1.regInit(init=[0] * self.configs.numLdMem, enable=load_p1_ready)
+            store_idx_p1.regInit(enable=store_p1_ready)
+            store_en_p1.regInit(init=0, enable=store_p1_ready)
+            bypass_idx_oh_p1.regInit()
+            bypass_en_p1.regInit(init=[0] * self.configs.numLdqEntries)
         else:
-            ######    Read/Write    ######
-            # Read Request
+            # non-pipelined "pseudo-control" signals
             for w in range(0, self.configs.numLdMem):
-                em.add_assignment(rreq_valid_o[w], load_en[w])
-                OHToBits(em, rreq_id_o[w], load_idx_oh[w])
-                Mux1H(em, rreq_addr_o[w], ldq_addr, load_idx_oh[w])
+                em.add_assignment(load_p1_ready[w], rreq_ready_i[w] & load_en[w])
+            em.add_assignment(store_p1_ready, wreq_ready_i[0])
 
-            for i in range(0, self.configs.numLdqEntries):
-                ldq_issue_set_vec = LogicVec(
-                    em, f"ldq_issue_set_vec_{i}", "w", self.configs.numLdMem
-                )
-                for w in range(0, self.configs.numLdMem):
-                    em.add_assignment(
-                        (ldq_issue_set_vec, w),
-                        (
-                            Val(load_idx_oh, w, i)
-                            & Val(rreq_ready_i, w)
-                            & Val(load_en, w)
-                        )
-                        | Val(bypass_en, i),
-                    )
-                Reduce(em, ldq_issue_set[i], ldq_issue_set_vec, BinOp.OR)
+        # pipeline register assignments
+        for w in range(0, self.configs.numLdMem):
+            em.add_assignment(load_idx_oh_p1[w], load_idx_oh[w])
+            em.add_assignment(load_en_p1[w], load_en[w])
+        em.add_assignment(store_idx_p1, store_idx)
+        em.add_assignment(store_en_p1, store_en)
+        for i in range(0, self.configs.numLdqEntries):
+            em.add_assignment(bypass_idx_oh_p1[i], bypass_idx_oh_p0[i])
+            em.add_assignment(bypass_en_p1[i], bypass_en[i])
 
-            # Write Request
-            em.add_assignment(wreq_valid_o[0], store_en)
-            em.add_assignment(wreq_id_o[0], Val(0))
-            MuxLookUp(em, wreq_addr_o[0], stq_addr, store_idx)
-            MuxLookUp(em, wreq_data_o[0], stq_data, store_idx)
-            em.add_assignment(stq_issue_en, store_en & wreq_ready_i[0])
+        ######    Read/Write    ######
+        # Read Request
+        for w in range(0, self.configs.numLdMem):
+            em.add_assignment(rreq_valid_o[w], load_en_p1[w])
+            OHToBits(em, rreq_id_o[w], load_idx_oh_p1[w])
+            Mux1H(em, rreq_addr_o[w], ldq_addr, load_idx_oh_p1[w])
 
-            # Read Response and Bypass
-            for i in range(0, self.configs.numLdqEntries):
-                # check each read response channel for each load
-                read_idx_oh = LogicArray(
-                    em, f"read_idx_oh_{i}", "w", self.configs.numLdMem
-                )
-                read_valid = Logic(em, f"read_valid_{i}", "w")
-                read_data = LogicVec(em, f"read_data_{i}", "w", self.configs.dataW)
-                for w in range(0, self.configs.numLdMem):
-                    em.add_assignment(
-                        read_idx_oh[w],
-                        rresp_valid_i[w]
-                        .when(rresp_id_i[w] == Val(i, self.configs.idW))
-                        .else_(Bit(0)),
-                    )
-                Mux1H(em, read_data, rresp_data_i, read_idx_oh)
-                Reduce(em, read_valid, read_idx_oh, BinOp.OR)
-                # multiplex from store queue data
-                bypass_data = LogicVec(em, f"bypass_data_{i}", "w", self.configs.dataW)
-                if self.configs.pipe0:
-                    Mux1H(em, bypass_data, stq_data, bypass_idx_oh_p0[i])
-                else:
-                    Mux1H(em, bypass_data, stq_data, bypass_idx_oh[i])
-                # multiplex from read and bypass data
-                em.add_assignment(ldq_data[i], read_data | bypass_data)
-                em.add_assignment(ldq_data_wen[i], bypass_en[i] | read_valid)
+        for i in range(0, self.configs.numLdqEntries):
+            ldq_issue_set_vec = LogicVec(
+                em, f"ldq_issue_set_vec_{i}", "w", self.configs.numLdMem
+            )
             for w in range(0, self.configs.numLdMem):
-                em.add_assignment(rresp_ready_o[w], Bit(1))
+                em.add_assignment(
+                    (ldq_issue_set_vec, w),
+                    (Val(load_idx_oh, w, i) & Val(load_p1_ready, w))
+                    | Val(bypass_en, i),
+                )
+            Reduce(em, ldq_issue_set[i], ldq_issue_set_vec, BinOp.OR)
 
-            # Write Response
-            if self.configs.stResp:
-                for i in range(0, self.configs.numStqEntries):
-                    em.add_assignment(
-                        stq_exec_set[i],
-                        wresp_valid_i[0]
-                        .when(stq_resp == Val(i, self.configs.stqAddrW))
-                        .else_(Bit(0)),
-                    )
-            else:
-                for i in range(0, self.configs.numStqEntries):
-                    em.add_assignment(
-                        stq_reset[i],
-                        wresp_valid_i[0]
-                        .when(stq_resp == Val(i, self.configs.stqAddrW))
-                        .else_(Bit(0)),
-                    )
-            em.add_assignment(stq_resp_en, wresp_valid_i[0])
-            em.add_assignment(wresp_ready_o[0], Bit(1))
+        # Write Request
+        em.add_assignment(wreq_valid_o[0], store_en_p1)
+        em.add_assignment(wreq_id_o[0], Val(0))
+        MuxLookUp(em, wreq_addr_o[0], stq_addr, store_idx_p1)
+        MuxLookUp(em, wreq_data_o[0], stq_data, store_idx_p1)
+        em.add_assignment(stq_issue_en, store_en & store_p1_ready)
 
-        # Write to the file
+        # Read Response and Bypass
+        for i in range(0, self.configs.numLdqEntries):
+            # check each read response channel for each load
+            read_idx_oh = LogicArray(em, f"read_idx_oh_{i}", "w", self.configs.numLdMem)
+            read_valid = Logic(em, f"read_valid_{i}", "w")
+            read_data = LogicVec(em, f"read_data_{i}", "w", self.configs.dataW)
+            for w in range(0, self.configs.numLdMem):
+                em.add_assignment(
+                    read_idx_oh[w],
+                    rresp_valid_i[w]
+                    .when(rresp_id_i[w] == Val(i, self.configs.idW))
+                    .else_(Bit(0)),
+                )
+            Mux1H(em, read_data, rresp_data_i, read_idx_oh)
+            Reduce(em, read_valid, read_idx_oh, BinOp.OR)
+            # multiplex from store queue data
+            bypass_data = LogicVec(em, f"bypass_data_{i}", "w", self.configs.dataW)
+            Mux1H(em, bypass_data, stq_data, bypass_idx_oh_p1[i])
+            # multiplex from read and bypass data
+            em.add_assignment(ldq_data[i], read_data | bypass_data)
+            em.add_assignment(ldq_data_wen[i], bypass_en_p1[i] | read_valid)
+        for w in range(0, self.configs.numLdMem):
+            em.add_assignment(rresp_ready_o[w], Bit(1))
+
+        # Write Response
+        if self.configs.stResp:
+            for i in range(0, self.configs.numStqEntries):
+                em.add_assignment(
+                    stq_exec_set[i],
+                    wresp_valid_i[0]
+                    .when(stq_resp == Val(i, self.configs.stqAddrW))
+                    .else_(Bit(0)),
+                )
+        else:
+            for i in range(0, self.configs.numStqEntries):
+                em.add_assignment(
+                    stq_reset[i],
+                    wresp_valid_i[0]
+                    .when(stq_resp == Val(i, self.configs.stqAddrW))
+                    .else_(Bit(0)),
+                )
+        em.add_assignment(stq_resp_en, wresp_valid_i[0])
+        em.add_assignment(wresp_ready_o[0], Bit(1))
+
+        ######   Write To File  ######
         output_str = em.get_definition_str(self.module_name)
         with open(f"{path_rtl}/{self.name}.{em.get_file_suffix()}", "a") as file:
             file.write(output_str)
