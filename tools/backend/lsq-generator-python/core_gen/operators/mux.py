@@ -47,23 +47,23 @@ def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
           -> selects the third bit: dout = '1'
     """
 
-    em.add_comment("Mux1H Begin")
-    em.add_comment(f"Mux1H({dout.name}, {din.name}, {sel.name})")
+    em.add_comment('Mux1H Begin')
+    em.add_comment(f'Mux1H({dout.name}, {din.name}, {sel.name})')
     em.use_temp()
 
     # din is always LogicVecArray
     if isinstance(din, LogicVecArray):
         length = din.length
         size = din.size
-        mux = LogicVecArray(em, em.get_temp("mux"), "w", length, din.size)
+        mux = LogicVecArray(em, em.get_temp('mux'), 'w', length, din.size)
     elif isinstance(din, LogicArray):
         length = din.length
         size = None
-        mux = LogicArray(em, em.get_temp("mux"), "w", length)
+        mux = LogicArray(em, em.get_temp('mux'), 'w', length)
     else:
         length = din.size
         size = None
-        mux = LogicArray(em, em.get_temp("mux"), "w", length)
+        mux = LogicArray(em, em.get_temp('mux'), 'w', length)
 
     str_zero = em.int_to_str(0, size)
     if j == None:
@@ -79,7 +79,7 @@ def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
             )
 
     Reduce(em, dout, mux, BinOp.OR, False)
-    em.add_comment("Mux1H End\n")
+    em.add_comment('Mux1H End\n')
 
 
 def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
@@ -134,8 +134,8 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     if func is None:
         func = em.int_to_str
 
-    em.add_comment("Mux1H For Rom Begin")
-    em.add_comment(f"Mux1H({dout.name}, {sel.name})")
+    em.add_comment('Mux1H For Rom Begin')
+    em.add_comment(f'Mux1H({dout.name}, {sel.name})')
     em.use_temp()
     mlen = sel.length
     size = dout.size
@@ -144,8 +144,8 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
     if isinstance(dout, LogicVecArray):
         length = dout.length
         for i in range(0, length):
-            em.add_comment(f"Loop {i}")
-            mux = LogicVecArray(em, em.get_temp(f"mux_{i}"), "w", mlen, size)
+            em.add_comment(f'Loop {i}')
+            mux = LogicVecArray(em, em.get_temp(f'mux_{i}'), 'w', mlen, size)
             for j in range(0, mlen):
                 str_value = func(GetValue(din[j], i), size)
                 if str_value == str_zero:
@@ -156,7 +156,7 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
                     )
             Reduce(em, dout[i], mux, BinOp.OR, False)
     else:  # type(dout) == LogicVec
-        mux = LogicVecArray(em, em.get_temp(f"mux"), "w", mlen, size)
+        mux = LogicVecArray(em, em.get_temp(f'mux'), 'w', mlen, size)
         for j in range(0, mlen):
             str_value = func(din[j], size)
             if str_value == str_zero:
@@ -166,7 +166,7 @@ def Mux1HROM(em: Emitter, dout, din, sel, func=None) -> str:
                     (mux, j), Val(str_value).when(Val(sel, j)).else_(Val(str_zero))
                 )
         Reduce(em, dout, mux, BinOp.OR, False)
-    em.add_comment("Mux1H For Rom End\n")
+    em.add_comment('Mux1H For Rom End\n')
 
 
 # TODO: Properly test this
@@ -201,8 +201,8 @@ def MuxLookUp(em: Emitter, dout, din, sel) -> str:
 
     """
 
-    em.add_comment("MuxLookUp Begin")
-    em.add_comment(f"MuxLookUp({dout.name}, {din.name}, {sel.name})")
+    em.add_comment('MuxLookUp Begin')
+    em.add_comment(f'MuxLookUp({dout.name}, {din.name}, {sel.name})')
 
     length = din.length
     size = sel.size
@@ -220,4 +220,4 @@ def MuxLookUp(em: Emitter, dout, din, sel) -> str:
         op.false_statement = whenelses[i + 1]
 
     em.add_assignment(dout, whenelses[0])
-    em.add_comment("MuxLookUp End\n")
+    em.add_comment('MuxLookUp End\n')

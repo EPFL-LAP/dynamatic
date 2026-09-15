@@ -52,14 +52,14 @@ def ReduceLogicVec(em: Emitter, dout, din, operator, length) -> str:
         em.add_assignment(dout, Bin(Val(din, 0), operator, Val(din, 1)))
     else:
         em.use_temp()
-        res = LogicVec(em, em.get_temp("res"), "w", length)
+        res = LogicVec(em, em.get_temp('res'), 'w', length)
         for i in range(0, din.size - length):
             em.add_assignment(
                 (res, i), Bin(Val(din, i), operator, Val(din, i + length))
             )
         for i in range(din.size - length, length):
             em.add_assignment((res, i), Val(din, i))
-        em.add_comment("Layer End")
+        em.add_comment('Layer End')
         ReduceLogicVec(em, dout, res, operator, length // 2)
 
 
@@ -76,12 +76,12 @@ def ReduceLogicArray(em: Emitter, dout, din, operator, length) -> str:
         em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
         em.use_temp()
-        res = LogicArray(em, em.get_temp("res"), "w", length)
+        res = LogicArray(em, em.get_temp('res'), 'w', length)
         for i in range(0, din.length - length):
             em.add_assignment(res[i], Bin(din[i], operator, din[i + length]))
         for i in range(din.length - length, length):
             em.add_assignment(res[i], din[i])
-        em.add_comment("Layer End")
+        em.add_comment('Layer End')
         ReduceLogicArray(em, dout, res, operator, length // 2)
 
 
@@ -126,12 +126,12 @@ def ReduceLogicVecArray(em: Emitter, dout, din, operator, length) -> str:
         em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
         em.use_temp()
-        res = LogicVecArray(em, em.get_temp("res"), "w", length, dout.size)
+        res = LogicVecArray(em, em.get_temp('res'), 'w', length, dout.size)
         for i in range(0, din.length - length):
             em.add_assignment(res[i], Bin(din[i], operator, din[i + length]))
         for i in range(din.length - length, length):
             em.add_assignment(res[i], din[i])
-        em.add_comment("Layer End")
+        em.add_comment('Layer End')
         ReduceLogicVecArray(em, dout, res, operator, length // 2)
 
 
@@ -153,8 +153,8 @@ def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
     from core_gen.signals import LogicVec, LogicArray, LogicVecArray
 
     if comment:
-        em.add_comment("Reduction Begin")
-        em.add_comment(f"Reduce({dout.name}, {din.name}, {em.get_binop_str(operator)})")
+        em.add_comment('Reduction Begin')
+        em.add_comment(f'Reduce({dout.name}, {din.name}, {em.get_binop_str(operator)})')
     if type(din) == LogicVec:
         if din.size == 1:
             em.add_assignment(dout, Val(din, 0))
@@ -171,4 +171,4 @@ def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
             else:
                 ReduceLogicVecArray(em, dout, din, operator, length)
     if comment:
-        em.add_comment("Reduction End\n")
+        em.add_comment('Reduction End\n')

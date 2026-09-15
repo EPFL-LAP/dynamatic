@@ -10,12 +10,12 @@ def codeGen(emitter: Emitter, path_rtl, configs):
     # Initialize a wrapper object to hold all submodule generator instances.
     lsq_submodules = lsq_submodule_wrapper.LSQ_Submodules()
 
-    name = configs.name + "_core"
+    name = configs.name + '_core'
     # empty the file
-    file = open(f"{path_rtl}/{name}.{emitter.get_file_suffix()}", "w").close()
+    file = open(f'{path_rtl}/{name}.{emitter.get_file_suffix()}', 'w').close()
 
     # Group Allocator
-    ga = group_allocator.GroupAllocator(name=name, suffix="_ga", configs=configs)
+    ga = group_allocator.GroupAllocator(name=name, suffix='_ga', configs=configs)
     ga.generate(emitter.new(), path_rtl)
     lsq_submodules.group_allocator = ga
 
@@ -28,7 +28,7 @@ def codeGen(emitter: Emitter, path_rtl, configs):
         # Load Address Port Dispatcher
         ptq_dispatcher_lda = dispatchers.PortToQueueDispatcher(
             name,
-            "_lda",
+            '_lda',
             configs.numLdPorts,
             configs.numLdqEntries,
             configs.addrW,
@@ -40,7 +40,7 @@ def codeGen(emitter: Emitter, path_rtl, configs):
         # Load Data Port Dispatcher
         qtp_dispatcher_ldd = dispatchers.QueueToPortDispatcher(
             name,
-            "_ldd",
+            '_ldd',
             configs.numLdPorts,
             configs.numLdqEntries,
             configs.dataW,
@@ -52,7 +52,7 @@ def codeGen(emitter: Emitter, path_rtl, configs):
     # Store Address Port Dispatcher
     ptq_dispatcher_sta = dispatchers.PortToQueueDispatcher(
         name,
-        "_sta",
+        '_sta',
         configs.numStPorts,
         configs.numStqEntries,
         configs.addrW,
@@ -64,7 +64,7 @@ def codeGen(emitter: Emitter, path_rtl, configs):
     # Store Data Port Dispatcher
     ptq_dispatcher_std = dispatchers.PortToQueueDispatcher(
         name,
-        "_std",
+        '_std',
         configs.numStPorts,
         configs.numStqEntries,
         configs.dataW,
@@ -76,11 +76,11 @@ def codeGen(emitter: Emitter, path_rtl, configs):
     # Store Backward Port Dispatcher
     if configs.stResp:
         qtp_dispatcher_stb = dispatchers.QueueToPortDispatcher(
-            name, "_stb", configs.numStPorts, configs.numStqEntries, 0, configs.stpAddrW
+            name, '_stb', configs.numStPorts, configs.numStqEntries, 0, configs.stpAddrW
         )
         qtp_dispatcher_stb.generate(emitter.new(), path_rtl)
         lsq_submodules.qtp_dispatcher_stb = qtp_dispatcher_stb
 
     # Change the name of the following module to lsq_core
-    lsq_core = lsq.LSQ(name, "", configs)
+    lsq_core = lsq.LSQ(name, '', configs)
     lsq_core.generate(emitter, lsq_submodules, path_rtl)

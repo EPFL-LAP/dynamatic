@@ -2,4 +2,4 @@
 from core_gen.emitters.emitter import Emitter
 from core_gen.emitters.vhdl_emitter import VHDLEmitter
 
-__all__ = ["Emitter", "VHDLEmitter"]
+__all__ = ['Emitter', 'VHDLEmitter']

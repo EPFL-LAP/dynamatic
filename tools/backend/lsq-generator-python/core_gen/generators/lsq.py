@@ -84,134 +84,134 @@ class LSQ:
 
         # group initialzation signals
         group_init_valid_i = LogicArray(
-            em, "group_init_valid", "i", self.configs.numGroups
+            em, 'group_init_valid', 'i', self.configs.numGroups
         )
         group_init_ready_o = LogicArray(
-            em, "group_init_ready", "o", self.configs.numGroups
+            em, 'group_init_ready', 'o', self.configs.numGroups
         )
 
         # Memory access ports, i.e., the connection "kernel -> LSQ"
         # Load address channel (addr, valid, ready) from kernel, contains signals:
         ldp_addr_i = LogicVecArray(
-            em, "ldp_addr", "i", self.configs.numLdPorts, self.configs.addrW
+            em, 'ldp_addr', 'i', self.configs.numLdPorts, self.configs.addrW
         )
         ldp_addr_valid_i = LogicArray(
-            em, "ldp_addr_valid", "i", self.configs.numLdPorts
+            em, 'ldp_addr_valid', 'i', self.configs.numLdPorts
         )
         ldp_addr_ready_o = LogicArray(
-            em, "ldp_addr_ready", "o", self.configs.numLdPorts
+            em, 'ldp_addr_ready', 'o', self.configs.numLdPorts
         )
 
         # Load data channel (data, valid, ready) to kernel
         ldp_data_o = LogicVecArray(
-            em, "ldp_data", "o", self.configs.numLdPorts, self.configs.dataW
+            em, 'ldp_data', 'o', self.configs.numLdPorts, self.configs.dataW
         )
         ldp_data_valid_o = LogicArray(
-            em, "ldp_data_valid", "o", self.configs.numLdPorts
+            em, 'ldp_data_valid', 'o', self.configs.numLdPorts
         )
         ldp_data_ready_i = LogicArray(
-            em, "ldp_data_ready", "i", self.configs.numLdPorts
+            em, 'ldp_data_ready', 'i', self.configs.numLdPorts
         )
 
         # Store address channel (addr, valid, ready) from kernel
         stp_addr_i = LogicVecArray(
-            em, "stp_addr", "i", self.configs.numStPorts, self.configs.addrW
+            em, 'stp_addr', 'i', self.configs.numStPorts, self.configs.addrW
         )
         stp_addr_valid_i = LogicArray(
-            em, "stp_addr_valid", "i", self.configs.numStPorts
+            em, 'stp_addr_valid', 'i', self.configs.numStPorts
         )
         stp_addr_ready_o = LogicArray(
-            em, "stp_addr_ready", "o", self.configs.numStPorts
+            em, 'stp_addr_ready', 'o', self.configs.numStPorts
         )
 
         # Store data channel (data, valid, ready) from kernel
         stp_data_i = LogicVecArray(
-            em, "stp_data", "i", self.configs.numStPorts, self.configs.dataW
+            em, 'stp_data', 'i', self.configs.numStPorts, self.configs.dataW
         )
         stp_data_valid_i = LogicArray(
-            em, "stp_data_valid", "i", self.configs.numStPorts
+            em, 'stp_data_valid', 'i', self.configs.numStPorts
         )
         stp_data_ready_o = LogicArray(
-            em, "stp_data_ready", "o", self.configs.numStPorts
+            em, 'stp_data_ready', 'o', self.configs.numStPorts
         )
 
         if self.configs.stResp:
             stp_exec_valid_o = LogicArray(
-                em, "stp_exec_valid", "o", self.configs.numStPorts
+                em, 'stp_exec_valid', 'o', self.configs.numStPorts
             )
             stp_exec_ready_i = LogicArray(
-                em, "stp_exec_ready", "i", self.configs.numStPorts
+                em, 'stp_exec_ready', 'i', self.configs.numStPorts
             )
 
         # queue empty signal
-        empty_o = Logic(em, "empty", "o")
+        empty_o = Logic(em, 'empty', 'o')
 
         # Memory interface: i.e., the connection LSQ -> AXI
         # We assume that the memory interface has
         # 1. A read request channel (rreq) and a read response channel (rresp).
         # 2. A write request channel (wreq) and a write response channel (wresp).
-        rreq_valid_o = LogicArray(em, "rreq_valid", "o", self.configs.numLdMem)
-        rreq_ready_i = LogicArray(em, "rreq_ready", "i", self.configs.numLdMem)
+        rreq_valid_o = LogicArray(em, 'rreq_valid', 'o', self.configs.numLdMem)
+        rreq_ready_i = LogicArray(em, 'rreq_ready', 'i', self.configs.numLdMem)
         rreq_id_o = LogicVecArray(
-            em, "rreq_id", "o", self.configs.numLdMem, self.configs.idW
+            em, 'rreq_id', 'o', self.configs.numLdMem, self.configs.idW
         )
         rreq_addr_o = LogicVecArray(
-            em, "rreq_addr", "o", self.configs.numLdMem, self.configs.addrW
+            em, 'rreq_addr', 'o', self.configs.numLdMem, self.configs.addrW
         )
 
-        rresp_valid_i = LogicArray(em, "rresp_valid", "i", self.configs.numLdMem)
-        rresp_ready_o = LogicArray(em, "rresp_ready", "o", self.configs.numLdMem)
+        rresp_valid_i = LogicArray(em, 'rresp_valid', 'i', self.configs.numLdMem)
+        rresp_ready_o = LogicArray(em, 'rresp_ready', 'o', self.configs.numLdMem)
         rresp_id_i = LogicVecArray(
-            em, "rresp_id", "i", self.configs.numLdMem, self.configs.idW
+            em, 'rresp_id', 'i', self.configs.numLdMem, self.configs.idW
         )
         rresp_data_i = LogicVecArray(
-            em, "rresp_data", "i", self.configs.numLdMem, self.configs.dataW
+            em, 'rresp_data', 'i', self.configs.numLdMem, self.configs.dataW
         )
 
-        wreq_valid_o = LogicArray(em, "wreq_valid", "o", self.configs.numStMem)
-        wreq_ready_i = LogicArray(em, "wreq_ready", "i", self.configs.numStMem)
+        wreq_valid_o = LogicArray(em, 'wreq_valid', 'o', self.configs.numStMem)
+        wreq_ready_i = LogicArray(em, 'wreq_ready', 'i', self.configs.numStMem)
         wreq_id_o = LogicVecArray(
-            em, "wreq_id", "o", self.configs.numStMem, self.configs.idW
+            em, 'wreq_id', 'o', self.configs.numStMem, self.configs.idW
         )
         wreq_addr_o = LogicVecArray(
-            em, "wreq_addr", "o", self.configs.numStMem, self.configs.addrW
+            em, 'wreq_addr', 'o', self.configs.numStMem, self.configs.addrW
         )
         wreq_data_o = LogicVecArray(
-            em, "wreq_data", "o", self.configs.numStMem, self.configs.dataW
+            em, 'wreq_data', 'o', self.configs.numStMem, self.configs.dataW
         )
 
-        wresp_valid_i = LogicArray(em, "wresp_valid", "i", self.configs.numStMem)
-        wresp_ready_o = LogicArray(em, "wresp_ready", "o", self.configs.numStMem)
+        wresp_valid_i = LogicArray(em, 'wresp_valid', 'i', self.configs.numStMem)
+        wresp_ready_o = LogicArray(em, 'wresp_ready', 'o', self.configs.numStMem)
         wresp_id_i = LogicVecArray(
-            em, "wresp_id", "i", self.configs.numStMem, self.configs.idW
+            em, 'wresp_id', 'i', self.configs.numStMem, self.configs.idW
         )
 
         # Pointer related signals
         # For updating pointers
-        num_loads = LogicVec(em, "num_loads", "w", self.configs.ldqAddrW)
-        num_stores = LogicVec(em, "num_stores", "w", self.configs.stqAddrW)
-        stq_issue_en = Logic(em, "stq_issue_en", "w")
-        stq_resp_en = Logic(em, "stq_resp_en", "w")
+        num_loads = LogicVec(em, 'num_loads', 'w', self.configs.ldqAddrW)
+        num_stores = LogicVec(em, 'num_stores', 'w', self.configs.stqAddrW)
+        stq_issue_en = Logic(em, 'stq_issue_en', 'w')
+        stq_resp_en = Logic(em, 'stq_resp_en', 'w')
         # Generated by pointers
-        ldq_empty = Logic(em, "ldq_empty", "w")
-        stq_empty = Logic(em, "stq_empty", "w")
-        ldq_head_oh = LogicVec(em, "ldq_head_oh", "w", self.configs.numLdqEntries)
-        stq_head_oh = LogicVec(em, "stq_head_oh", "w", self.configs.numStqEntries)
+        ldq_empty = Logic(em, 'ldq_empty', 'w')
+        stq_empty = Logic(em, 'stq_empty', 'w')
+        ldq_head_oh = LogicVec(em, 'ldq_head_oh', 'w', self.configs.numLdqEntries)
+        stq_head_oh = LogicVec(em, 'stq_head_oh', 'w', self.configs.numStqEntries)
         #! If this is the lsq master, then we need the following logic
         #! Define new interfaces needed by dynamatic
         if self.configs.master:
-            memStart_ready = Logic(em, "memStart_ready", "o")
-            memStart_valid = Logic(em, "memStart_valid", "i")
-            ctrlEnd_ready = Logic(em, "ctrlEnd_ready", "o")
-            ctrlEnd_valid = Logic(em, "ctrlEnd_valid", "i")
-            memEnd_ready = Logic(em, "memEnd_ready", "i")
-            memEnd_valid = Logic(em, "memEnd_valid", "o")
+            memStart_ready = Logic(em, 'memStart_ready', 'o')
+            memStart_valid = Logic(em, 'memStart_valid', 'i')
+            ctrlEnd_ready = Logic(em, 'ctrlEnd_ready', 'o')
+            ctrlEnd_valid = Logic(em, 'ctrlEnd_valid', 'i')
+            memEnd_ready = Logic(em, 'memEnd_ready', 'i')
+            memEnd_valid = Logic(em, 'memEnd_valid', 'o')
 
             #! Add extra signals required
-            memStartReady = Logic(em, "memStartReady", "w", force_reg=True)
-            memEndValid = Logic(em, "memEndValid", "w", force_reg=True)
-            ctrlEndReady = Logic(em, "ctrlEndReady", "w", force_reg=True)
-            temp_gen_mem = Logic(em, "TEMP_GEN_MEM", "w")
+            memStartReady = Logic(em, 'memStartReady', 'w', force_reg=True)
+            memEndValid = Logic(em, 'memEndValid', 'w', force_reg=True)
+            ctrlEndReady = Logic(em, 'ctrlEndReady', 'w', force_reg=True)
+            temp_gen_mem = Logic(em, 'TEMP_GEN_MEM', 'w')
 
             #! The memory completion signal cannot be set to 1 when any group is allocating:
             no_curr_ga = ~reduce_bin(
@@ -221,140 +221,140 @@ class LSQ:
 
             #! Define the needed logic
             em.add_comment(
-                "This signal indicates that all mem. ops are completed and func. can return."
+                'This signal indicates that all mem. ops are completed and func. can return.'
             )
-            em.add_comment("LSQ can return iff all the following conditions are true:")
-            em.add_comment("1. No more upcoming BBs containing memory accesses.")
-            em.add_comment("2. Both store and load queues are empty.")
-            em.add_comment("3. No GA in the same cycle.")
+            em.add_comment('LSQ can return iff all the following conditions are true:')
+            em.add_comment('1. No more upcoming BBs containing memory accesses.')
+            em.add_comment('2. Both store and load queues are empty.')
+            em.add_comment('3. No GA in the same cycle.')
             em.add_assignment(
                 temp_gen_mem, ctrlEnd_valid & stq_empty & ldq_empty & no_curr_ga
             )
 
-            em.add_comment("Define logic for the new interfaces needed by dynamatic")
-            vhdl_str = ""
+            em.add_comment('Define logic for the new interfaces needed by dynamatic')
+            vhdl_str = ''
             # TODO: Add proper emitter functions in order to do this
             vhdl_str += "\tprocess (clk) is\n\tbegin\n"
-            vhdl_str += "\t" * 2 + "if rising_edge(clk) then\n"
-            vhdl_str += "\t" * 3 + "if rst = '1' then\n"
-            vhdl_str += "\t" * 4 + "memStartReady <= '1';\n"
-            vhdl_str += "\t" * 4 + "memEndValid <= '0';\n"
-            vhdl_str += "\t" * 4 + "ctrlEndReady <= '0';\n"
-            vhdl_str += "\t" * 3 + "else\n"
+            vhdl_str += '\t' * 2 + "if rising_edge(clk) then\n"
+            vhdl_str += '\t' * 3 + "if rst = '1' then\n"
+            vhdl_str += '\t' * 4 + "memStartReady <= '1';\n"
+            vhdl_str += '\t' * 4 + "memEndValid <= '0';\n"
+            vhdl_str += '\t' * 4 + "ctrlEndReady <= '0';\n"
+            vhdl_str += '\t' * 3 + "else\n"
             vhdl_str += (
-                "\t" * 4
+                '\t' * 4
                 + "memStartReady <= (memEndValid and memEnd_ready_i) or ((not (memStart_valid_i and memStartReady)) and memStartReady);\n"
             )
-            vhdl_str += "\t" * 4 + "memEndValid <= TEMP_GEN_MEM or memEndValid;\n"
+            vhdl_str += '\t' * 4 + "memEndValid <= TEMP_GEN_MEM or memEndValid;\n"
             vhdl_str += (
-                "\t" * 4
+                '\t' * 4
                 + "ctrlEndReady <= (not (ctrlEnd_valid_i and ctrlEndReady)) and (TEMP_GEN_MEM or ctrlEndReady);\n"
             )
-            vhdl_str += "\t" * 3 + "end if;\n"
-            vhdl_str += "\t" * 2 + "end if;\n"
+            vhdl_str += '\t' * 3 + "end if;\n"
+            vhdl_str += '\t' * 2 + "end if;\n"
             vhdl_str += "\tend process;\n\n"
 
             em.add_custom_statement(CustomStatement(vhdl_str))
 
             #! Assign signals for the newly added ports
-            em.add_comment("Update new memory interfaces")
+            em.add_comment('Update new memory interfaces')
             em.add_assignment(memStart_ready, memStartReady)
             em.add_assignment(ctrlEnd_ready, ctrlEndReady)
             em.add_assignment(memEnd_valid, memEndValid)
 
         ######  Queue Registers ######
         # Load Queue Entries
-        ldq_alloc = LogicArray(em, "ldq_alloc", "r", self.configs.numLdqEntries)
-        ldq_issue = LogicArray(em, "ldq_issue", "r", self.configs.numLdqEntries)
+        ldq_alloc = LogicArray(em, 'ldq_alloc', 'r', self.configs.numLdqEntries)
+        ldq_issue = LogicArray(em, 'ldq_issue', 'r', self.configs.numLdqEntries)
         if self.configs.ldpAddrW > 0:
             ldq_port_idx = LogicVecArray(
                 em,
-                "ldq_port_idx",
-                "r",
+                'ldq_port_idx',
+                'r',
                 self.configs.numLdqEntries,
                 self.configs.ldpAddrW,
             )
         else:
             ldq_port_idx = None
         ldq_addr_valid = LogicArray(
-            em, "ldq_addr_valid", "r", self.configs.numLdqEntries
+            em, 'ldq_addr_valid', 'r', self.configs.numLdqEntries
         )
         ldq_addr = LogicVecArray(
-            em, "ldq_addr", "r", self.configs.numLdqEntries, self.configs.addrW
+            em, 'ldq_addr', 'r', self.configs.numLdqEntries, self.configs.addrW
         )
         ldq_data_valid = LogicArray(
-            em, "ldq_data_valid", "r", self.configs.numLdqEntries
+            em, 'ldq_data_valid', 'r', self.configs.numLdqEntries
         )
         ldq_data = LogicVecArray(
-            em, "ldq_data", "r", self.configs.numLdqEntries, self.configs.dataW
+            em, 'ldq_data', 'r', self.configs.numLdqEntries, self.configs.dataW
         )
 
         # Store Queue Entries
-        stq_alloc = LogicArray(em, "stq_alloc", "r", self.configs.numStqEntries)
+        stq_alloc = LogicArray(em, 'stq_alloc', 'r', self.configs.numStqEntries)
         if self.configs.stResp:
-            stq_exec = LogicArray(em, "stq_exec", "r", self.configs.numStqEntries)
+            stq_exec = LogicArray(em, 'stq_exec', 'r', self.configs.numStqEntries)
         if self.configs.stpAddrW > 0:
             stq_port_idx = LogicVecArray(
                 em,
-                "stq_port_idx",
-                "r",
+                'stq_port_idx',
+                'r',
                 self.configs.numStqEntries,
                 self.configs.stpAddrW,
             )
         else:
             stq_port_idx = None
         stq_addr_valid = LogicArray(
-            em, "stq_addr_valid", "r", self.configs.numStqEntries
+            em, 'stq_addr_valid', 'r', self.configs.numStqEntries
         )
         stq_addr = LogicVecArray(
-            em, "stq_addr", "r", self.configs.numStqEntries, self.configs.addrW
+            em, 'stq_addr', 'r', self.configs.numStqEntries, self.configs.addrW
         )
         stq_data_valid = LogicArray(
-            em, "stq_data_valid", "r", self.configs.numStqEntries
+            em, 'stq_data_valid', 'r', self.configs.numStqEntries
         )
         stq_data = LogicVecArray(
-            em, "stq_data", "r", self.configs.numStqEntries, self.configs.dataW
+            em, 'stq_data', 'r', self.configs.numStqEntries, self.configs.dataW
         )
 
         # Order for load-store
         store_is_older = LogicVecArray(
             em,
-            "store_is_older",
-            "r",
+            'store_is_older',
+            'r',
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
 
         # Pointers
-        ldq_tail = LogicVec(em, "ldq_tail", "r", self.configs.ldqAddrW)
-        ldq_head = LogicVec(em, "ldq_head", "r", self.configs.ldqAddrW)
+        ldq_tail = LogicVec(em, 'ldq_tail', 'r', self.configs.ldqAddrW)
+        ldq_head = LogicVec(em, 'ldq_head', 'r', self.configs.ldqAddrW)
 
-        stq_tail = LogicVec(em, "stq_tail", "r", self.configs.stqAddrW)
-        stq_head = LogicVec(em, "stq_head", "r", self.configs.stqAddrW)
-        stq_issue = LogicVec(em, "stq_issue", "r", self.configs.stqAddrW)
-        stq_resp = LogicVec(em, "stq_resp", "r", self.configs.stqAddrW)
+        stq_tail = LogicVec(em, 'stq_tail', 'r', self.configs.stqAddrW)
+        stq_head = LogicVec(em, 'stq_head', 'r', self.configs.stqAddrW)
+        stq_issue = LogicVec(em, 'stq_issue', 'r', self.configs.stqAddrW)
+        stq_resp = LogicVec(em, 'stq_resp', 'r', self.configs.stqAddrW)
 
         # Entry related signals
         # From port dispatchers
-        ldq_wen = LogicArray(em, "ldq_wen", "w", self.configs.numLdqEntries)
-        ldq_addr_wen = LogicArray(em, "ldq_addr_wen", "w", self.configs.numLdqEntries)
-        ldq_reset = LogicArray(em, "ldq_reset", "w", self.configs.numLdqEntries)
-        stq_wen = LogicArray(em, "stq_wen", "w", self.configs.numStqEntries)
-        stq_addr_wen = LogicArray(em, "stq_addr_wen", "w", self.configs.numStqEntries)
-        stq_data_wen = LogicArray(em, "stq_data_wen", "w", self.configs.numStqEntries)
-        stq_reset = LogicArray(em, "stq_reset", "w", self.configs.numStqEntries)
+        ldq_wen = LogicArray(em, 'ldq_wen', 'w', self.configs.numLdqEntries)
+        ldq_addr_wen = LogicArray(em, 'ldq_addr_wen', 'w', self.configs.numLdqEntries)
+        ldq_reset = LogicArray(em, 'ldq_reset', 'w', self.configs.numLdqEntries)
+        stq_wen = LogicArray(em, 'stq_wen', 'w', self.configs.numStqEntries)
+        stq_addr_wen = LogicArray(em, 'stq_addr_wen', 'w', self.configs.numStqEntries)
+        stq_data_wen = LogicArray(em, 'stq_data_wen', 'w', self.configs.numStqEntries)
+        stq_reset = LogicArray(em, 'stq_reset', 'w', self.configs.numStqEntries)
         # From Read/Write Block
-        ldq_data_wen = LogicArray(em, "ldq_data_wen", "w", self.configs.numLdqEntries)
-        ldq_issue_set = LogicArray(em, "ldq_issue_set", "w", self.configs.numLdqEntries)
+        ldq_data_wen = LogicArray(em, 'ldq_data_wen', 'w', self.configs.numLdqEntries)
+        ldq_issue_set = LogicArray(em, 'ldq_issue_set', 'w', self.configs.numLdqEntries)
         if self.configs.stResp:
             stq_exec_set = LogicArray(
-                em, "stq_exec_set", "w", self.configs.numStqEntries
+                em, 'stq_exec_set', 'w', self.configs.numStqEntries
             )
         # Form Group Allocator
         ga_ls_order = LogicVecArray(
             em,
-            "ga_ls_order",
-            "w",
+            'ga_ls_order',
+            'w',
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
@@ -362,7 +362,7 @@ class LSQ:
         BitsToOH(em, ldq_head_oh, ldq_head)
         BitsToOH(em, stq_head_oh, stq_head)
         # indicates tail pointer was just updated (i.e., new stores were allocated)
-        stq_tail_update = Logic(em, "stq_tail_update", "r")
+        stq_tail_update = Logic(em, 'stq_tail_update', 'r')
         stq_tail_update.regInit()
         Reduce(em, stq_tail_update, num_stores, BinOp.OR)
 
@@ -373,20 +373,20 @@ class LSQ:
         # signal type is 'w' for wire, and the pipeline stage is effectively
         # bypassed. If the signals are registers, we need to conditionally call
         # regInit().
-        pipe_comp_type = "r" if self.configs.pipeComp else "w"
-        pipe0_type = "r" if self.configs.pipe0 else "w"
-        pipe1_type = "r" if self.configs.pipe1 else "w"
+        pipe_comp_type = 'r' if self.configs.pipeComp else 'w'
+        pipe0_type = 'r' if self.configs.pipe0 else 'w'
+        pipe1_type = 'r' if self.configs.pipe1 else 'w'
 
         # update queue entries
         # load queue
         ldq_wen_pcomp = LogicArray(
-            em, "ldq_wen_pcomp", pipe_comp_type, self.configs.numLdqEntries
+            em, 'ldq_wen_pcomp', pipe_comp_type, self.configs.numLdqEntries
         )
         ldq_wen_p0 = LogicArray(
-            em, "ldq_wen_p0", pipe0_type, self.configs.numLdqEntries
+            em, 'ldq_wen_p0', pipe0_type, self.configs.numLdqEntries
         )
         ldq_alloc_next = LogicArray(
-            em, "ldq_alloc_next", "w", self.configs.numLdqEntries
+            em, 'ldq_alloc_next', 'w', self.configs.numLdqEntries
         )
         if self.configs.pipeComp:
             ldq_wen_pcomp.regInit()
@@ -409,7 +409,7 @@ class LSQ:
             )
         # store queue
         stq_alloc_next = LogicArray(
-            em, "stq_alloc_next", "w", self.configs.numStqEntries
+            em, 'stq_alloc_next', 'w', self.configs.numStqEntries
         )
         for i in range(0, self.configs.numStqEntries):
             em.add_assignment(stq_alloc_next[i], ~stq_reset[i] & stq_alloc[i])
@@ -439,8 +439,8 @@ class LSQ:
                 )
 
         # pointers update
-        ldq_not_empty = Logic(em, "ldq_not_empty", "w")
-        stq_not_empty = Logic(em, "stq_not_empty", "w")
+        ldq_not_empty = Logic(em, 'ldq_not_empty', 'w')
+        stq_not_empty = Logic(em, 'stq_not_empty', 'w')
         Reduce(em, ldq_not_empty, ldq_alloc, BinOp.OR)
         em.add_assignment(ldq_empty, ~ldq_not_empty)
         MuxLookUp(em, stq_not_empty, stq_alloc, stq_head)
@@ -452,13 +452,13 @@ class LSQ:
         WrapAddConst(em, stq_issue, stq_issue, 1, self.configs.numStqEntries)
         WrapAddConst(em, stq_resp, stq_resp, 1, self.configs.numStqEntries)
 
-        ldq_tail_oh = LogicVec(em, "ldq_tail_oh", "w", self.configs.numLdqEntries)
+        ldq_tail_oh = LogicVec(em, 'ldq_tail_oh', 'w', self.configs.numLdqEntries)
         BitsToOH(em, ldq_tail_oh, ldq_tail)
         ldq_head_next_oh = LogicVec(
-            em, "ldq_head_next_oh", "w", self.configs.numLdqEntries
+            em, 'ldq_head_next_oh', 'w', self.configs.numLdqEntries
         )
-        ldq_head_next = LogicVec(em, "ldq_head_next", "w", self.configs.ldqAddrW)
-        ldq_head_sel = Logic(em, "ldq_head_sel", "w")
+        ldq_head_next = LogicVec(em, 'ldq_head_next', 'w', self.configs.ldqAddrW)
+        ldq_head_sel = Logic(em, 'ldq_head_sel', 'w')
         if self.configs.headLag:
             # Update the head pointer according to the valid signal of last cycle
             CyclicPriorityMasking(em, ldq_head_next_oh, ldq_alloc, ldq_tail_oh)
@@ -469,13 +469,13 @@ class LSQ:
         OHToBits(em, ldq_head_next, ldq_head_next_oh)
         em.add_assignment(ldq_head, ldq_head_next.when(ldq_head_sel).else_(ldq_tail))
 
-        stq_tail_oh = LogicVec(em, "stq_tail_oh", "w", self.configs.numStqEntries)
+        stq_tail_oh = LogicVec(em, 'stq_tail_oh', 'w', self.configs.numStqEntries)
         BitsToOH(em, stq_tail_oh, stq_tail)
         stq_head_next_oh = LogicVec(
-            em, "stq_head_next_oh", "w", self.configs.numStqEntries
+            em, 'stq_head_next_oh', 'w', self.configs.numStqEntries
         )
-        stq_head_next = LogicVec(em, "stq_head_next", "w", self.configs.stqAddrW)
-        stq_head_sel = Logic(em, "stq_head_sel", "w")
+        stq_head_next = LogicVec(em, 'stq_head_next', 'w', self.configs.stqAddrW)
+        stq_head_sel = Logic(em, 'stq_head_sel', 'w')
         if self.configs.stResp:
             if self.configs.headLag:
                 # Update the head pointer according to the valid signal of last cycle
@@ -635,33 +635,33 @@ class LSQ:
 
         ###### Dependency Check ######
         load_idx_oh = LogicVecArray(
-            em, "load_idx_oh", "w", self.configs.numLdMem, self.configs.numLdqEntries
+            em, 'load_idx_oh', 'w', self.configs.numLdMem, self.configs.numLdqEntries
         )
-        load_en = LogicArray(em, "load_en", "w", self.configs.numLdMem)
+        load_en = LogicArray(em, 'load_en', 'w', self.configs.numLdMem)
 
         # Multiple store channels not yet implemented
         assert self.configs.numStMem == 1
-        store_idx = LogicVec(em, "store_idx", "w", self.configs.stqAddrW)
-        store_en = Logic(em, "store_en", "w")
+        store_idx = LogicVec(em, 'store_idx', 'w', self.configs.stqAddrW)
+        store_en = Logic(em, 'store_en', 'w')
 
         # Matrix Generation
         ld_st_conflict = LogicVecArray(
             em,
-            "ld_st_conflict",
-            "w",
+            'ld_st_conflict',
+            'w',
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
         can_bypass = LogicVecArray(
             em,
-            "can_bypass",
-            "w",
+            'can_bypass',
+            'w',
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
         can_bypass_p0 = LogicVecArray(
             em,
-            "can_bypass_p0",
+            'can_bypass_p0',
             pipe0_type,
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
@@ -670,42 +670,42 @@ class LSQ:
             can_bypass_p0.regInit(init=[0] * self.configs.numLdqEntries)
 
         ldq_head_oh_pcomp = LogicVec(
-            em, "ldq_head_oh_pcomp", pipe_comp_type, self.configs.numLdqEntries
+            em, 'ldq_head_oh_pcomp', pipe_comp_type, self.configs.numLdqEntries
         )
         ldq_alloc_pcomp = LogicArray(
-            em, "ldq_alloc_pcomp", pipe_comp_type, self.configs.numLdqEntries
+            em, 'ldq_alloc_pcomp', pipe_comp_type, self.configs.numLdqEntries
         )
         ldq_addr_valid_pcomp = LogicArray(
-            em, "ldq_addr_valid_pcomp", pipe_comp_type, self.configs.numLdqEntries
+            em, 'ldq_addr_valid_pcomp', pipe_comp_type, self.configs.numLdqEntries
         )
         stq_alloc_pcomp = LogicArray(
-            em, "stq_alloc_pcomp", pipe_comp_type, self.configs.numStqEntries
+            em, 'stq_alloc_pcomp', pipe_comp_type, self.configs.numStqEntries
         )
         stq_addr_valid_pcomp = LogicArray(
-            em, "stq_addr_valid_pcomp", pipe_comp_type, self.configs.numStqEntries
+            em, 'stq_addr_valid_pcomp', pipe_comp_type, self.configs.numStqEntries
         )
         stq_data_valid_pcomp = LogicArray(
-            em, "stq_data_valid_pcomp", pipe_comp_type, self.configs.numStqEntries
+            em, 'stq_data_valid_pcomp', pipe_comp_type, self.configs.numStqEntries
         )
-        stq_tail_update_pcomp = Logic(em, "stq_tail_update_pcomp", pipe_comp_type)
+        stq_tail_update_pcomp = Logic(em, 'stq_tail_update_pcomp', pipe_comp_type)
         # addr_valid_pcomp is always a wire: combines other registers signals
         addr_valid_pcomp = LogicVecArray(
             em,
-            "addr_valid_pcomp",
-            "w",
+            'addr_valid_pcomp',
+            'w',
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
         addr_same_pcomp = LogicVecArray(
             em,
-            "addr_same_pcomp",
+            'addr_same_pcomp',
             pipe_comp_type,
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
         store_is_older_pcomp = LogicVecArray(
             em,
-            "store_is_older_pcomp",
+            'store_is_older_pcomp',
             pipe_comp_type,
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
@@ -714,12 +714,12 @@ class LSQ:
         # combinational signal indicating whether a load has already completed (assuming it is allocated), meaning the
         # data (= read response) from memory has been received
         load_completed = LogicArray(
-            em, "load_completed", "w", self.configs.numLdqEntries
+            em, 'load_completed', 'w', self.configs.numLdqEntries
         )
         # combinational signal indicating whether a store has already completed (assuming it is allocated), meaning the
         # write response from memory has been received
         store_completed = LogicArray(
-            em, "store_completed", "w", self.configs.numStqEntries
+            em, 'store_completed', 'w', self.configs.numStqEntries
         )
 
         if self.configs.pipeComp:
@@ -814,13 +814,13 @@ class LSQ:
 
         # Load
 
-        load_conflict = LogicArray(em, "load_conflict", "w", self.configs.numLdqEntries)
+        load_conflict = LogicArray(em, 'load_conflict', 'w', self.configs.numLdqEntries)
         load_req_valid = LogicArray(
-            em, "load_req_valid", "w", self.configs.numLdqEntries
+            em, 'load_req_valid', 'w', self.configs.numLdqEntries
         )
-        can_load = LogicArray(em, "can_load", "w", self.configs.numLdqEntries)
+        can_load = LogicArray(em, 'can_load', 'w', self.configs.numLdqEntries)
         can_load_p0 = LogicArray(
-            em, "can_load_p0", pipe0_type, self.configs.numLdqEntries
+            em, 'can_load_p0', pipe0_type, self.configs.numLdqEntries
         )
         if self.configs.pipe0:
             can_load_p0.regInit(init=[0] * self.configs.numLdqEntries)
@@ -841,7 +841,7 @@ class LSQ:
             em.add_assignment(can_load[i], ~ldq_issue[i] & can_load_p0[i])
 
         ldq_head_oh_p0 = LogicVec(
-            em, "ldq_head_oh_p0", pipe0_type, self.configs.numLdqEntries
+            em, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries
         )
         if self.configs.pipe0:
             ldq_head_oh_p0.regInit()
@@ -854,12 +854,12 @@ class LSQ:
             Reduce(em, load_en[w], can_load_list[w], BinOp.OR)
             if w + 1 != self.configs.numLdMem:
                 load_idx_oh_LogicArray = LogicArray(
-                    em, f"load_idx_oh_Array_{w+1}", "w", self.configs.numLdqEntries
+                    em, f'load_idx_oh_Array_{w+1}', 'w', self.configs.numLdqEntries
                 )
                 VecToArray(em, load_idx_oh_LogicArray, load_idx_oh[w])
                 can_load_list.append(
                     LogicArray(
-                        em, f"can_load_list_{w+1}", "w", self.configs.numLdqEntries
+                        em, f'can_load_list_{w+1}', 'w', self.configs.numLdqEntries
                     )
                 )
                 for i in range(0, self.configs.numLdqEntries):
@@ -876,7 +876,7 @@ class LSQ:
 
         # Store request is valid if the entry is allocated and has valid address+data.
         store_req_valid_arr = LogicArray(
-            em, "store_req_valid_arr", "w", self.configs.numStqEntries
+            em, 'store_req_valid_arr', 'w', self.configs.numStqEntries
         )
         for i in range(self.configs.numStqEntries):
             em.add_assignment(
@@ -884,29 +884,29 @@ class LSQ:
                 stq_alloc_pcomp[i] & stq_addr_valid_pcomp[i] & stq_data_valid_pcomp[i],
             )
 
-        store_conflict = Logic(em, "store_conflict", "w")
-        store_req_valid_p0 = Logic(em, "store_req_valid_p0", pipe0_type)
+        store_conflict = Logic(em, 'store_conflict', 'w')
+        store_req_valid_p0 = Logic(em, 'store_req_valid_p0', pipe0_type)
         st_ld_conflict_p0 = LogicVec(
-            em, "st_ld_conflict_p0", pipe0_type, self.configs.numLdqEntries
+            em, 'st_ld_conflict_p0', pipe0_type, self.configs.numLdqEntries
         )
         if self.configs.pipe0:
             store_req_valid_p0.regInit(init=0)
             st_ld_conflict_p0.regInit()
 
         # next issue pointer (needed for look-ahead when pipelining is enabled and for stalling store issue)
-        stq_issue_next = LogicVec(em, "stq_issue_next", "w", self.configs.stqAddrW)
+        stq_issue_next = LogicVec(em, 'stq_issue_next', 'w', self.configs.stqAddrW)
         WrapAddConst(em, stq_issue_next, stq_issue, 1, self.configs.numStqEntries)
 
         # checks for current and next (if needed) store entry
-        store_req_valid_curr = Logic(em, "store_req_valid_curr", "w")
+        store_req_valid_curr = Logic(em, 'store_req_valid_curr', 'w')
         st_ld_conflict_curr = LogicVec(
-            em, "st_ld_conflict_curr", "w", self.configs.numLdqEntries
+            em, 'st_ld_conflict_curr', 'w', self.configs.numLdqEntries
         )
         if self.configs.pipe0:
             # with pipelining: also compute for the next entry
-            store_req_valid_next = Logic(em, "store_req_valid_next", "w")
+            store_req_valid_next = Logic(em, 'store_req_valid_next', 'w')
             st_ld_conflict_next = LogicVec(
-                em, "st_ld_conflict_next", "w", self.configs.numLdqEntries
+                em, 'st_ld_conflict_next', 'w', self.configs.numLdqEntries
             )
 
         # validity lookup
@@ -969,9 +969,9 @@ class LSQ:
         # stall store issue once the issue pointer catches up to the tail pointer (i.e., when all
         # store entries are in-flight), and only allow store issue to proceed when the tail pointer
         # moves (indicating a store entry has been freed up and subsequently allocated again).
-        store_issue_stall_p0 = Logic(em, "store_issue_stall", "r")
-        store_issue_stall_set = Logic(em, "store_issue_stall_set", "w")
-        store_issue_stall_reset = Logic(em, "store_issue_stall_reset", "w")
+        store_issue_stall_p0 = Logic(em, 'store_issue_stall', 'r')
+        store_issue_stall_set = Logic(em, 'store_issue_stall_set', 'w')
+        store_issue_stall_reset = Logic(em, 'store_issue_stall_reset', 'w')
         store_issue_stall_p0.regInit(init=0)
         em.add_assignment(
             store_issue_stall_set,
@@ -994,20 +994,20 @@ class LSQ:
         # Bypass
         bypass_idx_oh_p0 = LogicVecArray(
             em,
-            "bypass_idx_oh_p0",
+            'bypass_idx_oh_p0',
             pipe0_type,
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
-        bypass_en = LogicArray(em, "bypass_en", "w", self.configs.numLdqEntries)
+        bypass_en = LogicArray(em, 'bypass_en', 'w', self.configs.numLdqEntries)
         if self.configs.pipe0:
             bypass_idx_oh_p0.regInit()
         if self.configs.bypass:
-            stq_last_oh = LogicVec(em, "stq_last_oh", "w", self.configs.numStqEntries)
+            stq_last_oh = LogicVec(em, 'stq_last_oh', 'w', self.configs.numStqEntries)
             BitsToOHSub1(em, stq_last_oh, stq_tail)
             for i in range(0, self.configs.numLdqEntries):
                 bypass_en_vec = LogicVec(
-                    em, f"bypass_en_vec_{i}", "w", self.configs.numStqEntries
+                    em, f'bypass_en_vec_{i}', 'w', self.configs.numStqEntries
                 )
                 # Search for the youngest store that is older than the load and conflicts
                 CyclicPriorityMasking(
@@ -1028,29 +1028,29 @@ class LSQ:
         # load registers (if enabled, w/ backpressure)
         load_idx_oh_p1 = LogicVecArray(
             em,
-            "load_idx_oh_p1",
+            'load_idx_oh_p1',
             pipe1_type,
             self.configs.numLdMem,
             self.configs.numLdqEntries,
         )
-        load_en_p1 = LogicArray(em, "load_en_p1", pipe1_type, self.configs.numLdMem)
+        load_en_p1 = LogicArray(em, 'load_en_p1', pipe1_type, self.configs.numLdMem)
         # store registers (if enabled, w/ backpressure)
-        store_idx_p1 = LogicVec(em, "store_idx_p1", pipe1_type, self.configs.stqAddrW)
-        store_en_p1 = Logic(em, "store_en_p1", pipe1_type)
+        store_idx_p1 = LogicVec(em, 'store_idx_p1', pipe1_type, self.configs.stqAddrW)
+        store_en_p1 = Logic(em, 'store_en_p1', pipe1_type)
         # bypass registers (if enabled, w/o backpressure)
         bypass_idx_oh_p1 = LogicVecArray(
             em,
-            "bypass_idx_oh_p1",
+            'bypass_idx_oh_p1',
             pipe1_type,
             self.configs.numLdqEntries,
             self.configs.numStqEntries,
         )
         bypass_en_p1 = LogicArray(
-            em, "bypass_en_p1", pipe1_type, self.configs.numLdqEntries
+            em, 'bypass_en_p1', pipe1_type, self.configs.numLdqEntries
         )
 
-        load_p1_ready = LogicArray(em, "load_p1_ready", "w", self.configs.numLdMem)
-        store_p1_ready = Logic(em, "store_p1_ready", "w")
+        load_p1_ready = LogicArray(em, 'load_p1_ready', 'w', self.configs.numLdMem)
+        store_p1_ready = Logic(em, 'store_p1_ready', 'w')
 
         if self.configs.pipe1:
             # pipeline register control signals (load_*_p1, store_*_p1)
@@ -1058,11 +1058,11 @@ class LSQ:
             # with a # combinational path from output ready to input ready. We
             # are ready # for new data if either there is a handshake at the
             # output (*_hs), # or the register is currently empty (not *_en_p1).
-            load_hs = LogicArray(em, "load_hs", "w", self.configs.numLdMem)
+            load_hs = LogicArray(em, 'load_hs', 'w', self.configs.numLdMem)
             for w in range(0, self.configs.numLdMem):
                 em.add_assignment(load_hs[w], load_en_p1[w] & rreq_ready_i[w])
                 em.add_assignment(load_p1_ready[w], load_hs[w] | ~load_en_p1[w])
-            store_hs = Logic(em, "store_hs", "w")
+            store_hs = Logic(em, 'store_hs', 'w')
             em.add_assignment(store_hs, store_en_p1 & wreq_ready_i[0])
             em.add_assignment(store_p1_ready, store_hs | ~store_en_p1)
             # register init
@@ -1097,7 +1097,7 @@ class LSQ:
 
         for i in range(0, self.configs.numLdqEntries):
             ldq_issue_set_vec = LogicVec(
-                em, f"ldq_issue_set_vec_{i}", "w", self.configs.numLdMem
+                em, f'ldq_issue_set_vec_{i}', 'w', self.configs.numLdMem
             )
             for w in range(0, self.configs.numLdMem):
                 em.add_assignment(
@@ -1117,9 +1117,9 @@ class LSQ:
         # Read Response and Bypass
         for i in range(0, self.configs.numLdqEntries):
             # check each read response channel for each load
-            read_idx_oh = LogicArray(em, f"read_idx_oh_{i}", "w", self.configs.numLdMem)
-            read_valid = Logic(em, f"read_valid_{i}", "w")
-            read_data = LogicVec(em, f"read_data_{i}", "w", self.configs.dataW)
+            read_idx_oh = LogicArray(em, f'read_idx_oh_{i}', 'w', self.configs.numLdMem)
+            read_valid = Logic(em, f'read_valid_{i}', 'w')
+            read_data = LogicVec(em, f'read_data_{i}', 'w', self.configs.dataW)
             for w in range(0, self.configs.numLdMem):
                 em.add_assignment(
                     read_idx_oh[w],
@@ -1130,7 +1130,7 @@ class LSQ:
             Mux1H(em, read_data, rresp_data_i, read_idx_oh)
             Reduce(em, read_valid, read_idx_oh, BinOp.OR)
             # multiplex from store queue data
-            bypass_data = LogicVec(em, f"bypass_data_{i}", "w", self.configs.dataW)
+            bypass_data = LogicVec(em, f'bypass_data_{i}', 'w', self.configs.dataW)
             Mux1H(em, bypass_data, stq_data, bypass_idx_oh_p1[i])
             # multiplex from read and bypass data
             em.add_assignment(ldq_data[i], read_data | bypass_data)
@@ -1160,7 +1160,7 @@ class LSQ:
 
         ######   Write To File  ######
         output_str = em.get_definition_str(self.module_name)
-        with open(f"{path_rtl}/{self.name}.{em.get_file_suffix()}", "a") as file:
+        with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
             file.write(output_str)
 
     def instantiate(self, **kwargs) -> str:

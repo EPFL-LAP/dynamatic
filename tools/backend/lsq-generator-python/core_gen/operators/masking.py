@@ -53,8 +53,8 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
                      010
     """
 
-    em.add_comment("Priority Masking Begin")
-    em.add_comment(f"CyclicPriorityMask({dout.name}, {din.name}, {base.name})")
+    em.add_comment('Priority Masking Begin')
+    em.add_comment(f'CyclicPriorityMask({dout.name}, {din.name}, {base.name})')
     em.use_temp()
     from core_gen.signals import LogicVecArray, LogicVec, LogicArray
 
@@ -62,11 +62,11 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
         assert reverse == False
         for i in range(0, din.size):
             size = din.length
-            double_in = LogicVec(em, em.get_temp(f"double_in_{i}"), "w", size * 2)
+            double_in = LogicVec(em, em.get_temp(f'double_in_{i}'), 'w', size * 2)
             for j in range(0, size):
                 em.add_assignment((double_in, j), Val(din, j, i))
                 em.add_assignment((double_in, j + size), Val(din, j, i))
-            double_out = LogicVec(em, em.get_temp(f"double_out_{i}"), "w", size * 2)
+            double_out = LogicVec(em, em.get_temp(f'double_out_{i}'), 'w', size * 2)
             # TODO: Double check whether the brackets are correct
             em.add_assignment(
                 double_out, double_in & ~(double_in - (Val(0, size).concat(base)))
@@ -81,14 +81,14 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
                 size = din.length
             else:
                 size = din.size
-            double_in = LogicVec(em, em.get_temp("double_in"), "w", size * 2)
+            double_in = LogicVec(em, em.get_temp('double_in'), 'w', size * 2)
             for i in range(0, size):
                 em.add_assignment((double_in, i), Val(din, size - 1 - i))
                 em.add_assignment((double_in, i + size), Val(din, size - 1 - i))
-            base_rev = LogicVec(em, em.get_temp("base_rev"), "w", size)
+            base_rev = LogicVec(em, em.get_temp('base_rev'), 'w', size)
             for i in range(0, size):
                 em.add_assignment((base_rev, i), Val(base, size - 1 - i))
-            double_out = LogicVec(em, em.get_temp("double_out"), "w", size * 2)
+            double_out = LogicVec(em, em.get_temp('double_out'), 'w', size * 2)
             em.add_assignment(
                 double_out, double_in & ~(double_in - (Val(0, size).concat(base_rev)))
             )
@@ -99,15 +99,15 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
         else:
             if isinstance(din, LogicArray):
                 size = din.length
-                double_in = LogicVec(em, em.get_temp("double_in"), "w", size * 2)
+                double_in = LogicVec(em, em.get_temp('double_in'), 'w', size * 2)
                 for i in range(0, size):
                     em.add_assignment((double_in, i), Val(din, i))
                     em.add_assignment((double_in, i + size), Val(din, i))
             else:
                 size = din.size
-                double_in = LogicVec(em, em.get_temp("double_in"), "w", size * 2)
+                double_in = LogicVec(em, em.get_temp('double_in'), 'w', size * 2)
                 em.add_assignment(double_in, din & din)
-            double_out = LogicVec(em, em.get_temp("double_out"), "w", size * 2)
+            double_out = LogicVec(em, em.get_temp('double_out'), 'w', size * 2)
             em.add_assignment(
                 double_out, double_in & ~(double_in - (Val(0, size).concat(base)))
             )
@@ -115,9 +115,9 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
                 # TODO: Have indexing function
                 em.add_assignment(
                     dout,
-                    Val(em.slice_var(f"{double_out.getNameRead()}", size - 1, 0))
+                    Val(em.slice_var(f'{double_out.getNameRead()}', size - 1, 0))
                     | Val(
-                        em.slice_var(f"{double_out.getNameRead()}", 2 * size - 1, size)
+                        em.slice_var(f'{double_out.getNameRead()}', 2 * size - 1, size)
                     ),
                 )
             else:
@@ -125,4 +125,4 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
                     em.add_assignment(
                         (dout, i), Val(double_out, i) | Val(double_out, i + size)
                     )
-    em.add_comment("Priority Masking End\n")
+    em.add_comment('Priority Masking End\n')

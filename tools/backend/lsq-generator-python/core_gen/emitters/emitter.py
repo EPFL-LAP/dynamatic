@@ -7,14 +7,14 @@ class Emitter:
     Holds indentation level, temporary name counter, and initialization strings.
     """
 
-    def __init__(self, clock_name: str = "clk", reset_name: str = "rst"):
+    def __init__(self, clock_name: str = 'clk', reset_name: str = 'rst'):
         self.tabLevel = 1
         self.tempCount = 0
 
-        self.signalInitString = ""
-        self.portInitString = ""
-        self.regInitString = ""
-        self.statementString = ""
+        self.signalInitString = ''
+        self.portInitString = ''
+        self.regInitString = ''
+        self.statementString = ''
 
         self.clock_name = clock_name
         self.reset_name = reset_name
@@ -24,11 +24,11 @@ class Emitter:
         # Keep Emitter abstract: prevent direct instantiation of the base class
         if self.__class__ is Emitter:
             raise NotImplementedError(
-                "Emitter is an abstract class and cannot be instantiated directly."
+                'Emitter is an abstract class and cannot be instantiated directly.'
             )
 
     def get_current_indent(self) -> str:
-        return "\t" * self.tabLevel
+        return '\t' * self.tabLevel
 
     def increase_indent(self):
         self.tabLevel += 1
@@ -37,7 +37,7 @@ class Emitter:
         self.tabLevel = max(0, self.tabLevel - 1)
 
     def get_temp(self, name: str) -> str:
-        return f"TEMP_{self.tempCount}_{name}"
+        return f'TEMP_{self.tempCount}_{name}'
 
     def use_temp(self):
         self.tempCount += 1
@@ -52,85 +52,85 @@ class Emitter:
         self.statementString += self.get_current_indent() + code
 
     def add_reg_str(self, code: str):
-        raise NotImplementedError("Emitter subclasses must implement add_reg_str()")
+        raise NotImplementedError('Emitter subclasses must implement add_reg_str()')
 
-    def add_assignment(self, out, statement: "Statement", in_process: bool = False):
-        raise NotImplementedError("Emitter subclasses must implement add_assignment()")
+    def add_assignment(self, out, statement: 'Statement', in_process: bool = False):
+        raise NotImplementedError('Emitter subclasses must implement add_assignment()')
 
     def add_comment(self, comment: str):
-        raise NotImplementedError("Emitter subclasses must implement add_comment()")
+        raise NotImplementedError('Emitter subclasses must implement add_comment()')
 
     def get_binop_str(self, op) -> str:
-        raise NotImplementedError("Emitter subclasses must implement get_binop_str()")
+        raise NotImplementedError('Emitter subclasses must implement get_binop_str()')
 
     def get_unop_str(self, op) -> str:
-        raise NotImplementedError("Emitter subclasses must implement get_unop_str()")
+        raise NotImplementedError('Emitter subclasses must implement get_unop_str()')
 
     def get_bit_str(self, bit) -> str:
-        raise NotImplementedError("Emitter subclasses must implement get_bit_str()")
+        raise NotImplementedError('Emitter subclasses must implement get_bit_str()')
 
-    def bin_to_str(self, bin, meta: "Meta") -> str:
-        raise NotImplementedError("Emitter subclasses must implement bin_to_str()")
+    def bin_to_str(self, bin, meta: 'Meta') -> str:
+        raise NotImplementedError('Emitter subclasses must implement bin_to_str()')
 
-    def un_to_str(self, un, meta: "Meta") -> str:
-        raise NotImplementedError("Emitter subclasses must implement un_to_str()")
+    def un_to_str(self, un, meta: 'Meta') -> str:
+        raise NotImplementedError('Emitter subclasses must implement un_to_str()')
 
-    def when_else_to_str(self, when_else, meta: "Meta") -> str:
+    def when_else_to_str(self, when_else, meta: 'Meta') -> str:
         raise NotImplementedError(
-            "Emitter subclasses must implement when_else_to_str()"
+            'Emitter subclasses must implement when_else_to_str()'
         )
 
     def print_custom_str(self, custom_statement) -> str:
         raise NotImplementedError(
-            "Emitter subclasses must implement print_custom_str()"
+            'Emitter subclasses must implement print_custom_str()'
         )
 
     def add_custom_statement(self, custom_statement) -> None:
         raise NotImplementedError(
-            "Emitter subclasses must implement add_custom_statement()"
+            'Emitter subclasses must implement add_custom_statement()'
         )
 
-    def int_to_str(din: int, size=None, meta: "Meta" = None) -> str:
-        raise NotImplementedError("Emitter subclasses must implement int_to_str()")
+    def int_to_str(din: int, size=None, meta: 'Meta' = None) -> str:
+        raise NotImplementedError('Emitter subclasses must implement int_to_str()')
 
     def mask_less(din, size) -> str:
-        raise NotImplementedError("Emitter subclasses must implement mask_less()")
+        raise NotImplementedError('Emitter subclasses must implement mask_less()')
 
     def mux_index(din, sel) -> str:
-        raise NotImplementedError("Emitter subclasses must implement mux_index()")
+        raise NotImplementedError('Emitter subclasses must implement mux_index()')
 
     def slice_var(self, var_name, high, low):
-        raise NotImplementedError("Emitter subclasses must implement slice_var()")
+        raise NotImplementedError('Emitter subclasses must implement slice_var()')
 
     def get_file_suffix(self) -> str:
-        raise NotImplementedError("Emitter subclasses must implement get_file_suffix()")
+        raise NotImplementedError('Emitter subclasses must implement get_file_suffix()')
 
     def get_reg_init_str(self) -> str:
         raise NotImplementedError(
-            "Emitter subclasses must implement get_reg_init_str()"
+            'Emitter subclasses must implement get_reg_init_str()'
         )
 
     def get_definition_str(self, module_name: str, write_regs: bool = True) -> str:
         raise NotImplementedError(
-            "Emitter subclasses must implement get_definition_str()"
+            'Emitter subclasses must implement get_definition_str()'
         )
 
     def start_instantiation(self, module_name: str, instance_name: str = None) -> str:
         raise NotImplementedError(
-            "Emitter subclasses must implement start_instantiation()"
+            'Emitter subclasses must implement start_instantiation()'
         )
 
-    def add_map(self, port_name: str, signal_name: str = "open") -> str:
-        raise NotImplementedError("Emitter subclasses must implement add_map()")
+    def add_map(self, port_name: str, signal_name: str = 'open') -> str:
+        raise NotImplementedError('Emitter subclasses must implement add_map()')
 
     def complete_instantiation(self) -> str:
         raise NotImplementedError(
-            "Emitter subclasses must implement complete_instantiation()"
+            'Emitter subclasses must implement complete_instantiation()'
         )
 
     @staticmethod
-    def new() -> "Emitter":
-        raise NotImplementedError("Emitter subclasses must implement new()")
+    def new() -> 'Emitter':
+        raise NotImplementedError('Emitter subclasses must implement new()')
 
     def assigned_var_to_str(self, var):
         from core_gen.signals import Logic
@@ -138,11 +138,11 @@ class Emitter:
         size = 1
         if type(var) == tuple:
             if len(var) == 2:
-                str_ret = f"{var[0].getNameWrite(var[1])}"
+                str_ret = f'{var[0].getNameWrite(var[1])}'
             else:
-                str_ret = f"{var[0].getNameWrite(var[1], var[2])}"
+                str_ret = f'{var[0].getNameWrite(var[1], var[2])}'
         else:
-            str_ret = f"{var.getNameWrite()}"
+            str_ret = f'{var.getNameWrite()}'
             if type(var) != Logic:
                 size = var.size
 
@@ -159,13 +159,13 @@ class Emitter:
             int_to_bin(0, 5)  # Output: 00000
         """
         if val < 0:
-            raise ValueError("_int_to_bin: Negative value cannot be converted to bits!")
+            raise ValueError('_int_to_bin: Negative value cannot be converted to bits!')
         if val >= (1 << size):
             raise ValueError(
-                f"_int_to_bin: Value {val} cannot be represented with {size} bit(s)!"
+                f'_int_to_bin: Value {val} cannot be represented with {size} bit(s)!'
             )
 
-        return f"{val:0{size}b}"
+        return f'{val:0{size}b}'
 
 
 class Meta:

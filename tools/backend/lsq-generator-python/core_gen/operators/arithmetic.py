@@ -20,18 +20,18 @@ def WrapAdd(em: Emitter, out, in_a, in_b, max: int) -> str:
             out = sum
     """
 
-    em.add_comment("WrapAdd Begin")
-    em.add_comment(f"WrapAdd({out.name}, {in_a.name}, {in_b.name}, {max})")
+    em.add_comment('WrapAdd Begin')
+    em.add_comment(f'WrapAdd({out.name}, {in_a.name}, {in_b.name}, {max})')
     if isPow2(max):
         em.add_assignment(out, in_a + in_b)
     else:
         em.use_temp()
-        sum = LogicVec(em, em.get_temp("sum"), "w", out.size + 1)
-        res = LogicVec(em, em.get_temp("res"), "w", out.size + 1)
+        sum = LogicVec(em, em.get_temp('sum'), 'w', out.size + 1)
+        res = LogicVec(em, em.get_temp('res'), 'w', out.size + 1)
         em.add_assignment(sum, Bit(0).concat(in_a) + Bit(0).concat(in_b))
         em.add_assignment(res, (sum - Val(max)).when(sum >= Val(max)).else_(sum))
         em.add_assignment(out, Val(em.slice_var(res.getNameRead(), out.size - 1, 0)))
-    em.add_comment("WrapAdd End\n")
+    em.add_comment('WrapAdd End\n')
 
 
 def WrapAddConst(em: Emitter, out, in_a, const: int, max: int) -> str:
@@ -45,8 +45,8 @@ def WrapAddConst(em: Emitter, out, in_a, const: int, max: int) -> str:
             out = in_a + const
     """
 
-    em.add_comment("WrapAdd Begin")
-    em.add_comment(f"WrapAdd({out.name}, {in_a.name}, {const}, {max})")
+    em.add_comment('WrapAdd Begin')
+    em.add_comment(f'WrapAdd({out.name}, {in_a.name}, {const}, {max})')
 
     if isPow2(max):
         em.add_assignment(out, in_a + Val(const))
@@ -57,7 +57,7 @@ def WrapAddConst(em: Emitter, out, in_a, const: int, max: int) -> str:
             .when(in_a >= Val(max - const))
             .else_(in_a + Val(const)),
         )
-    em.add_comment("WrapAdd End")
+    em.add_comment('WrapAdd End')
 
 
 def WrapSub(em: Emitter, out, in_a, in_b, max: int) -> str:
@@ -71,12 +71,12 @@ def WrapSub(em: Emitter, out, in_a, in_b, max: int) -> str:
             out = (in_a + max) - in_b
     """
 
-    em.add_comment("WrapSub Begin")
-    em.add_comment(f"WrapSub({out.name}, {in_a.name}, {in_b.name}, {max})")
+    em.add_comment('WrapSub Begin')
+    em.add_comment(f'WrapSub({out.name}, {in_a.name}, {in_b.name}, {max})')
     if isPow2(max):
         em.add_assignment(out, in_a - in_b)
     else:
         em.add_assignment(
             out, (in_a - in_b).when(in_a >= in_b).else_(Val(max) - in_b + in_a)
         )
-    em.add_comment("WrapSub End")
+    em.add_comment('WrapSub End')
