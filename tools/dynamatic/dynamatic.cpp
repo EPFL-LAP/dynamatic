@@ -142,7 +142,8 @@ struct Argument {
 struct CommandArguments {
   SmallVector<StringRef> positionals;
   mlir::DenseSet<StringRef> flags;
-  StringMap<StringRef> options;
+  StringMap<StringRef> options;                   // single-valued options
+  StringMap<SmallVector<StringRef>> multiOptions; // multi-valued options
 };
 
 class Command {
@@ -153,6 +154,7 @@ public:
   StringMap<Argument> positionals;
   StringMap<Argument> flags;
   StringMap<Argument> options;
+  StringMap<Argument> multiOptions;
 
   Command(StringRef keyword, StringRef desc, FrontendState &state)
       : keyword(keyword), desc(desc), state(state) {}
@@ -165,13 +167,25 @@ public:
   void addFlag(const Argument &arg) {
     assert(!flags.contains(arg.name) && "duplicate flag name");
     assert(!options.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and flag have same name");
     flags[arg.name] = arg;
   }
 
   void addOption(const Argument &arg) {
     assert(!options.contains(arg.name) && "duplicate option name");
     assert(!flags.contains(arg.name) && "option and flag have same name");
+    assert(!multiOptions.contains(arg.name) &&
+           "multi-option and option have same name");
     options[arg.name] = arg;
+  }
+
+  void addMultiOption(const Argument &arg) {
+    assert(!multiOptions.contains(arg.name) && "duplicate multi-option name");
+    assert(!flags.contains(arg.name) && "multi-option and flag have same name");
+    assert(!options.contains(arg.name) &&
+           "multi-option and option have same name");
+    multiOptions[arg.name] = arg;
   }
 
   CommandResult parseAndExecute(ArrayRef<std::string> tokens);
@@ -196,6 +210,9 @@ private:
 
   LogicalResult parseOption(StringRef name, StringRef value,
                             CommandArguments &args) const;
+
+  LogicalResult parseMultiOption(StringRef name, SmallVector<StringRef> value,
+                                 CommandArguments &args) const;
 };
 
 class Exit : public Command {
@@ -309,6 +326,11 @@ public:
   static constexpr llvm::StringLiteral CALCULATE_PATH_DELAYS =
       "calculate-path-delays";
   static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
+  static constexpr llvm::StringLiteral OUT_WITH_LSQS = "out-with-lsqs";
+  static constexpr llvm::StringLiteral NUM_OF_COMPARATORS =
+      "num-of-comparators";
+  static constexpr llvm::StringLiteral OUT_WITH_LSQS_DEP_GRAPH_FILE =
+      "dep-graph-file";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -328,6 +350,15 @@ public:
                "needs to be built with Gurobi support) and 'cbc'. The default "
                "option is gurobi and it will fall back to cbc if gurobi is not "
                "available."});
+    addFlag(
+        {OUT_WITH_LSQS, "Replace LSQs with the Out with LSQs elastic circuit"});
+    addMultiOption({NUM_OF_COMPARATORS,
+                    "Comparator counts for Out with LSQs, assigned cyclically "
+                    "to memory dependence edges"});
+    addOption(
+        {OUT_WITH_LSQS_DEP_GRAPH_FILE,
+         "Optional DOT file providing per-edge comparator counts; unspecified "
+         "dependences use default number of comparators"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
@@ -497,6 +528,19 @@ CommandResult Command::parseAndExecute(ArrayRef<std::string> tokens) {
         }
         if (failed(parseOption(name, *nextToken, parsed)))
           return CommandResult::SYNTAX_ERROR;
+      } else if (multiOptions.contains(name)) {
+        // This is a multi-valued option
+        SmallVector<StringRef> values;
+        ++tokIt;
+        StringRef nextTokenStr = *tokIt;
+        while (tokIt != opts.end() && !nextTokenStr.starts_with("--")) {
+          values.push_back(*tokIt);
+          ++tokIt;
+          nextTokenStr = *tokIt;
+        }
+        --tokIt; // Adjust for the loop increment
+        if (failed(parseMultiOption(name, values, parsed)))
+          return CommandResult::SYNTAX_ERROR;
       } else {
         llvm::errs() << ERR << "Unknow flag/option '" << tok << "'\n";
         return CommandResult::SYNTAX_ERROR;
@@ -539,6 +583,18 @@ LogicalResult Command::parseOption(StringRef name, StringRef value,
     return failure();
   }
   args.options.insert({name, value});
+  return success();
+};
+
+LogicalResult Command::parseMultiOption(StringRef name,
+                                        SmallVector<StringRef> values,
+                                        CommandArguments &args) const {
+  if (args.multiOptions.contains(name)) {
+    llvm::errs() << ERR << "Multi-option '" << name
+                 << "' given more than once\n";
+    return failure();
+  }
+  args.multiOptions[name] = values;
   return success();
 }
 
@@ -583,6 +639,9 @@ void Command::help() const {
   printListArgs(flags, "FLAGS", [&](auto ref) { os << "--" << ref; });
   printListArgs(options, "OPTIONS",
                 [&](auto ref) { os << "--" << ref << " <option-value>"; });
+  printListArgs(
+      multiOptions, "OPTIONS with multiple option values",
+      [&](auto ref) { os << "--" << ref << " [<option-values-list>]"; });
   os << "\n";
 }
 
@@ -761,6 +820,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string milpSolver = "cbc";
 #endif // DYNAMATIC_GUROBI_NOT_INSTALLED
 
+  std::string outWithLsqsNumComparators = "3";
+  std::string outWithLsqsDepGraphFile;
   std::string fastTokenDelivery =
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
@@ -769,7 +830,8 @@ CommandResult Compile::execute(CommandArguments &args) {
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
         it->second == "fpl22" || it->second == "fpga24" ||
-        it->second == "costaware" || it->second == "mapbuf") {
+        it->second == "costaware" || it->second == "mapbuf" ||
+        it->second == "cpbuf") {
       buffers = it->second;
     } else {
       llvm::errs()
@@ -778,7 +840,8 @@ CommandResult Compile::execute(CommandArguments &args) {
              "correctness), 'fpga20' (throughput-driven buffering), or 'fpl22' "
              "(throughput- and timing-driven buffering), or 'costaware' "
              "(throughput- and area-driven buffering), or 'mapbuf' "
-             "(simultaneous technology mapping and buffer placement).";
+             "(simultaneous technology mapping and buffer placement), or "
+             "'cpbuf' (only buffering for critical path).";
       return CommandResult::FAIL;
     }
   }
@@ -786,6 +849,21 @@ CommandResult Compile::execute(CommandArguments &args) {
   if (auto it = args.options.find(MILP_SOLVER); it != args.options.end()) {
     milpSolver = it->second;
   }
+
+  if (auto it = args.multiOptions.find(NUM_OF_COMPARATORS);
+      it != args.multiOptions.end()) {
+    outWithLsqsNumComparators = "";
+    for (const auto &valStr : it->second) {
+      int val = std::stoi(std::string(valStr));
+      outWithLsqsNumComparators += std::to_string(val) + ",";
+    }
+  }
+
+  if (auto it = args.options.find(OUT_WITH_LSQS_DEP_GRAPH_FILE);
+      it != args.options.end())
+    outWithLsqsDepGraphFile = it->second;
+
+  std::string outWithLsqs = args.flags.contains(OUT_WITH_LSQS) ? "1" : "0";
 
   std::string sharing = args.flags.contains(SHARING) ? "1" : "0";
   std::string rigidification = args.flags.contains(RIGIDIFICATION) ? "1" : "0";
@@ -808,7 +886,8 @@ CommandResult Compile::execute(CommandArguments &args) {
       state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
       state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
       fastTokenDelivery, milpSolver, straightToQueue, speculation,
-      enableShortCircuit, enableDuplication, calculatePathDelays, instrumentII);
+      enableShortCircuit, enableDuplication, calculatePathDelays, instrumentII,
+      outWithLsqs, outWithLsqsNumComparators, outWithLsqsDepGraphFile);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

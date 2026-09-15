@@ -216,7 +216,6 @@ LogicalResult ExportInfo::concretizeExternalModules() {
         return failure();
       }
 
-    // ...then generate the component itself
     return match->concretize(request, dynamaticPath, outputPath);
   };
 
@@ -734,6 +733,32 @@ void RTLWriter::constructIOMappings(
   };
 
   auto addPortType = [&](Type portType, StringRef port, StringRef signal) {
+    if (instOp.getModuleName().contains("ctrl_extractor")) {
+      size_t idx = port.rfind("_");
+      if (idx != std::string::npos)
+        port = port.substr(0, idx);
+
+      llvm::TypeSwitch<Type, void>(portType)
+          .Case<ChannelType>([&](ChannelType channelType) {
+            mappings[{port.str(), false}].push_back(
+                getInternalSignalName(signal, SignalType::DATA));
+            mappings[{port.str() + "_valid", false}].push_back(
+                getInternalSignalName(signal, SignalType::VALID));
+            mappings[{port.str() + "_ready", false}].push_back(
+                getInternalSignalName(signal, SignalType::READY));
+          })
+          .Case<ControlType>([&](auto type) {
+            mappings[{port.str() + "_valid", false}].push_back(
+                getInternalSignalName(signal, SignalType::VALID));
+            mappings[{port.str() + "_ready", false}].push_back(
+                getInternalSignalName(signal, SignalType::READY));
+          })
+          .Case<IntegerType>([&](IntegerType intType) {
+            mappings[getSignalName(port)].push_back(signal.str());
+          });
+
+      return;
+    }
     llvm::TypeSwitch<Type, void>(portType)
         .Case<ChannelType>([&](ChannelType channelType) {
           mappings[getTypedSignalName(port, SignalType::DATA)].push_back(

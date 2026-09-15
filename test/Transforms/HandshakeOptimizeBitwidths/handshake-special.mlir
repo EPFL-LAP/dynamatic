@@ -40,19 +40,21 @@ handshake.func @cmergeToMuxIndexOpt(%arg0: !handshake.channel<i32>, %arg1: !hand
 
 // CHECK-LABEL:   handshake.func @memAddrOpt(
 // CHECK-SAME:                               %[[VAL_0:.*]]: memref<1000xi32>, %[[VAL_1:.*]]: !handshake.control<>, %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["mem", "mem_start", "start"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<1000xi32>] %[[VAL_1]] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) %[[VAL_2]] {connectedBlocks = [0 : i32]} :    (!handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i32>) -> !handshake.channel<i32>
+// CHECK:           %[[VAL_3:.*]]:3, %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<1000xi32>] %[[VAL_1]] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) %[[VAL_2]] {connectedBlocks = [0 : i32]} :    (!handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>)
 // CHECK:           %[[VAL_11:.*]] = constant %[[VAL_2]] {value = 0 : i10} : <>, <i10>
 // CHECK:           %[[VAL_12:.*]] = constant %[[VAL_2]] {value = 500 : i10} : <>, <i10>
 // CHECK:           %[[VAL_13:.*]] = constant %[[VAL_2]] {value = 42 : i32} : <>, <i32>
 // CHECK:           %[[VAL_5]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
-// CHECK:           %[[VAL_6]], %[[VAL_14:.*]] = load{{\[}}%[[VAL_11]]] %[[VAL_3]] {handshake.bb = 0 : ui32} : <i10>, <i32>, <i10>, <i32>
-// CHECK:           %[[VAL_7]], %[[VAL_8]] = store{{\[}}%[[VAL_12]]] %[[VAL_13]] {handshake.bb = 0 : ui32} : <i10>, <i32>, <i10>, <i32>
-// CHECK:           %[[VAL_15:.*]] = constant %[[VAL_2]] {value = -25 : i10} : <>, <i10>
-// CHECK:           %[[VAL_9]], %[[VAL_10]] = store{{\[}}%[[VAL_15]]] %[[VAL_13]] {handshake.bb = 0 : ui32} : <i10>, <i32>, <i10>, <i32>
+// CHECK:           %[[VAL_6]], %[[VAL_14:.*]] = load{{\[}}%[[VAL_11]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32} : <i10>, <i32>, <i10>, <i32>
+// CHECK:           %[[VAL_7]], %[[VAL_8]], %[[VAL_15:.*]] = store{{\[}}%[[VAL_12]]] %[[VAL_13]] %[[VAL_3]]#1 {handshake.bb = 0 : ui32} : <i10>, <i32>, <>, <i10>, <i32>, <>
+// CHECK:           %[[VAL_16:.*]] = constant %[[VAL_2]] {value = -25 : i10} : <>, <i10>
+// CHECK:           %[[VAL_9]], %[[VAL_10]], %[[VAL_17:.*]] = store{{\[}}%[[VAL_16]]] %[[VAL_13]] %[[VAL_3]]#2 {handshake.bb = 0 : ui32} : <i10>, <i32>, <>, <i10>, <i32>, <>
+// CHECK:           sink %[[VAL_15]] : <>
+// CHECK:           sink %[[VAL_17]] : <>
 // CHECK:           end %[[VAL_14]], %[[VAL_4]] : <i32>, <>
 // CHECK:         }
 handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: !handshake.control<>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
-  %ldData1, %done = mem_controller[%mem : memref<1000xi32>] %mem_start (%ctrl1, %ldAddr1, %stAddr1, %stData1, %stAddr2, %stData2) %start {connectedBlocks = [0 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> !handshake.channel<i32>
+  %ldData1, %stDoneFromMem1, %stDoneFromMem2, %done = mem_controller[%mem : memref<1000xi32>] %mem_start (%ctrl1, %ldAddr1, %stAddr1, %stData1, %stAddr2, %stData2) %start {connectedBlocks = [0 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>)
   %addr1 = constant %start {value = 0 : i8} : <>, <i8>
   %addr2 = constant %start {value = 500 : i16}: <>, <i16>
   %addr3 = constant %start {value = 999 : i32}: <>, <i32>
@@ -61,8 +63,10 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: !handshake.contro
   %addr1Ext = extui %addr1 : <i8> to <i32>
   %addr2Ext = extui %addr2 : <i16> to <i32>
   %ldAddr1, %ldVal = load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
-  %stAddr1, %stData1 = store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
-  %stAddr2, %stData2 = store[%addr3] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+  %stAddr1, %stData1, %stDoneToSucc1 = store[%addr2Ext] %dataStore %stDoneFromMem1 {handshake.bb = 0 : ui32} : <i32>, <i32>, <>, <i32>, <i32>, <>
+  %stAddr2, %stData2, %stDoneToSucc2 = store[%addr3] %dataStore %stDoneFromMem2 {handshake.bb = 0 : ui32} : <i32>, <i32>, <>, <i32>, <i32>, <>
+  sink %stDoneToSucc1 : <>
+  sink %stDoneToSucc2 : <>  
   end %ldVal, %done : <i32>, <>
 }
 
@@ -72,21 +76,23 @@ handshake.func @memAddrOpt(%mem: memref<1000xi32>, %mem_start: !handshake.contro
 
 // CHECK-LABEL:   handshake.func @memAddrOptMasterSlave(
 // CHECK-SAME:                                          %[[VAL_0:.*]]: memref<1000xi32>, %[[VAL_1:.*]]: !handshake.control<>, %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>) attributes {argNames = ["mem", "mem_start", "start"], resNames = ["out0", "out1"]} {
-// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<1000xi32>] %[[VAL_1]] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]]#1, %[[VAL_8]]#2, %[[VAL_8]]#3) %[[VAL_2]] {connectedBlocks = [0 : i32]} :    (!handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>) -> !handshake.channel<i32>
-// CHECK:           %[[VAL_8]]:4 = lsq[MC] (%[[VAL_2]], %[[VAL_9:.*]], %[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_3]])  {groupSizes = [2 : i32]} : (!handshake.control<>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>)
+// CHECK:           %[[VAL_3:.*]]:3, %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<1000xi32>] %[[VAL_1]] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]]#2, %[[VAL_8]]#3, %[[VAL_8]]#4) %[[VAL_2]] {connectedBlocks = [0 : i32]} :    (!handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i32>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>) -> (!handshake.control<>, !handshake.channel<i32>, !handshake.control<>)
+// CHECK:           %[[VAL_8]]:5 = lsq[MC] (%[[VAL_2]], %[[VAL_9:.*]], %[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_3]]#1, %[[VAL_3]]#2)  {groupSizes = [2 : i32]} : (!handshake.control<>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.channel<i10>, !handshake.channel<i10>, !handshake.channel<i32>)
 // CHECK:           %[[VAL_12:.*]] = constant %[[VAL_2]] {value = 0 : i10} : <>, <i10>
 // CHECK:           %[[VAL_13:.*]] = constant %[[VAL_2]] {value = 500 : i10} : <>, <i10>
 // CHECK:           %[[VAL_14:.*]] = constant %[[VAL_2]] {value = 42 : i32} : <>, <i32>
 // CHECK:           %[[VAL_5]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
 // CHECK:           %[[VAL_9]], %[[VAL_15:.*]] = load{{\[}}%[[VAL_12]]] %[[VAL_8]]#0 {handshake.bb = 0 : ui32} : <i10>, <i32>, <i10>, <i32>
-// CHECK:           %[[VAL_10]], %[[VAL_11]] = store{{\[}}%[[VAL_13]]] %[[VAL_14]] {handshake.bb = 0 : ui32} : <i10>, <i32>, <i10>, <i32>
-// CHECK:           %[[VAL_16:.*]] = constant %[[VAL_2]] {value = -25 : i10} : <>, <i10>
-// CHECK:           %[[VAL_6]], %[[VAL_7]] = store{{\[}}%[[VAL_16]]] %[[VAL_14]] {handshake.bb = 0 : ui32} : <i10>, <i32>, <i10>, <i32>
+// CHECK:           %[[VAL_10]], %[[VAL_11]], %[[VAL_16:.*]] = store{{\[}}%[[VAL_13]]] %[[VAL_14]] %[[VAL_8]]#1 {handshake.bb = 0 : ui32} : <i10>, <i32>, <>, <i10>, <i32>, <>
+// CHECK:           %[[VAL_17:.*]] = constant %[[VAL_2]] {value = -25 : i10} : <>, <i10>
+// CHECK:           %[[VAL_6]], %[[VAL_7]], %[[VAL_18:.*]] = store{{\[}}%[[VAL_17]]] %[[VAL_14]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32} : <i10>, <i32>, <>, <i10>, <i32>, <>
+// CHECK:           sink %[[VAL_16]] : <>
+// CHECK:           sink %[[VAL_18]] : <>
 // CHECK:           end %[[VAL_15]], %[[VAL_4]] : <i32>, <>
 // CHECK:         }
 handshake.func @memAddrOptMasterSlave(%mem: memref<1000xi32>, %mem_start: !handshake.control<>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
-  %ldDataToLSQ, %done = mem_controller[%mem : memref<1000xi32>] %mem_start (%ctrl1, %stAddr2, %stData2, %ldAddrToMC, %stAddrToMC, %stdDataToMC) %start {connectedBlocks = [0 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> !handshake.channel<i32>
-  %ldData1, %ldAddrToMC, %stAddrToMC, %stdDataToMC = lsq[MC] (%start, %ldAddr1, %stAddr1, %stData1, %ldDataToLSQ) {groupSizes = [2 : i32]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
+  %stDoneFromMem2, %ldDataToLSQ, %stDoneToLSQ1, %done = mem_controller[%mem : memref<1000xi32>] %mem_start (%ctrl1, %stAddr2, %stData2, %ldAddrToMC, %stAddrToMC, %stdDataToMC) %start {connectedBlocks = [0 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> ( !handshake.control<>, !handshake.channel<i32>, !handshake.control<>)
+  %ldData1, %stDoneFromMem1, %ldAddrToMC, %stAddrToMC, %stdDataToMC = lsq[MC] (%start, %ldAddr1, %stAddr1, %stData1, %ldDataToLSQ, %stDoneToLSQ1) {groupSizes = [2 : i32]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
   %addr1 = constant %start {value = 0 : i8} : <>, <i8>
   %addr2 = constant %start {value = 500 : i16}: <>, <i16>
   %addr3 = constant %start {value = 999 : i32}: <>, <i32>
@@ -95,8 +101,10 @@ handshake.func @memAddrOptMasterSlave(%mem: memref<1000xi32>, %mem_start: !hands
   %addr1Ext = extui %addr1 : <i8> to <i32>
   %addr2Ext = extui %addr2 : <i16> to <i32>
   %ldAddr1, %ldVal = load[%addr1Ext] %ldData1 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
-  %stAddr1, %stData1 = store[%addr2Ext] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
-  %stAddr2, %stData2 = store[%addr3] %dataStore {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+  %stAddr1, %stData1, %stDoneToSucc1 = store[%addr2Ext] %dataStore %stDoneFromMem1 {handshake.bb = 0 : ui32} : <i32>, <i32>, <>, <i32>, <i32>, <>
+  %stAddr2, %stData2, %stDoneToSucc2 = store[%addr3] %dataStore %stDoneFromMem2 {handshake.bb = 0 : ui32} : <i32>, <i32>, <>, <i32>, <i32>, <>
+  sink %stDoneToSucc1 : <>
+  sink %stDoneToSucc2 : <>  
   end %ldVal, %done : <i32>, <>
 }
 
