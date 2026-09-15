@@ -3,6 +3,7 @@ add_dynamatic_library(DynamaticBufferPlacement
   Utils/BufferPlacementMILP.cpp
   Utils/CFDFC.cpp
   Utils/UnitMILPVars.cpp
+  CPBuffers.cpp
   FPGA20Buffers.cpp
   FPL22Buffers.cpp
   FPGA24Buffers.cpp
@@ -35,4 +36,3 @@ if (GUROBI_FOUND)
     ${GUROBI_LIBRARY}
   )
 endif()
-

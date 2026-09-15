@@ -141,7 +141,7 @@ struct MILPVars {
 class BufferPlacementMILP : public MILP<BufferPlacement> {
 public:
   // Enum representation of algorithm class
-  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF };
+  enum class Algorithm { FPGA20, FPL22, FPGA24, CostAware, MAPBUF, CPBUF };
 
   /// Contains timing characterizations for dataflow components required to
   /// create the MILP constraints.

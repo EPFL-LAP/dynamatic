@@ -21,6 +21,7 @@
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Transforms/BufferPlacement/CostAwareBuffers.h"
+#include "dynamatic/Transforms/BufferPlacement/CPBuffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA20Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPGA24Buffers.h"
 #include "dynamatic/Transforms/BufferPlacement/FPL22Buffers.h"
@@ -51,7 +52,8 @@ using namespace dynamatic::experimental;
 static constexpr llvm::StringLiteral ON_MERGES("on-merges");
 /// Algorithms that do require solving an MILP.
 static constexpr llvm::StringLiteral FPGA20("fpga20"), FPL22("fpl22"),
-    COST_AWARE("costaware"), MAPBUF("mapbuf"), FPGA24("fpga24");
+    COST_AWARE("costaware"), MAPBUF("mapbuf"), FPGA24("fpga24"),
+    CPBUF("cpbuf");
 
 // [START Boilerplate code for the MLIR pass]
 #include "dynamatic/Transforms/Passes.h" // IWYU pragma: keep
@@ -179,7 +181,8 @@ void HandshakePlaceBuffersPass::runOnOperation() {
       algorithm == FPL22 || 
       algorithm == FPGA24 ||
       algorithm == COST_AWARE ||
-      algorithm == MAPBUF
+      algorithm == MAPBUF ||
+      algorithm == CPBUF
       // clang-format on
   ) {
     if (failed(placeUsingMILP()))
@@ -657,6 +660,22 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
     fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
                                writeTo, ftd);
     return milp.solve(placement, calculatePathDelays);
+  }
+  if (algorithm == CPBUF) {
+    if (dumpMILPModels)
+      writeTo = dumpDir + sep + funcName + "-cp-buffers";
+    cpbuf::CPBuffers milp(solverKind, timeout, info, timingDB, targetCP,
+                          writeTo);
+    if (failed(milp.solve(placement, calculatePathDelays)))
+      return failure();
+
+    // CP buffering deliberately omits throughput/occupancy variables. The
+    // common instantiation path nevertheless expects an occupancy entry for
+    // every channel in every extracted CFDFC.
+    for (auto &[cfdfc, _] : info.cfdfcs)
+      for (Value channel : cfdfc->channels)
+        cfdfc->channelOccupancy.try_emplace(channel, 0.0);
+    return success();
   }
   if (algorithm == FPL22) {
     // Create disjoint block unions of all CFDFCs

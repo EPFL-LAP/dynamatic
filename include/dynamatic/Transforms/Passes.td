@@ -287,7 +287,8 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf', 'cp'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf', "
+    "'cpbuf'.">,
     Option<"solver", "solver", "std::string", "\"gurobi\"",
     "The MILP solver. Choices are: 'gurobi', 'cbc'">,
     Option<"frequencies", "frequencies", "std::string", "",
