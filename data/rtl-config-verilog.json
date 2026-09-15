@@ -195,10 +195,19 @@
   {
     "name": "handshake.remui",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/remui.v",
-    "dependencies": ["join_type", "delay_buffer", "oehb_dataless"],
+    "dependencies": [
+      "join_type",
+      "delay_buffer",
+      "oehb_dataless"
+    ],
     "hdl": "verilog"
   },
   {
@@ -381,34 +390,57 @@
       }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/maxsi.v",
-    "dependencies": ["join_type"],
+    "dependencies": [
+      "join_type"
+    ],
     "hdl": "verilog"
   },
   {
     "name": "handshake.maxui",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/maxui.v",
-    "dependencies": ["join_type"],
+    "dependencies": [
+      "join_type"
+    ],
     "hdl": "verilog"
   },
   {
     "name": "handshake.minsi",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/minsi.v",
-    "dependencies": ["join_type"],
+    "dependencies": [
+      "join_type"
+    ],
     "hdl": "verilog"
   },
   {
     "name": "handshake.minui",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      {
+        "name": "DATA_TYPE",
+        "type": "dataflow",
+        "data-lb": 1,
+        "extra-eq": 0
+      }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/minui.v",
-    "dependencies": ["join_type"],
+    "dependencies": [
+      "join_type"
+    ],
     "hdl": "verilog"
   },
   {

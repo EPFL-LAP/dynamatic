@@ -4,41 +4,40 @@ module mem_controller_loadless #(
   parameter NUM_STORES   = 1,
   parameter DATA_TYPE   = 32,
   parameter ADDR_TYPE   = 32
-) (
-  input                                      clk,
-  input                                      rst,
-  // start input control
-  input                                      memStart_valid,
-  output                                     memStart_ready,
-  // end output control
-  output                                     memEnd_valid,
-  input                                      memEnd_ready,
-  // "no more requests" input control
-  input                                      ctrlEnd_valid,
-  output                                     ctrlEnd_ready,
-  // Control Input Channels
-  input  [      (NUM_CONTROLS * 32) - 1 : 0] ctrl,
-  input  [             NUM_CONTROLS - 1 : 0] ctrl_valid,
-  output [             NUM_CONTROLS - 1 : 0] ctrl_ready,
-  // Store Address Input Channels
-  input  [(NUM_STORES * ADDR_TYPE) - 1 : 0] stAddr,
-  input  [               NUM_STORES - 1 : 0] stAddr_valid,
-  output [               NUM_STORES - 1 : 0] stAddr_ready,
-  // Store Data Input Channels
-  input  [(NUM_STORES * DATA_TYPE) - 1 : 0] stData,
-  input  [               NUM_STORES - 1 : 0] stData_valid,
-  output [               NUM_STORES - 1 : 0] stData_ready,
-  // Store Done Output Channels
-  output [               NUM_STORES - 1 : 0] stDone_valid,
-  input  [               NUM_STORES - 1 : 0] stDone_ready,
-  // Interface to Dual-port BRAM
-  input  [               DATA_TYPE - 1 : 0] loadData,
-  output                                     loadEn,
-  output [               ADDR_TYPE - 1 : 0] loadAddr,
-  output                                     storeEn,
-  output [               ADDR_TYPE - 1 : 0] storeAddr,
-  output [               DATA_TYPE - 1 : 0] storeData
-);
+)
+    (input clk,
+     input rst,
+     // start input control
+     input memStart_valid,
+     output memStart_ready,
+     // end output control
+     output memEnd_valid,
+     input memEnd_ready,
+     // "no more requests" input control
+     input ctrlEnd_valid,
+     output ctrlEnd_ready,
+     // Control Input Channels
+     input [(NUM_CONTROLS * 32) - 1 : 0] ctrl,
+     input [NUM_CONTROLS - 1 : 0] ctrl_valid,
+     output [NUM_CONTROLS - 1 : 0] ctrl_ready,
+     // Store Address Input Channels
+     input [(NUM_STORES * ADDR_TYPE) - 1 : 0] stAddr,
+     input [NUM_STORES - 1 : 0] stAddr_valid,
+     output [NUM_STORES - 1 : 0] stAddr_ready,
+     // Store Data Input Channels
+     input [(NUM_STORES * DATA_TYPE) - 1 : 0] stData,
+     input [NUM_STORES - 1 : 0] stData_valid,
+     output [NUM_STORES - 1 : 0] stData_ready,
+     // Store Done Output Channels
+     output [NUM_STORES - 1 : 0] stDone_valid,
+     input [NUM_STORES - 1 : 0] stDone_ready,
+     // Interface to Dual-port BRAM
+     input [DATA_TYPE - 1 : 0] loadData,
+     output loadEn,
+     output [ADDR_TYPE - 1 : 0] loadAddr,
+     output storeEn,
+     output [ADDR_TYPE - 1 : 0] storeAddr,
+     output [DATA_TYPE - 1 : 0] storeData);
   // Terminology:
   // Access ports    : circuit to memory_controller;
   // Interface ports : memory_controller to memory_interface (e.g., BRAM/AXI);
@@ -103,7 +102,8 @@ module mem_controller_loadless #(
     if (rst) begin
       store_complete <= {NUM_STORES{1'b0}};
     end else begin
-      for (store_idx = 0; store_idx < NUM_STORES; store_idx = store_idx + 1) begin
+      for (store_idx = 0; store_idx < NUM_STORES; store_idx = store_idx + 1)
+      begin
         if (store_access_port_selected[store_idx])
           store_complete[store_idx] <= 1'b1;
         else if (stDone_ready[store_idx])
@@ -149,5 +149,4 @@ module mem_controller_loadless #(
     .ctrlEnd_ready  (ctrlEnd_ready),
     .allRequestsDone(allRequestsDone)
   );
-
 endmodule

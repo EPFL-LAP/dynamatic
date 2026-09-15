@@ -2,32 +2,31 @@
 module store #(
   parameter DATA_TYPE = 32,
   parameter ADDR_TYPE = 32
-)(
-  input  clk,
-  input  rst,
-  // Data from Circuit Channel
-  input  [DATA_TYPE - 1 : 0] dataIn,
-  input  dataIn_valid,
-  output dataIn_ready,
-  // Address from Circuit Channel
-  input  [ADDR_TYPE - 1 : 0] addrIn,
-  input  addrIn_valid,
-  output addrIn_ready,
-  // Done signal from Interface Channel
-  input  doneFromMem_valid,
-  output doneFromMem_ready,
-  // Data to Interface Channel
-  output [DATA_TYPE - 1 : 0] dataToMem,
-  output dataToMem_valid,
-  input  dataToMem_ready,
-  // Address to Interface Channel
-  output [ADDR_TYPE - 1 : 0] addrOut,
-  output addrOut_valid,
-  input  addrOut_ready,
-  // Done signal to Circuit Channel
-  output doneOut_valid,
-  input  doneOut_ready
-);
+)
+    (input clk,
+     input rst,
+     // Data from Circuit Channel
+     input [DATA_TYPE - 1 : 0] dataIn,
+     input dataIn_valid,
+     output dataIn_ready,
+     // Address from Circuit Channel
+     input [ADDR_TYPE - 1 : 0] addrIn,
+     input addrIn_valid,
+     output addrIn_ready,
+     // Done signal from Interface Channel
+     input doneFromMem_valid,
+     output doneFromMem_ready,
+     // Data to Interface Channel
+     output [DATA_TYPE - 1 : 0] dataToMem,
+     output dataToMem_valid,
+     input dataToMem_ready,
+     // Address to Interface Channel
+     output [ADDR_TYPE - 1 : 0] addrOut,
+     output addrOut_valid,
+     input addrOut_ready,
+     // Done signal to Circuit Channel
+     output doneOut_valid,
+     input doneOut_ready);
 
   // Data assignment
   assign dataToMem = dataIn;
@@ -42,5 +41,4 @@ module store #(
   // Done signal assignment
   assign doneFromMem_ready = doneOut_ready;
   assign doneOut_valid = doneFromMem_valid;
-
 endmodule

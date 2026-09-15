@@ -60,7 +60,7 @@ public:
                        mlir::PatternBenefit benefit = 1)
       : DynOpConversionPattern<mlir::func::FuncOp>(namer, typeConverter, ctx,
                                                    benefit),
-        shouldAnnotateCFG(annotateCFG) {};
+        shouldAnnotateCFG(annotateCFG){};
 
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -71,7 +71,6 @@ private:
   bool shouldAnnotateCFG = false;
 
 public:
-
   /// Groups memory operations by interface and group for a given memory region.
   struct MemAccesses {
     /// Memory operations for a simple memory controller, grouped by
