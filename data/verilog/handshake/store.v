@@ -1,8 +1,7 @@
 `timescale 1ns/1ps
-module store #(
-  parameter DATA_TYPE = 32,
-  parameter ADDR_TYPE = 32
-)
+module store
+    #(parameter DATA_TYPE = 32,
+      parameter ADDR_TYPE = 32)
     (input clk,
      input rst,
      // Data from Circuit Channel

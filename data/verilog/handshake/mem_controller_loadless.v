@@ -1,10 +1,9 @@
 `timescale 1ns / 1ps
-module mem_controller_loadless #(
-  parameter NUM_CONTROLS = 1,
-  parameter NUM_STORES   = 1,
-  parameter DATA_TYPE   = 32,
-  parameter ADDR_TYPE   = 32
-)
+module mem_controller_loadless
+    #(parameter NUM_CONTROLS = 1,
+      parameter NUM_STORES = 1,
+      parameter DATA_TYPE = 32,
+      parameter ADDR_TYPE = 32)
     (input clk,
      input rst,
      // start input control
@@ -138,15 +137,13 @@ module mem_controller_loadless #(
   // of accesses in the block instead of just the number of stores.
   assign allRequestsDone = (remainingStores == zeroStore && ctrl_valid == zeroCtrl) ? 1'b1 : 1'b0;
 
-  mc_control control (
-    .rst            (rst),
-    .clk            (clk),
-    .memStart_valid (memStart_valid),
-    .memStart_ready (memStart_ready),
-    .memEnd_valid   (memEnd_valid),
-    .memEnd_ready   (memEnd_ready),
-    .ctrlEnd_valid  (ctrlEnd_valid),
-    .ctrlEnd_ready  (ctrlEnd_ready),
-    .allRequestsDone(allRequestsDone)
-  );
+  mc_control control(.rst(rst),
+                     .clk(clk),
+                     .memStart_valid(memStart_valid),
+                     .memStart_ready(memStart_ready),
+                     .memEnd_valid(memEnd_valid),
+                     .memEnd_ready(memEnd_ready),
+                     .ctrlEnd_valid(ctrlEnd_valid),
+                     .ctrlEnd_ready(ctrlEnd_ready),
+                     .allRequestsDone(allRequestsDone));
 endmodule

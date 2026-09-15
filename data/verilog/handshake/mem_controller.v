@@ -1,11 +1,10 @@
 `timescale 1ns / 1ps
-module mem_controller #(
-  parameter NUM_CONTROLS = 1,
-  parameter NUM_LOADS    = 1,
-  parameter NUM_STORES   = 1,
-  parameter DATA_TYPE   = 32,
-  parameter ADDR_TYPE   = 32
-)
+module mem_controller
+    #(parameter NUM_CONTROLS = 1,
+      parameter NUM_LOADS = 1,
+      parameter NUM_STORES = 1,
+      parameter DATA_TYPE = 32,
+      parameter ADDR_TYPE = 32)
     (input clk,
      input rst,
      // start input control
@@ -82,21 +81,18 @@ module mem_controller #(
              .storeAddr(storeAddr),
              .storeData(storeData));
 
-  read_memory_arbiter #(
-    .ARBITER_SIZE(NUM_LOADS),
-    .ADDR_TYPE  (ADDR_TYPE),
-    .DATA_TYPE  (DATA_TYPE)
-  ) read_arbiter (
-    .rst             (rst),
-    .clk             (clk),
-    .pValid          (ldAddr_valid),
-    .ready           (ldAddr_ready),
-    .address_in      (ldAddr),
-    .nReady          (ldData_ready),
-    .valid           (ldData_valid),
-    .data_out        (ldData),
-    .read_enable     (loadEn),
-    .read_address    (loadAddr),
-    .data_from_memory(loadData)
-  );
+  read_memory_arbiter #(.ARBITER_SIZE(NUM_LOADS),
+                        .ADDR_TYPE(ADDR_TYPE),
+                        .DATA_TYPE(DATA_TYPE))
+      read_arbiter(.rst(rst),
+                   .clk(clk),
+                   .pValid(ldAddr_valid),
+                   .ready(ldAddr_ready),
+                   .address_in(ldAddr),
+                   .nReady(ldData_ready),
+                   .valid(ldData_valid),
+                   .data_out(ldData),
+                   .read_enable(loadEn),
+                   .read_address(loadAddr),
+                   .data_from_memory(loadData));
 endmodule
