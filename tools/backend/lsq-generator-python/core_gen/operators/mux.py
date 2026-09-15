@@ -31,7 +31,7 @@ def Mux1H(em: Emitter, dout, din, sel, j=None) -> str:
             When "sel" is LogicVecArray, select the j-th "sel" signal.
 
     Returns:
-        str: A VHDL code snippet for multiplexing.
+        str: A code snippet for multiplexing.
 
     Example:
         type(din) = LogicVecArray:

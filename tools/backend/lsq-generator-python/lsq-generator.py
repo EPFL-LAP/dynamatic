@@ -141,32 +141,54 @@ class LSQWrapper:
         ##
         # Define all the IOs, details can be found in the table above
         # ! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
+
+        # io_storeData: output
         io_storeData = LogicVec(
             em, "io_storeData", 'o', self.lsq_config.dataW, custom_suffix=""
         )
+
+        # io_storeAddr: output
         io_storeAddr = LogicVec(
             em, "io_storeAddr", 'o', self.lsq_config.addrW, custom_suffix=""
         )
+
+        # io_storeEn: output
         io_storeEn = Logic(em, "io_storeEn", 'o', custom_suffix="")
+
+        # io_loadData: input
         io_loadData = LogicVec(
             em, "io_loadData", 'i', self.lsq_config.dataW, custom_suffix=""
         )
+
+        # io_loadAddr: output
         io_loadAddr = LogicVec(
             em, "io_loadAddr", 'o', self.lsq_config.addrW, custom_suffix=""
         )
+
+        # io_loadEn: output
         io_loadEn = Logic(em, "io_loadEn", 'o', custom_suffix="")
+
+        # io_ctrl_*_ready: output
         io_ctrl_ready = LogicArray(
             em, "io_ctrl", 'o', self.lsq_config.numGroups, custom_suffix="_ready"
         )
+
+        # io_ctrl_*_valid: input
         io_ctrl_valid = LogicArray(
             em, "io_ctrl", 'i', self.lsq_config.numGroups, custom_suffix="_valid"
         )
+
+        # io_ldAddr_*_ready: output
         io_ldAddr_ready = LogicArray(
             em, "io_ldAddr", 'o', self.lsq_config.numLdPorts, custom_suffix="_ready"
         )
+
+        # io_ldAddr_*_valid: input
         io_ldAddr_valid = LogicArray(
             em, "io_ldAddr", 'i', self.lsq_config.numLdPorts, custom_suffix="_valid"
         )
+
+        # io_ldAddr_*_bits: input
         io_ldAddr_bits = LogicVecArray(
             em,
             "io_ldAddr",
@@ -175,12 +197,18 @@ class LSQWrapper:
             self.lsq_config.addrW,
             custom_suffix="_bits",
         )
+
+        # io_ldData_*_ready: input
         io_ldData_ready = LogicArray(
             em, "io_ldData", 'i', self.lsq_config.numLdPorts, custom_suffix="_ready"
         )
+
+        # io_ldData_*_valid: output
         io_ldData_valid = LogicArray(
             em, "io_ldData", 'o', self.lsq_config.numLdPorts, custom_suffix="_valid"
         )
+
+        # io_ldData_*_bits: output
         io_ldData_bits = LogicVecArray(
             em,
             "io_ldData",
@@ -189,12 +217,18 @@ class LSQWrapper:
             self.lsq_config.dataW,
             custom_suffix="_bits",
         )
+
+        # io_stAddr_ready: output
         io_stAddr_ready = LogicArray(
             em, "io_stAddr", 'o', self.lsq_config.numStPorts, custom_suffix="_ready"
         )
+
+        # io_stAddr_valid: input
         io_stAddr_valid = LogicArray(
             em, "io_stAddr", 'i', self.lsq_config.numStPorts, custom_suffix="_valid"
         )
+
+        # io_stAddr_bits: input
         io_stAddr_bits = LogicVecArray(
             em,
             "io_stAddr",
@@ -203,12 +237,18 @@ class LSQWrapper:
             self.lsq_config.addrW,
             custom_suffix="_bits",
         )
+
+        # io_stData_ready: output
         io_stData_ready = LogicArray(
             em, "io_stData", 'o', self.lsq_config.numStPorts, custom_suffix="_ready"
         )
+
+        # io_stData_valid: input
         io_stData_valid = LogicArray(
             em, "io_stData", 'i', self.lsq_config.numStPorts, custom_suffix="_valid"
         )
+
+        # io_stData_bits: input
         io_stData_bits = LogicVecArray(
             em,
             "io_stData",
@@ -217,11 +257,23 @@ class LSQWrapper:
             self.lsq_config.dataW,
             custom_suffix="_bits",
         )
+
+        # io_memStart_ready: output
         io_memStart_ready = Logic(em, "io_memStart", 'o', custom_suffix="_ready")
+
+        # io_memStart_valid: input
         io_memStart_valid = Logic(em, "io_memStart", 'i', custom_suffix="_valid")
+
+        # io_ctrlEnd_ready: output
         io_ctrlEnd_ready = Logic(em, "io_ctrlEnd", 'o', custom_suffix="_ready")
+
+        # io_ctrlEnd_valid: input
         io_ctrlEnd_valid = Logic(em, "io_ctrlEnd", 'i', custom_suffix="_valid")
+
+        # io_memEnd_ready: input
         io_memEnd_ready = Logic(em, "io_memEnd", 'i', custom_suffix="_ready")
+
+        # io_memEnd_valid: output
         io_memEnd_valid = Logic(em, "io_memEnd", 'o', custom_suffix="_valid")
 
         ##
@@ -478,30 +530,47 @@ class LSQWrapper:
         em.clock_name = "clock"
         em.reset_name = "reset"
 
+        # io_stDataToMC_bits: output
         io_storeData = LogicVec(
             em, "io_stDataToMC", 'o', self.lsq_config.dataW, custom_suffix="_bits"
         )
+
+        # io_stAddrToMC_bits: output
         io_storeAddr = LogicVec(
             em, "io_stAddrToMC", 'o', self.lsq_config.addrW, custom_suffix="_bits"
         )
+
+        # io_ldDataFromMC_bits: input
         io_loadData = LogicVec(
             em, "io_ldDataFromMC", 'i', self.lsq_config.dataW, custom_suffix="_bits"
         )
+
+        # io_ldAddrToMC_bits: output
         io_loadAddr = LogicVec(
             em, "io_ldAddrToMC", 'o', self.lsq_config.addrW, custom_suffix="_bits"
         )
+
+        # io_ctrl_*_ready: output
         io_ctrl_ready = LogicArray(
             em, "io_ctrl", 'o', self.lsq_config.numGroups, custom_suffix="_ready"
         )
+
+        # io_ctrl_*_valid: input
         io_ctrl_valid = LogicArray(
             em, "io_ctrl", 'i', self.lsq_config.numGroups, custom_suffix="_valid"
         )
+
+        # io_ldAddr_*_ready: output
         io_ldAddr_ready = LogicArray(
             em, "io_ldAddr", 'o', self.lsq_config.numLdPorts, custom_suffix="_ready"
         )
+
+        # io_ldAddr_*_valid: input
         io_ldAddr_valid = LogicArray(
             em, "io_ldAddr", 'i', self.lsq_config.numLdPorts, custom_suffix="_valid"
         )
+
+        # io_ldAddr_*_bits: input
         io_ldAddr_bits = LogicVecArray(
             em,
             "io_ldAddr",
@@ -510,12 +579,18 @@ class LSQWrapper:
             self.lsq_config.addrW,
             custom_suffix="_bits",
         )
+
+        # io_ldData_*_ready: input
         io_ldData_ready = LogicArray(
             em, "io_ldData", 'i', self.lsq_config.numLdPorts, custom_suffix="_ready"
         )
+
+        # io_ldData_*_valid: output
         io_ldData_valid = LogicArray(
             em, "io_ldData", 'o', self.lsq_config.numLdPorts, custom_suffix="_valid"
         )
+
+        # io_ldData_*_bits: output
         io_ldData_bits = LogicVecArray(
             em,
             "io_ldData",
@@ -524,12 +599,18 @@ class LSQWrapper:
             self.lsq_config.dataW,
             custom_suffix="_bits",
         )
+
+        # io_stAddr_ready: output
         io_stAddr_ready = LogicArray(
             em, "io_stAddr", 'o', self.lsq_config.numStPorts, custom_suffix="_ready"
         )
+
+        # io_stAddr_valid: input
         io_stAddr_valid = LogicArray(
             em, "io_stAddr", 'i', self.lsq_config.numStPorts, custom_suffix="_valid"
         )
+
+        # io_stAddr_bits: input
         io_stAddr_bits = LogicVecArray(
             em,
             "io_stAddr",
@@ -538,12 +619,18 @@ class LSQWrapper:
             self.lsq_config.addrW,
             custom_suffix="_bits",
         )
+
+        # io_stData_ready: output
         io_stData_ready = LogicArray(
             em, "io_stData", 'o', self.lsq_config.numStPorts, custom_suffix="_ready"
         )
+
+        # io_stData_valid: input
         io_stData_valid = LogicArray(
             em, "io_stData", 'i', self.lsq_config.numStPorts, custom_suffix="_valid"
         )
+
+        # io_stData_bits: input
         io_stData_bits = LogicVecArray(
             em,
             "io_stData",
@@ -552,13 +639,29 @@ class LSQWrapper:
             self.lsq_config.dataW,
             custom_suffix="_bits",
         )
+
+        # io_ldAddrToMC_ready: input
         io_ldAddrToMC_ready = Logic(em, "io_ldAddrToMC", 'i', custom_suffix="_ready")
+
+        # io_ldAddrToMC_valid
         io_ldAddrToMC_valid = Logic(em, "io_ldAddrToMC", 'o', custom_suffix="_valid")
+
+        # io_ldDataFromMC_ready
         io_ldDataFromMC_ready = Logic(em, "io_ldDataFromMC", 'o', custom_suffix="_ready")
+
+        # io_ldDataFromMC_valid
         io_ldDataFromMC_valid = Logic(em, "io_ldDataFromMC", 'i', custom_suffix="_valid")
+
+        # io_stAddrToMC_ready
         io_stAddrToMC_ready = Logic(em, "io_stAddrToMC", 'i', custom_suffix="_ready")
+
+        # io_stAddrToMC_valid
         io_stAddrToMC_valid = Logic(em, "io_stAddrToMC", 'o', custom_suffix="_valid")
+
+        # io_stDataToMC_ready
         io_stDataToMC_ready = Logic(em, "io_stDataToMC", 'i', custom_suffix="_ready")
+
+        # io_stDataToMC_valid
         io_stDataToMC_valid = Logic(em, "io_stDataToMC", 'o', custom_suffix="_valid")
 
         ##

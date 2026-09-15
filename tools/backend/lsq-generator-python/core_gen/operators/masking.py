@@ -22,7 +22,7 @@ def CyclicPriorityMasking(em: Emitter, dout, din, base, reverse=False) -> str:
            base = 001000        base = 001000      base = 001000
            reverse = False      reverse = True     reverse = False
 
-           dout1= 010000        dout2= 000100      dout3= 00001
+           dout1= 010000        dout2= 000100      dout3= 000010
            (base to MSB)        (base to LSB)      (base to MSB -> LSB to base)
 
     Behavior (with the Example 1):
