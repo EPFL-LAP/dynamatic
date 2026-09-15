@@ -51,9 +51,9 @@ class Statement:
     def concat(self, other):
         return Bin(self, BinOp.CONCAT, other)
 
-    def to_str(self, em: "Emitter", meta: "Meta") -> str:
+    def to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         if self.get_precedence() <= meta.precedence:
-            return f"({self._to_str(em, meta)})"
+            return f'({self._to_str(em, meta)})'
         else:
             return self._to_str(em, meta)
 
@@ -62,13 +62,13 @@ class Statement:
         return self
 
     def else_(self, statement):
-        if getattr(self, "condition", None) is None:
-            raise ValueError("else_ can only be called after when")
+        if getattr(self, 'condition', None) is None:
+            raise ValueError('else_ can only be called after when')
 
         return WhenElse(self, self.condition, statement)
 
-    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
-        raise NotImplementedError("Subclasses must implement _to_str method")
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
+        raise NotImplementedError('Subclasses must implement _to_str method')
 
     def get_type(self) -> str:
         return Type.LOGIC
@@ -79,10 +79,10 @@ class Statement:
 
 
 class Type(Enum):
-    LOGIC = "logic"
-    ARITH = "arith"
-    BOOL = "bool"
-    ANY = "any"
+    LOGIC = 'logic'
+    ARITH = 'arith'
+    BOOL = 'bool'
+    ANY = 'any'
 
 
 class Val(Statement):
@@ -95,7 +95,7 @@ class Val(Statement):
         self.var = var
         self.size = size
 
-    def _to_str(self, em: "Emitter", meta: "Meta"):
+    def _to_str(self, em: 'Emitter', meta: 'Meta'):
         if self.size is not None:
             size = self.size
         else:
@@ -125,19 +125,19 @@ class Val(Statement):
 class BinOp(Enum):
     """Represents a binary operator"""
 
-    ADD = ("+", 4, Type.ARITH, Type.ARITH)
-    SUB = ("-", 4, Type.ARITH, Type.ARITH)
-    AND = ("and", 3, Type.LOGIC, Type.LOGIC)
-    OR = ("or", 3, Type.LOGIC, Type.LOGIC)
-    XOR = ("xor", 3, Type.LOGIC, Type.LOGIC)
-    CONCAT = ("&", 3, Type.LOGIC, Type.LOGIC)
-    MUL = ("*", 5, Type.ARITH, Type.ARITH)
-    GE = (">=", 2, Type.BOOL, Type.ARITH)
-    LE = ("<=", 2, Type.BOOL, Type.ARITH)
-    GT = (">", 2, Type.BOOL, Type.ARITH)
-    LT = ("<", 2, Type.BOOL, Type.ARITH)
-    EQ = ("=", 1, Type.BOOL, Type.ANY)
-    NEQ = ("!=", 1, Type.BOOL, Type.ANY)
+    ADD = ('+', 4, Type.ARITH, Type.ARITH)
+    SUB = ('-', 4, Type.ARITH, Type.ARITH)
+    AND = ('and', 3, Type.LOGIC, Type.LOGIC)
+    OR = ('or', 3, Type.LOGIC, Type.LOGIC)
+    XOR = ('xor', 3, Type.LOGIC, Type.LOGIC)
+    CONCAT = ('&', 3, Type.LOGIC, Type.LOGIC)
+    MUL = ('*', 5, Type.ARITH, Type.ARITH)
+    GE = ('>=', 2, Type.BOOL, Type.ARITH)
+    LE = ('<=', 2, Type.BOOL, Type.ARITH)
+    GT = ('>', 2, Type.BOOL, Type.ARITH)
+    LT = ('<', 2, Type.BOOL, Type.ARITH)
+    EQ = ('=', 1, Type.BOOL, Type.ANY)
+    NEQ = ('!=', 1, Type.BOOL, Type.ANY)
 
     def get_precedence(self) -> int:
         return self.value[1]
@@ -168,14 +168,14 @@ class Bin(Statement):
     def get_param_type(self) -> str:
         return self.op.get_param_type()
 
-    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.bin_to_str(self, meta)
 
 
 class UnOp(Enum):
     """Represents a unary operator"""
 
-    NOT = ("not", 10, Type.LOGIC, Type.LOGIC)
+    NOT = ('not', 10, Type.LOGIC, Type.LOGIC)
 
     def get_precedence(self) -> int:
         return self.value[1]
@@ -205,7 +205,7 @@ class Un(Statement):
     def get_param_type(self) -> str:
         return self.op.get_param_type()
 
-    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.un_to_str(self, meta)
 
 
@@ -216,13 +216,13 @@ class Bit(Statement):
 
     def __init__(self, value: int):
         if value not in (0, 1):
-            raise ValueError("Bit value must be 0 or 1")
+            raise ValueError('Bit value must be 0 or 1')
         self.value = value
 
     def get_precedence(self) -> int:
         return 11
 
-    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.get_bit_str(self)
 
 
@@ -234,7 +234,7 @@ class CustomStatement(Statement):
     def __init__(self, vhdl_str):
         self.vhdl_str = vhdl_str
 
-    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.print_custom_str(self)
 
 
@@ -256,7 +256,7 @@ class WhenElse(Statement):
     def get_precedence(self) -> int:
         return 0
 
-    def _to_str(self, em: "Emitter", meta: "Meta") -> str:
+    def _to_str(self, em: 'Emitter', meta: 'Meta') -> str:
         return em.when_else_to_str(self, meta)
 
     def get_type(self) -> str:
@@ -281,7 +281,7 @@ def reduce_bin(op: BinOp, statements: list) -> Statement:
         Statement: A single Statement object resulting from the reduction.
     """
     if len(statements) == 0:
-        raise ValueError("Cannot reduce an empty list of statements")
+        raise ValueError('Cannot reduce an empty list of statements')
     elif len(statements) == 1:
         return statements[0]
     else:
