@@ -263,7 +263,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
-  --sort-blocks-in-program-order \
+  --sort-blocks-rpo \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
@@ -294,14 +294,14 @@ exit_on_fail "Failed to consume markers" \
 if [[ $DISABLE_LSQ -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --force-memory-interface="force-mc=true" \
-    --sort-blocks-in-program-order \
+    --sort-blocks-rpo \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --mark-memory-interfaces \
-    --sort-blocks-in-program-order \
+    --sort-blocks-rpo \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
     "Marked memory accesses with the corresponding interfaces in cf"
