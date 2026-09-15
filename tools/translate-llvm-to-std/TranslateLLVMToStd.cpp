@@ -176,11 +176,14 @@ void convertInitializerToDenseElemAttrRecursive(
     } else if (auto *constFloat = llvm::dyn_cast<llvm::ConstantFP>(elem)) {
       values.push_back(
           mlir::FloatAttr::get(baseMLIRElemType, constFloat->getValueAPF()));
-    } else if (llvm::isa<llvm::ConstantDataArray>(elem)) {
+    } else if (llvm::isa<llvm::ConstantDataArray, llvm::ConstantAggregateZero>(
+                   elem)) {
+      // NOTE: llvm might use ConstantAggregateZero when the whole array is
+      // initialized as 0, which is why we need to allow for both a
+      // ConstantDataArray or ConstantAggregateZero
       convertInitializerToDenseElemAttrRecursive(elem, values,
                                                  baseMLIRElemType);
     } else {
-      llvm::errs() << "Unhandled constant element type:\n";
       llvm::report_fatal_error("Unhandled base element type.");
     }
   }
@@ -345,6 +348,9 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
   } else if (inst->getOpcode() == Instruction::FNeg) {
     naiveTranslation<arith::NegFOp>(getMLIRType(inst->getType(), ctx),
                                     valueMap[inst->getOperand(0)], inst);
+  } else if (auto *freezeInst = dyn_cast<FreezeInst>(inst)) {
+    // Freeze instruction is a NOP for us as we don't propagate poison values
+    valueMap[inst] = valueMap[freezeInst->getOperand(0)];
   } else {
     llvm_unreachable("Not implemented");
   }

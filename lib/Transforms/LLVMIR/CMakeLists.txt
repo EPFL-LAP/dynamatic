@@ -21,6 +21,7 @@ add_llvm_pass_plugin(MemDepAnalysis
 # Link to required LLVM and Polly libraries
 add_llvm_pass_plugin(ArrayPartition
   ArrayPartition.cpp
+  GuardLoadStore.cpp
   DEPENDS
   LLVMCore
   LLVMSupport

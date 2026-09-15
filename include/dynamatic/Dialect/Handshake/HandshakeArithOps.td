@@ -472,6 +472,16 @@ def Handshake_RemSIOp : Handshake_Arith_IntBinaryOp<"remsi", [
   let summary = "Signed integer remainder.";
 }
 
+def Handshake_RemUIOp : Handshake_Arith_IntBinaryOp<"remui", [
+  BinaryArithNamedIO,
+  IsIntChannel<"lhs">,
+  IsIntChannel<"rhs">,
+  IsIntChannel<"result">,
+  LatencyInterface
+]> {
+  let summary = "Unsigned integer remainder.";
+}
+
 def Handshake_DivUIOp : Handshake_Arith_IntBinaryOp<"divui", [
   BinaryArithNamedIO,
   IsIntChannel<"lhs">,

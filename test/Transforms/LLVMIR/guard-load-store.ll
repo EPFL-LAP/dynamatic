@@ -47,4 +47,4 @@ define i32 @main() {
 ; CHECK-NEXT: store i32 %0, ptr %1, align 1
 ; CHECK-NEXT: ret void
 ; CHECK-NOT: call {{.*}} @__dyn_guard
-; CHECK: attributes #[[ATTR]] = { alwaysinline }
+; CHECK: attributes #[[ATTR]] = { alwaysinline memory(readwrite) }

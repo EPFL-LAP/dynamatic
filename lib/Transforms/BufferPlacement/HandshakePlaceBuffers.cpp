@@ -575,10 +575,11 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    // If FTD has no backward channels, use the legacy CFDFC construction.
-    cfdfcs.emplace_back(info.funcOp, selectedArchs, numExecs,
-                        ftd && !backwardChannels.empty() ? &backwardChannels
-                                                         : nullptr);
+    if (ftd)
+      cfdfcs.push_back(CFDFC::createFTD(info.funcOp, selectedArchs, numExecs,
+                                        backwardChannels));
+    else
+      cfdfcs.push_back(CFDFC::create(info.funcOp, selectedArchs, numExecs));
   } while (!firstCFDFC);
 
   return success();
@@ -764,7 +765,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
     for (auto initOp : funcOp.getOps<handshake::InitOp>()) {
       ChannelBufProps &resProps = channelProps[initOp->getResult(0)];
       if (resProps.maxTrans.value_or(1) >= 1) {
-        resProps.minTrans = std::max(resProps.minTrans, 10U);
+        resProps.minTrans = std::max(resProps.minTrans, 1U);
       } else {
         initOp->emitWarning()
             << "Cannot place transparent buffer on init operation's output "
@@ -772,7 +773,7 @@ LogicalResult HandshakePlaceBuffersPass::placeWithoutUsingMILP() {
                "an invalid buffering.";
       }
       if (resProps.maxOpaque.value_or(1) >= 1) {
-        resProps.minOpaque = std::max(resProps.minOpaque, 10U);
+        resProps.minOpaque = std::max(resProps.minOpaque, 1U);
       } else {
         initOp->emitWarning()
             << "Cannot place opaque buffer on init operation's output due to "
