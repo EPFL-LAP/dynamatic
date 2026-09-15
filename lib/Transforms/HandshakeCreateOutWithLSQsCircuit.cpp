@@ -493,6 +493,13 @@ Value createWaitingSignalForPair(
       insertConditionalSkips(branchedDoneSignals, conds, successorOp,
                              conditionalSequentializerOps, rewriter);
 
+  // A join with a single input is an identity.
+  if (conditionallySkippedDoneSignals.size() == 1) {
+    addAttrToList(conditionalSequentializerOps, SKIP_COND_SEQ,
+                  rewriter.getUnitAttr());
+    return conditionallySkippedDoneSignals.front();
+  }
+
   handshake::JoinOp joinOp = rewriter.create<handshake::JoinOp>(
       predecessorOp->getLoc(), conditionallySkippedDoneSignals);
   inheritBB(predecessorOp, joinOp);
