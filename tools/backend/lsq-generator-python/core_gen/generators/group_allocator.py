@@ -12,7 +12,7 @@ class GroupAllocator:
 
         Models a group allocator for a Load-Store Queue (LSQ) system.
 
-        This class encapsulates the logic for generating a VHDL module that allocates
+        This class encapsulates the logic for generating a module that allocates
         space for groups of memory operations (loads and stores) in the load queue and
         the store queue.
 
@@ -31,9 +31,9 @@ class GroupAllocator:
                     configs=configs
                 )
 
-            # You can later generate VHDL entity and architecture by
+            # You can later generate entity and architecture by
             #     ga.generate(...)
-            # You can later instantiate VHDL entity by
+            # You can later instantiate entity by
             #     ga.instantiate(...)
         """
 
@@ -43,11 +43,11 @@ class GroupAllocator:
 
     def generate(self, em: Emitter, path_rtl: str) -> None:
         """
-        Generates the VHDL 'entity' and 'architecture' sections for a group allocator.
+        Generates the 'entity' and 'architecture' sections for a group allocator.
 
         Parameters:
             em          : Emitter used for code generation
-            path_rtl    : Output directory for VHDL files.
+            path_rtl    : Output directory for files.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
@@ -195,7 +195,7 @@ class GroupAllocator:
             # With single-group allocation, there should never be multiple group allocation requests at the same time.
             # Otherwise, we would not know which group to allocate first. Also, the group allocator logic assumes the
             # handshake signal is one-hot (or zero) and uses Mux1H() which relies on that assumption to work correctly.
-            # We thus add an assertion to check this is always the case.
+            # We thus add a VHDL assertion to check this is always the case.
 
             group_init_valid_vec = LogicVec(
                 em, 'group_init_valid_vec', 'w', self.configs.numGroups
@@ -304,6 +304,8 @@ class GroupAllocator:
             CyclicLeftShift(em, ga_ls_order_temp[i], ga_ls_order_rom[i], stq_tail_i)
         CyclicLeftShift(em, ga_ls_order_o, ga_ls_order_temp, ldq_tail_i)
 
+        ######   Write To File  ######
+
         # Write to the file
         output_str = em.get_definition_str(
             self.module_name, write_regs=self.configs.gaMulti
@@ -333,7 +335,7 @@ class GroupAllocator:
         """
         Group Allocator Instantiation
 
-        Creates the VHDL port mapping for the group allocator entity.
+        Creates the port mapping for the group allocator entity.
 
         Parameters:
             em                   : Emitter for code generation
@@ -354,7 +356,7 @@ class GroupAllocator:
             ga_ls_order_o        : Group Allocator load-store order matrix
 
         Returns:
-            VHDL instantiation string for inclusion in the architecture body.
+            instantiation string for inclusion in the architecture body.
 
         Example:
             arch += ga.instantiate(

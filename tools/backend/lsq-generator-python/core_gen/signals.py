@@ -1,7 +1,7 @@
 # ===----------------------------------------------------------------------===#
-# VHDL Signal Definition
+# Signal Definition
 # ===----------------------------------------------------------------------===#
-# This section defined Python classes that generate VHDL signal declarations.
+# This section defined Python classes that generate signal declarations.
 #
 # - class Logic         : (std_logic) one‑bit signal wire / port / register
 # - class LogicVec      : (std_logic_vector) Multi-bit signal.
@@ -17,7 +17,7 @@ from core_gen.ir import Statement
 
 class Logic(Statement):
     """
-    A one-bit logic signal.
+    A one-bit std_logic signal.
 
     Logic class encapsulates wires, ports, and registers in the code generator,
     handling name with '_i', '_o', '_q', '_d' suffixes.
@@ -37,8 +37,8 @@ class Logic(Statement):
     Methods:
         getNameRead(): Returns the name we should use when reading the signal. (e.g. <name>_q for a register type)
         getNameWrite(): Returns the name to write to. (e.g. <name>_d for a register type)
-        signalInit(): Appends the VHDL signal/port declaration.
-        regInit(): Appends the VHDL register initialization block.
+        signalInit(): Appends the signal/port declaration.
+        regInit(): Appends the register initialization block.
     """
 
     # Signal name
@@ -130,9 +130,21 @@ class Logic(Statement):
             return self.get_base_name(sufix) + ('_o' if not self.dyn_comp else '')
 
     def signalInit(self, sufix='') -> None:
+        """
+        Appends the appropriate declaration or port line for this signal to a global buffer.
+        """
         self.em.logic_signal_init(self, sufix)
 
     def regInit(self, enable=None, init=None) -> None:
+        """
+        Generates a clocked process snippet that sets up the register's behavior.
+        For example,
+            if (rst = '1') then
+                <name>_q <= '0';
+            elsif (rising_edge(clk)) then
+                <name>_q <= <name>_d;
+            end if;
+        """
         self.em.logic_reg_init(self, enable, init)
 
     def get_base_name(self, sufix='') -> str:
@@ -239,7 +251,7 @@ class LogicVec(Logic):
 
 class LogicArray(Logic):
     """
-    Represents a N-length array of one-bit VHDL std_logic.
+    Represents a N-length array of one-bit std_logic.
     Generates total of N one-bit std_logic.
 
     Each element (total N) is generated as a separate Logic(name + f'_{i}', type)
@@ -304,7 +316,7 @@ class LogicArray(Logic):
 
 class LogicVecArray(LogicVec):
     """
-    Represents a N-length array of M-bit VHDL std_logic_vec.
+    Represents a N-length array of M-bit std_logic_vec.
     Generates total of N M-bit std_logic_vec.
 
     Each element (total N) is generated as a separate LogicVec

@@ -25,7 +25,7 @@ class PortToQueueDispatcher:
 
         Models a dispatcher that routes signals from multiple ports to queue entries.
 
-        This class encapsulates the logic for generating a VHDL module that takes
+        This class encapsulates the logic for generating a module that takes
         arguments from a specific access port and passes them to a corresponding
         queue entry.
 
@@ -58,9 +58,9 @@ class PortToQueueDispatcher:
                                     configs.ldpAddrW
                                 )
 
-            # You can later generate VHDL entity and architecture by
+            # You can later generate entity and architecture by
             #     ptq_dispatcher_lda.generate(...)
-            # You can later instantiate VHDL entity by
+            # You can later instantiate entity by
             #     ptq_dispatcher_lda.instantiate(...)
 
         """
@@ -74,12 +74,12 @@ class PortToQueueDispatcher:
 
     def generate(self, em: Emitter, path_rtl) -> None:
         """
-        Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
+        Generates the 'entity' and 'architecture' sections for a dispatcher
         that passes arguments from a specific access port to a corresponding queue entry.
 
         Parameters:
             em          : The emitter used to generate the code
-            path_rtl    : Output directory for VHDL files.
+            path_rtl    : Output directory for files.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
@@ -188,6 +188,8 @@ class PortToQueueDispatcher:
             Reduce(em, entry_wen_o[i], entry_port_transfer[i], BinOp.OR)
 
         ######   Write To File  ######
+
+        # Write to the file
         output_str = em.get_definition_str(self.module_name)
         with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
             file.write(output_str)
@@ -208,7 +210,7 @@ class PortToQueueDispatcher:
         """
         Port-to-Queue Dispatcher Instantiation
 
-        Creates the VHDL port mapping for the Port-to-Queue dispatcher entity.
+        Creates the port mapping for the Port-to-Queue dispatcher entity.
         Connects the top-level signals (reset, clock, port and entry signals)
         to the internal dispatcher instance named <self.module_name>_dispatcher.
 
@@ -225,7 +227,7 @@ class PortToQueueDispatcher:
             queue_head_oh_i      : One-hot vector indicating the current head index of the queue.
 
         Returns:
-            VHDL instantiation string for inclusion in the architecture body.
+            instantiation string for inclusion in the architecture body.
 
         Example (Load Address Port Dispatcher):
             arch += ptq_dispatcher_lda.instantiate(
@@ -319,7 +321,7 @@ class QueueToPortDispatcher:
 
         Models a dispatcher that routes signals from queue entries to access ports.
 
-        This class encapsulates the logic for generating a VHDL module that takes
+        This class encapsulates the logic for generating a module that takes
         data from queue entries and routes it to the correct outgoing port based on
         priority.
 
@@ -348,9 +350,9 @@ class QueueToPortDispatcher:
                                     portAddrW=configs.ldpAddrW
                                 )
 
-            # You can later generate VHDL entity and architecture by
+            # You can later generate entity and architecture by
             #     qtp_dispatcher_ldd.generate(...)
-            # You can later instantiate VHDL entity by
+            # You can later instantiate entity by
             #     qtp_dispatcher_ldd.instantiate(...)
         """
 
@@ -366,12 +368,12 @@ class QueueToPortDispatcher:
         """
         Queue-to-Port (Entry-to-Port) Dispatcher
 
-        Generates the VHDL 'entity' and 'architecture' sections for a dispatcher
+        Generates the 'entity' and 'architecture' sections for a dispatcher
         that routes data from queue entries to their access ports.
 
         Parameters:
             em          : Emitter used for code generation
-            path_rtl    : Output directory for VHDL files.
+            path_rtl    : Output directory for files.
 
         Output:
             Appends the 'entity' and 'architecture' definitions
@@ -497,6 +499,9 @@ class QueueToPortDispatcher:
         for i in range(0, self.numEntries):
             Reduce(em, entry_reset_o[i], entry_port_transfer[i], BinOp.OR)
 
+        ######   Write To File  ######
+
+        # Write to the file
         output_str = em.get_definition_str(self.module_name)
         with open(f'{path_rtl}/{self.name}.{em.get_file_suffix()}', 'a') as file:
             file.write(output_str)
@@ -517,7 +522,7 @@ class QueueToPortDispatcher:
         """
         Queue-to-Port Dispatcher Instantiation
 
-        Creates the VHDL port mapping for the Queue-to-Port dispatcher entity.
+        Creates the port mapping for the Queue-to-Port dispatcher entity.
         Connects the top-level signals (reset, clock, entry and port signals)
         to the internal dispatcher instance named <self.module_name>_dispatcher.
 
@@ -534,7 +539,7 @@ class QueueToPortDispatcher:
             queue_head_oh_i         : One-hot vector indicating the current head index of the queue.
 
         Returns:
-            VHDL instantiation string for inclusion in the architecture body.
+            instantiation string for inclusion in the architecture body.
 
 
         Example:

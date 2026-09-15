@@ -67,7 +67,7 @@ def ReduceLogicArray(em: Emitter, dout, din, operator, length) -> str:
     """
     Recursively perform reduction of LogicArray "din" by "operator".
 
-    Identical in behavior to ReduceLogicVec, but operates on multiple VHDL single-bit std_logic
+    Identical in behavior to ReduceLogicVec, but operates on multiple single-bit std_logic
     instead of std_logic_vector.
     """
     from core_gen.signals import LogicArray
@@ -148,7 +148,7 @@ def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
         dout    : Destination signal to receive the reduced data.
         din     : Source data to be reduced.
         operator: types of operator for the reduction
-        comment : Turn on/off adding VHDL comment lines.
+        comment : Turn on/off adding comment lines.
     """
     from core_gen.signals import LogicVec, LogicArray, LogicVecArray
 
