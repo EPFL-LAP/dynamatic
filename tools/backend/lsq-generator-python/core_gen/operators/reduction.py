@@ -1,8 +1,7 @@
-from core_gen.context import VHDLContext
-from core_gen.utils import *
-from core_gen.signals import *
+from core_gen.emitters import Emitter
+from core_gen.utils import log2Ceil
 from core_gen.operators import *
-
+from core_gen.ir import Val, Bin
 
 # ===----------------------------------------------------------------------===#
 # Reduction
@@ -16,9 +15,10 @@ from core_gen.operators import *
 # Reduce():
 #   Detects the type of `din` and dispatches to the appropriate implementation.
 
-def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
+
+def ReduceLogicVec(em: Emitter, dout, din, operator, length) -> str:
     """
-    Recursively reduce the vector "din" by "operator".
+    Recursively reduce the vector "din" by "operator" and add this to "em".
 
     Parameters:
         dout     (Logic)   : Destination std_logic to hold the reduced result.
@@ -30,9 +30,6 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
         The "length" parameter is used internally to control recursion depth and
         should always start at "2**(log2Ceil(din.size) - 1)".
 
-    Returns:
-        str_ret (str): A code snippet implementing the LogicVec reduction.
-
     Usage:
         (Called only internally by Reduce)
         ReduceLogicVec(dout, din, operator, 2**(log2Ceil(din.size) - 1))
@@ -41,59 +38,56 @@ def ReduceLogicVec(ctx: VHDLContext, dout, din, operator, length) -> str:
         "length" is just for an recursive action.
 
 
-    Example: 
+    Example:
         1. din = "01110010", operator = 'and' -> dout = '0'
         2. din = "01100111", operator = 'or'  -> dout = '1'
         3. din = "abcdefghijklmnop"
            dout = "a" operator "b" operator "c" operator "d" operator "e" operator "f"
                       operator "g" operator "h" operator "i" operator "j" operator "k"
-                      operator "l" operator "m" operator "n" operator "o" operator "p" 
+                      operator "l" operator "m" operator "n" operator "o" operator "p"
     """
+    from core_gen.signals import LogicVec
 
-    str_ret = ''
-    if (length == 1):
-        str_ret += ctx.get_current_indent() + f'{dout.getNameWrite()} <= ' + \
-            f'{din.getNameRead(0)} {operator} {din.getNameRead(1)};\n'
+    if length == 1:
+        em.add_assignment(dout, Bin(Val(din, 0), operator, Val(din, 1)))
     else:
-        ctx.use_temp()
-        res = LogicVec(ctx, ctx.get_temp('res'), 'w', length)
+        em.use_temp()
+        res = LogicVec(em, em.get_temp('res'), 'w', length)
         for i in range(0, din.size - length):
-            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= ' + \
-                f'{din.getNameRead(i)} {operator} {din.getNameRead(i+length)};\n'
+            em.add_assignment(
+                (res, i), Bin(Val(din, i), operator, Val(din, i + length))
+            )
         for i in range(din.size - length, length):
-            str_ret += ctx.get_current_indent() + f'{res.getNameWrite(i)} <= ' + \
-                f'{din.getNameRead(i)};\n'
-        str_ret += ctx.get_current_indent() + '-- Layer End\n'
-        str_ret += ReduceLogicVec(ctx, dout, res, operator, length//2)
-    return str_ret
+            em.add_assignment((res, i), Val(din, i))
+        em.add_comment('Layer End')
+        ReduceLogicVec(em, dout, res, operator, length // 2)
 
 
-def ReduceLogicArray(ctx: VHDLContext, dout, din, operator, length) -> str:
+def ReduceLogicArray(em: Emitter, dout, din, operator, length) -> str:
     """
     Recursively perform reduction of LogicArray "din" by "operator".
 
     Identical in behavior to ReduceLogicVec, but operates on multiple single-bit std_logic
     instead of std_logic_vector.
     """
+    from core_gen.signals import LogicArray
 
-    str_ret = ''
-    if (length == 1):
-        str_ret += Op(ctx, dout, din[0], operator, din[1])
+    if length == 1:
+        em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
-        ctx.use_temp()
-        res = LogicArray(ctx, ctx.get_temp('res'), 'w', length)
+        em.use_temp()
+        res = LogicArray(em, em.get_temp('res'), 'w', length)
         for i in range(0, din.length - length):
-            str_ret += Op(ctx, res[i], din[i], operator, din[i+length])
+            em.add_assignment(res[i], Bin(din[i], operator, din[i + length]))
         for i in range(din.length - length, length):
-            str_ret += Op(ctx, res[i], din[i])
-        str_ret += ctx.get_current_indent() + '-- Layer End\n'
-        str_ret += ReduceLogicArray(ctx, dout, res, operator, length//2)
-    return str_ret
+            em.add_assignment(res[i], din[i])
+        em.add_comment('Layer End')
+        ReduceLogicArray(em, dout, res, operator, length // 2)
 
 
-def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
+def ReduceLogicVecArray(em: Emitter, dout, din, operator, length) -> str:
     """
-    Recursively perform reduction of the LogicVecArray "din" by "operator".
+    Recursively perform reduction of the LogicVecArray "din" by "operator" and add this to "em".
 
     Parameters:
         dout     (LogicVec)     : Destination std_logic_vector to hold the reduced result.
@@ -104,9 +98,6 @@ def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
 
         The "length" parameter is used internally to control recursion depth and
         should always start at "2**(log2Ceil(din.size) - 1)".
-
-    Returns:
-        str_ret (str): A code snippet implementing the LogicVecArray reduction.
 
     Usage:
         (Called only internally by Reduce)
@@ -129,24 +120,24 @@ def ReduceLogicVecArray(ctx: VHDLContext, dout, din, operator, length) -> str:
 
         Therefore, dout is LogicVec.
     """
-    str_ret = ''
-    if (length == 1):
-        str_ret += Op(ctx, dout, din[0], operator, din[1])
+    from core_gen.signals import LogicVecArray, LogicArray
+
+    if length == 1:
+        em.add_assignment(dout, Bin(din[0], operator, din[1]))
     else:
-        ctx.use_temp()
-        res = LogicVecArray(ctx, ctx.get_temp('res'), 'w', length, dout.size)
+        em.use_temp()
+        res = LogicVecArray(em, em.get_temp('res'), 'w', length, dout.size)
         for i in range(0, din.length - length):
-            str_ret += Op(ctx, res[i], din[i], operator, din[i+length])
+            em.add_assignment(res[i], Bin(din[i], operator, din[i + length]))
         for i in range(din.length - length, length):
-            str_ret += Op(ctx, res[i], din[i])
-        str_ret += ctx.get_current_indent() + '-- Layer End\n'
-        str_ret += ReduceLogicVecArray(ctx, dout, res, operator, length//2)
-    return str_ret
+            em.add_assignment(res[i], din[i])
+        em.add_comment('Layer End')
+        ReduceLogicVecArray(em, dout, res, operator, length // 2)
 
 
-def Reduce(ctx: VHDLContext, dout, din, operator, comment: bool = True) -> str:
+def Reduce(em: Emitter, dout, din, operator, comment: bool = True) -> str:
     """
-    Execute reduction based on the type of "din"
+    Execute reduction based on the type of "din" and add this to "em".
 
     This function wraps the three implementations:
         - ReduceLogicVec        : when "din" is LogicVec
@@ -158,30 +149,26 @@ def Reduce(ctx: VHDLContext, dout, din, operator, comment: bool = True) -> str:
         din     : Source data to be reduced.
         operator: types of operator for the reduction
         comment : Turn on/off adding comment lines.
-
-    Returns:
-        str_ret : A code snippet (with indentation) implementing the reduction.
     """
+    from core_gen.signals import LogicVec, LogicArray, LogicVecArray
 
-    str_ret = ''
-    if (comment):
-        str_ret += ctx.get_current_indent() + '-- Reduction Begin\n'
-        str_ret += ctx.get_current_indent() + f'-- Reduce({dout.name}, {din.name}, {operator})\n'
-    if (type(din) == LogicVec):
-        if (din.size == 1):
-            str_ret += Op(ctx, dout, (din, 0))
+    if comment:
+        em.add_comment('Reduction Begin')
+        em.add_comment(f'Reduce({dout.name}, {din.name}, {em.get_binop_str(operator)})')
+    if type(din) == LogicVec:
+        if din.size == 1:
+            em.add_assignment(dout, Val(din, 0))
         else:
-            length = 2**(log2Ceil(din.size) - 1)
-            str_ret += ReduceLogicVec(ctx, dout, din, operator, length)
+            length = 2 ** (log2Ceil(din.size) - 1)
+            ReduceLogicVec(em, dout, din, operator, length)
     else:
-        if (din.length == 1):
-            str_ret += Op(ctx, dout, din[0])
+        if din.length == 1:
+            em.add_assignment(dout, Val(din[0]))
         else:
-            length = 2**(log2Ceil(din.length) - 1)
-            if (type(din) == LogicArray):
-                str_ret += ReduceLogicArray(ctx, dout, din, operator, length)
+            length = 2 ** (log2Ceil(din.length) - 1)
+            if type(din) == LogicArray:
+                ReduceLogicArray(em, dout, din, operator, length)
             else:
-                str_ret += ReduceLogicVecArray(ctx, dout, din, operator, length)
-    if (comment):
-        str_ret += ctx.get_current_indent() + '-- Reduction End\n\n'
-    return str_ret
+                ReduceLogicVecArray(em, dout, din, operator, length)
+    if comment:
+        em.add_comment('Reduction End\n')
