@@ -27,9 +27,10 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 
-OUT_WITH_LSQS_ACTIVE=${20}
-OUT_WITH_LSQS_N=${21}
-OUT_WITH_LSQS_DEP_GRAPH_FILE=${22}
+FORK_FIFO_SIZE=${20}
+OUT_WITH_LSQS_ACTIVE=${21}
+OUT_WITH_LSQS_N=${22}
+OUT_WITH_LSQS_DEP_GRAPH_FILE=${23}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -378,7 +379,7 @@ else
     "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
       --handshake-optimize-bitwidths \
-      --handshake-materialize --handshake-infer-basic-blocks \
+      --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
     exit_on_fail "Failed to apply rest of the transformations to handshake after out with LSQs" \
       "Applied rest of the transformations to handshake after out with LSQs"
@@ -389,7 +390,7 @@ else
       --handshake-deactivate-mem-dependencies="dep-graph-file=$COMP_DIR/${KERNEL_NAME}_DEP_G.dot" --handshake-replace-memory-interfaces \
       --handshake-remove-unused-memrefs \
       --handshake-optimize-bitwidths \
-      --handshake-materialize --handshake-infer-basic-blocks \
+      --handshake-materialize="forkFifoSize=$FORK_FIFO_SIZE" --handshake-infer-basic-blocks \
       > "$F_HANDSHAKE_TRANSFORMED"
     exit_on_fail "Failed to apply transformations to handshake" \
       "Applied transformations to handshake"

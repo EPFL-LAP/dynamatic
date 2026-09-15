@@ -218,6 +218,41 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
     forkOp->erase();
   }
 }
+
+/// Inserts a FIFO before each consumer of a data-carrying eager fork output.
+/// Paths directly feeding a memory controller, including through the casts
+/// historically used on those paths, are deliberately left untouched.
+static void bufferForkOutputs(handshake::FuncOp funcOp, unsigned fifoSize,
+                              OpBuilder &builder) {
+  if (fifoSize == 0)
+    return;
+
+  for (handshake::ForkOp forkOp : funcOp.getOps<handshake::ForkOp>()) {
+    for (Value result : forkOp.getResults()) {
+      if (isa<handshake::ControlType>(result.getType()))
+        continue;
+
+      assert(result.hasOneUse() && "materialized fork result has one use");
+      Operation *consumer = *result.getUsers().begin();
+      bool feedsMemoryController = isa<handshake::MemoryControllerOp>(consumer);
+      if (isa<handshake::TruncIOp, handshake::ExtSIOp>(consumer)) {
+        feedsMemoryController |=
+            llvm::any_of(consumer->getUsers(), [](Operation *castConsumer) {
+              return isa<handshake::MemoryControllerOp>(castConsumer);
+            });
+      }
+      if (feedsMemoryController)
+        continue;
+
+      builder.setInsertionPoint(consumer);
+      auto bufferOp = builder.create<handshake::BufferOp>(
+          result.getLoc(), result, fifoSize,
+          handshake::BufferType::FIFO_BREAK_NONE);
+      inheritBB(consumer, bufferOp);
+      replaceFirstUse(consumer, result, bufferOp.getResult());
+    }
+  }
+}
 namespace {
 
 /// Removes outputs of forks that do not have real uses. This can result in the
@@ -448,6 +483,10 @@ struct HandshakeMaterializePass
     // Finally, promote forks to lazy wherever necessary
     for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
       promoteEagerToLazyForks(funcOp);
+
+    unsigned forkFifoSizeInt = std::stoul(forkFifoSize);
+    for (handshake::FuncOp funcOp : modOp.getOps<handshake::FuncOp>())
+      bufferForkOutputs(funcOp, forkFifoSizeInt, builder);
 
     assert(succeeded(verifyIRMaterialized(modOp)) && "IR is not materialized");
   }

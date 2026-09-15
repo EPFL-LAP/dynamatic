@@ -101,7 +101,7 @@ struct FrontendState {
   std::optional<std::string> sourcePath = std::nullopt;
   std::string outputDir = "out";
 
-  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd) {};
+  FrontendState(StringRef cwd) : cwd(cwd), dynamaticPath(cwd){};
 
   bool sourcePathIsSet(StringRef keyword);
 
@@ -136,7 +136,7 @@ struct Argument {
 
   Argument() = default;
 
-  Argument(StringRef name, StringRef desc) : name(name), desc(desc) {};
+  Argument(StringRef name, StringRef desc) : name(name), desc(desc){};
 };
 
 struct CommandArguments {
@@ -218,7 +218,7 @@ private:
 class Exit : public Command {
 public:
   Exit(FrontendState &state)
-      : Command("exit", "Exits the Dynamatic frontend", state) {};
+      : Command("exit", "Exits the Dynamatic frontend", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -226,7 +226,7 @@ public:
 class Help : public Command {
 public:
   Help(FrontendState &state)
-      : Command("help", "Displays this help message", state) {};
+      : Command("help", "Displays this help message", state){};
 
   CommandResult execute(CommandArguments &args) override;
 };
@@ -331,6 +331,7 @@ public:
       "num-of-comparators";
   static constexpr llvm::StringLiteral OUT_WITH_LSQS_DEP_GRAPH_FILE =
       "dep-graph-file";
+  static constexpr llvm::StringLiteral FORK_FIFO_SIZE = "fork-fifo-size";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -359,6 +360,9 @@ public:
         {OUT_WITH_LSQS_DEP_GRAPH_FILE,
          "Optional DOT file providing per-edge comparator counts; unspecified "
          "dependences use default number of comparators"});
+    addOption(
+        {FORK_FIFO_SIZE,
+         "Add a FIFO of the specified size to each data output of every fork"});
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
@@ -826,6 +830,7 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(FAST_TOKEN_DELIVERY) ? "1" : "0";
   std::string straightToQueue =
       args.flags.contains(STRAIGHT_TO_QUEUE) ? "1" : "0";
+  std::string forkFifoSize = "0";
 
   if (auto it = args.options.find(BUFFER_ALGORITHM); it != args.options.end()) {
     if (it->second == "on-merges" || it->second == "fpga20" ||
@@ -848,6 +853,15 @@ CommandResult Compile::execute(CommandArguments &args) {
 
   if (auto it = args.options.find(MILP_SOLVER); it != args.options.end()) {
     milpSolver = it->second;
+  }
+
+  if (auto it = args.options.find(FORK_FIFO_SIZE); it != args.options.end()) {
+    int val = std::stoi(std::string(it->second));
+    if (val < 0) {
+      llvm::errs() << "Fork FIFO size must be non-negative.";
+      return CommandResult::FAIL;
+    }
+    forkFifoSize = std::to_string(val);
   }
 
   if (auto it = args.multiOptions.find(NUM_OF_COMPARATORS);
@@ -881,13 +895,14 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
 
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
-      fastTokenDelivery, milpSolver, straightToQueue, speculation,
-      enableShortCircuit, enableDuplication, calculatePathDelays, instrumentII,
-      outWithLsqs, outWithLsqsNumComparators, outWithLsqsDepGraphFile);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), sharing,
+                 state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
+                 fastTokenDelivery, milpSolver, straightToQueue, speculation,
+                 enableShortCircuit, enableDuplication, calculatePathDelays,
+                 instrumentII, forkFifoSize, outWithLsqs,
+                 outWithLsqsNumComparators, outWithLsqsDepGraphFile);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {
