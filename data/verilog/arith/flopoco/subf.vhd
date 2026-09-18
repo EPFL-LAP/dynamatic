@@ -37,6 +37,8 @@ begin
   join_inputs : entity work.join_type(arch) generic map(2)
     port map(
       -- inputs
+      clk => clk,
+      rst => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready => oehb_ready,
@@ -134,6 +136,8 @@ begin
   join_inputs : entity work.join_type(arch) generic map(2)
     port map(
       -- inputs
+      clk => clk,
+      rst => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready => oehb_ready,

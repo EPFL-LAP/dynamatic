@@ -46,6 +46,8 @@ architecture arch_64_4_345000 of divf_arch_64_4_345000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -218,6 +220,8 @@ architecture arch_64_4_398000 of divf_arch_64_4_398000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -364,6 +368,8 @@ architecture arch_64_6_859333 of divf_arch_64_6_859333 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -493,6 +499,8 @@ architecture arch_64_16_008000 of divf_arch_64_16_008000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -608,6 +616,8 @@ architecture arch_32_3_812000 of divf_arch_32_3_812000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -734,6 +744,8 @@ architecture arch_32_6_629333 of divf_arch_32_6_629333 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,
@@ -852,6 +864,8 @@ architecture arch_32_14_152000 of divf_arch_32_14_152000 is
           join_inputs : entity work.join_type(arch) generic map(2) 
     port map( 
       -- inputs 
+      clk          => clk,
+      rst          => rst,
       ins_valid(0) => lhs_valid,
       ins_valid(1) => rhs_valid,
       outs_ready   => oehb_ready,

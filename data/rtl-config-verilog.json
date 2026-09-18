@@ -826,6 +826,11 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.noti",
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t noti -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS",
+    "hdl": "verilog"
+  },
+  {
     "name": "handshake.br",
     "parameters": [
       {
@@ -887,6 +892,17 @@
       { "name": "DATA_WIDTH", "type": "unsigned", "generic": true }
     ],
     "generator": "\"$DYNAMATIC/bin/generators/rtl-constant-generator-verilog\" \"$DYNAMATIC/data/verilog/handshake/constant.v\" \"$OUTPUT_DIR/$MODULE_NAME.v\" $MODULE_NAME $VALUE",
+    "hdl": "verilog"
+  },
+  {
+    "name": "handshake.init",
+    "parameters": [
+      {
+        "name": "INITIAL_VALUE",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/verilog/verilog-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.v -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initial_value=$INITIAL_VALUE",
     "hdl": "verilog"
   },
   {
