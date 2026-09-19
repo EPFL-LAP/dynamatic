@@ -42,6 +42,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/FileSystem.h"
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
@@ -440,6 +441,113 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
   }
 
   return newGraph;
+}
+
+// ===--------------------------------------------------------------------=== //
+// [FTD_LOG] Debug logging (temporary)
+// ===--------------------------------------------------------------------=== //
+
+/// [FTD_LOG] The log file, created on first use and truncated each run.
+static llvm::raw_ostream &ftdLog() {
+  static llvm::raw_fd_ostream *stream = []() -> llvm::raw_fd_ostream * {
+    std::error_code ec;
+    llvm::sys::fs::create_directories("/home/yuqin/dynamatic-scripts/logs");
+    auto *fileStream =
+        new llvm::raw_fd_ostream("/home/yuqin/dynamatic-scripts/logs/ftd-suppression.log", ec, llvm::sys::fs::OF_Text);
+    if (ec) {
+      llvm::errs() << "[FTD_LOG] cannot open the log file: " << ec.message()
+                   << "\n";
+      delete fileStream;
+      return nullptr;
+    }
+    // Never destroyed, so do not let anything sit in a buffer
+    fileStream->SetUnbuffered();
+    return fileStream;
+  }();
+  if (!stream)
+    return llvm::errs();
+  return *stream;
+}
+
+/// [FTD_LOG] Short identifier of an operation, stable within one run.
+static std::string ftdId(Operation *op) {
+  if (!op)
+    return "-";
+  return std::to_string((reinterpret_cast<size_t>(op) >> 4) & 0xfff);
+}
+
+/// [FTD_LOG] Name of an operation, as carried by its handshake.name.
+static std::string ftdName(Operation *op) {
+  if (!op)
+    return "<block-arg>";
+  if (auto name = op->getAttrOfType<StringAttr>("handshake.name"))
+    return name.getValue().str();
+  return op->getName().getStringRef().str() + "#" + ftdId(op);
+}
+
+/// [FTD_LOG] FTD annotations carried by an operation.
+static std::string ftdAttrs(Operation *op) {
+  if (!op)
+    return "";
+  std::string attrs;
+  if (op->hasAttr(FTD_EXPLICIT_MU))
+    attrs += " MU";
+  if (op->hasAttr(FTD_EXPLICIT_GAMMA))
+    attrs += " GAMMA";
+  if (op->hasAttr(FTD_REGEN))
+    attrs += " regen";
+  if (op->hasAttr(FTD_OP_TO_SKIP))
+    attrs += " skip";
+  if (op->hasAttr(FTD_INIT_MERGE))
+    attrs += " imerge";
+  if (op->hasAttr(FTD_COND_VAR))
+    attrs += " CONDVAR";
+  return attrs;
+}
+
+/// [FTD_LOG] Index of a shadow block, or -1 when it is not one.
+static int ftdBB(ftd::ShadowCFG *shadow, Block *block) {
+  if (!shadow || !block)
+    return -1;
+  for (unsigned idx = 0, e = shadow->getRegion().getBlocks().size(); idx < e;
+       ++idx)
+    if (shadow->getBlock(idx) == block)
+      return (int)idx;
+  return -1;
+}
+
+/// [FTD_LOG] Compact description of a value: defining op, block, result.
+static std::string ftdVal(Value val) {
+  if (!val)
+    return "<null>";
+  Operation *op = val.getDefiningOp();
+  if (!op)
+    return "<arg>";
+  std::string desc = ftdName(op);
+  if (auto bb = op->getAttrOfType<IntegerAttr>("handshake.bb"))
+    desc += "(bb" + std::to_string(bb.getUInt()) + ")";
+  if (op->getNumResults() > 1)
+    if (auto res = val.dyn_cast<OpResult>())
+      desc += "." + std::to_string(res.getResultNumber());
+  desc += ftdAttrs(op);
+  return desc;
+}
+
+/// [FTD_LOG] A set of local blocks, listed as their original bb indices.
+static std::string ftdDeps(ftd::ShadowCFG *shadow, const ftd::LocalCFG &lcfg,
+                           const DenseSet<Block *> &blocks) {
+  std::string out;
+  for (Block *b : blocks)
+    out += " bb" + std::to_string(ftdBB(shadow, lcfg.origMap.lookup(b)));
+  return out.empty() ? std::string(" (none)") : out;
+}
+
+/// [FTD_LOG] A list of condition variables, in order.
+static std::string ftdVars(const std::vector<std::string> &vars) {
+  std::string out;
+  for (const std::string &v : vars)
+    out += " " + v;
+  return out.empty() ? std::string(" (none)") : out;
 }
 
 // ===--------------------------------------------------------------------=== //
@@ -847,6 +955,10 @@ Value ftd::bddToCircuit(
   muxOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttrWithFallback(muxOp, forcedBBAttr, block, builder);
 
+  ftdLog() << "        bdd mux#" << ftdId(muxOp) << " on " << varName
+           << " sel=" << ftdVal(muxCond) << " in0=" << ftdVal(muxOperands[0])
+           << " in1=" << ftdVal(muxOperands[1]) << "\n";
+
   return muxOp.getResult();
 }
 
@@ -903,6 +1015,9 @@ static Value generateReachabilityLogic(
                 return a < b;
               return bi.isLess(idA.value(), idB.value());
             });
+
+  ftdLog() << "      reachability logic: fSup=" << fSuppress->toString()
+           << " vars:" << ftdVars(cofactorList) << "\n";
 
   BDD *bdd = buildBDD(fSuppress, cofactorList);
 
@@ -1020,6 +1135,10 @@ static void buildBranchTreeRecursive(
       conditionVal.getLoc(), suppResultTypes, suppressCondition, conditionVal);
   suppBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttr(suppBranch, conditionVal.getParentBlock(), builder);
+  ftdLog() << "      dist filter for " << currentVar
+           << ": cond=" << ftdVal(suppressCondition)
+           << " data=" << ftdVal(conditionVal)
+           << " -> br#" << ftdId(suppBranch) << "\n";
 
   // False Output -> Active Select (Pass to Main Branch)
   Value activeSelectSignal = suppBranch.getFalseResult();
@@ -1033,6 +1152,10 @@ static void buildBranchTreeRecursive(
       sourceVal.getLoc(), resultTypes, activeSelectSignal, sourceVal);
   branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
   setBBAttr(branchOp, sourceVal.getParentBlock(), builder);
+  ftdLog() << "      dist split of " << currentVar << " on " << splitVar
+           << ": sel=" << ftdVal(activeSelectSignal)
+           << " data=" << ftdVal(sourceVal) << " -> br#" << ftdId(branchOp)
+           << " (true=" << splitVar << "=1, false=" << splitVar << "=0)\n";
 
   Value trueResult = branchOp.getTrueResult();
   Value falseResult = branchOp.getFalseResult();
@@ -1143,9 +1266,16 @@ void ftd::buildDistributionNetwork(
             });
 
   // 3. Initial Registration and Construct Branch Trees
+  ftdLog() << "    distribution network: vars" << ftdVars(sortedVars) << "\n";
   for (const auto &var : sortedVars) {
     // Use pre-registered value if available (e.g. demoted high-level variable)
     Value rawVal = registry.lookup(var, {});
+    ftdLog() << "      var " << var << ": "
+             << (rawVal ? "pre-registered " + ftdVal(rawVal)
+                        : std::string("from IR"))
+             << ", needed on " << varNeeds[var].size() << " path(s)"
+             << (varNeeds[var].size() > 1 ? " -> branch tree" : " -> direct")
+             << "\n";
     if (!rawVal) {
       rawVal = getOriginalValue(builder, var, bi, pendingMuxOperands, shadow);
       if (!rawVal) {
@@ -1208,6 +1338,9 @@ Value ftd::expressionToCircuit(
   for (auto &p : tmp)
     cofactorList.push_back(p.second);
 
+  ftdLog() << "      mux tree for " << expr->toString()
+           << " vars:" << ftdVars(cofactorList) << "\n";
+
   BDD *bdd = buildBDD(expr, cofactorList);
   return bddToCircuit(builder, bdd, insertBlock, registry, {}, bi,
                       pendingMuxOperands, shadow, forcedBBAttr);
@@ -1237,6 +1370,10 @@ Value ftd::computeLoopBackedgeCondition(
     const BlockIndexing &bi,
     DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
     ShadowCFG *shadow) {
+
+  ftdLog() << "\n========= loop backedge condition =========\n"
+           << "loop header : bb" << ftdBB(shadow, loopHeader) << "\n"
+           << "insert block: bb" << ftdBB(shadow, insertBlock) << "\n";
 
   // 1. Build Local CFG with Prod = Cons = Loop Header (self-loop graph)
   OpBuilder tmpBuilder(builder.getContext());
@@ -1284,9 +1421,13 @@ Value ftd::computeLoopBackedgeCondition(
   // 10. Enumerate paths → expression → circuit
   BoolExpression *fBackedge =
       enumeratePaths(*acyclicDG, bi, locConsControlDeps);
+  ftdLog() << "  --- backedge expression ---\n"
+           << "  deps:" << ftdDeps(shadow, *acyclicDG, locConsControlDeps)
+           << "\n  fBackedge: " << fBackedge->toString() << "\n";
   Value conditionValue =
       expressionToCircuit(builder, fBackedge, *acyclicDG, insertBlock, registry,
                           bi, pendingMuxOperands, shadow);
+  ftdLog() << "  backedge condition = " << ftdVal(conditionValue) << "\n";
 
   // 11. Clean up temporary graphs
   acyclicDG->containerOp->erase();
@@ -1733,12 +1874,21 @@ unsigned CyclicDemotionHelper::getVarNativeLevel(const std::string &var) {
   // Map the condition variable to its block, then to the decision-graph
   // block, and read that block's loop-nesting level.
   auto opt = bi.getBlockFromCondition(var);
-  if (!opt)
+  if (!opt) {
+    ftdLog() << "      native level " << var << ": 0 (no block)\n";
     return 0;
+  }
   auto it = origToFullDG.find(opt.value());
-  if (it == origToFullDG.end())
+  if (it == origToFullDG.end()) {
+    ftdLog() << "      native level " << var << ": 0 (bb"
+             << ftdBB(shadow, opt.value())
+             << " NOT in the decision graph)\n";
     return 0;
-  return cyclicMgr.getNestingLevel(it->second);
+  }
+  unsigned lvl = cyclicMgr.getNestingLevel(it->second);
+  ftdLog() << "      native level " << var << ": " << lvl << " (bb"
+           << ftdBB(shadow, opt.value()) << ")\n";
+  return lvl;
 }
 
 /// Finds the loop scope at nesting level `level` that contains `origIRBlock`'s
@@ -1777,6 +1927,10 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
     return currentValue;
   }
 
+  ftdLog() << "    demote one level: value=" << ftdVal(currentValue)
+           << " origBlock=bb" << ftdBB(shadow, origBlock) << " fromLevel="
+           << fromLevel << "\n";
+
   // 1. Extract acyclic layered CFG for this loop scope
   OpBuilder layerBuilder(ctx);
   auto levelCFG = cyclicMgr.extractLayeredCFG(scope, layerBuilder);
@@ -1811,6 +1965,8 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
       if (!depValue.getType().isa<handshake::ChannelType>())
         depValue.setType(ftd::channelifyType(depValue.getType()));
       levelRegistry.registerSignal(depVar, {}, depValue);
+      ftdLog() << "      level registry: " << depVar << " (native level "
+               << depNative << ") = " << ftdVal(depValue) << "\n";
     }
   }
 
@@ -1821,7 +1977,10 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
   // 5. Main suppression expression: header -> loop exit
   BoolExpression *fCons = enumeratePaths(*levelCFG, bi, levelDeps);
   fCons = fCons->boolMinimize();
+  ftdLog() << "      level deps:" << ftdDeps(shadow, *levelCFG, levelDeps)
+           << "\n      level fCons: " << fCons->toString() << "\n";
   BoolExpression *fSup = fCons->boolNegate()->boolMinimize();
+  ftdLog() << "      level fSup : " << fSup->toString() << "\n";
 
   // 6. DP suppression: header -> value's block
   BoolExpression *fSupDP = BoolExpression::boolZero();
@@ -1840,6 +1999,9 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
       auto dpDeps = dpDGCDA.getAllBlockDeps()[dpDG->newCons].allControlDeps;
       BoolExpression *fConsDP = enumeratePaths(*dpDG, bi, dpDeps);
       fSupDP = fConsDP->boolMinimize()->boolNegate()->boolMinimize();
+      ftdLog() << "      level DP (bb" << ftdBB(shadow, origHeader) << "->bb"
+               << ftdBB(shadow, origBlock) << ") fSup: " << fSupDP->toString()
+               << "\n";
 
       // Ensure all DP expression variables are in the level registry
       std::set<std::string> dpVars = fSupDP->getVariables();
@@ -1896,6 +2058,9 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
     branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
     setBBAttr(branchOp, insertBlock, builder);
     result = branchOp.getFalseResult();
+    ftdLog() << "      level branch: cond=" << ftdVal(branchCond)
+             << " data=" << ftdVal(currentValue) << " -> " << ftdVal(result)
+             << "\n";
   }
 
   levelCFG->containerOp->erase();
@@ -1913,10 +2078,17 @@ Value CyclicDemotionHelper::getValueAtLevel(const std::string &varName,
                                             unsigned targetLevel) {
   auto key = std::make_pair(varName, targetLevel);
   auto it = demotionCache.find(key);
-  if (it != demotionCache.end())
+  if (it != demotionCache.end()) {
+    ftdLog() << "    demotion " << varName << " @level" << targetLevel
+             << ": cache hit = " << ftdVal(it->second) << "\n";
     return it->second;
+  }
 
   unsigned native = getVarNativeLevel(varName);
+  ftdLog() << "    demotion " << varName << " @level" << targetLevel
+           << ": native=" << native
+           << (native <= targetLevel ? " -> original wire" : " -> demoting")
+           << "\n";
   Value val;
   if (native <= targetLevel) {
     // Variable is at or below target level — use original value
@@ -1932,6 +2104,8 @@ Value CyclicDemotionHelper::getValueAtLevel(const std::string &varName,
   }
 
   demotionCache[key] = val;
+  ftdLog() << "    demotion " << varName << " @level" << targetLevel
+           << " = " << ftdVal(val) << "\n";
   return val;
 }
 
@@ -2021,6 +2195,16 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
                         consumer->hasAttr(FTD_EXPLICIT_GAMMA) &&
                         (producerBlock != consumerBlock ||
                          connection.getDefiningOp()->hasAttr(FTD_EXPLICIT_MU));
+
+  ftdLog() << "\n================ delivery ================\n"
+           << "producer : " << ftdName(connection.getDefiningOp()) << " (bb"
+           << prodBBIdx << ")" << ftdAttrs(connection.getDefiningOp()) << "\n"
+           << "consumer : " << ftdName(consumer) << " (bb" << consBBIdx << ")"
+           << ftdAttrs(consumer) << "\n"
+           << "value    : " << ftdVal(connection) << "\n"
+           << "gamma    : " << (deliverToGamma ? "yes" : "no")
+           << ", producer reachable: "
+           << (isReachable(entryBlock, producerBlock) ? "yes" : "no") << "\n";
 
   // If producer is unreachable, the suppression is not needed.
   if (!isReachable(entryBlock, producerBlock)) {
@@ -2114,6 +2298,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
       currentMuxOp = nextMuxOp;
     }
     dominatorBlock = lastValidDominator;
+    ftdLog() << "  gamma dominator candidate: bb"
+             << ftdBB(&shadow, dominatorBlock) << "\n";
 
     // dominatorBlock must dominate the producer and every block whose branch
     // condition the suppression depends on, so take the nearest common
@@ -2143,6 +2329,9 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
   auto locGraph =
       buildLocalCFGRegion(tmpBuilder, dominatorBlock, consumerBlock, bi);
 
+  ftdLog() << "local CFG: bb" << ftdBB(&shadow, dominatorBlock) << " -> bb"
+           << ftdBB(&shadow, consumerBlock) << "\n";
+
   ControlDependenceAnalysis locCDA(*locGraph->region);
   // The condition blocks the consumer's reachability depends on, from the
   // dominator block; the suppression condition is built over exactly these.
@@ -2151,6 +2340,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
   // their dependences.
   DenseSet<Block *> locConsControlDepsFull =
       locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
+  ftdLog() << "  raw CDA deps of the consumer:"
+           << ftdDeps(&shadow, *locGraph, locConsControlDepsFull) << "\n";
   // The condition blocks driving the gamma's selects along the consumer input's
   // path — the conditions under which the consumer input is the one selected.
   DenseSet<Block *> muxConditionSet;
@@ -2191,6 +2382,13 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
         }
       }
 
+      ftdLog() << "  [gamma chain] mux#" << ftdId(currentMuxOp)
+               << " entered by " << ftdVal(currentConnection)
+               << (isDataInput ? (requiredVal ? " as TRUE data"
+                                              : " as FALSE data")
+                               : " as CONDITION")
+               << "\n";
+
       if (isDataInput) {
         // 1. Get the condition value driving this Mux
         Value muxCondition = currentMuxOp->getOperand(0);
@@ -2224,10 +2422,19 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
           }
         }
 
+        ftdLog() << "    condition " << ftdVal(muxCondition) << " -> bb"
+                 << ftdBB(&shadow, muxConditionBlock) << ", in local CFG: "
+                 << (condBlockLocal ? "yes" : "NO (constraint dropped)")
+                 << "\n";
+
         // 4. Add to dependencies and record requirement
         if (condBlockLocal) {
-          if (bi.isLess(muxConditionBlock, dominatorBlock))
+          if (bi.isLess(muxConditionBlock, dominatorBlock)) {
+            ftdLog() << "    constraint dropped: bb"
+                     << ftdBB(&shadow, muxConditionBlock)
+                     << " is before the dominator\n";
             continue;
+          }
           // Add this block and its all-dependency blocks to the dependency set
           // so path enumeration observes it.
           locConsControlDepsFull.insert(condBlockLocal);
@@ -2238,6 +2445,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
 
           // Record the specific value required (True/False) to pass this Mux
           muxConstraints[condBlockLocal] = requiredVal;
+          ftdLog() << "    constraint: bb" << ftdBB(&shadow, muxConditionBlock)
+                   << " must be " << (requiredVal ? "TRUE" : "FALSE") << "\n";
         }
       }
 
@@ -2270,9 +2479,83 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
       }
 
       if (nextMuxOp) {
+        ftdLog() << "    chain continues to mux#" << ftdId(nextMuxOp) << "\n";
         currentMuxOp = nextMuxOp;
       } else {
+        ftdLog() << "    chain ends at mux#" << ftdId(currentMuxOp) << "\n";
         isChainActive = false;
+      }
+    }
+
+    // The walk above only visits the muxes on the path from the consumer input
+    // to the root of the gamma tree. The token is routed by the whole tree, so
+    // every predicate of the tree must be visible to the decision graph, as a
+    // dependence only: no constraint is known for the muxes off that path, and
+    // the constrained graph is minimized afterwards. Leaving them out also
+    // hides the loops they belong to from the demotion logic.
+
+    // Same-block gamma mux fed by `val` through exactly one data input
+    auto gammaFedBy = [&](Value val, Operation *from) -> Operation * {
+      for (Operation *user : val.getUsers()) {
+        if (!llvm::isa<handshake::MuxOp>(user) ||
+            !user->hasAttr(FTD_EXPLICIT_GAMMA) || getBB(user) != getBB(from))
+          continue;
+        unsigned count = (user->getOperand(1) == val ? 1 : 0) +
+                         (user->getOperand(2) == val ? 1 : 0);
+        if (count == 1)
+          return user;
+      }
+      return nullptr;
+    };
+
+    // 1. Climb to the root of the tree along the data inputs
+    Operation *rootMuxOp = consumer;
+    DenseSet<Operation *> climbed;
+    while (climbed.insert(rootMuxOp).second) {
+      Operation *up = gammaFedBy(rootMuxOp->getResult(0), rootMuxOp);
+      if (!up)
+        break;
+      rootMuxOp = up;
+    }
+
+    // 2. Visit every mux of the tree from the root down, once each
+    SmallVector<Operation *> worklist{rootMuxOp};
+    DenseSet<Operation *> visited;
+    while (!worklist.empty()) {
+      Operation *muxOp = worklist.pop_back_val();
+      if (!visited.insert(muxOp).second)
+        continue;
+
+      // Trace the select back through suppression branches to the condition
+      Value muxCondition = muxOp->getOperand(0);
+      while (Operation *defOp = muxCondition.getDefiningOp()) {
+        if (llvm::isa<handshake::ConditionalBranchOp>(defOp) &&
+            defOp->hasAttr(FTD_OP_TO_SKIP))
+          muxCondition = defOp->getOperand(1);
+        else
+          break;
+      }
+      Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, shadow);
+
+      // Same filters as the walk above, without recording a constraint
+      if (muxConditionBlock && !bi.isLess(muxConditionBlock, dominatorBlock)) {
+        for (auto it : locGraph->origMap) {
+          if (it.second != muxConditionBlock)
+            continue;
+          muxConditionSet.insert(muxConditionBlock);
+          locConsControlDepsFull.insert(it.first);
+          for (Block *dep : locCDA.getAllBlockDeps()[it.first].allControlDeps)
+            locConsControlDepsFull.insert(dep);
+          break;
+        }
+      }
+
+      // Descend into the sub-trees feeding the two data inputs
+      for (unsigned idx : {1u, 2u}) {
+        Operation *defOp = muxOp->getOperand(idx).getDefiningOp();
+        if (defOp && llvm::isa<handshake::MuxOp>(defOp) &&
+            defOp->hasAttr(FTD_EXPLICIT_GAMMA) && getBB(defOp) == getBB(muxOp))
+          worklist.push_back(defOp);
       }
     }
   }
@@ -2301,6 +2584,7 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
           constOp.getResult(), supData);
       branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       branchOp->setAttr("handshake.bb", targetBBAttr);
+      ftdLog() << "  consumer is never reached: token always discarded\n";
 
       for (auto &use : llvm::make_early_inc_range(connection.getUses())) {
         if (use.getOwner() != consumer)
@@ -2327,6 +2611,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
   // blocks it depends on.
   SignalRegistry registry;
   builder.setInsertionPointToStart(consumer->getBlock());
+  ftdLog() << "  deps after the gamma extension:"
+           << ftdDeps(&shadow, *locGraph, locConsControlDepsFull) << "\n";
   auto fullDecisionGraph =
       buildDecisionGraph(*locGraph, locConsControlDepsFull);
 
@@ -2394,9 +2680,13 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
   // Variables produced inside loops live at a deeper loop-nesting level; demote
   // them down to level 0 ahead of time and cache them, so the routing and the
   // expression below consume the level-0 wires.
+  ftdLog() << "  full decision graph deps:"
+           << ftdDeps(&shadow, *level0CFG, level0Deps) << "\n"
+           << "  --- demotion ---\n";
   demotionHelper.preRegisterDemotedValues(level0FullDG, registry);
 
   // Build distribution on level 0
+  ftdLog() << "  --- distribution ---\n";
   buildDistributionNetwork(builder, *level0FullDG, bi, registry, nullptr,
                            &shadow);
 
@@ -2416,8 +2706,14 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
       enumeratePaths(*level0ConstrainedDG, bi, constrainedDeps);
 
   fCons = fCons->boolMinimize();
+  ftdLog() << "  --- main expression ---\n"
+           << "  constrained deps:"
+           << ftdDeps(&shadow, *level0ConstrainedDG, constrainedDeps) << "\n"
+           << "  mux constraints : " << level0MuxConstraints.size() << "\n"
+           << "  fCons: " << fCons->toString() << "\n";
   BoolExpression *fSup = fCons->boolNegate();
   fSup = fSup->boolMinimize();
+  ftdLog() << "  fSup : " << fSup->toString() << "\n";
 
   // Build the circuit that computes, for a `start`->`target` stretch, the
   // expression under which the token must be discarded because it does not
@@ -2478,6 +2774,10 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     BoolExpression *fConsLocal = enumeratePaths(*level0DG, bi, dgDeps);
     BoolExpression *fSupLocal =
         fConsLocal->boolMinimize()->boolNegate()->boolMinimize();
+    ftdLog() << "  --- extra filter bb" << ftdBB(&shadow, start) << " -> bb"
+             << ftdBB(&shadow, target) << " ---\n"
+             << "  fCons: " << fConsLocal->toString() << "\n"
+             << "  fSup : " << fSupLocal->toString() << "\n";
 
     Value result;
     if (fSupLocal->type != experimental::boolean::ExpressionType::Zero) {
@@ -2608,6 +2908,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
                   lfCond, supData);
               lfBranch->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
               lfBranch->setAttr("handshake.bb", prodBBAttr);
+              ftdLog() << "  loop filter branch: cond=" << ftdVal(lfCond)
+                       << " data=" << ftdVal(supData) << "\n";
               // Pass the token through only when the node is reached.
               supData = lfBranch.getFalseResult();
             }
@@ -2663,6 +2965,8 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
           dpBranchCond, branchCond);
       dpBranchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
       dpBranchOp->setAttr("handshake.bb", targetBBAttr);
+      ftdLog() << "  final DP filter: cond=" << ftdVal(dpBranchCond)
+               << " applied to " << ftdVal(branchCond) << "\n";
       branchCond = dpBranchOp.getFalseResult();
     }
 
@@ -2674,6 +2978,9 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     branchOp->setAttr(FTD_OP_TO_SKIP, builder.getUnitAttr());
     branchOp->setAttr("handshake.bb", targetBBAttr);
     supData = branchOp.getFalseResult();
+    ftdLog() << "  SUPPRESSION branch#" << ftdId(branchOp)
+             << ": cond=" << ftdVal(branchCond) << " data=" << ftdVal(supData)
+             << " delivered to " << ftdName(consumer) << "\n";
 
     // Take into account the possibility of a mux to get the condition input
     // also as data input. In this case, the data input can be optimized to
