@@ -476,6 +476,23 @@ def PushConstants : DynamaticPass<"push-constants"> {
   }];
 }
 
+def SortBlocksRPO : Pass<"sort-blocks-rpo", "mlir::ModuleOp"> {
+  let summary = "Sort the blocks of each function in reverse post order.";
+  let description = [{
+    This pass reorders the blocks of every function in a reverse post order of
+    its CFG. In such an order the position of a block increases along every edge
+    which is not a back edge, and a block always comes after all of its
+    dominators. Blocks which the entry block cannot reach come last.
+
+    Several parts of the flow derive a block identifier from the position of the
+    block in its region (the block IDs of the cf-level profiler, the
+    `handshake.bb` attribute set during the conversion to Handshake) and then
+    rely on those identifiers being ordered along the control flow, `isBackedge`
+    in `Support/CFG.h` being the main example. Nothing guarantees that the blocks
+    reach this point in such an order, hence this pass.
+  }];
+}
+
 def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
   let summary = "Deletes the unique name of all operations in the IR.";
   let description = [{
