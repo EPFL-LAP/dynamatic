@@ -329,14 +329,9 @@ using InstPairType = std::pair<Instruction *, Instruction *>;
 
 namespace {
 
-/// \brief: What a memory analysis has been able to establish about one
-/// ordered pair of memory accesses.
-///
-/// Every pair starts out as `Unknown` and each analysis may refine it into one
-/// of the two proven states. A pair that is still `Unknown` once every
-/// analysis has run carries no information, and must therefore be treated
-/// conservatively (i.e., as if the dependence were real).
-enum class DependenceState {
+/// \brief: Which of the three things an analysis can have established about
+/// one ordered pair of memory accesses.
+enum class DependenceKind {
   /// No analysis has been able to say anything about this pair yet.
   Unknown = 0,
   /// The dependence definitely exists: the two accesses may touch the same
@@ -348,32 +343,82 @@ enum class DependenceState {
   ProvenFalse,
 };
 
+/// \brief: What a memory analysis has established about one ordered pair of
+/// memory accesses, together with the loop depth and iteration distance in
+/// the one case where those exist.
+class DependenceState {
+public:
+  /// Nothing established yet, which is where every entry starts.
+  DependenceState() = default;
+  static DependenceState unknown() { return DependenceState(); }
+
+  /// There is no dependence between the two accesses.
+  static DependenceState provenFalse() {
+    return DependenceState(DependenceKind::ProvenFalse, 0, 0);
+  }
+
+  /// There is a dependence, carried by the loop at nesting level
+  /// `loopDepth`: srcAccess in iteration i has to go before dstAccess in
+  /// iteration i + `distance`.
+  static DependenceState provenTrue(unsigned loopDepth, unsigned distance) {
+    return DependenceState(DependenceKind::ProvenTrue, loopDepth, distance);
+  }
+
+  DependenceKind getKind() const { return kind; }
+  bool isUnknown() const { return kind == DependenceKind::Unknown; }
+  bool isProvenTrue() const { return kind == DependenceKind::ProvenTrue; }
+  bool isProvenFalse() const { return kind == DependenceKind::ProvenFalse; }
+
+  /// The nesting level of the loop carrying a dependence that is known to
+  /// exist. Only a `ProvenTrue` state has one.
+  unsigned getLoopDepth() const {
+    assert(isProvenTrue() && "only a dependence known to exist has a depth");
+    return loopDepth;
+  }
+
+  /// The iteration distance of a dependence that is known to exist. Only a
+  /// `ProvenTrue` state has one.
+  unsigned getDistance() const {
+    assert(isProvenTrue() &&
+           "only a dependence known to exist has an iteration distance");
+    return distance;
+  }
+
+private:
+  DependenceState(DependenceKind kind, unsigned loopDepth, unsigned distance)
+      : kind(kind), loopDepth(loopDepth), distance(distance) {}
+
+  DependenceKind kind = DependenceKind::Unknown;
+  unsigned loopDepth = 0;
+  unsigned distance = 0;
+};
+
 /// \brief: A short, human-readable spelling of a dependence state, for
 /// analyses that want to log individual decisions.
 [[maybe_unused]] llvm::StringRef toString(DependenceState state) {
-  switch (state) {
-  case DependenceState::Unknown:
+  switch (state.getKind()) {
+  case DependenceKind::Unknown:
     return "unknown";
-  case DependenceState::ProvenTrue:
+  case DependenceKind::ProvenTrue:
     return "proven-true";
-  case DependenceState::ProvenFalse:
+  case DependenceKind::ProvenFalse:
     return "proven-false";
   }
-  llvm_unreachable("unhandled DependenceState");
+  llvm_unreachable("unhandled DependenceKind");
 }
 
 /// \brief: A single character standing for a dependence state, used when
 /// printing the matrix as a grid.
 char toChar(DependenceState state) {
-  switch (state) {
-  case DependenceState::Unknown:
+  switch (state.getKind()) {
+  case DependenceKind::Unknown:
     return '?';
-  case DependenceState::ProvenTrue:
+  case DependenceKind::ProvenTrue:
     return 'T';
-  case DependenceState::ProvenFalse:
+  case DependenceKind::ProvenFalse:
     return 'F';
   }
-  llvm_unreachable("unhandled DependenceState");
+  llvm_unreachable("unhandled DependenceKind");
 }
 
 /// \brief: Collects every load and store of a function, in program order.
@@ -404,7 +449,7 @@ public:
   /// Accesses are indexed in the order in which they are given.
   explicit DependenceMatrix(llvm::ArrayRef<Instruction *> accesses)
       : accesses(accesses.begin(), accesses.end()),
-        states(accesses.size() * accesses.size(), DependenceState::Unknown) {
+        states(accesses.size() * accesses.size()) {
     for (auto [idx, access] : llvm::enumerate(this->accesses))
       accessToIndex.try_emplace(access, idx);
     // Every entry starts out `Unknown`, so every entry starts out in the set.
@@ -441,7 +486,7 @@ public:
   /// srcAccess -> dstAccess. Keeps `unknownEntries` in step.
   void setState(unsigned srcIndex, unsigned dstIndex, DependenceState state) {
     unsigned flatIndex = getFlatIndex(srcIndex, dstIndex);
-    if (state == DependenceState::Unknown)
+    if (state.isUnknown())
       unknownEntries.insert(flatIndex);
     else
       unknownEntries.erase(flatIndex);
@@ -490,7 +535,7 @@ public:
 
     for (Instruction *srcAccess : accesses)
       for (Instruction *dstAccess : accesses)
-        if (getState(srcAccess, dstAccess) != DependenceState::ProvenFalse)
+        if (!getState(srcAccess, dstAccess).isProvenFalse())
           depPairList.emplace_back(srcAccess, dstAccess);
 
     return depPairList;
@@ -875,7 +920,7 @@ public:
         // cross-loop assumption as removeNonAliasing.
         if (commonDepth == 0 && scopMinDepth == 1) {
           depMatrix.setState(srcAccess, dstAccess,
-                             DependenceState::ProvenFalse);
+                             DependenceState::provenFalse());
           continue;
         }
 
@@ -890,7 +935,8 @@ public:
       // Only an answer of "definitely empty" disproves the dependence; an isl
       // error leaves the entry unknown.
       if (srcMap.intersect(dstMap).is_empty().is_true())
-        depMatrix.setState(srcAccess, dstAccess, DependenceState::ProvenFalse);
+        depMatrix.setState(srcAccess, dstAccess,
+                           DependenceState::provenFalse());
     }
   }
 
@@ -997,7 +1043,7 @@ bool equalBase(Instruction *a, Instruction *b) {
 /// orders (see MarkMemoryInterfaces).
 void removeEqual(DependenceMatrix &depMatrix) {
   for (Instruction *access : depMatrix.getAccesses())
-    depMatrix.setState(access, access, DependenceState::ProvenFalse);
+    depMatrix.setState(access, access, DependenceState::provenFalse());
 }
 
 /// \brief: Rules out every read-after-read pair.
@@ -1007,7 +1053,7 @@ void removeEqual(DependenceMatrix &depMatrix) {
 void removeRAR(DependenceMatrix &depMatrix) {
   for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
     if (!srcAccess->mayWriteToMemory() && !dstAccess->mayWriteToMemory())
-      depMatrix.setState(srcAccess, dstAccess, DependenceState::ProvenFalse);
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
 }
 
 /// \brief: Rules out every pair of accesses to different base arrays.
@@ -1022,7 +1068,7 @@ void removeRAR(DependenceMatrix &depMatrix) {
 void removeUnequalBase(DependenceMatrix &depMatrix) {
   for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
     if (!equalBase(srcAccess, dstAccess))
-      depMatrix.setState(srcAccess, dstAccess, DependenceState::ProvenFalse);
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
 }
 
 /// \brief: Do the two accesses sit inside at least one common loop?
@@ -1056,7 +1102,7 @@ bool haveCommonLoop(const LoopInfo &loopInfo, Instruction *a, Instruction *b) {
 void removeSucceedingPredecessor(DependenceMatrix &depMatrix) {
   for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
     if (!isPotentiallyReachable(srcAccess, dstAccess))
-      depMatrix.setState(srcAccess, dstAccess, DependenceState::ProvenFalse);
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
 }
 
 /// \brief: Rules out the pairs that cannot be violated within one iteration
@@ -1070,7 +1116,7 @@ void removeNonAliasing(DependenceMatrix &depMatrix,
 
     if (!canBeViolatedInSameIteration(srcAccess, dstAccess, aliasAnalysis,
                                       loopInfo))
-      depMatrix.setState(srcAccess, dstAccess, DependenceState::ProvenFalse);
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
   }
 }
 
@@ -1082,9 +1128,16 @@ std::map<Instruction *, LLVMMemDependency> DependenceMatrix::toDependencyMap(
     assert(nameMapping.count(srcAccess) > 0 && "Unnamed load/store op!");
     assert(nameMapping.count(dstAccess) > 0 && "Unnamed load/store op!");
 
+    // A pair that is still `Unknown` is reported conservatively, and no
+    // analysis has given it a depth or a distance to report.
+    DependenceState state = getState(srcAccess, dstAccess);
+    unsigned loopDepth = state.isProvenTrue() ? state.getLoopDepth() : 0;
+    unsigned distance = state.isProvenTrue() ? state.getDistance() : 0;
+
     LLVMMemDependency &deps = instToDepsMap[srcAccess];
     deps.name = nameMapping.at(srcAccess);
-    deps.destAndDepthAndDist.emplace_back(nameMapping.at(dstAccess), 0, 0);
+    deps.destAndDepthAndDist.emplace_back(nameMapping.at(dstAccess), loopDepth,
+                                          distance);
   }
 
   return instToDepsMap;
