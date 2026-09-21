@@ -949,34 +949,6 @@ public:
   iterator end() { return memInsts.end(); }
 };
 
-struct IndexAnalysis {
-
-  IndexAnalysis() : otherInsts() {}
-  ~IndexAnalysis() = default;
-
-  /// Returns all memory instructions in SCoPs which do not require an LSQ
-  /// connection
-  std::vector<Instruction *> &getOtherInsts() { return otherInsts; }
-
-  /// Query whether any SCoP contains BB
-  bool isInScop(BasicBlock *bb) { return bbList.find(bb) != bbList.end(); }
-
-  /// Returns an integer uniquely identifying the SCoP which contains BB
-  int getScopID(BasicBlock *bb) {
-    return (isInScop(bb)) ? bbToScopMap[bb] : -1;
-  }
-
-  std::vector<Instruction *> otherInsts;
-
-  // NOTE: in the legacy implementation they were called "instRAWlist". But this
-  // was actually imprecise, as this contains also RAW dependencies.
-  std::set<InstPairType> dependentReadAndWritePairs;
-  std::set<InstPairType> dependentWriteAndWritePairs;
-  std::set<BasicBlock *> bbList;
-  std::map<BasicBlock *, int> bbToScopMap;
-  std::map<Instruction *, Value *> instToBase;
-};
-
 namespace {
 
 void getAllRegions(llvm::Region &region,
@@ -1163,8 +1135,6 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
     }
   };
 
-  IndexAnalysis indexAnalysis;
-  AAManager::Result *aliasAnalysis;
   unsigned memCount = 0;
 
   /// \brief: Applies the polyhedral and dataflow analysis of one Scop to the
@@ -1187,11 +1157,6 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
 
   PreservedAnalyses run(Function &llvmFunction, FunctionAnalysisManager &fam);
 
-  /// \brief: returns a list of (srcInst, dstInst) pairs that might have a WAR
-  /// or WAW conflict.
-  std::vector<InstPairType>
-  getDependencyPairs(Function &llvmFunction,
-                     const SameScopHelper &sameScopHelper);
   std::map<Instruction *, std::string> nameAllLoadStores(Function &f);
 };
 
@@ -1250,106 +1215,6 @@ void MemDepAnalysisPass::processScop(Scop &scop, DependenceMatrix &depMatrix,
   }
 
   meta.refineDependences(depMatrix, aliasAnalysis);
-}
-
-// Helper function: Get all instructions of a certain type "T"
-template <typename T>
-std::vector<Instruction *> getAllInsts(Function *llvmFunction) {
-  std::vector<Instruction *> insts;
-  for (BasicBlock &bb : *llvmFunction) {
-    for (Instruction &inst : bb)
-      if (isa<T>(inst))
-        insts.push_back(&inst);
-  }
-  return insts;
-}
-
-std::vector<InstPairType>
-MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
-                                       const SameScopHelper &sameScopHelper) {
-  std::vector<InstPairType> depPairList;
-  for (auto *storeInst : getAllInsts<StoreInst>(&llvmFunction)) {
-    // Find RAW dependencies
-    for (auto *loadInst : getAllInsts<LoadInst>(&llvmFunction)) {
-
-      InstPairType rawPair = std::make_pair(storeInst, loadInst);
-
-      // NOTE: In dynamatic we assume that memory with different base addresses
-      // are store in separate RAMs. Two instructions targetting differing base
-      // arrays can never conflict.
-      if (!equalBase(storeInst, loadInst))
-        continue;
-
-      // Instructions are in the same scop: use the result from IndexAnalysis
-      if (sameScopHelper.sameScop(loadInst, storeInst)) {
-        if (indexAnalysis.dependentReadAndWritePairs.count(rawPair))
-          depPairList.push_back(rawPair);
-
-        LLVM_DEBUG({
-          if (!indexAnalysis.dependentReadAndWritePairs.count(rawPair)) {
-            llvm::dbgs() << "--------------------------------------------\n";
-            llvm::dbgs() << "The following memory access instruction pair "
-                            "proven to be independent according to polyhedral "
-                            "analysis:\n";
-            loadInst->dump();
-            storeInst->dump();
-          }
-        });
-        continue;
-      }
-
-      // Instruction are in different Scops: use the result from alias analysis
-      AliasResult aliasResult = aliasAnalysis->alias(
-          MemoryLocation::get(loadInst), MemoryLocation::get(storeInst));
-
-      // If they always or sometimes alias:
-      if (aliasResult != AliasResult::NoAlias) {
-        // If the pair of load/store potentially access the same memory
-        // location, then we consider two cases:
-        //   1. If it is possible to reach from the load inst to the store, then
-        //   we add the WAR dependency
-        //   2. If it is possible to reach from the store inst to the load, then
-        //   we add the RAW dep
-        if (isPotentiallyReachable(storeInst, loadInst))
-          depPairList.emplace_back(storeInst, loadInst);
-        if (isPotentiallyReachable(loadInst, storeInst))
-          depPairList.emplace_back(loadInst, storeInst);
-      }
-    }
-    // Find WAW dependencies
-    for (auto *secondStoreInst : getAllInsts<StoreInst>(&llvmFunction)) {
-      if (secondStoreInst == storeInst)
-        continue;
-
-      // NOTE: In dynamatic we assume that memory with different base addresses
-      // are store in separate RAMs. Two instructions targetting differing base
-      // arrays can never conflict.
-      if (!equalBase(storeInst, secondStoreInst))
-        continue;
-
-      auto pair = InstPairType(secondStoreInst, storeInst);
-      auto pairRev = InstPairType(storeInst, secondStoreInst);
-
-      // Instructions are in the same scop: use the result from IndexAnalysis
-      if (sameScopHelper.sameScop(storeInst, secondStoreInst)) {
-        if (indexAnalysis.dependentWriteAndWritePairs.count(pair) > 0)
-          depPairList.push_back(pair);
-        else if (indexAnalysis.dependentWriteAndWritePairs.count(pairRev) > 0)
-          depPairList.push_back(pairRev);
-        continue;
-      }
-
-      // Otherwise, use results from alias analysis:
-      AliasResult aliasResult = aliasAnalysis->alias(
-          MemoryLocation::get(storeInst), MemoryLocation::get(secondStoreInst));
-      // If they always or sometimes alias:
-      if (aliasResult != AliasResult::NoAlias) {
-        depPairList.push_back(pair);
-      }
-    }
-  }
-
-  return depPairList;
 }
 
 // This flow currently only supports the dependence analysis within one BB and
