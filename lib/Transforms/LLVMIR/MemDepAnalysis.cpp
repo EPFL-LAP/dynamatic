@@ -56,6 +56,11 @@
 
 #include "llvm/Analysis/DependenceAnalysis.h"
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+
 #define DEBUG_TYPE "mem-dep-analysis"
 
 using namespace llvm;
@@ -322,6 +327,237 @@ std::optional<int64_t> getDistance(Dependence *d) {
 
 using InstPairType = std::pair<Instruction *, Instruction *>;
 
+namespace {
+
+/// \brief: What a memory analysis has been able to establish about one
+/// ordered pair of memory accesses.
+///
+/// Every pair starts out as `Unknown` and each analysis may refine it into one
+/// of the two proven states. A pair that is still `Unknown` once every
+/// analysis has run carries no information, and must therefore be treated
+/// conservatively (i.e., as if the dependence were real).
+enum class DependenceState {
+  /// No analysis has been able to say anything about this pair yet.
+  Unknown = 0,
+  /// The dependence definitely exists: the two accesses may touch the same
+  /// address, and their relative order has to be enforced at runtime.
+  ProvenTrue,
+  /// The dependence definitely does not exist: either the accesses can never
+  /// touch the same address, or their order is already enforced by something
+  /// else (e.g., by the dataflow itself).
+  ProvenFalse,
+};
+
+/// \brief: A short, human-readable spelling of a dependence state, for
+/// analyses that want to log individual decisions.
+[[maybe_unused]] llvm::StringRef toString(DependenceState state) {
+  switch (state) {
+  case DependenceState::Unknown:
+    return "unknown";
+  case DependenceState::ProvenTrue:
+    return "proven-true";
+  case DependenceState::ProvenFalse:
+    return "proven-false";
+  }
+  llvm_unreachable("unhandled DependenceState");
+}
+
+/// \brief: A single character standing for a dependence state, used when
+/// printing the matrix as a grid.
+char toChar(DependenceState state) {
+  switch (state) {
+  case DependenceState::Unknown:
+    return '?';
+  case DependenceState::ProvenTrue:
+    return 'T';
+  case DependenceState::ProvenFalse:
+    return 'F';
+  }
+  llvm_unreachable("unhandled DependenceState");
+}
+
+/// \brief: Collects every load and store of a function, in program order.
+std::vector<Instruction *> collectMemoryAccesses(Function &llvmFunction) {
+  std::vector<Instruction *> accesses;
+  for (BasicBlock &bb : llvmFunction)
+    for (Instruction &inst : bb)
+      if (isa<LoadInst, StoreInst>(inst))
+        accesses.push_back(&inst);
+  return accesses;
+}
+
+/// \brief: The state of every ordered pair of memory accesses in a function.
+///
+/// The matrix is indexed by (source, destination), where the source is the
+/// *predecessor* of the dependence and the destination its *successor*: the
+/// entry at `(src, dst)` answers "must `src` be ordered before `dst`?". It is
+/// therefore asymmetric, and `(src, dst)` and `(dst, src)` are two independent
+/// entries; the diagonal is present but meaningless, since an access is never
+/// a dependence of itself.
+///
+/// This is meant to be the shared substrate for the various analyses in this
+/// pass: each analysis refines the entries it can prove, and the final set of
+/// dependence edges is read off the matrix once they have all run.
+class DependenceMatrix {
+public:
+  /// Builds a matrix covering `accesses`, with every entry set to `Unknown`.
+  /// Accesses are indexed in the order in which they are given.
+  explicit DependenceMatrix(llvm::ArrayRef<Instruction *> accesses)
+      : accesses(accesses.begin(), accesses.end()),
+        states(accesses.size() * accesses.size(), DependenceState::Unknown) {
+    for (auto [idx, access] : llvm::enumerate(this->accesses))
+      accessToIndex.try_emplace(access, idx);
+    // Every entry starts out `Unknown`, so every entry starts out in the set.
+    for (unsigned flatIndex = 0; flatIndex < states.size(); ++flatIndex)
+      unknownEntries.insert(unknownEntries.end(), flatIndex);
+  }
+
+  /// The number of memory accesses covered, i.e., the side length of the
+  /// matrix.
+  unsigned getNumAccesses() const { return accesses.size(); }
+
+  /// The memory accesses covered, in index order.
+  llvm::ArrayRef<Instruction *> getAccesses() const { return accesses; }
+
+  /// The index of an access, which must be one the matrix covers.
+  unsigned getIndexOf(Instruction *access) const {
+    auto it = accessToIndex.find(access);
+    assert(it != accessToIndex.end() &&
+           "memory access is not covered by this dependence matrix");
+    return it->second;
+  }
+
+  /// \brief: What is currently known about the dependence srcAccess ->
+  /// dstAccess.
+  DependenceState getState(Instruction *srcAccess,
+                           Instruction *dstAccess) const {
+    return states[getFlatIndex(getIndexOf(srcAccess), getIndexOf(dstAccess))];
+  }
+  DependenceState getState(unsigned srcIndex, unsigned dstIndex) const {
+    return states[getFlatIndex(srcIndex, dstIndex)];
+  }
+
+  /// \brief: Records what an analysis has established about the dependence
+  /// srcAccess -> dstAccess. Keeps `unknownEntries` in step.
+  void setState(unsigned srcIndex, unsigned dstIndex, DependenceState state) {
+    unsigned flatIndex = getFlatIndex(srcIndex, dstIndex);
+    if (state == DependenceState::Unknown)
+      unknownEntries.insert(flatIndex);
+    else
+      unknownEntries.erase(flatIndex);
+    states[flatIndex] = state;
+  }
+  void setState(Instruction *srcAccess, Instruction *dstAccess,
+                DependenceState state) {
+    setState(getIndexOf(srcAccess), getIndexOf(dstAccess), state);
+  }
+
+  /// The number of entries no analysis has settled yet.
+  unsigned getNumUnknown() const { return unknownEntries.size(); }
+
+  /// \brief: The dependences that are still `Unknown`, as (source,
+  /// destination) access pairs, in the same row-major order as the matrix.
+  ///
+  /// This is what a refinement pass should loop over: it costs the number of
+  /// entries still open rather than a full rescan of the matrix, and entries
+  /// an earlier pass has already settled are skipped for free.
+  ///
+  /// The result is a snapshot, so refining entries while looping over it is
+  /// safe. Reading the live set instead would not be: settling an entry
+  /// erases it from `unknownEntries`, which invalidates an iterator to it.
+  std::vector<InstPairType> getUnknownDependences() const {
+    std::vector<InstPairType> unknownPairs;
+    unknownPairs.reserve(unknownEntries.size());
+
+    for (unsigned flatIndex : unknownEntries)
+      unknownPairs.emplace_back(accesses[flatIndex / getNumAccesses()],
+                                accesses[flatIndex % getNumAccesses()]);
+
+    return unknownPairs;
+  }
+
+  /// \brief: The dependence edges the matrix currently describes.
+  ///
+  /// An edge is produced for every ordered pair that could be a dependence and
+  /// has not been proven not to be one, so a pair that is still `Unknown`
+  /// conservatively becomes an edge.
+  ///
+  /// This reads nothing but the matrix: every reason to drop a pair has to
+  /// have been written into it as `ProvenFalse` by one of the refinement
+  /// passes beforehand (see removeEqual, removeRAR, removeUnequalBase).
+  std::vector<InstPairType> getDependencePairs() const {
+    std::vector<InstPairType> depPairList;
+
+    for (Instruction *srcAccess : accesses)
+      for (Instruction *dstAccess : accesses)
+        if (getState(srcAccess, dstAccess) != DependenceState::ProvenFalse)
+          depPairList.emplace_back(srcAccess, dstAccess);
+
+    return depPairList;
+  }
+
+  /// \brief: The same edges, grouped by source access and keyed the way the
+  /// serialization to LLVM metadata expects.
+  ///
+  /// One memory access can be the source of several dependences. E.g.,
+  ///
+  ///   store %location, %data; name = "store1"
+  ///   %read_data1 = load %location; name = "load1"
+  ///   %read_data2 = load %location; name = "load2"
+  ///
+  /// has two RAW dependences, (store1, load1) and (store1, load2), and both
+  /// are annotated on store1 as a single list [dep1, dep2]. Each source
+  /// therefore maps to one `LLVMMemDependency` holding all of its
+  /// destinations.
+  ///
+  /// `nameMapping` must name every access the matrix covers, as produced by
+  /// `nameAllLoadStores`.
+  std::map<Instruction *, LLVMMemDependency> toDependencyMap(
+      const std::map<Instruction *, std::string> &nameMapping) const;
+
+  /// \brief: Prints the matrix as a grid of one character per entry ('T' for
+  /// proven true, 'F' for proven false, '?' for unknown), rows being sources
+  /// and columns destinations, preceded by the legend of access indices.
+  void print(llvm::raw_ostream &os) const {
+    os << "Dependence matrix over " << getNumAccesses()
+       << " memory accesses, " << getNumUnknown()
+       << " entries still unknown (rows: source/predecessor, columns: "
+          "destination/successor):\n";
+    for (auto [idx, access] : llvm::enumerate(accesses))
+      os << "  [" << idx << "]" << *access << "\n";
+    for (unsigned srcIndex = 0; srcIndex < getNumAccesses(); ++srcIndex) {
+      os << "  ";
+      for (unsigned dstIndex = 0; dstIndex < getNumAccesses(); ++dstIndex)
+        os << toChar(getState(srcIndex, dstIndex));
+      os << "\n";
+    }
+  }
+
+private:
+  /// The offset of an entry in the row-major `states` array.
+  unsigned getFlatIndex(unsigned srcIndex, unsigned dstIndex) const {
+    assert(srcIndex < getNumAccesses() && dstIndex < getNumAccesses() &&
+           "dependence matrix index out of range");
+    return srcIndex * getNumAccesses() + dstIndex;
+  }
+
+  /// The accesses covered, in index order.
+  llvm::SmallVector<Instruction *> accesses;
+  /// The reverse of `accesses`.
+  llvm::DenseMap<Instruction *, unsigned> accessToIndex;
+  /// The entries, stored row-major: the state of (srcIndex, dstIndex) lives at
+  /// `srcIndex * getNumAccesses() + dstIndex`.
+  std::vector<DependenceState> states;
+  /// The flat indices of the entries that are still `Unknown`, maintained by
+  /// setState() so that a refinement pass never has to rescan the matrix to
+  /// find the work it has left. Ordered, so iteration is deterministic and
+  /// follows the same row-major order as `states`.
+  std::set<unsigned> unknownEntries;
+};
+
+} // namespace
+
+
 /// \brief: An data container class that represents the analysis data from the
 /// Scop.
 /// https://www.cs.colostate.edu/~pouchet/software/polyopt/doc/htmltexinfo/Specifics-of-Polyhedral-Programs.html.
@@ -342,9 +578,9 @@ class ScopAnalysisInfo {
   std::map<InstPairType, bool> dependsCache;
   std::set<InstPairType> outstandingDependsQueries;
 
-  /// \brief (needs proof-read here): Find the loop depth of the outer most
-  /// common loop that contain both instructions.
-  int getOutMostCommonLoopDepth(Instruction *i0, Instruction *i1) {
+  /// \brief (needs proof-read here): Find the loop depth of the inner most
+  /// common loop that contains both instructions.
+  int getInnerMostCommonLoopDepth(Instruction *i0, Instruction *i1) {
     const auto *bb0 = i0->getParent();
     const auto *bb1 = i1->getParent();
     int depth0 = loopInfo->getLoopDepth(bb0);
@@ -721,6 +957,58 @@ const Value *findBase(Instruction *inst) {
 
 bool equalBase(Instruction *a, Instruction *b) {
   return findBase(a) == findBase(b);
+}
+
+/// \brief: Rules out every pair of an access with itself.
+///
+/// An access is never a dependence of itself: the diagonal of the matrix is
+/// meaningless, and the rest of the pipeline treats a self-edge as a WAW
+/// between two executions of one instruction, which the dataflow already
+/// orders (see MarkMemoryInterfaces).
+void removeEqual(DependenceMatrix &depMatrix) {
+  for (Instruction *access : depMatrix.getAccesses())
+    depMatrix.setState(access, access, DependenceState::ProvenFalse);
+}
+
+/// \brief: Rules out every read-after-read pair.
+///
+/// Two loads never conflict, and the rest of the pipeline assumes RAR edges
+/// are never recorded.
+void removeRAR(DependenceMatrix &depMatrix) {
+  for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
+    if (!srcAccess->mayWriteToMemory() && !dstAccess->mayWriteToMemory())
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::ProvenFalse);
+}
+
+/// \brief: Rules out every pair of accesses to different base arrays.
+///
+/// Dynamatic places distinct base arrays in distinct RAMs, so two accesses to
+/// different arrays can never conflict. They also end up on different memory
+/// interfaces, and an edge across two interfaces would trip the assertions in
+/// MemoryInterfaces.
+///
+/// NOTE: Needs to be ran after removeRAR and removeEqual as 
+/// equalBase can throw an error for same access and two load queries
+void removeUnequalBase(DependenceMatrix &depMatrix) {
+  for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
+    if (!equalBase(srcAccess, dstAccess))
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::ProvenFalse);
+}
+
+std::map<Instruction *, LLVMMemDependency> DependenceMatrix::toDependencyMap(
+    const std::map<Instruction *, std::string> &nameMapping) const {
+  std::map<Instruction *, LLVMMemDependency> instToDepsMap;
+
+  for (auto &[srcAccess, dstAccess] : getDependencePairs()) {
+    assert(nameMapping.count(srcAccess) > 0 && "Unnamed load/store op!");
+    assert(nameMapping.count(dstAccess) > 0 && "Unnamed load/store op!");
+
+    LLVMMemDependency &deps = instToDepsMap[srcAccess];
+    deps.name = nameMapping.at(srcAccess);
+    deps.destAndDepthAndDist.emplace_back(nameMapping.at(dstAccess), 0, 0);
+  }
+
+  return instToDepsMap;
 }
 
 /// \brief: an LLVM pass that combines polyhedral and alias analysis to compute
@@ -1251,7 +1539,39 @@ PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
     return this->runDependenceAnalysisBased(llvmFunction, fam);
   }
 
-  return this->runPollyBasedInLegacyDynamatic(llvmFunction, fam);
+  llvm::LLVMContext &ctx = llvmFunction.getContext();
+
+  auto nameMapping = nameAllLoadStores(llvmFunction);
+
+  // The state of every ordered pair of memory accesses in the function. Every
+  // entry starts out `Unknown`; each refinement below narrows the entries it
+  // can prove, and whatever is still `Unknown` at the end is conservatively
+  // treated as a real dependence.
+  DependenceMatrix depMatrix(collectMemoryAccesses(llvmFunction));
+
+  // Rule out the pairs that cannot be a dependence in the first place. These
+  // are not analysis results. The order matters: see the note on
+  // removeUnequalBase, which must come last of the three.
+  removeEqual(depMatrix);
+  removeRAR(depMatrix);
+  removeUnequalBase(depMatrix);
+
+  // TODO: refine the matrix further, e.g.
+  //   refineWithPollyAnalysis(llvmFunction, fam, depMatrix);
+  // Nothing refines it in this version, so the whole matrix stays `Unknown`
+  // and the edges below are maximally conservative: every pair that could be
+  // a dependence is reported as one.
+
+  LLVM_DEBUG(depMatrix.print(llvm::dbgs()););
+
+  // Group the edges by source access and serialize them onto the LLVM
+  // instructions, where translate-llvm-to-std picks them up and turns them
+  // into handshake::MemDependenceArrayAttr.
+  for (auto [srcAccess, deps] : depMatrix.toDependencyMap(nameMapping)) {
+    deps.toLLVMMetaDataNode(ctx, srcAccess);
+  }
+
+  return PreservedAnalyses::all();
 }
 } // namespace
 
