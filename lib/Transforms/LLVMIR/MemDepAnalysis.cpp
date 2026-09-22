@@ -1247,10 +1247,21 @@ DependenceState toDependenceState(Dependence &dep, Instruction *srcAccess,
   if (!distance)
     return DependenceState::unknown();
 
-  // A negative distance describes the pair in the other direction
-  // This means that the successor runs ahead of the predecessor
-  if (*distance < 0)
+  // A dependence in the other direction describes the pair the other way
+  // round, which is its own entry in the matrix: the successor runs ahead of
+  // the predecessor. This is a question about the whole direction vector,
+  // not the innermost entry, which is what isDirectionNegative() answers --
+  // it skips the leading `=` levels and reports whether the first level that
+  // differs runs backwards.
+  if (dep.isDirectionNegative())
     return DependenceState::provenFalse();
+
+  // Forward, then, but a negative innermost entry means an outer level is
+  // what carries it, so the distance we hold is not the one that matters.
+  // For a[i][j] = a[i-1][j+2] the vector is [1 -2]: the dependence is real,
+  // at distance 1 in i, and the -2 in j describes nothing we can report.
+  if (*distance < 0)
+    return DependenceState::unknown();
 
   // At distance 0 the analysis tests positive in both directions, e.g. for
   //
@@ -1260,8 +1271,28 @@ DependenceState toDependenceState(Dependence &dep, Instruction *srcAccess,
   // it reports both (RAW, 0) and (WAR, 0). Only the one that matches program
   // order is real; the other asks for an order the same iteration never
   // needs.
-  if (*distance == 0 && !srcAccess->comesBefore(dstAccess))
-    return DependenceState::provenFalse();
+  //
+  // This only holds when the conflict really is confined to one iteration.
+  // `distance` is the entry for the innermost common loop, so an outer
+  // level can still carry it. In bicg,
+  //
+  //   for (i) for (j) s[j] = s[j] + r[i] * val;
+  //
+  // the vector is [S 0]: distance 0 in j
+  // Requiring every outer level to be `=` rules that out.
+  if (*distance == 0 && !srcAccess->comesBefore(dstAccess)) {
+    bool outerLevelsAllEqual = true;
+    for (unsigned level = 1; level < loopDepth; ++level)
+      if (dep.getDirection(level) != Dependence::DVEntry::EQ)
+        outerLevelsAllEqual = false;
+    if (outerLevelsAllEqual)
+      return DependenceState::provenFalse();
+
+    // An outer level carries the dependence, so it is real. The distance we
+    // hold is the innermost one, which is not the distance that carries it,
+    // so report the edge without a distance we cannot stand behind.
+    return DependenceState::unknown();
+  }
 
   return DependenceState::provenTrue(loopDepth, *distance);
 }
