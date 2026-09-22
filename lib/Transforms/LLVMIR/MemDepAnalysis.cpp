@@ -647,6 +647,7 @@ bool canBeViolatedInSameIteration(Instruction *srcAccess,
 /// https://www.cs.colostate.edu/~pouchet/software/polyopt/doc/htmltexinfo/Specifics-of-Polyhedral-Programs.html.
 class ScopAnalysisInfo {
   LoopInfo *loopInfo;
+  InstructionDependenceInfo instrDependenceInfo;
 
   int scopMinDepth;
   std::vector<Instruction *> memInsts;
@@ -798,7 +799,8 @@ class ScopAnalysisInfo {
   }
 
 public:
-  ScopAnalysisInfo(Scop &scop) : ctx(isl::ctx(isl_ctx_alloc())) {
+  ScopAnalysisInfo(Scop &scop)
+      : instrDependenceInfo(*scop.getLI()), ctx(isl::ctx(isl_ctx_alloc())) {
     loopInfo = scop.getLI();
 
     // @Jiahui17: Here is my understanding of what the code below is doing, we
@@ -891,6 +893,25 @@ public:
 // intersect entire store-set with entire load-set.
 
   // clang-format on
+  /// \brief: Does the dataflow already run these two accesses one after the
+  /// other, so that the memory system does not have to enforce it?
+  ///
+  /// This is the GIID property of
+  /// https://ieeexplore.ieee.org/document/8977873:
+  /// InstructionDependenceInfo proves it by walking the CFG and checking that
+  /// every token reaching one of the accesses has passed through the other
+  /// without crossing a back edge -- all of dstAccess' inputs come from
+  /// srcAccess, or all of srcAccess' outputs reach dstAccess.
+  ///
+  /// NOTE: these walks report a vacuous true when they stop at an excluded
+  /// back edge without reaching their destination, so a "yes" here is weaker
+  /// than it looks. It is used only to *permit* the restricted intersection
+  /// below, never to disprove a dependence on its own.
+  bool isOrderedByDataflow(Instruction *srcAccess, Instruction *dstAccess) {
+    return instrDependenceInfo.hasTokenDependence(srcAccess, dstAccess) ||
+           instrDependenceInfo.hasRevTokenDependence(srcAccess, dstAccess);
+  }
+
   void refineDependences(DependenceMatrix &depMatrix,
                          AAManager::Result &aliasAnalysis) {
     for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences()) {
@@ -902,10 +923,16 @@ public:
 
       isl::map srcMap, dstMap;
 
-      // If the dependence can be violated within one iteration, that
-      // iteration has to stay in the intersection
+      // The restricted intersection below only looks at later iterations of
+      // the destination, so it is only allowed when two things hold: the
+      // dependence cannot be violated within one iteration, and the dataflow
+      // already orders the two. Without the second condition a pair whose
+      // same-iteration order merely happens to be favourable would be judged
+      // on later iterations alone, which is not enough when the Scop sits
+      // inside a loop it does not contain (lu's pivot swap).
       if (canBeViolatedInSameIteration(srcAccess, dstAccess, aliasAnalysis,
-                                       *loopInfo)) {
+                                       *loopInfo) ||
+          !isOrderedByDataflow(srcAccess, dstAccess)) {
         // We cannot put any restrictions on the indices being processed by
         // the instructions, so we intersect the sets of all possible indices
         // ever accessed.
