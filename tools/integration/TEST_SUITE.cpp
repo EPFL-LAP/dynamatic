@@ -582,7 +582,7 @@ TEST_F(IIMonitorFixture, dataDependentTripCount) {
   // The loop pipelines freely. a[i] is read and written at the same index
   // in every iteration, so the two accesses only ever meet within one
   // iteration, where the load already precedes the store: the WAR edge is
-  // the only memory ordering needed. 
+  // the only memory ordering needed.
   EXPECT_EQ(summary.medianII, 1.0);
 }
 
