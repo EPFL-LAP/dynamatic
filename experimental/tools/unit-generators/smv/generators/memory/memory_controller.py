@@ -38,12 +38,14 @@ def _generate_mem_controller_loadless(
     store_data_ports = [f"stData_{n}" for n in range(num_stores)] + [
         f"stData_{n}_valid" for n in range(num_stores)
     ]
+    store_done_ports = [f"stDone_{n}_ready" for n in range(num_stores)]
     mc_in_ports = ", ".join(
         ["loadData", "memStart_valid"]
         + control_ports
         + store_address_ports
         + store_data_ports
         + ["ctrlEnd_valid"]
+        + store_done_ports
         + ["memEnd_ready"]
     )
 
@@ -64,6 +66,7 @@ MODULE {name}({mc_in_ports})
   inner_arbiter : {name}__write_memory_arbiter({arbiter_args});
   inner_mc_control : {name}__mc_control(memStart_valid, memEnd_ready, ctrlEnd_valid, all_requests_done);
   remainingStores : {ctrl_type.smv_type};
+  {"\n  ".join([f"store_complete_{n} : boolean;" for n in range(num_stores)])}
 
   ASSIGN
   init(remainingStores) := {ctrl_type.format_constant(0)};
@@ -71,6 +74,8 @@ MODULE {name}({mc_in_ports})
     {"\n    ".join([f"ctrl_{n}_valid = TRUE : remainingStores + ctrl_{n} - stores_done;" for n in range(num_controls)])}
     TRUE : remainingStores - stores_done;
   esac;
+
+  {"\n\n  ".join([f"init(store_complete_{n}) := FALSE;\n  next(store_complete_{n}) := case\n    inner_arbiter.ready_{n} : TRUE;\n    stDone_{n}_ready : FALSE;\n    TRUE : store_complete_{n};\n  esac;" for n in range(num_stores)])}
 
   DEFINE
   stores_done := storeEn ? {ctrl_type.format_constant(1)} : {ctrl_type.format_constant(0)};
@@ -98,6 +103,9 @@ MODULE {name}({mc_in_ports})
   -- stData_*_ready: ready signal for the store data ports. This signal
   -- is activated the same way as stAddr_*_ready.
   {"\n  ".join([f"stData_{n}_ready := inner_arbiter.ready_{n};" for n in range(num_stores)])}
+
+  -- stDone_*_valid: completion remains valid until its consumer accepts it.
+  {"\n  ".join([f"stDone_{n}_valid := store_complete_{n};" for n in range(num_stores)])}
 
   loadEn := FALSE; -- in a loadless memory controller there are no loads
   loadAddr := {addr_type.format_constant(0)};
@@ -180,6 +188,7 @@ def _generate_mem_controller(
     store_data_ports = [f"stData_{n}" for n in range(num_stores)] + [
         f"stData_{n}_valid" for n in range(num_stores)
     ]
+    store_done_ports = [f"stDone_{n}_ready" for n in range(num_stores)]
 
     mc_in_ports = ", ".join(
         ["loadData", "memStart_valid"]
@@ -189,6 +198,7 @@ def _generate_mem_controller(
         + store_data_ports
         + ["ctrlEnd_valid"]
         + load_data_ports
+        + store_done_ports
         + ["memEnd_ready"]
     )
 
@@ -198,6 +208,7 @@ def _generate_mem_controller(
         + store_address_ports
         + store_data_ports
         + ["ctrlEnd_valid"]
+        + store_done_ports
         + ["memEnd_ready"]
     )
 
@@ -242,6 +253,9 @@ MODULE {name}({smv_input_symbols})
   -- stData_*_ready: ready signal for the store data ports. This signal
   -- is activated the same way as stAddr_*_ready.
   {"\n  ".join([f"stData_{n}_ready := inner_mc_loadless.stData_{n}_ready;" for n in range(num_stores)])}
+
+  -- stDone_*_valid: completion response from the write-side controller.
+  {"\n  ".join([f"stDone_{n}_valid := inner_mc_loadless.stDone_{n}_valid;" for n in range(num_stores)])}
 
   loadEn := inner_arbiter.read_enable;
   loadAddr := inner_arbiter.read_address;
