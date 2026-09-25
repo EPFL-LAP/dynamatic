@@ -12,7 +12,11 @@ import argparse
 import os
 import sys
 
-from core_gen import *
+from core_gen.signals import Logic, LogicVec, LogicArray, LogicVecArray
+from core_gen.configs import Configs, GetConfigs
+from core_gen.codegen import codeGen
+from core_gen.emitters import Emitter, VHDLEmitter
+from core_gen.ir import Val, CustomStatement, Bit
 
 # ===----------------------------------------------------------------------===#
 # Parser Definition
@@ -20,10 +24,9 @@ from core_gen import *
 parser = argparse.ArgumentParser(
     description="Please specify the output path and lsq config file"
 )
-parser.add_argument("--output-dir", "-o",
-                    dest="output_path", default=".", type=str)
+parser.add_argument("--output-dir", "-o", dest="output_path", default=".", type=str)
 parser.add_argument(
-    "--config-file", "-c", required=True, dest="config_files", default="", type=str
+    "--config-file", "-c", required=True, dest="config_files", default='', type=str
 )
 
 # Build the target
@@ -127,976 +130,764 @@ class LSQWrapper:
         self.module_suffix = suffix
         self.lsq_config = configs
 
-        # Define information needed for file generation
-        # This part is inherited from the design of the original lsq_generator
-        self.library_header = (
-            "library IEEE;\nuse IEEE.std_logic_1164.all;\nuse IEEE.numeric_std.all;\n\n"
-        )
-        self.tab_level = 1
-        self.temp_count = 0
-        self.signal_init_str = ""
-        self.port_init_str = (
-            "\tport(\n\t\treset : in std_logic;\n\t\tclock : in std_logic"
-        )
-        self.reg_init_str = "\tprocess (clock, reset) is\n" + "\tbegin\n"
-
         # Define the final output string
-        self.lsq_wrapper_str = "\n\n"
 
-    def genWrapper(self):
+    def genWrapper(self, em: Emitter):
         """This function generates the desired wrapper for the LSQ"""
 
-        # PART 1: Add library information to the module
-        self.lsq_wrapper_str += self.library_header
-
-        # PART 2: Define the entity
-        self.lsq_wrapper_str += f"entity {self.lsq_name} is\n"
-
-        # PART 3: Add the module port definition
-        self.lsq_wrapper_str += self.port_init_str
+        em.clock_name = "clock"
+        em.reset_name = "reset"
 
         ##
         # Define all the IOs, details can be found in the table above
         # ! Now for storeData and loadData related IO, we assume there's only one channel, thus we don't use the *Array class
-        # io_storeData: output
-        io_storeData = VHDLLogicVecType("io_storeData", "o", self.lsq_config.dataW)
 
-        self.lsq_wrapper_str += io_storeData.signalInit()
+        # io_storeData: output
+        io_storeData = LogicVec(
+            em, "io_storeData", 'o', self.lsq_config.dataW, dyn_comp=True
+        )
 
         # io_storeAddr: output
-        io_storeAddr = VHDLLogicVecType("io_storeAddr", "o", self.lsq_config.addrW)
-
-        self.lsq_wrapper_str += io_storeAddr.signalInit()
+        io_storeAddr = LogicVec(
+            em, "io_storeAddr", 'o', self.lsq_config.addrW, dyn_comp=True
+        )
 
         # io_storeEn: output
-        io_storeEn = VHDLLogicType("io_storeEn", "o")
-
-        self.lsq_wrapper_str += io_storeEn.signalInit()
+        io_storeEn = Logic(em, "io_storeEn", 'o', dyn_comp=True)
 
         # io_loadData: input
-        io_loadData = VHDLLogicVecType("io_loadData", "i", self.lsq_config.dataW)
-
-        self.lsq_wrapper_str += io_loadData.signalInit()
+        io_loadData = LogicVec(
+            em, "io_loadData", 'i', self.lsq_config.dataW, dyn_comp=True
+        )
 
         # io_loadAddr: output
-        io_loadAddr = VHDLLogicVecType("io_loadAddr", "o", self.lsq_config.addrW)
-
-        self.lsq_wrapper_str += io_loadAddr.signalInit()
+        io_loadAddr = LogicVec(
+            em, "io_loadAddr", 'o', self.lsq_config.addrW, dyn_comp=True
+        )
 
         # io_loadEn: output
-        io_loadEn = VHDLLogicType("io_loadEn", "o")
-
-        self.lsq_wrapper_str += io_loadEn.signalInit()
+        io_loadEn = Logic(em, "io_loadEn", 'o', dyn_comp=True)
 
         # io_ctrl_*_ready: output
-        io_ctrl_ready = VHDLLogicTypeArray(
-            "io_ctrl_ready", "o", self.lsq_config.numGroups
+        io_ctrl_ready = LogicArray(
+            em, "io_ctrl_ready", 'o', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_ready.signalInit()
 
         # io_ctrl_*_valid: input
-        io_ctrl_valid = VHDLLogicTypeArray(
-            "io_ctrl_valid", "i", self.lsq_config.numGroups
+        io_ctrl_valid = LogicArray(
+            em, "io_ctrl_valid", 'i', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_valid.signalInit()
 
         # io_ldAddr_*_ready: output
-        io_ldAddr_ready = VHDLLogicTypeArray(
-            "io_ldAddr_ready", "o", self.lsq_config.numLdPorts
+        io_ldAddr_ready = LogicArray(
+            em, "io_ldAddr_ready", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_ready.signalInit()
 
         # io_ldAddr_*_valid: input
-        io_ldAddr_valid = VHDLLogicTypeArray(
-            "io_ldAddr_valid", "i", self.lsq_config.numLdPorts
+        io_ldAddr_valid = LogicArray(
+            em, "io_ldAddr_valid", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_valid.signalInit()
 
         # io_ldAddr_*_bits: input
-        io_ldAddr_bits = VHDLLogicVecTypeArray(
-            "io_ldAddr_bits", "i", self.lsq_config.numLdPorts, self.lsq_config.addrW
+        io_ldAddr_bits = LogicVecArray(
+            em,
+            "io_ldAddr_bits",
+            'i',
+            self.lsq_config.numLdPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_ldAddr_bits.signalInit()
 
         # io_ldData_*_ready: input
-        io_ldData_ready = VHDLLogicTypeArray(
-            "io_ldData_ready", "i", self.lsq_config.numLdPorts
+        io_ldData_ready = LogicArray(
+            em, "io_ldData_ready", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_ready.signalInit()
 
         # io_ldData_*_valid: output
-        io_ldData_valid = VHDLLogicTypeArray(
-            "io_ldData_valid", "o", self.lsq_config.numLdPorts
+        io_ldData_valid = LogicArray(
+            em, "io_ldData_valid", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_valid.signalInit()
 
         # io_ldData_*_bits: output
-        io_ldData_bits = VHDLLogicVecTypeArray(
-            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.dataW
+        io_ldData_bits = LogicVecArray(
+            em,
+            "io_ldData_bits",
+            'o',
+            self.lsq_config.numLdPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_ldData_bits.signalInit()
 
         # io_stAddr_ready: output
-        io_stAddr_ready = VHDLLogicTypeArray(
-            "io_stAddr_ready", "o", self.lsq_config.numStPorts
+        io_stAddr_ready = LogicArray(
+            em, "io_stAddr_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_ready.signalInit()
 
         # io_stAddr_valid: input
-        io_stAddr_valid = VHDLLogicTypeArray(
-            "io_stAddr_valid", "i", self.lsq_config.numStPorts
+        io_stAddr_valid = LogicArray(
+            em, "io_stAddr_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_valid.signalInit()
 
         # io_stAddr_bits: input
-        io_stAddr_bits = VHDLLogicVecTypeArray(
-            "io_stAddr_bits", "i", self.lsq_config.numStPorts, self.lsq_config.addrW
+        io_stAddr_bits = LogicVecArray(
+            em,
+            "io_stAddr_bits",
+            'i',
+            self.lsq_config.numStPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_stAddr_bits.signalInit()
 
         # io_stData_ready: output
-        io_stData_ready = VHDLLogicTypeArray(
-            "io_stData_ready", "o", self.lsq_config.numStPorts
+        io_stData_ready = LogicArray(
+            em, "io_stData_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_ready.signalInit()
 
         # io_stData_valid: input
-        io_stData_valid = VHDLLogicTypeArray(
-            "io_stData_valid", "i", self.lsq_config.numStPorts
+        io_stData_valid = LogicArray(
+            em, "io_stData_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_valid.signalInit()
 
         # io_stData_bits: input
-        io_stData_bits = VHDLLogicVecTypeArray(
-            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.dataW
+        io_stData_bits = LogicVecArray(
+            em,
+            "io_stData_bits",
+            'i',
+            self.lsq_config.numStPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_stData_bits.signalInit()
 
         # io_memStart_ready: output
-        io_memStart_ready = VHDLLogicType("io_memStart_ready", "o")
-        self.lsq_wrapper_str += io_memStart_ready.signalInit()
+        io_memStart_ready = Logic(em, "io_memStart_ready", 'o', dyn_comp=True)
 
         # io_memStart_valid: input
-        io_memStart_valid = VHDLLogicType("io_memStart_valid", "i")
-        self.lsq_wrapper_str += io_memStart_valid.signalInit()
+        io_memStart_valid = Logic(em, "io_memStart_valid", 'i', dyn_comp=True)
 
         # io_ctrlEnd_ready: output
-        io_ctrlEnd_ready = VHDLLogicType("io_ctrlEnd_ready", "o")
-        self.lsq_wrapper_str += io_ctrlEnd_ready.signalInit()
+        io_ctrlEnd_ready = Logic(em, "io_ctrlEnd_ready", 'o', dyn_comp=True)
 
         # io_ctrlEnd_valid: input
-        io_ctrlEnd_valid = VHDLLogicType("io_ctrlEnd_valid", "i")
-        self.lsq_wrapper_str += io_ctrlEnd_valid.signalInit()
+        io_ctrlEnd_valid = Logic(em, "io_ctrlEnd_valid", 'i', dyn_comp=True)
 
         # io_memEnd_ready: input
-        io_memEnd_ready = VHDLLogicType("io_memEnd_ready", "i")
-        self.lsq_wrapper_str += io_memEnd_ready.signalInit()
+        io_memEnd_ready = Logic(em, "io_memEnd_ready", 'i', dyn_comp=True)
 
         # io_memEnd_valid: output
-        io_memEnd_valid = VHDLLogicType("io_memEnd_valid", "o")
-        self.lsq_wrapper_str += io_memEnd_valid.signalInit()
-
-        ##
-        # IO Definition finished
-        ##
-        self.lsq_wrapper_str += "\n\t);"
-        self.lsq_wrapper_str += "\nend entity;\n\n"
+        io_memEnd_valid = Logic(em, "io_memEnd_valid", 'o', dyn_comp=True)
 
         ##
         # Architecture definition start
         ##
-        self.lsq_wrapper_str += f"architecture arch of {self.lsq_name} is\n"
 
         # Define internal signals
-        rreq_ready = VHDLLogicTypeArray(
-            "rreq_ready", "w", self.lsq_config.numLdMem)
-        self.lsq_wrapper_str += rreq_ready.signalInit()
-
-        rresp_valid = VHDLLogicTypeArray(
-            "rresp_valid", "w", self.lsq_config.numLdMem)
-        self.lsq_wrapper_str += rresp_valid.signalInit()
-
-        rresp_id = VHDLLogicVecTypeArray(
-            "rresp_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        rreq_ready = LogicArray(
+            em,
+            "rreq_ready",
+            'w',
+            self.lsq_config.numLdMem,
+            dyn_comp=True,
+            force_reg=True,
         )
-        self.lsq_wrapper_str += rresp_id.signalInit()
-
-        wreq_ready = VHDLLogicTypeArray(
-            "wreq_ready", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wreq_ready.signalInit()
-
-        wresp_valid = VHDLLogicTypeArray(
-            "wresp_valid", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wresp_valid.signalInit()
-
-        wresp_id = VHDLLogicVecTypeArray(
-            "wresp_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        rresp_valid = LogicArray(
+            em,
+            "rresp_valid",
+            'w',
+            self.lsq_config.numLdMem,
+            dyn_comp=True,
+            force_reg=True,
         )
-        self.lsq_wrapper_str += wresp_id.signalInit()
-
-        rreq_id = VHDLLogicVecTypeArray(
-            "rreq_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        rresp_id = LogicVecArray(
+            em,
+            "rresp_id",
+            'w',
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
         )
-        self.lsq_wrapper_str += rreq_id.signalInit()
-
-        wreq_id = VHDLLogicVecTypeArray(
-            "wreq_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        wreq_ready = LogicArray(
+            em,
+            "wreq_ready",
+            'w',
+            self.lsq_config.numStMem,
+            dyn_comp=True,
+            force_reg=True,
         )
-        self.lsq_wrapper_str += wreq_id.signalInit()
+        wresp_valid = LogicArray(
+            em,
+            "wresp_valid",
+            'w',
+            self.lsq_config.numStMem,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        wresp_id = LogicVecArray(
+            em,
+            "wresp_id",
+            'w',
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
+        )
+        rreq_id = LogicVecArray(
+            em,
+            "rreq_id",
+            'w',
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+        )
 
-        # Begin actual arch logic definition
-        self.lsq_wrapper_str += "begin\n"
+        wreq_id = LogicVecArray(
+            em,
+            "wreq_id",
+            'w',
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+        )
 
         # Define the process to update
         # rreq_ready, rresp_valid
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
-        self.lsq_wrapper_str += (
-            "\t-- Process for rreq_ready, rresp_valid and rresp_id\n"
+        em.add_comment(
+            "--------------------------------------------------------------------------"
         )
-        self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * \
-            (self.tab_level + 1) + "if reset = '1' then\n"
+        em.add_comment("Process for rreq_ready, rresp_valid and rresp_id")
+
+        em.add_statement(em.get_reg_init_str())
+        em.increase_indent()
+        em.add_custom_statement(CustomStatement("if reset = '1' then"))
+        em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(rresp_valid[i],
-                                          (self.tab_level + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(
-                rresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+            em.add_assignment(rreq_ready[i], Bit(0), in_process=True)
+            em.add_assignment(rresp_valid[i], Bit(0), in_process=True)
+            em.add_assignment(rresp_id[i], Val(0), in_process=True)
+
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then"))
+        em.increase_indent()
+
+        for i in range(self.lsq_config.numLdMem):
+            em.add_assignment(rreq_ready[i], Bit(1), in_process=True)
+
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_loadEn.getNameWrite()} = '1' then",
             )
-
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         )
+        em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rreq_ready[i], (self.tab_level + 2), "'1'")
+            em.add_assignment(rresp_valid[i], Bit(1), in_process=True)
+            em.add_assignment(rresp_id[i], rreq_id[i], in_process=True)
 
-        self.lsq_wrapper_str += (
-            "\n"
-            + "\t" * (self.tab_level + 2)
-            + "if "
-            + io_loadEn.getNameWrite()
-            + " = '1' then\n"
-        )
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("else"))
+        em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_valid[i],
-                                          (self.tab_level + 3), "'1'")
-            self.lsq_wrapper_str += OpTab(rresp_id[i],
-                                          (self.tab_level + 3), rreq_id[i])
+            em.add_assignment(rresp_valid[i], Bit(0), in_process=True)
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + "else\n"
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end process;"))
 
-        for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_valid[i],
-                                          (self.tab_level + 3), "'0'")
-
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + "end if;\n"
-            + "\t" * 2
-            + "end if;\n"
-            + "\tend process;\n"
+        em.add_comment(
+            "--------------------------------------------------------------------------"
         )
-
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
 
         # Define the process to update
         # wreq_ready, wresp_valid, wresp_id
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
-        self.lsq_wrapper_str += (
-            "\t-- Process for wreq_ready, wresp_valid and wresp_id\n"
+        em.add_comment(
+            "--------------------------------------------------------------------------"
         )
-        self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * \
-            (self.tab_level + 1) + "if reset = '1' then\n"
+        em.add_comment("Process for wreq_ready, wresp_valid and wresp_id")
+
+        em.add_statement(em.get_reg_init_str())
+        em.increase_indent()
+        em.add_custom_statement(CustomStatement("if reset = '1' then"))
+        em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(
-                wresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+            em.add_assignment(wreq_ready[i], Bit(0), in_process=True)
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
+            em.add_assignment(wresp_id[i], Val(0), in_process=True)
+
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then"))
+        em.increase_indent()
+
+        for i in range(self.lsq_config.numStMem):
+            em.add_assignment(wreq_ready[i], Bit(1), in_process=True)
+
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_storeEn.getNameWrite()} = '1' then",
             )
-
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         )
+        em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wreq_ready[i], (self.tab_level + 2), "'1'")
+            em.add_assignment(wresp_valid[i], Bit(1), in_process=True)
+            em.add_assignment(wresp_id[i], rreq_id[i], in_process=True)
 
-        self.lsq_wrapper_str += (
-            "\n"
-            + "\t" * (self.tab_level + 2)
-            + "if "
-            + io_storeEn.getNameWrite()
-            + " = '1' then\n"
-        )
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("else"))
+        em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 3), "'1'")
-            self.lsq_wrapper_str += OpTab(wresp_id[i],
-                                          (self.tab_level + 3), rreq_id[i])
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + "else\n"
-
-        for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 3), "'0'")
-
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + "end if;\n"
-            + "\t" * 2
-            + "end if;\n"
-            + "\tend process;\n"
-        )
-
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end process;"))
 
         ###
         # Instantiate the LSQ_core module
         ###
-        self.lsq_wrapper_str += "\t-- Instantiate the core LSQ logic\n"
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level)
-            + f"{self.lsq_name}_core : entity work.{self.lsq_name}_core\n"
-        )
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + f"port map(\n"
+        em.add_comment("Instantiate the core LSQ logic")
+        em.start_instantiation(self.lsq_name + "_core")
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"rst => reset,\n"
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"clk => clock,\n"
+        em.add_map("rst", "reset")
+        em.add_map("clk", "clock")
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"wreq_data_0_o => {io_storeData.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"wreq_addr_0_o => {io_storeAddr.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"wreq_valid_0_o => {io_storeEn.getNameWrite()},\n"
-        )
+        em.add_map("empty_o")
+        em.add_map("wreq_data_0_o", io_storeData.getNameWrite())
+        em.add_map("wreq_addr_0_o", io_storeAddr.getNameWrite())
+        em.add_map("wreq_valid_0_o", io_storeEn.getNameWrite())
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"rresp_data_0_i => {io_loadData.getNameRead()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"rreq_addr_0_o => {io_loadAddr.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"rreq_valid_0_o => {io_loadEn.getNameWrite()},\n"
-        )
+        em.add_map("rresp_data_0_i", io_loadData.getNameRead())
+        em.add_map("rreq_addr_0_o", io_loadAddr.getNameWrite())
+        em.add_map("rreq_valid_0_o", io_loadEn.getNameWrite())
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"memStart_ready_o => {io_memStart_ready.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"memStart_valid_i => {io_memStart_valid.getNameRead()},\n"
-        )
+        em.add_map("memStart_ready_o", io_memStart_ready.getNameWrite())
+        em.add_map("memStart_valid_i", io_memStart_valid.getNameRead())
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"ctrlEnd_ready_o => {io_ctrlEnd_ready.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"ctrlEnd_valid_i => {io_ctrlEnd_valid.getNameRead()},\n"
-        )
-
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"memEnd_ready_i => {io_memEnd_ready.getNameRead()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"memEnd_valid_o => {io_memEnd_valid.getNameWrite()},\n"
-        )
+        em.add_map("ctrlEnd_ready_o", io_ctrlEnd_ready.getNameWrite())
+        em.add_map("ctrlEnd_valid_i", io_ctrlEnd_valid.getNameRead())
+        em.add_map("memEnd_ready_i", io_memEnd_ready.getNameRead())
+        em.add_map("memEnd_valid_o", io_memEnd_valid.getNameWrite())
 
         for i in range(self.lsq_config.numGroups):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"group_init_valid_{i}_i => {io_ctrl_valid[i].getNameRead()},\n"
-            )
-
+            em.add_map(f"group_init_ready_{i}_o", io_ctrl_ready[i].getNameWrite())
+            em.add_map(f"group_init_valid_{i}_i", io_ctrl_valid[i].getNameRead())
         for i in range(self.lsq_config.numLdPorts):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_addr_ready_{i}_o => {io_ldAddr_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_addr_valid_{i}_i => {io_ldAddr_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_addr_{i}_i => {io_ldAddr_bits[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_data_ready_{i}_i => {io_ldData_ready[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_data_valid_{i}_o => {io_ldData_valid[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_data_{i}_o => {io_ldData_bits[i].getNameWrite()},\n"
-            )
+            em.add_map(f"ldp_addr_ready_{i}_o", io_ldAddr_ready[i].getNameWrite())
+            em.add_map(f"ldp_addr_valid_{i}_i", io_ldAddr_valid[i].getNameRead())
+            em.add_map(f"ldp_addr_{i}_i", io_ldAddr_bits[i].getNameRead())
+            em.add_map(f"ldp_data_ready_{i}_i", io_ldData_ready[i].getNameRead())
+            em.add_map(f"ldp_data_valid_{i}_o", io_ldData_valid[i].getNameWrite())
+            em.add_map(f"ldp_data_{i}_o", io_ldData_bits[i].getNameWrite())
 
         for i in range(self.lsq_config.numStPorts):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_addr_ready_{i}_o => {io_stAddr_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_addr_valid_{i}_i => {io_stAddr_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_addr_{i}_i => {io_stAddr_bits[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_data_ready_{i}_o => {io_stData_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_data_valid_{i}_i => {io_stData_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n"
-            )
+            em.add_map(f"stp_addr_ready_{i}_o", io_stAddr_ready[i].getNameWrite())
+            em.add_map(f"stp_addr_valid_{i}_i", io_stAddr_valid[i].getNameRead())
+            em.add_map(f"stp_addr_{i}_i", io_stAddr_bits[i].getNameRead())
+            em.add_map(f"stp_data_ready_{i}_o", io_stData_ready[i].getNameWrite())
+            em.add_map(f"stp_data_valid_{i}_i", io_stData_valid[i].getNameRead())
+            em.add_map(f"stp_data_{i}_i", io_stData_bits[i].getNameRead())
 
         # Define all AXI ports, we assume there is only 1 channel
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rreq_ready_{i}_i => {rreq_ready[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rresp_valid_{i}_i => {rresp_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rresp_id_{i}_i => {rresp_id[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rreq_id_0_o => {rreq_id[i].getNameWrite()},\n"
-            )
+            em.add_map(f"rreq_ready_{i}_i", rreq_ready[i].getNameRead())
+            em.add_map(f"rresp_valid_{i}_i", rresp_valid[i].getNameRead())
+            em.add_map(f"rresp_ready_{i}_o")
+            em.add_map(f"rresp_id_{i}_i", rresp_id[i].getNameRead())
+            em.add_map(f"rreq_id_0_o", rreq_id[i].getNameWrite())
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wreq_ready_{i}_i => {wreq_ready[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wresp_valid_{i}_i => {wresp_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wresp_id_{i}_i => {wresp_id[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wreq_id_{i}_o => {wreq_id[i].getNameWrite()}\n"
-            )
+            em.add_map(f"wreq_ready_{i}_i", wreq_ready[i].getNameRead())
+            em.add_map(f"wresp_valid_{i}_i", wresp_valid[i].getNameRead())
+            em.add_map(f"wresp_ready_{i}_o")
+            em.add_map(f"wresp_id_{i}_i", wresp_id[i].getNameRead())
+            em.add_map(f"wreq_id_{i}_o", wreq_id[i].getNameWrite())
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + ");\n"
-
-        # End module definition
-        self.lsq_wrapper_str += "end architecture;\n"
+        em.complete_instantiation()
 
         # Write to the file
-        with open(f"{self.output_folder}/{self.lsq_name}.vhd", "w") as file:
-            file.write(self.lsq_wrapper_str)
+        output_str = em.get_definition_str(self.lsq_name)
+        with open(
+            f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", 'w'
+        ) as file:
+            file.write(output_str)
 
-        return self.lsq_wrapper_str
+        return output_str
 
-    def genWrapperSlave(self):
+    def genWrapperSlave(self, em: Emitter):
         """This function generates the desired wrapper for the LSQ"""
-
-        # PART 1: Add library information to the module
-        self.lsq_wrapper_str += self.library_header
-
-        # PART 2: Define the entity
-        self.lsq_wrapper_str += f"entity {self.lsq_name} is\n"
-
-        # PART 3: Add the module port definition
-        self.lsq_wrapper_str += self.port_init_str
 
         ##
         # Define all the IOs
+        em.clock_name = "clock"
+        em.reset_name = "reset"
 
         # io_stDataToMC_bits: output
-        io_storeData = VHDLLogicVecType(
-            "io_stDataToMC_bits", "o", self.lsq_config.dataW
+        io_storeData = LogicVec(
+            em, "io_stDataToMC_bits", 'o', self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_storeData.signalInit()
 
         # io_stAddrToMC_bits: output
-        io_storeAddr = VHDLLogicVecType(
-            "io_stAddrToMC_bits", "o", self.lsq_config.addrW
+        io_storeAddr = LogicVec(
+            em, "io_stAddrToMC_bits", 'o', self.lsq_config.addrW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_storeAddr.signalInit()
 
         # io_ldDataFromMC_bits: input
-        io_loadData = VHDLLogicVecType(
-            "io_ldDataFromMC_bits", "i", self.lsq_config.dataW
+        io_loadData = LogicVec(
+            em, "io_ldDataFromMC_bits", 'i', self.lsq_config.dataW, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_loadData.signalInit()
 
         # io_ldAddrToMC_bits: output
-        io_loadAddr = VHDLLogicVecType(
-            "io_ldAddrToMC_bits", "o", self.lsq_config.addrW)
-        self.lsq_wrapper_str += io_loadAddr.signalInit()
+        io_loadAddr = LogicVec(
+            em, "io_ldAddrToMC_bits", 'o', self.lsq_config.addrW, dyn_comp=True
+        )
 
         # io_ctrl_*_ready: output
-        io_ctrl_ready = VHDLLogicTypeArray(
-            "io_ctrl_ready", "o", self.lsq_config.numGroups
+        io_ctrl_ready = LogicArray(
+            em, "io_ctrl_ready", 'o', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_ready.signalInit()
 
         # io_ctrl_*_valid: input
-        io_ctrl_valid = VHDLLogicTypeArray(
-            "io_ctrl_valid", "i", self.lsq_config.numGroups
+        io_ctrl_valid = LogicArray(
+            em, "io_ctrl_valid", 'i', self.lsq_config.numGroups, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ctrl_valid.signalInit()
 
         # io_ldAddr_*_ready: output
-        io_ldAddr_ready = VHDLLogicTypeArray(
-            "io_ldAddr_ready", "o", self.lsq_config.numLdPorts
+        io_ldAddr_ready = LogicArray(
+            em, "io_ldAddr_ready", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_ready.signalInit()
 
         # io_ldAddr_*_valid: input
-        io_ldAddr_valid = VHDLLogicTypeArray(
-            "io_ldAddr_valid", "i", self.lsq_config.numLdPorts
+        io_ldAddr_valid = LogicArray(
+            em, "io_ldAddr_valid", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldAddr_valid.signalInit()
 
         # io_ldAddr_*_bits: input
-        io_ldAddr_bits = VHDLLogicVecTypeArray(
-            "io_ldAddr_bits", "i", self.lsq_config.numLdPorts, self.lsq_config.addrW
+        io_ldAddr_bits = LogicVecArray(
+            em,
+            "io_ldAddr_bits",
+            'i',
+            self.lsq_config.numLdPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_ldAddr_bits.signalInit()
 
         # io_ldData_*_ready: input
-        io_ldData_ready = VHDLLogicTypeArray(
-            "io_ldData_ready", "i", self.lsq_config.numLdPorts
+        io_ldData_ready = LogicArray(
+            em, "io_ldData_ready", 'i', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_ready.signalInit()
 
         # io_ldData_*_valid: output
-        io_ldData_valid = VHDLLogicTypeArray(
-            "io_ldData_valid", "o", self.lsq_config.numLdPorts
+        io_ldData_valid = LogicArray(
+            em, "io_ldData_valid", 'o', self.lsq_config.numLdPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_ldData_valid.signalInit()
 
         # io_ldData_*_bits: output
-        io_ldData_bits = VHDLLogicVecTypeArray(
-            "io_ldData_bits", "o", self.lsq_config.numLdPorts, self.lsq_config.dataW
+        io_ldData_bits = LogicVecArray(
+            em,
+            "io_ldData_bits",
+            'o',
+            self.lsq_config.numLdPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_ldData_bits.signalInit()
 
         # io_stAddr_ready: output
-        io_stAddr_ready = VHDLLogicTypeArray(
-            "io_stAddr_ready", "o", self.lsq_config.numStPorts
+        io_stAddr_ready = LogicArray(
+            em, "io_stAddr_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_ready.signalInit()
 
         # io_stAddr_valid: input
-        io_stAddr_valid = VHDLLogicTypeArray(
-            "io_stAddr_valid", "i", self.lsq_config.numStPorts
+        io_stAddr_valid = LogicArray(
+            em, "io_stAddr_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stAddr_valid.signalInit()
 
         # io_stAddr_bits: input
-        io_stAddr_bits = VHDLLogicVecTypeArray(
-            "io_stAddr_bits", "i", self.lsq_config.numStPorts, self.lsq_config.addrW
+        io_stAddr_bits = LogicVecArray(
+            em,
+            "io_stAddr_bits",
+            'i',
+            self.lsq_config.numStPorts,
+            self.lsq_config.addrW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_stAddr_bits.signalInit()
 
         # io_stData_ready: output
-        io_stData_ready = VHDLLogicTypeArray(
-            "io_stData_ready", "o", self.lsq_config.numStPorts
+        io_stData_ready = LogicArray(
+            em, "io_stData_ready", 'o', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_ready.signalInit()
 
         # io_stData_valid: input
-        io_stData_valid = VHDLLogicTypeArray(
-            "io_stData_valid", "i", self.lsq_config.numStPorts
+        io_stData_valid = LogicArray(
+            em, "io_stData_valid", 'i', self.lsq_config.numStPorts, dyn_comp=True
         )
-        self.lsq_wrapper_str += io_stData_valid.signalInit()
 
         # io_stData_bits: input
-        io_stData_bits = VHDLLogicVecTypeArray(
-            "io_stData_bits", "i", self.lsq_config.numStPorts, self.lsq_config.dataW
+        io_stData_bits = LogicVecArray(
+            em,
+            "io_stData_bits",
+            'i',
+            self.lsq_config.numStPorts,
+            self.lsq_config.dataW,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += io_stData_bits.signalInit()
 
         # io_ldAddrToMC_ready: input
-        io_ldAddrToMC_ready = VHDLLogicType("io_ldAddrToMC_ready", "i")
-        self.lsq_wrapper_str += io_ldAddrToMC_ready.signalInit()
+        io_ldAddrToMC_ready = Logic(em, "io_ldAddrToMC_ready", 'i', dyn_comp=True)
 
         # io_ldAddrToMC_valid
-        io_ldAddrToMC_valid = VHDLLogicType("io_ldAddrToMC_valid", "o")
-        self.lsq_wrapper_str += io_ldAddrToMC_valid.signalInit()
+        io_ldAddrToMC_valid = Logic(em, "io_ldAddrToMC_valid", 'o', dyn_comp=True)
 
         # io_ldDataFromMC_ready
-        io_ldDataFromMC_ready = VHDLLogicType("io_ldDataFromMC_ready", "o")
-        self.lsq_wrapper_str += io_ldDataFromMC_ready.signalInit()
+        io_ldDataFromMC_ready = Logic(em, "io_ldDataFromMC_ready", 'o', dyn_comp=True)
 
         # io_ldDataFromMC_valid
-        io_ldDataFromMC_valid = VHDLLogicType("io_ldDataFromMC_valid", "i")
-        self.lsq_wrapper_str += io_ldDataFromMC_valid.signalInit()
+        io_ldDataFromMC_valid = Logic(em, "io_ldDataFromMC_valid", 'i', dyn_comp=True)
 
         # io_stAddrToMC_ready
-        io_stAddrToMC_ready = VHDLLogicType("io_stAddrToMC_ready", "i")
-        self.lsq_wrapper_str += io_stAddrToMC_ready.signalInit()
+        io_stAddrToMC_ready = Logic(em, "io_stAddrToMC_ready", 'i', dyn_comp=True)
 
         # io_stAddrToMC_valid
-        io_stAddrToMC_valid = VHDLLogicType("io_stAddrToMC_valid", "o")
-        self.lsq_wrapper_str += io_stAddrToMC_valid.signalInit()
+        io_stAddrToMC_valid = Logic(em, "io_stAddrToMC_valid", 'o', dyn_comp=True)
 
         # io_stDataToMC_ready
-        io_stDataToMC_ready = VHDLLogicType("io_stDataToMC_ready", "i")
-        self.lsq_wrapper_str += io_stDataToMC_ready.signalInit()
+        io_stDataToMC_ready = Logic(em, "io_stDataToMC_ready", 'i', dyn_comp=True)
 
         # io_stDataToMC_valid
-        io_stDataToMC_valid = VHDLLogicType("io_stDataToMC_valid", "o")
-        self.lsq_wrapper_str += io_stDataToMC_valid.signalInit()
+        io_stDataToMC_valid = Logic(em, "io_stDataToMC_valid", 'o', dyn_comp=True)
 
         ##
         # IO Definition finished
         ##
-        self.lsq_wrapper_str += "\n\t);"
-        self.lsq_wrapper_str += "\nend entity;\n\n"
 
         ##
         # Architecture definition start
         ##
-        self.lsq_wrapper_str += f"architecture arch of {self.lsq_name} is\n"
 
         # Define internal signals
-        io_loadEn = VHDLLogicType("io_loadEn", "w")
-        self.lsq_wrapper_str += io_loadEn.signalInit()
+        io_loadEn = Logic(em, "io_loadEn", 'w', dyn_comp=True)
+        io_storeEn = Logic(em, "io_storeEn", 'w', dyn_comp=True)
 
-        io_storeEn = VHDLLogicType("io_storeEn", "w")
-        self.lsq_wrapper_str += io_storeEn.signalInit()
-
-        rresp_id = VHDLLogicVecTypeArray(
-            "rresp_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        rresp_id = LogicVecArray(
+            em,
+            "rresp_id",
+            'w',
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
         )
-        self.lsq_wrapper_str += rresp_id.signalInit()
 
-        wreq_ready = VHDLLogicTypeArray(
-            "wreq_ready", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wreq_ready.signalInit()
-
-        wresp_valid = VHDLLogicTypeArray(
-            "wresp_valid", "w", self.lsq_config.numStMem)
-        self.lsq_wrapper_str += wresp_valid.signalInit()
-
-        wresp_id = VHDLLogicVecTypeArray(
-            "wresp_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        wreq_ready = LogicArray(
+            em,
+            "wreq_ready",
+            'w',
+            self.lsq_config.numStMem,
+            dyn_comp=True,
         )
-        self.lsq_wrapper_str += wresp_id.signalInit()
-
-        rreq_id = VHDLLogicVecTypeArray(
-            "rreq_id", "w", self.lsq_config.numLdMem, self.lsq_config.idW
+        wresp_valid = LogicArray(
+            em,
+            "wresp_valid",
+            'w',
+            self.lsq_config.numStMem,
+            dyn_comp=True,
+            force_reg=True,
         )
-        self.lsq_wrapper_str += rreq_id.signalInit()
-
-        wreq_id = VHDLLogicVecTypeArray(
-            "wreq_id", "w", self.lsq_config.numStMem, self.lsq_config.idW
+        wresp_id = LogicVecArray(
+            em,
+            "wresp_id",
+            'w',
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+            force_reg=True,
         )
-        self.lsq_wrapper_str += wreq_id.signalInit()
 
-        # Begin actual arch logic definition
-        self.lsq_wrapper_str += "begin\n"
+        rreq_id = LogicVecArray(
+            em,
+            "rreq_id",
+            'w',
+            self.lsq_config.numLdMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+        )
+        wreq_id = LogicVecArray(
+            em,
+            "wreq_id",
+            'w',
+            self.lsq_config.numStMem,
+            self.lsq_config.idW,
+            dyn_comp=True,
+        )
 
         # Define the process to update
         # rresp_id
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
-        self.lsq_wrapper_str += "\t-- Process for rresp_id\n"
-        self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * \
-            (self.tab_level + 1) + "if reset = '1' then\n"
+        em.add_comment(
+            "----------------------------------------------------------------------------"
+        )
+        em.add_comment("Process for rresp_id")
+        em.add_statement(em.get_reg_init_str())
+        em.increase_indent()
+        em.add_custom_statement(CustomStatement("if reset = '1' then"))
+        em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(
-                rresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+            em.add_assignment(rresp_id[i], Val(0), in_process=True)
+
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then"))
+        em.increase_indent()
+
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_loadEn.getNameWrite()} = '1' then",
             )
-
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         )
-        self.lsq_wrapper_str += (
-            "\n"
-            + "\t" * (self.tab_level + 2)
-            + "if "
-            + io_loadEn.getNameWrite()
-            + " = '1' then\n"
-        )
+        em.increase_indent()
 
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += OpTab(rresp_id[i],
-                                          (self.tab_level + 3), rreq_id[i])
+            em.add_assignment(rresp_id[i], rreq_id[i], in_process=True)
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + "end if;\n"
-            + "\t" * 2
-            + "end if;\n"
-            + "\tend process;\n"
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end process;"))
+
+        em.add_comment(
+            "--------------------------------------------------------------------------"
         )
-
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
 
         # Define the process to update
         # wresp_valid, wresp_id
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
-        self.lsq_wrapper_str += (
-            "\t-- Process for wreq_ready, wresp_valid and wresp_id\n"
+        em.add_comment(
+            "----------------------------------------------------------------------------"
         )
-        self.lsq_wrapper_str += self.reg_init_str
-        self.lsq_wrapper_str += "\t" * \
-            (self.tab_level + 1) + "if reset = '1' then\n"
+        em.add_comment("Process for wreq_ready, wresp_valid and wresp_id")
+        em.add_statement(em.get_reg_init_str())
+        em.increase_indent()
+        em.add_custom_statement(CustomStatement("if reset = '1' then"))
+        em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 2), "'0'")
-            self.lsq_wrapper_str += OpTab(
-                wresp_id[i], (self.tab_level + 2), "(", "others", "=>", "'0'", ")"
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
+            em.add_assignment(wresp_id[i], Val(0), in_process=True)
+
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("elsif rising_edge(clock) then"))
+        em.increase_indent()
+
+        em.add_comment(
+            "Signals the LSQ core that the store is completed if the MC is ready."
+        )
+        em.add_comment(
+            "NOTE: we assume that MC joins the addr and data, so here we only check the addr ready."
+        )
+        em.add_custom_statement(
+            CustomStatement(
+                f"if {io_storeEn.getNameWrite()} = '1' "
+                f"and {io_stAddrToMC_ready.getNameRead()} = '1' then",
             )
-
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 1) + "elsif rising_edge(clock) then\n"
         )
-
-        self.lsq_wrapper_str += "\t-- Signals the LSQ core that the store is completed if the MC is ready.\n"
-        self.lsq_wrapper_str += "\t-- NOTE: we assume that MC joins the addr and data, so here we only check the addr ready.\n"
-        self.lsq_wrapper_str += (
-            "\n"
-            + "\t" * (self.tab_level + 2)
-            + "if "
-            + io_storeEn.getNameWrite()
-            + " = '1'" + " and " + io_stAddrToMC_ready.getNameRead() + " = '1' then\n"
-        )
+        em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 3), "'1'")
-            self.lsq_wrapper_str += OpTab(wresp_id[i],
-                                          (self.tab_level + 3), rreq_id[i])
+            em.add_assignment(wresp_valid[i], Bit(1), in_process=True)
+            em.add_assignment(wresp_id[i], rreq_id[i], in_process=True)
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + "else\n"
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("else"))
+        em.increase_indent()
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += OpTab(wresp_valid[i],
-                                          (self.tab_level + 3), "'0'")
+            em.add_assignment(wresp_valid[i], Bit(0), in_process=True)
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + "end if;\n"
-            + "\t" * 2
-            + "end if;\n"
-            + "\tend process;\n"
-        )
-
-        self.lsq_wrapper_str += "\t----------------------------------------------------------------------------\n"
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end if;"))
+        em.decrease_indent()
+        em.add_custom_statement(CustomStatement("end process;"))
 
         ###
         # Signal Assignment
         ###
-        self.lsq_wrapper_str += "\t-- Signal Assignment\n"
-        self.lsq_wrapper_str += OpTab(io_ldAddrToMC_valid,
-                                      self.tab_level, io_loadEn)
-        self.lsq_wrapper_str += OpTab(io_stAddrToMC_valid,
-                                      self.tab_level, io_storeEn)
-        self.lsq_wrapper_str += OpTab(io_stDataToMC_valid,
-                                      self.tab_level, io_storeEn)
-        self.lsq_wrapper_str += OpTab(
-            wreq_ready[0],
-            self.tab_level,
-            io_stAddrToMC_ready,
-            "and",
-            io_stDataToMC_ready,
-        )
+        em.add_comment("Signal Assignment")
+        em.add_assignment(io_ldAddrToMC_valid, io_loadEn)
+        em.add_assignment(io_stAddrToMC_valid, io_storeEn)
+        em.add_assignment(io_stDataToMC_valid, io_storeEn)
+        em.add_assignment(wreq_ready[0], io_stAddrToMC_ready & io_stDataToMC_ready)
 
         ###
         # Instantiate the LSQ_core module
         ###
-        self.lsq_wrapper_str += "\t-- Instantiate the core LSQ logic\n"
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level)
-            + f"{self.lsq_name}_core : entity work.{self.lsq_name}_core\n"
-        )
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + f"port map(\n"
+        em.add_comment("Instantiate the core LSQ logic")
+        em.start_instantiation(self.lsq_name + "_core")
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"rst => reset,\n"
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 2) + f"clk => clock,\n"
+        em.add_map("rst", "reset")
+        em.add_map("clk", "clock")
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"wreq_data_0_o => {io_storeData.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"wreq_addr_0_o => {io_storeAddr.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"wreq_valid_0_o => {io_storeEn.getNameWrite()},\n"
-        )
+        em.add_map("wreq_data_0_o", io_storeData.getNameWrite())
+        em.add_map("wreq_addr_0_o", io_storeAddr.getNameWrite())
+        em.add_map("wreq_valid_0_o", io_storeEn.getNameWrite())
 
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"rresp_data_0_i => {io_loadData.getNameRead()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"rreq_addr_0_o => {io_loadAddr.getNameWrite()},\n"
-        )
-        self.lsq_wrapper_str += (
-            "\t" * (self.tab_level + 2)
-            + f"rreq_valid_0_o => {io_loadEn.getNameWrite()},\n"
-        )
+        em.add_map("rresp_data_0_i", io_loadData.getNameRead())
+        em.add_map("rreq_addr_0_o", io_loadAddr.getNameWrite())
+        em.add_map("rreq_valid_0_o", io_loadEn.getNameWrite())
 
         for i in range(self.lsq_config.numGroups):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"group_init_ready_{i}_o => {io_ctrl_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"group_init_valid_{i}_i => {io_ctrl_valid[i].getNameRead()},\n"
-            )
+            em.add_map(f"group_init_ready_{i}_o", io_ctrl_ready[i].getNameWrite())
+            em.add_map(f"group_init_valid_{i}_i", io_ctrl_valid[i].getNameRead())
 
         for i in range(self.lsq_config.numLdPorts):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_addr_ready_{i}_o => {io_ldAddr_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_addr_valid_{i}_i => {io_ldAddr_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_addr_{i}_i => {io_ldAddr_bits[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_data_ready_{i}_i => {io_ldData_ready[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_data_valid_{i}_o => {io_ldData_valid[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"ldp_data_{i}_o => {io_ldData_bits[i].getNameWrite()},\n"
-            )
+            em.add_map(f"ldp_addr_ready_{i}_o", io_ldAddr_ready[i].getNameWrite())
+            em.add_map(f"ldp_addr_valid_{i}_i", io_ldAddr_valid[i].getNameRead())
+            em.add_map(f"ldp_addr_{i}_i", io_ldAddr_bits[i].getNameRead())
+            em.add_map(f"ldp_data_ready_{i}_i", io_ldData_ready[i].getNameRead())
+            em.add_map(f"ldp_data_valid_{i}_o", io_ldData_valid[i].getNameWrite())
+            em.add_map(f"ldp_data_{i}_o", io_ldData_bits[i].getNameWrite())
 
         for i in range(self.lsq_config.numStPorts):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_addr_ready_{i}_o => {io_stAddr_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_addr_valid_{i}_i => {io_stAddr_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_addr_{i}_i => {io_stAddr_bits[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_data_ready_{i}_o => {io_stData_ready[i].getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_data_valid_{i}_i => {io_stData_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"stp_data_{i}_i => {io_stData_bits[i].getNameRead()},\n"
-            )
+            em.add_map(f"stp_addr_ready_{i}_o", io_stAddr_ready[i].getNameWrite())
+            em.add_map(f"stp_addr_valid_{i}_i", io_stAddr_valid[i].getNameRead())
+            em.add_map(f"stp_addr_{i}_i", io_stAddr_bits[i].getNameRead())
+            em.add_map(f"stp_data_ready_{i}_o", io_stData_ready[i].getNameWrite())
+            em.add_map(f"stp_data_valid_{i}_i", io_stData_valid[i].getNameRead())
+            em.add_map(f"stp_data_{i}_i", io_stData_bits[i].getNameRead())
 
         # Define all AXI ports, we assume there is only 1 channel
         for i in range(self.lsq_config.numLdMem):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rreq_ready_{i}_i => {io_ldAddrToMC_ready.getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rresp_valid_{i}_i => {io_ldDataFromMC_valid.getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rresp_ready_{i}_o => {io_ldDataFromMC_ready.getNameWrite()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rresp_id_{i}_i => {rresp_id[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"rreq_id_0_o => {rreq_id[i].getNameWrite()},\n"
-            )
+            em.add_map(f"rreq_ready_{i}_i", io_ldAddrToMC_ready.getNameRead())
+            em.add_map(f"rresp_valid_{i}_i", io_ldDataFromMC_valid.getNameRead())
+            em.add_map(f"rresp_ready_{i}_o", io_ldDataFromMC_ready.getNameWrite())
+            em.add_map(f"rresp_id_{i}_i", rresp_id[i].getNameRead())
+            em.add_map(f"rreq_id_0_o", rreq_id[i].getNameWrite())
 
         for i in range(self.lsq_config.numStMem):
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wreq_ready_{i}_i => {wreq_ready[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wresp_valid_{i}_i => {wresp_valid[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wresp_id_{i}_i => {wresp_id[i].getNameRead()},\n"
-            )
-            self.lsq_wrapper_str += (
-                "\t" * (self.tab_level + 2)
-                + f"wreq_id_{i}_o => {wreq_id[i].getNameWrite()}\n"
-            )
+            em.add_map(f"wreq_ready_{i}_i", wreq_ready[i].getNameRead())
+            em.add_map(f"wresp_valid_{i}_i", wresp_valid[i].getNameRead())
+            em.add_map(f"wresp_id_{i}_i", wresp_id[i].getNameRead())
+            em.add_map(f"wreq_id_{i}_o", wreq_id[i].getNameWrite())
 
-        self.lsq_wrapper_str += "\t" * (self.tab_level + 1) + ");\n"
-
-        # End module definition
-        self.lsq_wrapper_str += "end architecture;\n"
+        em.complete_instantiation()
 
         # Write to the file
-        with open(f"{self.output_folder}/{self.lsq_name}.vhd", "w") as file:
-            file.write(self.lsq_wrapper_str)
+        output_str = em.get_definition_str(self.lsq_name)
+        with open(
+            f"{self.output_folder}/{self.lsq_name}.{em.get_file_suffix()}", 'w'
+        ) as file:
+            file.write(output_str)
 
-        return self.lsq_wrapper_str
+        return output_str
 
 
 # ===----------------------------------------------------------------------===#
@@ -1113,20 +904,22 @@ def main():
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
 
+    emitter = VHDLEmitter()
+
     # Parse the config file
     lsqConfig = GetConfigs(args.config_files)
 
     # STEP 1: Generate the desired core lsq logic
-    codeGen(args.output_path, lsqConfig)
+    codeGen(emitter.new(), args.output_path, lsqConfig)
 
     # STEP 2: Generate the wrapper to be connected with circuits generated by Dynamatic
     lsq_wrapper_module = LSQWrapper(args.output_path, "_wrapper", lsqConfig)
 
     # Step 3: Generate the corresponding wrapper based on the config.master
     if lsqConfig.master:
-        lsq_wrapper_module.genWrapper()
+        lsq_wrapper_module.genWrapper(emitter)
     else:
-        lsq_wrapper_module.genWrapperSlave()
+        lsq_wrapper_module.genWrapperSlave(emitter)
 
 
 if __name__ == "__main__":
