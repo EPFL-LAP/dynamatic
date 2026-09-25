@@ -283,9 +283,11 @@ public:
   TransferFnArray<ast::ScalarParameter>
   getFreshScalarParameterTransferFns() override {
     return {
-        copyFromInput<ast::ScalarParameter>(),
-        OutputTransferFn<ast::ScalarParameter, INPUT_DEPENDENCY>(
-            [](const ast::ScalarParameter &, ParamTypingContext context) {
+        defaultTransferFn<ast::ScalarParameter>(),
+        defaultOutputTransferFn<ast::ScalarParameter>().wrap(
+            [](llvm::function_ref<ParamTypingContext()> wrapped,
+               const ast::ScalarParameter &) {
+              ParamTypingContext context = wrapped();
               context.numScalarParam++;
               return context;
             }),
@@ -300,10 +302,12 @@ public:
   TransferFnArray<ast::ArrayParameter>
   getFreshArrayParameterTransferFns() override {
     return {
-        /*element type=*/copyFromInput<ast::ArrayParameter>(),
-        /*dimension=*/copyFromInput<ast::ArrayParameter>(),
-        OutputTransferFn<ast::ArrayParameter, INPUT_DEPENDENCY>(
-            [](const ast::ArrayParameter &, ParamTypingContext context) {
+        /*element type=*/defaultTransferFn<ast::ArrayParameter>(),
+        /*dimension=*/defaultTransferFn<ast::ArrayParameter>(),
+        defaultOutputTransferFn<ast::ArrayParameter>().wrap(
+            [](llvm::function_ref<ParamTypingContext()> wrapped,
+               const ast::ArrayParameter &) {
+              ParamTypingContext context = wrapped();
               context.numArrayParam++;
               return context;
             }),
