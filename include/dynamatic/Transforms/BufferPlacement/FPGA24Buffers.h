@@ -31,6 +31,7 @@
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
+#include "llvm/ADT/MapVector.h"
 #include <list>
 #include <vector>
 
@@ -104,11 +105,11 @@ private:
   /// CFDFCs needed for cylce constraints.
   std::vector<CFDFC *> cfdfcs;
 
-  /// Computed minimum feasible Initiation Interval across all CFDFCs (set by
-  /// addCycleTimeConstraints).
+  /// Best-possible II across all CFDFCs (Equation 5 upper bound; set by
+  /// addCycleTimeConstraints). Not a forced common cycle latency.
   double computedII = 1.0;
 
-  /// Computed minimum feasible Initiation Interval per CFDFC.
+  /// Best-possible II per CFDFC, passed to occupancy LP2 as II_CFC.
   llvm::MapVector<CFDFC *, double> computedCFDFCIIs;
 
   /// Setups the entire MILP, creating all variables, constraints, and setting
@@ -140,7 +141,19 @@ private:
   std::vector<ReconvergentPathWithGraph> reconvergentPaths;
   std::vector<CFDFC *> cfdfcs;
 
-  llvm::MapVector<Value, CPVar> channelOccupancy;
+  /// N^c_max (Paper: Section 5, Table 2): Maximal token occupancy on channel c.
+  llvm::MapVector<Value, CPVar> maxChannelOccupancy;
+
+  /// N^c_{CFC_i} (Paper: Section 5, Table 2 / Equation 8):
+  /// Token occupancy on channel c required by CFDFC i.
+  /// In equation 13, we take the maximum across all CFDFCs and put them into
+  /// maxChannelOccupancy.
+  llvm::MapVector<CFDFC *, llvm::MapVector<Value, CPVar>> cfdfcChannelOccupancy;
+
+  /// N^u_{CFC_i} (Paper: Section 5, Equation 9):
+  /// Token occupancy on unit u required by CFDFC i.
+  llvm::MapVector<CFDFC *, llvm::MapVector<Operation *, CPVar>>
+      cfdfcUnitOccupancy;
 
   void setup();
 
