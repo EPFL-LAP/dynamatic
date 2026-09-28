@@ -113,8 +113,9 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
 
   - **signals.py**  
     Defines the four signal classes:  `Logic`, `LogicVec`, `LogicArray`, `LogicVecArray`.
-    Pass `dyn_comp=True` to drop the `_i`/`_o` port suffixes, which the LSQ
-    wrapper needs to match the port names used by Dynamatic.
+    Pass `custom_suffix` (e.g. `'_ready'`) to replace the default `_i`/`_o` port
+    suffix; it is appended after any array index (`io_ctrl` becomes `io_ctrl_0_ready`).
+    The LSQ wrapper uses this to match the port names used by Dynamatic.
 
   - **core_gen/operators/**  
     Low-level functions that generate snippets:  
