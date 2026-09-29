@@ -52,6 +52,7 @@ F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
+F_CF_EE_MARKED="$COMP_DIR/cf_ee_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
 F_HANDSHAKE="$COMP_DIR/handshake.mlir"
@@ -59,6 +60,7 @@ F_EAGERLYELASTIC="$COMP_DIR/handshake_eagerlyelastic.mlir"
 F_HANDSHAKE_TRANSFORMED="$COMP_DIR/handshake_transformed.mlir"
 F_HANDSHAKE_SPECULATION="$COMP_DIR/handshake_speculation.mlir"
 F_HANDSHAKE_BUFFERED="$COMP_DIR/handshake_buffered.mlir"
+F_HANDSHAKE_MEM="$OUTPUT_DIR/handshake_mem.mlir"
 F_HANDSHAKE_EXPORT="$COMP_DIR/handshake_export.mlir"
 F_HANDSHAKE_RIGIDIFIED="$COMP_DIR/handshake_rigidified.mlir"
 F_HANDSHAKE_SQ="$COMP_DIR/handshake_sq.mlir"
@@ -259,31 +261,28 @@ fi
 # cf level -> handshake level
 if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
   echo_info "Running FTD algorithm for handshake conversion"
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+
+  if [[ $EAGERLYELASTIC -ne 0 ]]; then
+    echo_info "Marking subloops for eagerly elastic execution"
+    "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
     --mark-subloop \
     --ftd-lower-cf-to-handshake \
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"
+  else
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --ftd-lower-cf-to-handshake \
+    --handshake-combine-steering-logic \
+    > "$F_HANDSHAKE"
+  fi
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
+  
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
 
-# do eager execution
-if [[ $EAGERLYELASTIC -ne 0 ]]; then
-  # error out immediately if FTD is disabled but eagerlyelastic was requested
-  if [[ $FAST_TOKEN_DELIVERY -eq 0 ]]; then
-    echo "Error: Eager execution requires Fast Token Delivery enabled"
-  else
-    "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-      --eagerly-elastic-all="num-rewrite-d=1" \
-      > "$F_EAGERLYELASTIC"
-    exit_on_fail "Failed to apply eager execution" "Applied eager execution"
-    F_HANDSHAKE="$F_EAGERLYELASTIC"
-  fi
-fi
 
 if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
 
@@ -309,10 +308,33 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
     "Applied transformations to handshake"
 
 else
-
-  # handshake transformations
+  
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
-    --handshake-deactivate-mem-dependencies --handshake-replace-memory-interfaces \
+    --handshake-deactivate-mem-dependencies \
+    --handshake-replace-memory-interfaces \
+    > "$F_HANDSHAKE_MEM"
+  exit_on_fail "Failed to replace memory interfaces" \
+    "Replaced memory interfaces"
+  F_HANDSHAKE="$F_HANDSHAKE_MEM"
+
+  # eager execution
+  if [[ $EAGERLYELASTIC -ne 0 ]]; then
+    # error out immediately if FTD is disabled but eagerlyelastic was requested
+    if [[ $FAST_TOKEN_DELIVERY -eq 0 ]]; then
+      echo "Error: Eager execution requires Fast Token Delivery enabled"
+      exit 1
+    else
+      "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
+        --eagerly-elastic-all="num-rewrite-d=1 region-based=true" \
+        > "$F_EAGERLYELASTIC"
+      exit_on_fail "Failed to apply eager execution" \
+        "Applied eager execution"
+      F_HANDSHAKE="$F_EAGERLYELASTIC"
+    fi
+  fi
+
+  # remaining handshake transformations
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
     --handshake-materialize --handshake-infer-basic-blocks \

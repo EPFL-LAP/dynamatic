@@ -134,7 +134,9 @@ def EagerlyElasticAll : Pass<"eagerly-elastic-all", "mlir::ModuleOp"> {
   }];
   let options =
     [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
-            "The number of times that Rewrite D should be applied.">];
+            "The number of times that Rewrite D should be applied.">,
+     Option<"regionBased", "region-based", "bool", "true",
+            "Whether region-based eager execution should also be used.">];
 }
 
 def MarkSubloop : Pass<"mark-subloop", "mlir::ModuleOp"> {
