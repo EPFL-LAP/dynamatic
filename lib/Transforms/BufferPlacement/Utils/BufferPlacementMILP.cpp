@@ -603,8 +603,28 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
 
     // get if the channel is a backedge as an integer
     unsigned backedge = cfdfc.backedges.contains(channel) ? 1 : 0;
+
+    // extra initial token under repeating inits
     unsigned fromRepInit = dyn_cast<handshake::RepeatingInitOp>(srcOp) ? 1 : 0;
 
+    // extra initial token under muxes controlled by cmerges
+    // (only placed by our rewrites for an FTD circuit)
+    unsigned cmergeMuxDataInput = 0;
+
+    // if dst is a mux
+    if (auto muxOp = dyn_cast<handshake::MuxOp>(dstOp)) {
+      auto select = muxOp.getSelectOperand();
+      // if mux select is from a cmerge
+      if (select.getDefiningOp<handshake::ControlMergeOp>() &&
+          // if this input is not a select
+          channel != select &&
+          // and if this input is not a constant
+          !isa_and_present<handshake::ConstantOp>(srcOp)) {
+        // add the initial token
+        cmergeMuxDataInput = 1;
+      }
+    }
+    
     // If the channel isn't a backedge, its steady-state occupancy
     // equals the difference between the fluid retiming variables
     // of the producer and consumer.
