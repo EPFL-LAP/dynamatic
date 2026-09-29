@@ -84,6 +84,34 @@ struct ConvertPredicateOp
   }
 };
 
+struct ConvertRegionInputOp
+    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::RegionInputOp> {
+  using DynOpConversionPattern<dynamatic::cf_extra::RegionInputOp>::DynOpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(dynamatic::cf_extra::RegionInputOp srcOp, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    rewriter.setInsertionPoint(srcOp);
+
+    // Channelify the output type(s)
+    llvm::SmallVector<mlir::Type> newTypes;
+    for (mlir::Type resType : srcOp->getResultTypes())
+      newTypes.push_back(ftd::channelifyType(resType));
+
+    // Create the handshake-level counterpart
+    auto newOp = rewriter.create<handshake::RegionInputOp>(
+        srcOp->getLoc(),
+        newTypes,
+        adaptor.getOperands(),
+        srcOp->getAttrDictionary().getValue()
+    );
+
+    namer.replaceOp(srcOp, newOp);
+    rewriter.replaceOp(srcOp, newOp);
+    return mlir::success();
+  }
+};
+
 struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
   using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
 
@@ -320,6 +348,7 @@ struct FtdCfToHandshakePass
         /*ConvertConstants,*/ AllocaOpConversion, ConvertCalls,
         /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
         ConvertPredicateOp,
+        ConvertRegionInputOp,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,

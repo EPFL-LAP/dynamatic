@@ -31,4 +31,25 @@ def PredicateOp : CFExtra_Op<"predicate", [AllTypesMatch<["data", "result"]>]> {
   }];
 }
 
+def RegionInputOp : CFExtra_Op<"region_input", [AllTypesMatch<["input", "result"]>]> {
+  let summary = "Identity marker operation for values entering an eager subregion";
+  let description = [{
+    A passthrough identity operation used as a marker for values crossing 
+    into a subregion before handshake conversion. It performs no logic 
+    and forwards its operand untouched.
+  }];
+
+  let arguments = (ins
+    AnyType:$input
+  );
+
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $input attr-dict `:` type($input)
+  }];
+}
+
 #endif // CF_EXTRA_OPS_TD

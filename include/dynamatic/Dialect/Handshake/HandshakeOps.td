@@ -2071,5 +2071,52 @@ def RepeatingInitOp : Handshake_Op<"repeating_init", [
   }];
 }
 
+def RegionInputOp : Handshake_Op<"region_input", [
+  Pure,
+  SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Marker node for tokens entering an eager subregion.";
+  let description = [{
+    The region_input operation acts as an identity channel marker for data 
+    entering an eager subregion. It carries the handshake channel unaltered 
+    and indicates the placement point for input suppressors before subregion 
+    logic.
+
+    Example:
+
+    ```mlir
+    %outs = handshake.region_input %ins : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$ins);
+  let results = (outs HandshakeType:$outs);
+
+  let assemblyFormat = [{
+    $ins attr-dict `:` custom<HandshakeType>(type($ins))
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    RegionInputOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getIns().getType())}
+      };
+    }
+  }];
+}
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD
