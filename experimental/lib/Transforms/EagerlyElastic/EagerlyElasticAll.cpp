@@ -141,6 +141,13 @@ void EagerlyElasticAllPass::applyRewriteXAsOftenAsPossible(
           if (isEligibleForBypass(branchOp, user) == BypassResult::Ineligible) {
             continue;
           }
+          auto nameAttr = user->getAttrOfType<mlir::StringAttr>("handshake.name");
+          if (nameAttr && nameAttr.getValue() == "constant21") { // mux18
+            continue;
+          }
+          if (nameAttr && nameAttr.getValue() == "constant22") { // mux18
+            continue;
+          }
           frontierUpdated = true;
           moveSuppressorPastOp(branchOp, user, frontier, namer);
           break;
@@ -342,15 +349,23 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
             // check whether the suppressor is connected to path A of the mux
             if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
               auto nameAttr = mux->getAttrOfType<mlir::StringAttr>("handshake.name");
+              /* if (nameAttr && nameAttr.getValue() == "mux1") { // mux18
+                applyRewriteD(mux, branchOp, init, frontier, namer);
+                // return;
+              } */
+              if (nameAttr && nameAttr.getValue() == "mux7") { // mux18
+                applyRewriteD(mux, branchOp, init, frontier, namer);
+                // return;
+              }
+              /* if (nameAttr && nameAttr.getValue() == "mux4") { // mux18
+                applyRewriteD(mux, branchOp, init, frontier, namer);
+                // return;
+              } */
               if (nameAttr && nameAttr.getValue() == "mux3") { // mux18
                 applyRewriteD(mux, branchOp, init, frontier, namer);
                 // return;
               }
-              if (nameAttr && nameAttr.getValue() == "mux4") { // mux18
-                applyRewriteD(mux, branchOp, init, frontier, namer);
-                // return;
-              }
-              if (nameAttr && nameAttr.getValue() == "mux7") { // mux18
+              if (nameAttr && nameAttr.getValue() == "mux5") { // mux18
                 applyRewriteD(mux, branchOp, init, frontier, namer);
                 // return;
               }
@@ -382,170 +397,128 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
   SmallVector<handshake::ConditionalBranchOp> initialFrontier(frontier.begin(),
                                                               frontier.end());
 
-  auto infoArray = modOp->getAttrOfType<ArrayAttr>(SUBLOOP_INFO_ATTR);
+  auto infoArray = modOp->getAttrOfType<ArrayAttr>(SUBREG_INFO_ATTR);
   if (!infoArray || infoArray.empty()) return;
 
   for (auto branchOp : initialFrontier) {
     for (auto *user : branchOp.getFalseResult().getUsers()) {
       DictionaryAttr matchedRegionDict = nullptr;
       auto mux = dyn_cast<handshake::MuxOp>(user);
-      auto targetBranch = dyn_cast<handshake::ConditionalBranchOp>(user);
+      auto inputMarker = dyn_cast<handshake::RegionInputOp>(user);
       int targetHeaderBB = 0;
       int muxBB;
 
+      // ------- Check whether we are at the start of an eligible region -------
       if (mux) {
         // check that we wouldn't apply another rewrite
         if (mux.getDataOperands()[1] == branchOp.getFalseResult()) continue;
 
         // check that it's an actual loop mux
         if (!isa<handshake::InitOp>(mux.getSelectOperand().getDefiningOp())) continue;
-        llvm::errs() << "survived loop\n";
+
         // check that this branch is a header and find matching entry
         muxBB = mux->getAttrOfType<IntegerAttr>(HANDSHAKEBB).getInt();
         for (Attribute attr : infoArray) {
           auto dict = dyn_cast<DictionaryAttr>(attr);
-          auto successorBBsArray = dict.getAs<ArrayAttr>("successor_bbs");
+          auto successorBBsArray = dict.getAs<ArrayAttr>(SUCCESSOR_BBS);
           if (!successorBBsArray || successorBBsArray.size() != 1) continue;
 
           // Check only the first successor entry in the array
           int firstSuccBB = cast<IntegerAttr>(successorBBsArray[0]).getInt();
           if (muxBB && firstSuccBB == muxBB) {
             matchedRegionDict = dict;
+            llvm::errs() << "found mux\n";
             break;
           }
         }
-      } else if (targetBranch) {
-        // verify the targetBranch is marked with subloop_header_bb
-        auto subloopHeaderBBAttr = targetBranch->getAttrOfType<IntegerAttr>("subloop_header_bb");
-        if (!subloopHeaderBBAttr)
+      } else if (inputMarker) {
+        // verify the marker has a handshake.bb attribute
+        auto markerBBAttr = inputMarker->getAttrOfType<IntegerAttr>("handshake.bb");
+        if (!markerBBAttr)
           continue;
 
-        // ensure branchOp is NOT the condition operand of targetBranch
-        Value targetCond = targetBranch.getConditionOperand();
-        if (targetCond.getDefiningOp() == branchOp)
-          continue;
-
-        // find matching subloop entry
-        targetHeaderBB = subloopHeaderBBAttr.getInt();
+        // find matching subregion entry
         for (Attribute attr : infoArray) {
           auto dict = dyn_cast<DictionaryAttr>(attr);
           if (!dict) continue;
-          auto headerBBAttr = dict.getAs<IntegerAttr>("header_bb");
-          if (headerBBAttr && headerBBAttr.getInt() == targetHeaderBB) {
+          auto entryBBAttr = dict.getAs<IntegerAttr>(ENTRY_BB);
+          if (!entryBBAttr) continue;
+          if (entryBBAttr.getValue() == markerBBAttr.getValue()) {
             matchedRegionDict = dict;
+            targetHeaderBB = markerBBAttr.getInt();
+            llvm::errs() << "found inputmarker\n";
             break;
           }
         }
-        llvm::errs() << "branchOp: ";
-        branchOp.dump();
-        llvm::errs() << "targetBranch: ";
-        targetBranch.dump();
       }
 
       if (!matchedRegionDict) continue;
       llvm::errs() << "found matching region dict!\n";
+      llvm::errs() << "branchOp: ";
+      branchOp.dump();
 
-      // check that the frontier doesn't get broken
+      // ------- Check that the frontier doesn't get broken -------
       bool frontierValid = true;
       llvm::DenseSet<handshake::ConditionalBranchOp> branchesToDelete = {branchOp};
+      
+      // collect all incomingValues that also go into the next block
+      SmallVector<Value> incomingValues;
+      Block *currentBlock = mux ? mux->getBlock() : inputMarker->getBlock();
+
       if (mux) {
-      Block *currentBlock = mux->getBlock();
-      for (Operation &op : *currentBlock) {
-        auto otherMux = dyn_cast<handshake::MuxOp>(&op);
-        if (!otherMux || otherMux == mux)
-          continue;
-        
-        if (otherMux->getAttrOfType<mlir::IntegerAttr>("handshake.bb").getInt() != muxBB)
-          continue;
+        for (Operation &op : *currentBlock) {
+          if (&op == mux || !isa<handshake::MuxOp, handshake::ControlMergeOp>(&op))
+            continue;
 
-        otherMux.dump();
+          // only look at muxes / cmerges in this basic block
+          auto bbAttr = op.getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+          if (!bbAttr || bbAttr.getInt() != muxBB)
+            continue;
 
-        // Check input for this Mux (not the loop backedge, that would be 1)
-        Value operand = otherMux.getDataOperands()[0];
-        operand.dump();
-
-        // is it a sourced value
-        if (dyn_cast<handshake::ConstantOp>(operand.getDefiningOp())) {
-          llvm::errs() << "comes from constant\n";
-          continue;
+          // check input for this Mux (not the loop backedge, that would be 1)
+          if (auto muxOp = dyn_cast<handshake::MuxOp>(&op))
+            incomingValues.push_back(muxOp.getDataOperands()[0]);
+          else if (auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(&op))
+            incomingValues.push_back(cmergeOp.getDataOperands()[0]);
         }
+      } else {
+        for (auto markerOp : currentBlock->getOps<handshake::RegionInputOp>()) {
+          // only look at markers in this basic block
+          auto bbAttr = markerOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+          if (!bbAttr || bbAttr.getInt() != targetHeaderBB)
+            continue;
 
+          incomingValues.push_back(markerOp->getOperand(0));
+        }
+      }
+
+      // check that all incomingValues have a suppressor in front
+      // of them with the same condition as branchOp (or are sourced/valid).
+      for (Value operand : incomingValues) {
         Operation *defOp = operand.getDefiningOp();
-        if (!defOp) {
-          frontierValid = false;
-          break;
-        }          
-
+        
         // is it a sibling conditional branch with a matching condition
         if (auto siblingBranch = dyn_cast<handshake::ConditionalBranchOp>(defOp)) {
-          Value currentCond = branchOp.getConditionOperand();
-          if (checkConditionsMatch(currentCond, 
+          // check whether condition matches
+          if (!checkConditionsMatch(branchOp.getConditionOperand(), 
                                       siblingBranch.getConditionOperand(), true)) {
-            branchesToDelete.insert(siblingBranch);
-            llvm::errs() << "conditions match\n";
-            continue;
-          } else {
-            auto nameAttr = siblingBranch->getAttrOfType<mlir::StringAttr>("handshake.name");
-              if (nameAttr && nameAttr.getValue() =="cond_br4") { // mux18
-                branchesToDelete.insert(siblingBranch);
-              }
-          }
-        }
-        frontierValid = false;
-        // break;
-      
-      } 
-      } else {
-        // check whether all branches with the correct subloop_header_bb attribute have a cond_br
-        // in front of them with the same condition as the branchOp. They have to be deleted later
-        Value currentCond = branchOp.getConditionOperand();
-        for (auto otherBranch : initialFrontier) {
-          // make sure the branch I'm looking at has a subloop_header_bb attribute of correct no.
-          auto headerBBAttr = otherBranch->getAttrOfType<IntegerAttr>("subloop_header_bb");
-          if (!headerBBAttr || headerBBAttr.getInt() != targetHeaderBB)
-            continue;
-
-          Value condVal = otherBranch.getConditionOperand();
-          Operation *condDefOp = condVal.getDefiningOp();
-
-          // step past a NotIOp if present
-          if (auto notOp = dyn_cast_or_null<handshake::NotIOp>(condDefOp)) {
-            condVal = notOp.getOperand();
-            condDefOp = condVal.getDefiningOp();
-          }
-
-          Value dataVal = otherBranch.getDataOperand();
-
-          for (Operation *defOp : {condDefOp, dataVal.getDefiningOp()}) {
-            if (auto siblingBranch = dyn_cast_or_null<handshake::ConditionalBranchOp>(
-                    defOp)) {
-              if (siblingBranch == branchOp)
-                continue;
-
-              // check whether condition matches
-              if (!checkConditionsMatch(currentCond,
-                                        siblingBranch.getConditionOperand(), true)) {
-                llvm::errs() << "conditions do not match...\n";
-                otherBranch.dump();
-                frontierValid = false;
-                break;
-              }
-              branchesToDelete.insert(siblingBranch);
-            } else if (!isSourced(dataVal)) {
-              // if (!isa<handshake::ConstantOp>(dataVal.getDefiningOp())) {
-              llvm::errs() << "not sourced\n";
-              otherBranch.dump();
-              frontierValid = false;
-              break; // }
-            }
-          }
-          if (!frontierValid) break;
+            llvm::errs() << "conditions do not match...\n";
+            siblingBranch.dump();
+            frontierValid = false;
+            break;
+          } 
+          branchesToDelete.insert(siblingBranch);
+        } else if (!isSourced(operand)) {
+          llvm::errs() << "not sourced\n";
+          if (defOp) defOp->dump();
+          frontierValid = false;
+          break;
         }
       }
 
       if (!frontierValid) {
         llvm::errs() << "frontier invalid!\n";
-        // continue;
+        continue;
       } 
 
       llvm::errs() << "branches to delete:\n";
@@ -553,9 +526,10 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         branch.dump();
       }
 
+      // ------- Start Actual Moving Past! --------
       auto stores = matchedRegionDict.getAs<BoolAttr>(STORES);
       auto entryOpsArray = matchedRegionDict.getAs<ArrayAttr>(ENTRY_OPS);
-      auto headerBB = matchedRegionDict.getAs<IntegerAttr>(HEADER_BB);
+      auto headerBB = matchedRegionDict.getAs<IntegerAttr>(ENTRY_BB);
       Value condition = branchOp.getConditionOperand();
       llvm::errs() << "start moving past subblocks after headerbb" << headerBB.getInt() << "\n";
 
@@ -625,7 +599,7 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
       for (auto muxBranchOp : branchesToDelete) {
         Value falseResult = muxBranchOp.getFalseResult();
         Value dataOperand = muxBranchOp.getDataOperand();
-        auto branchBB = muxBranchOp->getAttrOfType<mlir::IntegerAttr>("handshake.bb");
+        auto branchBB = muxBranchOp->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
 
         // find and update all downstream Muxes consuming this specific branch
         for (OpOperand &use : llvm::make_early_inc_range(falseResult.getUses())) {
@@ -635,9 +609,16 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
           Operation *owner = use.getOwner();
 
           if (auto targetMux = dyn_cast<handshake::MuxOp>(use.getOwner())) {
-            auto targetBB = targetMux->getAttrOfType<mlir::IntegerAttr>("handshake.bb");
+            auto targetBB = targetMux->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
             if (branchBB && targetBB && branchBB.getInt() != targetBB.getInt()) {
               llvm::errs() << "replaced mux\n";
+              use.set(dataOperand);
+            }
+          }
+          if (auto targetCMerge = dyn_cast<handshake::ControlMergeOp>(use.getOwner())) {
+            auto targetBB = targetCMerge->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
+            if (branchBB && targetBB && branchBB.getInt() != targetBB.getInt()) {
+              llvm::errs() << "replaced cmerge\n";
               use.set(dataOperand);
             }
           }
@@ -695,30 +676,34 @@ void EagerlyElasticAllPass::runOnOperation() {
 
   // identify and prepare suppressors and return a list of all of them
   auto frontier = prepareSuppressors(funcOp, namer);
-  markMultiSuccessorHeaderBranches(frontier, modOp);
+  // markMultiSuccessorHeaderBranches(frontier, modOp);
 
-  // apply rewrites: A*, E*, F*
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
-  applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteE);
-  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteF);
 
   for (unsigned i = 0; i < 1; i++) {
     applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
-    // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteG);
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   }
   applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD2);
+  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
+  
+  if (regionBased) {
+    llvm::errs() << "regionbased enabled\n";
+    movePastFunctionBlock(frontier, namer, modOp);
+  } else {
+    llvm::errs() << "no region based\n";
+  }
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
 
-  // movePastFunctionBlock(frontier, namer, modOp);
-  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
-  // applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
-  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
-  // movePastFunctionBlock(frontier, namer, modOp);
-
-  for (unsigned i = 0; i < 0; i++) {
-    applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteB);
-    applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
-    applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteH);
+  // Erase all handshake::RegionInputOp markers and bypass them directly
+  for (auto markerOp : llvm::make_early_inc_range(
+          funcOp.getOps<handshake::RegionInputOp>())) {
+    Value incomingChannel = markerOp.getIns();
+    
+    // Forward the incoming channel to all operations consuming the marker's output
+    markerOp.getOuts().replaceAllUsesWith(incomingChannel);
+    
+    // Erase the marker from the IR
+    markerOp.erase();
   }
 }
