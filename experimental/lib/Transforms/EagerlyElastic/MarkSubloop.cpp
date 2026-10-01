@@ -256,54 +256,6 @@ void MarkSubloopPass::runOnOperation() {
       }
     }    
 
-    // collect external values used within subblocks if we are at an if/else region
-    if (successorAttrs.size() > 1) {
-    llvm::errs() << "collect external values used within subblocks\n";
-    // Map each external Value to its marker in this specific entryBlock
-    llvm::DenseMap<Value, Value> markedValues;
-    Operation *terminator = entryBlock->getTerminator();
-    // iterate over all operations in the subblocks
-    for (Block *block : subblocks) {
-      for (Operation &op : block->getOperations()) {
-        for (OpOperand &use : op.getOpOperands()) {
-          Value val = use.get();
-          if (isa<MemRefType>(val.getType())) continue;
-
-          Block *defBlock = getTrueDefiningBlock(val);
-          // we only care about values originating from outside the subblocks
-          if (!defBlock || subblocks.contains(defBlock)) continue;
-
-          // Check if we already created a marker in entryBlock for this value
-          auto it = markedValues.find(val);
-          if (it != markedValues.end()) {
-            use.set(it->second);
-            continue;
-          }
-
-          // insert marker directly above entryBlock's terminator
-          builder.setInsertionPoint(terminator);
-          auto markerOp = builder.create<dynamatic::cf_extra::RegionInputOp>(
-          terminator->getLoc(), val.getType(), val);
-          namer.setName(markerOp);
-
-          Value markedVal = markerOp.getResult();
-          markedValues[val] = markedVal;
-
-          // Rewire uses in the subblocks to read from the marker output
-          use.set(markedVal);
-
-          if (Operation *defOp = val.getDefiningOp()) {
-            llvm::errs() << "Operation producing marked value: " << *defOp << "\n";
-          } else if (auto arg = dyn_cast<BlockArgument>(val)) {
-            llvm::errs() << "Marked value is a BlockArgument of block: ";
-            arg.getOwner()->printAsOperand(llvm::errs());
-            llvm::errs() << "\n";
-          }
-        }
-      }
-    }}
-
-
     // find all the stores in the subblocks
     llvm::SmallVector<memref::StoreOp> storesToModify;
     for (mlir::Block *block : subblocks) {
@@ -359,5 +311,83 @@ void MarkSubloopPass::runOnOperation() {
 
   // attach the attribute directly to modOp
   modOp->setAttr("handshake.subregion_info", builder.getArrayAttr(allRegionsMetadata));
+
+  // Precompute reverse lookup from block index to Block*
+  SmallVector<Block *> blocksByIndex(blockIndices.size());
+  for (auto &[block, idx] : blockIndices)
+    blocksByIndex[idx] = block;
+
+  // collect external values used within subblocks if we are at an if/else region
+  for (Attribute regionAttr : allRegionsMetadata) {
+    auto dict = dyn_cast<DictionaryAttr>(regionAttr);
+    if (!dict)
+      continue;
+
+    // only look at if / else blocks - blocks that have 2 successors
+    auto successorAttrs = dict.getAs<ArrayAttr>("successor_bbs");
+    if (!successorAttrs || successorAttrs.size() <= 1)
+      continue;
+
+    auto entryBBAttr = dict.getAs<IntegerAttr>("entry_bb");
+    if (!entryBBAttr)
+      continue;
+
+    unsigned entryBBIdx = entryBBAttr.getInt();
+    if (entryBBIdx >= blocksByIndex.size()) continue;
+    Block *entryBlock = blocksByIndex[entryBBIdx];
+
+    // Look up subblocks for this region
+    auto it = validRegions.find(entryBlock);
+    if (it == validRegions.end()) continue;
+    llvm::SetVector<Block *> &subblocks = it->second.subblocks;
+
+    llvm::errs() << "collect external values used within subblocks\n";
+    
+    // Map each external Value to its marker in this specific entryBlock
+    llvm::DenseMap<Value, Value> markedValues;
+    Operation *terminator = entryBlock->getTerminator();
+    
+    // iterate over all operations in the subblocks
+    for (Block *block : subblocks) {
+      for (Operation &op : block->getOperations()) {
+        for (OpOperand &use : op.getOpOperands()) {
+          Value val = use.get();
+          if (isa<MemRefType>(val.getType())) continue;
+
+          Block *defBlock = getTrueDefiningBlock(val);
+          // we only care about values originating from outside the subblocks
+          if (!defBlock || subblocks.contains(defBlock)) continue;
+
+          // Check if we already created a marker in entryBlock for this value
+          auto it = markedValues.find(val);
+          if (it != markedValues.end()) {
+            use.set(it->second);
+            continue;
+          }
+
+          // insert marker directly above entryBlock's terminator
+          builder.setInsertionPoint(terminator);
+          auto markerOp = builder.create<dynamatic::cf_extra::RegionInputOp>(
+          terminator->getLoc(), val.getType(), val);
+          namer.setName(markerOp);
+
+          Value markedVal = markerOp.getResult();
+          markedValues[val] = markedVal;
+
+          // Rewire uses in the subblocks to read from the marker output
+          use.set(markedVal);
+
+          if (Operation *defOp = val.getDefiningOp()) {
+            llvm::errs() << "Operation producing marked value: " << *defOp << "\n";
+          } else if (auto arg = dyn_cast<BlockArgument>(val)) {
+            llvm::errs() << "Marked value is a BlockArgument of block: ";
+            arg.getOwner()->printAsOperand(llvm::errs());
+            llvm::errs() << "\n";
+          }
+        }
+      }
+    }
+  }
+
   llvm::errs() << "finished mark subregion\n";
 }

@@ -635,7 +635,7 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     // occupancy of the channel places a limit on throughput
     // if a buffer breaking data and valid is placed on the channel
     model->addConstr(chTokenOccupancy ==
-                         backedge + fromRepInit + retDst - retSrc,
+                         backedge + fromRepInit + cmergeMuxDataInput + retDst - retSrc,
                      "throughput_channelRetiming");
   }
 }
