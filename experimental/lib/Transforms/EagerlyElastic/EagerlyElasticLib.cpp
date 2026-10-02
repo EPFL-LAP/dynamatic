@@ -75,12 +75,12 @@ bool isSourced(Value value) {
       isa<handshake::RepeatingInitOp>(definingOp))
     return false;
 
-  if (isa<handshake::SourceOp>(value.getDefiningOp()))
+  if (isa<handshake::SourceOp>(definingOp))
     return true;
 
   // If all operands of the defining operation are sourced, the value is also
   // sourced.
-  return llvm::all_of(value.getDefiningOp()->getOperands(),
+  return llvm::all_of(definingOp->getOperands(),
                       [](Value v) { return isSourced(v); });
 }
 
@@ -604,66 +604,4 @@ void applyRewriteH(handshake::MuxOp dataMux,
   }
 
   moveSuppressorPastOp(trueBranch, dataMux, frontier, namer);
-}
-
-void markMultiSuccessorHeaderBranches(
-    const llvm::DenseSet<handshake::ConditionalBranchOp> &frontier,
-    ModuleOp modOp) {
-  auto subloopInfoAttr = modOp->getAttrOfType<ArrayAttr>("handshake.subloop_info");
-  if (!subloopInfoAttr)
-    return;
-  OpBuilder builder(modOp.getContext());
-  
-  for (handshake::ConditionalBranchOp branchOp : frontier) {
-    // get the bb of the current branch
-    auto bbAttr = branchOp->getAttrOfType<IntegerAttr>("handshake.bb");
-    int64_t currentBB = bbAttr.getInt();
-
-    for (Attribute loopAttr : subloopInfoAttr) {
-      auto dict = cast<DictionaryAttr>(loopAttr);
-      auto headerBBAttr = dict.getAs<IntegerAttr>("header_bb");
-      auto successorBBsArray = dict.getAs<ArrayAttr>("successor_bbs");
-
-      if (!headerBBAttr || !successorBBsArray)
-        continue;
-
-      int64_t headerBB = headerBBAttr.getInt();
-
-      // Condition 1: Must belong to this header block
-      if (currentBB != headerBB)
-        continue;
-
-      // Condition 2: Header must have MULTIPLE successors
-      if (successorBBsArray.size() <= 1)
-        continue;
-
-      // Condition 3: Verify the branch targets one of the successor blocks
-      bool targetsSuccessor = false;
-      for (Operation *user : branchOp.getFalseResult().getUsers()) {
-        if (isa<handshake::ControlMergeOp>(user))
-          continue;
-          
-        auto userBBAttr = user->getAttrOfType<IntegerAttr>("handshake.bb");
-        int64_t userBB = userBBAttr.getInt();
-
-        // Check if userBB is in successor_bbs
-        for (Attribute succAttr : successorBBsArray) {
-          if (dyn_cast<IntegerAttr>(succAttr).getInt() == userBB) {
-            targetsSuccessor = true;
-            break;
-          }
-        }
-        if (targetsSuccessor)
-          break;
-      }
-
-      // mark the cond_branch with the header bb
-      if (targetsSuccessor) {
-        branchOp->setAttr("subloop_header_bb",
-                          builder.getI64IntegerAttr(headerBB));
-        // branchOp.dump();
-        break; // match found for this branch
-      }
-    }
-  }
 }

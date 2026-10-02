@@ -9,10 +9,12 @@ using namespace dynamatic;
 using namespace mlir;
 
 #define HANDSHAKEBB "handshake.bb"
-#define SUBLOOP_INFO_ATTR "handshake.subloop_info"
+#define SUBREG_INFO_ATTR "handshake.subregion_info"
 #define ENTRY_OPS "entry_ops"
 #define STORES "stores"
-#define HEADER_BB "header_bb"
+#define ENTRY_BB "entry_bb"
+#define SUCCESSOR_BBS "successor_bbs"
+#define SUBREGION_HEADER_BB "subloop_header_bb"
 
 enum class BypassResult : bool { Ineligible = false, Eligible = true };
 
@@ -79,7 +81,3 @@ void applyRewriteH(handshake::MuxOp dataMux,
                    handshake::InitOp initOp,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer);
-
-void markMultiSuccessorHeaderBranches(
-    const llvm::DenseSet<handshake::ConditionalBranchOp> &frontier,
-    ModuleOp modOp);

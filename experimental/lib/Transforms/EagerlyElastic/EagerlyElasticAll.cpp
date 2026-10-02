@@ -139,7 +139,8 @@ void EagerlyElasticAllPass::applyRewriteXAsOftenAsPossible(
         switch (rewrite) {
         case RewriteStrategy::RewriteA: {
           if (isEligibleForBypass(branchOp, user) == BypassResult::Ineligible) {
-            continue;
+            if (regionBased || !isa<handshake::RegionInputOp>(user))
+              continue;
           }
           auto nameAttr = user->getAttrOfType<mlir::StringAttr>("handshake.name");
           if (nameAttr && nameAttr.getValue() == "constant21") { // mux18
@@ -349,26 +350,22 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
             // check whether the suppressor is connected to path A of the mux
             if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
               auto nameAttr = mux->getAttrOfType<mlir::StringAttr>("handshake.name");
-              /* if (nameAttr && nameAttr.getValue() == "mux1") { // mux18
-                applyRewriteD(mux, branchOp, init, frontier, namer);
-                // return;
-              } */
               if (nameAttr && nameAttr.getValue() == "mux7") { // mux18
                 applyRewriteD(mux, branchOp, init, frontier, namer);
                 // return;
               }
-              /* if (nameAttr && nameAttr.getValue() == "mux4") { // mux18
+              if (nameAttr && nameAttr.getValue() == "mux4") { // mux18
                 applyRewriteD(mux, branchOp, init, frontier, namer);
                 // return;
-              } */
+              }
               if (nameAttr && nameAttr.getValue() == "mux3") { // mux18
                 applyRewriteD(mux, branchOp, init, frontier, namer);
                 // return;
               }
-              if (nameAttr && nameAttr.getValue() == "mux5") { // mux18
+              /* if (nameAttr && nameAttr.getValue() == "mux5") { // mux18
                 applyRewriteD(mux, branchOp, init, frontier, namer);
                 // return;
-              }
+              } */
             }
           }
           break;
@@ -529,11 +526,11 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
       // ------- Start Actual Moving Past! --------
       auto stores = matchedRegionDict.getAs<BoolAttr>(STORES);
       auto entryOpsArray = matchedRegionDict.getAs<ArrayAttr>(ENTRY_OPS);
-      auto headerBB = matchedRegionDict.getAs<IntegerAttr>(ENTRY_BB);
+      auto entryBB = matchedRegionDict.getAs<IntegerAttr>(ENTRY_BB);
       Value condition = branchOp.getConditionOperand();
-      llvm::errs() << "start moving past subblocks after headerbb" << headerBB.getInt() << "\n";
+      llvm::errs() << "start moving past subblocks after entryBB" << entryBB.getInt() << "\n";
 
-      // place a suppressor in front of all identified entry ops
+      // --- place a suppressor in front of all identified entry ops ---
       for (Attribute attr : entryOpsArray) {
         auto entryDict = cast<DictionaryAttr>(attr);
         StringRef opName = entryDict.getAs<StringAttr>("op").getValue();
@@ -560,95 +557,63 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         targetOperand.set(newBranch.getFalseResult());
         frontier.insert(newBranch);
       }
+      llvm::errs() << "done with first part\n";
 
-      // handle stores
+      // --- rewire the condition for the suppressors in front of stores ---
       if (stores && stores.getValue()) {
-        std::string pseudoName = "pseudo_cond" + std::to_string(headerBB.getInt());
+        // find the corresponding pseudo constant
+        std::string pseudoName = "pseudo_cond" + std::to_string(entryBB.getInt());
         auto pseudoConstant = dyn_cast_or_null<handshake::ConstantOp>(namer.getOp(pseudoName));
         if (!pseudoConstant || pseudoConstant.getResult().use_empty()) {
           llvm::errs() << "ABORT NO PSEUDOCONSTANT??\n";
           continue;
         }
 
-        for (OpOperand &targetOperand : llvm::make_early_inc_range(pseudoConstant.getResult().getUses())) {
-          // This is MuxOp on Pass 1, but an AndIOp on Pass 2, 3, etc.
-          Operation *consumerOp = targetOperand.getOwner(); 
-          Value currentInput = targetOperand.get();
+        // create a new OrIOp directly after the pseudoconstant
+        OpBuilder builder(pseudoConstant);
+        builder.setInsertionPointAfter(pseudoConstant);
 
-          // insert the new AndIOp right before the consumer
-          /* OpBuilder builder(consumerOp);
-          auto notOp = builder.create<handshake::NotIOp>(consumerOp->getLoc(), condition);
-          auto andOp = builder.create<handshake::AndIOp>(
-              consumerOp->getLoc(), currentInput, notOp.getResult());
-          setHandshakeAttrs(consumerOp->getAttr(HANDSHAKEBB), namer, {andOp, notOp}); */
+        Value currentVal = pseudoConstant.getResult();
 
-          // insert the new Or right before the consumer
-          OpBuilder builder(consumerOp);
-          auto orOp = builder.create<handshake::OrIOp>(
-              consumerOp->getLoc(), currentInput, condition);
-          setHandshakeAttrs(consumerOp->getAttr(HANDSHAKEBB), namer, {orOp});
-          llvm::errs() << "placed or\n";
-          condition.dump();
+        // create the OrIOp combining the constant with the condition
+        auto orOp = builder.create<handshake::OrIOp>(
+            pseudoConstant.getLoc(), currentVal, condition);
+        setHandshakeAttrs(pseudoConstant->getAttr(HANDSHAKEBB), namer, {orOp});
 
-          targetOperand.set(orOp.getResult());
-        }
+        // rewire all existing uses of pseudoConstant to the OrIOp result
+        currentVal.replaceAllUsesExcept(orOp.getResult(), orOp);
       } else { llvm::errs() << "no stores\n";}
 
+      // --- remove the suppressors that have just been bypassed ---
       llvm::errs() << "size: " << branchesToDelete.size() << '\n';
-      // rewire the original muxes to bypass the old branchOps
-      for (auto muxBranchOp : branchesToDelete) {
-        Value falseResult = muxBranchOp.getFalseResult();
-        Value dataOperand = muxBranchOp.getDataOperand();
-        auto branchBB = muxBranchOp->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
+      // rewire the original muxes to bypass the old branchOps      
+      for (auto branchToDelete : branchesToDelete) {
+        Value falseResult = branchToDelete.getFalseResult();
+        Value dataOperand = branchToDelete.getDataOperand();
+        auto branchBB = branchToDelete->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
 
-        // find and update all downstream Muxes consuming this specific branch
+        // iterate over every branchToDelete's falseResult uses
         for (OpOperand &use : llvm::make_early_inc_range(falseResult.getUses())) {
-          // TODO: remove this fix
-          /* use.set(dataOperand);
-          continue; */
           Operation *owner = use.getOwner();
 
-          if (auto targetMux = dyn_cast<handshake::MuxOp>(use.getOwner())) {
-            auto targetBB = targetMux->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
-            if (branchBB && targetBB && branchBB.getInt() != targetBB.getInt()) {
-              llvm::errs() << "replaced mux\n";
+          // check if the consumer is a MuxOp or CMergeOp located inside 
+          // the same bb as the original mux. Only necessary for mux blocks
+          if (isa<handshake::MuxOp, handshake::ControlMergeOp>(owner)) {
+            auto targetBB = owner->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
+            if (targetBB && muxBB && targetBB.getInt() == muxBB) {
+              llvm::errs() << "Bypassing suppressor directly into mux/cmerge\n";
               use.set(dataOperand);
-            }
-          }
-          if (auto targetCMerge = dyn_cast<handshake::ControlMergeOp>(use.getOwner())) {
-            auto targetBB = targetCMerge->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
-            if (branchBB && targetBB && branchBB.getInt() != targetBB.getInt()) {
-              llvm::errs() << "replaced cmerge\n";
-              use.set(dataOperand);
+              continue;
             }
           }
 
-          if (auto branch = dyn_cast<handshake::ConditionalBranchOp>(use.getOwner())) {
-            if (auto headerBBAttr = branch->getAttrOfType<IntegerAttr>("subloop_header_bb")) {
-              if (headerBBAttr.getInt() == headerBB.getInt()) {
-                llvm::errs() << "replaced use because attribute\n";
-                use.set(dataOperand); 
-              }
-            }
-          }
-
-          // Check if owner is a Not operation and its result feeds a matching ConditionalBranchOp
-          if (isa<handshake::NotIOp>(owner)) {
-            bool feedsMatchingBranch = false;
-            for (Operation *notUser : owner->getResult(0).getUsers()) {
-              if (auto branch = dyn_cast<handshake::ConditionalBranchOp>(notUser)) {
-                if (auto headerBBAttr = branch->getAttrOfType<IntegerAttr>("subloop_header_bb")) {
-                  if (headerBBAttr.getInt() == headerBB.getInt()) {
-                    feedsMatchingBranch = true;
-                    break;
-                  }
-                }
-              }
-            }
-            // If the NOT op feeds a marked branch, rewire the NOT op's input operand
-            if (feedsMatchingBranch) {
-              llvm::errs() << "replaced use because feedsMatchingBranch\n";
+          // check if the consumer is a RegionInputOp in the entryBB
+          if (auto inputMarker = dyn_cast<handshake::RegionInputOp>(owner)) {
+            auto markerBB = inputMarker->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+            if (markerBB && markerBB.getInt() == entryBB.getInt()) {
+              llvm::errs() << "Bypassing suppressor directly into RegionInputOp\n";
               use.set(dataOperand);
+              continue;
             }
           }
         }        
@@ -656,8 +621,8 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         // if the branchOp has no uses anymore, delete it
         if (falseResult.use_empty()) {
           llvm::errs() << "deleted branch\n";
-          frontier.erase(muxBranchOp);
-          muxBranchOp.erase();
+          frontier.erase(branchToDelete);
+          branchToDelete.erase();
         }
       }
       llvm::errs() << "finished movePastFunctionBlock\n";
@@ -685,7 +650,7 @@ void EagerlyElasticAllPass::runOnOperation() {
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   }
   applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD2);
-  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
+  applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   
   if (regionBased) {
     llvm::errs() << "regionbased enabled\n";
