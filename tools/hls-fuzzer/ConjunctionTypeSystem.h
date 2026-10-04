@@ -340,10 +340,11 @@ protected:
   /// contexts of each having no influence on any others.
   ///
   /// This method makes it possible for the class implementing the conjunction
-  /// to implement logic that modifies the input context of 'subElement'
+  /// to implement logic that modifies the input context
+  /// (computed prior to this crossing) of 'subElement'
   /// of an 'ASTNode' (deduced from its transfer functions).
   ///
-  /// One call crosses exactly one sub element ('subElement') of exactly one sub
+  /// One call modifies exactly one sub element ('subElement') of exactly one sub
   /// type system ('SubTypeSystem'): only the context of 'SubTypeSystem' for
   /// 'subElement' is replaced, all other contexts are left as calculated by
   /// their own type systems.
@@ -420,10 +421,10 @@ protected:
     // version that additionally applies 'crossingFunc' to its result.
     auto &transferFn = std::get<subElement>(conjunctionTransferFns);
 
-    // 'newDeps' are the filtered 'Dep' instances of 'Tuple', used purely to get
-    // hold of their indices for 'wrap' below.
+    // 'additionalDepsFromCrossing' are the filtered 'Dep' instances in 'Tuple',
+    // used purely to get hold of their indices for 'wrap' below.
     std::apply(
-        [&](auto &&...newDeps) {
+        [&](auto &&...depStructsFromCrossing) {
           // Computes the input context of 'subElement' by first running the
           // original transfer function and then overwriting the context of
           // 'SubTypeSystem' with the result of 'crossingFunc'.
@@ -432,9 +433,9 @@ protected:
           auto crossing = [crossingFunc =
                                std::forward<CrossingFunc>(crossingFunc)](
                               llvm::function_ref<Context()> originalTransferFn,
-                              const auto &...deps) {
-            // Context prior to the crossing.
-            Context context = originalTransferFn();
+                              const auto &...contextsAndASTNodes) {
+            // Context computed prior to the crossing.
+            Context contextBeforeCrossing = originalTransferFn();
 
             // First remove the 'ASTNode's from the argument list.
             // This is now equal to just the context's without
@@ -447,23 +448,22 @@ protected:
                 [&](auto &&arg) {
                   using T = std::decay_t<decltype(arg)>;
                   if constexpr (std::is_same_v<Context, T>) {
-
                     return std::forward_as_tuple(arg);
                   } else {
                     return std::make_tuple();
                   }
                 },
-                std::forward_as_tuple(deps...));
+                std::forward_as_tuple(contextsAndASTNodes...));
 
             struct Sentinel {};
 
-            // Now reinsert 'context' at the corresponding indices
-            // of where the original dep was prior to it being
-            // filtered.
+            // Insert 'contextBeforeCrossing' at the corresponding
+            // index of where the original 'Dep' struct was prior
+            // to it being filtered by 'CalcFilter'.
             // Note that we pad the context tuple to contain some
             // extra sentinel values such that its length is equal
-            // to 'depdencies' again, creating a one to one
-            // correspondence.
+            // to 'dependencies'. We need these extra elements in the tuple
+            // to insert the 'contextBeforeCrossing' instances.
             auto withSelfRefs = enumerateTuplesInto(
                 [&](auto &&...args) {
                   // Create one flat tuple out of the tuples.
@@ -475,9 +475,9 @@ protected:
                   using T = std::decay_t<decltype(arg)>;
                   if constexpr (CalcFilter::matches(index)) {
                     if constexpr (std::is_same_v<Sentinel, T>)
-                      return std::forward_as_tuple(context);
+                      return std::forward_as_tuple(contextBeforeCrossing);
                     else
-                      return std::forward_as_tuple(context, arg);
+                      return std::forward_as_tuple(contextBeforeCrossing, arg);
                   } else {
                     return std::forward_as_tuple(arg);
                   }
@@ -489,27 +489,30 @@ protected:
                                    std::tuple_size_v<decltype(contextsOnly)>)>(
                         Sentinel{})));
 
-            std::get<typename SubTypeSystem::Context>(context) = std::apply(
-                crossingFunc,
-                // Finally, return the context of just the
-                // requested type systems.
-                mapTuplesInto(
-                    [](auto &&...args) {
-                      return std::forward_as_tuple(
-                          std::forward<decltype(args)>(args)...);
-                    },
-                    [](const Context &context, auto &&dep) -> decltype(auto) {
-                      using Dep = std::decay_t<decltype(dep)>;
-                      return std::get<typename Dep::type::Context>(context);
-                    },
-                    withSelfRefs, std::make_tuple(dependencies{}...)));
-            return context;
+            std::get<typename SubTypeSystem::Context>(contextBeforeCrossing) =
+                std::apply(
+                    crossingFunc,
+                    // Finally, return the context of just the
+                    // requested type systems.
+                    mapTuplesInto(
+                        [](auto &&...args) {
+                          return std::forward_as_tuple(
+                              std::forward<decltype(args)>(args)...);
+                        },
+                        [](const Context &context,
+                           auto &&dep) -> decltype(auto) {
+                          using Dep = std::decay_t<decltype(dep)>;
+                          return std::get<typename Dep::type::Context>(context);
+                        },
+                        withSelfRefs, std::make_tuple(dependencies{}...)));
+            return contextBeforeCrossing;
           };
 
           transferFn =
               std::move(transferFn)
-                  .template wrap<Context,
-                                 std::decay_t<decltype(newDeps)>::index...>(
+                  .template wrap<
+                      Context,
+                      std::decay_t<decltype(depStructsFromCrossing)>::index...>(
                       std::move(crossing));
         },
         Tuple{});
