@@ -344,8 +344,8 @@ protected:
   /// (computed prior to this crossing) of 'subElement'
   /// of an 'ASTNode' (deduced from its transfer functions).
   ///
-  /// One call modifies exactly one sub element ('subElement') of exactly one sub
-  /// type system ('SubTypeSystem'): only the context of 'SubTypeSystem' for
+  /// One call modifies exactly one sub element ('subElement') of exactly one
+  /// sub type system ('SubTypeSystem'): only the context of 'SubTypeSystem' for
   /// 'subElement' is replaced, all other contexts are left as calculated by
   /// their own type systems.
   /// Crossing multiple type systems or multiple sub elements is done by simply
