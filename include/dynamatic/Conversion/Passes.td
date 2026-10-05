@@ -63,6 +63,9 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
       which represent dataflow circuits that can ultimately be converted to an
           RTL design.
 }];
+  let options = [Option<
+      "annotateCFG", "annotate-cfg", "bool", "false",
+      "Preserve the original CFG in a function annotation before flattening.">];
 }
 
 //===----------------------------------------------------------------------===//

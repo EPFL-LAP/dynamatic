@@ -6,6 +6,7 @@ add_dynamatic_library(DynamaticTransforms
   FuncMaximizeSSA.cpp
   FuncSetArgNames.cpp
   ConsumeProducerOutputAttrMarker.cpp
+  HandshakeCreateOutWithLSQsCircuit.cpp
   HandshakeCanonicalize.cpp
   HandshakeDeactivateMemDependencies.cpp
   HandshakeHoistExtInstances.cpp
@@ -33,6 +34,7 @@ add_dynamatic_library(DynamaticTransforms
   MLIRIR
   MLIRMemRefDialect
   MLIRFuncDialect
+  MLIRControlFlowDialect
   MLIRSupport
   MLIRTransformUtils
   DynamaticSupport

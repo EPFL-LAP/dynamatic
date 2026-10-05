@@ -205,6 +205,10 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
       continue;
 
     for (Value operand : storeOp->getOperands()) {
+
+      if (operand == storeOp.getDone())
+        continue;
+
       Channel channel(operand, true);
       Operation *defOp = operand.getDefiningOp();
 
