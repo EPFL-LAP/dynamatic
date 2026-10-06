@@ -56,6 +56,11 @@
 
 #include "llvm/Analysis/DependenceAnalysis.h"
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+
 #define DEBUG_TYPE "mem-dep-analysis"
 
 using namespace llvm;
@@ -322,6 +327,321 @@ std::optional<int64_t> getDistance(Dependence *d) {
 
 using InstPairType = std::pair<Instruction *, Instruction *>;
 
+namespace {
+
+/// \brief: Which of the three things an analysis can have established about
+/// one ordered pair of memory accesses.
+enum class DependenceKind {
+  /// No analysis has been able to say anything about this pair yet.
+  Unknown = 0,
+  /// The dependence definitely exists: the two accesses may touch the same
+  /// address, and their relative order has to be enforced at runtime.
+  ProvenTrue,
+  /// The dependence definitely does not exist: either the accesses can never
+  /// touch the same address, or their order is already enforced by something
+  /// else (e.g., by the dataflow itself).
+  ProvenFalse,
+};
+
+/// \brief: What a memory analysis has established about one ordered pair of
+/// memory accesses, together with the loop depth and iteration distance in
+/// the one case where those exist.
+class DependenceState {
+public:
+  /// Nothing established yet, which is where every entry starts.
+  DependenceState() = default;
+  static DependenceState unknown() { return DependenceState(); }
+
+  /// There is no dependence between the two accesses.
+  static DependenceState provenFalse() {
+    return DependenceState(DependenceKind::ProvenFalse, 0, 0);
+  }
+
+  /// There is a dependence, carried by the loop at nesting level
+  /// `loopDepth`: srcAccess in iteration i has to go before dstAccess in
+  /// iteration i + `distance`.
+  static DependenceState provenTrue(unsigned loopDepth, unsigned distance) {
+    return DependenceState(DependenceKind::ProvenTrue, loopDepth, distance);
+  }
+
+  DependenceKind getKind() const { return kind; }
+  bool isUnknown() const { return kind == DependenceKind::Unknown; }
+  bool isProvenTrue() const { return kind == DependenceKind::ProvenTrue; }
+  bool isProvenFalse() const { return kind == DependenceKind::ProvenFalse; }
+
+  /// The nesting level of the loop carrying a dependence that is known to
+  /// exist. Only a `ProvenTrue` state has one.
+  unsigned getLoopDepth() const {
+    assert(isProvenTrue() && "only a dependence known to exist has a depth");
+    return loopDepth;
+  }
+
+  /// The iteration distance of a dependence that is known to exist. Only a
+  /// `ProvenTrue` state has one.
+  unsigned getDistance() const {
+    assert(isProvenTrue() &&
+           "only a dependence known to exist has an iteration distance");
+    return distance;
+  }
+
+private:
+  DependenceState(DependenceKind kind, unsigned loopDepth, unsigned distance)
+      : kind(kind), loopDepth(loopDepth), distance(distance) {}
+
+  DependenceKind kind = DependenceKind::Unknown;
+  unsigned loopDepth = 0;
+  unsigned distance = 0;
+};
+
+/// \brief: A short, human-readable spelling of a dependence state, for
+/// analyses that want to log individual decisions.
+[[maybe_unused]] llvm::StringRef toString(DependenceState state) {
+  switch (state.getKind()) {
+  case DependenceKind::Unknown:
+    return "unknown";
+  case DependenceKind::ProvenTrue:
+    return "proven-true";
+  case DependenceKind::ProvenFalse:
+    return "proven-false";
+  }
+  llvm_unreachable("unhandled DependenceKind");
+}
+
+/// \brief: A single character standing for a dependence state, used when
+/// printing the matrix as a grid.
+char toChar(DependenceState state) {
+  switch (state.getKind()) {
+  case DependenceKind::Unknown:
+    return '?';
+  case DependenceKind::ProvenTrue:
+    return 'T';
+  case DependenceKind::ProvenFalse:
+    return 'F';
+  }
+  llvm_unreachable("unhandled DependenceKind");
+}
+
+/// \brief: Collects every load and store of a function, in program order.
+std::vector<Instruction *> collectMemoryAccesses(Function &llvmFunction) {
+  std::vector<Instruction *> accesses;
+  for (BasicBlock &bb : llvmFunction)
+    for (Instruction &inst : bb)
+      if (isa<LoadInst, StoreInst>(inst))
+        accesses.push_back(&inst);
+  return accesses;
+}
+
+/// \brief: The state of every ordered pair of memory accesses in a function.
+///
+/// The matrix is indexed by (source, destination), where the source is the
+/// *predecessor* of the dependence and the destination its *successor*: the
+/// entry at `(src, dst)` answers "must `src` be ordered before `dst`?". It is
+/// therefore asymmetric, and `(src, dst)` and `(dst, src)` are two independent
+/// entries; the diagonal is present but meaningless, since an access is never
+/// a dependence of itself.
+///
+/// This is meant to be the shared substrate for the various analyses in this
+/// pass: each analysis refines the entries it can prove, and the final set of
+/// dependence edges is read off the matrix once they have all run.
+class DependenceMatrix {
+public:
+  /// Builds a matrix covering `accesses`, with every entry set to `Unknown`.
+  /// Accesses are indexed in the order in which they are given.
+  explicit DependenceMatrix(llvm::ArrayRef<Instruction *> accesses)
+      : accesses(accesses.begin(), accesses.end()),
+        states(accesses.size() * accesses.size()) {
+    for (auto [idx, access] : llvm::enumerate(this->accesses))
+      accessToIndex.try_emplace(access, idx);
+    // Every entry starts out `Unknown`, so every entry starts out in the set.
+    for (unsigned flatIndex = 0; flatIndex < states.size(); ++flatIndex)
+      unknownEntries.insert(unknownEntries.end(), flatIndex);
+  }
+
+  /// The number of memory accesses covered, i.e., the side length of the
+  /// matrix.
+  unsigned getNumAccesses() const { return accesses.size(); }
+
+  /// The memory accesses covered, in index order.
+  llvm::ArrayRef<Instruction *> getAccesses() const { return accesses; }
+
+  /// The index of an access, which must be one the matrix covers.
+  unsigned getIndexOf(Instruction *access) const {
+    auto it = accessToIndex.find(access);
+    assert(it != accessToIndex.end() &&
+           "memory access is not covered by this dependence matrix");
+    return it->second;
+  }
+
+  /// \brief: What is currently known about the dependence srcAccess ->
+  /// dstAccess.
+  DependenceState getState(Instruction *srcAccess,
+                           Instruction *dstAccess) const {
+    return states[getFlatIndex(getIndexOf(srcAccess), getIndexOf(dstAccess))];
+  }
+  DependenceState getState(unsigned srcIndex, unsigned dstIndex) const {
+    return states[getFlatIndex(srcIndex, dstIndex)];
+  }
+
+  /// \brief: Records what an analysis has established about the dependence
+  /// srcAccess -> dstAccess. Keeps `unknownEntries` in step.
+  void setState(unsigned srcIndex, unsigned dstIndex, DependenceState state) {
+    unsigned flatIndex = getFlatIndex(srcIndex, dstIndex);
+    if (state.isUnknown())
+      unknownEntries.insert(flatIndex);
+    else
+      unknownEntries.erase(flatIndex);
+    states[flatIndex] = state;
+  }
+  void setState(Instruction *srcAccess, Instruction *dstAccess,
+                DependenceState state) {
+    setState(getIndexOf(srcAccess), getIndexOf(dstAccess), state);
+  }
+
+  /// The number of entries no analysis has settled yet.
+  unsigned getNumUnknown() const { return unknownEntries.size(); }
+
+  /// \brief: The dependences that are still `Unknown`, as (source,
+  /// destination) access pairs, in the same row-major order as the matrix.
+  ///
+  /// This is what a refinement pass should loop over: it costs the number of
+  /// entries still open rather than a full rescan of the matrix, and entries
+  /// an earlier pass has already settled are skipped for free.
+  ///
+  /// The result is a snapshot, so refining entries while looping over it is
+  /// safe. Reading the live set instead would not be: settling an entry
+  /// erases it from `unknownEntries`, which invalidates an iterator to it.
+  std::vector<InstPairType> getUnknownDependences() const {
+    std::vector<InstPairType> unknownPairs;
+    unknownPairs.reserve(unknownEntries.size());
+
+    for (unsigned flatIndex : unknownEntries)
+      unknownPairs.emplace_back(accesses[flatIndex / getNumAccesses()],
+                                accesses[flatIndex % getNumAccesses()]);
+
+    return unknownPairs;
+  }
+
+  /// \brief: The dependence edges the matrix currently describes.
+  ///
+  /// An edge is produced for every ordered pair that could be a dependence and
+  /// has not been proven not to be one, so a pair that is still `Unknown`
+  /// conservatively becomes an edge.
+  ///
+  /// This reads nothing but the matrix: every reason to drop a pair has to
+  /// have been written into it as `ProvenFalse` by one of the refinement
+  /// passes beforehand (see removeEqual, removeRAR, removeUnequalBase).
+  std::vector<InstPairType> getDependencePairs() const {
+    std::vector<InstPairType> depPairList;
+
+    for (Instruction *srcAccess : accesses)
+      for (Instruction *dstAccess : accesses)
+        if (!getState(srcAccess, dstAccess).isProvenFalse())
+          depPairList.emplace_back(srcAccess, dstAccess);
+
+    return depPairList;
+  }
+
+  /// \brief: The same edges, grouped by source access and keyed the way the
+  /// serialization to LLVM metadata expects.
+  ///
+  /// One memory access can be the source of several dependences. E.g.,
+  ///
+  ///   store %location, %data; name = "store1"
+  ///   %read_data1 = load %location; name = "load1"
+  ///   %read_data2 = load %location; name = "load2"
+  ///
+  /// has two RAW dependences, (store1, load1) and (store1, load2), and both
+  /// are annotated on store1 as a single list [dep1, dep2]. Each source
+  /// therefore maps to one `LLVMMemDependency` holding all of its
+  /// destinations.
+  ///
+  /// `nameMapping` must name every access the matrix covers, as produced by
+  /// `nameAllLoadStores`.
+  std::map<Instruction *, LLVMMemDependency> toDependencyMap(
+      const std::map<Instruction *, std::string> &nameMapping) const;
+
+  /// \brief: Prints the matrix as a grid of one character per entry ('T' for
+  /// proven true, 'F' for proven false, '?' for unknown), rows being sources
+  /// and columns destinations, preceded by the legend of access indices.
+  void print(llvm::raw_ostream &os) const {
+    os << "Dependence matrix over " << getNumAccesses() << " memory accesses, "
+       << getNumUnknown()
+       << " entries still unknown (rows: source/predecessor, columns: "
+          "destination/successor):\n";
+    for (auto [idx, access] : llvm::enumerate(accesses))
+      os << "  [" << idx << "]" << *access << "\n";
+    for (unsigned srcIndex = 0; srcIndex < getNumAccesses(); ++srcIndex) {
+      os << "  ";
+      for (unsigned dstIndex = 0; dstIndex < getNumAccesses(); ++dstIndex)
+        os << toChar(getState(srcIndex, dstIndex));
+      os << "\n";
+    }
+  }
+
+private:
+  /// The offset of an entry in the row-major `states` array.
+  unsigned getFlatIndex(unsigned srcIndex, unsigned dstIndex) const {
+    assert(srcIndex < getNumAccesses() && dstIndex < getNumAccesses() &&
+           "dependence matrix index out of range");
+    return srcIndex * getNumAccesses() + dstIndex;
+  }
+
+  /// The accesses covered, in index order.
+  llvm::SmallVector<Instruction *> accesses;
+  /// The reverse of `accesses`.
+  llvm::DenseMap<Instruction *, unsigned> accessToIndex;
+  /// The entries, stored row-major: the state of (srcIndex, dstIndex) lives at
+  /// `srcIndex * getNumAccesses() + dstIndex`.
+  std::vector<DependenceState> states;
+  /// The flat indices of the entries that are still `Unknown`, maintained by
+  /// setState() so that a refinement pass never has to rescan the matrix to
+  /// find the work it has left. Ordered, so iteration is deterministic and
+  /// follows the same row-major order as `states`.
+  std::set<unsigned> unknownEntries;
+};
+
+} // namespace
+
+/// \brief: can this dependency be violated in the same iteration of a
+/// loop/outside of a loop? Either:
+/// - LLVM aliasanalysis finds that there is no alias, so they cannot touch the
+///  same address, or
+/// - the successor is semantically before the predecessor: In this case there
+/// is no conflict if the successor runs before the predecessor
+bool canBeViolatedInSameIteration(Instruction *srcAccess,
+                                  Instruction *dstAccess,
+                                  AAManager::Result &aliasAnalysis,
+                                  const LoopInfo &loopInfo) {
+  // Can they touch the same address at all, for one valuation of the
+  // surrounding induction variables?
+  if (aliasAnalysis.alias(MemoryLocation::get(srcAccess),
+                          MemoryLocation::get(dstAccess)) ==
+      AliasResult::NoAlias)
+    return false;
+
+  // Inside one basic block, execution order within an iteration is exactly
+  // program order.
+  if (srcAccess->getParent() == dstAccess->getParent())
+    return srcAccess->comesBefore(dstAccess);
+
+  // Across blocks, a path that stays inside one iteration is one that never
+  // goes around a back edge of a loop the two accesses share, so blocking
+  // those latches turns plain CFG reachability into the same-iteration
+  // question. When they share no loop, the latch set is empty and this
+  // degenerates to "can dstAccess ever follow srcAccess".
+  llvm::SmallPtrSet<BasicBlock *, 4> backEdgeSources;
+  for (const Loop *loop = loopInfo.getLoopFor(srcAccess->getParent());
+       loop != nullptr; loop = loop->getParentLoop()) {
+    if (!loop->contains(dstAccess->getParent()))
+      continue;
+    llvm::SmallVector<BasicBlock *, 4> latches;
+    loop->getLoopLatches(latches);
+    backEdgeSources.insert(latches.begin(), latches.end());
+  }
+
+  return isPotentiallyReachable(srcAccess, dstAccess, &backEdgeSources);
+}
+
 /// \brief: An data container class that represents the analysis data from the
 /// Scop.
 /// https://www.cs.colostate.edu/~pouchet/software/polyopt/doc/htmltexinfo/Specifics-of-Polyhedral-Programs.html.
@@ -333,7 +653,6 @@ class ScopAnalysisInfo {
   std::vector<Instruction *> memInsts;
   std::map<Instruction *, isl::map> instToCurrentMap;
   std::map<Instruction *, int> instToLoopDepth;
-  std::set<InstPairType> intersections;
   std::map<Instruction *, llvm::Value *> instToBase;
   /// Each Minimized Scop has a separate context. This ensures that trying to
   /// intersect maps for instructions from separate Scops will raise an error
@@ -342,9 +661,9 @@ class ScopAnalysisInfo {
   std::map<InstPairType, bool> dependsCache;
   std::set<InstPairType> outstandingDependsQueries;
 
-  /// \brief (needs proof-read here): Find the loop depth of the outer most
-  /// common loop that contain both instructions.
-  int getOutMostCommonLoopDepth(Instruction *i0, Instruction *i1) {
+  /// \brief (needs proof-read here): Find the loop depth of the inner most
+  /// common loop that contains both instructions.
+  int getInnerMostCommonLoopDepth(Instruction *i0, Instruction *i1) {
     const auto *bb0 = i0->getParent();
     const auto *bb1 = i1->getParent();
     int depth0 = loopInfo->getLoopDepth(bb0);
@@ -371,6 +690,11 @@ class ScopAnalysisInfo {
     }
 
     return depth0;
+  }
+
+  /// \brief: Is this access one of the ones this Scop covers?
+  bool isCovered(Instruction *inst) const {
+    return instToCurrentMap.count(inst) > 0;
   }
 
   isl::map getMap(Instruction *inst, unsigned int depthToKeep, bool getFuture) {
@@ -511,8 +835,8 @@ public:
 
   ~ScopAnalysisInfo() = default;
 
-  /// \brief: Use addScopStmt() to add all ScopStmt's in a Scop. Then,
-  /// computeIntersections() and finally getIntersectionList()
+  /// \brief: Use addScopStmt() to add all ScopStmt's in a Scop, then
+  /// refineDependences() to write what this Scop proves into the matrix.
   void addScopStmt(ScopStmt &stmt) {
     int depth = loopInfo->getLoopDepth(stmt.getBasicBlock());
 
@@ -547,9 +871,14 @@ public:
 
   // clang-format off
 
-// \brief: This function computes the WAR and WAW dependencies in a Scop.
+// \brief: Refines `depMatrix` with the polyhedral information of this Scop.
 //
-// \example:
+// For each pair of accesses that is still unknown, it intersects the sets of
+// addresses the two of them touch. An empty intersection proves they can
+// never conflict, so the dependence is `ProvenFalse`. A non-empty one proves
+// nothing (the accesses may collide)
+//
+// Example:
 // 1. For ... -> SI -> LI -> ... , SI may affect LI in this and future iterations
 //          ↱---------------↵
 // intersect store-set with current and future load-set.
@@ -561,72 +890,82 @@ public:
 // 3. For ... -> SI -> ......     , SI and LI iterations are independent.
 //         ↱  -> LI ->     |
 //         |---------------↵
-// intersect entire store-set with entire load-set. For each write access,
-// compare with relevant sets of read accesses.
-//
-// Similarly, two stores are checked for possible WAW conflicts
+// intersect entire store-set with entire load-set.
 
   // clang-format on
-  void computeIntersections() {
-    for (auto *storeInst : memInsts) {
-      if (!storeInst->mayWriteToMemory())
-        continue;
-
-      // Checking for RAW and WAW conflicts between storeInst and secondInst
-      for (auto *secondInst : memInsts) {
-        /* Skip checking with self */
-        if (secondInst == storeInst)
-          continue;
-
-        // No need to check between different arrays
-        if (instToBase[secondInst] != instToBase[storeInst]) {
-          continue;
-        }
-
-        int commonDepth = getOutMostCommonLoopDepth(secondInst, storeInst);
-
-        auto pair = InstPairType(storeInst, secondInst);
-
-        isl::map instMap, wrInstMap;
-
-        // Condition:
-        // - The store instruction has a GIID on secondInst (i.e., the
-        // dependency of store on secondInst is **always** enforced by data
-        // dependency).
-        //
-        bool hasDependency =
-            instrDependenceInfo.hasTokenDependence(storeInst, secondInst) ||
-            instrDependenceInfo.hasRevTokenDependence(storeInst, secondInst);
-
-        auto *loadInst = dyn_cast_or_null<LoadInst>(secondInst);
-        if (loadInst != nullptr && hasDependency) {
-          // Consecutive top-level loops will finish the load before any store,
-          // since there is an operand dependency.
-          if (commonDepth == 0 && scopMinDepth == 1)
-            continue;
-          assert(commonDepth - scopMinDepth + 1 >= 0);
-          unsigned depthToKeep = commonDepth - scopMinDepth + 1;
-          instMap = getMap(secondInst, depthToKeep, true);
-          wrInstMap = getMap(storeInst, depthToKeep, false);
-        } else {
-          // Generic case: we cannot put any restrictions on the indices being
-          // processed by the instructions, if there are no token flow that can
-          // be established between them. Therefore, we intersect the sets of
-          // all possible indices ever accessed
-          wrInstMap = getMap(storeInst, 0, false);
-          instMap = getMap(secondInst, 0, false);
-        }
-
-        // If the two instructions might access the same index:
-        isl::map intersect = instMap.intersect(wrInstMap);
-        if (intersect.is_empty().is_false()) {
-          intersections.insert(pair);
-        }
-      }
-    }
+  /// \brief: Does the dataflow already run these two accesses one after the
+  /// other, so that the memory system does not have to enforce it?
+  ///
+  /// This is the GIID property of
+  /// https://ieeexplore.ieee.org/document/8977873:
+  /// InstructionDependenceInfo proves it by walking the CFG and checking that
+  /// every token reaching one of the accesses has passed through the other
+  /// without crossing a back edge -- all of dstAccess' inputs come from
+  /// srcAccess, or all of srcAccess' outputs reach dstAccess.
+  ///
+  /// NOTE: these walks report a vacuous true when they stop at an excluded
+  /// back edge without reaching their destination, so a "yes" here is weaker
+  /// than it looks. It is used only to *permit* the restricted intersection
+  /// below, never to disprove a dependence on its own.
+  bool isOrderedByDataflow(Instruction *srcAccess, Instruction *dstAccess) {
+    return instrDependenceInfo.hasTokenDependence(srcAccess, dstAccess) ||
+           instrDependenceInfo.hasRevTokenDependence(srcAccess, dstAccess);
   }
 
-  std::set<InstPairType> &getIntersectionList() { return intersections; }
+  void refineDependences(DependenceMatrix &depMatrix,
+                         AAManager::Result &aliasAnalysis) {
+    for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences()) {
+      // This Scop can only speak about the accesses it covers. Anything else
+      // stays unknown, and some other analysis (or the conservative default)
+      // has to deal with it.
+      if (!isCovered(srcAccess) || !isCovered(dstAccess))
+        continue;
+
+      isl::map srcMap, dstMap;
+
+      // The restricted intersection below only looks at later iterations of
+      // the destination, so it is only allowed when two things hold: the
+      // dependence cannot be violated within one iteration, and the dataflow
+      // already orders the two. Without the second condition a pair whose
+      // same-iteration order merely happens to be favourable would be judged
+      // on later iterations alone, which is not enough when the Scop sits
+      // inside a loop it does not contain (lu's pivot swap).
+      if (canBeViolatedInSameIteration(srcAccess, dstAccess, aliasAnalysis,
+                                       *loopInfo) ||
+          !isOrderedByDataflow(srcAccess, dstAccess)) {
+        // We cannot put any restrictions on the indices being processed by
+        // the instructions, so we intersect the sets of all possible indices
+        // ever accessed.
+        srcMap = getMap(srcAccess, 0, false);
+        dstMap = getMap(dstAccess, 0, false);
+      } else {
+        int commonDepth = getInnerMostCommonLoopDepth(srcAccess, dstAccess);
+
+        // The two share no loop, so there are no other iterations for them
+        // to collide in, and alias analysis has just ruled out the only
+        // occasion they both execute. NOTE: this leans on the same
+        // cross-loop assumption as removeNonAliasing.
+        if (commonDepth == 0 && scopMinDepth == 1) {
+          depMatrix.setState(srcAccess, dstAccess,
+                             DependenceState::provenFalse());
+          continue;
+        }
+
+        // Only a later iteration of the destination can conflict, so the
+        // destination's set is taken over the future iterations only.
+        assert(commonDepth - scopMinDepth + 1 >= 0);
+        unsigned depthToKeep = commonDepth - scopMinDepth + 1;
+        srcMap = getMap(srcAccess, depthToKeep, false);
+        dstMap = getMap(dstAccess, depthToKeep, true);
+      }
+
+      // Only an answer of "definitely empty" disproves the dependence; an isl
+      // error leaves the entry unknown.
+      if (srcMap.intersect(dstMap).is_empty().is_true())
+        depMatrix.setState(srcAccess, dstAccess,
+                           DependenceState::provenFalse());
+    }
+  }
 
   std::map<Instruction *, llvm::Value *> &getInstsToBase() {
     return instToBase;
@@ -635,34 +974,6 @@ public:
   using iterator = std::vector<Instruction *>::iterator;
   iterator begin() { return memInsts.begin(); }
   iterator end() { return memInsts.end(); }
-};
-
-struct IndexAnalysis {
-
-  IndexAnalysis() : otherInsts() {}
-  ~IndexAnalysis() = default;
-
-  /// Returns all memory instructions in SCoPs which do not require an LSQ
-  /// connection
-  std::vector<Instruction *> &getOtherInsts() { return otherInsts; }
-
-  /// Query whether any SCoP contains BB
-  bool isInScop(BasicBlock *bb) { return bbList.find(bb) != bbList.end(); }
-
-  /// Returns an integer uniquely identifying the SCoP which contains BB
-  int getScopID(BasicBlock *bb) {
-    return (isInScop(bb)) ? bbToScopMap[bb] : -1;
-  }
-
-  std::vector<Instruction *> otherInsts;
-
-  // NOTE: in the legacy implementation they were called "instRAWlist". But this
-  // was actually imprecise, as this contains also RAW dependencies.
-  std::set<InstPairType> dependentReadAndWritePairs;
-  std::set<InstPairType> dependentWriteAndWritePairs;
-  std::set<BasicBlock *> bbList;
-  std::map<BasicBlock *, int> bbToScopMap;
-  std::map<Instruction *, Value *> instToBase;
 };
 
 namespace {
@@ -723,9 +1034,116 @@ bool equalBase(Instruction *a, Instruction *b) {
   return findBase(a) == findBase(b);
 }
 
+/// \brief: Rules out every pair of an access with itself.
+///
+/// An access is never a dependence of itself: the diagonal of the matrix is
+/// meaningless, and the rest of the pipeline treats a self-edge as a WAW
+/// between two executions of one instruction, which the dataflow already
+/// orders (see MarkMemoryInterfaces).
+void removeEqual(DependenceMatrix &depMatrix) {
+  for (Instruction *access : depMatrix.getAccesses())
+    depMatrix.setState(access, access, DependenceState::provenFalse());
+}
+
+/// \brief: Rules out every read-after-read pair.
+///
+/// Two loads never conflict, and the rest of the pipeline assumes RAR edges
+/// are never recorded.
+void removeRAR(DependenceMatrix &depMatrix) {
+  for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
+    if (!srcAccess->mayWriteToMemory() && !dstAccess->mayWriteToMemory())
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
+}
+
+/// \brief: Rules out every pair of accesses to different base arrays.
+///
+/// Dynamatic places distinct base arrays in distinct RAMs, so two accesses to
+/// different arrays can never conflict. They also end up on different memory
+/// interfaces, and an edge across two interfaces would trip the assertions in
+/// MemoryInterfaces.
+///
+/// NOTE: Needs to be ran after removeRAR and removeEqual as
+/// equalBase can throw an error for same access and two load queries
+void removeUnequalBase(DependenceMatrix &depMatrix) {
+  for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
+    if (!equalBase(srcAccess, dstAccess))
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
+}
+
+/// \brief: Do the two accesses sit inside at least one common loop?
+bool haveCommonLoop(const LoopInfo &loopInfo, Instruction *a, Instruction *b) {
+  std::set<const Loop *> loopsOfA;
+  for (const Loop *loop = loopInfo.getLoopFor(a->getParent()); loop != nullptr;
+       loop = loop->getParentLoop())
+    loopsOfA.insert(loop);
+
+  for (const Loop *loop = loopInfo.getLoopFor(b->getParent()); loop != nullptr;
+       loop = loop->getParentLoop())
+    if (loopsOfA.count(loop) > 0)
+      return true;
+
+  return false;
+}
+
+/// \brief: Rules out the pairs whose successor can never execute after their
+/// predecessor at all.
+///
+/// This is the "not in a loop" case of the rule that a dependence whose
+/// predecessor runs after its successor is vacuous: in
+///
+///   A[j] = ...;
+///   A[k] = ...;
+///
+/// only A[j] -> A[k] has to be enforced. For two accesses inside one loop
+/// this never fires, because the back edge makes each reachable from the
+/// other; there the same rule is applied per iteration, inside
+/// canBeViolatedInSameIteration.
+void removeSucceedingPredecessor(DependenceMatrix &depMatrix) {
+  for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences())
+    if (!isPotentiallyReachable(srcAccess, dstAccess))
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
+}
+
+/// \brief: Rules out the pairs that cannot be violated within one iteration
+/// and have no other iteration in which to be violated.
+void removeNonAliasing(DependenceMatrix &depMatrix,
+                       AAManager::Result &aliasAnalysis,
+                       const LoopInfo &loopInfo) {
+  for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences()) {
+    if (haveCommonLoop(loopInfo, srcAccess, dstAccess))
+      continue;
+
+    if (!canBeViolatedInSameIteration(srcAccess, dstAccess, aliasAnalysis,
+                                      loopInfo))
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
+  }
+}
+
+std::map<Instruction *, LLVMMemDependency> DependenceMatrix::toDependencyMap(
+    const std::map<Instruction *, std::string> &nameMapping) const {
+  std::map<Instruction *, LLVMMemDependency> instToDepsMap;
+
+  for (auto &[srcAccess, dstAccess] : getDependencePairs()) {
+    assert(nameMapping.count(srcAccess) > 0 && "Unnamed load/store op!");
+    assert(nameMapping.count(dstAccess) > 0 && "Unnamed load/store op!");
+
+    // A pair that is still `Unknown` is reported conservatively, and no
+    // analysis has given it a depth or a distance to report.
+    DependenceState state = getState(srcAccess, dstAccess);
+    unsigned loopDepth = state.isProvenTrue() ? state.getLoopDepth() : 0;
+    unsigned distance = state.isProvenTrue() ? state.getDistance() : 0;
+
+    LLVMMemDependency &deps = instToDepsMap[srcAccess];
+    deps.name = nameMapping.at(srcAccess);
+    deps.destAndDepthAndDist.emplace_back(nameMapping.at(dstAccess), loopDepth,
+                                          distance);
+  }
+
+  return instToDepsMap;
+}
+
 /// \brief: an LLVM pass that combines polyhedral and alias analysis to compute
-/// a set of dependency edges from the LLVM IR. It further uses dataflow
-/// analysis to eliminate dependency edges enforced by the dataflow.
+/// a set of dependency edges from the LLVM IR.
 struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
 
   // This struct keeps track for every memory instruction:
@@ -743,34 +1161,29 @@ struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
     }
   };
 
-  IndexAnalysis indexAnalysis;
-  AAManager::Result *aliasAnalysis;
   unsigned memCount = 0;
 
-  /// \brief: Loops through the scop regions in the IR and applies index and
-  /// dataflow analysis to compute the minimum set of dependency edges.
-  void processScop(Scop &s, std::vector<ScopAnalysisInfo> &scopMeta);
+  /// \brief: Applies the polyhedral and dataflow analysis of one Scop to the
+  /// dependence matrix, disproving the pairs it can.
+  void processScop(Scop &scop, DependenceMatrix &depMatrix,
+                   AAManager::Result &aliasAnalysis);
 
   /// \brief: Loops through the loops in the IR and collect the loads and
   /// stores.
   void processLoop(Loop *l, std::vector<struct LoopMetaData> &loopMetaInfos);
 
   // Uses "llvm/Analysis/DependenceAnalysis.h"
-  PreservedAnalyses runDependenceAnalysisBased(Function &llvmFunction,
-                                               FunctionAnalysisManager &fam);
+  void refineWithDependenceAnalysis(Function &llvmFunction,
+                                    FunctionAnalysisManager &fam,
+                                    DependenceMatrix &depMatrix);
 
-  // Polly-based implementation inherited from the legacy Dynamatic
-  PreservedAnalyses
-  runPollyBasedInLegacyDynamatic(Function &llvmFunction,
-                                 FunctionAnalysisManager &fam);
+  // Polly-based refinement inherited from the legacy Dynamatic
+  void refineWithPollyAnalysis(Function &llvmFunction,
+                               FunctionAnalysisManager &fam,
+                               DependenceMatrix &depMatrix);
 
   PreservedAnalyses run(Function &llvmFunction, FunctionAnalysisManager &fam);
 
-  /// \brief: returns a list of (srcInst, dstInst) pairs that might have a WAR
-  /// or WAW conflict.
-  std::vector<InstPairType>
-  getDependencyPairs(Function &llvmFunction,
-                     const SameScopHelper &sameScopHelper);
   std::map<Instruction *, std::string> nameAllLoadStores(Function &f);
 };
 
@@ -816,442 +1229,196 @@ MemDepAnalysisPass::nameAllLoadStores(Function &f) {
   return nameMapping;
 }
 
-void MemDepAnalysisPass::processScop(Scop &scop,
-                                     std::vector<ScopAnalysisInfo> &scopMeta) {
+void MemDepAnalysisPass::processScop(Scop &scop, DependenceMatrix &depMatrix,
+                                     AAManager::Result &aliasAnalysis) {
 
-  auto meta = ScopAnalysisInfo(scop);
+  ScopAnalysisInfo meta(scop);
 
   for (auto &stmt : scop) {
-    auto *bb = stmt.getBasicBlock();
-    indexAnalysis.bbList.insert(bb);
-    indexAnalysis.bbToScopMap[bb] = scopMeta.size();
-
     if (!hasMemoryReadOrWrite(stmt))
       continue;
 
     meta.addScopStmt(stmt);
   }
 
-  meta.computeIntersections();
-
-  for (auto [inst, baseAddr] : meta.getInstsToBase()) {
-    indexAnalysis.instToBase[inst] = baseAddr;
-  }
-
-  for (auto pair : meta.getIntersectionList()) {
-    // The convention used in ScopMeta class is that the first element in an
-    // instPair is a store instruction. Thus, checking the type of the second
-    // instruction tells us whther it is a RAW/WAW dependency
-    if (pair.second->mayWriteToMemory())
-      indexAnalysis.dependentWriteAndWritePairs.insert(pair);
-    else
-      indexAnalysis.dependentReadAndWritePairs.insert(pair);
-  }
-
-  scopMeta.push_back(meta);
+  meta.refineDependences(depMatrix, aliasAnalysis);
 }
 
-// Helper function: Get all instructions of a certain type "T"
-template <typename T>
-std::vector<Instruction *> getAllInsts(Function *llvmFunction) {
-  std::vector<Instruction *> insts;
-  for (BasicBlock &bb : *llvmFunction) {
-    for (Instruction &inst : bb)
-      if (isa<T>(inst))
-        insts.push_back(&inst);
-  }
-  return insts;
-}
+/// \brief: Turns one dependence reported by LLVM's DependenceAnalysis into a
+/// matrix state.
+///
+/// The analysis reports (predecessor, successor, iteration-distance), meaning
+/// the predecessor in iteration i has to go before the successor in iteration
+/// i + distance. Example: (ld, st, 1) means the ld in iteration i has to go
+/// before the st in iteration i + 1.
+DependenceState toDependenceState(Dependence &dep, Instruction *srcAccess,
+                                  Instruction *dstAccess) {
+  unsigned loopDepth = dep.getLevels();
+  std::optional<int64_t> distance = getDistance(&dep);
 
-std::vector<InstPairType>
-MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
-                                       const SameScopHelper &sameScopHelper) {
-  std::vector<InstPairType> depPairList;
-  for (auto *storeInst : getAllInsts<StoreInst>(&llvmFunction)) {
-    // Find RAW dependencies
-    for (auto *loadInst : getAllInsts<LoadInst>(&llvmFunction)) {
+  // When no distance is available (example: histogram)
+  //
+  //   void histogram(in_int_t feature[1000], in_float_t weight[1000],
+  //                  inout_float_t hist[1000], in_int_t n) {
+  //     for (int i = 0; i < n; ++i) {
+  //       int m = feature[i];
+  //       float wt = weight[i];
+  //       float x = hist[m];     // <--- LD
+  //       hist[m + 3] = x + wt;  // <--- ST
+  //     }
+  //   }
+  //
+  // the compiler knows the source has to go before the destination in the
+  // inner-most loop, but cannot say by how much (it depends on m).
+  // Fall back to unknown, as some further pass might find exact distances
+  if (!distance)
+    return DependenceState::unknown();
 
-      InstPairType rawPair = std::make_pair(storeInst, loadInst);
+  // A dependence in the other direction describes the pair the other way
+  // round, which is its own entry in the matrix: the successor runs ahead of
+  // the predecessor. This is a question about the whole direction vector,
+  // not the innermost entry, which is what isDirectionNegative() answers --
+  // it skips the leading `=` levels and reports whether the first level that
+  // differs runs backwards.
+  if (dep.isDirectionNegative())
+    return DependenceState::provenFalse();
 
-      // NOTE: In dynamatic we assume that memory with different base addresses
-      // are store in separate RAMs. Two instructions targetting differing base
-      // arrays can never conflict.
-      if (!equalBase(storeInst, loadInst))
-        continue;
+  // Forward, then, but a negative innermost entry means an outer level is
+  // what carries it, so the distance we hold is not the one that matters.
+  // For a[i][j] = a[i-1][j+2] the vector is [1 -2]: the dependence is real,
+  // at distance 1 in i, and the -2 in j describes nothing we can report.
+  if (*distance < 0)
+    return DependenceState::unknown();
 
-      // Instructions are in the same scop: use the result from IndexAnalysis
-      if (sameScopHelper.sameScop(loadInst, storeInst)) {
-        if (indexAnalysis.dependentReadAndWritePairs.count(rawPair))
-          depPairList.push_back(rawPair);
+  // At distance 0 the analysis tests positive in both directions, e.g. for
+  //
+  //   for (int i = 0; i < n; i++)
+  //     a[i] = a[i] + 5;
+  //
+  // it reports both (RAW, 0) and (WAR, 0). Only the one that matches program
+  // order is real; the other asks for an order the same iteration never
+  // needs.
+  //
+  // This only holds when the conflict really is confined to one iteration.
+  // `distance` is the entry for the innermost common loop, so an outer
+  // level can still carry it. In bicg,
+  //
+  //   for (i) for (j) s[j] = s[j] + r[i] * val;
+  //
+  // the vector is [S 0]: distance 0 in j
+  // Requiring every outer level to be `=` rules that out.
+  if (*distance == 0 && !srcAccess->comesBefore(dstAccess)) {
+    bool outerLevelsAllEqual = true;
+    for (unsigned level = 1; level < loopDepth; ++level)
+      if (dep.getDirection(level) != Dependence::DVEntry::EQ)
+        outerLevelsAllEqual = false;
+    if (outerLevelsAllEqual)
+      return DependenceState::provenFalse();
 
-        LLVM_DEBUG({
-          if (!indexAnalysis.dependentReadAndWritePairs.count(rawPair)) {
-            llvm::dbgs() << "--------------------------------------------\n";
-            llvm::dbgs() << "The following memory access instruction pair "
-                            "proven to be independent according to polyhedral "
-                            "analysis:\n";
-            loadInst->dump();
-            storeInst->dump();
-          }
-        });
-        continue;
-      }
-
-      // Instruction are in different Scops: use the result from alias analysis
-      AliasResult aliasResult = aliasAnalysis->alias(
-          MemoryLocation::get(loadInst), MemoryLocation::get(storeInst));
-
-      // If they always or sometimes alias:
-      if (aliasResult != AliasResult::NoAlias) {
-        // If the pair of load/store potentially access the same memory
-        // location, then we consider two cases:
-        //   1. If it is possible to reach from the load inst to the store, then
-        //   we add the WAR dependency
-        //   2. If it is possible to reach from the store inst to the load, then
-        //   we add the RAW dep
-        if (isPotentiallyReachable(storeInst, loadInst))
-          depPairList.emplace_back(storeInst, loadInst);
-        if (isPotentiallyReachable(loadInst, storeInst))
-          depPairList.emplace_back(loadInst, storeInst);
-      }
-    }
-    // Find WAW dependencies
-    for (auto *secondStoreInst : getAllInsts<StoreInst>(&llvmFunction)) {
-      if (secondStoreInst == storeInst)
-        continue;
-
-      // NOTE: In dynamatic we assume that memory with different base addresses
-      // are store in separate RAMs. Two instructions targetting differing base
-      // arrays can never conflict.
-      if (!equalBase(storeInst, secondStoreInst))
-        continue;
-
-      auto pair = InstPairType(secondStoreInst, storeInst);
-      auto pairRev = InstPairType(storeInst, secondStoreInst);
-
-      // Instructions are in the same scop: use the result from IndexAnalysis
-      if (sameScopHelper.sameScop(storeInst, secondStoreInst)) {
-        if (indexAnalysis.dependentWriteAndWritePairs.count(pair) > 0)
-          depPairList.push_back(pair);
-        else if (indexAnalysis.dependentWriteAndWritePairs.count(pairRev) > 0)
-          depPairList.push_back(pairRev);
-        continue;
-      }
-
-      // Otherwise, use results from alias analysis:
-      AliasResult aliasResult = aliasAnalysis->alias(
-          MemoryLocation::get(storeInst), MemoryLocation::get(secondStoreInst));
-      // If they always or sometimes alias:
-      if (aliasResult != AliasResult::NoAlias) {
-        depPairList.push_back(pair);
-      }
-    }
+    // An outer level carries the dependence, so it is real. The distance we
+    // hold is the innermost one, which is not the distance that carries it,
+    // so report the edge without a distance we cannot stand behind.
+    return DependenceState::unknown();
   }
 
-  return depPairList;
+  return DependenceState::provenTrue(loopDepth, *distance);
 }
 
 // This flow currently only supports the dependence analysis within one BB and
 // the inner-most loops in all loop nests
-PreservedAnalyses
-MemDepAnalysisPass::runDependenceAnalysisBased(Function &llvmFunction,
-                                               FunctionAnalysisManager &fam) {
+void MemDepAnalysisPass::refineWithDependenceAnalysis(
+    Function &llvmFunction, FunctionAnalysisManager &fam,
+    DependenceMatrix &depMatrix) {
 
-  // REMARK:
-  //
-  // We aim to use this analysis to report:
-  // (predecessor, successor, iteration-dist)
-  //
-  // which means that predecessor in iteration i has to go before successor in
-  // iteration i + "iteration-dist"
-  //
-  // Example:
-  // (ld, st, 1)
-  // this means that the ld in iteration i has to go before st in iteration i +
-  // 1
-  //
-  // So, we need to rely on their BB order to understand who actually goes
-  // first.
+  // This analysis has never looked at main, where a memcpy (or any other
+  // call touching memory more than once) trips it up. Leaving its entries
+  // untouched costs nothing: main is not lowered to hardware, and whatever
+  // stays unknown is reported conservatively anyway.
+  if (llvmFunction.getName() == "main")
+    return;
+
   auto &dependenceAnalysis = fam.getResult<DependenceAnalysis>(llvmFunction);
-  auto nameMapping = nameAllLoadStores(llvmFunction);
 
-  if (llvmFunction.getName() == "main") {
-    return PreservedAnalyses::all();
-  }
+  for (auto [srcAccess, dstAccess] : depMatrix.getUnknownDependences()) {
+    // Pairs spanning two basic blocks are out of this flow's scope. They stay
+    // unknown and are reported conservatively.
+    if (srcAccess->getParent() != dstAccess->getParent())
+      continue;
 
-  std::vector<Instruction *> memoryInsts;
-  for (BasicBlock &bb : llvmFunction) {
-    for (Instruction &inst : bb)
-      if (isa<LoadInst, StoreInst>(inst))
-        memoryInsts.push_back(&inst);
-  }
+    std::unique_ptr<Dependence> dep =
+        dependenceAnalysis.depends(/* proceed */ srcAccess,
+                                   /* succeed */ dstAccess, true);
 
-  // This map is used to record the dependencies and we serialize them to
-  // metadata nodes later.
-  std::map<Instruction *, LLVMMemDependency> instToDepsMap;
-
-  // REMARK:
-  // - When the dependency analysis reports a loop independent dependency, it
-  // actually tests positive for both RAW and WAR; in this case,  we use the BB
-  // order to determine which one goes first.
-  // - When the dependency analysis reports a loop-carried dependency, it will
-  // correctly reports both direction with one positive and one negative.
-  //
-  for (auto *src : memoryInsts) {
-    for (auto *dst : memoryInsts) {
-      if (src->getParent() != dst->getParent())
-        continue;
-
-      // Check the base address pointer used in gep of the two accesses (e.g.,
-      // function arguments, allocas..), we assume that different function
-      // arguments do not alias.
-      if (!equalBase(src, dst))
-        continue;
-
-      if (src == dst)
-        continue;
-
-      if (auto d = dependenceAnalysis.depends(/* proceed */ src,
-                                              /* succeed */ dst, true)) {
-
-        auto llvmAnalyzedDistance = getDistance(d.get());
-        std::optional<int> finalDistanceOrNoDependency;
-
-        // getLevels reports the innermost loop. This parameter is currently not
-        // used anywhere in Dynamatic (as of Mar. 4, 2026), but is extracted and
-        // represented in the IR for completeness.
-        unsigned depth = d->getLevels();
-        if (/* When distance is not available (example: histogram) */
-            !llvmAnalyzedDistance) {
-
-          //
-          // void histogram(in_int_t feature[1000], in_float_t weight[1000],
-          //                inout_float_t hist[1000], in_int_t n) {
-          //   for (int i = 0; i < n; ++i) {
-          //     int m = feature[i];
-          //     float wt = weight[i];
-          //     float x = hist[m]; <-- LD
-          //     hist[m + 3] = x + wt; <--- ST
-          //   }
-          // }
-          //
-          // In the histogram example above, the compiler identifies that src
-          // has to go before dst in the inner-most loop in some cases, but it
-          // cannot statically determine the exact distance (which depends on
-          // the value of m). In this case, we can use the most conservative
-          // order:
-          //
-          if (!src->comesBefore(dst)) {
-            // CASE 1. If the reported distance is not the same as their
-            // instruction sequence:
-            //
-            // --- program order --------
-            // DST -> SRC
-            // --- dependence reported --
-            // (SRC, DST, "I don't know the distance")
-            // --------------------------
-            // here, we conservatively choose that the distance to be 1 (so the
-            // ld in the next iteration already has to wait)
-            //
-            LLVM_DEBUG(llvm::errs() << "Dependence (distance unknown, "
-                                       "conservatively set to 1):\n";
-                       llvm::errs() << *src << "\n";
-                       llvm::errs() << "  precedes:\n";
-                       llvm::errs() << *dst << "\n";
-                       llvm::errs() << "  distance: " << 1 << "\n";
-
-            );
-            finalDistanceOrNoDependency = 1;
-          } else {
-            // CASE 2. If the reported distance is the same as their instruction
-            // sequence:
-            //
-            // --- program order --------
-            // SRC -> DST
-            // --- dependence reported --
-            // (SRC, DST, "I don't know the distance")
-            // --------------------------
-            // here, we conservatively choose that the distance to be 0 (so the
-            // st in the same iteration has to wait for the load).
-            //
-            LLVM_DEBUG(
-                llvm::errs() << "Dependence (distance unknown, conservatively "
-                                "set to 0):\n";
-                llvm::errs() << *src << "\n"; llvm::errs() << "  precedes:\n";
-                llvm::errs() << *dst << "\n";
-                llvm::errs() << "  distance: " << 0 << "\n";);
-            finalDistanceOrNoDependency = 0;
-          }
-        } else if (d->isOrdered()) {
-          if (/* When distance is available and it is not a RAR (trivial dep.)
-               */
-              *llvmAnalyzedDistance == 0) {
-            // Special case when dist == 0 (same BB): the analysis reports in
-            // both directions. Here we we can directly use program order to
-            // enforce:
-            //
-            // void test_memory_1(int a[N], int n) {
-            //   for (int i = 0; i < n; i++)
-            //     a[i] = a[i] + 5;
-            // }
-            // In this example, we technically cannot reorder the load/store
-            // w.r.t their iterations, so the analysis tells us that there is
-            // (RAW, 0) and (WAR, 0).
-            //
-            // In this case, we can use Instruction::comesBefore(...) to check
-            // the actual program order.
-            //
-            if (src->comesBefore(dst)) {
-              LLVM_DEBUG(
-                  llvm::errs() << "Dependence (same iteration or no loop):\n";
-                  llvm::errs() << *src << "\n"; llvm::errs() << "  precedes:\n";
-                  llvm::errs() << *dst << "\n";
-                  llvm::errs()
-                  << "  distance: " << *llvmAnalyzedDistance << "\n";);
-              finalDistanceOrNoDependency = *llvmAnalyzedDistance;
-            }
-          } else {
-            LLVM_DEBUG(
-                llvm::errs() << "Dependence:\n"; llvm::errs() << *src << "\n";
-                llvm::errs() << "  precedes:\n"; llvm::errs() << *dst << "\n";
-                llvm::errs()
-                << "  distance: " << *llvmAnalyzedDistance << "\n";);
-            finalDistanceOrNoDependency = *llvmAnalyzedDistance;
-          }
-        }
-
-        if (
-            // clang-format off
-            /* there is a dependency */
-            finalDistanceOrNoDependency &&
-            /* it reports both fwd and bwd directions, we just need one of them for the SDC constraints */
-            *finalDistanceOrNoDependency >= 0
-            // clang-format on
-        ) {
-          if (instToDepsMap.count(src) == 0) {
-            // This branch creates the list [dep1] if the predecessor
-            // instruction hasn't been visited yet
-            LLVMMemDependency newDep;
-            newDep.name = nameMapping[src];
-            newDep.destAndDepthAndDist.emplace_back(
-                nameMapping[dst], depth, *finalDistanceOrNoDependency);
-            instToDepsMap[src] = newDep;
-          } else {
-            // Otherwise, populate the existing list [dep1, dep2, ...] with the
-            // new dep.
-            instToDepsMap[src].destAndDepthAndDist.emplace_back(
-                nameMapping[dst], depth, *finalDistanceOrNoDependency);
-          }
-        }
-
-        LLVM_DEBUG(llvm::errs() << "-------------------------\n";);
-      }
+    // No dependence reported at all is a proof that the two never conflict.
+    if (!dep) {
+      depMatrix.setState(srcAccess, dstAccess, DependenceState::provenFalse());
+      continue;
     }
-  }
-  llvm::LLVMContext &ctx = llvmFunction.getContext();
 
-  for (auto [src, dests] : instToDepsMap) {
-    dests.toLLVMMetaDataNode(ctx, src);
+    depMatrix.setState(srcAccess, dstAccess,
+                       toDependenceState(*dep, srcAccess, dstAccess));
   }
-
-  return PreservedAnalyses::all();
 }
 
-// Polly-based implementation inherited from the legacy Dynamatic
-PreservedAnalyses MemDepAnalysisPass::runPollyBasedInLegacyDynamatic(
-    Function &llvmFunction, FunctionAnalysisManager &fam) {
-  llvm::LLVMContext &ctx = llvmFunction.getContext();
+/// \brief: Refines `depMatrix` with the analysis inherited from the legacy
+/// Dynamatic: Polly's polyhedral intersection of access relations, guided by
+/// the GIID dataflow checks.
+///
+/// An access that no Scop covers is never touched, so its entries stay
+/// unknown and are reported conservatively.
+void MemDepAnalysisPass::refineWithPollyAnalysis(Function &llvmFunction,
+                                                 FunctionAnalysisManager &fam,
+                                                 DependenceMatrix &depMatrix) {
 
   auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(llvmFunction);
-
   auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(llvmFunction);
-
-  std::vector<ScopAnalysisInfo> scopMetaInfos;
-
-  aliasAnalysis = &fam.getResult<AAManager>(llvmFunction);
+  auto &aliasAnalysis = fam.getResult<AAManager>(llvmFunction);
 
   std::deque<Region *> regionQueue;
   getAllRegions(*regionInfoAnalysis.getTopLevelRegion(), regionQueue);
 
-  Scop *scop;
-  for (Region *region : regionQueue) {
-    if ((scop = scopInfoAnalysis.getScop(region)))
-      processScop(*scop, scopMetaInfos);
-  }
-
-  SameScopHelper sameScopHelper;
-
-  for (auto &bb : llvmFunction) {
-    int scopId = indexAnalysis.getScopID(&bb);
-    // NOTE: If the BB is not in the scop, then we use alias analysis to check
-    // if they ever collide.
-    if (!indexAnalysis.isInScop(&bb))
-      continue;
-    for (auto &inst : bb) {
-      if (!inst.mayReadOrWriteMemory())
-        continue;
-      if (isa<CallInst>(&inst)) {
-        llvm::errs() << "Warning - Applying memory analysis on a function with "
-                        "a call instruction!\n";
-        continue;
-      }
-      sameScopHelper.instToScopId[&inst] = scopId;
-    }
-  }
-
-  auto nameMapping = nameAllLoadStores(llvmFunction);
-
-  // NOTE: LLVMMemDependency:
-  // A helper data structure that holds memory dependencies.
-  // It can dump the dependencies to many llvm meta data nodes (used in LLVM IR)
-  // or to an memory dependency attribute used in the handshake dialect.
-  std::map<Instruction *, LLVMMemDependency> instToDepsMap;
-  for (auto &[src, dst] : getDependencyPairs(llvmFunction, sameScopHelper)) {
-    assert(nameMapping.count(src) > 0 && "Unnamed load/store op!");
-    // In LLVM IR, one memory instruction might produce data that is needed by
-    // many successor instructions. E.g.,
-    //
-    // store %location, %data; name = "store1"
-    // %read_data1 = load %location; name = "load1"
-    // %read_data2 = load %location; name = "load2"
-    //
-    // Here, we have two RAW dependencies: dep1 = (store1, load1) and dep2 =
-    // (store1, load2). In LLVM IR, we annotate both of them on store1 as a list
-    // of dependencies [dep1, dep2].
-    //
-    // For each pair of memory dependencies:
-    // - dep: store -> load;
-    // - dep: store -> store;
-    if (instToDepsMap.count(src) == 0) {
-      // This branch creates the list [dep1] if the predecessor instruction
-      // hasn't been visited yet
-      LLVMMemDependency newDep;
-      newDep.name = nameMapping[src];
-      newDep.destAndDepthAndDist.emplace_back(nameMapping[dst], 0, 0);
-      instToDepsMap[src] = newDep;
-    } else {
-      // Otherwise, populate the existing list [dep1, dep2, ...] with the new
-      // dep.
-      instToDepsMap[src].destAndDepthAndDist.emplace_back(nameMapping[dst], 0,
-                                                          0);
-    }
-  }
-
-  for (auto [src, dests] : instToDepsMap) {
-    dests.toLLVMMetaDataNode(ctx, src);
-  }
-
-  return PreservedAnalyses::all();
+  for (Region *region : regionQueue)
+    if (Scop *scop = scopInfoAnalysis.getScop(region))
+      processScop(*scop, depMatrix, aliasAnalysis);
 }
 
 PreservedAnalyses MemDepAnalysisPass::run(Function &llvmFunction,
                                           FunctionAnalysisManager &fam) {
 
-  if (useDependenceAnalysis) {
-    return this->runDependenceAnalysisBased(llvmFunction, fam);
+  llvm::LLVMContext &ctx = llvmFunction.getContext();
+
+  auto nameMapping = nameAllLoadStores(llvmFunction);
+
+  // The state of every ordered pair of memory accesses in the function. Every
+  // entry starts out `Unknown`; each refinement below narrows the entries it
+  // can prove, and whatever is still `Unknown` at the end is conservatively
+  // treated as a real dependence.
+  DependenceMatrix depMatrix(collectMemoryAccesses(llvmFunction));
+
+  // Rule out the pairs that cannot be a dependence in the first place. These
+  // are not analysis results. The order matters: see the note on
+  // removeUnequalBase, which must come last of the three.
+  removeEqual(depMatrix);
+  removeRAR(depMatrix);
+  removeUnequalBase(depMatrix);
+
+  removeSucceedingPredecessor(depMatrix);
+  removeNonAliasing(depMatrix, fam.getResult<AAManager>(llvmFunction),
+                    fam.getResult<LoopAnalysis>(llvmFunction));
+
+  refineWithDependenceAnalysis(llvmFunction, fam, depMatrix);
+  refineWithPollyAnalysis(llvmFunction, fam, depMatrix);
+
+  LLVM_DEBUG(depMatrix.print(llvm::dbgs()););
+
+  // Group the edges by source access and serialize them onto the LLVM
+  // instructions, where translate-llvm-to-std picks them up and turns them
+  // into handshake::MemDependenceArrayAttr.
+  for (auto [srcAccess, deps] : depMatrix.toDependencyMap(nameMapping)) {
+    deps.toLLVMMetaDataNode(ctx, srcAccess);
   }
 
-  return this->runPollyBasedInLegacyDynamatic(llvmFunction, fam);
+  return PreservedAnalyses::all();
 }
 } // namespace
 
