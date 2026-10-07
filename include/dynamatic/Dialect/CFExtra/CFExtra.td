@@ -52,4 +52,11 @@ def RegionInputOp : CFExtra_Op<"region_input", [AllTypesMatch<["input", "result"
   }];
 }
 
+def TriggerMarkerOp : CFExtra_Op<"trigger_marker"> {
+  let summary = "Marker operation in a basic block to request an FTD token";
+  let arguments = (ins);
+  let results = (outs);
+  let assemblyFormat = "attr-dict";
+}
+
 #endif // CF_EXTRA_OPS_TD

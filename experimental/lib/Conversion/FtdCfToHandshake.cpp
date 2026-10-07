@@ -112,6 +112,51 @@ struct ConvertRegionInputOp
   }
 };
 
+struct ConvertTriggerMarkerOp
+    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::TriggerMarkerOp> {
+  using DynOpConversionPattern<dynamatic::cf_extra::TriggerMarkerOp>::DynOpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(dynamatic::cf_extra::TriggerMarkerOp srcOp, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto funcOp = srcOp->getParentOfType<handshake::FuncOp>();
+    if (!funcOp)
+      return rewriter.notifyMatchFailure(srcOp, "Expected handshake::FuncOp parent");
+
+    // 1. Function start token (last argument of handshake::FuncOp)
+    Value startValue = funcOp.getArguments().back();
+
+    // 2. Insert the seed constant in the entry block
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+
+    auto i32Type = rewriter.getIntegerType(32);
+    auto oneAttr = rewriter.getIntegerAttr(i32Type, 1);
+
+    // Create the constant in BB 0 triggered by startValue
+    auto seedCst = rewriter.create<handshake::ConstantOp>(
+        srcOp.getLoc(), oneAttr, startValue);
+    seedCst->setAttr("handshake.bb", rewriter.getUI32IntegerAttr(0));
+
+    // 3. Replace the marker in the target block with the consumer op
+    rewriter.setInsertionPoint(srcOp);
+
+    // If you need a sink just to terminate the token:
+    auto consumerOp = rewriter.create<handshake::SinkOp>(
+        srcOp.getLoc(), seedCst.getResult());
+
+    // Or if you have a custom Handshake op:
+    // auto consumerOp = rewriter.create<handshake::CustomOp>(
+    //     srcOp.getLoc(), seedCst.getResult());
+
+    inheritBB(srcOp, consumerOp);
+    namer.replaceOp(srcOp, consumerOp);
+    rewriter.eraseOp(srcOp);
+
+    return mlir::success();
+  }
+};
+
 struct AllocaOpConversion : public DynOpConversionPattern<memref::AllocaOp> {
   using DynOpConversionPattern<memref::AllocaOp>::DynOpConversionPattern;
 
@@ -349,6 +394,7 @@ struct FtdCfToHandshakePass
         /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
         ConvertPredicateOp,
         ConvertRegionInputOp,
+        ConvertTriggerMarkerOp,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -638,12 +684,12 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
     // constant is considered as sourcable, this will be the output of a source
     // component, otherwise it remains startValue
     Value controlValue;
-    if (cstOp->hasAttr("ftd.pseudo_cond")) {
+   /*  if (cstOp->hasAttr("ftd.pseudo_cond")) {
       // Trigger from the block argument / block control signal instead of startValue!
       Block *cstBlock = cstOp->getBlock();
       controlValue = cstBlock->getArguments().back(); // Block control token!
     }
-    else if (isCstSourcable(cstOp)) {
+    else  */if (isCstSourcable(cstOp)) {
       auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
       inheritBB(cstOp, sourceOp);
       controlValue = sourceOp.getResult();

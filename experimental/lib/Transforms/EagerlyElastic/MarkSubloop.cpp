@@ -16,9 +16,9 @@ struct EntryOpInfo {
 };
 
 struct RegionInfo {
-  mlir::Block *entryBlock;
-  llvm::SetVector<mlir::Block *> subblocks;
-  mlir::Block *exitBlock;
+  Block *entryBlock;
+  llvm::SetVector<Block *> subblocks;
+  Block *exitBlock;
 };
 
 // [START Boilerplate code for the MLIR pass]
@@ -121,6 +121,58 @@ void MarkSubloopPass::runOnOperation() {
 
   // iterate over all dom / postdom pairs
   for (mlir::Block &entry : cfg) {
+    if (entry.getNumSuccessors() == 1) {
+      // entry has a single successor that is the header of a loop
+      Block *loopHeader = entry.getSuccessor(0);
+
+      // find the end of the loop
+      Block *latch = nullptr;
+      for (Block *pred : loopHeader->getPredecessors()) {
+        if (domInfo.dominates(loopHeader, pred)) {
+          latch = pred;
+          break;
+        }
+      }
+
+      if (!latch) continue;
+
+      // collect all subblocks
+      llvm::SetVector<mlir::Block *> subBlocksSet;
+      subBlocksSet.insert(loopHeader);
+      subBlocksSet.insert(latch);    
+      for (mlir::Block &subblock : cfg) {
+        // subblock is dominated by the entry and postdominated by the exit
+        if (domInfo.properlyDominates(loopHeader, &subblock) &&
+            postDomInfo.properlyPostDominates(latch, &subblock)) {
+          subBlocksSet.insert(&subblock);
+        }
+      }
+      
+      // find the exitBlock after the latch
+      Block *exit = nullptr;
+      for (mlir::Block *succ : latch->getSuccessors()) {
+        if (succ != loopHeader) {
+          exit = succ;
+          break;
+        }
+      }
+
+      // add to validRegions
+      validRegions[&entry] = {&entry, std::move(subBlocksSet), exit};
+      continue;
+    }
+
+    // latches cannot be entries
+    bool isLatch = false;
+    for (mlir::Block *succ : entry.getSuccessors()) {
+      if (domInfo.dominates(succ, &entry)) {
+        isLatch = true;
+        break;
+      }
+    }
+    if (isLatch)
+      continue;
+
     for (mlir::Block &exit : cfg) {
       if (&entry == &exit) continue;
 
@@ -139,45 +191,12 @@ void MarkSubloopPass::runOnOperation() {
       }
       if (subBlocksSet.empty()) continue;
 
-      /* // If we already have a region for this entry that is smaller, skip
+      // If we already have a region for this entry that is smaller, skip
       auto it = validRegions.find(&entry);
       if (it != validRegions.end() && it->second.subblocks.size() <= subBlocksSet.size())
         continue;
       // Insert or overwrite with the shorter region
-      validRegions[&entry] = {&entry, std::move(subBlocksSet), &exit}; */
-
-      // verify that subblocks stay within the exit boundary
-      bool validSuccessors = true;
-      for (mlir::Block *subblock : subBlocksSet) {
-        for (mlir::Block *succ : subblock->getSuccessors()) {
-          if (!subBlocksSet.contains(succ) && succ != &exit) {
-            validSuccessors = false;
-            break;
-          }
-        }
-        if (!validSuccessors) break;
-      }
-
-      // verify that no control enters subblocks from anywhere except entry
-      bool validPredecessors = true;
-      for (mlir::Block *subblock : subBlocksSet) {
-        for (mlir::Block *pred : subblock->getPredecessors()) {
-          if (!subBlocksSet.contains(pred) && pred != &entry) {
-            validPredecessors = false;
-            break;
-          }
-        }
-        if (!validPredecessors) break;
-      }
-
-      if (validSuccessors && validPredecessors) {
-        // If we already have a region for this entry that is smaller, skip
-        auto it = validRegions.find(&entry);
-        if (it != validRegions.end() && it->second.subblocks.size() <= subBlocksSet.size())
-          continue;
-        // Insert or overwrite with the shorter region
-        validRegions[&entry] = {&entry, std::move(subBlocksSet), &exit};
-      }
+      validRegions[&entry] = {&entry, std::move(subBlocksSet), &exit};
     }
   }
 
@@ -188,6 +207,7 @@ void MarkSubloopPass::runOnOperation() {
   llvm::errs() << "size of validRegions: " << validRegions.size() << '\n';
 
   llvm::SmallVector<Attribute> allRegionsMetadata;
+  llvm::DenseSet<Block *> markedBlocks;
 
   // Process all discovered regions
   for (auto &[entryBlock, region] : validRegions) {
@@ -295,6 +315,16 @@ void MarkSubloopPass::runOnOperation() {
         namer.setName(predOp);
         // Rewire the data operand safely using setOperand on its specific index
         storeOp.setOperand(0, predOp->getResult(0));
+
+        // check whether i already have a marker in that block
+        Block *storeBlock = storeOp->getBlock();
+        if (markedBlocks.contains(storeBlock)) continue;
+        markedBlocks.insert(storeBlock);
+
+        // create the markerOp which will replace the control network
+        auto markerOp = builder.create<dynamatic::cf_extra::TriggerMarkerOp>(
+            storeOp.getLoc());
+        namer.setName(markerOp);
       }
     }
 
