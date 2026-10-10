@@ -597,13 +597,15 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
     non-selected data input does not need to have arrived when the result is
     produced: its token is killed when it arrives. `antitokenDepth` (default 1)
     is the maximum number of tokens that may be pending to be killed on one data
-    input, i.e., how far one data input may run ahead of the other.
+    input, i.e., how far one data input may run ahead of the other. With
+    `antitokenDepth` = 0, the select waits for the condition and both data
+    inputs, and consumes all three when the result is produced (join).
   }];
 
   let arguments = (ins ChannelType:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue,
                        OptionalAttr<ConfinedAttr<I64Attr,
-                         [IntMinValue<1>]>>:$antitokenDepth);
+                         [IntMinValue<0>]>>:$antitokenDepth);
   let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{

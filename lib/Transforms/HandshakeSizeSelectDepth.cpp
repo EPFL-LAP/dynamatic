@@ -7,9 +7,11 @@
 //===----------------------------------------------------------------------===//
 //
 // Sets the `antitokenDepth` attribute of each select inside a CFDFC to
-// ceil(max_latency / II), where II is the lowest II among the CFDFCs that
-// contain the select and max_latency is the maximum latency from the closest
-// fork that is an ancestor of both data inputs of the select to the select.
+// ceil(|latency_true - latency_false| / II), where II is the lowest II among
+// the CFDFCs that contain the select and latency_x is the maximum latency from
+// the closest fork that is an ancestor of both data inputs of the select to
+// data input x. The depth bounds how many iterations the faster data input may
+// run ahead of the slower one; a depth of 0 makes the select a join.
 //
 //===----------------------------------------------------------------------===//
 
@@ -25,6 +27,7 @@
 #include "llvm/Support/Debug.h"
 #include <cassert>
 #include <cmath>
+#include <cstdlib>
 #include <deque>
 #include <optional>
 
@@ -208,20 +211,25 @@ void HandshakeSizeSelectDepthPass::sizeSelects(handshake::FuncOp funcOp) {
     // shared by the two data inputs (see getMaxLatencyFrom)
     DenseMap<Operation *, std::optional<int64_t>> memo;
     DenseSet<Operation *> onPath;
-    int64_t maxLatency = std::max(
+    int64_t trueLatency =
         getMaxLatencyFrom(selectOp.getTrueValue(), forkOp, memo, onPath)
-            .value_or(0),
+            .value_or(0);
+    int64_t falseLatency =
         getMaxLatencyFrom(selectOp.getFalseValue(), forkOp, memo, onPath)
-            .value_or(0));
+            .value_or(0);
 
-    // Small tolerance so that, e.g., II = 1 / 0.1666... does not round up
+    // The faster data input runs ahead of the slower one by the difference of
+    // their latencies. Small tolerance so that, e.g., II = 1 / 0.1666... does
+    // not round up. Equal latencies give a depth of 0 (join).
+    int64_t latencyDiff = std::abs(trueLatency - falseLatency);
     int64_t depth = std::max<int64_t>(
-        1, static_cast<int64_t>(std::ceil(maxLatency / ii - 1e-6)));
+        0, static_cast<int64_t>(std::ceil(latencyDiff / ii - 1e-6)));
     selectOp.setAntitokenDepthAttr(
         IntegerAttr::get(IntegerType::get(ctx, 64), depth));
     LLVM_DEBUG(llvm::dbgs() << getUniqueName(selectOp) << ": II = " << ii
                             << ", fork = " << getUniqueName(forkOp)
-                            << ", max latency = " << maxLatency
+                            << ", true latency = " << trueLatency
+                            << ", false latency = " << falseLatency
                             << ", antitokenDepth = " << depth << "\n");
   });
 }

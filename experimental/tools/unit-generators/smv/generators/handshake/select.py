@@ -4,12 +4,15 @@ from generators.support.utils import *
 def generate_select(name, params):
     data_type = SmvScalarType(params[ATTR_BITWIDTH])
     # Maximum number of tokens that may be owed to be killed on one data input,
-    # i.e., how far one data input may run ahead of the other
+    # i.e., how far one data input may run ahead of the other. With 0, the
+    # select waits for the condition and both data inputs (join).
     antitoken_depth = params.get(ATTR_ANTITOKEN_DEPTH, 1)
-    if antitoken_depth < 1:
+    if antitoken_depth < 0:
         raise ValueError(
-            f"antitoken_depth must be at least 1, got {antitoken_depth}")
+            f"antitoken_depth must be non-negative, got {antitoken_depth}")
 
+    if antitoken_depth == 0:
+        return _generate_join_select(name)
     return _generate_select(name, data_type, antitoken_depth)
 
 
@@ -79,5 +82,24 @@ MODULE {name} (condition, condition_valid, trueValue, trueValue_valid, falseValu
   falseValue_ready := !falseValue_valid | fireFalse | discardFalse;
   condition_ready := !condition_valid | fireTrue | fireFalse;
   result_valid := canTrue | canFalse;
+  result := condition ? trueValue : falseValue;
+"""
+
+
+def _generate_join_select(name):
+    return f"""
+-- Select with antitoken depth 0: waits for the condition and both data inputs,
+-- and consumes all three when the result is produced (join).
+MODULE {name} (condition, condition_valid, trueValue, trueValue_valid, falseValue, falseValue_valid, result_ready)
+  DEFINE
+  allValid := condition_valid & trueValue_valid & falseValue_valid;
+  fire := allValid & result_ready;
+
+  -- output
+  DEFINE
+  trueValue_ready := !trueValue_valid | fire;
+  falseValue_ready := !falseValue_valid | fire;
+  condition_ready := !condition_valid | fire;
+  result_valid := allValid;
   result := condition ? trueValue : falseValue;
 """
