@@ -602,7 +602,8 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
 
   let arguments = (ins ChannelType:$condition, ChannelType:$trueValue,
                        ChannelType:$falseValue,
-                       OptionalAttr<ConfinedAttr<I64Attr, [IntMinValue<1>]>>:$antitokenDepth);
+                       OptionalAttr<ConfinedAttr<I64Attr,
+                         [IntMinValue<1>]>>:$antitokenDepth);
   let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{
