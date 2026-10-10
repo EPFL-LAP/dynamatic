@@ -150,9 +150,11 @@ def HandshakeSizeSelectDepth
     `handshake.cfdfcToBBList` function attributes set by buffer placement) that
     contain the select's basic block. Then finds the closest fork that is an
     ancestor of both data inputs of the select, computes the maximum latency
-    from that fork to the select, and sets the select's `antitokenDepth`
-    attribute to ceil(max_latency / II) (at least 1). Selects outside of any
-    CFDFC, or without a common ancestor fork, are left unchanged.
+    from that fork to each data input, and sets the select's `antitokenDepth`
+    attribute to ceil(|latency_true - latency_false| / II), i.e., how many
+    iterations the faster data input may run ahead of the slower one. Equal
+    latencies give a depth of 0, which makes the select a join. Selects outside
+    of any CFDFC, or without a common ancestor fork, are left unchanged.
   }];
 }
 

@@ -2,11 +2,14 @@
 def generate_select(name, parameters):
     bitwidth = parameters["bitwidth"]
     # Maximum number of tokens that may be owed to be killed on one data input,
-    # i.e., how far one data input may run ahead of the other
+    # i.e., how far one data input may run ahead of the other. With 0, the
+    # select waits for the condition and both data inputs (join).
     antitoken_depth = parameters.get("antitoken_depth", 1)
-    if antitoken_depth < 1:
+    if antitoken_depth < 0:
         raise ValueError(
-            f"antitoken_depth must be at least 1, got {antitoken_depth}")
+            f"antitoken_depth must be non-negative, got {antitoken_depth}")
+    if antitoken_depth == 0:
+        return _generate_join_select(name, bitwidth)
     return _generate_select(name, bitwidth, antitoken_depth)
 
 
@@ -136,3 +139,43 @@ module {name}(
 endmodule
 """
     return selector
+
+
+def _generate_join_select(name, bitwidth):
+    return f"""
+// Module of select with antitoken depth 0
+// The selector waits for the condition and both data inputs, and consumes all
+// three when the result is produced (join): no token is killed afterwards.
+module {name}(
+  // inputs
+  input  clk,
+  input  rst,
+  input  condition,
+  input  condition_valid,
+  input  [{bitwidth}-1 : 0] trueValue,
+  input  trueValue_valid,
+  input  [{bitwidth}-1 : 0] falseValue,
+  input  falseValue_valid,
+  input  result_ready,
+  // outputs
+  output  [{bitwidth}-1 : 0] result,
+  output  result_valid,
+  output  condition_ready,
+  output  trueValue_ready,
+  output  falseValue_ready
+);
+
+  wire allValid, fire;
+
+  assign allValid = condition_valid & trueValue_valid & falseValue_valid;
+  assign fire = allValid & result_ready;
+
+  assign result_valid = allValid;
+  assign trueValue_ready = !trueValue_valid | fire;
+  assign falseValue_ready = !falseValue_valid | fire;
+  assign condition_ready = !condition_valid | fire;
+
+  assign result = condition ? trueValue : falseValue;
+
+endmodule
+"""

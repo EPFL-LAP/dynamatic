@@ -8,11 +8,12 @@ def generate_select(name, parameters):
     bitwidth = parameters["bitwidth"]
     extra_signals = parameters["extra_signals"]
     # Maximum number of tokens that may be owed to be killed on one data input,
-    # i.e., how far one data input may run ahead of the other
+    # i.e., how far one data input may run ahead of the other. With 0, the
+    # select waits for the condition and both data inputs (join).
     antitoken_depth = parameters.get("antitoken_depth", 1)
-    if antitoken_depth < 1:
+    if antitoken_depth < 0:
         raise ValueError(
-            f"antitoken_depth must be at least 1, got {antitoken_depth}")
+            f"antitoken_depth must be non-negative, got {antitoken_depth}")
 
     if extra_signals:
         return _generate_select_signal_manager(name, bitwidth, extra_signals,
@@ -22,7 +23,6 @@ def generate_select(name, parameters):
 
 
 def _generate_select(name, bitwidth, antitoken_depth):
-    cnt_bitwidth = antitoken_depth.bit_length()
 
     entity = f"""
 library ieee;
@@ -51,6 +51,10 @@ entity {name} is
 end entity;
 """
 
+    if antitoken_depth == 0:
+        return entity + _generate_join_architecture(name)
+
+    cnt_bitwidth = antitoken_depth.bit_length()
     architecture = f"""
 -- Architecture of selector
 -- trueValue is selected when condition = 1, falseValue when condition = 0.
@@ -159,6 +163,30 @@ end architecture;
 """
 
     return entity + architecture
+
+
+def _generate_join_architecture(name):
+    return f"""
+-- Architecture of selector with antitoken depth 0
+-- The selector waits for the condition and both data inputs, and consumes all
+-- three when the result is produced (join): no token is killed afterwards.
+architecture arch of {name} is
+  signal allValid, fire : std_logic;
+begin
+
+  allValid <= condition_valid and trueValue_valid and falseValue_valid;
+  fire     <= allValid and result_ready;
+
+  result_valid     <= allValid;
+  trueValue_ready  <= (not trueValue_valid) or fire;
+  falseValue_ready <= (not falseValue_valid) or fire;
+  condition_ready  <= (not condition_valid) or fire;
+
+  result <= falseValue when (condition(0) = '0') else
+            trueValue;
+
+end architecture;
+"""
 
 
 def _generate_concat(bitwidth: int, concat_layout: ConcatLayout):
