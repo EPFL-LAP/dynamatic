@@ -22,6 +22,7 @@ add_dynamatic_library(DynamaticTransforms
   RemovePolygeistAttributes.cpp
   ScfRotateForLoops.cpp
   ScfSimpleIfToSelect.cpp
+  HandshakeSizeSelectDepth.cpp
   DropUnlistedFunctions.cpp
   HandshakeTreeHeightReduction.cpp
   HandshakeSetUnitImplAttributes.cpp

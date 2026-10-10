@@ -418,6 +418,7 @@ else
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$FAST_TOKEN_DELIVERY \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
+    --handshake-size-select-depth \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

@@ -742,10 +742,10 @@ void BufferPlacementMILP::addSteadyStateReachabilityConstraints(CFDFC &cfdfc) {
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
     /// executed. Temporarily, emulate the same behavior obtained from passing
-    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// our DOTs to the old buffer pass by assuming the "false" input is always
     /// the least executed one
     if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
-      if (channel == selOp.getTrueValue())
+      if (channel == selOp.getFalseValue())
         continue;
 
     // Retrieve the struct storing MILP variables
@@ -789,10 +789,10 @@ void BufferPlacementMILP::
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
     /// executed. Temporarily, emulate the same behavior obtained from passing
-    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// our DOTs to the old buffer pass by assuming the "false" input is always
     /// the least executed one
     if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
-      if (channel == selOp.getTrueValue())
+      if (channel == selOp.getFalseValue())
         continue;
 
     // The channel must have variables for the data signal
@@ -868,10 +868,10 @@ void BufferPlacementMILP::
     /// TODO: The legacy implementation does not add any constraints here for
     /// the input channel to select operations that is less frequently
     /// executed. Temporarily, emulate the same behavior obtained from passing
-    /// our DOTs to the old buffer pass by assuming the "true" input is always
+    /// our DOTs to the old buffer pass by assuming the "false" input is always
     /// the least executed one
     if (auto selOp = dyn_cast<handshake::SelectOp>(dstOp))
-      if (channel == selOp.getTrueValue())
+      if (channel == selOp.getFalseValue())
         continue;
 
     // The channel must have variables for the data and ready signals

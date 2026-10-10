@@ -141,6 +141,21 @@ def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> 
   }];
 }
 
+def HandshakeSizeSelectDepth
+    : Pass<"handshake-size-select-depth", "mlir::ModuleOp"> {
+  let summary = "Size the antitoken depth of selects from the CFDFC II.";
+  let description = [{
+    For each `handshake::SelectOp` inside a CFDFC, takes the lowest II among
+    the CFDFCs (from the `handshake.cfdfcThroughput` and
+    `handshake.cfdfcToBBList` function attributes set by buffer placement) that
+    contain the select's basic block. Then finds the closest fork that is an
+    ancestor of both data inputs of the select, computes the maximum latency
+    from that fork to the select, and sets the select's `antitokenDepth`
+    attribute to ceil(max_latency / II) (at least 1). Selects outside of any
+    CFDFC, or without a common ancestor fork, are left unchanged.
+  }];
+}
+
 def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
