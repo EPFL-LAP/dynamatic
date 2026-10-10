@@ -74,6 +74,9 @@ test_generator -t mux -p size=2 data_bitwidth=16 index_bitwidth=16
 
 echo -e "\nTesting select..."
 test_generator -t select -p bitwidth=0
+test_generator -t select -p bitwidth=16
+test_generator -t select -p bitwidth=0 antitoken_depth=1
+test_generator -t select -p bitwidth=16 antitoken_depth=4
 
 echo -e "\nTesting sink..."
 test_generator -t sink -p bitwidth=0
