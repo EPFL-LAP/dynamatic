@@ -592,8 +592,17 @@ def Handshake_SelectOp : Handshake_Arith_Op<"select", [
 ]> {
   let summary = "Select a value based on a 1-bit predicate.";
 
+  let description = [{
+    Selects trueValue when the condition is 1, falseValue otherwise. The
+    non-selected data input does not need to have arrived when the result is
+    produced: its token is killed when it arrives. `antitokenDepth` (default 1)
+    is the maximum number of tokens that may be pending to be killed on one data
+    input, i.e., how far one data input may run ahead of the other.
+  }];
+
   let arguments = (ins ChannelType:$condition, ChannelType:$trueValue,
-                       ChannelType:$falseValue);
+                       ChannelType:$falseValue,
+                       OptionalAttr<ConfinedAttr<I64Attr, [IntMinValue<1>]>>:$antitokenDepth);
   let results = (outs ChannelType:$result);
 
   let extraClassDeclaration = [{

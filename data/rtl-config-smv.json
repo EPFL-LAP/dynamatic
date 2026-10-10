@@ -88,7 +88,13 @@
   },
   {
     "name": "handshake.select",
-    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t select -p bitwidth=$BITWIDTH",
+    "parameters": [
+      {
+        "name": "ANTITOKEN_DEPTH",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/experimental/tools/unit-generators/smv/smv-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.smv -t select -p bitwidth=$BITWIDTH antitoken_depth=$ANTITOKEN_DEPTH",
     "hdl": "smv"
   },
   {
