@@ -734,7 +734,8 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
         // Data bitwidth
         addType("DATA_TYPE", selectOp.getTrueValue());
         // Maximum number of tokens pending to be killed on one data input
-        addUnsigned("ANTITOKEN_DEPTH", selectOp.getAntitokenDepth().value_or(1));
+        addUnsigned("ANTITOKEN_DEPTH",
+                    selectOp.getAntitokenDepth().value_or(1));
       })
       .Case<handshake::CmpFOp>([&](handshake::CmpFOp cmpFOp) {
         // Predicate and bitwidth
