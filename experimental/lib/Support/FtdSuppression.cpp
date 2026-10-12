@@ -41,7 +41,9 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/RegionGraphTraits.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/SCCIterator.h"
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
@@ -1539,6 +1541,41 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
     nodeSet.insert(b);
   }
 
+  // Keep inner loops whole: if a dependency lies on a cycle that does not
+  // contain the producer (an inner loop between the producer and the
+  // consumer), keep all the decision blocks of that cycle. Otherwise the cycle
+  // can vanish from the decision graph (e.g., when the block of the backedge
+  // is not a dependency), so a condition produced on every iteration of the
+  // inner loop is seen at loop level 0 and is not demoted to its value at the
+  // loop exit, leaving one token per extra iteration unconsumed.
+  //
+  // Example: an inner loop with two exits in the body of an outer loop
+  // (`while (q > 0) { if (p[q] == t) break; q = next[q]; }`):
+  //
+  //   bb6 -> bb7, bb9    (c6: q > 0)
+  //   bb7 -> bb10, bb8   (c7: p[q] == t, break)
+  //   bb8 -> bb7, bb9    (c8: q > 0, backedge or exit)
+  //   bb9 -> bb10
+  //
+  // From bb6 to bb10, if the dependencies are bb6 and bb7 only, the decision
+  // graph is bb6 -> bb7 -> bb10 without the cycle bb7 <-> bb8. c7 then looks
+  // like a value produced once per iteration of the outer loop, although bb7
+  // runs once per iteration of the inner loop
+  if (rawGraph.newProd) {
+    for (auto sccIt = llvm::scc_begin(rawGraph.newProd); !sccIt.isAtEnd();
+         ++sccIt) {
+      const std::vector<Block *> &scc = *sccIt;
+      if (!sccIt.hasCycle() || llvm::is_contained(scc, rawGraph.newProd) ||
+          llvm::none_of(scc,
+                        [&](Block *b) { return dependencies.contains(b); }))
+        continue;
+      for (Block *b : scc) {
+        if (!b->empty() && isa<cf::CondBranchOp>(b->back()))
+          nodeSet.insert(b);
+      }
+    }
+  }
+
   // 2. Setup New Container
   auto newL = std::make_unique<ftd::LocalCFG>();
   OpBuilder builder(rawGraph.containerOp->getContext());
@@ -2467,11 +2504,44 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     DenseSet<Block *> dgDeps =
         dgCDA.getAllBlockDeps()[level0DG->newCons].allControlDeps;
 
-    // Private registry: reuse the already-demoted level-0 condition wires
-    // (shared via the demotion cache in demotionHelper), then build this
-    // delivery's own distribution branches into it.
+    // Private registry: register the level-0 condition wires, then build this
+    // delivery's own distribution branches into it. The loop nesting of a
+    // variable is read from this stretch's decision graph, since the main one
+    // may not contain the loop (e.g., the dominator->consumer graph can skip
+    // an inner loop that lies between the dominator and the producer). A wire
+    // already demoted by demotionHelper is reused through its cache; otherwise
+    // it is demoted on this stretch's graph.
+    //
+    // Example: with the inner loop of buildDecisionGraph's example, deliver a
+    // value produced in bb9 to a gamma in bb10, with bb6 as the dominator. The
+    // main graph bb6 -> bb10 only depends on c6, so demotionHelper sees no
+    // inner loop. The stretch bb6 -> bb9 goes through the inner loop (bb9 is
+    // reached from bb6 or by exiting through bb8), so its condition uses c7,
+    // which must be demoted to its value at the loop exit. With the raw c7,
+    // the condition consumes one c7 per outer iteration while bb7 produces one
+    // per inner iteration: the extra tokens pile up in the fork of c7 until
+    // the circuit deadlocks
+    DenseMap<Block *, Block *> origToLocalDG;
+    for (auto [dgBlock, origBlock] : fullDG->origMap)
+      if (origBlock)
+        origToLocalDG[origBlock] = dgBlock;
+    CyclicDemotionHelper localDemotionHelper(
+        builder, funcOp.getContext(), bi, cyc, origToLocalDG,
+        consumer->getLoc(), consumer->getBlock(), nullptr, &shadow);
     SignalRegistry localRegistry;
-    demotionHelper.preRegisterDemotedValues(level0DG, localRegistry);
+    for (Block *b : level0DG->topoOrder) {
+      Block *origBlock = level0DG->origMap.lookup(b);
+      if (!origBlock)
+        continue;
+      std::string var = bi.getBlockCondition(origBlock);
+      if (localDemotionHelper.getVarNativeLevel(var) == 0)
+        continue;
+      CyclicDemotionHelper &helper = demotionHelper.getVarNativeLevel(var) > 0
+                                         ? demotionHelper
+                                         : localDemotionHelper;
+      if (Value demoted = helper.getValueAtLevel(var, 0))
+        localRegistry.registerSignal(var, {}, demoted);
+    }
     buildDistributionNetwork(builder, *level0DG, bi, localRegistry, nullptr,
                              &shadow);
 
