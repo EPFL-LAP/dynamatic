@@ -30,24 +30,43 @@ std::string ftd::BlockIndexing::getBlockCondition(Block *block) const {
 }
 
 ftd::BlockIndexing::BlockIndexing(Region &region) {
-  mlir::DominanceInfo domInfo;
-
-  // Create a vector with all the blocks
-  SmallVector<Block *> allBlocks;
-  for (Block &bb : region.getBlocks())
-    allBlocks.push_back(&bb);
-
-  // Sort the vector according to the dominance information, so that each
-  // block comes after its dominators.
-  llvm::sort(allBlocks.begin(), allBlocks.end(),
-             [&](Block *a, Block *b) { return domInfo.dominates(a, b); });
-
-  // Associate a smaller index in the map to the blocks at higher levels of the
-  // dominance tree
-  for (auto [blockID, bb] : llvm::enumerate(allBlocks)) {
-    indexToBlock.insert({blockID, bb});
-    blockToIndex.insert({bb, blockID});
+  // Index the blocks in region order, which `--sort-blocks-rpo` sets to a
+  // reverse postorder: if Bi dominates Bj, or Bj is reachable from Bi without
+  // going through a backedge, then i < j. Sorting by dominance alone does not
+  // order the blocks that do not dominate each other, while the users of the
+  // indexing rely on that order (e.g., an edge to a block with a smaller index
+  // is a backedge).
+  //
+  // Example: a loop with two exits (`while (q > 0) { if (p[q] == t) break;
+  // q = next[q]; }`), where bb2 is the loop header and bb3 the latch:
+  //
+  //   bb1 -> bb2, bb4
+  //   bb2 -> bb5, bb3    (exit when q == 0)
+  //   bb3 -> bb2, bb4    (backedge, or exit on break)
+  //   bb4 -> bb5
+  //
+  // bb2 and bb4 do not dominate each other, so a dominance sort may index bb4
+  // before bb2. The forward edge bb3 -> bb4 would then look like a backedge,
+  // and bb2 -> bb3 -> bb4 like a path going backwards
+  for (auto [blockID, bb] : llvm::enumerate(region.getBlocks())) {
+    indexToBlock.insert({blockID, &bb});
+    blockToIndex.insert({&bb, blockID});
   }
+
+#ifndef NDEBUG
+  if (region.hasOneBlock())
+    return;
+  mlir::DominanceInfo domInfo;
+  for (Block &bb : llvm::drop_begin(region)) {
+    if (!domInfo.isReachableFromEntry(&bb))
+      continue;
+    auto *node = domInfo.getNode(&bb);
+    assert(node && node->getIDom() &&
+           blockToIndex.lookup(node->getIDom()->getBlock()) <
+               blockToIndex.lookup(&bb) &&
+           "blocks are not sorted in reverse postorder");
+  }
+#endif
 }
 
 std::optional<Block *>
