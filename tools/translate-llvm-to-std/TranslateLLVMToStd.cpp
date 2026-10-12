@@ -154,7 +154,9 @@ static const llvm::Value *findBase(llvm::Value *ptr) {
           << "The index value is calculated from multiple base addresses!\n";
       llvm::errs() << "List of addresses:\n";
       for (const auto *addr : baseArray) {
-        addr->dump();
+        // Use print() since dump() is unavailable in release builds of LLVM
+        addr->print(llvm::errs());
+        llvm::errs() << "\n";
       }
     });
     llvm::report_fatal_error(

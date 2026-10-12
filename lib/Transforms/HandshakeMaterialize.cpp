@@ -409,7 +409,13 @@ struct HandshakeMaterializePass
 
   using HandshakeMaterializeBase::HandshakeMaterializeBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
 
@@ -450,6 +456,12 @@ struct HandshakeMaterializePass
       promoteEagerToLazyForks(funcOp);
 
     assert(succeeded(verifyIRMaterialized(modOp)) && "IR is not materialized");
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace
