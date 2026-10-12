@@ -169,7 +169,13 @@ std::string BLIFFileManager::getBlifFilePathForHandshakeOp(Operation *op) {
   if (blifFileName != "") {
     // Check if the file exists
     if (!std::filesystem::exists(blifFileName)) {
-      llvm::errs() << "BLIF file for operation `" << getUniqueName(op)
+      // Read the name attribute directly since DynamaticSupport does not link
+      // against DynamaticAnalysis (where `getUniqueName` is defined)
+      auto nameAttr =
+          op->getAttrOfType<mlir::StringAttr>(NameAnalysis::ATTR_NAME);
+      llvm::errs() << "BLIF file for operation `"
+                   << (nameAttr ? nameAttr.getValue()
+                                : op->getName().getStringRef())
                    << "` does not exist: " << blifFileName
                    << ". Check the file path specified for this operation is "
                       "correct. If it is not present, you should generate it "
