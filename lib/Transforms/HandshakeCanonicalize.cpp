@@ -149,9 +149,23 @@ struct DowngradeIndexlessControlMerge
         cmergeOp.getLoc(), cmergeOp->getOperands());
     inheritBB(cmergeOp, mergeOp);
 
-    // Replace the cmerge's data result with the merge's result, erase any
-    // sinks consuming the index result, and finally delete the cmerge
-    rewriter.replaceAllUsesWith(cmergeOp.getResult(), mergeOp.getResult());
+    // A cmerge contains a slot that breaks the ready path, while a merge gets
+    // its slots from buffer placement, which requires one only on the output
+    // of a merge on a cycle. Canonicalization runs after buffer placement, so
+    // keep the slot as an explicit buffer when the cmerge is on a cycle:
+    // dropping it changes the capacity of the cycle
+    Value newResult = mergeOp.getResult();
+    if (isChannelOnCycle(cmergeOp.getResult())) {
+      auto bufOp = rewriter.create<handshake::BufferOp>(
+          cmergeOp.getLoc(), mergeOp.getResult(), /*numSlots=*/1,
+          handshake::BufferType::ONE_SLOT_BREAK_R);
+      inheritBB(cmergeOp, bufOp);
+      newResult = bufOp.getResult();
+    }
+
+    // Replace the cmerge's data result with the new result, erase any sinks
+    // consuming the index result, and finally delete the cmerge
+    rewriter.replaceAllUsesWith(cmergeOp.getResult(), newResult);
     eraseSinkUsers(indexRes, rewriter);
     rewriter.eraseOp(cmergeOp);
     return success();

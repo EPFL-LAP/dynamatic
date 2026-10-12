@@ -70,8 +70,10 @@ initial begin : read_file_process
     integer i;
     transaction_idx = 0;
 
-    wait(rst === 0);
-    @(write_process_done);
+    // Load the memory when the reset is released, as the VHDL testbench does
+    // before the circuit starts: waiting for the write process here loads it
+    // after the start token, so loads issued right away read zeros
+    @(negedge rst);
     fp = $fopen(TV_IN,"r");
     if(fp == 0) begin       // Failed to open file
         $display("Failed to open file \"%s\"!", TV_IN);

@@ -10,9 +10,20 @@ def generate_merge(name, params):
     bitwidth = params["bitwidth"]
     extra_signals = params.get("extra_signals", None)
 
+    # The merge has no internal slot: buffer placement adds the slots it needs
+    # (e.g., on the output of a merge that is on a cycle)
     if extra_signals:
         return _generate_merge_signal_manager(name, size, bitwidth, extra_signals)
-    elif bitwidth == 0:
+    return generate_merge_notehb(name, {"size": size, "bitwidth": bitwidth})
+
+
+def generate_merge_with_tehb(name, params):
+    # Merge followed by a slot that breaks the ready path, for units that
+    # instantiate a merge internally and rely on that slot (e.g., spec_commit)
+    size = params["size"]
+    bitwidth = params["bitwidth"]
+
+    if bitwidth == 0:
         return _generate_merge_dataless(name, size)
     else:
         return _generate_merge(name, size, bitwidth)
@@ -164,4 +175,7 @@ def _generate_merge_signal_manager(name, size, bitwidth, extra_signals):
             "extra_signals": extra_signals
         }],
         extra_signals,
-        lambda name: _generate_merge(name, size, bitwidth + extra_signals_bitwidth))
+        lambda name: generate_merge_notehb(name, {
+            "size": size,
+            "bitwidth": bitwidth + extra_signals_bitwidth,
+        }))

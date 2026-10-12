@@ -1,5 +1,5 @@
 from generators.handshake.cond_br import generate_cond_br
-from generators.handshake.merge import generate_merge
+from generators.handshake.merge import generate_merge_with_tehb
 from generators.support.signal_manager.utils.concat import ConcatLayout
 from generators.support.signal_manager.utils.generation import generate_concat, generate_slice
 from generators.support.signal_manager.utils.entity import generate_entity
@@ -24,7 +24,7 @@ def _generate_spec_commit(name, bitwidth):
         generate_cond_br(cond_br_name, {
             "bitwidth": bitwidth,
         }) + \
-        generate_merge(merge_name, {
+        generate_merge_with_tehb(merge_name, {
             "size": 2,
             "bitwidth": bitwidth,
         })
