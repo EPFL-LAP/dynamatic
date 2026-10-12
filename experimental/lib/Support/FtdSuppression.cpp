@@ -1548,19 +1548,6 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
   // is not a dependency), so a condition produced on every iteration of the
   // inner loop is seen at loop level 0 and is not demoted to its value at the
   // loop exit, leaving one token per extra iteration unconsumed.
-  //
-  // Example: an inner loop with two exits in the body of an outer loop
-  // (`while (q > 0) { if (p[q] == t) break; q = next[q]; }`):
-  //
-  //   bb6 -> bb7, bb9    (c6: q > 0)
-  //   bb7 -> bb10, bb8   (c7: p[q] == t, break)
-  //   bb8 -> bb7, bb9    (c8: q > 0, backedge or exit)
-  //   bb9 -> bb10
-  //
-  // From bb6 to bb10, if the dependencies are bb6 and bb7 only, the decision
-  // graph is bb6 -> bb7 -> bb10 without the cycle bb7 <-> bb8. c7 then looks
-  // like a value produced once per iteration of the outer loop, although bb7
-  // runs once per iteration of the inner loop
   if (rawGraph.newProd) {
     for (auto sccIt = llvm::scc_begin(rawGraph.newProd); !sccIt.isAtEnd();
          ++sccIt) {
@@ -2511,16 +2498,6 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     // an inner loop that lies between the dominator and the producer). A wire
     // already demoted by demotionHelper is reused through its cache; otherwise
     // it is demoted on this stretch's graph.
-    //
-    // Example: with the inner loop of buildDecisionGraph's example, deliver a
-    // value produced in bb9 to a gamma in bb10, with bb6 as the dominator. The
-    // main graph bb6 -> bb10 only depends on c6, so demotionHelper sees no
-    // inner loop. The stretch bb6 -> bb9 goes through the inner loop (bb9 is
-    // reached from bb6 or by exiting through bb8), so its condition uses c7,
-    // which must be demoted to its value at the loop exit. With the raw c7,
-    // the condition consumes one c7 per outer iteration while bb7 produces one
-    // per inner iteration: the extra tokens pile up in the fork of c7 until
-    // the circuit deadlocks
     DenseMap<Block *, Block *> origToLocalDG;
     for (auto [dgBlock, origBlock] : fullDG->origMap)
       if (origBlock)

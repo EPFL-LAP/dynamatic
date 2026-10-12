@@ -434,22 +434,6 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       // operands after it, since a definition later on a path overrides the
       // earlier ones. Dominance alone is not enough: it does not order blocks
       // that do not dominate each other.
-      //
-      // Example: a loop with two exits, where c1, c2 and c3 are the
-      // conditions of bb1, bb2 and bb3 (true successor first):
-      //
-      //   bb1 -> bb2, bb4
-      //   bb2 -> bb5, bb3    (loop header, exit 1)
-      //   bb3 -> bb2, bb4    (latch, exit 2)
-      //   bb4 -> bb5
-      //
-      // The phi in bb5 takes a value from bb2 and one from bb4, which do not
-      // dominate each other. On the path bb1 -> bb2 -> bb3 -> bb4 -> bb5 the
-      // value from bb4 overrides the one from bb2, so the bb2 input must avoid
-      // bb4 and must come first. With the order [bb4, bb2], the bb2 input does
-      // not avoid bb4 and gets c1.c2 + c1.~c3, which overlaps with the bb4
-      // input (~c1 + ~c2.~c3) on c1.~c2.~c3; the gamma expansion then runs
-      // out of conditions to tell them apart
       SmallVector<GateInput *> phiOperands = phi->operands;
       llvm::stable_sort(phiOperands, [&](GateInput *a, GateInput *b) {
         return bi.isLess(a->getBlock(), b->getBlock());

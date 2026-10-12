@@ -265,18 +265,6 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
 // is then the value at its input from outside its loop. Any other Mux (e.g., a
 // MU, whose loop input is not its own output) produces a value of its own and
 // ends the search.
-//
-// Example: in jacobi_1d_imper, the outer loop (bb1-bb4) contains two inner
-// loops, bb2 and bb3, and the straight-to-the-queue pass orders the LSQ group
-// allocations of bb2 after those of bb3 in the previous outer iteration:
-//
-//   mux8  = mux [start, mux8 regenerated]          (bb1, regenerate start)
-//   mux10 = mux [mux8, mux10 regenerated]          (bb2)
-//   mux15 = mux [start, bb3 token at loop exit]    (bb1, MU)
-//   mux12 = mux [mux15, mux12 regenerated]         (bb2)
-//
-// Going through any Mux would resolve both mux10 and mux12 to `start`, merge
-// them, and drop the dependency of bb2 on bb3
 Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
   Value val = muxOp.getDataOperands()[idx];
   auto prodMux = val.getDefiningOp<handshake::MuxOp>();

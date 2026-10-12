@@ -36,18 +36,6 @@ ftd::BlockIndexing::BlockIndexing(Region &region) {
   // order the blocks that do not dominate each other, while the users of the
   // indexing rely on that order (e.g., an edge to a block with a smaller index
   // is a backedge).
-  //
-  // Example: a loop with two exits (`while (q > 0) { if (p[q] == t) break;
-  // q = next[q]; }`), where bb2 is the loop header and bb3 the latch:
-  //
-  //   bb1 -> bb2, bb4
-  //   bb2 -> bb5, bb3    (exit when q == 0)
-  //   bb3 -> bb2, bb4    (backedge, or exit on break)
-  //   bb4 -> bb5
-  //
-  // bb2 and bb4 do not dominate each other, so a dominance sort may index bb4
-  // before bb2. The forward edge bb3 -> bb4 would then look like a backedge,
-  // and bb2 -> bb3 -> bb4 like a path going backwards
   for (auto [blockID, bb] : llvm::enumerate(region.getBlocks())) {
     indexToBlock.insert({blockID, &bb});
     blockToIndex.insert({&bb, blockID});
