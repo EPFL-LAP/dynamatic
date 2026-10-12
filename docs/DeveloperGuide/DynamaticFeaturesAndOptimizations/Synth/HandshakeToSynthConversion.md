@@ -31,7 +31,7 @@ The pass executes in two sequential steps, each building directly on the output 
 
 ## Pre-check
 
-Before Step 1 begins, `runDynamaticPass()` walks every operation inside the `handshake.func` and asserts that it implements `BLIFImplInterface` and carries a non-empty BLIF file path. Any operation that fails this check signals a pass failure with an error message directing the user to run `--mark-handshake-blif-impl` first.
+Before Step 1 begins, `runOnOperation()` walks every operation inside the `handshake.func` and asserts that it implements `BLIFImplInterface` and carries a non-empty BLIF file path. Any operation that fails this check signals a pass failure with an error message directing the user to run `--mark-handshake-blif-impl` first.
 
 ---
 

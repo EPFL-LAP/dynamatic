@@ -50,7 +50,13 @@ struct HandshakePlaceBuffersCustomPass
   using HandshakePlaceBuffersCustomBase::HandshakePlaceBuffersCustomBase;
 
   /// Called on the MLIR module provided as input.
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
 
@@ -62,7 +68,6 @@ struct HandshakePlaceBuffersCustomPass
     }
 
     OpBuilder builder(ctx);
-    NameAnalysis &namer = getAnalysis<NameAnalysis>();
     Operation *op = namer.getOp(pred);
     if (!op) {
       llvm::errs() << "No operation named \"" << pred << "\" exists\n";
@@ -94,6 +99,12 @@ struct HandshakePlaceBuffersCustomPass
     inheritBB(succ, bufOp);
     Value bufferRes = bufOp->getResult(0);
     succ->replaceUsesOfWith(channel, bufferRes);
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace
