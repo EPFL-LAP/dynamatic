@@ -579,8 +579,11 @@ TEST_F(IIMonitorFixture, dataDependentTripCount) {
   const IISummary &summary = summaries.front();
   EXPECT_EQ(summary.iterations, 901);
   EXPECT_EQ(summary.activations, 1);
-  // The comparison feeding the exit decision is on the loop's recurrence.
-  EXPECT_EQ(summary.medianII, 4.0);
+  // The loop pipelines freely. a[i] is read and written at the same index
+  // in every iteration, so the two accesses only ever meet within one
+  // iteration, where the load already precedes the store: the WAR edge is
+  // the only memory ordering needed.
+  EXPECT_EQ(summary.medianII, 1.0);
 }
 
 // A program without loops gets no monitors and must still simulate cleanly.
