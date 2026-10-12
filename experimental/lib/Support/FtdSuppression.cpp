@@ -1541,13 +1541,20 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
     nodeSet.insert(b);
   }
 
-  // Keep inner loops whole: if a dependency lies on a cycle that does not
-  // contain the producer (an inner loop between the producer and the
-  // consumer), keep all the decision blocks of that cycle. Otherwise the cycle
-  // can vanish from the decision graph (e.g., when the block of the backedge
-  // is not a dependency), so a condition produced on every iteration of the
-  // inner loop is seen at loop level 0 and is not demoted to its value at the
-  // loop exit, leaving one token per extra iteration unconsumed.
+  // Neither the producer nor the consumer is on a cycle of rawGraph: the
+  // producer is the entry, and edges back to it go to rawGraph.sinkBB, while
+  // the consumer always goes to sinkBB. sinkBB is the single exit of the local
+  // CFG: a path that reaches it without going through the consumer is one on
+  // which the token is not used. A cycle is therefore a loop that a token
+  // goes through after the producer and before the consumer (e.g., an inner
+  // loop between them, while both may be in the same outer loop of the
+  // program). If a dependency is in such a loop, add to the node set every
+  // block of the loop that ends with a conditional branch, not only the
+  // dependencies. Otherwise the loop can disappear from the decision graph,
+  // e.g., when the block with the backedge is not a dependency. A condition
+  // computed in the loop would then look like it is produced once, instead of
+  // once per iteration, so it would not be demoted to its value at the loop
+  // exit, and the tokens of the extra iterations would never be consumed.
   if (rawGraph.newProd) {
     for (auto sccIt = llvm::scc_begin(rawGraph.newProd); !sccIt.isAtEnd();
          ++sccIt) {
@@ -2505,6 +2512,11 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     CyclicDemotionHelper localDemotionHelper(
         builder, funcOp.getContext(), bi, cyc, origToLocalDG,
         consumer->getLoc(), consumer->getBlock(), nullptr, &shadow);
+    // Level 0 is the nesting level of blocks outside any loop of the decision
+    // graph, and the level at which level0DG is evaluated. A condition at
+    // level 0 is produced once per evaluation and is used as is. A condition at
+    // a higher level is produced once per iteration of its loop, so it is
+    // demoted to level 0, i.e., to its value at the exit of its outermost loop
     SignalRegistry localRegistry;
     for (Block *b : level0DG->topoOrder) {
       Block *origBlock = level0DG->origMap.lookup(b);

@@ -434,7 +434,20 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       // operands after it, since a definition later on a path overrides the
       // earlier ones. Dominance alone is not enough: it does not order blocks
       // that do not dominate each other.
+      //
+      // stable_sort keeps operands that compare equal (operands from the same
+      // block) in their order in phi->operands. llvm::sort leaves their order
+      // unspecified, so the gammas built from it could change across standard
+      // library implementations or builds
       SmallVector<GateInput *> phiOperands = phi->operands;
+      // isLess treats a block with no index as equal to any block, which does
+      // not give a valid order for sorting
+      assert(llvm::all_of(phiOperands,
+                          [&](GateInput *in) {
+                            return bi.getIndexFromBlock(in->getBlock())
+                                .has_value();
+                          }) &&
+             "every phi operand must come from an indexed block");
       llvm::stable_sort(phiOperands, [&](GateInput *a, GateInput *b) {
         return bi.isLess(a->getBlock(), b->getBlock());
       });

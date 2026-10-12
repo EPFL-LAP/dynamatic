@@ -269,6 +269,10 @@ Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
   Value val = muxOp.getDataOperands()[idx];
   auto prodMux = val.getDefiningOp<handshake::MuxOp>();
   int prodCycleIdx;
+  // 3 operands = the select and two data inputs, one from inside the loop
+  // (index prodCycleIdx) and one from outside it. With exactly two data
+  // inputs, the input from outside is the other one: 1 - prodCycleIdx. With
+  // more data inputs, that index could be wrong or out of range
   if (prodMux && prodMux.getNumOperands() == 3 &&
       isSelfRegenerateMux(prodMux, prodCycleIdx))
     return returnNonMuxProducerVal(prodMux, 1 - prodCycleIdx);
@@ -334,12 +338,16 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
         auto muxUser = cast<handshake::MuxOp>(returnedMux);
         // The candidate must regenerate the same value, which is not the case
         // if a Mux that is not self regenerating lies on the way (see
-        // returnNonMuxProducerVal)
+        // returnNonMuxProducerVal). As for muxOp, 1 - userCycleIdx is the
+        // input from outside the loop of a Mux with two data inputs
         int userCycleIdx;
-        if (isSelfRegenerateMux(muxUser, userCycleIdx) &&
-            returnNonMuxProducerVal(muxUser, 1 - userCycleIdx) ==
-                valProducedByNonMux)
-          dataMuxUsers.insert(muxUser);
+        if (isSelfRegenerateMux(muxUser, userCycleIdx)) {
+          assert(muxUser.getNumOperands() == 3 &&
+                 "self regenerating Mux must have two data inputs");
+          if (returnNonMuxProducerVal(muxUser, 1 - userCycleIdx) ==
+              valProducedByNonMux)
+            dataMuxUsers.insert(muxUser);
+        }
       }
     }
 
