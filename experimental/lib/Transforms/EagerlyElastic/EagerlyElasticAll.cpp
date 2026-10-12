@@ -57,6 +57,10 @@ private:
   void applyRewriteXOnce(DenseSet<handshake::ConditionalBranchOp> &frontier,
                          NameAnalysis &namer, RewriteStrategy rewrite);
 
+  void applyRewritesForRegion(
+    DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer,
+    uint32_t expectedBB);
+
   void movePastFunctionBlock(
       DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &name,
       ModuleOp modOp);
@@ -349,19 +353,8 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
 
             // check whether the suppressor is connected to path A of the mux
             if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
-              auto nameAttr = mux->getAttrOfType<mlir::StringAttr>("handshake.name");
-              if (nameAttr && nameAttr.getValue() == "mux7") { // mux18
-                applyRewriteD(mux, branchOp, init, frontier, namer);
-                // return;
-              }
-              if (nameAttr && nameAttr.getValue() == "mux4") { // mux18
-                applyRewriteD(mux, branchOp, init, frontier, namer);
-                // return;
-              }
-              if (nameAttr && nameAttr.getValue() == "mux3") { // mux18
-                applyRewriteD(mux, branchOp, init, frontier, namer);
-                // return;
-              }
+              applyRewriteD(mux, branchOp, init, frontier, namer);
+              return;
               /* if (nameAttr && nameAttr.getValue() == "mux5") { // mux18
                 applyRewriteD(mux, branchOp, init, frontier, namer);
                 // return;
@@ -382,6 +375,48 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
           applyRewriteDMerged(merge, branchOp, frontier, namer);
           return;
         }
+      }
+    }
+  }
+}
+
+void EagerlyElasticAllPass::applyRewritesForRegion(
+    DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer,
+    uint32_t expectedBB) {
+  SmallVector<handshake::ConditionalBranchOp> initialFrontier(frontier.begin(),
+                                                              frontier.end());
+
+  DenseSet<handshake::MuxOp> rewrittenMuxes;
+
+  for (auto branchOp : initialFrontier) {
+    for (auto *user : branchOp.getFalseResult().getUsers()) {
+      if (auto mux = dyn_cast<handshake::MuxOp>(user)) {
+        // Skip this mux if it has already been rewritten.
+        if (rewrittenMuxes.contains(mux))
+          continue;
+
+        // identify loops (mux connected to init)
+        auto init = dyn_cast_or_null<handshake::InitOp>(
+            mux.getSelectOperand().getDefiningOp());
+
+        if (!init) continue;
+
+        if (!checkConditionsMatch(branchOp.getConditionOperand(),
+                                  init.getOperand(), false)) {
+          continue;
+        }
+
+        // check whether the suppressor is connected to path A of the mux
+        if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
+          auto bbAttr =
+              mux->getAttrOfType<mlir::IntegerAttr>("handshake.bb");
+          if (bbAttr && bbAttr.getValue() == expectedBB) { 
+            applyRewriteD(mux, branchOp, init, frontier, namer);
+            // Mark mux as rewritten
+            rewrittenMuxes.insert(mux);
+          }
+        }
+        
       }
     }
   }
@@ -424,7 +459,7 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
           int firstSuccBB = cast<IntegerAttr>(successorBBsArray[0]).getInt();
           if (muxBB && firstSuccBB == muxBB) {
             matchedRegionDict = dict;
-            llvm::errs() << "found mux\n";
+            llvm::errs() << "found mux in bb: " << muxBB << '\n';
             break;
           }
         }
@@ -464,19 +499,18 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
 
       if (mux) {
         for (Operation &op : *currentBlock) {
-          if (&op == mux || !isa<handshake::MuxOp, handshake::ControlMergeOp>(&op))
+          if (&op == mux || !isa<handshake::MuxOp>(&op))
             continue;
 
           // only look at muxes / cmerges in this basic block
           auto bbAttr = op.getAttrOfType<IntegerAttr>(HANDSHAKEBB);
-          if (!bbAttr || bbAttr.getInt() != muxBB)
+          if (!bbAttr || bbAttr.getInt() != muxBB) {
             continue;
+          }
 
           // check input for this Mux (not the loop backedge, that would be 1)
           if (auto muxOp = dyn_cast<handshake::MuxOp>(&op))
             incomingValues.push_back(muxOp.getDataOperands()[0]);
-          else if (auto cmergeOp = dyn_cast<handshake::ControlMergeOp>(&op))
-            incomingValues.push_back(cmergeOp.getDataOperands()[0]);
         }
       } else {
         for (auto markerOp : currentBlock->getOps<handshake::RegionInputOp>()) {
@@ -557,7 +591,6 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         targetOperand.set(newBranch.getFalseResult());
         frontier.insert(newBranch);
       }
-      llvm::errs() << "done with first part\n";
 
       // --- rewire the condition for the suppressors in front of stores ---
       if (stores && stores.getValue()) {
@@ -590,7 +623,6 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
       for (auto branchToDelete : branchesToDelete) {
         Value falseResult = branchToDelete.getFalseResult();
         Value dataOperand = branchToDelete.getDataOperand();
-        auto branchBB = branchToDelete->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
 
         // iterate over every branchToDelete's falseResult uses
         for (OpOperand &use : llvm::make_early_inc_range(falseResult.getUses())) {
@@ -598,7 +630,7 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
 
           // check if the consumer is a MuxOp or CMergeOp located inside 
           // the same bb as the original mux. Only necessary for mux blocks
-          if (isa<handshake::MuxOp, handshake::ControlMergeOp>(owner)) {
+          if (isa<handshake::MuxOp>(owner)) { // removed cmergeop
             auto targetBB = owner->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
             if (targetBB && muxBB && targetBB.getInt() == muxBB) {
               llvm::errs() << "Bypassing suppressor directly into mux/cmerge\n";
@@ -645,11 +677,7 @@ void EagerlyElasticAllPass::runOnOperation() {
 
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
 
-  for (unsigned i = 0; i < 1; i++) {
-    applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
-    applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
-  }
-  applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD2);
+  applyRewritesForRegion(frontier, namer, 2);
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   
   if (regionBased) {
@@ -670,5 +698,67 @@ void EagerlyElasticAllPass::runOnOperation() {
     
     // Erase the marker from the IR
     markerOp.erase();
+  }
+
+  llvm::errs() << "rewire control network\n";
+
+  // index all trigger markers by bb
+  DenseMap<unsigned, SmallVector<Operation *, 2>> markersByBB;
+  for (auto sinkOp : llvm::make_early_inc_range(funcOp.getOps<handshake::SinkOp>())) {
+    if (auto bbAttr = sinkOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB)) {
+      markersByBB[bbAttr.getUInt()].push_back(sinkOp);
+    }
+  }
+
+  // single set to collect all operations to delete
+  DenseSet<Operation *> opsToErase;
+
+  // iterate through all memory controllers
+  for (auto mcOp : funcOp.getOps<handshake::MemoryControllerOp>()) {
+    ValueRange inputs = mcOp.getInputs();
+
+    // if there are only 2 access operands, it's only a load so we can skip
+    if (inputs.size() < 3) continue;
+
+    // the first input is the store control channel (=constant)
+    Value storeCtrlVal = inputs[0];
+    auto cstOp = storeCtrlVal.getDefiningOp<handshake::ConstantOp>();
+    if (!cstOp) continue;
+    auto bbAttr = cstOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+    if (!bbAttr) continue;
+
+    // find a corresponding trigger marker (has to be in the same bb)
+    unsigned bb = bbAttr.getUInt();
+    auto markerIt = markersByBB.find(bb);
+    if (markerIt == markersByBB.end()) continue;
+
+    // pop the next marker inline
+    Operation *triggerMarker = markerIt->second.pop_back_val();
+    Value triggerMarkerInputVal = triggerMarker->getOperand(0);
+    triggerMarker->dump();
+    // find the suppression condition from the existing address suppressor
+    auto storeOp = inputs[1].getDefiningOp<handshake::StoreOp>();
+    if (!storeOp) continue;
+    auto addrSupp = storeOp.getAddress().getDefiningOp<handshake::ConditionalBranchOp>();
+    if (!addrSupp) continue;
+    Value conditionVal = addrSupp.getConditionOperand();
+
+    // insert the new suppressor branch after the constant
+    OpBuilder builder(cstOp);
+    builder.setInsertionPointAfter(cstOp);
+    auto ctrlBranch = builder.create<handshake::ConditionalBranchOp>(cstOp.getLoc(),
+        conditionVal, triggerMarkerInputVal);
+    setHandshakeAttrs(cstOp->getAttr(HANDSHAKEBB), namer, {ctrlBranch});
+
+    // rewire the branch data input to the marker's input stream
+    mcOp.getInputsMutable()[0].set(ctrlBranch.getFalseResult());
+    opsToErase.insert(cstOp);
+    opsToErase.insert(triggerMarker);
+  }
+
+  // clean up all matched operations
+  for (Operation *op : opsToErase) {
+    op->dropAllUses();
+    op->erase();
   }
 }

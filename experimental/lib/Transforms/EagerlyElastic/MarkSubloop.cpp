@@ -207,7 +207,8 @@ void MarkSubloopPass::runOnOperation() {
   llvm::errs() << "size of validRegions: " << validRegions.size() << '\n';
 
   llvm::SmallVector<Attribute> allRegionsMetadata;
-  llvm::DenseSet<Block *> markedBlocks;
+  // track the targeted memory controllers
+  llvm::DenseSet<Value> markedMemrefs;
 
   // Process all discovered regions
   for (auto &[entryBlock, region] : validRegions) {
@@ -300,7 +301,7 @@ void MarkSubloopPass::runOnOperation() {
       std::string pseudoName = "pseudo_cond" + std::to_string(entryBBIdx);
       pseudoCondOp->setAttr("handshake.name", builder.getStringAttr(pseudoName));
       pseudoCondOp->setAttr("ftd.pseudo_cond", builder.getUnitAttr());
-        
+
       for (memref::StoreOp storeOp : storesToModify) {
         builder.setInsertionPoint(storeOp);
 
@@ -316,10 +317,12 @@ void MarkSubloopPass::runOnOperation() {
         // Rewire the data operand safely using setOperand on its specific index
         storeOp.setOperand(0, predOp->getResult(0));
 
-        // check whether i already have a marker in that block
-        Block *storeBlock = storeOp->getBlock();
-        if (markedBlocks.contains(storeBlock)) continue;
-        markedBlocks.insert(storeBlock);
+        // check whether this memory controller already has a marker
+        Value targetMemref = storeOp.getMemRef();
+        if (markedMemrefs.contains(targetMemref)) continue;
+        markedMemrefs.insert(targetMemref);
+        targetMemref.dump();
+        llvm::errs() << markedMemrefs.size() << '\n';
 
         // create the markerOp which will replace the control network
         auto markerOp = builder.create<dynamatic::cf_extra::TriggerMarkerOp>(
