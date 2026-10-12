@@ -101,9 +101,9 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
         ctrlEnd, mc.groups);
   } else if (!needsMC && needsLSQ) {
     // We only need an LSQ
-    lsqOp = builder.create<handshake::LSQOp>(
-        loc, memref, memStart, lsq.ctrls, lsq.ldAddrs, lsq.stAddrs,
-        lsq.stDatas, ctrlEnd, lsq.groups);
+    lsqOp = builder.create<handshake::LSQOp>(loc, memref, memStart, lsq.ctrls,
+                                             lsq.ldAddrs, lsq.stAddrs,
+                                             lsq.stDatas, ctrlEnd, lsq.groups);
   } else {
     // We need a MC and an LSQ. They need to be connected with 4 new channels
     // so that the LSQ can forward its loads and stores to the MC. We need
@@ -128,9 +128,9 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
 
     // Create the LSQ, which gets the MC's load data result as input and
     // generates the necessary outputs that will go to the MC
-    lsqOp = builder.create<handshake::LSQOp>(
-        loc, mcOp, lsq.ctrls, lsq.ldAddrs, lsq.stAddrs, lsq.stDatas,
-        mcOp.getLsqLdData(), lsq.groups);
+    lsqOp = builder.create<handshake::LSQOp>(loc, mcOp, lsq.ctrls, lsq.ldAddrs,
+                                             lsq.stAddrs, lsq.stDatas,
+                                             mcOp.getLsqLdData(), lsq.groups);
 
     // Resolve the backedges to fully connect the MC and LSQ
     ldAddr.setValue(lsqOp.getLdAddrToMC());
@@ -209,8 +209,8 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     // LSQ inputs
     for (Operation *lsqOp : lsqGroupOps)
       inputs.lsq.addAccess(lsqOp);
-    inputs.lsq.groups.push_back(MemGroupAttr::get(
-        ctx, group, /*hasCtrl=*/true, getAccessKinds(lsqGroupOps)));
+    inputs.lsq.groups.push_back(MemGroupAttr::get(ctx, group, /*hasCtrl=*/true,
+                                                  getAccessKinds(lsqGroupOps)));
   }
 
   if (mcPorts.empty())

@@ -82,8 +82,9 @@ public:
 
   /// The operation producing the memory input(s) the port refers to. This is
   /// found by following the def-use chain of the port's first input through
-  /// forks and bitwidth modifications. It may be nullptr if the operation cannot
-  /// be found this way (e.g., when a control port is a function argument).
+  /// forks and bitwidth modifications. It may be nullptr if the operation
+  /// cannot be found this way (e.g., when a control port is a function
+  /// argument).
   mlir::Operation *portOp;
 
   /// Deleted default constructor.
