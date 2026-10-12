@@ -442,11 +442,11 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       SmallVector<GateInput *> phiOperands = phi->operands;
       // isLess treats a block with no index as equal to any block, which does
       // not give a valid order for sorting
-      assert(llvm::all_of(phiOperands,
-                          [&](GateInput *in) {
-                            return bi.getIndexFromBlock(in->getBlock())
-                                .has_value();
-                          }) &&
+      assert(llvm::all_of(
+                 phiOperands,
+                 [&](GateInput *in) {
+                   return bi.getIndexFromBlock(in->getBlock()).has_value();
+                 }) &&
              "every phi operand must come from an indexed block");
       llvm::stable_sort(phiOperands, [&](GateInput *a, GateInput *b) {
         return bi.isLess(a->getBlock(), b->getBlock());
