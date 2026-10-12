@@ -189,6 +189,12 @@ public:
   /// Get a vector containing all the gates related to a basic block.
   ArrayRef<Gate *> getGatesPerBlock(Block *bb) const;
 
+  /// Get the phis with a single operand, as pairs of the value of the phi and
+  /// its operand. Such a phi needs no gate: its value is always its operand.
+  ArrayRef<std::pair<Value, GateInput *>> getTrivialPhis() const {
+    return trivialPhis;
+  }
+
   /// Deallocates all the gates created.
   ~GSAAnalysis();
 
@@ -206,6 +212,10 @@ private:
   /// List of all gate inputs which have been created (and must be thus
   /// deallocated).
   SmallVector<GateInput *> gateInputList;
+
+  /// Phis with a single operand, as pairs of the value of the phi and its
+  /// operand.
+  SmallVector<std::pair<Value, GateInput *>> trivialPhis;
 
   /// Identify the gates necessary in the function, referencing all of their
   /// inputs. In this case, the starting point are the block arguments in the

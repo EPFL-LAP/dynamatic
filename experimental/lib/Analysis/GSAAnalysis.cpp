@@ -428,6 +428,21 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       if (phi->gsaGateFunction != PhiGate)
         continue;
 
+      // When all the predecessors forward the same value, the phi has a single
+      // operand, and its value is always that operand. Connect the gates using
+      // the phi to the operand, and record the phi so that its value is
+      // replaced with the operand when the gates are instantiated
+      if (phi->operands.size() == 1) {
+        GateInput *operand = phi->operands.front();
+        for (auto &[bb, gates] : gatesPerBlock)
+          for (Gate *gate : gates)
+            for (GateInput *op : gate->operands)
+              if (op->isTypeGate() && op->getGate() == phi)
+                op->input = operand->input;
+        trivialPhis.emplace_back(phi->result, operand);
+        continue;
+      }
+
       // Sort the operands of the phi in block order, so that Bi comes before Bj
       // if Bj can be reached from Bi without going through a backedge (which
       // includes Bi dominating Bj). Each operand avoids the blocks of the

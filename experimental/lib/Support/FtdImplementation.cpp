@@ -764,6 +764,15 @@ LogicalResult experimental::ftd::addGsaGates(
   if (region.getBlocks().size() == 1)
     return success();
 
+  // A phi with a single operand has no gate: replace its value with the
+  // operand. This happens before the gates are instantiated, so that if the
+  // operand is a gate, the uses moved to its value are then moved to its mux
+  for (auto [result, operand] : gsa.getTrivialPhis()) {
+    Value replacement = operand->isTypeGate() ? operand->getGate()->result
+                                              : operand->getValue();
+    rewriter.replaceAllUsesWith(result, replacement);
+  }
+
   // List of missing GSA functions
   SmallVector<MissingGsa> missingGsaList;
   // List of gammas with only one input
