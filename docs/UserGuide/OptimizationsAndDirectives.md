@@ -5,6 +5,7 @@ Dynamatic offers a number of options to optimize the generated RTL code to meet 
 1. [Clock frequency](#1-achieving-a-specific-clock-frequency)  
 2. [Area](#2-area)  
 3. [Latency and throughput](#3-latency-and-throughput)  
+    - [Memory Partitioning](#memory-partitioning)  
 4. [Customizing Design to Specific Hardware: Floating Point IPs](#adjusting-design-to-specific-hardware-floating-point-ips)
 5. [Optimization algorithms in Dynamatic](#optimization-algorithms-in-dynamatic)
     - [Buffer placement algorithm: FPGA'20](#buffer-placement-algorithm-fpga20)
@@ -25,6 +26,49 @@ Circuit area can be optimized using the following compile flags
 
 ### 3. Latency and Throughput
 Latency and throughput can be improved using buffer placement with either the `fpga20` or `fpl22` values for the `--buffer-algorithm` compile flag.  
+
+#### Memory Partitioning
+Each array is mapped to a single memory with a single port, so loop unrolling alone often gives no speedup: the unrolled iterations compete for the same port. The `array_partition` pragma splits an array into several independent banks, each with its own ports, so that accesses to different banks can happen in the same cycle.
+
+The pragma has to be placed anywhere inside a function body and uses the following syntax:
+
+```c
+#pragma DYN array_partition array=<name> dimension=<d> style=<block|cyclic|complete> factor=<n>
+```
+
+**Dimension**: the array dimension to partition, counted from 1 starting at the leftmost index. For `int a[M][N]`, `dimension=1` splits along `M` (rows) and `dimension=2` splits along `N` (columns). The other dimensions are left intact, so each bank keeps the full extent of the unpartitioned dimensions:
+
+```c
+int a[4][8];
+// dimension=1 factor=2 -> a.bank.0[2][8],  a.bank.1[2][8]
+// dimension=2 factor=2 -> a.bank.0[4][4],  a.bank.1[4][4]
+```
+
+For one-dimensional arrays, use `dimension=1`.
+
+**Style**:
+- `block`: splits the array into `factor` contiguous chunks.
+- `cyclic`: distributes elements round-robin; element `i` goes to bank `i % factor`.
+- `complete`: splits the array into individual elements (registers); `factor` should be equal to number of elements in array.
+
+> [!NOTE]
+> `cyclic` suits linear accesses (`a[i]`, `a[i+1]`, …) in an unrolled loop. `block` suits accesses to distant chunks in the same iteration, e.g. `a[i]` and `a[i + N/2]`. `complete` suits small arrays whose accesses are all fully unrolled.
+
+Partitioning should be combined with unrolling by a matching factor. In the example below, each unrolled copy accesses `a[4k + c]` for a constant `c`, so every access is bound to one bank at compile time and all four loads can be issued in parallel:
+
+```c
+void kernel(int out[N]) {
+#pragma DYN array_partition array=a dimension=1 style=cyclic factor=4
+  int a[N];
+  ...
+#pragma clang loop unroll_count(4)
+  for (int i = 0; i < N; i++)
+    out[i] = a[i] + 1;
+}
+```
+
+> [!NOTE]
+> Partitioning only pays off when the bank of each access can be determined at compile time, i.e., when the index is an affine function of the loop counter and the unroll factor is a multiple of the partition factor. For data-dependent indices such as `a[idx[i]]`, the bank is selected at runtime by a branch per access. The result stays correct, but concurrent accesses can still hit the same bank, which limits the speedup.
 
 ### Adjusting Design to Specific Hardware: Floating Point IPs
 Dynamatic uses open-source [FloPoCo](https://flopoco.org/) components proprietory [Vivado](https://docs.amd.com/v/u/en-US/pg060-floating-point) to allow users to customize their floating point units. For instructions on how to achieve this, see [the floating point units guide](../DeveloperGuide/Specs/FloatingPointUnits.md). Floating point units can be selected using the `set-fp-units-generator <flopoco|vivado>` command as shown in the [command reference](../UserGuide/CommandReference.md).

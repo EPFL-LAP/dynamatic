@@ -8,7 +8,9 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FunctionExtras.h"
 
+#include <algorithm>
 #include <any>
+#include <vector>
 
 namespace dynamatic::gen {
 
@@ -325,6 +327,41 @@ using TypedContextTuple =
     std::array<const TypingContext *,
                std::tuple_size_v<typename ASTNode::SubElements> + 1>;
 
+/// Context a 'Projection' handed to 'OpaqueTransferFn::wrap' projects a
+/// 'TypingContext' down to, i.e. the one the wrapped transfer function was
+/// built for. Deducing it from the projection is what keeps it from having to
+/// be spelled out at every call site.
+template <typename TypingContext, typename Projection>
+using ProjectedContext = std::remove_const_t<
+    std::remove_reference_t<decltype(std::declval<const Projection &>()(
+        std::declval<const TypingContext &>()))>>;
+
+namespace detail {
+
+/// Returns, as a tuple, the arguments the calling convention of 'TransferFn'
+/// passes for the dependency 'index' (see that class): the input context for
+/// 'INPUT_DEPENDENCY', and otherwise the subelement's output context followed
+/// by its AST node .
+///
+/// The optionals are unwrapped for a non-weak dependency, which assumes that
+/// the required contexts and subelements have already been generated.
+template <std::size_t index, typename ASTNode, typename TypingContext>
+auto getDependencyArguments(
+    const SubElementsTuple<ASTNode> &subElements,
+    const TypedContextTuple<ASTNode, TypingContext> &contexts) {
+  if constexpr (index == INPUT_DEPENDENCY) {
+    return std::forward_as_tuple(*contexts.back());
+  } else if constexpr (isWeak(index)) {
+    return std::make_tuple(std::get<unwrapWeak(index)>(contexts),
+                           std::cref(std::get<unwrapWeak(index)>(subElements)));
+  } else {
+    return std::forward_as_tuple(*std::get<index>(contexts),
+                                 *std::get<index>(subElements));
+  }
+}
+
+} // namespace detail
+
 /// Opaque-wrapper over 'TransferFn' that can be constructed from any instance
 /// of 'TransferFn' with the same 'ASTNode'.
 /// Users should construct 'TransferFn' instances instead.
@@ -356,27 +393,9 @@ public:
                 -> TypingContext {
               // Construct a tuple of all arguments that 'dep' should be called
               // with.
-              // This mainly uses 'inputIndices' to index into 'subElements' and
-              // 'contexts'.
-              // The logic here simply unwraps the optionals: It assumes that
-              // the required contexts and subelements have already been
-              // generated.
-              auto argTuple = std::tuple_cat([&](auto &&integral) {
-                constexpr std::size_t index = decltype(integral){};
-                if constexpr (index == INPUT_DEPENDENCY) {
-                  // Input context.
-                  return std::forward_as_tuple(*contexts.back());
-                } else if constexpr (isWeak(index)) {
-                  // Subelement context + ASTNode.
-                  return std::make_tuple(
-                      std::get<unwrapWeak(index)>(contexts),
-                      std::cref(std::get<unwrapWeak(index)>(subElements)));
-                } else {
-                  // Subelement context + ASTNode.
-                  return std::forward_as_tuple(*std::get<index>(contexts),
-                                               *std::get<index>(subElements));
-                }
-              }(std::integral_constant<std::size_t, inputIndices>{})...);
+              auto argTuple = std::tuple_cat(
+                  detail::getDependencyArguments<inputIndices, ASTNode>(
+                      subElements, contexts)...);
 
               return std::apply(dep, std::move(argTuple));
             }) {}
@@ -417,6 +436,69 @@ public:
     return std::visit(
         [](auto &&value) -> llvm::ArrayRef<std::size_t> { return value; },
         inputIndices);
+  }
+
+  /// Returns an 'OpaqueTransferFn' over 'TypingContext' that runs 'f' in place
+  /// of 'this', handing 'this' to it so that it can run it and adjust or
+  /// reinterpret what it computed.
+  ///
+  /// 'f' is called as
+  ///
+  ///   TypingContext(function_ref<SubContext()> wrapped, const Dependency &...)
+  ///
+  /// where the dependency arguments are exactly the ones 'TransferFn' passes
+  /// for 'extraDependencies'.
+  /// 'wrapped' is a callable taking no arguments and returning the context this
+  /// transfer function originally computed.
+  /// 'TypingContext' is the new context type that the returned wrapper should
+  /// accept.
+  ///
+  /// If 'this' was originally created for a different context type 'SubContext,
+  /// 'projection' can be used to map 'TypingContext' to 'SubContext'.
+  /// 'SubContext' cannot be specified explicitly but should simply be the type
+  /// returned by 'projection'.
+  /// It must be callable as 'const SubContext&(const TypingContext&)'.
+  ///
+  /// 'extraDependencies' are unioned into this transfer function's own, for a
+  /// wrapper that needs subelements the wrapped function did not ask for. Like
+  /// any dependency they are thereby also forced to be generated first.
+  template <typename TypingContext, std::size_t... extraDependencies,
+            typename F, typename Projection = llvm::identity<TypingContext>>
+  OpaqueTransferFn wrap(F f, Projection projection = {}) && {
+    using SubContext = ProjectedContext<TypingContext, Projection>;
+
+    llvm::ArrayRef<std::size_t> own = getInputDependencies();
+    std::vector indices(own.begin(), own.end());
+    constexpr std::array<std::size_t, sizeof...(extraDependencies)> extra{
+        extraDependencies...};
+    indices.insert(indices.end(), extra.begin(), extra.end());
+    // Remove duplicates.
+    std::sort(indices.begin(), indices.end());
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+
+    return OpaqueTransferFn(
+        llvm::identity<TypingContext>{}, std::move(indices),
+        [wrapped = std::move(*this), f = std::move(f),
+         projection = std::move(projection)](
+            const SubElementsTuple<ASTNode> &subElements,
+            const TypedContextTuple<ASTNode, TypingContext> &contexts)
+            -> TypingContext {
+          auto callWrapped = [&] {
+            return wrapped.template call<SubContext>(
+                subElements,
+                mapTuplesIntoArray(
+                    [&](const TypingContext *context) -> const SubContext * {
+                      return context ? &projection(*context) : nullptr;
+                    },
+                    contexts));
+          };
+
+          return std::apply(
+              f, std::tuple_cat(
+                     std::tuple(llvm::function_ref<SubContext()>(callWrapped)),
+                     detail::getDependencyArguments<extraDependencies, ASTNode>(
+                         subElements, contexts)...));
+        });
   }
 
   /// Calculates the context from the currently calculated subelements and
@@ -578,6 +660,54 @@ public:
     return computationFn(astNode, contexts);
   }
 
+  /// Returns an 'OpaqueOutputTransferFn' over 'TypingContext' that runs 'f' in
+  /// place of 'this', handing 'this' to it so that it can run it and adjust or
+  /// reinterpret what it computed.
+  ///
+  /// 'f' is called as
+  ///
+  ///   TypingContext(function_ref<SubContext()> wrapped, const ASTNode &,
+  ///                 const TypingContext &...)
+  ///
+  /// which is 'OutputTransferFn's convention with 'wrapped' put in front: the
+  /// fully constructed AST node, then one output context per entry of
+  /// 'extraDependencies', with 'INPUT_DEPENDENCY' naming the input context.
+  ///
+  /// If 'this' was originally created for a different context type 'SubContext,
+  /// 'projection' can be used to map 'TypingContext' to 'SubContext'.
+  /// 'SubContext' cannot be specified explicitly but should simply be the type
+  /// returned by 'projection'.
+  /// It must be callable as 'const SubContext&(const TypingContext&)'.
+  template <typename TypingContext, std::size_t... extraDependencies,
+            typename F, typename Projection = llvm::identity<TypingContext>>
+  OpaqueOutputTransferFn wrap(F f, Projection projection = {}) && {
+    using SubContext = ProjectedContext<TypingContext, Projection>;
+
+    return OpaqueOutputTransferFn(
+        llvm::identity<TypingContext>{},
+        [wrapped = std::move(*this), f = std::move(f),
+         projection = std::move(projection)](
+            const ASTNode &astNode,
+            const TypedContextTuple<ASTNode, TypingContext> &contexts)
+            -> TypingContext {
+          auto callWrapped = [&] {
+            return wrapped.template call<SubContext>(
+                astNode,
+                mapTuplesIntoArray(
+                    [&](const TypingContext *context) -> const SubContext * {
+                      return context ? &projection(*context) : nullptr;
+                    },
+                    contexts));
+          };
+
+          // Like 'OutputTransferFn', an output transfer function is handed
+          // output contexts only, 'INPUT_DEPENDENCY' clamping to the input one.
+          return f(
+              llvm::function_ref<SubContext()>(callWrapped), astNode,
+              *contexts[std::min(extraDependencies, contexts.size() - 1)]...);
+        });
+  }
+
   /// More type-safe variant of the call operator that accepts and returns
   /// 'TypingContext' instead of 'OpaqueContext'. It is the users responsibility
   /// that 'TypingContext' matches the 'TypingContext' of the 'TransferFn' this
@@ -622,6 +752,26 @@ struct CalculateDependencyArray<ASTNode, std::tuple<SubElements...>> {
 template <typename ASTNode>
 using TransferFnArray =
     typename details::CalculateDependencyArray<ASTNode>::type;
+
+namespace detail {
+
+/// Deduces the 'ASTNode' of a 'TransferFnArray' from its output transfer
+/// function. Only used in unevaluated contexts.
+template <typename ASTNode>
+ASTNode transferFnArrayASTNode(const OpaqueOutputTransferFn<ASTNode> &) {
+  llvm_unreachable("template mechanism only");
+}
+
+} // namespace detail
+
+/// 'ASTNode' of the 'TransferFnArray' instantiation 'TransferFns'.
+/// Since 'TransferFnArray' is an alias template, 'ASTNode' cannot be deduced
+/// from function parameters of that type. Functions wishing to deduce it should
+/// accept the tuple as a generic type parameter and use this alias instead.
+template <typename TransferFns>
+using TransferFnArrayASTNode = decltype(detail::transferFnArrayASTNode(
+    std::get<std::tuple_size_v<TransferFns> - 1>(
+        std::declval<const TransferFns &>())));
 
 /// Abstract base class for all type systems. Users of a type system such as
 /// the C generator use this interface in conjunction with 'OpaqueContext' to be
@@ -1267,6 +1417,200 @@ public:
     return self().getStatementProbabilityTable(context.cast<TypingContext>());
   }
 
+  // Generic adaptors.
+  //
+  // Everything above this point is named after the AST node it is about, which
+  // is what makes a type system readable but also what keeps code that is
+  // generic over the AST node from being written at all.
+  // The methods below turn an 'ASTNode' back into a call of the method
+  // corresponding to it, so that such code only has to name the AST node.
+  //
+  // The methods are called qualified on 'Target', which defaults to the most
+  // derived type system and therefore to the very method the caller would have
+  // named by hand. One can use a base class as 'Target' type instead to call a
+  // super class's implementation.
+  //
+  // 'TemplateTypeSystem' is the mirror image, implementing all of the methods
+  // above from one method template each.
+
+  /// Returns the transfer functions of 'ASTNode' by dispatching to the
+  /// 'get*TransferFns' method corresponding to it. 'args' are the extra
+  /// arguments that method takes, if any.
+  ///
+  /// Note that the AST node alone identifies the method.
+  template <typename ASTNode, typename Target = Self, typename... Args>
+  TransferFnArray<ASTNode> getTransferFn(Args &&...args) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<ASTNode, ast::Function>)
+      return target.Target::getFunctionTransferFns(std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ReturnStatement>)
+      return target.Target::getReturnStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarType>)
+      return target.Target::getScalarTypeTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ReturnType>)
+      return target.Target::getReturnTypeTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::BinaryExpression>)
+      return target.Target::getBinaryExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::UnaryExpression>)
+      return target.Target::getUnaryExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::Variable>)
+      return target.Target::getVariableTransferFns(std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::CastExpression>)
+      return target.Target::getCastExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ConditionalExpression>)
+      return target.Target::getConditionalExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::Constant>)
+      return target.Target::getConstantTransferFns(std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ExistingScalarParameter>)
+      return target.Target::getExistingScalarParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarParameter>)
+      return target.Target::getFreshScalarParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayReadExpression>)
+      return target.Target::getArrayReadExpressionTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ExistingArrayParameter>)
+      return target.Target::getExistingArrayParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayParameter>)
+      return target.Target::getFreshArrayParameterTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayAssignmentStatement>)
+      return target.Target::getArrayAssignmentStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarAssignmentStatement>)
+      return target.Target::getScalarAssignmentStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StatementList>)
+      return target.Target::getStatementListTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
+      return target.Target::getStructuredForStatementTransferFns(
+          std::forward<Args>(args)...);
+    else {
+      static_assert(sizeof(ASTNode) == 0,
+                    "'ASTNode' does not have any transfer functions");
+      llvm_unreachable("does not compile");
+    }
+  }
+
+  /// Returns whether the terminal 'node' should be discarded in 'context', by
+  /// dispatching to the 'discard*' method corresponding to it.
+  ///
+  /// A terminal is an AST node the generator already has in hand and merely
+  /// asks the type system to accept, as opposed to a non-terminal which it is
+  /// about to generate from scratch (see 'discardNonTerminal').
+  ///
+  /// Note that 'discardConstant' and 'discardArrayDimension' are the methods
+  /// that may also *replace* the node they are given, which this adaptor cannot
+  /// express and therefore reduces to whether it was discarded. Callers that
+  /// care have to use the method.
+  template <typename ASTNode, typename Target = Self>
+  bool discardTerminal(const ASTNode &node, const TypingContext &context) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<ASTNode, ast::ScalarType>)
+      return target.Target::discardScalarType(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::ReturnType>)
+      return target.Target::discardReturnType(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::Constant>)
+      return !target.Target::discardConstant(node, context);
+    else if constexpr (std::is_same_v<ASTNode, std::size_t>)
+      // The dimension of an 'ast::ArrayParameter'.
+      return !target.Target::discardArrayDimension(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarParameter>)
+      return target.Target::discardExistingScalarParameter(node, context);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayParameter>)
+      return target.Target::discardExistingArrayParameter(node, context);
+    else {
+      static_assert(sizeof(ASTNode) == 0,
+                    "'ASTNode' is not a terminal that can be discarded");
+      llvm_unreachable("does not compile");
+    }
+  }
+
+  /// Returns whether the generator should refrain from generating 'ASTNode' in
+  /// 'context', by dispatching to the 'discard*' method corresponding to it.
+  /// 'args' are the extra arguments that method takes, if any -- the operator
+  /// of a binary or unary expression being the only ones today.
+  ///
+  /// A non-terminal is an AST node the generator is about to generate from
+  /// scratch, which is every AST node with subelements. Note in particular that
+  /// 'ast::ScalarParameter' and 'ast::ArrayParameter' refer to a *fresh*
+  /// parameter here, an existing one being a terminal instead (see
+  /// 'discardTerminal').
+  template <typename ASTNode, typename Target = Self, typename... Args>
+  bool discardNonTerminal(const TypingContext &context, Args &&...args) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<ASTNode, ast::BinaryExpression>)
+      return target.Target::discardBinaryExpression(std::forward<Args>(args)...,
+                                                    context);
+    else if constexpr (std::is_same_v<ASTNode, ast::UnaryExpression>)
+      return target.Target::discardUnaryExpression(std::forward<Args>(args)...,
+                                                   context);
+    else if constexpr (std::is_same_v<ASTNode, ast::Variable>)
+      return target.Target::discardVariable(context,
+                                            std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::CastExpression>)
+      return target.Target::discardCastExpression(context,
+                                                  std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ConditionalExpression>)
+      return target.Target::discardConditionalExpression(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarParameter>)
+      return target.Target::discardFreshScalarParameter(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayReadExpression>)
+      return target.Target::discardArrayReadExpression(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayParameter>)
+      return target.Target::discardFreshArrayParameter(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ArrayAssignmentStatement>)
+      return target.Target::discardArrayAssignmentStatement(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::ScalarAssignmentStatement>)
+      return target.Target::discardScalarAssignmentStatement(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StatementList>)
+      return target.Target::discardStatementList(context,
+                                                 std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
+      return target.Target::discardStructuredForStatement(
+          context, std::forward<Args>(args)...);
+    else {
+      static_assert(sizeof(ASTNode) == 0,
+                    "'ASTNode' is not a non-terminal that can be discarded");
+      llvm_unreachable("does not compile");
+    }
+  }
+
+  /// Returns the probability table keyed by 'Key' in 'context', by dispatching
+  /// to the 'get*ProbabilityTable' method corresponding to it.
+  ///
+  /// Unlike the adaptors above this one dispatches on the key of the table
+  /// rather than on an AST node, there being one table per set of AST nodes the
+  /// generator picks from rather than one per AST node.
+  template <typename Key, typename Target = Self>
+  ProbabilityTable<Key> getProbabilityTable(const TypingContext &context) {
+    Target &target = static_cast<Target &>(*this);
+    if constexpr (std::is_same_v<Key, ExpressionKey>)
+      return target.Target::getExpressionProbabilityTable(context);
+    else if constexpr (std::is_same_v<Key, StatementKey>)
+      return target.Target::getStatementProbabilityTable(context);
+    else {
+      static_assert(sizeof(Key) == 0, "'Key' does not key a probability table");
+      llvm_unreachable("does not compile");
+    }
+  }
+
 private:
   Self &self() { return static_cast<Self &>(*this); }
 
@@ -1278,83 +1622,6 @@ private:
 class NoopTypeSystem final : public TypeSystem<std::monostate, NoopTypeSystem> {
 public:
   ~NoopTypeSystem() override;
-};
-
-/// Convenience type system that disallows every AST constructs (besides
-/// functions) by default.
-template <typename TypingContext, typename Self>
-class DisallowByDefaultTypeSystem : public TypeSystem<TypingContext, Self> {
-
-public:
-  static bool discardBinaryExpression(ast::BinaryExpression::Op,
-                                      const TypingContext &) {
-    return true;
-  }
-
-  static bool discardUnaryExpression(ast::UnaryExpression::Op,
-                                     const TypingContext &) {
-    return true;
-  }
-
-  static bool discardVariable(const TypingContext &) { return true; }
-
-  static bool discardCastExpression(const TypingContext &) { return true; }
-
-  static bool discardConditionalExpression(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardScalarType(const ast::ScalarType &,
-                                const TypingContext &) {
-    return true;
-  }
-
-  static bool discardReturnType(const ast::ReturnType &,
-                                const TypingContext &) {
-    return true;
-  }
-
-  std::optional<ast::Constant> discardConstant(const ast::Constant &,
-                                               const TypingContext &) {
-    return std::nullopt;
-  }
-
-  static bool discardExistingScalarParameter(const ast::ScalarParameter &,
-                                             const TypingContext &) {
-    return true;
-  }
-
-  static bool discardFreshScalarParameter(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardArrayReadExpression(const TypingContext &) { return true; }
-
-  static bool discardExistingArrayParameter(const ast::ArrayParameter &,
-                                            const TypingContext &) {
-    return true;
-  }
-
-  static bool discardFreshArrayParameter(const TypingContext &) { return true; }
-
-  static std::optional<std::size_t>
-  discardArrayDimension(std::size_t, const TypingContext &) {
-    return std::nullopt;
-  }
-
-  static bool discardArrayAssignmentStatement(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardScalarAssignmentStatement(const TypingContext &) {
-    return true;
-  }
-
-  static bool discardStatementList(const TypingContext &) { return true; }
-
-  static bool discardStructuredForStatement(const TypingContext &) {
-    return true;
-  }
 };
 
 } // namespace dynamatic::gen
