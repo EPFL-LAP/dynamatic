@@ -3,14 +3,14 @@
 
 // CHECK-LABEL:   handshake.func @simpleOneGroupLSQ(
 // CHECK-SAME:                                      %[[VAL_0:.*]]: memref<64xi32>, %[[VAL_1:.*]]: !handshake.control<>, %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["mem0", "mem0_start", "start"], resNames = ["out0", "mem0_end", "end"]} {
-// CHECK:           %[[VAL_3:.*]]:2 = lsq{{\[}}%[[VAL_0]] : memref<64xi32>] (%[[VAL_1]], %[[VAL_2]], %[[VAL_4:.*]], %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_2]])  {groupSizes = [3 : i32]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
-// CHECK:           %[[VAL_9:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
-// CHECK:           %[[VAL_10:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
-// CHECK:           %[[VAL_4]], %[[VAL_12:.*]] = load{{\[}}%[[VAL_9]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_5]], %[[VAL_6]] = store{{\[}}%[[VAL_10]]] %[[VAL_12]] {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_7]], %[[VAL_8]] = store{{\[}}%[[VAL_11]]] %[[VAL_12]] {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_12]], %[[VAL_3]]#1, %[[VAL_2]] : <i32>, <>, <>
+// CHECK:           %[[VAL_3:.*]], %[[VAL_4:.*]] = lsq{{\[}}%[[VAL_0]] : memref<64xi32>] start(%[[VAL_1]]) ctrl(%[[VAL_2]]) ldAddr(%[[VAL_5:.*]]) stAddr(%[[VAL_6:.*]], %[[VAL_7:.*]]) stData(%[[VAL_8:.*]], %[[VAL_9:.*]]) end(%[[VAL_2]]) {groups = [#handshake.mem_group<0, ctrl, [ld, st, st]>]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+// CHECK:           %[[VAL_10:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
+// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
+// CHECK:           %[[VAL_5]], %[[VAL_13:.*]] = load{{\[}}%[[VAL_10]]] %[[VAL_3]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_6]], %[[VAL_8]] = store{{\[}}%[[VAL_11]]] %[[VAL_13]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_7]], %[[VAL_9]] = store{{\[}}%[[VAL_12]]] %[[VAL_13]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           end {handshake.bb = 0 : ui32} %[[VAL_13]], %[[VAL_4]], %[[VAL_2]] : <i32>, <>, <>
 // CHECK:         }
 func.func @simpleOneGroupLSQ(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
@@ -26,25 +26,25 @@ func.func @simpleOneGroupLSQ(%mem: memref<64xi32>) -> i32 {
 
 // CHECK-LABEL:   handshake.func @simpleMultiGroupLSQ(
 // CHECK-SAME:                                        %[[VAL_0:.*]]: memref<64xi32>, %[[VAL_1:.*]]: !handshake.control<>, %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["mem0", "mem0_start", "start"], resNames = ["out0", "mem0_end", "end"]} {
-// CHECK:           %[[VAL_3:.*]]:3 = lsq{{\[}}%[[VAL_0]] : memref<64xi32>] (%[[VAL_1]], %[[VAL_2]], %[[VAL_4:.*]], %[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]], %[[VAL_6]])  {groupSizes = [2 : i32, 2 : i32]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
-// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_13:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
-// CHECK:           %[[VAL_4]], %[[VAL_14:.*]] = load{{\[}}%[[VAL_11]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_5]], %[[VAL_15:.*]] = load{{\[}}%[[VAL_12]]] %[[VAL_3]]#1 {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_16:.*]] = br %[[VAL_14]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_3:.*]]:2, %[[VAL_4:.*]] = lsq{{\[}}%[[VAL_0]] : memref<64xi32>] start(%[[VAL_1]]) ctrl(%[[VAL_2]], %[[VAL_5:.*]]) ldAddr(%[[VAL_6:.*]], %[[VAL_7:.*]]) stAddr(%[[VAL_8:.*]], %[[VAL_9:.*]]) stData(%[[VAL_10:.*]], %[[VAL_11:.*]]) end(%[[VAL_5]]) {groups = [#handshake.mem_group<0, ctrl, [ld, ld]>, #handshake.mem_group<1, ctrl, [st, st]>]} : (!handshake.control<>, !handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
+// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
+// CHECK:           %[[VAL_13:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_14:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
+// CHECK:           %[[VAL_6]], %[[VAL_15:.*]] = load{{\[}}%[[VAL_12]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_7]], %[[VAL_16:.*]] = load{{\[}}%[[VAL_13]]] %[[VAL_3]]#1 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
 // CHECK:           %[[VAL_17:.*]] = br %[[VAL_15]] {handshake.bb = 0 : ui32} : <i32>
-// CHECK:           %[[VAL_18:.*]] = br %[[VAL_12]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_18:.*]] = br %[[VAL_16]] {handshake.bb = 0 : ui32} : <i32>
 // CHECK:           %[[VAL_19:.*]] = br %[[VAL_13]] {handshake.bb = 0 : ui32} : <i32>
-// CHECK:           %[[VAL_20:.*]] = br %[[VAL_2]] {handshake.bb = 0 : ui32} : <>
-// CHECK:           %[[VAL_21:.*]] = merge %[[VAL_16]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_20:.*]] = br %[[VAL_14]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_21:.*]] = br %[[VAL_2]] {handshake.bb = 0 : ui32} : <>
 // CHECK:           %[[VAL_22:.*]] = merge %[[VAL_17]] {handshake.bb = 1 : ui32} : <i32>
 // CHECK:           %[[VAL_23:.*]] = merge %[[VAL_18]] {handshake.bb = 1 : ui32} : <i32>
 // CHECK:           %[[VAL_24:.*]] = merge %[[VAL_19]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_6]], %[[VAL_25:.*]] = control_merge [%[[VAL_20]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
-// CHECK:           %[[VAL_7]], %[[VAL_8]] = store{{\[}}%[[VAL_23]]] %[[VAL_21]] {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_9]], %[[VAL_10]] = store{{\[}}%[[VAL_24]]] %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_21]], %[[VAL_3]]#2, %[[VAL_2]] : <i32>, <>, <>
+// CHECK:           %[[VAL_25:.*]] = merge %[[VAL_20]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_5]], %[[VAL_26:.*]] = control_merge {{\[}}%[[VAL_21]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
+// CHECK:           %[[VAL_8]], %[[VAL_10]] = store{{\[}}%[[VAL_24]]] %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_9]], %[[VAL_11]] = store{{\[}}%[[VAL_25]]] %[[VAL_23]] {handshake.bb = 1 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_22]], %[[VAL_4]], %[[VAL_2]] : <i32>, <>, <>
 // CHECK:         }
 func.func @simpleMultiGroupLSQ(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
@@ -63,23 +63,23 @@ func.func @simpleMultiGroupLSQ(%mem: memref<64xi32>) -> i32 {
 
 // CHECK-LABEL:   handshake.func @mixLSQAndMCLoads(
 // CHECK-SAME:                                     %[[VAL_0:.*]]: memref<64xi32>, %[[VAL_1:.*]]: !handshake.control<>, %[[VAL_2:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["mem0", "mem0_start", "start"], resNames = ["out0", "mem0_end", "end"]} {
-// CHECK:           %[[VAL_3:.*]]:3, %[[VAL_4:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<64xi32>] %[[VAL_1]] (%[[VAL_5:.*]], %[[VAL_6:.*]], %[[VAL_7:.*]]#2, %[[VAL_7]]#3, %[[VAL_7]]#4) %[[VAL_8:.*]] {connectedBlocks = [0 : i32, 1 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
-// CHECK:           %[[VAL_7]]:5 = lsq[MC] (%[[VAL_2]], %[[VAL_9:.*]], %[[VAL_8]], %[[VAL_10:.*]], %[[VAL_3]]#2)  {groupSizes = [1 : i32, 1 : i32]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
-// CHECK:           %[[VAL_11:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
-// CHECK:           %[[VAL_12:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_13:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
-// CHECK:           %[[VAL_9]], %[[VAL_14:.*]] = load{{\[}}%[[VAL_11]]] %[[VAL_7]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_5]], %[[VAL_15:.*]] = load{{\[}}%[[VAL_12]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_16:.*]] = br %[[VAL_11]] {handshake.bb = 0 : ui32} : <i32>
-// CHECK:           %[[VAL_17:.*]] = br %[[VAL_13]] {handshake.bb = 0 : ui32} : <i32>
-// CHECK:           %[[VAL_18:.*]] = br %[[VAL_2]] {handshake.bb = 0 : ui32} : <>
-// CHECK:           %[[VAL_19:.*]] = merge %[[VAL_16]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_20:.*]] = merge %[[VAL_17]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_8]], %[[VAL_21:.*]] = control_merge [%[[VAL_18]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
-// CHECK:           %[[VAL_10]], %[[VAL_22:.*]] = load{{\[}}%[[VAL_19]]] %[[VAL_7]]#1 {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_6]], %[[VAL_23:.*]] = load{{\[}}%[[VAL_20]]] %[[VAL_3]]#1 {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_24:.*]] = addi %[[VAL_22]], %[[VAL_23]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_24]], %[[VAL_4]], %[[VAL_2]] : <i32>, <>, <>
+// CHECK:           %[[VAL_3:.*]]:2, %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<64xi32>] start(%[[VAL_1]]) ldAddr(%[[VAL_6:.*]], %[[VAL_7:.*]]) fromLSQ(%[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]) end(%[[VAL_11:.*]]) {groups = [#handshake.mem_group<0, [ld]>, #handshake.mem_group<1, [ld]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
+// CHECK:           %[[VAL_12:.*]]:2, %[[VAL_8]], %[[VAL_9]], %[[VAL_10]] = lsq[MC] ctrl(%[[VAL_2]], %[[VAL_11]]) ldAddr(%[[VAL_13:.*]], %[[VAL_14:.*]]) fromMC(%[[VAL_4]]) {groups = [#handshake.mem_group<0, ctrl, [ld]>, #handshake.mem_group<1, ctrl, [ld]>]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
+// CHECK:           %[[VAL_15:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
+// CHECK:           %[[VAL_16:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_17:.*]] = constant %[[VAL_2]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
+// CHECK:           %[[VAL_13]], %[[VAL_18:.*]] = load{{\[}}%[[VAL_15]]] %[[VAL_12]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_6]], %[[VAL_19:.*]] = load{{\[}}%[[VAL_16]]] %[[VAL_3]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_20:.*]] = br %[[VAL_15]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_21:.*]] = br %[[VAL_17]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_22:.*]] = br %[[VAL_2]] {handshake.bb = 0 : ui32} : <>
+// CHECK:           %[[VAL_23:.*]] = merge %[[VAL_20]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_24:.*]] = merge %[[VAL_21]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_11]], %[[VAL_25:.*]] = control_merge {{\[}}%[[VAL_22]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
+// CHECK:           %[[VAL_14]], %[[VAL_26:.*]] = load{{\[}}%[[VAL_23]]] %[[VAL_12]]#1 {handshake.bb = 1 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_7]], %[[VAL_27:.*]] = load{{\[}}%[[VAL_24]]] %[[VAL_3]]#1 {handshake.bb = 1 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_28:.*]] = addi %[[VAL_26]], %[[VAL_27]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_28]], %[[VAL_5]], %[[VAL_2]] : <i32>, <>, <>
 // CHECK:         }
 func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
   %c0 = arith.constant 0 : index
@@ -99,23 +99,23 @@ func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
 
 // CHECK-LABEL:   handshake.func @mixLSQAndMCStores(
 // CHECK-SAME:                                      %[[VAL_0:.*]]: memref<64xi32>, %[[VAL_1:.*]]: !handshake.channel<i32>, %[[VAL_2:.*]]: !handshake.control<>, %[[VAL_3:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["mem0", "in0", "mem0_start", "start"], resNames = ["out0", "mem0_end", "end"]} {
-// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<64xi32>] %[[VAL_2]] (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]], %[[VAL_10:.*]]#0, %[[VAL_10]]#1, %[[VAL_10]]#2) %[[VAL_11:.*]] {connectedBlocks = [0 : i32, 1 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> !handshake.channel<i32>
-// CHECK:           %[[VAL_10]]:3 = lsq[MC] (%[[VAL_3]], %[[VAL_12:.*]], %[[VAL_13:.*]], %[[VAL_11]], %[[VAL_14:.*]], %[[VAL_15:.*]], %[[VAL_4]])  {groupSizes = [1 : i32, 1 : i32]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
+// CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<64xi32>] start(%[[VAL_2]]) ctrl(%[[VAL_6:.*]], %[[VAL_7:.*]]) stAddr(%[[VAL_8:.*]]) stData(%[[VAL_9:.*]]) fromLSQ(%[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_12:.*]]) end(%[[VAL_13:.*]]) {groups = [#handshake.mem_group<0, ctrl, [st]>, #handshake.mem_group<1, ctrl, []>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+// CHECK:           %[[VAL_10]], %[[VAL_11]], %[[VAL_12]] = lsq[MC] ctrl(%[[VAL_3]], %[[VAL_13]]) stAddr(%[[VAL_14:.*]], %[[VAL_15:.*]]) stData(%[[VAL_16:.*]], %[[VAL_17:.*]]) fromMC(%[[VAL_4]]) {groups = [#handshake.mem_group<0, ctrl, [st]>, #handshake.mem_group<1, ctrl, [st]>]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
 // CHECK:           %[[VAL_6]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
-// CHECK:           %[[VAL_16:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
-// CHECK:           %[[VAL_17:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_18:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
-// CHECK:           %[[VAL_12]], %[[VAL_13]] = store{{\[}}%[[VAL_16]]] %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_7]], %[[VAL_8]] = store{{\[}}%[[VAL_17]]] %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_19:.*]] = br %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>
-// CHECK:           %[[VAL_20:.*]] = br %[[VAL_18]] {handshake.bb = 0 : ui32} : <i32>
-// CHECK:           %[[VAL_21:.*]] = br %[[VAL_3]] {handshake.bb = 0 : ui32} : <>
-// CHECK:           %[[VAL_9]] = constant %[[VAL_11]] {handshake.bb = 1 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_22:.*]] = merge %[[VAL_19]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_23:.*]] = merge %[[VAL_20]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_11]], %[[VAL_24:.*]] = control_merge [%[[VAL_21]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
-// CHECK:           %[[VAL_14]], %[[VAL_15]] = store{{\[}}%[[VAL_23]]] %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_22]], %[[VAL_5]], %[[VAL_3]] : <i32>, <>, <>
+// CHECK:           %[[VAL_18:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
+// CHECK:           %[[VAL_19:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_20:.*]] = constant %[[VAL_3]] {handshake.bb = 0 : ui32, value = 2 : i32} : <>, <i32>
+// CHECK:           %[[VAL_14]], %[[VAL_16]] = store{{\[}}%[[VAL_18]]] %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_8]], %[[VAL_9]] = store{{\[}}%[[VAL_19]]] %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_21:.*]] = br %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_22:.*]] = br %[[VAL_20]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_23:.*]] = br %[[VAL_3]] {handshake.bb = 0 : ui32} : <>
+// CHECK:           %[[VAL_7]] = constant %[[VAL_13]] {handshake.bb = 1 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_24:.*]] = merge %[[VAL_21]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_25:.*]] = merge %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_13]], %[[VAL_26:.*]] = control_merge {{\[}}%[[VAL_23]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
+// CHECK:           %[[VAL_15]], %[[VAL_17]] = store{{\[}}%[[VAL_25]]] %[[VAL_24]] {handshake.bb = 1 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_24]], %[[VAL_5]], %[[VAL_3]] : <i32>, <>, <>
 // CHECK:         }
 func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
   %c0 = arith.constant 0 : index
@@ -133,38 +133,38 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 
 // CHECK-LABEL:   handshake.func @ifThenElseSameLSQGroup(
 // CHECK-SAME:                                           %[[VAL_0:.*]]: memref<64xi32>, %[[VAL_1:.*]]: !handshake.channel<i32>, %[[VAL_2:.*]]: !handshake.control<>, %[[VAL_3:.*]]: !handshake.control<>, ...) -> (!handshake.channel<i32>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["mem0", "in0", "mem0_start", "start"], resNames = ["out0", "mem0_end", "end"]} {
-// CHECK:           %[[VAL_4:.*]]:3, %[[VAL_5:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<64xi32>] %[[VAL_2]] (%[[VAL_6:.*]], %[[VAL_7:.*]], %[[VAL_8:.*]], %[[VAL_9:.*]]#1, %[[VAL_9]]#2, %[[VAL_9]]#3) %[[VAL_10:.*]] {connectedBlocks = [1 : i32, 2 : i32, 3 : i32]} : (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
-// CHECK:           %[[VAL_9]]:4 = lsq[MC] (%[[VAL_3]], %[[VAL_11:.*]], %[[VAL_12:.*]], %[[VAL_13:.*]], %[[VAL_4]]#2)  {groupSizes = [2 : i32]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
-// CHECK:           %[[VAL_14:.*]] = source {handshake.bb = 0 : ui32}
-// CHECK:           %[[VAL_15:.*]] = constant %[[VAL_14]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
-// CHECK:           %[[VAL_11]], %[[VAL_16:.*]] = load{{\[}}%[[VAL_1]]] %[[VAL_9]]#0 {handshake.bb = 0 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_17:.*]] = cmpi eq, %[[VAL_16]], %[[VAL_15]] {handshake.bb = 0 : ui32} : <i32>
-// CHECK:           %[[VAL_18:.*]], %[[VAL_19:.*]] = cond_br %[[VAL_17]], %[[VAL_1]] {handshake.bb = 0 : ui32} : <i1>, <i32>
-// CHECK:           %[[VAL_20:.*]], %[[VAL_21:.*]] = cond_br %[[VAL_17]], %[[VAL_3]] {handshake.bb = 0 : ui32} : <i1>, <>
-// CHECK:           %[[VAL_22:.*]] = merge %[[VAL_18]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_23:.*]], %[[VAL_24:.*]] = control_merge [%[[VAL_20]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
-// CHECK:           %[[VAL_25:.*]] = source {handshake.bb = 1 : ui32}
-// CHECK:           %[[VAL_26:.*]] = constant %[[VAL_25]] {handshake.bb = 1 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_27:.*]] = addi %[[VAL_22]], %[[VAL_26]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_6]], %[[VAL_28:.*]] = load{{\[}}%[[VAL_27]]] %[[VAL_4]]#0 {handshake.bb = 1 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_29:.*]] = br %[[VAL_28]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_30:.*]] = br %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>
-// CHECK:           %[[VAL_31:.*]] = br %[[VAL_23]] {handshake.bb = 1 : ui32} : <>
-// CHECK:           %[[VAL_32:.*]] = merge %[[VAL_19]] {handshake.bb = 2 : ui32} : <i32>
-// CHECK:           %[[VAL_33:.*]], %[[VAL_34:.*]] = control_merge [%[[VAL_21]]]  {handshake.bb = 2 : ui32} : [<>] to <>, <i1>
-// CHECK:           %[[VAL_35:.*]] = source {handshake.bb = 2 : ui32}
-// CHECK:           %[[VAL_36:.*]] = constant %[[VAL_35]] {handshake.bb = 2 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_37:.*]] = addi %[[VAL_32]], %[[VAL_36]] {handshake.bb = 2 : ui32} : <i32>
-// CHECK:           %[[VAL_7]], %[[VAL_38:.*]] = load{{\[}}%[[VAL_37]]] %[[VAL_4]]#1 {handshake.bb = 2 : ui32} : <i32>, <i32>
-// CHECK:           %[[VAL_39:.*]] = br %[[VAL_38]] {handshake.bb = 2 : ui32} : <i32>
-// CHECK:           %[[VAL_40:.*]] = br %[[VAL_32]] {handshake.bb = 2 : ui32} : <i32>
-// CHECK:           %[[VAL_41:.*]] = br %[[VAL_33]] {handshake.bb = 2 : ui32} : <>
-// CHECK:           %[[VAL_8]] = constant %[[VAL_10]] {handshake.bb = 3 : ui32, value = 1 : i32} : <>, <i32>
-// CHECK:           %[[VAL_42:.*]] = mux %[[VAL_43:.*]] {{\[}}%[[VAL_29]], %[[VAL_39]]] {handshake.bb = 3 : ui32} : <i1>, [<i32>, <i32>] to <i32>
-// CHECK:           %[[VAL_44:.*]] = mux %[[VAL_43]] {{\[}}%[[VAL_30]], %[[VAL_40]]] {handshake.bb = 3 : ui32} : <i1>, [<i32>, <i32>] to <i32>
-// CHECK:           %[[VAL_10]], %[[VAL_43]] = control_merge [%[[VAL_31]], %[[VAL_41]]]  {handshake.bb = 3 : ui32} : [<>, <>] to <>, <i1>
-// CHECK:           %[[VAL_12]], %[[VAL_13]] = store{{\[}}%[[VAL_44]]] %[[VAL_42]] {handshake.bb = 3 : ui32} : <i32>, <i32>
-// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_42]], %[[VAL_5]], %[[VAL_3]] : <i32>, <>, <>
+// CHECK:           %[[VAL_4:.*]]:2, %[[VAL_5:.*]], %[[VAL_6:.*]] = mem_controller{{\[}}%[[VAL_0]] : memref<64xi32>] start(%[[VAL_2]]) ctrl(%[[VAL_7:.*]]) ldAddr(%[[VAL_8:.*]], %[[VAL_9:.*]]) fromLSQ(%[[VAL_10:.*]], %[[VAL_11:.*]], %[[VAL_12:.*]]) end(%[[VAL_13:.*]]) {groups = [#handshake.mem_group<1, [ld]>, #handshake.mem_group<2, [ld]>, #handshake.mem_group<3, ctrl, []>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
+// CHECK:           %[[VAL_14:.*]], %[[VAL_10]], %[[VAL_11]], %[[VAL_12]] = lsq[MC] ctrl(%[[VAL_3]]) ldAddr(%[[VAL_15:.*]]) stAddr(%[[VAL_16:.*]]) stData(%[[VAL_17:.*]]) fromMC(%[[VAL_5]]) {groups = [#handshake.mem_group<0, ctrl, [ld, st]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>)
+// CHECK:           %[[VAL_18:.*]] = source {handshake.bb = 0 : ui32} : <>
+// CHECK:           %[[VAL_19:.*]] = constant %[[VAL_18]] {handshake.bb = 0 : ui32, value = 0 : i32} : <>, <i32>
+// CHECK:           %[[VAL_15]], %[[VAL_20:.*]] = load{{\[}}%[[VAL_1]]] %[[VAL_14]] {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_21:.*]] = cmpi eq, %[[VAL_20]], %[[VAL_19]] {handshake.bb = 0 : ui32} : <i32>
+// CHECK:           %[[VAL_22:.*]], %[[VAL_23:.*]] = cond_br %[[VAL_21]], %[[VAL_1]] {handshake.bb = 0 : ui32} : <i1>, <i32>
+// CHECK:           %[[VAL_24:.*]], %[[VAL_25:.*]] = cond_br %[[VAL_21]], %[[VAL_3]] {handshake.bb = 0 : ui32} : <i1>, <>
+// CHECK:           %[[VAL_26:.*]] = merge %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_27:.*]], %[[VAL_28:.*]] = control_merge {{\[}}%[[VAL_24]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
+// CHECK:           %[[VAL_29:.*]] = source {handshake.bb = 1 : ui32} : <>
+// CHECK:           %[[VAL_30:.*]] = constant %[[VAL_29]] {handshake.bb = 1 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_31:.*]] = addi %[[VAL_26]], %[[VAL_30]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_8]], %[[VAL_32:.*]] = load{{\[}}%[[VAL_31]]] %[[VAL_4]]#0 {handshake.bb = 1 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_33:.*]] = br %[[VAL_32]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_34:.*]] = br %[[VAL_26]] {handshake.bb = 1 : ui32} : <i32>
+// CHECK:           %[[VAL_35:.*]] = br %[[VAL_27]] {handshake.bb = 1 : ui32} : <>
+// CHECK:           %[[VAL_36:.*]] = merge %[[VAL_23]] {handshake.bb = 2 : ui32} : <i32>
+// CHECK:           %[[VAL_37:.*]], %[[VAL_38:.*]] = control_merge {{\[}}%[[VAL_25]]]  {handshake.bb = 2 : ui32} : [<>] to <>, <i1>
+// CHECK:           %[[VAL_39:.*]] = source {handshake.bb = 2 : ui32} : <>
+// CHECK:           %[[VAL_40:.*]] = constant %[[VAL_39]] {handshake.bb = 2 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_41:.*]] = addi %[[VAL_36]], %[[VAL_40]] {handshake.bb = 2 : ui32} : <i32>
+// CHECK:           %[[VAL_9]], %[[VAL_42:.*]] = load{{\[}}%[[VAL_41]]] %[[VAL_4]]#1 {handshake.bb = 2 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           %[[VAL_43:.*]] = br %[[VAL_42]] {handshake.bb = 2 : ui32} : <i32>
+// CHECK:           %[[VAL_44:.*]] = br %[[VAL_36]] {handshake.bb = 2 : ui32} : <i32>
+// CHECK:           %[[VAL_45:.*]] = br %[[VAL_37]] {handshake.bb = 2 : ui32} : <>
+// CHECK:           %[[VAL_7]] = constant %[[VAL_13]] {handshake.bb = 3 : ui32, value = 1 : i32} : <>, <i32>
+// CHECK:           %[[VAL_46:.*]] = mux %[[VAL_47:.*]] {{\[}}%[[VAL_33]], %[[VAL_43]]] {handshake.bb = 3 : ui32} : <i1>, [<i32>, <i32>] to <i32>
+// CHECK:           %[[VAL_48:.*]] = mux %[[VAL_47]] {{\[}}%[[VAL_34]], %[[VAL_44]]] {handshake.bb = 3 : ui32} : <i1>, [<i32>, <i32>] to <i32>
+// CHECK:           %[[VAL_13]], %[[VAL_47]] = control_merge {{\[}}%[[VAL_35]], %[[VAL_45]]]  {handshake.bb = 3 : ui32} : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_16]], %[[VAL_17]] = store{{\[}}%[[VAL_48]]] %[[VAL_46]] {handshake.bb = 3 : ui32} : <i32>, <i32>, <i32>, <i32>
+// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_46]], %[[VAL_6]], %[[VAL_3]] : <i32>, <>, <>
 // CHECK:         }
 func.func @ifThenElseSameLSQGroup(%mem: memref<64xi32>, %idx: index) -> i32 {
   %c0 = arith.constant 0 : i32

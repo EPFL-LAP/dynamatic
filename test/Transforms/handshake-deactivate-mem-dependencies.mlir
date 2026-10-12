@@ -2,8 +2,8 @@
 
 // CHECK-LABEL:   handshake.func @test0(
 handshake.func @test0(%arg0: !handshake.channel<i32>, %arg4: memref<8xi32>, %arg5: memref<8xi8>, %arg6: !handshake.control<>, %arg7: !handshake.control<>, %arg8: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>, !handshake.control<>) attributes {argNames = ["var1", "var0", "var2", "var0_start", "var2_start", "start"], resNames = ["var0_end", "var2_end", "end"]} {
-  %0 = lsq[%arg5 : memref<8xi8>] (%arg7, %arg8, %addressResult_12, %dataResult_13, %arg8)  {groupSizes = [2 : i32], handshake.name = "lsq0"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control<>) -> !handshake.control<>
-  %1:2 = lsq[%arg4 : memref<8xi32>] (%arg6, %arg8, %addressResult_10, %addressResult_14, %dataResult_15, %arg8)  {groupSizes = [2 : i32], handshake.name = "lsq1"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+  %0 = lsq[%arg5 : memref<8xi8>] start(%arg7) ctrl(%arg8) stAddr(%addressResult_12) stData(%dataResult_13) end(%arg8) {groups = [#handshake.mem_group<0, ctrl, [st]>], handshake.name = "lsq0"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control<>) -> !handshake.control<>
+  %1:2 = lsq[%arg4 : memref<8xi32>] start(%arg6) ctrl(%arg8) ldAddr(%addressResult_10) stAddr(%addressResult_14) stData(%dataResult_15) end(%arg8) {groups = [#handshake.mem_group<0, ctrl, [ld, st]>], handshake.name = "lsq1"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
   %22 = constant %arg8 {handshake.bb = 0 : ui32, handshake.name = "constant6", value = 0 : i32} : <>, <i32>
 
 // ^bb1:
@@ -24,7 +24,7 @@ handshake.func @test0(%arg0: !handshake.channel<i32>, %arg4: memref<8xi32>, %arg
 
 // CHECK-LABEL:   handshake.func @shrsi_giid(
 handshake.func @shrsi_giid(%arg0: !handshake.channel<i8>, %arg1: memref<2xi16>, %arg2: !handshake.control<>, %arg3: !handshake.control<>, ...) -> (!handshake.control<>, !handshake.control<>) attributes {argNames = ["var5", "var1", "var1_start", "start"], resNames = ["var1_end", "end"]} {
-  %0:2 = lsq[%arg1 : memref<2xi16>] (%arg2, %arg3, %addressResult, %addressResult_0, %dataResult_1, %arg3)  {groupSizes = [2 : i32], handshake.name = "lsq0"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i16>, !handshake.control<>) -> (!handshake.channel<i16>, !handshake.control<>)
+  %0:2 = lsq[%arg1 : memref<2xi16>] start(%arg2) ctrl(%arg3) ldAddr(%addressResult) stAddr(%addressResult_0) stData(%dataResult_1) end(%arg3) {groups = [#handshake.mem_group<0, ctrl, [ld, st]>], handshake.name = "lsq0"} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i16>, !handshake.control<>) -> (!handshake.channel<i16>, !handshake.control<>)
   %1 = constant %arg3 {handshake.bb = 0 : ui32, handshake.name = "constant0", value = 0 : i32} : <>, <i32>
   // CHECK: load
   // CHECK-SAME: #handshake<deps[{

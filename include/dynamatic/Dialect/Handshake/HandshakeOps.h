@@ -80,7 +80,10 @@ public:
     LSQ_LOAD_STORE,
   };
 
-  /// The operation producing the memory input(s) the port refers to.
+  /// The operation producing the memory input(s) the port refers to. This is
+  /// found by following the def-use chain of the port's first input through
+  /// forks and bitwidth modifications. It may be nullptr if the operation cannot
+  /// be found this way (e.g., when a control port is a function argument).
   mlir::Operation *portOp;
 
   /// Deleted default constructor.
@@ -189,10 +192,10 @@ public:
 /// memory interface.
 class StorePort : public MemoryPort {
 public:
-  /// Constructs the store port from a store operation, the index of the
-  /// store's address output in the memory interface's inputs (the store's data
-  /// output is assumed to be at the next index), and the specific store kind.
-  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx);
+  /// Constructs the store port from a store operation, and the indices of the
+  /// store's address and data outputs in the memory interface's inputs.
+  StorePort(dynamatic::handshake::StoreOp storeOp, unsigned addrInputIdx,
+            unsigned dataInputIdx);
 
   /// Default copy constructor.
   StorePort(const StorePort &other) = default;
@@ -327,9 +330,9 @@ public:
 /// Represents a list of memory ports logically grouped together for a specific
 /// memory interface. The semantics of a group are given by the memory interface
 /// the group belongs to. A group may have a single control port and 0 or more
-/// memory access ports (loads and stores) stored in the same order as the
-/// memory interface's inputs. All ports in a group must map to a continuous
-/// subrange of the memory interface's inputs.
+/// memory access ports (loads and stores) stored in program order. The ports of
+/// a group are generally spread over several operand segments of the memory
+/// interface.
 class GroupMemoryPorts {
 public:
   /// Optional control port for the group.
@@ -356,26 +359,6 @@ public:
   /// Computes the number of results in the asociated memory interface that map
   /// to this group's ports.
   unsigned getNumResults() const;
-
-  /// Returns the first operand index that is associated with a port of the
-  /// group. If no port of the group has an operand associated with it, returns
-  /// std::string::npos.
-  size_t getFirstOperandIndex() const;
-
-  /// Returns the last operand index that is associated with a port of the
-  /// group. If no port of the group has an operand associated with it, returns
-  /// std::string::npos.
-  size_t getLastOperandIndex() const;
-
-  /// Returns the first result index that is associated with a port of the
-  /// group. If no port of the group has a result associated with it, returns
-  /// std::string::npos.
-  size_t getFirstResultIndex() const;
-
-  /// Returns the last result index that is associated with a port of the
-  /// group. If no port of the group has a result associated with it, returns
-  /// std::string::npos.
-  size_t getLastResultIndex() const;
 
   /// Determines whether the group contains any port of the provided kinds.
   template <typename... PortKinds>
@@ -427,21 +410,21 @@ public:
   FuncMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp)
       : memOp(memOp) {}
 
-  /// Returns the continuous subrange of the memory interface's inputs which a
-  /// group (indicated by its index in the list) maps to.
-  mlir::ValueRange getGroupInputs(unsigned groupIdx);
+  /// Returns the memory interface's inputs which a group (indicated by its
+  /// index in the list) maps to, in port order.
+  mlir::SmallVector<mlir::Value> getGroupInputs(unsigned groupIdx);
 
-  /// Returns the continuous subrange of the memory interface's results which a
-  /// group (indicated by its index in the list) maps to.
-  mlir::ValueRange getGroupResults(unsigned groupIdx);
+  /// Returns the memory interface's results which a group (indicated by its
+  /// index in the list) maps to, in port order.
+  mlir::SmallVector<mlir::Value> getGroupResults(unsigned groupIdx);
 
-  /// Returns the continuous subrange of the memory interface's inputs which
-  /// connect to other memory interfaces.
-  mlir::ValueRange getInterfacesInputs();
+  /// Returns the memory interface's inputs which connect to other memory
+  /// interfaces.
+  mlir::SmallVector<mlir::Value> getInterfacesInputs();
 
-  /// Returns the continuous subrange of the memory interface's results which
-  /// connect to other memory interfaces.
-  mlir::ValueRange getInterfacesResults();
+  /// Returns the memory interface's results which connect to other memory
+  /// interfaces.
+  mlir::SmallVector<mlir::Value> getInterfacesResults();
 
   /// Returns the number of groups attached to the memory interface.
   unsigned getNumGroups() { return groups.size(); }
@@ -567,8 +550,8 @@ public:
   MCLoadStorePort getMCPort() const;
 };
 
-/// Identifies the type of all ports in a memory interface's memory inputs by
-/// backtracking their def-use chain till reaching specific operation types.
+/// Returns the ports of a memory interface, derived from its operand segments
+/// and memory groups.
 FuncMemoryPorts getMemoryPorts(dynamatic::handshake::MemoryOpInterface memOp);
 
 /// Attempts to find a memory interface by following the value's uses in a BFS

@@ -64,15 +64,6 @@ static ParseResult parseHandshakeTypes(OpAsmParser &parser,
   return success();
 }
 
-/// Parser for the `custom<SimpleControl>` Tablegen directive.
-static ParseResult parseSimpleControl(OpAsmParser &parser, Type &type) {
-  // No parsing needed.
-
-  // Make ControlType without any extra signals
-  type = ControlType::get(parser.getContext());
-  return success();
-}
-
 static void printHandshakeType(OpAsmPrinter &printer, Operation * /*op*/,
                                Type type) {
   if (auto controlType = dyn_cast<handshake::ControlType>(type)) {
@@ -93,11 +84,6 @@ static void printHandshakeTypes(OpAsmPrinter &printer, Operation * /*op*/,
     printer << ", ";
   }
   printHandshakeType(printer, nullptr, types.back());
-}
-
-/// Printer for the `custom<SimpleControl>` Tablegen directive.
-static void printSimpleControl(OpAsmPrinter &, Operation *, Type) {
-  // No printing needed.
 }
 
 static void printHandshakeType(OpAsmPrinter &printer, Type type) {
@@ -694,9 +680,9 @@ FunctionType InstanceOp::getModuleType() {
   return FunctionType::get(getContext(), getOperandTypes(), getResultTypes());
 }
 
-/// Finds the type of operation that produces the input by backtracking the
-/// def-use chain through potential bitwidth modification and/or fork
-/// operations.
+/// Finds the operation that produces the input by backtracking the def-use
+/// chain through potential bitwidth modification and/or fork operations.
+/// Returns nullptr if the input is a block argument.
 static Operation *backtrackToMemInput(Value input) {
   Operation *inputOp = input.getDefiningOp();
   while (isa_and_present<handshake::ExtSIOp, handshake::ExtUIOp,
@@ -705,264 +691,470 @@ static Operation *backtrackToMemInput(Value input) {
   return inputOp;
 }
 
-/// Common verification logic for memory controllers and LSQs.
-static LogicalResult verifyMemOp(FuncMemoryPorts &ports) {
-  // At most we can connect to a single other memory interface
-  if (ports.interfacePorts.size() > 1)
-    return ports.memOp.emitError() << "Interface may have at most one port to "
-                                      "other memory interfaces, but has "
-                                   << ports.interfacePorts.size() << ".";
+static handshake::ChannelType wrapChannel(Type type) {
+  assert(ChannelType::isSupportedSignalType(type) && "unsupported data type");
+  return handshake::ChannelType::get(type);
+}
+
+/// Name of the attribute holding the groups of memory interfaces.
+static constexpr StringLiteral GROUPS_ATTR_NAME("groups");
+
+/// Converts a list of memory groups into an array attribute.
+static ArrayAttr buildGroupsAttr(OpBuilder &builder,
+                               ArrayRef<MemGroupAttr> groups) {
+  return builder.getArrayAttr(
+      SmallVector<Attribute>(groups.begin(), groups.end()));
+}
+
+/// Name of the attributes holding the operand/result segment sizes of memory
+/// interfaces.
+static StringRef getOprdSegmentsAttrName() {
+  return OpTrait::AttrSizedOperandSegments<void>::getOperandSegmentSizeAttr();
+}
+static StringRef getResSegmentsAttrName() {
+  return OpTrait::AttrSizedResultSegments<void>::getResultSegmentSizeAttr();
+}
+
+/// Returns the absolute operand index of the first operand in the segment.
+template <typename MemOp>
+static unsigned getOprdSegmentStart(MemOp memOp, unsigned segment) {
+  return memOp.getODSOperandIndexAndLength(segment).first;
+}
+
+/// Returns the absolute result index of the first result in the segment.
+template <typename MemOp>
+static unsigned getResSegmentStart(MemOp memOp, unsigned segment) {
+  return memOp.getODSResultIndexAndLength(segment).first;
+}
+
+/// Verifies that the groups of a memory interface are consistent with the
+/// sizes of its control, load, and store segments.
+static LogicalResult verifyMemGroups(Operation *memOp,
+                                     ArrayRef<MemGroupAttr> groups,
+                                     unsigned numCtrls, unsigned numLdAddrs,
+                                     unsigned numLdDatas, unsigned numStAddrs,
+                                     unsigned numStDatas) {
+  if (groups.empty())
+    return memOp->emitError() << "memory interface must have at least one "
+                                 "group";
+
+  unsigned groupCtrls = 0, groupLoads = 0, groupStores = 0;
+  for (MemGroupAttr group : groups) {
+    if (group.getHasCtrl())
+      ++groupCtrls;
+    groupLoads += group.getNumLoads();
+    groupStores += group.getNumStores();
+  }
+  auto checkCount = [&](StringRef what, unsigned expected,
+                        unsigned actual) -> LogicalResult {
+    if (expected == actual)
+      return success();
+    return memOp->emitError()
+           << "groups declare " << expected << " " << what << ", but "
+           << actual << " are provided";
+  };
+  return success(
+      succeeded(checkCount("control ports", groupCtrls, numCtrls)) &&
+      succeeded(checkCount("load addresses", groupLoads, numLdAddrs)) &&
+      succeeded(checkCount("load data results", groupLoads, numLdDatas)) &&
+      succeeded(checkCount("store addresses", groupStores, numStAddrs)) &&
+      succeeded(checkCount("store data", groupStores, numStDatas)));
+}
+
+/// Verifies that all non-null values have the same bitwidth.
+static LogicalResult verifySameBitwidth(Operation *memOp, StringRef what,
+                                        ArrayRef<Value> values) {
+  std::optional<unsigned> width;
+  for (Value val : values) {
+    if (!val)
+      continue;
+    unsigned valWidth = getHandshakeTypeBitWidth(val.getType());
+    if (!width) {
+      width = valWidth;
+    } else if (*width != valWidth) {
+      return memOp->emitError()
+             << "inconsistent bitwidths for " << what << ", expected " << *width
+             << " bits but got " << valWidth << " bits";
+    }
+  }
   return success();
 }
 
-/// During construction of a memory interface's ports information, checks
-/// whether bitwidths are consistent between all signals of the same nature
-/// (e.g., address signals). A width of 0 is understood as "uninitialized", in
-/// which case the first encountered signal determines the "reference" for that
-/// signal type's width. Fails when the memory input's bitwidth doesn't match
-/// the previously established bitwidth.
-static LogicalResult checkAndSetBitwidth(Value memInput, unsigned &width) {
-  // Determine the signal's width
-  Type inType = memInput.getType();
-  if (!isa<handshake::ControlType, handshake::ChannelType>(inType)) {
-    return memInput.getUsers().begin()->emitError()
-           << "Invalid input type, expected !handshake.control or "
-              "!handshake.channel";
+/// Returns the bitwidth of the first non-null value, or 0 if there is none.
+static unsigned getFirstBitwidth(ArrayRef<Value> values) {
+  for (Value val : values) {
+    if (val)
+      return getHandshakeTypeBitWidth(val.getType());
   }
-  unsigned inputWidth = getHandshakeTypeBitWidth(inType);
+  return 0;
+}
 
-  if (width == 0) {
-    // This is the first time we encounter a signal of this type, consider its
-    // width as the reference one for its category
-    width = inputWidth;
-    return success();
+/// Prints a comma-separated list of operands in parentheses after the keyword,
+/// unless the list is empty.
+static void printMemSection(OpAsmPrinter &p, StringRef keyword,
+                            ValueRange values) {
+  if (values.empty())
+    return;
+  p << " " << keyword << "(";
+  llvm::interleaveComma(values, p);
+  p << ")";
+}
+
+/// Parses an optional `keyword(operand, ...)` section, appending the operands
+/// to the list. Returns the number of parsed operands.
+static FailureOr<unsigned>
+parseMemSection(OpAsmParser &parser, StringRef keyword,
+                SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands) {
+  if (failed(parser.parseOptionalKeyword(keyword)))
+    return 0;
+  size_t numBefore = operands.size();
+  if (parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren))
+    return failure();
+  return operands.size() - numBefore;
+}
+
+/// Parses an optional reference to a memory region of the form
+/// `[%memref : type]`. If the `allowMC` flag is set, `[MC]` is accepted instead
+/// to indicate the absence of a memory region (sets `hasMemRef` to false).
+static ParseResult
+parseMemRegion(OpAsmParser &parser, bool allowMC, bool &hasMemRef,
+               SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
+               SmallVectorImpl<Type> &types) {
+  if (parser.parseLSquare())
+    return failure();
+  if (allowMC && succeeded(parser.parseOptionalKeyword("MC"))) {
+    hasMemRef = false;
+    return parser.parseRSquare();
   }
-  if (width != inputWidth) {
-    return memInput.getUsers().begin()->emitError()
-           << "Inconsistent bitwidths in inputs, expected signal with " << width
-           << " bits but got signal with " << inputWidth << " bits.";
-  }
+  hasMemRef = true;
+  OpAsmParser::UnresolvedOperand memref;
+  Type memrefType;
+  if (parser.parseOperand(memref) || parser.parseColonType(memrefType) ||
+      parser.parseRSquare())
+    return failure();
+  operands.push_back(memref);
+  types.push_back(memrefType);
   return success();
+}
+
+/// Parses the attribute dictionary and the functional type of a memory
+/// interface, then resolves the operands (the memory region's operand and
+/// type, if any, must already be at the front of the lists).
+static ParseResult
+parseMemTypes(OpAsmParser &parser, OperationState &result, llvm::SMLoc loc,
+              SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
+              SmallVectorImpl<Type> &operandTypes) {
+  FunctionType funType;
+  if (parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(funType))
+    return failure();
+  llvm::append_range(operandTypes, funType.getInputs());
+  result.addTypes(funType.getResults());
+  return parser.resolveOperands(operands, operandTypes, loc, result.operands);
+}
+
+/// Sets the result segment sizes of a parsed memory interface, checking that
+/// they are consistent with the number of parsed result types.
+static ParseResult setParsedResultSegments(OpAsmParser &parser,
+                                           OperationState &result,
+                                           llvm::SMLoc loc,
+                                           ArrayRef<int32_t> segments) {
+  int64_t numResults = 0;
+  for (int32_t size : segments)
+    numResults += size;
+  if (numResults != static_cast<int64_t>(result.types.size()))
+    return parser.emitError(loc)
+           << "expected " << numResults
+           << " results based on the memory groups and operands, but got "
+           << result.types.size();
+  result.addAttribute(getResSegmentsAttrName(),
+                      parser.getBuilder().getDenseI32ArrayAttr(segments));
+  return success();
+}
+
+/// Returns the memory groups stored in a parsed attribute dictionary.
+static FailureOr<SmallVector<MemGroupAttr>>
+getParsedGroups(OpAsmParser &parser, OperationState &result, llvm::SMLoc loc) {
+  // Both memory interfaces store their groups under the same attribute name
+  auto groupsAttr =
+      dyn_cast_if_present<ArrayAttr>(result.attributes.get(GROUPS_ATTR_NAME));
+  if (!groupsAttr)
+    return parser.emitError(loc) << "expected 'groups' attribute";
+  SmallVector<MemGroupAttr> groups;
+  for (Attribute attr : groupsAttr) {
+    auto group = dyn_cast<MemGroupAttr>(attr);
+    if (!group)
+      return parser.emitError(loc)
+             << "expected 'groups' to only contain memory groups";
+    groups.push_back(group);
+  }
+  return groups;
 }
 
 //===----------------------------------------------------------------------===//
 // MemoryControllerOp
 //===----------------------------------------------------------------------===//
 
-static handshake::ChannelType wrapChannel(Type type) {
-  assert(ChannelType::isSupportedSignalType(type) && "unsupported data type");
-  return handshake::ChannelType::get(type);
+// Operand segments of a memory controller.
+enum MCOperandSegment : unsigned {
+  MC_MEMREF,
+  MC_MEM_START,
+  MC_CTRLS,
+  MC_LD_ADDRS,
+  MC_ST_ADDRS,
+  MC_ST_DATAS,
+  MC_LSQ_LD_ADDR,
+  MC_LSQ_ST_ADDR,
+  MC_LSQ_ST_DATA,
+  MC_CTRL_END
+};
+// Result segments of a memory controller.
+enum MCResultSegment : unsigned { MC_LD_DATAS, MC_LSQ_LD_DATA, MC_MEM_END };
+
+void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                               Value memRef, Value memStart, ValueRange ctrls,
+                               ValueRange ldAddrs, ValueRange stAddrs,
+                               ValueRange stDatas, Value ctrlEnd,
+                               ArrayRef<MemGroupAttr> groups) {
+  build(odsBuilder, odsState, memRef, memStart, ctrls, ldAddrs, stAddrs,
+        stDatas, nullptr, nullptr, nullptr, ctrlEnd, groups);
 }
 
 void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                               Value memRef, Value memStart, ValueRange inputs,
-                               Value ctrlEnd, ArrayRef<unsigned> blocks,
-                               unsigned numLoads) {
-  // Memory operands
+                               Value memRef, Value memStart, ValueRange ctrls,
+                               ValueRange ldAddrs, ValueRange stAddrs,
+                               ValueRange stDatas, Value lsqLdAddr,
+                               Value lsqStAddr, Value lsqStData, Value ctrlEnd,
+                               ArrayRef<MemGroupAttr> groups) {
+  bool hasLSQ = lsqLdAddr != nullptr;
+  assert((hasLSQ == (lsqStAddr != nullptr)) &&
+         (hasLSQ == (lsqStData != nullptr)) &&
+         "LSQ ports must all be present or absent");
+
+  // Operands
   odsState.addOperands({memRef, memStart});
-  odsState.addOperands(inputs);
+  odsState.addOperands(ctrls);
+  odsState.addOperands(ldAddrs);
+  odsState.addOperands(stAddrs);
+  odsState.addOperands(stDatas);
+  if (hasLSQ)
+    odsState.addOperands({lsqLdAddr, lsqStAddr, lsqStData});
   odsState.addOperands(ctrlEnd);
+  int32_t lsqSize = hasLSQ ? 1 : 0;
+  odsState.addAttribute(
+      getOprdSegmentsAttrName(),
+      odsBuilder.getDenseI32ArrayAttr(
+          {1, 1, static_cast<int32_t>(ctrls.size()),
+           static_cast<int32_t>(ldAddrs.size()),
+           static_cast<int32_t>(stAddrs.size()),
+           static_cast<int32_t>(stDatas.size()), lsqSize, lsqSize, lsqSize,
+           1}));
 
-  // Data outputs (get their type from memref)
+  // Results (data outputs get their type from the memref)
   MemRefType memrefType = memRef.getType().cast<MemRefType>();
-  MLIRContext *ctx = odsBuilder.getContext();
-  odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
-  odsState.types.push_back(handshake::ControlType::get(ctx));
+  Type dataType = wrapChannel(memrefType.getElementType());
+  odsState.types.append(ldAddrs.size(), dataType);
+  if (hasLSQ)
+    odsState.types.push_back(dataType);
+  odsState.types.push_back(handshake::ControlType::get(odsBuilder.getContext()));
+  odsState.addAttribute(getResSegmentsAttrName(),
+                        odsBuilder.getDenseI32ArrayAttr(
+                            {static_cast<int32_t>(ldAddrs.size()), lsqSize, 1}));
 
-  // Set "connectedBlocks" attribute
-  SmallVector<int> blocksAttribute;
-  for (unsigned size : blocks)
-    blocksAttribute.push_back(size);
-  odsState.addAttribute("connectedBlocks",
-                        odsBuilder.getI32ArrayAttr(blocksAttribute));
+  odsState.addAttribute(GROUPS_ATTR_NAME,
+                        buildGroupsAttr(odsBuilder, groups));
 }
 
-/// Attempts to derive the ports for a memory controller. Fails if some of the
-/// ports fails to be identified.
-static LogicalResult getMCPorts(MCPorts &mcPorts) {
-  unsigned nextBlockIdx = 0, resIdx = 0;
-  std::optional<unsigned> currentBlockID;
-  GroupMemoryPorts *currentGroup = nullptr;
-  ValueRange memResults = mcPorts.memOp->getResults();
-  SmallVector<unsigned> blocks = mcPorts.getMCOp().getMCBlocks();
+ParseResult MemoryControllerOp::parse(OpAsmParser &parser,
+                                      OperationState &result) {
+  SmallVector<OpAsmParser::UnresolvedOperand> operands;
+  SmallVector<Type> operandTypes;
+  llvm::SMLoc loc = parser.getCurrentLocation();
 
-  // Moves forward in our list of blocks, checking that we do not overflow it.
-  auto getNextBlockID = [&]() -> LogicalResult {
-    if (nextBlockIdx == blocks.size())
-      return mcPorts.memOp.emitError()
-             << "MC connects to more blocks than it declares.";
-    currentBlockID = blocks[nextBlockIdx++];
-    return success();
-  };
+  bool hasMemRef;
+  if (parseMemRegion(parser, /*allowMC=*/false, hasMemRef, operands,
+                     operandTypes))
+    return failure();
 
-  // Iterate over all memory inputs and figure out which ports are connected to
-  // the memory controller
-  auto inputIter = llvm::enumerate(mcPorts.memOp->getOperands());
-  auto currentIt = inputIter.begin();
-
-  // Skip the memref and memory start signals as well as the control end signal
-  ++(++currentIt);
-  unsigned lastIterOprd = mcPorts.memOp->getNumOperands() - 1;
-  for (; currentIt != inputIter.end(); ++currentIt) {
-    auto input = *currentIt;
-    if (input.index() == lastIterOprd)
-      break;
-    Operation *portOp = backtrackToMemInput(input.value());
-
-    // Identify the block the input operation belongs to
-    unsigned portOpBlock = 0;
-    if (portOp) {
-      auto ctrlBlock =
-          dyn_cast_if_present<IntegerAttr>(portOp->getAttr(BB_ATTR_NAME));
-      if (ctrlBlock) {
-        portOpBlock = ctrlBlock.getUInt();
-      } else if (isa<handshake::LoadOp, handshake::StoreOp>(portOp)) {
-        return portOp->emitError() << "Input operation of memory interface "
-                                      "does not belong to any basic block.";
-      }
-    }
-
-    // Checks wheter an access port belongs to the correct block
-    auto checkAccessPort = [&]() -> LogicalResult {
-      if (portOpBlock != *currentBlockID)
-        return mcPorts.memOp->emitError()
-               << "Access port belongs to block " << portOpBlock
-               << ", but expected it to be part of block " << *currentBlockID;
-      return success();
-    };
-
-    auto handleLoad = [&](handshake::LoadOp loadOp) -> LogicalResult {
-      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.dataWidth)))
-        return failure();
-
-      if (!currentGroup || portOpBlock != *currentBlockID) {
-        // If this is the first input or if the load belongs to a different
-        // block, allocate a new data stucture for the block's memory ports
-        // (without control)
-        if (failed(getNextBlockID()))
-          return failure();
-        mcPorts.groups.emplace_back();
-        currentGroup = &mcPorts.groups.back();
-      }
-
-      if (failed(checkAccessPort()))
-        return failure();
-
-      // Add a load port to the group
-      currentGroup->accessPorts.push_back(
-          LoadPort(loadOp, input.index(), resIdx++));
-      return success();
-    };
-
-    auto handleStore = [&](handshake::StoreOp storeOp) -> LogicalResult {
-      auto dataInput = *(++currentIt);
-      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(dataInput.value(), mcPorts.dataWidth)))
-        return failure();
-
-      // All basic blocks with at least one store access must have a control
-      // input, so the block's memory ports must already be defined and point to
-      // the same block
-      if (!currentGroup)
-        return storeOp.emitError() << "Store port must be preceeded by control "
-                                      "port.";
-
-      if (failed(checkAccessPort()))
-        return failure();
-
-      // Add a store port to the block
-      currentGroup->accessPorts.push_back(StorePort(storeOp, input.index()));
-      return success();
-    };
-
-    auto handleLSQ = [&](handshake::LSQOp lsqOp) -> LogicalResult {
-      auto stAddrInput = *(++currentIt);
-      auto stDataInput = *(++currentIt);
-      if (failed(checkAndSetBitwidth(input.value(), mcPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx], mcPorts.dataWidth)) ||
-          failed(checkAndSetBitwidth(stAddrInput.value(), mcPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(stDataInput.value(), mcPorts.dataWidth)))
-        return failure();
-
-      // Add the port to the list of ports from other memory
-      // interfaces
-      mcPorts.interfacePorts.push_back(
-          LSQLoadStorePort(lsqOp, input.index(), resIdx++));
-      return success();
-    };
-
-    auto handleControl = [&](Operation *ctrlOp) -> LogicalResult {
-      if (failed(checkAndSetBitwidth(input.value(), mcPorts.ctrlWidth)) ||
-          failed(getNextBlockID()))
-        return failure();
-
-      // Allocate a new data stucture for the group's memory ports
-      mcPorts.groups.emplace_back(ControlPort(ctrlOp, input.index()));
-      currentGroup = &mcPorts.groups.back();
-      return success();
-    };
-
-    LogicalResult res = failure();
-    if (!portOp) {
-      // Control signal may come directly from function arguments
-      res = handleControl(portOp);
-    } else {
-      res = llvm::TypeSwitch<Operation *, LogicalResult>(portOp)
-                .Case<handshake::LoadOp>(handleLoad)
-                .Case<handshake::StoreOp>(handleStore)
-                .Case<handshake::LSQOp>(handleLSQ)
-                .Default(handleControl);
-    }
-
-    // Forward failure when parsing parts
-    if (failed(res))
+  // Parse operand sections, in segment order
+  SmallVector<int32_t> segments{1};
+  for (StringRef keyword :
+       {"start", "ctrl", "ldAddr", "stAddr", "stData", "fromLSQ", "end"}) {
+    FailureOr<unsigned> numOprds = parseMemSection(parser, keyword, operands);
+    if (failed(numOprds))
       return failure();
+    if (keyword == "fromLSQ") {
+      if (*numOprds != 0 && *numOprds != 3)
+        return parser.emitError(loc)
+               << "expected 3 operands (load address, store address, store "
+                  "data) from LSQ";
+      segments.append(3, *numOprds ? 1 : 0);
+    } else {
+      segments.push_back(*numOprds);
+    }
+  }
+  bool hasLSQ = segments[MC_LSQ_LD_ADDR] != 0;
+  result.addAttribute(getOprdSegmentsAttrName(),
+                      parser.getBuilder().getDenseI32ArrayAttr(segments));
+
+  if (parseMemTypes(parser, result, loc, operands, operandTypes))
+    return failure();
+
+  // Derive the result segments from the groups
+  FailureOr<SmallVector<MemGroupAttr>> groups =
+      getParsedGroups(parser, result, loc);
+  if (failed(groups))
+    return failure();
+  int32_t numLoads = 0;
+  for (MemGroupAttr group : *groups)
+    numLoads += group.getNumLoads();
+  return setParsedResultSegments(parser, result, loc,
+                                 {numLoads, hasLSQ ? 1 : 0, 1});
+}
+
+void MemoryControllerOp::print(OpAsmPrinter &p) {
+  p << "[" << getMemRef() << " : " << getMemRef().getType() << "]";
+  printMemSection(p, "start", getMemStart());
+  printMemSection(p, "ctrl", getCtrls());
+  printMemSection(p, "ldAddr", getLdAddrs());
+  printMemSection(p, "stAddr", getStAddrs());
+  printMemSection(p, "stData", getStDatas());
+  if (isConnectedToLSQ()) {
+    printMemSection(p, "fromLSQ",
+                    ValueRange{getLsqLdAddr(), getLsqStAddr(), getLsqStData()});
+  }
+  printMemSection(p, "end", getCtrlEnd());
+  p.printOptionalAttrDict((*this)->getAttrs(),
+                          {getOprdSegmentsAttrName(), getResSegmentsAttrName()});
+  p << " : ";
+  p.printFunctionalType(getOperands().drop_front().getTypes(),
+                        getResultTypes());
+}
+
+/// Derives the ports of a memory controller from its operand segments and
+/// groups.
+static void getMCPorts(MCPorts &mcPorts) {
+  handshake::MemoryControllerOp mcOp = mcPorts.getMCOp();
+  unsigned ctrlStart = getOprdSegmentStart(mcOp, MC_CTRLS);
+  unsigned ldAddrStart = getOprdSegmentStart(mcOp, MC_LD_ADDRS);
+  unsigned stAddrStart = getOprdSegmentStart(mcOp, MC_ST_ADDRS);
+  unsigned stDataStart = getOprdSegmentStart(mcOp, MC_ST_DATAS);
+  unsigned ldDataStart = getResSegmentStart(mcOp, MC_LD_DATAS);
+
+  unsigned ctrlIdx = 0, ldIdx = 0, stIdx = 0;
+  for (MemGroupAttr group : mcOp.getMemGroups()) {
+    if (group.getHasCtrl()) {
+      unsigned idx = ctrlStart + ctrlIdx++;
+      Operation *ctrlOp = backtrackToMemInput(mcOp->getOperand(idx));
+      mcPorts.groups.emplace_back(ControlPort(ctrlOp, idx));
+    } else {
+      mcPorts.groups.emplace_back();
+    }
+    GroupMemoryPorts &groupPorts = mcPorts.groups.back();
+    for (MemAccessKind kind : group.getAccesses()) {
+      if (kind == MemAccessKind::LOAD) {
+        unsigned addrIdx = ldAddrStart + ldIdx;
+        auto loadOp = dyn_cast_if_present<handshake::LoadOp>(
+            backtrackToMemInput(mcOp->getOperand(addrIdx)));
+        groupPorts.accessPorts.push_back(
+            LoadPort(loadOp, addrIdx, ldDataStart + ldIdx++));
+      } else {
+        unsigned addrIdx = stAddrStart + stIdx;
+        auto storeOp = dyn_cast_if_present<handshake::StoreOp>(
+            backtrackToMemInput(mcOp->getOperand(addrIdx)));
+        groupPorts.accessPorts.push_back(
+            StorePort(storeOp, addrIdx, stDataStart + stIdx++));
+      }
+    }
   }
 
-  // Check that all blocks have been accounted for
-  if (nextBlockIdx != blocks.size())
-    return mcPorts.memOp->emitError()
-           << "MC declares more blocks than it connects to.";
-  // Check that all memory results have been accounted for
-  if (resIdx != memResults.size() - 1)
-    return mcPorts.memOp->emitError()
-           << "When identifying memory ports, some memory results were "
-              "unnacounted for, this is not normal!";
-  return success();
+  if (mcOp.isConnectedToLSQ()) {
+    auto lsqOp = dyn_cast_if_present<handshake::LSQOp>(
+        backtrackToMemInput(mcOp.getLsqLdAddr()));
+    mcPorts.interfacePorts.push_back(
+        LSQLoadStorePort(lsqOp, getOprdSegmentStart(mcOp, MC_LSQ_LD_ADDR),
+                         getResSegmentStart(mcOp, MC_LSQ_LD_DATA)));
+  }
+
+  SmallVector<Value> ctrls(mcOp.getCtrls());
+  SmallVector<Value> addrs(mcOp.getLdAddrs());
+  llvm::append_range(addrs, mcOp.getStAddrs());
+  addrs.append({mcOp.getLsqLdAddr(), mcOp.getLsqStAddr()});
+  SmallVector<Value> datas(mcOp.getStDatas());
+  llvm::append_range(datas, mcOp.getLdDatas());
+  datas.append({mcOp.getLsqStData(), mcOp.getLsqLdData()});
+  mcPorts.ctrlWidth = getFirstBitwidth(ctrls);
+  mcPorts.addrWidth = getFirstBitwidth(addrs);
+  mcPorts.dataWidth = getFirstBitwidth(datas);
 }
 
 LogicalResult MemoryControllerOp::verify() {
-  // Blocks must be unique
-  SmallVector<unsigned> blocks = getMCBlocks();
-  if (blocks.empty())
-    return emitError() << "Memory controller must have at least one block.";
-  DenseSet<unsigned> uniqueBlocks;
-  for (unsigned blockID : blocks) {
-    if (auto [_, newBlock] = uniqueBlocks.insert(blockID); !newBlock)
-      return emitError() << "Block IDs must be unique but ID " << blockID
-                         << " was found at least twice in the list.";
-  }
-
-  // Try to get the memort ports: this will catch most issues
-  MCPorts mcPorts(*this);
-  if (failed(getMCPorts(mcPorts)) || failed(verifyMemOp(mcPorts)))
+  SmallVector<MemGroupAttr> groups = getMemGroups();
+  if (failed(verifyMemGroups(*this, groups, getCtrls().size(),
+                             getLdAddrs().size(), getLdDatas().size(),
+                             getStAddrs().size(), getStDatas().size())))
     return failure();
 
-  // If there is a port to another memory interface it must be to an LSQ
-  if (!mcPorts.interfacePorts.empty()) {
-    if (!isa<LSQLoadStorePort>(mcPorts.interfacePorts.front()))
-      return emitError()
-             << "The only memory interface port the memory controller "
-                "supports is to an LSQ.";
+  // Blocks must be unique, and blocks with stores must have a control port
+  DenseSet<unsigned> uniqueBlocks;
+  for (MemGroupAttr group : groups) {
+    if (auto [_, newBlock] = uniqueBlocks.insert(group.getId()); !newBlock)
+      return emitError() << "Block IDs must be unique but ID " << group.getId()
+                         << " was found at least twice in the list.";
+    if (group.getNumStores() != 0 && !group.getHasCtrl())
+      return emitError() << "Block " << group.getId()
+                         << " has stores but no control port.";
   }
-  return success();
+
+  // Access ports must belong to the basic block of their group
+  MCPorts mcPorts = getPorts();
+  for (auto [group, groupPorts] : llvm::zip_equal(groups, mcPorts.groups)) {
+    for (MemoryPort &port : groupPorts.accessPorts) {
+      if (!port.portOp)
+        continue;
+      // Read the attribute directly since the dialect does not link against
+      // the support library (where `getLogicBB` is defined)
+      auto bb = port.portOp->getAttrOfType<IntegerAttr>(BB_ATTR_NAME);
+      if (bb && bb.getUInt() != group.getId())
+        return emitError() << "Access port belongs to block " << bb.getUInt()
+                           << ", but expected it to be part of block "
+                           << group.getId();
+    }
+  }
+
+  // The ports from/to the LSQ must all be present or absent
+  bool hasLSQ = isConnectedToLSQ();
+  if (hasLSQ != (getLsqStAddr() != nullptr) ||
+      hasLSQ != (getLsqStData() != nullptr) ||
+      hasLSQ != (getLsqLdData() != nullptr))
+    return emitError() << "LSQ load address, store address, store data, and "
+                          "load data ports must all be present or absent.";
+  if (hasLSQ) {
+    for (Value lsqVal : {getLsqLdAddr(), getLsqStAddr(), getLsqStData(),
+                         getLsqLdData()}) {
+      if (cast<ExtraSignalsTypeInterface>(lsqVal.getType())
+              .getNumExtraSignals() != 0)
+        return emitError() << "LSQ ports shouldn't have any extra signals.";
+    }
+  }
+
+  // Signals of the same nature must have the same bitwidth
+  SmallVector<Value> addrs(getLdAddrs());
+  llvm::append_range(addrs, getStAddrs());
+  addrs.append({getLsqLdAddr(), getLsqStAddr()});
+  SmallVector<Value> datas(getStDatas());
+  llvm::append_range(datas, getLdDatas());
+  datas.append({getLsqStData(), getLsqLdData()});
+  return success(
+      succeeded(verifySameBitwidth(*this, "control ports",
+                                   SmallVector<Value>(getCtrls()))) &&
+      succeeded(verifySameBitwidth(*this, "addresses", addrs)) &&
+      succeeded(verifySameBitwidth(*this, "data", datas)));
 }
 
 dynamatic::MCPorts MemoryControllerOp::getPorts() {
   MCPorts mcPorts(*this);
-  if (failed(getMCPorts(mcPorts)))
-    assert(false && "failed to identify memory ports");
+  getMCPorts(mcPorts);
   return mcPorts;
 }
 
@@ -1013,299 +1205,270 @@ MemoryControllerOp::getLoadPortSlotNamer(size_t index) {
 // LSQOp
 //===----------------------------------------------------------------------===//
 
-static void buildLSQGroupSizes(OpBuilder &odsBuilder, OperationState &odsState,
-                               ArrayRef<unsigned> groupSizes) {
-  SmallVector<int> sizesAttribute;
-  for (unsigned size : groupSizes)
-    sizesAttribute.push_back(size);
-  odsState.addAttribute(LSQOp::getGroupSizesAttrName(odsState.name).strref(),
-                        odsBuilder.getI32ArrayAttr(sizesAttribute));
-}
+// Operand segments of an LSQ.
+enum LSQOperandSegment : unsigned {
+  LSQ_MEMREF,
+  LSQ_MEM_START,
+  LSQ_CTRLS,
+  LSQ_LD_ADDRS,
+  LSQ_ST_ADDRS,
+  LSQ_ST_DATAS,
+  LSQ_LD_DATA_FROM_MC,
+  LSQ_CTRL_END
+};
+// Result segments of an LSQ.
+enum LSQResultSegment : unsigned {
+  LSQ_LD_DATAS,
+  LSQ_LD_ADDR_TO_MC,
+  LSQ_ST_ADDR_TO_MC,
+  LSQ_ST_DATA_TO_MC,
+  LSQ_MEM_END
+};
 
-void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
-                  Value memStart, ValueRange inputs, Value ctrlEnd,
-                  ArrayRef<unsigned> groupSizes, unsigned numLoads) {
-  // Memory operands
-  odsState.addOperands({memref, memStart});
-  odsState.addOperands(inputs);
+void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memRef,
+                  Value memStart, ValueRange ctrls, ValueRange ldAddrs,
+                  ValueRange stAddrs, ValueRange stDatas, Value ctrlEnd,
+                  ArrayRef<MemGroupAttr> groups) {
+  // Operands
+  odsState.addOperands({memRef, memStart});
+  odsState.addOperands(ctrls);
+  odsState.addOperands(ldAddrs);
+  odsState.addOperands(stAddrs);
+  odsState.addOperands(stDatas);
   odsState.addOperands(ctrlEnd);
+  odsState.addAttribute(getOprdSegmentsAttrName(),
+                        odsBuilder.getDenseI32ArrayAttr(
+                            {1, 1, static_cast<int32_t>(ctrls.size()),
+                             static_cast<int32_t>(ldAddrs.size()),
+                             static_cast<int32_t>(stAddrs.size()),
+                             static_cast<int32_t>(stDatas.size()), 0, 1}));
 
-  // Data outputs (get their type from memref)
-  MemRefType memrefType = memref.getType().cast<MemRefType>();
-  MLIRContext *ctx = odsBuilder.getContext();
-  odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
-  odsState.types.push_back(handshake::ControlType::get(ctx));
-  buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
+  // Results (data outputs get their type from the memref)
+  MemRefType memrefType = memRef.getType().cast<MemRefType>();
+  odsState.types.append(ldAddrs.size(),
+                        wrapChannel(memrefType.getElementType()));
+  odsState.types.push_back(handshake::ControlType::get(odsBuilder.getContext()));
+  odsState.addAttribute(getResSegmentsAttrName(),
+                        odsBuilder.getDenseI32ArrayAttr(
+                            {static_cast<int32_t>(ldAddrs.size()), 0, 0, 0, 1}));
+
+  odsState.addAttribute(GROUPS_ATTR_NAME,
+                        buildGroupsAttr(odsBuilder, groups));
 }
 
 void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState,
-                  handshake::MemoryControllerOp mcOp, ValueRange inputs,
-                  ArrayRef<unsigned> groupSizes, unsigned numLoads) {
-  // Memory operands
-  odsState.addOperands(inputs);
+                  handshake::MemoryControllerOp mcOp, ValueRange ctrls,
+                  ValueRange ldAddrs, ValueRange stAddrs, ValueRange stDatas,
+                  Value ldDataFromMC, ArrayRef<MemGroupAttr> groups) {
+  // Operands
+  odsState.addOperands(ctrls);
+  odsState.addOperands(ldAddrs);
+  odsState.addOperands(stAddrs);
+  odsState.addOperands(stDatas);
+  odsState.addOperands(ldDataFromMC);
+  odsState.addAttribute(getOprdSegmentsAttrName(),
+                        odsBuilder.getDenseI32ArrayAttr(
+                            {0, 0, static_cast<int32_t>(ctrls.size()),
+                             static_cast<int32_t>(ldAddrs.size()),
+                             static_cast<int32_t>(stAddrs.size()),
+                             static_cast<int32_t>(stDatas.size()), 1, 0}));
 
-  // Data outputs (get their type from memref)
-  MemRefType memrefType = mcOp.getMemRefType();
+  // Results (data outputs get their type from the memref). The LSQ is a slave
+  // interface in this case (the MC is the master), so it doesn't produce a
+  // completion signal but instead load/store requests going to the MC
   MLIRContext *ctx = odsBuilder.getContext();
-  Type dataType = wrapChannel(memrefType.getElementType());
-  odsState.types.append(numLoads, dataType);
-
-  // Add results for load/store address and store data
+  Type dataType = wrapChannel(mcOp.getMemRefType().getElementType());
   Type addrType = handshake::ChannelType::getAddrChannel(ctx);
-  odsState.types.append(2, addrType);
-  odsState.types.push_back(dataType);
+  odsState.types.append(ldAddrs.size(), dataType);
+  odsState.types.append({addrType, addrType, dataType});
+  odsState.addAttribute(getResSegmentsAttrName(),
+                        odsBuilder.getDenseI32ArrayAttr(
+                            {static_cast<int32_t>(ldAddrs.size()), 1, 1, 1, 0}));
 
-  // The LSQ is a slave interface in this case (the MC is the master), so it
-  // doesn't produce a completion signal
-
-  buildLSQGroupSizes(odsBuilder, odsState, groupSizes);
+  odsState.addAttribute(GROUPS_ATTR_NAME,
+                        buildGroupsAttr(odsBuilder, groups));
 }
 
 ParseResult LSQOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::UnresolvedOperand> operands;
-  SmallVector<Type> resultTypes, operandTypes;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+  SmallVector<Type> operandTypes;
+  llvm::SMLoc loc = parser.getCurrentLocation();
 
-  // Parse reference to memory region
-  if (parser.parseLSquare())
+  // Either the LSQ is the master interface ([%memref : type]) or it talks to
+  // the external memory through an MC ([MC])
+  bool isMaster;
+  if (parseMemRegion(parser, /*allowMC=*/true, isMaster, operands,
+                     operandTypes))
     return failure();
-  if (parser.parseOptionalKeyword("MC")) {
-    // We expect something of the form "memref operand : memref type"
-    OpAsmParser::UnresolvedOperand memrefOperand;
-    Type memrefType;
-    if (parser.parseOperand(memrefOperand) || parser.parseColon() ||
-        parser.parseType(memrefType))
+
+  // Parse operand sections, in segment order
+  SmallVector<int32_t> segments{isMaster ? 1 : 0};
+  for (StringRef keyword : {"start", "ctrl", "ldAddr", "stAddr", "stData",
+                            "fromMC", "end"}) {
+    FailureOr<unsigned> numOprds = parseMemSection(parser, keyword, operands);
+    if (failed(numOprds))
       return failure();
-    operands.push_back(memrefOperand);
-    operandTypes.push_back(memrefType);
+    segments.push_back(*numOprds);
   }
-  if (parser.parseRSquare())
+  bool hasMC = segments[LSQ_LD_DATA_FROM_MC] != 0;
+  if (isMaster == hasMC)
+    return parser.emitError(loc)
+           << "LSQ must either reference a memory region or have a load data "
+              "input from an MC (fromMC), but not both";
+  result.addAttribute(getOprdSegmentsAttrName(),
+                      parser.getBuilder().getDenseI32ArrayAttr(segments));
+
+  if (parseMemTypes(parser, result, loc, operands, operandTypes))
     return failure();
 
-  // Parse memory operands
-  if (parser.parseLParen() || parser.parseOperandList(operands) ||
-      parser.parseRParen())
+  // Derive the result segments from the groups
+  FailureOr<SmallVector<MemGroupAttr>> groups =
+      getParsedGroups(parser, result, loc);
+  if (failed(groups))
     return failure();
-
-  // Parse group sizes and other attributes
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  // Parse operand and result types (function type)
-  FunctionType funType;
-  if (parser.parseColonType(funType))
-    return failure();
-  llvm::copy(funType.getInputs(), std::back_inserter(operandTypes));
-  llvm::copy(funType.getResults(), std::back_inserter(resultTypes));
-
-  // Set result types and resolve operand types
-  result.addTypes(resultTypes);
-  if (parser.resolveOperands(operands, operandTypes, allOperandLoc,
-                             result.operands))
-    return failure();
-  return success();
+  int32_t numLoads = 0;
+  for (MemGroupAttr group : *groups)
+    numLoads += group.getNumLoads();
+  int32_t toMC = hasMC ? 1 : 0;
+  return setParsedResultSegments(parser, result, loc,
+                                 {numLoads, toMC, toMC, toMC, isMaster ? 1 : 0});
 }
 
 void LSQOp::print(OpAsmPrinter &p) {
-  // Print reference to memory region
-  bool connectsToMC = isConnectedToMC();
-  if (connectsToMC) {
-    p << "[MC] ";
-  } else {
-    Value memref = getInputs().front();
-    p << "[" << memref << " : " << memref.getType() << "] ";
-  }
-
-  // Print memory operands
   ValueRange inputs = getOperands();
-  if (!connectsToMC) {
-    // Skip the memref if present
+  if (Value memref = getMasterMemRef()) {
+    p << "[" << memref << " : " << memref.getType() << "]";
     inputs = inputs.drop_front();
+  } else {
+    p << "[MC]";
   }
-  p << "(";
-  for (Value oprd : inputs.drop_back(1))
-    p << oprd << ", ";
-  p << inputs.back() << ") ";
-
-  // Print group sizes and other attributes
-  p.printOptionalAttrDict((*this)->getAttrs());
-
-  // Print result types
+  if (Value memStart = getMasterMemStart())
+    printMemSection(p, "start", memStart);
+  printMemSection(p, "ctrl", getCtrls());
+  printMemSection(p, "ldAddr", getLdAddrs());
+  printMemSection(p, "stAddr", getStAddrs());
+  printMemSection(p, "stData", getStDatas());
+  if (Value ldDataFromMC = getLdDataFromMC())
+    printMemSection(p, "fromMC", ldDataFromMC);
+  if (Value ctrlEnd = getMasterCtrlEnd())
+    printMemSection(p, "end", ctrlEnd);
+  p.printOptionalAttrDict((*this)->getAttrs(),
+                          {getOprdSegmentsAttrName(), getResSegmentsAttrName()});
   p << " : ";
-  p.printFunctionalType(inputs.getTypes(), getResults().getTypes());
+  p.printFunctionalType(inputs.getTypes(), getResultTypes());
 }
 
-/// Attempts to derive the ports for an LSQ. Fails if some of the ports fails to
-/// be identified.
-static LogicalResult getLSQPorts(LSQPorts &lsqPorts) {
-  unsigned nextGroupIdx = 0, resIdx = 0;
-  std::optional<unsigned> currentGroupRemaining;
-  GroupMemoryPorts *currentGroup = nullptr;
-  ValueRange memResults = lsqPorts.memOp->getResults();
-  SmallVector<unsigned> groupSizes = lsqPorts.getLSQOp().getLSQGroupSizes();
+/// Derives the ports of an LSQ from its operand segments and groups.
+static void getLSQPorts(LSQPorts &lsqPorts) {
+  handshake::LSQOp lsqOp = lsqPorts.getLSQOp();
+  unsigned ctrlStart = getOprdSegmentStart(lsqOp, LSQ_CTRLS);
+  unsigned ldAddrStart = getOprdSegmentStart(lsqOp, LSQ_LD_ADDRS);
+  unsigned stAddrStart = getOprdSegmentStart(lsqOp, LSQ_ST_ADDRS);
+  unsigned stDataStart = getOprdSegmentStart(lsqOp, LSQ_ST_DATAS);
+  unsigned ldDataStart = getResSegmentStart(lsqOp, LSQ_LD_DATAS);
 
-  auto checkGroupIsValid = [&]() -> LogicalResult {
-    if (!currentGroupRemaining)
-      return lsqPorts.memOp->emitError()
-             << "Access port must be precedeed by control port to start group";
-    if (*currentGroupRemaining == 0)
-      return lsqPorts.memOp->emitError()
-             << "There are more access ports in group " << nextGroupIdx - 1
-             << " than what the LSQ declares.";
-    return success();
-  };
-
-  // Iterate over all memory inputs and figure out which ports are connected to
-  // the memory controller
-  auto inputIter = llvm::enumerate(lsqPorts.memOp->getOperands());
-  auto currentIt = inputIter.begin();
-  auto iterEnd = inputIter.end();
-
-  unsigned lastIterOprd = lsqPorts.memOp->getNumOperands();
-  if (lsqPorts.memOp.isMasterInterface()) {
-    // Skip the memref and memory start signals as well as the ctrl end signal
-    ++(++currentIt);
-    --lastIterOprd;
-  }
-  for (; currentIt != iterEnd; ++currentIt) {
-    auto input = *currentIt;
-    if (input.index() == lastIterOprd)
-      break;
-
-    auto handleLoad = [&](handshake::LoadOp loadOp) -> LogicalResult {
-      if (failed(checkAndSetBitwidth(input.value(), lsqPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx], lsqPorts.dataWidth)) ||
-          failed(checkGroupIsValid()))
-        return failure();
-
-      // Add a load port to the group
-      currentGroup->accessPorts.push_back(
-          LoadPort(loadOp, input.index(), resIdx++));
-      --(*currentGroupRemaining);
-      return success();
-    };
-
-    auto handleStore = [&](handshake::StoreOp storeOp) -> LogicalResult {
-      auto dataInput = *(++currentIt);
-      if (failed(checkAndSetBitwidth(input.value(), lsqPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(dataInput.value(), lsqPorts.dataWidth)) ||
-          failed(checkGroupIsValid()))
-        return failure();
-
-      // Add a store port to the group and decrement our group size by one
-      currentGroup->accessPorts.push_back(StorePort(storeOp, input.index()));
-      --(*currentGroupRemaining);
-      return success();
-    };
-
-    auto handleMC = [&](handshake::MemoryControllerOp mcOp) -> LogicalResult {
-      if (failed(checkAndSetBitwidth(input.value(), lsqPorts.dataWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx], lsqPorts.addrWidth)) ||
-          failed(checkAndSetBitwidth(memResults[resIdx + 1],
-                                     lsqPorts.addrWidth)) ||
-          failed(
-              checkAndSetBitwidth(memResults[resIdx + 2], lsqPorts.dataWidth)))
-        return failure();
-
-      // Add the port to the list of ports from other memory interfaces
-      lsqPorts.interfacePorts.push_back(
-          MCLoadStorePort(mcOp, resIdx, input.index()));
-      resIdx += 3;
-      return success();
-    };
-
-    auto handleControl = [&](Operation *ctrlOp) -> LogicalResult {
-      if (failed(checkAndSetBitwidth(input.value(), lsqPorts.ctrlWidth)))
-        return failure();
-
-      // Moves forward in our list of groups, checking that we do not overflow
-      // it and that the previous one (if any) was completed
-      if (nextGroupIdx == groupSizes.size())
-        return lsqPorts.memOp.emitError()
-               << "LSQ has more groups than it declares.";
-      if (currentGroupRemaining && *currentGroupRemaining != 0)
-        return lsqPorts.memOp.emitError()
-               << "Group " << nextGroupIdx - 1 << " is missing "
-               << *currentGroupRemaining
-               << " access ports compared to what the LSQ declares.";
-      currentGroupRemaining = groupSizes[nextGroupIdx++];
-
-      // Allocate a new data stucture for the group's memory ports
-      lsqPorts.groups.emplace_back(ControlPort(ctrlOp, input.index()));
-      currentGroup = &lsqPorts.groups.back();
-      return success();
-    };
-
-    Operation *portOp = backtrackToMemInput(input.value());
-    LogicalResult res = failure();
-    if (!portOp) {
-      // Control signal may come directly from function arguments
-      res = handleControl(portOp);
-    } else {
-      res = llvm::TypeSwitch<Operation *, LogicalResult>(portOp)
-                .Case<handshake::LoadOp>(handleLoad)
-                .Case<handshake::StoreOp>(handleStore)
-                .Case<handshake::MemoryControllerOp>(handleMC)
-                .Default(handleControl);
+  unsigned ctrlIdx = 0, ldIdx = 0, stIdx = 0;
+  for (MemGroupAttr group : lsqOp.getMemGroups()) {
+    // All LSQ groups have a control port (checked by the verifier)
+    unsigned idx = ctrlStart + ctrlIdx++;
+    Operation *ctrlOp = backtrackToMemInput(lsqOp->getOperand(idx));
+    GroupMemoryPorts &groupPorts =
+        lsqPorts.groups.emplace_back(ControlPort(ctrlOp, idx));
+    for (MemAccessKind kind : group.getAccesses()) {
+      if (kind == MemAccessKind::LOAD) {
+        unsigned addrIdx = ldAddrStart + ldIdx;
+        auto loadOp = dyn_cast_if_present<handshake::LoadOp>(
+            backtrackToMemInput(lsqOp->getOperand(addrIdx)));
+        groupPorts.accessPorts.push_back(
+            LoadPort(loadOp, addrIdx, ldDataStart + ldIdx++));
+      } else {
+        unsigned addrIdx = stAddrStart + stIdx;
+        auto storeOp = dyn_cast_if_present<handshake::StoreOp>(
+            backtrackToMemInput(lsqOp->getOperand(addrIdx)));
+        groupPorts.accessPorts.push_back(
+            StorePort(storeOp, addrIdx, stDataStart + stIdx++));
+      }
     }
-
-    // Forward failure when parsing parts
-    if (failed(res))
-      return failure();
   }
 
-  // Check that all groups have been accounted for
-  if (nextGroupIdx != groupSizes.size())
-    return lsqPorts.memOp->emitError()
-           << "LSQ declares more groups than it connects to.";
-  // Check that all memory results have been accounted for
-  unsigned expectedResIdx = memResults.size();
-  if (lsqPorts.memOp.isMasterInterface())
-    expectedResIdx -= 1;
-  if (resIdx != expectedResIdx) {
-    return lsqPorts.memOp->emitError()
-           << "Some memory results were unnacounted for when identifying ports";
+  if (lsqOp.isConnectedToMC()) {
+    lsqPorts.interfacePorts.push_back(
+        MCLoadStorePort(lsqOp.getConnectedMC(),
+                        getResSegmentStart(lsqOp, LSQ_LD_ADDR_TO_MC),
+                        getOprdSegmentStart(lsqOp, LSQ_LD_DATA_FROM_MC)));
   }
-  return success();
+
+  SmallVector<Value> ctrls(lsqOp.getCtrls());
+  SmallVector<Value> addrs(lsqOp.getLdAddrs());
+  llvm::append_range(addrs, lsqOp.getStAddrs());
+  addrs.append({lsqOp.getLdAddrToMC(), lsqOp.getStAddrToMC()});
+  SmallVector<Value> datas(lsqOp.getStDatas());
+  llvm::append_range(datas, lsqOp.getLdDatas());
+  datas.append({lsqOp.getStDataToMC(), lsqOp.getLdDataFromMC()});
+  lsqPorts.ctrlWidth = getFirstBitwidth(ctrls);
+  lsqPorts.addrWidth = getFirstBitwidth(addrs);
+  lsqPorts.dataWidth = getFirstBitwidth(datas);
 }
 
 LogicalResult LSQOp::verify() {
-  // Group sizes must be strictly greater than 0
-  SmallVector<unsigned> sizes = getLSQGroupSizes();
-  if (sizes.empty())
-    return emitError() << "LSQ needs to have at least one group.";
-  for (unsigned size : sizes) {
-    if (size == 0)
+  SmallVector<MemGroupAttr> groups = getMemGroups();
+  if (failed(verifyMemGroups(*this, groups, getCtrls().size(),
+                             getLdAddrs().size(), getLdDatas().size(),
+                             getStAddrs().size(), getStDatas().size())))
+    return failure();
+
+  // Every group must have a control port and at least one access
+  for (MemGroupAttr group : groups) {
+    if (!group.getHasCtrl())
+      return emitError() << "LSQ group " << group.getId()
+                         << " must have a control port.";
+    if (group.getAccesses().empty())
       return emitError() << "Group sizes must be stricly greater than 0.";
   }
 
-  // Try to get the memort ports: this will catch most issues
-  LSQPorts lsqPorts(*this);
-  if (failed(getLSQPorts(lsqPorts)) || failed(verifyMemOp(lsqPorts)))
-    return failure();
+  // The LSQ is either the master interface or connected to an MC
+  bool isMaster = getMasterMemRef() != nullptr;
+  if (isMaster != (getMasterMemStart() != nullptr) ||
+      isMaster != (getMasterCtrlEnd() != nullptr) ||
+      isMaster != (getMasterMemEnd() != nullptr))
+    return emitError() << "memory region, memory start, control end, and "
+                          "memory end must all be present or absent.";
+  bool hasMC = isConnectedToMC();
+  if (hasMC != (getLdAddrToMC() != nullptr) ||
+      hasMC != (getStAddrToMC() != nullptr) ||
+      hasMC != (getStDataToMC() != nullptr))
+    return emitError() << "MC load data, load address, store address, and "
+                          "store data ports must all be present or absent.";
+  if (isMaster == hasMC)
+    return emitError() << "LSQ must either be the master interface or be "
+                          "connected to an MC, but not both.";
 
-  // If there is a port to another memory interface it must be to an LSQ
-  if (!lsqPorts.interfacePorts.empty()) {
-    if (!isa<MCLoadStorePort>(lsqPorts.interfacePorts.front()))
-      return emitError() << "The only memory interface port the LSQ supports "
-                            "is to a memory controller.";
-  }
-  return success();
+  // Signals of the same nature must have the same bitwidth
+  SmallVector<Value> addrs(getLdAddrs());
+  llvm::append_range(addrs, getStAddrs());
+  addrs.append({getLdAddrToMC(), getStAddrToMC()});
+  SmallVector<Value> datas(getStDatas());
+  llvm::append_range(datas, getLdDatas());
+  datas.append({getStDataToMC(), getLdDataFromMC()});
+  return success(
+      succeeded(verifySameBitwidth(*this, "control ports",
+                                   SmallVector<Value>(getCtrls()))) &&
+      succeeded(verifySameBitwidth(*this, "addresses", addrs)) &&
+      succeeded(verifySameBitwidth(*this, "data", datas)));
 }
 
 dynamatic::LSQPorts LSQOp::getPorts() {
   LSQPorts lsqPorts(*this);
-  if (failed(getLSQPorts(lsqPorts)))
-    assert(false && "failed to identify memory ports");
+  getLSQPorts(lsqPorts);
   return lsqPorts;
 }
 
 handshake::MemoryControllerOp LSQOp::getConnectedMC() {
-  auto storeDataUsers = getResults().back().getUsers();
-  if (storeDataUsers.empty())
+  Value ldDataFromMC = getLdDataFromMC();
+  if (!ldDataFromMC)
     return nullptr;
-  return dyn_cast_if_present<dynamatic::handshake::MemoryControllerOp>(
-      *storeDataUsers.begin());
+  return dyn_cast_if_present<handshake::MemoryControllerOp>(
+      backtrackToMemInput(ldDataFromMC));
 }
 
 SmallVector<Value> LSQOp::getControlPaths(Operation *ctrlOp) {
@@ -1381,18 +1544,10 @@ SmallVector<Value> LSQOp::getControlPaths(Operation *ctrlOp) {
 
 dynamatic::FuncMemoryPorts
 dynamatic::getMemoryPorts(handshake::MemoryOpInterface memOp) {
-  if (auto mcOp = dyn_cast<handshake::MemoryControllerOp>((Operation *)memOp)) {
-    MCPorts mcPorts(mcOp);
-    if (failed(getMCPorts(mcPorts)))
-      assert(false && "failed to identify memory ports");
-    return mcPorts;
-  }
-  if (auto lsqOp = dyn_cast<handshake::LSQOp>((Operation *)memOp)) {
-    LSQPorts lsqPorts(lsqOp);
-    if (failed(getLSQPorts(lsqPorts)))
-      assert(false && "failed to identify memory ports");
-    return lsqPorts;
-  }
+  if (auto mcOp = dyn_cast<handshake::MemoryControllerOp>((Operation *)memOp))
+    return mcOp.getPorts();
+  if (auto lsqOp = dyn_cast<handshake::LSQOp>((Operation *)memOp))
+    return lsqOp.getPorts();
   llvm_unreachable("unknown memory interface type");
 }
 
@@ -1425,14 +1580,15 @@ LoadPort::LoadPort(handshake::LoadOp loadOp, unsigned addrInputIdx,
     : MemoryPort(loadOp, {addrInputIdx}, {dataOutputIdx}, Kind::LOAD) {}
 
 handshake::LoadOp LoadPort::getLoadOp() const {
-  return cast<handshake::LoadOp>(portOp);
+  return cast_if_present<handshake::LoadOp>(portOp);
 }
 
-StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx)
-    : MemoryPort(storeOp, {addrInputIdx, addrInputIdx + 1}, {}, Kind::STORE) {}
+StorePort::StorePort(handshake::StoreOp storeOp, unsigned addrInputIdx,
+                     unsigned dataInputIdx)
+    : MemoryPort(storeOp, {addrInputIdx, dataInputIdx}, {}, Kind::STORE) {}
 
 handshake::StoreOp StorePort::getStoreOp() const {
-  return cast<handshake::StoreOp>(portOp);
+  return cast_if_present<handshake::StoreOp>(portOp);
 }
 
 LSQLoadStorePort::LSQLoadStorePort(dynamatic::handshake::LSQOp lsqOp,
@@ -1443,7 +1599,7 @@ LSQLoadStorePort::LSQLoadStorePort(dynamatic::handshake::LSQOp lsqOp,
                  {loadDataOutputIdx}, Kind::LSQ_LOAD_STORE) {}
 
 handshake::LSQOp LSQLoadStorePort::getLSQOp() const {
-  return cast<handshake::LSQOp>(portOp);
+  return cast_if_present<handshake::LSQOp>(portOp);
 }
 
 MCLoadStorePort::MCLoadStorePort(dynamatic::handshake::MemoryControllerOp mcOp,
@@ -1455,7 +1611,7 @@ MCLoadStorePort::MCLoadStorePort(dynamatic::handshake::MemoryControllerOp mcOp,
           Kind::MC_LOAD_STORE) {}
 
 handshake::MemoryControllerOp MCLoadStorePort::getMCOp() const {
-  return cast<handshake::MemoryControllerOp>(portOp);
+  return cast_if_present<handshake::MemoryControllerOp>(portOp);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1485,97 +1641,60 @@ unsigned GroupMemoryPorts::getNumResults() const {
   return numResults;
 }
 
-size_t GroupMemoryPorts::getFirstOperandIndex() const {
-  if (ctrlPort)
-    return (*ctrlPort).getCtrlInputIndex();
-  for (const MemoryPort &port : accessPorts) {
-    if (auto indices = port.getOprdIndices(); !indices.empty())
-      return indices.front();
-  }
-  return std::string::npos;
-}
-
-size_t GroupMemoryPorts::getLastOperandIndex() const {
-  for (const MemoryPort &port : llvm::reverse(accessPorts)) {
-    if (auto indices = port.getOprdIndices(); !indices.empty())
-      return indices.back();
-  }
-  if (ctrlPort)
-    return (*ctrlPort).getCtrlInputIndex();
-  return std::string::npos;
-}
-
-size_t GroupMemoryPorts::getFirstResultIndex() const {
-  for (const MemoryPort &port : accessPorts) {
-    if (auto indices = port.getResIndices(); !indices.empty())
-      return indices.front();
-  }
-  return std::string::npos;
-}
-
-size_t GroupMemoryPorts::getLastResultIndex() const {
-  for (const MemoryPort &port : llvm::reverse(accessPorts)) {
-    if (auto indices = port.getResIndices(); !indices.empty())
-      return indices.front();
-  }
-  return std::string::npos;
-}
-
 //===----------------------------------------------------------------------===//
 // FuncMemoryPorts (and children)
 //===----------------------------------------------------------------------===//
 
-mlir::ValueRange FuncMemoryPorts::getGroupInputs(unsigned groupIdx) {
-  assert(groupIdx < groups.size() && "index higher than number of groups");
-  size_t firstIdx = groups[groupIdx].getFirstOperandIndex();
-  if (firstIdx == std::string::npos)
-    return {};
-  size_t lastIdx = groups[groupIdx].getLastOperandIndex();
-  return memOp->getOperands().slice(firstIdx, lastIdx - firstIdx + 1);
-}
-
-mlir::ValueRange FuncMemoryPorts::getGroupResults(unsigned groupIdx) {
-  assert(groupIdx < groups.size() && "index higher than number of groups");
-  size_t firstIdx = groups[groupIdx].getFirstResultIndex();
-  if (firstIdx == std::string::npos)
-    return {};
-  size_t lastIdx = groups[groupIdx].getLastResultIndex();
-  return memOp->getResults().slice(firstIdx, lastIdx - firstIdx + 1);
-}
-
-namespace {
-using FGetIndices = std::function<ArrayRef<unsigned>(const MemoryPort &)>;
-} // namespace
-
-static ValueRange getInterfaceValueRange(const FuncMemoryPorts &ports,
-                                         ValueRange allValues,
-                                         const FGetIndices &fGetIndices) {
-  size_t firstIdx = std::string::npos;
-  for (const MemoryPort &port : ports.interfacePorts) {
-    if (auto indices = fGetIndices(port); !indices.empty()) {
-      firstIdx = indices.front();
-      break;
-    }
+/// Collects the memory interface's operands (resp. results) that the ports
+/// refer to, in port order.
+static SmallVector<Value> getPortValues(ArrayRef<const MemoryPort *> ports,
+                                        Operation *memOp, bool operands) {
+  SmallVector<Value> values;
+  for (const MemoryPort *port : ports) {
+    ArrayRef<unsigned> indices =
+        operands ? port->getOprdIndices() : port->getResIndices();
+    for (unsigned idx : indices)
+      values.push_back(operands ? memOp->getOperand(idx)
+                                : memOp->getResult(idx));
   }
-  if (firstIdx == std::string::npos)
-    return {};
-
-  for (const MemoryPort &port : llvm::reverse(ports.interfacePorts)) {
-    if (auto indices = fGetIndices(port); !indices.empty())
-      return allValues.slice(firstIdx, indices.back() - firstIdx + 1);
-  }
-  llvm_unreachable("no last index, this is impossible");
-  return {};
+  return values;
 }
 
-ValueRange FuncMemoryPorts::getInterfacesInputs() {
-  return getInterfaceValueRange(*this, memOp->getOperands(),
-                                &MemoryPort::getOprdIndices);
+/// Returns pointers to all the ports (control first) of a group.
+static SmallVector<const MemoryPort *>
+getGroupPorts(const GroupMemoryPorts &group) {
+  SmallVector<const MemoryPort *> ports;
+  if (group.ctrlPort)
+    ports.push_back(&*group.ctrlPort);
+  for (const MemoryPort &port : group.accessPorts)
+    ports.push_back(&port);
+  return ports;
 }
 
-ValueRange FuncMemoryPorts::getInterfacesResults() {
-  return getInterfaceValueRange(*this, memOp->getResults(),
-                                &MemoryPort::getResIndices);
+SmallVector<Value> FuncMemoryPorts::getGroupInputs(unsigned groupIdx) {
+  assert(groupIdx < groups.size() && "index higher than number of groups");
+  return getPortValues(getGroupPorts(groups[groupIdx]), memOp,
+                       /*operands=*/true);
+}
+
+SmallVector<Value> FuncMemoryPorts::getGroupResults(unsigned groupIdx) {
+  assert(groupIdx < groups.size() && "index higher than number of groups");
+  return getPortValues(getGroupPorts(groups[groupIdx]), memOp,
+                       /*operands=*/false);
+}
+
+SmallVector<Value> FuncMemoryPorts::getInterfacesInputs() {
+  SmallVector<const MemoryPort *> ports;
+  for (const MemoryPort &port : interfacePorts)
+    ports.push_back(&port);
+  return getPortValues(ports, memOp, /*operands=*/true);
+}
+
+SmallVector<Value> FuncMemoryPorts::getInterfacesResults() {
+  SmallVector<const MemoryPort *> ports;
+  for (const MemoryPort &port : interfacePorts)
+    ports.push_back(&port);
+  return getPortValues(ports, memOp, /*operands=*/false);
 }
 
 MCBlock::MCBlock(GroupMemoryPorts *group, unsigned blockID)

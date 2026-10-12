@@ -228,3 +228,84 @@ handshake.func @invalidSpecCommitWithInvalidDataTypes(
   %dataOut = spec_commit[%ctrl] %dataIn : !handshake.channel<i32, [spec: i1]>, !handshake.control<>, <i1>
   end
 }
+
+// -----
+
+handshake.func @mcGroupLoadCountMismatch(%mem: memref<64xi32>, %memStart: !handshake.control<>, %addr0: !handshake.channel<i32>, %addr1: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{groups declare 1 load addresses, but 2 are provided}}
+  %ldData, %memEnd = mem_controller [%mem : memref<64xi32>] start(%memStart) ldAddr(%addr0, %addr1) end(%start) {groups = [#handshake.mem_group<0, [ld]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+  end %ldData, %memEnd : <i32>, <>
+}
+
+// -----
+
+handshake.func @mcResultCountMismatch(%mem: memref<64xi32>, %memStart: !handshake.control<>, %addr0: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{expected 2 results based on the memory groups and operands, but got 3}}
+  %ldData:2, %memEnd = mem_controller [%mem : memref<64xi32>] start(%memStart) ldAddr(%addr0) end(%start) {groups = [#handshake.mem_group<0, [ld]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
+  end %ldData#0, %memEnd : <i32>, <>
+}
+
+// -----
+
+handshake.func @mcStoreWithoutControl(%mem: memref<64xi32>, %memStart: !handshake.control<>, %stAddr: !handshake.channel<i32>, %stData: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.control<> {
+  // expected-error @below {{Block 0 has stores but no control port.}}
+  %memEnd = mem_controller [%mem : memref<64xi32>] start(%memStart) stAddr(%stAddr) stData(%stData) end(%start) {groups = [#handshake.mem_group<0, [st]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> !handshake.control<>
+  end %memEnd : <>
+}
+
+// -----
+
+handshake.func @mcDuplicateBlocks(%mem: memref<64xi32>, %memStart: !handshake.control<>, %addr0: !handshake.channel<i32>, %addr1: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{Block IDs must be unique but ID 0 was found at least twice in the list.}}
+  %ldData:2, %memEnd = mem_controller [%mem : memref<64xi32>] start(%memStart) ldAddr(%addr0, %addr1) end(%start) {groups = [#handshake.mem_group<0, [ld]>, #handshake.mem_group<0, [ld]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
+  end %ldData#0, %memEnd : <i32>, <>
+}
+
+// -----
+
+handshake.func @mcAddressWidthMismatch(%mem: memref<64xi32>, %memStart: !handshake.control<>, %addr0: !handshake.channel<i32>, %addr1: !handshake.channel<i8>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{inconsistent bitwidths for addresses, expected 32 bits but got 8 bits}}
+  %ldData:2, %memEnd = mem_controller [%mem : memref<64xi32>] start(%memStart) ldAddr(%addr0, %addr1) end(%start) {groups = [#handshake.mem_group<0, [ld, ld]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.channel<i8>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
+  end %ldData#0, %memEnd : <i32>, <>
+}
+
+// -----
+
+handshake.func @lsqGroupWithoutControl(%mem: memref<64xi32>, %memStart: !handshake.control<>, %ldAddr: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{groups declare 0 control ports, but 1 are provided}}
+  %ldData, %memEnd = lsq [%mem : memref<64xi32>] start(%memStart) ctrl(%start) ldAddr(%ldAddr) end(%start) {groups = [#handshake.mem_group<0, [ld]>]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+  end %ldData, %memEnd : <i32>, <>
+}
+
+// -----
+
+handshake.func @lsqEmptyGroup(%mem: memref<64xi32>, %memStart: !handshake.control<>, %ldAddr: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{Group sizes must be stricly greater than 0.}}
+  %ldData, %memEnd = lsq [%mem : memref<64xi32>] start(%memStart) ctrl(%start, %start) ldAddr(%ldAddr) end(%start) {groups = [#handshake.mem_group<0, ctrl, [ld]>, #handshake.mem_group<1, ctrl, []>]} : (!handshake.control<>, !handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+  end %ldData, %memEnd : <i32>, <>
+}
+
+// -----
+
+handshake.func @lsqMasterAndSlave(%mem: memref<64xi32>, %memStart: !handshake.control<>, %ldAddr: !handshake.channel<i32>, %ldData: !handshake.channel<i32>, %start: !handshake.control<>) -> !handshake.control<> {
+  // expected-error @below {{LSQ must either reference a memory region or have a load data input from an MC (fromMC), but not both}}
+  %res:5 = lsq [%mem : memref<64xi32>] start(%memStart) ctrl(%start) ldAddr(%ldAddr) fromMC(%ldData) end(%start) {groups = [#handshake.mem_group<0, ctrl, [ld]>]} : (!handshake.control<>, !handshake.control<>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.channel<i32>, !handshake.control<>)
+  end %start : <>
+}
+
+// -----
+
+handshake.func @invalidMemGroupAccess(%mem: memref<64xi32>, %memStart: !handshake.control<>, %addr: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{expected 'ld' or 'st', but got 'load'}}
+  %ldData, %memEnd = mem_controller [%mem : memref<64xi32>] start(%memStart) ldAddr(%addr) end(%start) {groups = [#handshake.mem_group<0, [load]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+  end %ldData, %memEnd : <i32>, <>
+}
+
+// -----
+
+handshake.func @mcPortInWrongBlock(%mem: memref<64xi32>, %memStart: !handshake.control<>, %addr: !handshake.channel<i32>, %start: !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>) {
+  // expected-error @below {{Access port belongs to block 0, but expected it to be part of block 1}}
+  %ldData, %memEnd = mem_controller [%mem : memref<64xi32>] start(%memStart) ldAddr(%ldAddrToMem) end(%start) {groups = [#handshake.mem_group<1, [ld]>]} : (!handshake.control<>, !handshake.channel<i32>, !handshake.control<>) -> (!handshake.channel<i32>, !handshake.control<>)
+  %ldAddrToMem, %ldDataToSucc = load [%addr] %ldData {handshake.bb = 0 : ui32} : <i32>, <i32>, <i32>, <i32>
+  end %ldDataToSucc, %memEnd : <i32>, <>
+}

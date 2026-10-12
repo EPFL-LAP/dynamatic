@@ -79,10 +79,6 @@ public:
                                       handshake::MemoryControllerOp &mcOp,
                                       handshake::LSQOp &lsqOp);
 
-  /// Returns results of load/store-like operations which are to be given as
-  /// operands to a memory interface.
-  static SmallVector<Value, 2> getMemResultsToInterface(Operation *memOp);
-
   /// Returns the result of a constant that serves as an MC control signal
   /// (indicating a non-zero number of stores in the block). Instantiates the
   /// constant operation in the IR after the provided control signal.
@@ -93,14 +89,27 @@ private:
   /// memory ports. An empty list of inputs for the MC indicates that no MC is
   /// necessary for the recorded ports. The same is true for the LSQ.
   struct InterfaceInputs {
+    /// Inputs of a single memory interface, split by kind.
+    struct Inputs {
+      /// Control inputs, one per group with a control port.
+      SmallVector<Value> ctrls;
+      /// Load addresses.
+      SmallVector<Value> ldAddrs;
+      /// Store addresses.
+      SmallVector<Value> stAddrs;
+      /// Store data.
+      SmallVector<Value> stDatas;
+      /// Groups of the interface, in order.
+      SmallVector<handshake::MemGroupAttr> groups;
+
+      /// Adds the results of a load/store port that go to the interface.
+      void addAccess(Operation *memOp);
+    };
+
     /// Inputs for the MC.
-    SmallVector<Value> mcInputs;
-    /// List of basic block IDs for the MC.
-    SmallVector<unsigned> mcBlocks;
+    Inputs mc;
     /// Inputs for the LSQ.
-    SmallVector<Value> lsqInputs;
-    /// List of group sizes for the MC.
-    SmallVector<unsigned> lsqGroupSizes;
+    Inputs lsq;
   };
 
   /// Groups a list of memory access ports by their group, which is a basic
@@ -121,12 +130,8 @@ private:
 
   /// Memory access ports for the MC.
   InterfacePorts mcPorts;
-  /// Number of loads to the MC.
-  unsigned mcNumLoads = 0;
   /// Memory access ports for the LSQ.
   InterfacePorts lsqPorts;
-  /// Number of loads to the LSQ.
-  unsigned lsqNumLoads = 0;
 
   /// Determines the list of inputs for the memory interface(s) to instantiate
   /// from the sets of recorded ports. This performs no verification of the
