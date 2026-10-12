@@ -303,7 +303,7 @@ class DuplicationFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
-class FtdWithSimpleBuffersFixture : public BaseFixture {};
+class FtdFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
   IntegrationTest config{
@@ -343,7 +343,7 @@ TEST_P(CBCSolverFixture, basic) {
 }
 #endif // DYNAMATIC_ENABLE_CBC
 
-TEST_P(FtdWithSimpleBuffersFixture, basic) {
+TEST_P(FtdFixture, basic) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),
@@ -353,7 +353,7 @@ TEST_P(FtdWithSimpleBuffersFixture, basic) {
       .useSharing = false,
       .useFTD = true,
       .milpSolver = "gurobi",
-      .bufferAlgorithm = "on-merges",
+      .bufferAlgorithm = "fpga20",
       .simTime = -1,
       // clang-format on
   };
@@ -784,7 +784,7 @@ INSTANTIATE_TEST_SUITE_P(
 #endif // DYNAMATIC_ENABLE_CBC
 
 INSTANTIATE_TEST_SUITE_P(
-    Tiny, FtdWithSimpleBuffersFixture,
+    Tiny, FtdFixture,
     testing::Values(
       // Benchmarks used in FPL '22 "FTD" paper
       "fir",

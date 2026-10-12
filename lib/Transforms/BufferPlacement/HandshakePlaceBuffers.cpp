@@ -416,7 +416,7 @@ static bool isBackedgeSourceLike(Operation *op) {
 }
 
 static bool isBackedgeDestinationLike(Operation *op) {
-  if (isa<handshake::InitOp, handshake::MergeLikeOpInterface>(op))
+  if (isa<handshake::MergeLikeOpInterface>(op))
     return true;
 
   auto notOp = dyn_cast<handshake::NotIOp>(op);
@@ -424,7 +424,7 @@ static bool isBackedgeDestinationLike(Operation *op) {
     return false;
 
   return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
-    return isa<handshake::InitOp, handshake::MergeLikeOpInterface>(user);
+    return isa<handshake::MergeLikeOpInterface>(user);
   });
 }
 
@@ -514,6 +514,13 @@ findBackwardChannelPerCyclicRegion(handshake::FuncOp funcOp) {
     for (const CircuitEdge &edge : edges) {
       if (!sccNodes.contains(edge.src) || !sccNodes.contains(edge.dst))
         continue;
+      // An init holds a token at reset, so the cycle through it carries one
+      // token. Model it on the channel into the init, whatever produces the
+      // loop condition (e.g., a noti, which isBackedgeSourceLike rejects)
+      if (isa<handshake::InitOp>(edge.dst)) {
+        backwardChannels.insert(edge.channel);
+        continue;
+      }
       if (!isBackedge(edge.channel, /*endpoints=*/nullptr, /*ftd=*/true))
         continue;
       if (!isBackedgeSourceLike(edge.src))

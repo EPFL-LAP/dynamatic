@@ -230,6 +230,29 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
+  // An LSQ accepts at most one group allocation per cycle. With straight to
+  // the queue, a lazy fork sends the group allocation of its block to the LSQ,
+  // and its other results deliver the dependency token that triggers the group
+  // allocation forks of the next blocks. Without a latency of at least one
+  // cycle on those results, two group allocations can reach the LSQ in the
+  // same cycle
+  for (handshake::LazyForkOp forkOp : funcOp.getOps<handshake::LazyForkOp>()) {
+    auto feedsLSQ = [](OpResult res) {
+      return llvm::any_of(res.getUsers(), [](Operation *user) {
+        return isa<handshake::LSQOp>(user);
+      });
+    };
+    if (llvm::none_of(forkOp->getResults(), feedsLSQ))
+      continue;
+
+    for (OpResult res : forkOp->getResults()) {
+      if (feedsLSQ(res))
+        continue;
+      Channel channel(res, true);
+      channel.props->minOpaque = std::max(channel.props->minOpaque, 1U);
+    }
+  }
+
   // See docs/Specs/Buffering.md
   // Memrefs are not real edges in the graph and are therefore unbufferizable
   for (BlockArgument arg : funcOp.getArguments()) {

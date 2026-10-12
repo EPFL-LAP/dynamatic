@@ -306,7 +306,10 @@ void CFDFC::collectChannelsFTD(const DenseSet<Value> &backwardChannels) {
             // Record all identified backward channels as backedges, but include
             // them as CFDFC channels only if they are compliant with the CFG.
             backedges.insert(res);
-            if (isCFGCompliant(srcBB, dstBB))
+            // The channel into an init carries the init's token. It may come
+            // from the init's own block, which is not an edge of the cycle
+            if (isCFGCompliant(srcBB, dstBB) ||
+                (srcBB == dstBB && isa<handshake::InitOp>(user)))
               channels.insert(res);
           }
         }
