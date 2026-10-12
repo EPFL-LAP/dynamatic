@@ -184,6 +184,39 @@ def MemInterfaceAttr : Handshake_Attr<"MemInterface", "mem_interface"> {
   }];
 }
 
+def MemGroupAttr : Handshake_Attr<"MemGroup", "mem_group"> {
+  let summary = "A group of ports to a memory interface";
+  let description = [{
+    Describes one group of ports connected to a memory interface (MC or LSQ).
+    For an MC, a group corresponds to a basic block (`id` is the block ID). For
+    an LSQ, a group is an LSQ group (`id` is the group number).
+
+    `hasCtrl` indicates whether the group has a control port. `accesses` lists
+    the kinds of the group's access ports in program order. The memory
+    interface's control, load, and store operands are stored in separate
+    operand segments, in group order. The i-th load (resp. store) access across
+    all groups corresponds to the i-th entry in the load (resp. store) operand
+    segment(s).
+
+    Example: `#handshake.mem_group<3, ctrl, [ld, st, ld]>` is the group of basic
+    block 3, which has a control port, a load, a store, and another load.
+  }];
+  let parameters = (ins "unsigned":$id, "bool":$hasCtrl,
+    ArrayRefParameter<"::dynamatic::handshake::MemAccessKind">:$accesses);
+  let hasCustomAssemblyFormat = 1;
+  let extraClassDeclaration = [{
+    /// Returns the number of load accesses in the group.
+    unsigned getNumLoads() const {
+      return llvm::count(getAccesses(), MemAccessKind::LOAD);
+    }
+
+    /// Returns the number of store accesses in the group.
+    unsigned getNumStores() const {
+      return llvm::count(getAccesses(), MemAccessKind::STORE);
+    }
+  }];
+}
+
 def MemDependenceAttr : Handshake_Attr<"MemDependence", "dep"> {
   let summary = "A memory dependence with respect to another memory access";
   let description = [{

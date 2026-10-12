@@ -89,6 +89,14 @@ Os &operator<<(Os &os, ChannelBufProps &props) {
   return os;
 }
 
+/// Kind of a memory access port connected to a memory interface. Backing type
+/// for the access list of the MemGroupAttr attribute.
+enum class MemAccessKind : uint8_t { LOAD, STORE };
+
+inline llvm::hash_code hash_value(MemAccessKind kind) {
+  return llvm::hash_value(static_cast<uint8_t>(kind));
+}
+
 } // namespace handshake
 } // namespace dynamatic
 

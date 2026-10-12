@@ -53,6 +53,61 @@ Attribute MemInterfaceAttr::parse(AsmParser &odsParser, Type odsType) {
 }
 
 //===----------------------------------------------------------------------===//
+// MemGroupAttr
+//===----------------------------------------------------------------------===//
+
+static constexpr StringLiteral MEM_GROUP_CTRL("ctrl"), MEM_GROUP_LD("ld"),
+    MEM_GROUP_ST("st");
+
+void MemGroupAttr::print(AsmPrinter &odsPrinter) const {
+  odsPrinter << "<" << getId();
+  if (getHasCtrl())
+    odsPrinter << ", " << MEM_GROUP_CTRL;
+  odsPrinter << ", [";
+  llvm::interleaveComma(getAccesses(), odsPrinter, [&](MemAccessKind kind) {
+    odsPrinter << (kind == MemAccessKind::LOAD ? MEM_GROUP_LD : MEM_GROUP_ST);
+  });
+  odsPrinter << "]>";
+}
+
+Attribute MemGroupAttr::parse(AsmParser &odsParser, Type odsType) {
+  unsigned id = 0;
+  if (odsParser.parseLess() || odsParser.parseInteger(id) ||
+      odsParser.parseComma())
+    return nullptr;
+
+  // The control keyword is optional
+  bool hasCtrl = false;
+  if (succeeded(odsParser.parseOptionalKeyword(MEM_GROUP_CTRL))) {
+    hasCtrl = true;
+    if (odsParser.parseComma())
+      return nullptr;
+  }
+
+  SmallVector<MemAccessKind> accesses;
+  auto parseAccess = [&]() -> ParseResult {
+    StringRef keyword;
+    llvm::SMLoc loc = odsParser.getCurrentLocation();
+    if (odsParser.parseKeyword(&keyword))
+      return failure();
+    if (keyword == MEM_GROUP_LD)
+      accesses.push_back(MemAccessKind::LOAD);
+    else if (keyword == MEM_GROUP_ST)
+      accesses.push_back(MemAccessKind::STORE);
+    else
+      return odsParser.emitError(loc)
+             << "expected '" << MEM_GROUP_LD << "' or '" << MEM_GROUP_ST
+             << "', but got '" << keyword << "'";
+    return success();
+  };
+  if (odsParser.parseCommaSeparatedList(AsmParser::Delimiter::Square,
+                                        parseAccess) ||
+      odsParser.parseGreater())
+    return nullptr;
+  return MemGroupAttr::get(odsParser.getContext(), id, hasCtrl, accesses);
+}
+
+//===----------------------------------------------------------------------===//
 // ChannelBufProps(Attr)
 //===----------------------------------------------------------------------===//
 
