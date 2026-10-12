@@ -260,13 +260,30 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
   return foundCycle;
 }
 
-// Apply DFS on the producers of a particular Mux feeding a particular input,
-// returning the first non-Mux producer's result value
+// Returns the value that input `idx` of a Mux regenerates. The search goes
+// through the producer Mux only if it is a self regenerating Mux, whose output
+// is then the value at its input from outside its loop. Any other Mux (e.g., a
+// MU, whose loop input is not its own output) produces a value of its own and
+// ends the search.
+//
+// Example: in jacobi_1d_imper, the outer loop (bb1-bb4) contains two inner
+// loops, bb2 and bb3, and the straight-to-the-queue pass orders the LSQ group
+// allocations of bb2 after those of bb3 in the previous outer iteration:
+//
+//   mux8  = mux [start, mux8 regenerated]          (bb1, regenerate start)
+//   mux10 = mux [mux8, mux10 regenerated]          (bb2)
+//   mux15 = mux [start, bb3 token at loop exit]    (bb1, MU)
+//   mux12 = mux [mux15, mux12 regenerated]         (bb2)
+//
+// Going through any Mux would resolve both mux10 and mux12 to `start`, merge
+// them, and drop the dependency of bb2 on bb3
 Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
   Value val = muxOp.getDataOperands()[idx];
-  Operation *prod = val.getDefiningOp();
-  if (isa_and_nonnull<handshake::MuxOp>(prod))
-    return returnNonMuxProducerVal(cast<handshake::MuxOp>(prod), idx);
+  auto prodMux = val.getDefiningOp<handshake::MuxOp>();
+  int prodCycleIdx;
+  if (prodMux && prodMux.getNumOperands() == 3 &&
+      isSelfRegenerateMux(prodMux, prodCycleIdx))
+    return returnNonMuxProducerVal(prodMux, 1 - prodCycleIdx);
   return val;
 }
 
@@ -327,8 +344,13 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
       Operation *returnedMux = returnMuxAtSameDepth(dataUser, muxOp);
       if (returnedMux != nullptr) {
         auto muxUser = cast<handshake::MuxOp>(returnedMux);
-        int tempValue;
-        if (isSelfRegenerateMux(muxOp, tempValue))
+        // The candidate must regenerate the same value, which is not the case
+        // if a Mux that is not self regenerating lies on the way (see
+        // returnNonMuxProducerVal)
+        int userCycleIdx;
+        if (isSelfRegenerateMux(muxUser, userCycleIdx) &&
+            returnNonMuxProducerVal(muxUser, 1 - userCycleIdx) ==
+                valProducedByNonMux)
           dataMuxUsers.insert(muxUser);
       }
     }
