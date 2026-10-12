@@ -290,7 +290,8 @@
   {
     "name": "handshake.select",
     "parameters": [
-      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
+      { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 },
+      { "name": "ANTITOKEN_DEPTH", "type": "unsigned" }
     ],
     "generic": "$DYNAMATIC/data/verilog/arith/select.v",
     "module-name": "selector",

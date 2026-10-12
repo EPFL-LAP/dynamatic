@@ -1373,7 +1373,8 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
     Value newRhs = modBitWidth(rhsExtValue, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
     auto newOp = rewriter.create<handshake::SelectOp>(
-        selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
+        selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs,
+        selectOp.getAntitokenDepthAttr());
     Value newRes = modBitWidth({newOp.getResult(), lhsExtValue.getExtType()},
                                resWidth, rewriter);
     inheritBB(selectOp, newOp);
