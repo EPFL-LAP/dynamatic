@@ -28,6 +28,7 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "experimental/Support/CFGAnnotation.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -251,6 +252,8 @@ LogicalResult LowerFuncToHandshake::matchAndRewrite(
     return failure();
 
   idBasicBlocks(funcOp, rewriter);
+  if (shouldAnnotateCFG)
+    experimental::cfg::annotateCFG(funcOp, rewriter, namer);
   return flattenAndTerminate(funcOp, rewriter, argReplacements);
 }
 
@@ -880,8 +883,11 @@ LogicalResult LowerFuncToHandshake::convertMemoryOps(
 
               Value addr = rewriter.getRemappedValue(indices.front());
               Value data = rewriter.getRemappedValue(storeOp.getValueToStore());
+              Value done =
+                  edgeBuilder.get(handshake::ControlType::get(getContext()));
               assert((addr && data) && "failed to remap address or data");
-              auto newOp = rewriter.create<handshake::StoreOp>(loc, addr, data);
+              auto newOp =
+                  rewriter.create<handshake::StoreOp>(loc, addr, data, done);
 
               copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp,
                                                                  newOp);
@@ -1658,6 +1664,8 @@ namespace {
 struct CfToHandshakePass
     : public dynamatic::impl::CfToHandshakeBase<CfToHandshakePass> {
 
+  using CfToHandshakeBase::CfToHandshakeBase;
+
   void runDynamaticPass() override {
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
@@ -1673,9 +1681,10 @@ struct CfToHandshakePass
 
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
+    patterns.add<LowerFuncToHandshake>(getAnalysis<NameAnalysis>(), converter,
+                                       ctx, annotateCFG);
     patterns.add<
         // clang-format off
-        LowerFuncToHandshake,
         ConvertConstants,
         AllocaOpConversion,
         ConvertCalls,

@@ -1128,6 +1128,13 @@ struct MemPortAddrOpt
     SmallVector<Value, 2> newOperands{newAddr, dataIn};
     SmallVector<Type, 2> newResultTypes{newAddr.getType(), dataIn.getType()};
 
+    if (auto storePortOp = dyn_cast<handshake::StoreMemPortOpInterface>(
+            portOp.getOperation())) {
+      Value done = storePortOp.getDoneInput();
+      newOperands.push_back(done);
+      newResultTypes.push_back(done.getType());
+    }
+
     // Replace the memory port
     rewriter.setInsertionPoint(portOp);
     auto newPortOp = cast<handshake::MemPortOpInterface>(rewriter.create(
@@ -1138,8 +1145,13 @@ struct MemPortAddrOpt
     inheritBB(portOp, newPortOp);
     Value newAddrRes = modBitWidth(
         {newPortOp.getAddressOutput(), ExtType::ZEXT}, addrWidth, rewriter);
-    rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput()});
-    ++bitwidthReduced;
+    if (auto newStorePortOp = dyn_cast<handshake::StoreMemPortOpInterface>(
+            newPortOp.getOperation())) {
+      rewriter.replaceOp(portOp, {newAddrRes, newStorePortOp.getDataOutput(),
+                                  newStorePortOp.getDoneOutput()});
+    } else
+      // Otherwise, we only need to modify the address output
+      rewriter.replaceOp(portOp, {newAddrRes, newPortOp.getDataOutput()});
     return success();
   }
 

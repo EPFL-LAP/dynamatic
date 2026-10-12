@@ -119,6 +119,28 @@ def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependen
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
+  let options =
+    [Option<"depGraphFile", "dep-graph-file", "std::string", "\"\"",
+            "Optional path at which to write the memory dependence graph in DOT format.">];
+}
+
+def HandshakeCreateOutWithLSQsCircuit : DynamaticPass<"handshake-create-out-with-lsqs-circuit"> {
+  let summary = "Inserts the skippable sequencializer which replaces the LSQ.";
+  let description = [{
+    Inserts a specific logic in the IR to respect the memory dependencies
+    between memory accesses in a Handshake function. Its logic is based on
+    sequentializing memory accesses in a way that allows the circuit to
+    "skip" the sequencialization logic when the accesses are prooven to be
+    independent.
+  }];
+  let options =
+    [Option<"numComparators", "num-of-comparators", "std::string", "\"3\"",
+            "Comma-separated comparator counts, assigned cyclically to memory dependence edges.">,
+     Option<"depGraphFile", "dep-graph-file", "std::string", "\"\"",
+            "DOT file providing per-edge comparator counts; unspecified dependences use default number of comparators.">,
+     Option<"dynamaticDir", "dynamatic-dir", "std::string", "\"\"",
+            "Dynamatic directory used as the base path fordependence graph.">];
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::func::FuncDialect"];
 }
 
 def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
@@ -179,7 +201,9 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
     LSQ never happen on the same cycle.   
   }];
   let options = [Option<"replicateConstants", "replicate-constant", "bool", "false",
-            "If true, replicate all the source->constant per each use.">];
+            "If true, replicate all the source->constant per each use.">,
+            Option<"forkFifoSize", "forkFifoSize", "std::string", "\"0\"",
+            "Size of the fifo in the output of each fork">];
 }
 
 def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
@@ -263,7 +287,7 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
   let options = [
     Option<"algorithm", "algorithm", "std::string", "\"fpga20\"",
     "Algorithm to use for buffer placement. Choices are: 'on-merges' (default, "
-    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf'.">,
+    "does not require Gurobi) 'fpga20', 'fpl22', 'costaware', 'mapbuf', 'cp'.">,
     Option<"solver", "solver", "std::string", "\"gurobi\"",
     "The MILP solver. Choices are: 'gurobi', 'cbc'">,
     Option<"frequencies", "frequencies", "std::string", "",

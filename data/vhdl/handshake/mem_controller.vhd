@@ -42,6 +42,9 @@ entity mem_controller is
     stData       : in  data_array (NUM_STORES - 1 downto 0)(DATA_TYPE - 1 downto 0);
     stData_valid : in  std_logic_vector(NUM_STORES - 1 downto 0);
     stData_ready : out std_logic_vector(NUM_STORES - 1 downto 0);
+    -- store done output
+    stDone_valid : out std_logic_vector(NUM_STORES - 1 downto 0);
+    stDone_ready : in  std_logic_vector(NUM_STORES - 1 downto 0);
     -- interface to dual-port BRAM
     loadData  : in  std_logic_vector(DATA_TYPE - 1 downto 0);
     loadEn    : out std_logic;
@@ -82,6 +85,8 @@ begin
       stData         => stData,
       stData_valid   => stData_valid,
       stData_ready   => stData_ready,
+      stDone_valid   => stDone_valid,
+      stDone_ready   => stDone_ready,
       loadData       => dropLoadData,
       loadEn         => dropLoadEn,
       loadAddr       => dropLoadAddr,

@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/CFG.h"
@@ -38,6 +39,9 @@ using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::handshake;
+
+constexpr llvm::StringLiteral SKIP_COND_GEN("Skip.Condition_Generator");
+constexpr llvm::StringLiteral SKIP_COND_SEQ("Skip.Conditional_Sequentializer");
 
 static cl::OptionCategory mainCategory("Application options");
 
@@ -252,7 +256,9 @@ static StringRef getNodeColor(Operation *op) {
   return llvm::TypeSwitch<Operation *, StringRef>(op)
       .Case<handshake::ForkOp, handshake::LazyForkOp, handshake::JoinOp>(
           [&](auto) { return "lavender"; })
-      .Case<handshake::BlockerOp>([&](auto) { return "cyan"; })
+      .Case<handshake::GateOp>([&](auto) { return "cyan"; })
+      .Case<handshake::CtrlExtractorOp>([&](auto) { return "lightyellow"; })
+      .Case<handshake::InitOp>([&](auto) { return "lightgrey"; })
       .Case<handshake::BufferOp>(
           [&](handshake::BufferOp bufferOp) -> StringRef {
             return bufferOp.isBypassDV() ? "palegreen" : "mediumseagreen";
@@ -277,6 +283,8 @@ static StringRef getNodeColor(Operation *op) {
 static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   DOTGraph::Builder builder(graph);
   mlir::DenseMap<unsigned, DOTGraph::Subgraph *> bbSubgraphs;
+  mlir::DenseMap<std::pair<unsigned, StringRef>, DOTGraph::Subgraph *>
+      nestedSubgraphs;
   DOTGraph::Subgraph *root = &builder.getRoot();
 
   auto addNode = [&](Operation *op,
@@ -286,7 +294,8 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     std::string prettyLabel;
     switch (labelType) {
     case LabelType::TYPE:
-      prettyLabel = getPrettyNodeLabel(op);
+      prettyLabel =
+          getUniqueName(op).str() + " (" + getPrettyNodeLabel(op) + ")";
       break;
     case LabelType::UNAME:
       prettyLabel = getUniqueName(op);
@@ -411,14 +420,33 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     // Determine the subgraph in which to insert the operation
     DOTGraph::Subgraph *bbSub = root;
     std::optional<unsigned> bb = getLogicBB(&op);
+
     if (bb) {
-      if (auto subIt = bbSubgraphs.find(*bb); subIt != bbSubgraphs.end()) {
-        bbSub = subIt->second;
+      // Ensure the BB-level subgraph exists
+      if (auto it = bbSubgraphs.find(*bb); it != bbSubgraphs.end()) {
+        bbSub = it->second;
       } else {
-        std::string name = "cluster" + std::to_string(*bb);
-        bbSub = &builder.addSubgraph(name, *root);
+        std::string bbName = "clusterBB" + std::to_string(*bb);
+        bbSub = &builder.addSubgraph(bbName, *root);
         bbSub->addAttr("label", "BB " + std::to_string(*bb));
-        bbSubgraphs.insert({*bb, bbSub});
+        bbSubgraphs[*bb] = bbSub;
+      }
+
+      if (op.hasAttr(SKIP_COND_GEN) || op.hasAttr(SKIP_COND_SEQ)) {
+        auto stringValue = op.hasAttr(SKIP_COND_GEN)
+                               ? "Condition_Generator"
+                               : "Conditional_Sequentializer";
+        auto key = std::make_pair(*bb, stringValue);
+        if (auto it = nestedSubgraphs.find(key); it != nestedSubgraphs.end()) {
+          bbSub = it->second;
+        } else {
+          std::string clusterName =
+              "clusterBB" + std::to_string(*bb) + "_" + stringValue;
+          auto *nested = &builder.addSubgraph(clusterName, *bbSub);
+          nested->addAttr("label", stringValue);
+          nestedSubgraphs[key] = nested;
+          bbSub = nested;
+        }
       }
     }
 
@@ -452,7 +480,8 @@ int main(int argc, char **argv) {
       argc, argv,
       "Exports a DOT graph corresponding to the module for visualization\n"
       "and legacy-compatibility purposes.The pass only supports exporting\n"
-      "the graph of a single Handshake function at the moment, and will fail\n"
+      "the graph of a single Handshake function at the moment, and will "
+      "fail\n"
       "if there is more than one Handhsake function in the module.");
 
   auto fileOrErr = MemoryBuffer::getFileOrSTDIN(inputFileName.c_str());
@@ -462,9 +491,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // Functions feeding into HLS tools might have attributes from high(er) level
-  // dialects or parsers. Allow unregistered dialects to not fail in these
-  // cases
+  // Functions feeding into HLS tools might have attributes from high(er)
+  // level dialects or parsers. Allow unregistered dialects to not fail in
+  // these cases
   MLIRContext context;
   context.loadDialect<memref::MemRefDialect, arith::ArithDialect,
                       handshake::HandshakeDialect, math::MathDialect>();
