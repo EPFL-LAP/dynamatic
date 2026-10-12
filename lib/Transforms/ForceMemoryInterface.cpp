@@ -37,7 +37,13 @@ struct ForceMemoryInterfacePass
 
   using ForceMemoryInterfaceBase::ForceMemoryInterfaceBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     // Exactly one of the two pass options need to have been set
     if (forceLSQ && forceMC)
       llvm::errs() << "Both " << forceLSQ.ArgStr << " and " << forceMC.ArgStr
@@ -78,6 +84,12 @@ struct ForceMemoryInterfacePass
 
       setDialectAttr<handshake::MemInterfaceAttr>(op, ctx, groupID);
     });
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace

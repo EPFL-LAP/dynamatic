@@ -51,7 +51,7 @@ struct HandshakeReplaceMemoryInterfacesPass
     : public dynamatic::impl::HandshakeReplaceMemoryInterfacesBase<
           HandshakeReplaceMemoryInterfacesPass> {
 
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 private:
   /// Replace all memory interfaces in the Handshake function.
@@ -83,11 +83,16 @@ private:
 };
 } // namespace
 
-void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
+void HandshakeReplaceMemoryInterfacesPass::runOnOperation() {
+  // Make sure all operation names are unique and haven't changed from what is
+  // cached (if anything is cached)
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  if (!namer.isAnalysisValid())
+    return signalPassFailure();
+
   mlir::ModuleOp modOp = getOperation();
 
   // Check that memory access ports are named
-  NameAnalysis &namer = getAnalysis<NameAnalysis>();
   WalkResult res = modOp.walk([&](Operation *op) {
     if (!isa<handshake::LoadOp, handshake::StoreOp>(op))
       return WalkResult::advance();
@@ -128,6 +133,12 @@ void HandshakeReplaceMemoryInterfacesPass::runDynamaticPass() {
     if (failed(replaceInFunction(funcOp)))
       return signalPassFailure();
   }
+
+  // Make sure all operation names are still unique and name operations that
+  // do not currently have a name
+  if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+  markAnalysesPreserved<NameAnalysis>();
 }
 
 LogicalResult HandshakeReplaceMemoryInterfacesPass::replaceInFunction(

@@ -733,6 +733,9 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
       .Case<handshake::SelectOp>([&](handshake::SelectOp selectOp) {
         // Data bitwidth
         addType("DATA_TYPE", selectOp.getTrueValue());
+        // Maximum number of tokens pending to be killed on one data input
+        addUnsigned("ANTITOKEN_DEPTH",
+                    selectOp.getAntitokenDepth().value_or(1));
       })
       .Case<handshake::CmpFOp>([&](handshake::CmpFOp cmpFOp) {
         // Predicate and bitwidth
@@ -2361,7 +2364,13 @@ class HandshakeToHWPass
 public:
   using HandshakeToHWBase::HandshakeToHWBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
 
@@ -2387,7 +2396,6 @@ public:
     }
 
     // Make sure all operations are named
-    NameAnalysis &namer = getAnalysis<NameAnalysis>();
     namer.nameAllUnnamedOps();
 
     ChannelTypeConverter typeConverter;
@@ -2503,9 +2511,11 @@ public:
     for (auto &[circuitOp, _] : lowerState.modState)
       createWrapper(circuitOp, lowerState, builder);
 
-    // At this level all operations already have an intrinsic name so we can
-    // disable our naming system
-    doNotNameOperations();
+    // At this level, operations do not need to follow our naming scheme, so
+    // only verify existing names instead of naming unnamed operations
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::DO_NOTHING)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 
 private:

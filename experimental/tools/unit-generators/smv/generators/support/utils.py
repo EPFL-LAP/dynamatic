@@ -16,6 +16,7 @@ ATTR_OUT_BITWIDTH = "output_bitwidth"
 ATTR_DATA_BITWIDTH = "data_bitwidth"
 ATTR_INDEX_BITWIDTH = "index_bitwidth"
 ATTR_ADDR_BITWIDTH = "addr_bitwidth"
+ATTR_ANTITOKEN_DEPTH = "antitoken_depth"
 
 
 class SmvScalarType:

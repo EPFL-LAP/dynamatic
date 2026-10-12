@@ -34,7 +34,7 @@ namespace xls {
 #define GEN_PASS_DEF_HANDSHAKETOXLS
 #include "experimental/xls/Conversion/Passes.h.inc"
 
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeToXlsPass();
+std::unique_ptr<mlir::Pass> createHandshakeToXlsPass();
 
 } // namespace xls
 } // namespace experimental

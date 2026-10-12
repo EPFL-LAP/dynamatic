@@ -7,71 +7,22 @@ from generators.support.signal_manager.utils.internal_signal import create_inter
 def generate_select(name, parameters):
     bitwidth = parameters["bitwidth"]
     extra_signals = parameters["extra_signals"]
+    # Maximum number of tokens that may be owed to be killed on one data input,
+    # i.e., how far one data input may run ahead of the other. With 0, the
+    # select waits for the condition and both data inputs (join).
+    antitoken_depth = parameters.get("antitoken_depth", 1)
+    if antitoken_depth < 0:
+        raise ValueError(
+            f"antitoken_depth must be non-negative, got {antitoken_depth}")
 
     if extra_signals:
-        return _generate_select_signal_manager(name, bitwidth, extra_signals)
+        return _generate_select_signal_manager(name, bitwidth, extra_signals,
+                                               antitoken_depth)
     else:
-        return _generate_select(name, bitwidth)
+        return _generate_select(name, bitwidth, antitoken_depth)
 
 
-def _generate_antitokens(name):
-    return f"""
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
--- Entity of antitokens
-entity {name} is
-  port (
-    clk, rst                   : in  std_logic;
-    pvalid1, pvalid0           : in  std_logic;
-    kill1, kill0               : out std_logic;
-    generate_at1, generate_at0 : in  std_logic;
-    stop_valid                 : out std_logic
-  );
-end entity;
-
--- Architecture of antitokens
-architecture arch of {name} is
-  signal reg_in0, reg_in1, reg_out0, reg_out1 : std_logic;
-begin
-
-  reg0 : process (clk)
-  begin
-    if (rising_edge(clk)) then
-      if (rst = '1') then
-        reg_out0 <= '0';
-      else
-        reg_out0 <= reg_in0;
-      end if;
-    end if;
-  end process reg0;
-
-  reg1 : process (clk)
-  begin
-    if (rising_edge(clk)) then
-      if (rst = '1') then
-        reg_out1 <= '0';
-      else
-        reg_out1 <= reg_in1;
-      end if;
-    end if;
-  end process reg1;
-
-  reg_in0 <= not pvalid0 and (generate_at0 or reg_out0);
-  reg_in1 <= not pvalid1 and (generate_at1 or reg_out1);
-
-  stop_valid <= reg_out0 or reg_out1;
-
-  kill0 <= generate_at0 or reg_out0;
-  kill1 <= generate_at1 or reg_out1;
-end architecture;
-"""
-
-
-def _generate_select(name, bitwidth):
-    antitokens_name = f"{name}_antitokens"
-    antitokens = _generate_antitokens(antitokens_name)
+def _generate_select(name, bitwidth, antitoken_depth):
 
     entity = f"""
 library ieee;
@@ -100,42 +51,142 @@ entity {name} is
 end entity;
 """
 
+    if antitoken_depth == 0:
+        return entity + _generate_join_architecture(name)
+
+    cnt_bitwidth = antitoken_depth.bit_length()
     architecture = f"""
 -- Architecture of selector
+-- trueValue is selected when condition = 1, falseValue when condition = 0.
+-- When the selector fires with one value while the token of the other value has
+-- not arrived yet, that token is owed to be killed when it arrives. Kills are
+-- owed to at most one of trueValue and falseValue at a time: a condition
+-- selecting a value waits at the head of the condition channel until all kills
+-- owed to that value are done, so the next token of that value is the one it
+-- selects.
+--   NORMAL     : no kill owed (cnt = 0)
+--   KILL_TRUE  : cnt trueValue tokens owed to be killed, falseValue may run ahead
+--   KILL_FALSE : cnt falseValue tokens owed to be killed, trueValue may run ahead
 architecture arch of {name} is
-  signal ee, validInternal : std_logic;
-  signal kill0, kill1      : std_logic;
-  signal antitokenStop     : std_logic;
-  signal g0, g1            : std_logic;
+  type state_t is (NORMAL, KILL_TRUE, KILL_FALSE);
+  signal state                       : state_t;
+  signal cnt                         : unsigned({cnt_bitwidth} - 1 downto 0);
+  signal killTrueOwed, killFalseOwed : std_logic;
+  signal full                        : std_logic;
+  signal selTrue, selFalse           : std_logic;
+  signal canTrue, canFalse           : std_logic;
+  signal fireTrue, fireFalse         : std_logic;
+  signal discardTrue, discardFalse   : std_logic;
 begin
 
-  ee            <= condition_valid and ((not condition(0) and falseValue_valid) or (condition(0) and trueValue_valid)); --condition(0) and one input
-  validInternal <= ee and not antitokenStop; -- propagate ee if not stopped by antitoken
+  killTrueOwed  <= '1' when state = KILL_TRUE else '0';
+  killFalseOwed <= '1' when state = KILL_FALSE else '0';
+  full          <= '1' when cnt = {antitoken_depth} else '0';
 
-  g0 <= not trueValue_valid and validInternal and result_ready;
-  g1 <= not falseValue_valid and validInternal and result_ready;
+  selTrue  <= condition_valid and condition(0);
+  selFalse <= condition_valid and not condition(0);
 
-  result_valid     <= validInternal;
-  trueValue_ready  <= (not trueValue_valid) or (validInternal and result_ready) or kill0; -- normal join or antitoken
-  falseValue_ready <= (not falseValue_valid) or (validInternal and result_ready) or kill1; --normal join or antitoken
-  condition_ready  <= (not condition_valid) or (validInternal and result_ready); --like normal join
+  -- Select a value if its next token is not owed a kill, and if firing does not
+  -- add a kill to the other value when that one is full
+  canTrue  <= selTrue and trueValue_valid and not killTrueOwed and
+              not (killFalseOwed and full and not falseValue_valid);
+  canFalse <= selFalse and falseValue_valid and not killFalseOwed and
+              not (killTrueOwed and full and not trueValue_valid);
+
+  fireTrue  <= canTrue and result_ready;
+  fireFalse <= canFalse and result_ready;
+
+  -- Kill an arriving token if a kill is owed to its value, or if the other value
+  -- is selected in the same cycle (normal join)
+  discardTrue  <= trueValue_valid and (killTrueOwed or fireFalse);
+  discardFalse <= falseValue_valid and (killFalseOwed or fireTrue);
+
+  result_valid     <= canTrue or canFalse;
+  trueValue_ready  <= (not trueValue_valid) or fireTrue or discardTrue;
+  falseValue_ready <= (not falseValue_valid) or fireFalse or discardFalse;
+  condition_ready  <= (not condition_valid) or fireTrue or fireFalse;
 
   result <= falseValue when (condition(0) = '0') else
             trueValue;
 
-  Antitokens : entity work.{antitokens_name}
-    port map(
-      clk, rst,
-      falseValue_valid, trueValue_valid,
-      kill1, kill0,
-      g1, g0,
-      antitokenStop
-    );
+  -- State and counter update:
+  --   - NORMAL -> KILL_TRUE with cnt = 1 when falseValue is selected and no
+  --     trueValue token is present to kill in the same cycle.
+  --   - KILL_TRUE: cnt + 1 when falseValue is selected and no trueValue token
+  --     is present, cnt - 1 when a trueValue token is killed and falseValue is
+  --     not selected, unchanged otherwise. Back to NORMAL when cnt reaches 0.
+  --   - NORMAL -> KILL_FALSE and KILL_FALSE are symmetric.
+  process (clk)
+  begin
+    if rising_edge(clk) then
+      if rst = '1' then
+        state <= NORMAL;
+        cnt   <= (others => '0');
+      else
+        case state is
+          when NORMAL =>
+            if fireFalse = '1' and trueValue_valid = '0' then
+              state <= KILL_TRUE;
+              cnt   <= to_unsigned(1, cnt'length);
+            elsif fireTrue = '1' and falseValue_valid = '0' then
+              state <= KILL_FALSE;
+              cnt   <= to_unsigned(1, cnt'length);
+            end if;
+          when KILL_TRUE =>
+            if fireFalse = '1' and trueValue_valid = '0' then
+              cnt <= cnt + 1;
+            elsif fireFalse = '0' and trueValue_valid = '1' then
+              cnt <= cnt - 1;
+              -- cnt still holds the old value: the last owed token is killed
+              -- and cnt becomes 0 together with the move to NORMAL
+              if cnt = 1 then
+                state <= NORMAL;
+              end if;
+            end if;
+          when KILL_FALSE =>
+            if fireTrue = '1' and falseValue_valid = '0' then
+              cnt <= cnt + 1;
+            elsif fireTrue = '0' and falseValue_valid = '1' then
+              cnt <= cnt - 1;
+              -- cnt still holds the old value: the last owed token is killed
+              -- and cnt becomes 0 together with the move to NORMAL
+              if cnt = 1 then
+                state <= NORMAL;
+              end if;
+            end if;
+        end case;
+      end if;
+    end if;
+  end process;
 
 end architecture;
 """
 
-    return antitokens + entity + architecture
+    return entity + architecture
+
+
+def _generate_join_architecture(name):
+    return f"""
+-- Architecture of selector with antitoken depth 0
+-- The selector waits for the condition and both data inputs, and consumes all
+-- three when the result is produced (join): no token is killed afterwards.
+architecture arch of {name} is
+  signal allValid, fire : std_logic;
+begin
+
+  allValid <= condition_valid and trueValue_valid and falseValue_valid;
+  fire     <= allValid and result_ready;
+
+  result_valid     <= allValid;
+  trueValue_ready  <= (not trueValue_valid) or fire;
+  falseValue_ready <= (not falseValue_valid) or fire;
+  condition_ready  <= (not condition_valid) or fire;
+
+  result <= falseValue when (condition(0) = '0') else
+            trueValue;
+
+end architecture;
+"""
 
 
 def _generate_concat(bitwidth: int, concat_layout: ConcatLayout):
@@ -217,14 +268,14 @@ def _generate_slice(bitwidth: int, concat_layout: ConcatLayout):
     return slice_assignments, slice_decls
 
 
-def _generate_select_signal_manager(name, bitwidth, extra_signals):
+def _generate_select_signal_manager(name, bitwidth, extra_signals, antitoken_depth):
     # Layout info for how extra signals are packed into one std_logic_vector
     concat_layout = ConcatLayout(extra_signals)
     extra_signals_total_bitwidth = concat_layout.total_bitwidth
 
     inner_name = f"{name}_inner"
     inner = _generate_select(inner_name, bitwidth +
-                             extra_signals_total_bitwidth)
+                             extra_signals_total_bitwidth, antitoken_depth)
 
     entity = generate_entity(name, [{
         "name": "condition",

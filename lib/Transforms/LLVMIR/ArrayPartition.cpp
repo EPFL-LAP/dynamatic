@@ -306,7 +306,7 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
   }
 
   if (!isa<GetElementPtrInst>(gepInst)) {
-    LLVM_DEBUG(gepInst->dump(););
+    LLVM_DEBUG(llvm::dbgs() << *gepInst << "\n";);
     llvm::report_fatal_error(
         "Trying to change the operands of an operation with unhandled type.");
   }

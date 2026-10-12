@@ -32,7 +32,13 @@ struct RemovePolygeistAttributesPass
     : public dynamatic::impl::RemovePolygeistAttributesBase<
           RemovePolygeistAttributesPass> {
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    dynamatic::NameAnalysis &namer = getAnalysis<dynamatic::NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     // Remove all attributes from the top-level module
     mlir::ModuleOp modOp = getOperation();
     for (NamedAttribute attr :
@@ -43,6 +49,12 @@ struct RemovePolygeistAttributesPass
       // Remove the llvm.linkage attribute from functions
       funcOp->removeAttr("llvm.linkage");
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(dynamatic::NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<dynamatic::NameAnalysis>();
   };
 };
 
