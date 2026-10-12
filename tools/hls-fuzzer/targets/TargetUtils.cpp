@@ -10,21 +10,34 @@ constexpr std::string_view SHELL = "bash";
 dynamatic::AbstractWorker::VerificationResult
 dynamatic::performDifferentialTesting(const std::filesystem::path &sourceFile,
                                       llvm::StringRef dynamaticPath,
-                                      std::optional<size_t> timeout) {
+                                      const DynamaticOptions &options) {
   // Create an 'execute.sh' that can additionally be used as a nice reproducer
   // for e.g. 'cvise'.
   std::filesystem::path parentPath = sourceFile.parent_path();
   std::string executeFile = (parentPath / EXECUTE_SCRIPT).string();
   llvm::cantFail(llvm::writeToOutput(
       executeFile, [&](llvm::raw_ostream &os) -> llvm::Error {
-        outputDynamaticInvocation(os, sourceFile, dynamaticPath,
-                                  llvm::formatv(R"(
-compile
+        outputDynamaticInvocation(
+            os, sourceFile, dynamaticPath,
+            llvm::formatv(R"(
+compile --buffer-algorithm {2}{1}
 write-hdl
 simulate --timeout {0}
 )",
-                                                timeout.value_or(0))
-                                      .str());
+                          options.timeout.value_or(0),
+                          options.instrumentII ? " --instrument-ii" : "",
+                          [&]() -> llvm::StringRef {
+                            switch (options.bufferAlgorithm) {
+                            case DynamaticOptions::OnMerges:
+                              return "on-merges";
+                            case DynamaticOptions::FPGA20:
+                              return "fpga20";
+                            case DynamaticOptions::FPL22:
+                              return "fpl22";
+                            }
+                            llvm_unreachable("all enum cases handled");
+                          }())
+                .str());
         return llvm::Error::success();
       }));
   return executeInWorkingDirectory(parentPath,
