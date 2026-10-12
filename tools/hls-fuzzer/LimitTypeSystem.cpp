@@ -1,8 +1,8 @@
 #include "LimitTypeSystem.h"
 
 dynamatic::ProbabilityTable<dynamatic::gen::AbstractTypeSystem::ExpressionKey>
-dynamatic::gen::LimitTypeSystem::getExpressionProbabilityTable(
-    const LimitTypingContext &context) {
+dynamatic::gen::details::DepthTypeSystem::getExpressionProbabilityTable(
+    const DepthTypingContext &context) {
   // Default probabilities for expressions.
   // Most expressions are 100 times more likely to be generated than a
   // constant.

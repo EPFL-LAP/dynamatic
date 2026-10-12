@@ -385,6 +385,13 @@ ast::operator<<(llvm::raw_ostream &os,
             << "] = " << arrayAssignmentStatement.getValueExpression() << ';';
 }
 
+llvm::raw_ostream &
+ast::operator<<(llvm::raw_ostream &os,
+                const ScalarAssignmentStatement &scalarAssignmentStatement) {
+  return os << scalarAssignmentStatement.getVariable() << " = "
+            << scalarAssignmentStatement.getValueExpression() << ';';
+}
+
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const Statement &statement) {
   return os << *statement.statement;

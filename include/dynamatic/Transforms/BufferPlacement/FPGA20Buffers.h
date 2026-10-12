@@ -49,7 +49,7 @@ public:
   /// ensuring that further calls to `optimize` fail.
   FPGA20Buffers(CPSolver::SolverKind solverKind, int timeout,
                 FuncInfo &funcInfo, const TimingDatabase &timingDB,
-                double targetPeriod, StringRef writeTo = "");
+                double targetPeriod, StringRef writeTo = "", bool ftd = false);
 
 protected:
   /// Interprets the MILP solution to derive buffer placement decisions. Since

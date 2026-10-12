@@ -510,6 +510,12 @@ LogicalResult StdExecuter::execute(mlir::math::AbsFOp op, std::vector<Any> &in,
   return success();
 }
 
+LogicalResult StdExecuter::execute(mlir::math::AbsIOp op, std::vector<Any> &in,
+                                   std::vector<Any> &out) {
+  out[0] = any_cast<APInt>(in[0]).abs();
+  return success();
+}
+
 LogicalResult StdExecuter::execute(mlir::arith::MaxSIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   APInt in0 = any_cast<APInt>(in[0]);
@@ -793,6 +799,7 @@ StdExecuter::StdExecuter(mlir::func::FuncOp &toplevel,
                 math::Log10Op,
                 math::SqrtOp,
                 math::AbsFOp,
+                math::AbsIOp,
                 memref::AllocOp,
                 memref::AllocaOp,
                 memref::LoadOp,

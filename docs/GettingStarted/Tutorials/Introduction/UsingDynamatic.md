@@ -88,7 +88,7 @@ Provide Dynamatic with the path to the C source code file under consideration. O
 dynamatic> set-src tutorials/Introduction/Ch1/loop_multiply.c
 ```
 > [!NOTE]
-> The frontend will assume that the C function to transform has the same name as the last component of the argument to `set-src` without the file extension, here `loop_multiply`.
+> The frontend assumes that the C function to transform has the same name as the name of the file given as argument to `set-src`, here `loop_multiply`.
 
 ### `compile`
 The first step towards generating the VHDL design is compilation. Here, 

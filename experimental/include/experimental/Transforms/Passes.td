@@ -16,7 +16,7 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
-def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-logic">  {
+def HandshakeCombineSteeringLogic : Pass<"handshake-combine-steering-logic", "mlir::ModuleOp"> {
   let summary = "Combine common steering logic between different handshake operations.";
   let description = [{
       Eliminates redundant steering units that have the same inputs but
@@ -24,8 +24,9 @@ def HandshakeCombineSteeringLogic : DynamaticPass< "handshake-combine-steering-l
       outputs. This is a simplification which comes immediately after the FTD 
       logic.
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
-def HandshakeStraightToQueue : DynamaticPass< "handshake-straight-to-queue">  {
+def HandshakeStraightToQueue : Pass<"handshake-straight-to-queue", "mlir::ModuleOp"> {
   let summary = "Use the FPGA'23 technique to allocate the basic blocks in the LSQs";
   let description = [{
     "Straight to the queue" allows to allocate the basic blocks in the LSQ 
@@ -74,7 +75,7 @@ def HandshakeSpecPostBuffer : Pass<"handshake-spec-post-buffer", "::mlir::Module
   let dependentDialects = ["handshake::HandshakeDialect"];
 }
 
-def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom"> {
+def HandshakePlaceBuffersCustom : Pass<"handshake-placebuffers-custom", "mlir::ModuleOp"> {
   let summary = "Place buffers on specific channels";
   let description = [{ Placing a single buffer on a specific output channel of
   a specfiic unit, this pass is useful for prototyping a custom placing pass
@@ -85,9 +86,10 @@ def HandshakePlaceBuffersCustom : DynamaticPass<"handshake-placebuffers-custom">
   	Option<"slots", "slots", "unsigned", "", "num of slots of buffer, range: anything > 0">,
   	Option<"type", "type", "std::string", "", "type of buffer">
   ];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
+def HandshakeSizeLSQs : Pass<"handshake-size-lsqs", "mlir::ModuleOp"> {
   let summary = "Size the LSQs based on the buffer placement information.";
   let description = [{
     Calculates the necessary Load-Store-Queue depths, based on the buffer placement information, 
@@ -102,9 +104,10 @@ def HandshakeSizeLSQs : DynamaticPass<"handshake-size-lsqs"> {
       "Three different cases for memory collsions: none/half/full">,
       Option<"targetCP", "target-period", "double", "4.0",
       "Target clock period for the LSQ pass">];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
+def HandshakeRigidification : Pass<"handshake-rigidification", "mlir::ModuleOp"> {
   let summary = "Simplifies handshake logic";
   let description = [{
     The pass uses the insights gathered from model checking stored in the property database
@@ -113,6 +116,20 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
   }];
   let options = [ Option<"jsonPath", "json-path", "std::string", "",
     "Path to JSON-formatted file where the properties' information is stored.">];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
+
+def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir::ModuleOp"> {
+  let summary = "Value prediction from a compile-time-fixed finite list.";
+  let description = [{
+    The pass duplicates a sequence of operations, replacing a variable operand with a 
+    predicted constant value. It identifies the exact operations to duplicate by using 
+    custom pragmas, which also specify the target variable and give a finite list for its 
+    predicted constant values. This makes it possible to convert data dependencies to control
+    flow dependencies. It can be run with compile and the flag "--enable-duplication".
+  }];
+}
+
+
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

@@ -63,7 +63,7 @@ struct HandshakeSizeLSQsPass
 
   using HandshakeSizeLSQsBase::HandshakeSizeLSQsBase;
 
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 private:
   // There is a offset between the arrival time of the arguments and the actual
@@ -142,7 +142,13 @@ private:
 };
 } // namespace
 
-void HandshakeSizeLSQsPass::runDynamaticPass() {
+void HandshakeSizeLSQsPass::runOnOperation() {
+  // Make sure all operation names are unique and haven't changed from what is
+  // cached (if anything is cached)
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  if (!namer.isAnalysisValid())
+    return signalPassFailure();
+
   llvm::SmallVector<LSQSizingResult> sizingResults;
 
   // Read component latencies
@@ -232,6 +238,12 @@ void HandshakeSizeLSQsPass::runDynamaticPass() {
       setDialectAttr(lsqOp, lsqDepthAttr);
     }
   }
+
+  // Make sure all operation names are still unique and name operations that
+  // do not currently have a name
+  if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+  markAnalysesPreserved<NameAnalysis>();
 }
 
 std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(

@@ -23,6 +23,9 @@ MILP_SOLVER=${13}
 STRAIGHT_TO_QUEUE=${14}
 SPECULATION=${15}
 ENABLE_SHORT_CIRCUIT=${16}
+ENABLE_DUPLICATION=${17:-0}
+CALCULATE_PATH_DELAYS=${18}
+INSTRUMENT_II=${19}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -46,10 +49,12 @@ F_C_REWRITTEN="$COMP_DIR/$KERNEL_NAME.c"
 
 F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
-F_CLANG_OPTIMIZED_DEPENDENCY="$COMP_DIR/clang.opt.dep.ll"
-
+F_CLANG_OPTIMIZED_PARTITIONED="$COMP_DIR/clang.opt.part.ll"
+F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY="$COMP_DIR/clang.opt.part.dep.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
+F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
+F_CF_DUPLICATED="$COMP_DIR/cf_duplicated.mlir"
 F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED="$COMP_DIR/cf_transformed_mem_interface_marked.mlir"
 F_PROFILER_BIN="$COMP_DIR/$KERNEL_NAME-profile"
 F_PROFILER_INPUTS="$COMP_DIR/profiler-inputs.txt"
@@ -105,11 +110,10 @@ export_cfg() {
 }
 
 # ============================================================================ #
-# Compilation flow
-# ============================================================================ #
 
 # Reset output directory
-rm -rf "$COMP_DIR" && mkdir -p "$COMP_DIR"
+rm -rf "$OUTPUT_DIR"/*/
+mkdir -p "$COMP_DIR"
 
 cp "$F_C_SOURCE" "$F_C_REWRITTEN"
 exit_on_fail "Failed to copy C source into $COMP_DIR" "Copied C source"
@@ -131,6 +135,8 @@ $DYNAMATIC_BINS/clang -O0 -funroll-loops -S -emit-llvm "$F_C_REWRITTEN" \
   -I "$DYNAMATIC_DIR/include"  \
   -I "$SRC_DIR" \
   -I "$DYNAMATIC_DIR/build/include/clang_headers" \
+  -Werror=uninitialized \
+  -Werror=shadow \
   -fplugin="$DYNAMATIC_DIR/build/lib/DynPragmasPlugin.so" \
   -Xclang \
   -ffp-contract=off \
@@ -159,6 +165,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # Here is a brief summary of what each llvm pass does:
 # - inline: Inlines the function calls.
 # - mem2reg: Promote allocas (allocate memory on the heap) into regs.
+# - gvn: remove redundant instructions using global value numbering, also removes redundant load operations. 
 # - lowerswitch: Convert switch case into branches.
 # - instcombine: combine operations. Needed to canonicalize a chain of GEPs.
 # - loop-rotate: canonicalize loops to do-while loops
@@ -175,7 +182,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -203,17 +210,38 @@ exit_on_fail "Failed to apply optimization to LLVM IR" \
 # - ArrayParititon pass currently breaks the SCoP analysis in Polly. Therefore,
 # we need to first attach analysis results to memory ops and then apply memory
 # bank partition.
+
+# NOTE: Currently array-partition is a super pass, performing multiple transforms, 
+# as seen in lib/Transforms/LLVMIR/ArrayPartition.cpp.
+# The passes performed are: 
+# indvars,loop-unroll,array-partition,guard-load-store,\
+# instcombine,always-inline,sccp,simplifycfg,sroa,mem2reg,adce,lower-switch
+#
+# NOTE: This was done to ensure that these additional transforms may happen conditionally,
+# i.e. if and only if the array partition pragma was actually used. Performing the
+# passes unconditionally broke performance tests (due to unexpected unrolling, 
+# select instead of branches, etc.) or created issues for the llvm -> mlir translation
+# by introducing unsupported instructions.
+$LLVM_OPT -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/ArrayPartition.so" \
+  -passes="array-partition" \
+  -polly-process-unprofitable \
+  "$F_CLANG_OPTIMIZED" \
+  > "$F_CLANG_OPTIMIZED_PARTITIONED"
+exit_on_fail "Failed to perform array partitioning in LLVM IR" \
+  "Applied memory partitioning pass to LLVM IR"
+
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/MemDepAnalysis.so" \
   -passes="mem-dep-analysis" \
   -polly-process-unprofitable \
-  "$F_CLANG_OPTIMIZED" \
-  > "$F_CLANG_OPTIMIZED_DEPENDENCY"
+  "$F_CLANG_OPTIMIZED_PARTITIONED" \
+  > "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY"
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
 $LLVM_TO_STD_TRANSLATION_BIN \
-  "$F_CLANG_OPTIMIZED_DEPENDENCY" \
+  "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
@@ -235,20 +263,45 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
-  --consume-producer-output-attr-marker \
+  --sort-blocks-rpo \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
 
+# duplicate parts of the operations specified by pragmas
+if [[ "$ENABLE_DUPLICATION" == "1" ]]; then
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --predicted-constant-duplication \
+  --canonicalize \
+  > "$F_CF_DUPLICATED"
+exit_on_fail "Failed to apply CF duplication" \
+  "Applied CF duplication"
+F_CF_TRANSFORMED="$F_CF_DUPLICATED"
+fi
+
+# consume the markers
+$DYNAMATIC_OPT_BIN \
+  --allow-unregistered-dialect \
+  "$F_CF_TRANSFORMED" \
+  --consume-producer-output-attr-marker \
+  > "$F_CF_CONSUMED_PRAGMARKERS"
+exit_on_fail "Failed to consume markers" \
+  "Consumed markers successfully"
+
+
 if [[ $DISABLE_LSQ -ne 0 ]]; then
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --force-memory-interface="force-mc=true" \
+    --sort-blocks-rpo \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_TRANSFORMED" \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --mark-memory-interfaces \
+    --sort-blocks-rpo \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
     "Marked memory accesses with the corresponding interfaces in cf"
@@ -286,7 +339,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE" \
     --handshake-remove-unused-memrefs \
     --handshake-optimize-bitwidths \
-    --handshake-materialize="replicate-constant=true" --handshake-infer-basic-blocks \
+    --handshake-materialize --handshake-infer-basic-blocks \
     > "$F_HANDSHAKE_TRANSFORMED"
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
@@ -354,15 +407,21 @@ else
   # Smart buffer placement
   echo_info "Running smart buffer placement with CP = $TARGET_CP and algorithm = '$BUFFER_ALGORITHM'"
   cd "$COMP_DIR"
+  if [[ "$CALCULATE_PATH_DELAYS" == "1" ]]; then
+    CALCULATE_PATH_DELAYS_FLAG="calculate-path-delays"
+  else
+    CALCULATE_PATH_DELAYS_FLAG=""
+  fi
   # To enable debug information, make sure that Dynamatic is built with Debug
   # mode and add "--debug-only=<DEBUG_TYPE>" to the binary call below. Check
   # out the value of <DEBUG_TYPE> in the cpp source files.
   "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_TRANSFORMED" \
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
-    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP timeout=300 dump-milp-models \
+    --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$FAST_TOKEN_DELIVERY \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
     ${SHARING_PASS:+"$SHARING_PASS"} \
+    --handshake-size-select-depth \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null
@@ -384,18 +443,20 @@ exit_on_fail "Failed to generate handshake_export" "Generated handshake_export"
 export_dot "$F_HANDSHAKE_EXPORT" "$KERNEL_NAME"
 export_cfg "$F_CF_TRANSFORMED" "${KERNEL_NAME}_CFG"
 
+LOWER_TO_HW_PASS="--lower-handshake-to-hw=instrument-ii=${INSTRUMENT_II:-0}"
+
 if [[ $USE_RIGIDIFICATION -ne 0 ]]; then
   # rigidification
   bash "$RIGIDIFICATION_SH" "$DYNAMATIC_DIR" "$OUTPUT_DIR" "$KERNEL_NAME" "$F_HANDSHAKE_EXPORT" "$F_HANDSHAKE_RIGIDIFIED" "$USE_K_INDUCTION"
   exit_on_fail "Failed to rigidify" "Rigidification completed"
 
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_RIGIDIFIED" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 else
   # handshake level -> hw level
-  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" --lower-handshake-to-hw \
+  "$DYNAMATIC_OPT_BIN" "$F_HANDSHAKE_EXPORT" $LOWER_TO_HW_PASS \
     > "$F_HW"
   exit_on_fail "Failed to lower to HW" "Lowered to HW"
 fi

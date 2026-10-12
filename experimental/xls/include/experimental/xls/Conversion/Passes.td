@@ -20,13 +20,13 @@ include "mlir/Pass/PassBase.td"
 // HandshakeToXls
 //===----------------------------------------------------------------------===//
 
-def HandshakeToXls : DynamaticPass<"lower-handshake-to-xls",
-                                  ["mlir::xls::XlsDialect"]> {
+def HandshakeToXls : Pass<"lower-handshake-to-xls", "mlir::ModuleOp"> {
   let summary = "Lowers Handshake to XLS.";
   let description = [{
     Lowers Handshake IR into a network of XLS procs connected by channels.
   }];
   let constructor = "dynamatic::experimental::xls::createHandshakeToXlsPass()";
+  let dependentDialects = ["mlir::xls::XlsDialect", "dynamatic::handshake::HandshakeDialect"];
 }
 
 #endif // XLS_CONVERSION_PASSES_TD

@@ -1,5 +1,5 @@
-#include "sparse.h"
 #include "dynamatic/Integration.h"
+#include "sparse.h"
 #include "stdlib.h"
 
 float sparse(in_float_t a[N], in_float_t x[N]) {

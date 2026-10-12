@@ -64,7 +64,7 @@ struct HandshakeAnnotatePropertiesPass
 
   using HandshakeAnnotatePropertiesBase::HandshakeAnnotatePropertiesBase;
 
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 private:
   unsigned int uid;
@@ -998,7 +998,13 @@ LogicalResult HandshakeAnnotatePropertiesPass::annotateQueriedProperties(
   return success();
 }
 
-void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
+void HandshakeAnnotatePropertiesPass::runOnOperation() {
+  // Make sure all operation names are unique and haven't changed from what is
+  // cached (if anything is cached)
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  if (!namer.isAnalysisValid())
+    return signalPassFailure();
+
   ModuleOp modOp = getOperation();
   auto iogs = findAllIOGs(modOp);
   llvm::DenseSet<SinkOp> sinks;
@@ -1022,11 +1028,17 @@ void HandshakeAnnotatePropertiesPass::runDynamaticPass() {
       }
     }
   }
-  getAnalysis<NameAnalysis>().nameAllUnnamedOps();
+  namer.nameAllUnnamedOps();
 
   if (failed(annotateQueriedProperties(iogs))) {
     return signalPassFailure();
   }
+
+  // Make sure all operation names are still unique and name operations that
+  // do not currently have a name
+  if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+  markAnalysesPreserved<NameAnalysis>();
 
   llvm::json::Value jsonVal(std::move(propertyTable));
 

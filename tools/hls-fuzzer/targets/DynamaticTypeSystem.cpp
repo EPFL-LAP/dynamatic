@@ -49,13 +49,12 @@ dynamatic::gen::DynamaticTypeSystem::getBinaryExpressionTransferFns(
   case ast::BinaryExpression::BitXor:
   case ast::BinaryExpression::ShiftLeft:
   case ast::BinaryExpression::ShiftRight:
-    return {
-        TransferFn<ast::BinaryExpression>(
-            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
-        TransferFn<ast::BinaryExpression>(
-            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired}),
-        OutputTransferFn<ast::BinaryExpression>::outputConstant(
-            DynamaticTypingContext{DynamaticTypingContext::IntegerRequired})};
+    return {TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            TransferFn<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired}),
+            OutputTransferFn<ast::BinaryExpression>(DynamaticTypingContext{
+                DynamaticTypingContext::IntegerRequired})};
   case ast::BinaryExpression::Plus:
   case ast::BinaryExpression::Minus:
   case ast::BinaryExpression::Mul:

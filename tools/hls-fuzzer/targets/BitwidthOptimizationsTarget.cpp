@@ -2,6 +2,7 @@
 
 #include "BitwidthTypeSystem.h"
 #include "TargetUtils.h"
+#include "TerminationTypeSystem.h"
 #include "hls-fuzzer/BasicCGenerator.h"
 #include "hls-fuzzer/ConjunctionTypeSystem.h"
 #include "hls-fuzzer/LimitTypeSystem.h"
@@ -46,12 +47,12 @@ void BitwidthOptimizationsGenerator::generate(llvm::raw_ostream &os,
                                               llvm::StringRef functionName) {
   // Enforce a strict bitwidth requirement for the entire program.
   maxBitwidth = random.getInteger<std::uint8_t>(1, 32);
-  gen::ConjunctionTypeSystem<gen::BitwidthTypeSystem, gen::LimitTypeSystem>
-      bitwidthTypeSystem(gen::BitwidthTypeSystem(maxBitwidth, random),
-                         gen::LimitTypeSystem());
-  gen::BasicCGenerator generator(random, bitwidthTypeSystem,
-                                 /*entryContext=*/
-                                 {gen::BitwidthTypingContext{maxBitwidth}, {}});
+  gen::ConjunctionTypeSystem<gen::TerminationTypeSystem, gen::LimitTypeSystem>
+      bitwidthTypeSystem{gen::TerminationTypeSystem(random),
+                         gen::LimitTypeSystem(random)};
+  gen::BasicCGenerator generator(
+      random, bitwidthTypeSystem,
+      /*entryContext=*/{{gen::BitwidthTypingContext{maxBitwidth}, {}}, {}});
 
   generator.generate(os, functionName);
 }

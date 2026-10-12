@@ -4,6 +4,10 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t absf -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.absi",
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t absi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+  },
+  {
     "name": "handshake.addf",
     "parameters": [
       {
@@ -136,6 +140,19 @@
     ]
   },
   {
+    "name": "handshake.remui",
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t remui -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "vitis_hls_cores"
+    ]
+  },
+  {
     "name": "handshake.divui",
     "parameters": [
       {
@@ -201,7 +218,13 @@
   },
   {
     "name": "handshake.select",
-    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t select -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
+    "parameters": [
+      {
+        "name": "ANTITOKEN_DEPTH",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t select -p bitwidth=$BITWIDTH antitoken_depth=$ANTITOKEN_DEPTH extra_signals=$EXTRA_SIGNALS"
   },
   {
     "name": "handshake.subf",
@@ -459,6 +482,16 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shrsi -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.init",
+    "parameters": [
+      {
+        "name": "INITIAL_VALUE",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t init -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS initial_value=$INITIAL_VALUE"
+  },
+  {
     "name": "handshake.shrui",
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t shrui -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
@@ -583,5 +616,15 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd"
+  },
+  {
+    "name": "ii_monitor",
+    "parameters": [
+      { "name": "LOOP_DEPTH", "type": "unsigned", "lb": 1 },
+      { "name": "LOOP_MAX_DEPTH", "type": "unsigned", "lb": 1 },
+      { "name": "INIT_SELECTS", "type": "string" }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t ii_monitor -p loop_depth=$LOOP_DEPTH loop_max_depth=$LOOP_MAX_DEPTH init_selects='$INIT_SELECTS' sel_bitwidths=$SEL_BITWIDTHS sel_extra_signals=$SEL_EXTRA_SIGNALS",
+    "hdl": "vhdl"
   }
 ]

@@ -31,7 +31,7 @@ module divsi #(
     .outs_valid (join_valid)
   );
 
-  divsi_vitis_hls_wrapper ip (
+  divsi_vitis_hls_wrapper #(.DATA_TYPE(DATA_TYPE)) ip (
       .clk(clk),
       .reset(rst),
       .din0(lhs),
@@ -49,8 +49,22 @@ module divsi #(
     .outs_ready(result_ready)
   ); 
 
+  //  FIXME: The latency of the long division depends on the bitwidth, but it
+  //  was hardcoded to 35 in the performance model.
+  // 
+  //  Here, we use the actual latency of the Vitis IP (see below for the
+  //  formula). This wouldn't change most of our benchmarks in the integration
+  //  tests (they use 32-bit division in any case), but we need to remember to
+  //  change the timing model to reflect this.
+  //  The long division algorithm in the Vitis IP needs:
+  //  2 cycles from the input/output regs
+  //  1 cycle from the input reg of the division unit
+  //  BITWIDTH number for the actual division.
+  //
+  //  delay_buffer should have total_latency - 1 cycle of latency (and OEHB
+  //  gives the remaining one)
   delay_buffer #(
-    .SIZE(34)
+    .SIZE(DATA_TYPE + 2)
   ) buff (
     .clk(clk),
     .rst(rst),
@@ -68,21 +82,23 @@ endmodule
 // > 32 (divider regs) 
 // > 1 (input reg of the divider)
 
-module divsi_vitis_hls_wrapper (
+module divsi_vitis_hls_wrapper #(
+  parameter DATA_TYPE = 32
+)(
     input  wire        clk,
     input  wire        reset,
     input  wire        ce,
-    input  wire [31:0] din0,
-    input  wire [31:0] din1,
-    output wire [31:0] dout
+    input  wire [DATA_TYPE-1:0] din0,
+    input  wire [DATA_TYPE-1:0] din1,
+    output wire [DATA_TYPE-1:0] dout
 );
 
-    wire [31:0] sig_remd;
+    wire [DATA_TYPE-1:0] sig_remd;
 
     dynamatic_units_sdiv_32ns_32ns_32_36_1_div #(
-        .in0_WIDTH(32),
-        .in1_WIDTH(32),
-        .out_WIDTH(32)
+        .in0_WIDTH(DATA_TYPE),
+        .in1_WIDTH(DATA_TYPE),
+        .out_WIDTH(DATA_TYPE)
     ) u_divwrapper (
         .clk(clk),
         .reset(reset),

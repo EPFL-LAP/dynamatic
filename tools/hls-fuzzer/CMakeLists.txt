@@ -12,6 +12,7 @@ add_llvm_library(DynamaticHLSFuzzer
         AST.cpp
         BasicCGenerator.cpp
         Randomly.cpp
+        Reproducer.cpp
         TypeSystem.cpp
         PARTIAL_SOURCES_INTENDED
 )
@@ -27,10 +28,14 @@ add_llvm_executable(hls-fuzzer
         Options.cpp
         OptionsParser.cpp
         TargetRegistry.cpp
+        statistics/ASTStatistic.cpp
         targets/BitwidthOptimizationsTarget.cpp
         targets/BitwidthTypeSystem.cpp
         targets/DynamaticTypeSystem.cpp
+        targets/LSQNoDepTypeSystem.cpp
+        targets/LSQOptimizationsTarget.cpp
         targets/RandomCTarget.cpp
+        targets/TerminationTypeSystem.cpp
         targets/TargetUtils.cpp
 )
 llvm_update_compile_flags(hls-fuzzer)

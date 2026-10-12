@@ -7,13 +7,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "gemver.h"
 #include "dynamatic/Integration.h"
 #include <stdlib.h>
 
-void gemver(in_int_t alpha, in_int_t beta, in_int_t u1[N], in_int_t v1[N],
-            in_int_t u2[N], in_int_t v2[N], in_int_t y[N], in_int_t z[N],
-            inout_int_t a[N][N], inout_int_t w[N], inout_int_t x[N]) {
+#define N 30
+
+void gemver(int alpha, int beta, int u1[N], int v1[N], int u2[N], int v2[N],
+            int y[N], int z[N], int a[N][N], int w[N], int x[N]) {
   for (unsigned i = 0; i < N; i++)
     for (unsigned j = 0; j < N; j++)
       a[i][j] = a[i][j] + u1[i] * v1[j] + u2[i] * v2[j];
@@ -37,17 +37,17 @@ void gemver(in_int_t alpha, in_int_t beta, in_int_t u1[N], in_int_t v1[N],
 }
 
 int main(void) {
-  in_int_t alpha;
-  in_int_t beta;
-  in_int_t u1[N];
-  in_int_t v1[N];
-  in_int_t u2[N];
-  in_int_t v2[N];
-  in_int_t y[N];
-  in_int_t z[N];
-  inout_int_t a[N][N];
-  inout_int_t w[N];
-  inout_int_t x[N];
+  int alpha;
+  int beta;
+  int u1[N];
+  int v1[N];
+  int u2[N];
+  int v2[N];
+  int y[N];
+  int z[N];
+  int a[N][N];
+  int w[N];
+  int x[N];
 
   alpha = rand() % 20;
   beta = rand() % 20;
@@ -60,8 +60,8 @@ int main(void) {
     x[yy] = rand() % 20;
     y[yy] = rand() % 20;
     z[yy] = rand() % 20;
-    for (unsigned x = 0; x < N; ++x)
-      a[yy][x] = rand() % 10;
+    for (unsigned xx = 0; xx < N; ++xx)
+      a[yy][xx] = rand() % 10;
   }
 
   CALL_KERNEL(gemver, alpha, beta, u1, v1, u2, v2, y, z, a, w, x);

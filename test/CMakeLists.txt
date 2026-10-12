@@ -10,6 +10,7 @@ set(DYNAMATIC_TEST_DEPENDS
   split-file
   dynamatic-opt
   export-rtl
+  hls-fuzzer
   hls-fuzzer-check-bitwidth
   translate-llvm-to-std
   source-rewriter

@@ -150,23 +150,33 @@ static bool followToBlock(Operation *op, unsigned &bb,
 }
 
 /// Determines whether the operation is of a nature which can be traversed
-/// outside blocks during backedge identification.
-static inline bool canGoThroughOutsideBlocks(Operation *op) {
+/// backwards during backedge source identification.
+static inline bool canBacktrackToLoopSourceThrough(Operation *op) {
   return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
              handshake::TruncIOp>(op);
 }
 
-/// Attempts to backtrack through forks and bitwidth modification operations
-/// till reaching a branch-like operation. On success, returns the branch-like
-/// operation that was backtracked to (or the passed operation if it was itself
-/// branch-like); otherwise, returns nullptr.
-static Operation *backtrackToBranch(Operation *op) {
+/// Determines whether the operation is of a nature which can be traversed
+/// forwards during backedge destination identification.
+static inline bool canFollowToMergeThrough(Operation *op, bool ftd) {
+  return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+             handshake::TruncIOp>(op) ||
+         (ftd && isa<handshake::NotIOp>(op));
+}
+
+/// Attempts to backtrack through source-transparent operations till reaching
+/// an operation that can act as the source of loop feedback within a block. On
+/// success, returns that operation (or the passed operation if it was itself
+/// such a source); otherwise, returns nullptr.
+static Operation *backtrackToLoopSource(Operation *op, bool ftd) {
   do {
     if (!op)
       break;
     if (isa<handshake::BranchOp, handshake::ConditionalBranchOp>(op))
       return op;
-    if (canGoThroughOutsideBlocks(op))
+    if (ftd && isa<handshake::CmpIOp, handshake::CmpFOp>(op))
+      return op;
+    if (canBacktrackToLoopSourceThrough(op))
       op = op->getOperand(0).getDefiningOp();
     else
       break;
@@ -175,20 +185,20 @@ static Operation *backtrackToBranch(Operation *op) {
 }
 
 /// Attempts to follow the def-use chains of all the operation's results through
-/// forks and bitwidth modification operations till reaching merge-like
-/// operations that all belong to the same basic block. On success, returns one
-/// of the merge-like operations reached by a def-use chain (or the passed
-/// operation if it was itself merge-like); otherwise, returns nullptr.
-static Operation *followToMerge(Operation *op) {
-  if (isa<handshake::MergeLikeOpInterface>(op))
+/// destination-transparent operations till reaching merge-like operations that
+/// all belong to the same basic block. On success, returns one of the
+/// merge-like operations reached by a def-use chain (or the passed operation if
+/// it was itself merge-like); otherwise, returns nullptr.
+static Operation *followToMerge(Operation *op, bool ftd) {
+  if (isa<handshake::InitOp, handshake::MergeLikeOpInterface>(op))
     return op;
-  if (canGoThroughOutsideBlocks(op)) {
+  if (canFollowToMergeThrough(op, ftd)) {
     // All users of the operation's results must lead to merges within a unique
     // block
     SmallVector<Operation *> mergeOps;
     for (OpResult res : op->getResults()) {
       for (Operation *user : res.getUsers()) {
-        Operation *op = followToMerge(user);
+        Operation *op = followToMerge(user, ftd);
         if (!op)
           return nullptr;
         mergeOps.push_back(op);
@@ -229,7 +239,8 @@ bool dynamatic::getBBEndpoints(Value val, BBEndpoints &endpoints) {
   return getBBEndpoints(val, *users.begin(), endpoints);
 }
 
-bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
+bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints,
+                           bool ftd) {
   // Get the value's BB endpoints
   BBEndpoints bbs;
   if (!getBBEndpoints(val, user, bbs))
@@ -245,27 +256,27 @@ bool dynamatic::isBackedge(Value val, Operation *user, BBEndpoints *endpoints) {
     return false;
 
   // If both source and destination blocks are identical, the edge must be
-  // located between a branch-like operation and a merge-like operation
-  Operation *brOp = backtrackToBranch(val.getDefiningOp());
-  if (!brOp)
+  // located between a loop-feedback source and a merge-like operation.
+  Operation *srcOp = backtrackToLoopSource(val.getDefiningOp(), ftd);
+  if (!srcOp)
     return false;
-  Operation *mergeOp = followToMerge(user);
+  Operation *mergeOp = followToMerge(user, ftd);
   if (!mergeOp)
     return false;
 
-  // Check that the branch and merge are part of the same block indicated by the
+  // Check that the source and merge are part of the same block indicated by the
   // edge's BB endpoints (should be the case in all non-degenerate cases)
-  std::optional<unsigned> brBB = getLogicBB(brOp);
+  std::optional<unsigned> srcBB = getLogicBB(srcOp);
   std::optional<unsigned> mergeBB = getLogicBB(mergeOp);
-  return brBB.has_value() && mergeBB.has_value() && *brBB == *mergeBB &&
-         *brBB == bbs.srcBB;
+  return srcBB.has_value() && mergeBB.has_value() && *srcBB == *mergeBB &&
+         *srcBB == bbs.srcBB;
 }
 
-bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints) {
+bool dynamatic::isBackedge(Value val, BBEndpoints *endpoints, bool ftd) {
   auto users = val.getUsers();
   assert(std::distance(users.begin(), users.end()) == 1 &&
          "value must have a single user");
-  return isBackedge(val, *users.begin(), endpoints);
+  return isBackedge(val, *users.begin(), endpoints, ftd);
 }
 
 namespace {

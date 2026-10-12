@@ -21,7 +21,7 @@ include "dynamatic/Support/Passes.td"
 // Arith passes
 //===----------------------------------------------------------------------===//
 
-def ArithReduceStrength : DynamaticPass<"arith-reduce-strength"> {
+def ArithReduceStrength : Pass<"arith-reduce-strength", "mlir::ModuleOp"> {
   let summary = "Strength reduction of arithmetic operations";
   let description = [{
     Performs strength reduction on arithmetic operations in the context of
@@ -35,13 +35,14 @@ def ArithReduceStrength : DynamaticPass<"arith-reduce-strength"> {
             "other when replacing a multiplication with a tree of adders. "
             "Above this number, we consider that there would be no desirable "
             "performance/area advantage to replace the multiplication.">];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//
 // SCF passes
 //===----------------------------------------------------------------------===//
 
-def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
+def ScfForLoopRotation : Pass<"scf-rotate-for-loops", "mlir::ModuleOp"> {
   let summary = "Transforms eligible for loops into do-while's";
   let description = [{
     Rotates for loops, semantically transforming them into do-while's, whenever
@@ -49,10 +50,10 @@ def ScfForLoopRotation : DynamaticPass<"scf-rotate-for-loops"> {
     the std level usually has one less basic block than the original for loop
     would have had, which ultimately reduces the area of the final circuit.
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
-                                        ["mlir::arith::ArithDialect"]> {
+def ScfSimpleIfToSelect : Pass<"scf-simple-if-to-select", "mlir::ModuleOp"> {
   let summary = "Transforms if's with simple bodies into select's.";
   let description = [{
     Transforms scf::IfOp operations with one result and a specific internal
@@ -71,6 +72,7 @@ def ScfSimpleIfToSelect : DynamaticPass<"scf-simple-if-to-select",
         if applicable, the value used as one of the operands of the arithmetic
         operation.
   }];
+  let dependentDialects = ["mlir::arith::ArithDialect", "dynamatic::handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//
@@ -88,7 +90,7 @@ def FuncMaximizeSSA : Pass<"func-maximize-ssa", "::mlir::func::FuncOp"> {
   }];
 }
 
-def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
+def FuncSetArgNames : Pass<"func-set-arg-names", "mlir::ModuleOp"> {
   let summary = "Replace function argument names with original ones from C";
   let description = [{
     The pass uses clang's C API to parse the original source code and replaces
@@ -98,6 +100,7 @@ def FuncSetArgNames : DynamaticPass<"func-set-arg-names"> {
   let options =
     [Option<"source", "source", "std::string", "",
             "Path to source C file from which the IR was generated.">];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//
@@ -121,7 +124,7 @@ def HandshakeDeactivateMemDependencies : Pass<"handshake-deactivate-mem-dependen
   }];
 }
 
-def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
+def HandshakeCanonicalize : Pass<"handshake-canonicalize", "mlir::ModuleOp"> {
   let summary = "Canonicalize Handshake operations.";
   let description = [{
     Canonicalizes and folds all Handshake operations in the module using a
@@ -129,9 +132,10 @@ def HandshakeCanonicalize : DynamaticPass<"handshake-canonicalize"> {
     status i.e., it inserts forks and sinks as needed to compensate for changes
     made to the IR.
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> {
+def HandshakeHoistExtInstances : Pass<"handshake-hoist-ext-instances", "mlir::ModuleOp"> {
   let summary = "Hoist external function instances into top-level IO.";
   let description = [{
     Replaces instances (`handshake::InstanceOp`) of external Handshake functions
@@ -139,9 +143,27 @@ def HandshakeHoistExtInstances : DynamaticPass<"handshake-hoist-ext-instances"> 
     functions. This is the equivalent of moving RTL modules from inside the
     Handshake function to outside of it.       
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
+def HandshakeSizeSelectDepth
+    : Pass<"handshake-size-select-depth", "mlir::ModuleOp"> {
+  let summary = "Size the antitoken depth of selects from the CFDFC II.";
+  let description = [{
+    For each `handshake::SelectOp` inside a CFDFC, takes the lowest II among
+    the CFDFCs (from the `handshake.cfdfcThroughput` and
+    `handshake.cfdfcToBBList` function attributes set by buffer placement) that
+    contain the select's basic block. Then finds the closest fork that is an
+    ancestor of both data inputs of the select, computes the maximum latency
+    from that fork to each data input, and sets the select's `antitokenDepth`
+    attribute to ceil(|latency_true - latency_false| / II), i.e., how many
+    iterations the faster data input may run ahead of the slower one. Equal
+    latencies give a depth of 0, which makes the select a join. Selects outside
+    of any CFDFC, or without a common ancestor fork, are left unchanged.
+  }];
+}
+
+def HandshakeInferBasicBlocks : Pass<"handshake-infer-basic-blocks", "mlir::ModuleOp"> {
   let summary = "Try to infer the basic block of untagged operations.";
   let description = [{
     Attempts to infer the logical basic block of all operations inside
@@ -152,6 +174,7 @@ def HandshakeInferBasicBlocks : DynamaticPass<"handshake-infer-basic-blocks"> {
     `dynamatic::BB_ATTR_NAME` on the operation. This pass does not fail, even
     when it does not manage to infer the basic block of all operations.
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 def ConsumeProducerOutputAttrMarker
@@ -168,7 +191,7 @@ def ConsumeProducerOutputAttrMarker
   }];
 }
 
-def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
+def HandshakeMaterialize : Pass<"handshake-materialize", "mlir::ModuleOp"> {
   let summary = "Materializes forks and sinks into the IR.";
   let description = [{
     Ensures that every SSA value within Handshake functions is used exactly once
@@ -180,10 +203,10 @@ def HandshakeMaterialize : DynamaticPass<"handshake-materialize"> {
   }];
   let options = [Option<"replicateConstants", "replicate-constant", "bool", "false",
             "If true, replicate all the source->constant per each use.">];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths", 
-                                                ["mlir::arith::ArithDialect"]> {
+def HandshakeOptimizeBitwidths : Pass<"handshake-optimize-bitwidths", "mlir::ModuleOp"> {
   let summary = "Optimize bitwidths of all channels.";
   let description = [{
     Reduces the bitwidths of channels wherever possible. Uses a standard
@@ -195,11 +218,10 @@ def HandshakeOptimizeBitwidths : DynamaticPass< "handshake-optimize-bitwidths",
   let statistics = [
     Statistic<"bitwidthReduced", "Bitwidth reduced", "Number of operations whose bitwidth was reduced">,
   ];
+  let dependentDialects = ["mlir::arith::ArithDialect", "dynamatic::handshake::HandshakeDialect"];
 }
 
-def HandshakeReplaceMemoryInterfaces : DynamaticPass<
-  "handshake-replace-memory-interfaces"
-> {
+def HandshakeReplaceMemoryInterfaces : Pass<"handshake-replace-memory-interfaces", "mlir::ModuleOp"> {
   let summary = "Place memory interfaces according to memoty port annotations.";
   let description = [{
     Inspects the `handshake::MemDependenceAttr` attributes on LSQ memory ports
@@ -219,6 +241,7 @@ def HandshakeReplaceMemoryInterfaces : DynamaticPass<
     are tagged with the basic block they belong to, and that all memory access
     operations are uniquely named.
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 def HandshakeRemoveUnusedMemRefs : Pass<
@@ -233,7 +256,7 @@ def HandshakeRemoveUnusedMemRefs : Pass<
 }
 
 def HandshakeSetBufferingProperties :
-  DynamaticPass<"handshake-set-buffering-properties"> {
+  Pass<"handshake-set-buffering-properties", "mlir::ModuleOp"> {
   let summary = "Attach buffering properties to specifc channels in the IR";
   let description = [{
     Adds buffering properties to specific channels in the IR. Which channels are
@@ -246,6 +269,7 @@ def HandshakeSetBufferingProperties :
     [Option<"version", "version", "std::string", "\"fpga20\"",
             "Set of buffering properties to apply. Options are: fpga20 "
             "(default).">];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
@@ -272,6 +296,9 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     Option<"timingModels", "timing-models", "std::string", "",
     "Path to JSON-formatted file containing timing models for dataflow "
     "components.">,
+    Option<"specTimingModels", "spec-timing-models", "std::string", "",
+    "Path to JSON-formatted file containing per-port timing models for "
+    "speculative units.">,
     Option<"firstCFDFC", "first-cfdfc", "bool", "false",
     "If true, only extract the first CFDFC from the input file">,
     Option<"targetCP", "target-period", "double", "4.0",
@@ -280,6 +307,13 @@ def HandshakePlaceBuffers : Pass<"handshake-place-buffers"> {
     "Timeout (in seconds) for the buffer placement MILP (0 for no timeout)">,
     Option<"dumpMILPModels", "dump-milp-models", "bool", "false",
     "If true, dump MILP models into a directory named 'buffer-placement'.">,
+    Option<"ftd", "ftd", "bool", "false",
+    "If true, use FTD-specific CFDFC extraction and backedge "
+    "identification.">,
+    Option<"calculatePathDelays", "calculate-path-delays", "bool", "false",
+    "After buffer placement, re-run the MILP with the buffering decisions "
+    "locked in to calculate the path delays the MILP believes are present in "
+    "the circuit.">,
     Option<"blifFiles", "blif-files", "std::string", "",
     "Path to AND-Inverter Graphs of dataflow components in Berkeley "
     "Logic Interchange Format (BLIF).">,
@@ -365,7 +399,7 @@ def FlattenModules : Pass<"hw-flatten-modules", "mlir::ModuleOp"> {
 }
 
 
-def BackAnnotate : DynamaticPass<"back-annotate"> {
+def BackAnnotate : Pass<"back-annotate", "mlir::ModuleOp"> {
   let summary = "Back-annotates IR from JSON-formatted attributes";
   let description = [{
     Sets supported attributes on operations and operands based on
@@ -378,9 +412,10 @@ def BackAnnotate : DynamaticPass<"back-annotate"> {
   let options =
     [Option<"filepath", "filepath", "std::string", "\"\"",
             "Path to JSON-formatted back-annotation file">];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
+def ForceMemoryInterface : Pass<"force-memory-interface", "mlir::ModuleOp"> {
   let summary = "Forces the use of a single type of memory interface";
   let description = [{
     Forces the type of memory interface that will be placed for all memory
@@ -397,10 +432,10 @@ def ForceMemoryInterface : DynamaticPass<"force-memory-interface"> {
       "Whether to force the placement of MCs in the circuit after Handshake "
       "lowering (off by default, mutually exclusice with force-lsq).">
   ];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
-                                          ["mlir::memref::MemRefDialect"]> {
+def FlattenMemRefRowMajor : Pass<"flatten-memref-row-major", "mlir::ModuleOp"> {
   let summary = "Flatten memrefs (row-major order)";
   let description = [{
     This pass flattens all multidimensional memories and accesses to them into
@@ -423,10 +458,11 @@ def FlattenMemRefRowMajor : DynamaticPass<"flatten-memref-row-major",
     the corresponding dimension is a power-of-2), this pass also simplify them
     to shifts.
   }];
+  let dependentDialects = ["mlir::memref::MemRefDialect", "dynamatic::handshake::HandshakeDialect"];
 }
 
 
-def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
+def MarkMemoryInterfaces : Pass<"mark-memory-interfaces", "mlir::ModuleOp"> {
   let summary = "Mark memory accesses with the interface they should connect to.";
   let description = [{
     Annotates all memory accesses in the IR with a
@@ -444,6 +480,7 @@ def MarkMemoryInterfaces : DynamaticPass<"mark-memory-interfaces"> {
     access depends on any other. If no such attributes are present it is assumed
     that there are no memory dependencies.  
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
@@ -455,7 +492,7 @@ def NameAllOperations : Pass<"name-all-operations", "mlir::ModuleOp"> {
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def PushConstants : DynamaticPass<"push-constants"> {
+def PushConstants : Pass<"push-constants", "mlir::ModuleOp"> {
   let summary = "Push constant definitions to blocks using them.";
   let description = [{
     This pass moves arith::ConstantOp operations to the block(s) using them,
@@ -463,6 +500,24 @@ def PushConstants : DynamaticPass<"push-constants"> {
     operations and their user(s) within each function. This pass will duplicate
     constant definitions if they have users in multiple blocks. It will also
     delete the original operation if it is not used within its defining block.
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
+def SortBlocksRPO : Pass<"sort-blocks-rpo", "mlir::ModuleOp"> {
+  let summary = "Sort the blocks of each function in reverse post order.";
+  let description = [{
+    This pass reorders the blocks of every function in a reverse post order of
+    its CFG. In such an order the position of a block increases along every edge
+    which is not a back edge, and a block always comes after all of its
+    dominators. Blocks which the entry block cannot reach come last.
+
+    Several parts of the flow derive a block identifier from the position of the
+    block in its region (the block IDs of the cf-level profiler, the
+    `handshake.bb` attribute set during the conversion to Handshake) and then
+    rely on those identifiers being ordered along the control flow, `isBackedge`
+    in `Support/CFG.h` being the main example. Nothing guarantees that the blocks
+    reach this point in such an order, hence this pass.
   }];
 }
 
@@ -478,7 +533,7 @@ def RemoveOperationNames : Pass<"remove-operation-names", "mlir::ModuleOp"> {
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
+def RemovePolygeistAttributes : Pass<"remove-polygeist-attributes", "mlir::ModuleOp"> {
   let summary = "Removes useless module and function attributes set by Polygeist.";
   let description = [{
     Polygeist sets a couple attributes belonging to the `dlti` and `llvm`
@@ -486,12 +541,13 @@ def RemovePolygeistAttributes : DynamaticPass<"remove-polygeist-attributes"> {
     about. This simply removes them (avoid having to pass the
     --allow-unregistered-dialect flag to all optimizer invokations).
   }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
-// Remark: this is an example where the implicit name analysis in DynamaticPass
-// creates a problem (still need to investigate why). If you switch this to
-// DynamaticPass instead of Pass, somehow it deletes the listed operation from
-// the module in the end.
+// Remark: this is an example where running the name analysis checks (as most
+// other module passes do) creates a problem (still need to investigate why).
+// If you add the NameAnalysis checks to this pass, somehow it deletes the
+// listed operation from the module in the end.
 def DropUnlistedFunctions : Pass<"drop-unlisted-functions"> {
   let summary = "Remove all unlisted functions from a given module.";
   let description = [{The output from Clang + opt + mlir-translate contains

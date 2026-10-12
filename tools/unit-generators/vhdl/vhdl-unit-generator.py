@@ -74,6 +74,7 @@ def main(generators):
 if __name__ == "__main__":
     generators = Generators()
     generators.add("handshake", "absf")
+    generators.add("handshake", "absi")
     generators.add("handshake", "addf")
     generators.add("handshake", "addi")
     generators.add("handshake", "andi")
@@ -134,7 +135,10 @@ if __name__ == "__main__":
     generators.add("handshake", "valid_merger")
     generators.add("handshake", "top_join")
     generators.add("handshake", "remsi")
+    generators.add("handshake", "remui")
     generators.add("handshake", "ram")
     generators.add("handshake", "sharing_wrapper")
+    generators.add("handshake", "init")
+    generators.add("handshake", "ii_monitor")
 
     main(generators)

@@ -69,12 +69,13 @@ The first thing we need to do is declare our pass somewhere. In LLVM/MLIR, this 
 Open the [`include/dynamatic/Transforms/Passes.td`](https://github.com/EPFL-LAP/dynamatic/blob/main/include/dynamatic/Transforms/Passes.td) file and copy-and-paste the following snippet anywhere below the include lines at the top of the file.
 
 ```tablegen
-def HandshakeMuxToMerge : DynamaticPass<"handshake-mux-to-merge"> {
+def HandshakeMuxToMerge : Pass<"handshake-mux-to-merge", "mlir::ModuleOp"> {
   let summary = "Transform all muxes into merges.";
   let description = [{
     Transform all muxes within the IR into merges with identical data operands. 
   }];
   let constructor = "dynamatic::createHandshakeMuxToMerge()";
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 ```
 
@@ -106,7 +107,7 @@ namespace dynamatic {
 
 /// The pass constructor, with the same name we specified in TableGen in the
 /// previous subsection.
-std::unique_ptr<dynamatic::DynamaticPass> createHandshakeMuxToMerge();
+std::unique_ptr<mlir::Pass> createHandshakeMuxToMerge();
 
 } // namespace dynamatic
 
@@ -140,7 +141,13 @@ namespace {
 struct HandshakeMuxToMergePass
     : public dynamatic::impl::HandshakeMuxToMergeBase<HandshakeMuxToMergePass> {
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what
+    // is cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     // This is the top-level operation in all MLIR files. All the IR is nested
     // within it
     mlir::ModuleOp mod = getOperation();
@@ -156,19 +163,25 @@ struct HandshakeMuxToMergePass
       // If the greedy pattern rewriter fails, the pass must also fail
       return signalPassFailure();
     }
+
+    // Name all newly created operations and keep the naming analysis cached
+    // for subsequent passes
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   };
 };
 }; // namespace
 
 /// Implementation of our pass constructor, which just returns an instance of
 /// the `HandshakeMuxToMergePass` struct. 
-std::unique_ptr<dynamatic::DynamaticPass>
+std::unique_ptr<mlir::Pass>
 dynamatic::createHandshakeMuxToMerge() {
   return std::make_unique<HandshakeMuxToMergePass>();
 }
 ```
 
-This file, at the botton, implements the pass constructor we declared in the header. This constuctor returns an instance of a struct defined just above---do not mind the slightly convoluted struct declaration, which showcases the [*curiously recurring template pattern*](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern) C++ idiom that is used extensively throuhgout MLIR/Dynamatic---whose single method `runDynamaticPass` defines what happens when the pass is called. In our case, we want to leverage MLIR's greedy pattern rewriter infrastructure to match on all muxes in the IR and replace them with merges with identical data inputs. If you would like to know more about how greedy pattern rewriting works, feel free to check out MLIR's [official documentation](https://mlir.llvm.org/docs/) on the subject. For this simple pass, you do not need to understand exactly how it works, just that it can match and try to rewrite certain operations inside the IR based on a set of user-provided rewrite patterns. Speaking of rewrite patterns, let's add our own to the file just above the `HandshakeMuxToMergePass` struct definition. Paste the following into the file.
+This file, at the botton, implements the pass constructor we declared in the header. This constuctor returns an instance of a struct defined just above---do not mind the slightly convoluted struct declaration, which showcases the [*curiously recurring template pattern*](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern) C++ idiom that is used extensively throuhgout MLIR/Dynamatic---whose single method `runOnOperation` defines what happens when the pass is called. Before and after transforming the IR, the method checks that all operation names are unique using Dynamatic's `NameAnalysis`, names any operation created by the pass, and marks the analysis as preserved so that subsequent passes can reuse it. In our case, we want to leverage MLIR's greedy pattern rewriter infrastructure to match on all muxes in the IR and replace them with merges with identical data inputs. If you would like to know more about how greedy pattern rewriting works, feel free to check out MLIR's [official documentation](https://mlir.llvm.org/docs/) on the subject. For this simple pass, you do not need to understand exactly how it works, just that it can match and try to rewrite certain operations inside the IR based on a set of user-provided rewrite patterns. Speaking of rewrite patterns, let's add our own to the file just above the `HandshakeMuxToMergePass` struct definition. Paste the following into the file.
 
 ```cpp
 /// Rewrite pattern that will match on all muxes in the IR and replace each of
@@ -202,7 +215,7 @@ This rewrite pattern, called `ReplaceMuxWithMerge`, matches on operations of typ
 - Then, we create a merge operation at the same location in the IR and with the same data inputs.
 - Finally, we tell the rewriter to replace the mux with the merge. This "rewires" the IR by making users of the mux's output channel use the merge's output channel instead, and deleted the original mux.
 
-To complete the pass implementation, we simply have to provide the rewrite pattern to the greedy pattern rewriter. Just add the following call to `patterns.add` inside `runDynamaticPass` after declaring the pattern set.
+To complete the pass implementation, we simply have to provide the rewrite pattern to the greedy pattern rewriter. Just add the following call to `patterns.add` inside `runOnOperation` after declaring the pattern set.
 
 ```cpp
 RewritePatternSet patterns(ctx);

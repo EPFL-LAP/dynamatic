@@ -413,11 +413,16 @@ struct FlattenMemRefRowMajorPass
           FlattenMemRefRowMajorPass> {
 public:
   using FlattenMemRefRowMajorBase::FlattenMemRefRowMajorBase;
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
     TypeConverter typeConverter;
-    NameAnalysis &namer = getAnalysis<NameAnalysis>();
     populateTypeConversionPatterns(typeConverter);
 
     RewritePatternSet patterns(ctx);
@@ -445,6 +450,12 @@ public:
 
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 

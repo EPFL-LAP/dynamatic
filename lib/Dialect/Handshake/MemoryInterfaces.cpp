@@ -26,6 +26,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include <algorithm>
 
 using namespace llvm;
 using namespace mlir;
@@ -316,19 +317,6 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
   dataWidth = ports.dataWidth;
   addrWidth = ports.addrWidth;
 
-  handshake::LSQDepthAttr lsqDepthAttr =
-      getDialectAttr<handshake::LSQDepthAttr>(lsqOp);
-  if (lsqDepthAttr) {
-    depthLoad = lsqDepthAttr.getLoadQueueDepth();
-    depthStore = lsqDepthAttr.getStoreQueueDepth();
-    // "depth" Parameter is theoretically unused, but still needed by the
-    // current LSQGenerator
-    depth = std::max(depthLoad, depthStore);
-  } else {
-    depthLoad = 16;
-    depthStore = 16;
-  }
-
   numGroups = ports.getNumGroups();
   numLoads = ports.getNumPorts<LoadPort>();
   numStores = ports.getNumPorts<StorePort>();
@@ -393,6 +381,35 @@ void LSQGenerationInfo::fromPorts(FuncMemoryPorts &ports) {
     // Push back the new ldOrder Info
     ldOrder.push_back(ldOrderOfOneGroup);
   }
+
+  unsigned maxLoadsPerGroup =
+      *std::max_element(loadsPerGroup.begin(), loadsPerGroup.end());
+  unsigned maxStoresPerGroup =
+      *std::max_element(storesPerGroup.begin(), storesPerGroup.end());
+
+  /// Determine load and store queue sizes
+  handshake::LSQDepthAttr lsqDepthAttr =
+      getDialectAttr<handshake::LSQDepthAttr>(lsqOp);
+  if (lsqDepthAttr) {
+    depthLoad = lsqDepthAttr.getLoadQueueDepth();
+    depthStore = lsqDepthAttr.getStoreQueueDepth();
+  } else {
+    // Use default depth of 16.
+    depthLoad = 16;
+    depthStore = 16;
+  }
+
+  // If the load/store queues are not large enough to hold a single group at
+  // once, increase their sizes to the minimum valid depth (i.e., the maximum
+  // number of loads/stores in a group + 1)
+  if (maxLoadsPerGroup >= depthLoad)
+    depthLoad = maxLoadsPerGroup + 1;
+  if (maxStoresPerGroup >= depthStore)
+    depthStore = maxStoresPerGroup + 1;
+
+  // "depth" Parameter is theoretically unused, but still needed by the
+  // current LSQGenerator
+  depth = std::max(depthLoad, depthStore);
 
   /// Adds as many 0s as necessary to the array so that its size equals the
   /// depth. Asserts if the array size is larger than the depth.

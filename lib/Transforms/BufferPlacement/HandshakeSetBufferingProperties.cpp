@@ -95,13 +95,9 @@ setSpeculatorBufferingProperties(handshake::FuncOp funcOp) {
   Channel resolveChannel(historyCtrl, true);
   resolveChannel.props->minTrans = std::max(resolveChannel.props->minTrans, 1U);
 
-  // The speculator's KILL_ONLY_DATA state stalls the data input for
-  // 1 cycle during misspeculation recovery. A transparent buffer on
-  // the data input absorbs this stall and prevents it from propagating
-  // upstream and causing throughput loss.
-  Value dataIn = specOp.getDataIn();
-  Channel dataInChannel(dataIn, true);
-  dataInChannel.props->minTrans = std::max(dataInChannel.props->minTrans, 1U);
+  Value trigger = specOp.getTrigger();
+  Channel triggerChannel(trigger, true);
+  triggerChannel.props->minTrans = std::max(triggerChannel.props->minTrans, 1U);
 
   return success();
 }
@@ -187,6 +183,17 @@ static LogicalResult setFPGA20Properties(handshake::FuncOp funcOp) {
     }
   }
 
+  // Init ops replace init-merge patterns on loop backedges, so their output
+  // also needs at least one buffer slot when it participates in a cycle.
+  for (handshake::InitOp initOp : funcOp.getOps<handshake::InitOp>()) {
+    for (OpResult initRes : initOp->getResults()) {
+      Channel channel(initRes, true);
+      if (isChannelOnCycle(initRes)) {
+        channel.props->minSlots = std::max(channel.props->minSlots, 1U);
+      }
+    }
+  }
+
   // See docs/Specs/Buffering.md
   // To mitigate the latency asymmetry between LSQ group allocation
   // and the Store/Load operations, we set a minimum number of buffer
@@ -265,7 +272,13 @@ struct HandshakeSetBufferingPropertiesPass
   using HandshakeSetBufferingPropertiesBase::
       HandshakeSetBufferingPropertiesBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     // Check that the provided version is valid
     if (version != "fpga20") {
@@ -284,6 +297,12 @@ struct HandshakeSetBufferingPropertiesPass
       if (failed(setFPGA20Properties(funcOp)))
         return signalPassFailure();
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   };
 };
 

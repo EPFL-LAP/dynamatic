@@ -1466,7 +1466,13 @@ class HandshakeToXlsPass
     : public dynamatic::experimental::xls::impl::HandshakeToXlsBase<
           HandshakeToXlsPass> {
 public:
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
 
@@ -1548,14 +1554,17 @@ public:
     builder.setInsertionPointToStart(modOp.getBody(0));
     procs.buildRequiredProcs(builder);
 
-    // XLS does not care about dynamatic's naming scheme:
-    doNotNameOperations();
+    // At this level, operations do not need to follow our naming scheme, so
+    // only verify existing names instead of naming unnamed operations
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::DO_NOTHING)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 
 } // end anonymous namespace
 
-std::unique_ptr<dynamatic::DynamaticPass>
+std::unique_ptr<mlir::Pass>
 dynamatic::experimental::xls::createHandshakeToXlsPass() {
   return std::make_unique<HandshakeToXlsPass>();
 }

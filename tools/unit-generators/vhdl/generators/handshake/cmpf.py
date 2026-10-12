@@ -15,8 +15,8 @@ def generate_cmpf(name, params):
         if is_double is None:
             raise ValueError(f"is_double was missing for generating a flopoco cmpf")
 
-        signals = _get_flopoco_signals(bitwidth)
-        body = _get_flopoco_body(bitwidth, predicate)
+        signals = _get_flopoco_signals(bitwidth, latency)
+        body = _get_flopoco_body(bitwidth, predicate, latency)
     elif impl == VIVADO_IMPL:
         signals = _get_vivado_signals()
         body = _get_vivado_body(predicate)
@@ -41,7 +41,17 @@ def generate_cmpf(name, params):
 ##################################################
 
 
-def _get_flopoco_signals(bitwidth):
+def _get_flopoco_signals(bitwidth, latency):
+    # For the pipelined (latency > 0) core, the 'unordered' and 'XeqY' outputs
+    # are combinational while the inequality outputs are pipelined (see the
+    # comment in '_get_flopoco_body'). We delay the former by one cycle so
+    # that every output feeding the result expression is valid at the same cycle.
+    delayed_signals = ""
+    if latency > 0:
+        delayed_signals = """
+  signal unordered_delayed : std_logic;
+  signal XeqY_delayed : std_logic;"""
+
     return f"""
   signal unordered : std_logic;
   signal XltY : std_logic;
@@ -50,12 +60,45 @@ def _get_flopoco_signals(bitwidth):
   signal XleY : std_logic;
   signal XgeY : std_logic;
   signal ip_lhs: std_logic_vector({bitwidth + 2} - 1 downto 0);
-  signal ip_rhs: std_logic_vector({bitwidth + 2} - 1 downto 0);
+  signal ip_rhs: std_logic_vector({bitwidth + 2} - 1 downto 0);{delayed_signals}
   """
 
 
-def _get_flopoco_body(bitwidth, predicate):
-    expression = _get_flopoco_expression_from_predicate(predicate)
+def _get_flopoco_body(bitwidth, predicate, latency):
+    # A pipelined core (latency > 0, e.g. the 64-bit one) must have its clock
+    # enable driven by 'valid_buffer_ready' so the pipeline freezes on
+    # downstream stalls; a combinational core (latency == 0) has no valid buffer
+    # and ties 'ce' high.
+    #
+    # The pipelined core is also internally inconsistent: 'XltY/XgtY/XleY/XgeY'
+    # are registered (1-cycle) but 'unordered' and 'XeqY' are combinational
+    # (0-cycle). We delay 'unordered' and 'XeqY' by one cycle to make every
+    # output identical in latency.
+    #
+    # This is arguably a bug in flopoco and/or something that could be modeled
+    # in components.json in the future.
+    # TODO: Double check this/fix when regenerating the FloPoCo IP!
+    if latency > 0:
+        clock_enable = "valid_buffer_ready"
+        unordered_sig, xeqy_sig = "unordered_delayed", "XeqY_delayed"
+        align_process = """
+  align_delayed : process (clk) is
+  begin
+    if rising_edge(clk) then
+      if valid_buffer_ready = '1' then
+        unordered_delayed <= unordered;
+        XeqY_delayed <= XeqY;
+      end if;
+    end if;
+  end process;
+"""
+    else:
+        clock_enable = "'1'"
+        unordered_sig, xeqy_sig = "unordered", "XeqY"
+        align_process = ""
+
+    expression = _get_flopoco_expression_from_predicate(
+        predicate, unordered_sig, xeqy_sig)
     return f"""
   ieee2nfloat_0: entity work.InputIEEE_{bitwidth}bit(arch)
     port map(
@@ -74,7 +117,7 @@ def _get_flopoco_body(bitwidth, predicate):
     );
   operator: entity work.FPComparator_{bitwidth}bit(arch)
   port map (clk=> clk,
-        ce=> '1',
+        ce=> {clock_enable},
         X=> ip_lhs,
         Y=> ip_rhs,
         unordered=> unordered,
@@ -83,27 +126,27 @@ def _get_flopoco_body(bitwidth, predicate):
         XgtY=> XgtY,
         XleY=> XleY,
         XgeY=> XgeY);
-
+{align_process}
   result(0) <= {expression};
   """
 
 
-def _get_flopoco_expression_from_predicate(predicate):
+def _get_flopoco_expression_from_predicate(predicate, unordered_sig, xeqy_sig):
     expressions = {
-        "oeq": "not unordered and XeqY",
-        "ogt": "not unordered and XgtY",
-        "oge": "not unordered and XgeY",
-        "olt": "not unordered and XltY",
-        "ole": "not unordered and XleY",
-        "one": "not unordered and not XeqY",
-        "ord": "not unordered",
-        "ueq": "unordered or XeqY",
-        "ugt": "unordered or XgtY",
-        "uge": "unordered or XgeY",
-        "ult": "unordered or XltY",
-        "ule": "unordered or XleY",
-        "une": "unordered or not XeqY",
-        "uno": "unordered",
+        "oeq": f"not {unordered_sig} and {xeqy_sig}",
+        "ogt": f"not {unordered_sig} and XgtY",
+        "oge": f"not {unordered_sig} and XgeY",
+        "olt": f"not {unordered_sig} and XltY",
+        "ole": f"not {unordered_sig} and XleY",
+        "one": f"not {unordered_sig} and not {xeqy_sig}",
+        "ord": f"not {unordered_sig}",
+        "ueq": f"{unordered_sig} or {xeqy_sig}",
+        "ugt": f"{unordered_sig} or XgtY",
+        "uge": f"{unordered_sig} or XgeY",
+        "ult": f"{unordered_sig} or XltY",
+        "ule": f"{unordered_sig} or XleY",
+        "une": f"{unordered_sig} or not {xeqy_sig}",
+        "uno": f"{unordered_sig}",
     }
     if predicate not in expressions:
         raise ValueError(f"Unsupported flopoco predicate: {predicate}")

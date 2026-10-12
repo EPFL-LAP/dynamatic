@@ -40,7 +40,7 @@ protected:
                    FuncInfo &funcInfo, const TimingDatabase &timingDB,
                    double targetPeriod, StringRef writeTo = "")
       : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                            targetPeriod, writeTo) {};
+                            targetPeriod, Algorithm::FPL22, writeTo) {};
 
   /// Interprets the MILP solution to derive buffer placement decisions. Since
   /// the MILP cannot encode the placement of both opaque and transparent slots

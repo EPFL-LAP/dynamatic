@@ -141,7 +141,13 @@ struct HandshakeInferBasicBlocksPass
 
   using HandshakeInferBasicBlocksBase::HandshakeInferBasicBlocksBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns{ctx};
     patterns.add<FuncOpInferBasicBlocks>(ctx);
@@ -150,6 +156,12 @@ struct HandshakeInferBasicBlocksPass
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))
       signalPassFailure();
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   };
 };
 } // namespace

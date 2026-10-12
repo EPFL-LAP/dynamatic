@@ -46,7 +46,7 @@ MAPBUFBuffers::MAPBUFBuffers(CPSolver::SolverKind solverKind, int timeout,
                              double lutDelay, int lutSize, bool acyclicType,
                              StringRef writeTo)
     : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
-                          writeTo),
+                          Algorithm::MAPBUF, writeTo),
       acyclicType(acyclicType), lutSize(lutSize), lutDelay(lutDelay),
       blifFiles(blifFiles) {
   if (!unsatisfiable)

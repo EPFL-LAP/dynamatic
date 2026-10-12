@@ -18,6 +18,7 @@
 - [Dependencies](UserGuide/Dependencies.md)
 - [Kernel Code Guidelines](UserGuide/KernelCodeGuideLines.md)
 - [Optimizations And Directives](UserGuide/OptimizationsAndDirectives.md)
+    - [LSQ](UserGuide/LSQ.md)
 - [Sub Modules Guide](UserGuide/SubModulesGuide.md)
 - [Verification](UserGuide/Verification.md)
 
