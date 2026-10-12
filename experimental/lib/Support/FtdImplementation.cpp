@@ -925,7 +925,7 @@ LogicalResult experimental::ftd::addGsaGates(
                            op->getOperand(1).getDefiningOp())
                            ? 1
                            : 2;
-    rewriter.replaceAllUsesWith(op->getResult(0), op->getOperand(operandToUse));
+    op->getResult(0).replaceAllUsesWith(op->getOperand(operandToUse));
 
     for (auto &[idx, mappedOp] : gsaList) {
       if (mappedOp == op)
@@ -1003,7 +1003,7 @@ LogicalResult experimental::ftd::addGsaGates(
             areEquivalentValues(mux1.getDataOperands()[1],
                                 mux2.getDataOperands()[1])) {
 
-          rewriter.replaceAllUsesWith(mux2.getResult(), mux1.getResult());
+          mux2.getResult().replaceAllUsesWith(mux1.getResult());
           rewriter.eraseOp(mux2);
           it2->second = nullptr;
           changed = true;
@@ -1024,7 +1024,7 @@ LogicalResult experimental::ftd::addGsaGates(
 
       if (areEquivalentValues(mux.getDataOperands()[0],
                               mux.getDataOperands()[1])) {
-        rewriter.replaceAllUsesWith(mux.getResult(), mux.getDataOperands()[0]);
+        mux.getResult().replaceAllUsesWith(mux.getDataOperands()[0]);
         rewriter.eraseOp(mux);
         op = nullptr;
         changed = true;
