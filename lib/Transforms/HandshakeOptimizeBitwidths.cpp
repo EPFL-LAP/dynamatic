@@ -1373,7 +1373,8 @@ struct ArithSelect : public OpRewritePattern<handshake::SelectOp> {
     Value newRhs = modBitWidth(rhsExtValue, optWidth, rewriter);
     rewriter.setInsertionPoint(selectOp);
     auto newOp = rewriter.create<handshake::SelectOp>(
-        selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs);
+        selectOp.getLoc(), selectOp.getCondition(), newLhs, newRhs,
+        selectOp.getAntitokenDepthAttr());
     Value newRes = modBitWidth({newOp.getResult(), lhsExtValue.getExtType()},
                                resWidth, rewriter);
     inheritBB(selectOp, newOp);
@@ -2074,7 +2075,13 @@ struct HandshakeOptimizeBitwidthsPass
           HandshakeOptimizeBitwidthsPass> {
   using HandshakeOptimizeBitwidthsBase::HandshakeOptimizeBitwidthsBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     auto *ctx = &getContext();
     mlir::ModuleOp modOp = getOperation();
 
@@ -2123,6 +2130,12 @@ struct HandshakeOptimizeBitwidthsPass
           return signalPassFailure();
       while (fwChanged || bwChanged);
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 
 private:

@@ -16,7 +16,7 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
-def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"> {
+def HandshakeAnnotateProperties : Pass<"handshake-annotate-properties", "mlir::ModuleOp"> {
   let summary = "Annotates Formal Properties into a json database";
   let description = [{
     This analysis pass generates a table that contains all the information needed to
@@ -32,6 +32,7 @@ def HandshakeAnnotateProperties : DynamaticPass< "handshake-annotate-properties"
     Option<"annotateList", "annotate-list", "std::string", "",
     "List of properties to annotate (overwrites annotate-properties/invariants)">
     ];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 #endif // EXPERIMENTAL_ANALYSIS_PASSES_TD

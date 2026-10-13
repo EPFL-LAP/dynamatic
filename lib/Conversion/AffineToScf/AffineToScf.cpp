@@ -115,10 +115,15 @@ private:
 namespace {
 class AffineToScfPass
     : public dynamatic::impl::AffineToScfBase<AffineToScfPass> {
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
-    NameAnalysis &namer = getAnalysis<NameAnalysis>();
 
     RewritePatternSet patterns(ctx);
     populateAffineToStdConversionPatterns(patterns);
@@ -129,6 +134,12 @@ class AffineToScfPass
                            scf::SCFDialect, VectorDialect>();
     if (failed(applyPartialConversion(modOp, target, std::move(patterns))))
       signalPassFailure();
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace

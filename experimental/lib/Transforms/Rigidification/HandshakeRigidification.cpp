@@ -58,7 +58,7 @@ struct HandshakeRigidificationPass
           HandshakeRigidificationPass> {
   using HandshakeRigidificationBase::HandshakeRigidificationBase;
 
-  void runDynamaticPass() override;
+  void runOnOperation() override;
 
 private:
   LogicalResult insertReadyRemover(AbsenceOfBackpressure prop);
@@ -66,7 +66,13 @@ private:
 };
 } // namespace
 
-void HandshakeRigidificationPass::runDynamaticPass() {
+void HandshakeRigidificationPass::runOnOperation() {
+  // Make sure all operation names are unique and haven't changed from what is
+  // cached (if anything is cached)
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  if (!namer.isAnalysisValid())
+    return signalPassFailure();
+
   FormalPropertyTable table;
   if (failed(table.addPropertiesFromJSON(jsonPath)))
     llvm::errs() << "[WARNING] Formal property retrieval failed\n";
@@ -85,6 +91,12 @@ void HandshakeRigidificationPass::runDynamaticPass() {
       }
     }
   }
+
+  // Make sure all operation names are still unique and name operations that
+  // do not currently have a name
+  if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    return signalPassFailure();
+  markAnalysesPreserved<NameAnalysis>();
 }
 
 LogicalResult
