@@ -147,6 +147,9 @@ struct IntegrationTest {
   // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
   bool useDuplication = false;
+  // Apply the formally verified steering-logic rewrites (ElasticMiter, ASPLOS
+  // '25) before buffer placement.
+  bool useSteeringRewrites = false;
   std::string milpSolver = "gurobi";
   std::string bufferAlgorithm = "fpga20";
   unsigned clockPeriod = 5;
@@ -194,6 +197,7 @@ int IntegrationTest::run() {
              << (this->useRigidification ? " --rigidification" : "")
              << (this->useSpeculation ? " --speculation" : "")
              << (this->useDuplication ? " --enable-duplication" : "")
+             << (this->useSteeringRewrites ? " --optimize-steering-rewrites" : "")
              << (this->instrumentII ? " --instrument-ii" : "")
              << " --milp-solver " << this->milpSolver << std::endl;
   // clang-format on
@@ -295,6 +299,7 @@ class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 class DuplicationFixture : public BaseFixture {};
+class SteeringRewritesFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
@@ -507,6 +512,32 @@ TEST_P(DuplicationFixture, basic) {
       // clang-format on
   };
   EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+/// Compiles the benchmark with the steering-logic rewrites applied and checks
+/// that the rewritten circuit still simulates correctly against the C
+/// reference.
+TEST_P(SteeringRewritesFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useSteeringRewrites = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  // Make sure the rewrites were actually part of the compilation flow.
+  EXPECT_TRUE(fs::exists(config.benchmarkPath / config.name /
+                         ("out_" + config.testName) / "comp" /
+                         "handshake_post_steering_rewrites.mlir"));
   RecordProperty("cycles", std::to_string(config.simTime));
   logPerformance(config.simTime);
 }
@@ -878,6 +909,22 @@ INSTANTIATE_TEST_SUITE_P(DuplicationBenchmarks, DuplicationFixture,
       "wrap_if"
     ),
     [](const auto &info) { return "dup_" + info.param; });
+
+// The benchmarks evaluated in "ElasticMiter: Formally Verified Dataflow
+// Circuit Rewrites" (ASPLOS '25), Table 2.
+INSTANTIATE_TEST_SUITE_P(SteeringRewritesBenchmarks, SteeringRewritesFixture,
+    testing::Values(
+      "binary_search",
+      "cnn",
+      "gemver",
+      "sobel",
+      "spmv",
+      "gcd",
+      "stencil_2d",
+      "matvec",
+      "fir"
+    ),
+    [](const auto &info) { return "steering_" + info.param; });
 
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 // clang-format on
