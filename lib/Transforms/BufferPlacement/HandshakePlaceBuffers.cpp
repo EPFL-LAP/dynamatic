@@ -93,6 +93,11 @@ struct HandshakePlaceBuffersPass
   void runOnOperation() override;
 
 protected:
+  /// Whether the input circuit requires the FTD-specific buffer placement
+  /// behavior. Steering-term rewrites produce the same relevant circuit
+  /// topology as FTD and therefore use exactly the same handling.
+  bool useFTDBufferPlacement() const { return ftd || optimizeSteeringRewrites; }
+
   /// Called for all buffer placement strategies that not require Gurobi to
   /// be installed on the host system.
   LogicalResult placeUsingMILP();
@@ -321,9 +326,9 @@ LogicalResult HandshakePlaceBuffersPass::checkFuncInvariants(FuncInfo &info) {
       }
     }
 
-    // FTD circuits may legitimately contain channels between blocks that have
-    // no corresponding edge in the original CFG.
-    if (ftd)
+    // FTD and steering-rewritten circuits may legitimately contain channels
+    // between blocks that have no corresponding edge in the original CFG.
+    if (useFTDBufferPlacement())
       continue;
 
     std::optional<unsigned> srcBB = opBlocks[&op];
@@ -548,7 +553,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
   }
 
   mlir::DenseSet<Value> backwardChannels;
-  if (ftd)
+  if (useFTDBufferPlacement())
     backwardChannels = findBackwardChannelPerCyclicRegion(info.funcOp);
 
   // Set of selected archs
@@ -575,7 +580,7 @@ LogicalResult HandshakePlaceBuffersPass::getCFDFCs(FuncInfo &info,
       break;
 
     // Create the CFDFC from the set of selected archs and BBs
-    if (ftd)
+    if (useFTDBufferPlacement())
       cfdfcs.push_back(CFDFC::createFTD(info.funcOp, selectedArchs, numExecs,
                                         backwardChannels));
     else
@@ -655,7 +660,7 @@ LogicalResult HandshakePlaceBuffersPass::solveBufferPlacementMILP(
       writeTo = dumpDir + sep + funcName + "-fpga20-buffers";
     }
     fpga20::FPGA20Buffers milp(solverKind, timeout, info, timingDB, targetCP,
-                               writeTo, ftd);
+                               writeTo, useFTDBufferPlacement());
     return milp.solve(placement, calculatePathDelays);
   }
   if (algorithm == FPL22) {

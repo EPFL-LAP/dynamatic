@@ -16,6 +16,18 @@
 include "dynamatic/Support/Passes.td"
 include "mlir/Pass/PassBase.td"
 
+def HandshakeRewriteTerms : Pass<"handshake-rewrite-terms", "mlir::ModuleOp"> {
+  let summary = "Rewrite terms in Handshake operation sequences.";
+  let description = [{
+      Removes redundant operations and simplifies the IR by applying a series
+      of optimizations. The pass uses a greedy pattern rewriter to apply the
+      optimizations, which are based on the specific semantics of Handshake
+      operations. The pass is conservative and does not perform any aggressive
+      transformations that could potentially change the behavior of the circuit.
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
 def HandshakeCombineSteeringLogic : Pass<"handshake-combine-steering-logic", "mlir::ModuleOp"> {
   let summary = "Combine common steering logic between different handshake operations.";
   let description = [{
