@@ -41,9 +41,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/RegionGraphTraits.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "llvm/ADT/SCCIterator.h"
 using namespace mlir;
 using namespace dynamatic;
 using namespace dynamatic::experimental;
@@ -1539,35 +1537,6 @@ ftd::buildDecisionGraph(const ftd::LocalCFG &rawGraph,
   nodeSet.insert(rawGraph.sinkBB);
   for (Block *b : dependencies) {
     nodeSet.insert(b);
-  }
-
-  // Neither the producer nor the consumer is on a cycle of rawGraph: the
-  // producer is the entry, and edges back to it go to rawGraph.sinkBB, while
-  // the consumer always goes to sinkBB. sinkBB is the single exit of the local
-  // CFG: a path that reaches it without going through the consumer is one on
-  // which the token is not used. A cycle is therefore a loop that a token
-  // goes through after the producer and before the consumer (e.g., an inner
-  // loop between them, while both may be in the same outer loop of the
-  // program). If a dependency is in such a loop, add to the node set every
-  // block of the loop that ends with a conditional branch, not only the
-  // dependencies. Otherwise the loop can disappear from the decision graph,
-  // e.g., when the block with the backedge is not a dependency. A condition
-  // computed in the loop would then look like it is produced once, instead of
-  // once per iteration, so it would not be demoted to its value at the loop
-  // exit, and the tokens of the extra iterations would never be consumed.
-  if (rawGraph.newProd) {
-    for (auto sccIt = llvm::scc_begin(rawGraph.newProd); !sccIt.isAtEnd();
-         ++sccIt) {
-      const std::vector<Block *> &scc = *sccIt;
-      if (!sccIt.hasCycle() || llvm::is_contained(scc, rawGraph.newProd) ||
-          llvm::none_of(scc,
-                        [&](Block *b) { return dependencies.contains(b); }))
-        continue;
-      for (Block *b : scc) {
-        if (!b->empty() && isa<cf::CondBranchOp>(b->back()))
-          nodeSet.insert(b);
-      }
-    }
   }
 
   // 2. Setup New Container
