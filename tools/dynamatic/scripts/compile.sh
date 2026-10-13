@@ -111,6 +111,11 @@ export_cfg() {
 
 # ============================================================================ #
 
+if [[ -z "$OUTPUT_DIR" || "$OUTPUT_DIR" == "/" ]]; then
+  echo "[FATAL] Invalid output directory"
+  exit 1
+fi
+
 # Reset output directory
 rm -rf "$OUTPUT_DIR"/*/
 mkdir -p "$COMP_DIR"
