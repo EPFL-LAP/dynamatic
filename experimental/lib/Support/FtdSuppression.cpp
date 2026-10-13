@@ -2467,11 +2467,39 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     DenseSet<Block *> dgDeps =
         dgCDA.getAllBlockDeps()[level0DG->newCons].allControlDeps;
 
-    // Private registry: reuse the already-demoted level-0 condition wires
-    // (shared via the demotion cache in demotionHelper), then build this
-    // delivery's own distribution branches into it.
+    // Private registry: register the level-0 condition wires, then build this
+    // delivery's own distribution branches into it. The loop nesting of a
+    // variable is read from this stretch's decision graph, since the main one
+    // may not contain the loop (e.g., the dominator->consumer graph can skip
+    // an inner loop that lies between the dominator and the producer). A wire
+    // already demoted by demotionHelper is reused through its cache; otherwise
+    // it is demoted on this stretch's graph.
+    DenseMap<Block *, Block *> origToLocalDG;
+    for (auto [dgBlock, origBlock] : fullDG->origMap)
+      if (origBlock)
+        origToLocalDG[origBlock] = dgBlock;
+    CyclicDemotionHelper localDemotionHelper(
+        builder, funcOp.getContext(), bi, cyc, origToLocalDG,
+        consumer->getLoc(), consumer->getBlock(), nullptr, &shadow);
+    // Level 0 is the nesting level of blocks outside any loop of the decision
+    // graph, and the level at which level0DG is evaluated. A condition at
+    // level 0 is produced once per evaluation and is used as is. A condition at
+    // a higher level is produced once per iteration of its loop, so it is
+    // demoted to level 0, i.e., to its value at the exit of its outermost loop
     SignalRegistry localRegistry;
-    demotionHelper.preRegisterDemotedValues(level0DG, localRegistry);
+    for (Block *b : level0DG->topoOrder) {
+      Block *origBlock = level0DG->origMap.lookup(b);
+      if (!origBlock)
+        continue;
+      std::string var = bi.getBlockCondition(origBlock);
+      if (localDemotionHelper.getVarNativeLevel(var) == 0)
+        continue;
+      CyclicDemotionHelper &helper = demotionHelper.getVarNativeLevel(var) > 0
+                                         ? demotionHelper
+                                         : localDemotionHelper;
+      if (Value demoted = helper.getValueAtLevel(var, 0))
+        localRegistry.registerSignal(var, {}, demoted);
+    }
     buildDistributionNetwork(builder, *level0DG, bi, localRegistry, nullptr,
                              &shadow);
 

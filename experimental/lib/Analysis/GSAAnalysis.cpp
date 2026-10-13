@@ -428,13 +428,29 @@ void experimental::gsa::GSAAnalysis::convertPhiToGamma(
       if (phi->gsaGateFunction != PhiGate)
         continue;
 
-      // Sort the operands of the phi so that Bi comes before Bj if Bi dominates
-      // Bj
+      // Sort the operands of the phi in block order, so that Bi comes before Bj
+      // if Bj can be reached from Bi without going through a backedge (which
+      // includes Bi dominating Bj). Each operand avoids the blocks of the
+      // operands after it, since a definition later on a path overrides the
+      // earlier ones. Dominance alone is not enough: it does not order blocks
+      // that do not dominate each other.
+      //
+      // stable_sort keeps operands that compare equal (operands from the same
+      // block) in their order in phi->operands. llvm::sort leaves their order
+      // unspecified, so the gammas built from it could change across standard
+      // library implementations or builds
       SmallVector<GateInput *> phiOperands = phi->operands;
-      llvm::sort(phiOperands.begin(), phiOperands.end(),
-                 [&](GateInput *a, GateInput *b) {
-                   return domInfo.dominates(a->getBlock(), b->getBlock());
-                 });
+      // isLess treats a block with no index as equal to any block, which does
+      // not give a valid order for sorting
+      assert(llvm::all_of(
+                 phiOperands,
+                 [&](GateInput *in) {
+                   return bi.getIndexFromBlock(in->getBlock()).has_value();
+                 }) &&
+             "every phi operand must come from an indexed block");
+      llvm::stable_sort(phiOperands, [&](GateInput *a, GateInput *b) {
+        return bi.isLess(a->getBlock(), b->getBlock());
+      });
 
       // Find the nearest common dominator among all the blocks involved
       // in the phi inputs. Also add all the blocks to the list of 'blocks to
