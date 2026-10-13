@@ -214,6 +214,20 @@ Operation *returnBranchFormingCycle(Operation *muxOrMergeOp, int &cycleInputIdx,
   return cycleBranchOp;
 }
 
+/// Returns the value the condition is derived from by looking through NOTs and
+/// forks. Sets `negated` if an odd number of NOTs was traversed.
+Value stripNots(Value condition, bool &negated) {
+  negated = false;
+  while (Operation *defOp = condition.getDefiningOp()) {
+    if (isa<handshake::NotIOp>(defOp))
+      negated = !negated;
+    else if (!isa<handshake::ForkOp>(defOp))
+      break;
+    condition = defOp->getOperand(0);
+  }
+  return condition;
+}
+
 Operation *returnBranchExitingCycle(Operation *muxOrMergeOp) {
   int cycleInputIdx;
   bool isCycleBranchTrueSucc;
@@ -226,44 +240,22 @@ Operation *returnBranchExitingCycle(Operation *muxOrMergeOp) {
   handshake::ConditionalBranchOp cyclicBranchOp =
       cast<handshake::ConditionalBranchOp>(potentialBranchOp);
 
-  Value loopCond = cyclicBranchOp.getConditionOperand();
-  Value origLoopCond;
-  bool isNegatedCyclicBr = false;
-  int countOfInverters = 0;
-  while (isa_and_nonnull<handshake::NotIOp>(loopCond.getDefiningOp())) {
-    loopCond = loopCond.getDefiningOp()->getOperand(0);
-    countOfInverters++;
-  }
-  if (countOfInverters % 2 != 0)
-    isNegatedCyclicBr = true;
-  origLoopCond = loopCond.getDefiningOp()->getOperand(0);
+  bool isNegatedCyclicBr;
+  Value origLoopCond =
+      stripNots(cyclicBranchOp.getConditionOperand(), isNegatedCyclicBr);
 
-  handshake::ConditionalBranchOp exitingBranch = nullptr;
+  // The exiting Branch is driven by the inverse of the loop condition
   for (auto *user : muxOrMergeOp->getResults().getUsers()) {
-    if (isa_and_nonnull<handshake::ConditionalBranchOp>(user) &&
-        user != cyclicBranchOp) {
-      auto br = cast<handshake::ConditionalBranchOp>(user);
-
-      Value cond = br.getConditionOperand();
-      Value origCond;
-      bool isNegated = false;
-      countOfInverters = 0;
-      while (isa_and_nonnull<handshake::NotIOp>(cond.getDefiningOp())) {
-        cond = cond.getDefiningOp()->getOperand(0);
-        countOfInverters++;
-      }
-      if (countOfInverters % 2 != 0)
-        isNegated = true;
-      origCond = cond.getDefiningOp()->getOperand(0);
-
-      if (origCond == origLoopCond && isNegated != isNegatedCyclicBr) {
-        exitingBranch = br;
-        break;
-      }
-    }
+    auto br = dyn_cast<handshake::ConditionalBranchOp>(user);
+    if (!br || br == cyclicBranchOp)
+      continue;
+    bool isNegated;
+    Value origCond = stripNots(br.getConditionOperand(), isNegated);
+    if (origCond == origLoopCond && isNegated != isNegatedCyclicBr)
+      return br;
   }
 
-  return exitingBranch;
+  return nullptr;
 }
 
 Operation *isConditionInverted(Value condition) {
@@ -278,15 +270,56 @@ Operation *isConditionInverted(Value condition) {
 }
 
 Operation *isConditionFeedingInit(Value condition) {
-  handshake::MergeOp existingInit = nullptr;
+  handshake::InitOp existingInit = nullptr;
   for (auto iterCondRes : condition.getUsers()) {
-    if (isa_and_nonnull<handshake::MergeOp>(iterCondRes)) {
-      existingInit = cast<handshake::MergeOp>(iterCondRes);
+    if (isa_and_nonnull<handshake::InitOp>(iterCondRes)) {
+      existingInit = cast<handshake::InitOp>(iterCondRes);
       break;
     }
   }
 
   return existingInit;
+}
+
+/// Returns the inverse of the condition, reusing the input of the NOT producing
+/// the condition or an existing NOT fed by the condition, if any.
+Value getOrCreateInvertedCondition(PatternRewriter &rewriter, Operation *bbFrom,
+                                   Value condition) {
+  if (auto notOp = condition.getDefiningOp<handshake::NotIOp>())
+    return notOp->getOperand(0);
+  if (Operation *existingNotOp = isConditionInverted(condition))
+    return existingNotOp->getResult(0);
+  handshake::NotIOp notIOp =
+      rewriter.create<handshake::NotIOp>(bbFrom->getLoc(), condition);
+  inheritBB(bbFrom, notIOp);
+  return notIOp.getResult();
+}
+
+/// Returns an Init (a single-slot buffer holding a token on reset) that is fed
+/// by the condition, reusing an existing one if the condition already feeds
+/// one.
+Value getOrCreateInit(PatternRewriter &rewriter, Operation *bbFrom,
+                      Value condition) {
+  if (Operation *existingInitOp = isConditionFeedingInit(condition))
+    return existingInitOp->getResult(0);
+  handshake::InitOp initOp =
+      rewriter.create<handshake::InitOp>(bbFrom->getLoc(), condition);
+  inheritBB(bbFrom, initOp);
+  return initOp.getResult();
+}
+
+/// Returns the select of a loop-header Mux: a value equal to initialToken for
+/// the first loop iteration, and equal to the loop condition afterwards. Since
+/// Inits produce a 0 on reset, an initial token of 1 is obtained by inverting
+/// both the input and the output of the Init.
+Value createLoopInit(PatternRewriter &rewriter, Operation *bbFrom,
+                     Value condition, bool initialToken) {
+  if (!initialToken)
+    return getOrCreateInit(rewriter, bbFrom, condition);
+  Value invertedCond =
+      getOrCreateInvertedCondition(rewriter, bbFrom, condition);
+  Value init = getOrCreateInit(rewriter, bbFrom, invertedCond);
+  return getOrCreateInvertedCondition(rewriter, bbFrom, init);
 }
 
 /// Erases unconditional branches (which would eventually lower to simple
@@ -541,24 +574,30 @@ struct RemoveBranchIfThenElse : public OpRewritePattern<MuxOrMergeOp> {
         1)
       return failure();
 
-    Value firstBranchCondition = firstBranchOperand.getConditionOperand();
-    Value secondBranchCondition = secondBranchOperand.getConditionOperand();
-
-    if (isMux) {
-      if (isa_and_nonnull<handshake::NotIOp>(
-              firstBranchCondition.getDefiningOp()))
-        firstBranchCondition =
-            firstBranchCondition.getDefiningOp()->getOperand(0);
-      if (isa_and_nonnull<handshake::NotIOp>(
-              secondBranchCondition.getDefiningOp()))
-        secondBranchCondition =
-            secondBranchCondition.getDefiningOp()->getOperand(0);
-    }
-
-    // If the two original conditions are not equivalent, the pattern match
-    // fails
-    if (firstBranchCondition != secondBranchCondition)
+    // The two Suppresses must have opposite conditions, so that exactly one of
+    // them lets each data token through; otherwise, the pattern match fails
+    bool isFirstNegated, isSecondNegated;
+    Value firstBranchCondition =
+        stripNots(firstBranchOperand.getConditionOperand(), isFirstNegated);
+    Value secondBranchCondition =
+        stripNots(secondBranchOperand.getConditionOperand(), isSecondNegated);
+    if (firstBranchCondition != secondBranchCondition ||
+        isFirstNegated == isSecondNegated)
       return failure();
+
+    // A Mux must select each token from the Suppress that lets it through: a
+    // Suppress lets a token through when its condition is false, and the Mux
+    // selects its first input when its select is false, so the first Suppress
+    // must have the same condition as the select; otherwise, the pattern match
+    // fails
+    if (isMux) {
+      bool isSelectNegated;
+      Value select =
+          stripNots(cast<handshake::MuxOp>(muxOrMergeOp).getSelectOperand(),
+                    isSelectNegated);
+      if (select != firstBranchCondition || isSelectNegated != isFirstNegated)
+        return failure();
+    }
 
     // If the data input of the two Branches is not the same, the pattern match
     // fails
@@ -661,6 +700,10 @@ struct ExtractLoopCondition
     if (cmergeUsers.empty())
       return failure();
 
+    // Nothing to extract if the index is already unused
+    if (cmergeOp.getIndex().use_empty())
+      return failure();
+
     int cycleInputIdx;
     bool isCycleBranchTrueSucc;
     Operation *potentialBranchOp = returnBranchFormingCycle(
@@ -681,67 +724,16 @@ struct ExtractLoopCondition
     Value condition = condBranchOp.getConditionOperand();
     bool needNot = ((isCycleBranchTrueSucc && cycleInputIdx == 0) ||
                     (!isCycleBranchTrueSucc && cycleInputIdx == 1));
-    bool foundNot = false;
-    handshake::NotIOp existingNotOp;
-    Operation *potentialNotOp = isConditionInverted(condition);
-    if (potentialNotOp != nullptr) {
-      foundNot = true;
-      existingNotOp = cast<handshake::NotIOp>(potentialNotOp);
-    }
+    rewriter.setInsertionPoint(condBranchOp);
+    if (needNot)
+      condition =
+          getOrCreateInvertedCondition(rewriter, condBranchOp, condition);
 
-    // Identify the value of the Init token
-    int constVal = outsideInputIdx;
-
-    // Obtain the Start signal from the last argument of any block
-    Block *cmergeBlock = cmergeOp->getBlock();
-    MutableArrayRef<BlockArgument> l = cmergeBlock->getArguments();
-    if (l.empty())
-      return failure();
-    mlir::Value start = l.back();
-    if (!isa<NoneType, handshake::ControlType>(start.getType()))
-      return failure();
-
-    if (needNot) {
-      if (foundNot)
-        condition = existingNotOp.getResult();
-      else {
-        rewriter.setInsertionPoint(condBranchOp);
-        handshake::NotIOp notIOp = rewriter.create<handshake::NotIOp>(
-            condBranchOp->getLoc(), condition);
-        inheritBB(condBranchOp, notIOp);
-        condition = notIOp.getResult();
-      }
-    }
-
-    // Check if there is an already existing Init, i.e., a Merge fed from the
-    // iterCond
-    bool foundInit = false;
-    handshake::MergeOp existingInitOp;
-    Operation *potentialInitOp = isConditionFeedingInit(condition);
-    if (potentialInitOp != nullptr) {
-      foundInit = true;
-      existingInitOp = cast<handshake::MergeOp>(potentialInitOp);
-    }
-
-    Value muxSel;
-    if (foundInit) {
-      muxSel = existingInitOp.getResult();
-    } else {
-      // Create a new ConstantOp in the same block as that of the branch
-      // forming the cycle
-      Type constantType = rewriter.getIntegerType(1);
-      Value valueOfConstant = rewriter.create<handshake::ConstantOp>(
-          condBranchOp->getLoc(),
-          rewriter.getIntegerAttr(constantType, constVal), start);
-
-      // Create a new Init
-      ValueRange operands = {condition, valueOfConstant};
-      rewriter.setInsertionPoint(cmergeOp);
-      handshake::MergeOp mergeOp =
-          rewriter.create<handshake::MergeOp>(cmergeOp.getLoc(), operands);
-      muxSel = mergeOp.getResult();
-      inheritBB(cmergeOp, mergeOp);
-    }
+    // The Init selects the input coming from outside the loop at the first
+    // iteration, and follows the loop condition afterwards
+    rewriter.setInsertionPoint(cmergeOp);
+    Value muxSel = createLoopInit(rewriter, cmergeOp, condition,
+                                  /*initialToken=*/outsideInputIdx == 1);
 
     Value index = cmergeOp.getIndex();
     rewriter.replaceAllUsesWith(index, muxSel);
@@ -1360,13 +1352,15 @@ struct DistributeRepeats : public OpRewritePattern<MuxOrMergeOp> {
       // but now we want to return to it exactly one user to make this Repeat
       // meaningful For this, we simply choose the first user of the
       // newMuxOrMergeResult that is not equal to newBranch
-      Operation *oneUser;
+      Operation *oneUser = nullptr;
       for (auto newMergeUser : newMuxOrMergeOp->getResults()[0].getUsers()) {
         if (newMergeUser != newBranch) {
           oneUser = newMergeUser;
           break;
         }
       }
+      // There are at least two users left besides the loop Branches
+      assert(oneUser && "expected a user to move back to the old Repeat");
       int idxInUserOperands = 0;
       for (auto oneUserOperand : oneUser->getOperands()) {
         if (oneUserOperand == newMuxOrMergeResult)
@@ -1475,79 +1469,17 @@ struct ConvertLoopMergeToMux : public OpRewritePattern<handshake::MergeOp> {
     Value condition = condBranchOp.getConditionOperand();
     bool needNot = ((isTrueOutputOuter && mergeCycleInputIdx == 1) ||
                     (!isTrueOutputOuter && mergeCycleInputIdx == 0));
-    Value iterCond;
-    if (needNot) {
+    rewriter.setInsertionPoint(condBranchOp);
+    Value iterCond =
+        needNot
+            ? getOrCreateInvertedCondition(rewriter, condBranchOp, condition)
+            : condition;
 
-      // Check if the condition already feeds a NOT, no need to create a new one
-      bool foundNot = false;
-      handshake::NotIOp existingNotOp;
-      for (auto condRes : condition.getUsers()) {
-        if (isa_and_nonnull<handshake::NotIOp>(condRes)) {
-          foundNot = true;
-          existingNotOp = cast<handshake::NotIOp>(condRes);
-          break;
-        }
-      }
-      if (foundNot) {
-        iterCond = existingNotOp.getResult();
-      } else {
-        rewriter.setInsertionPoint(condBranchOp);
-        handshake::NotIOp notIOp = rewriter.create<handshake::NotIOp>(
-            condBranchOp->getLoc(), condition);
-        inheritBB(condBranchOp, notIOp);
-        iterCond = notIOp.getResult();
-      }
-
-    } else {
-      iterCond = condition;
-    }
-
-    // 2nd) Identify the value of the constant that will be triggered from Start
-    // and add it
-    // The value of the constant should be the mergeOuterInputIdx
-    int constVal = mergeOuterInputIdx;
-    // Obtain the start signal from the last argument of any block
-    Block *mergeBlock = mergeOp->getBlock();
-    MutableArrayRef<BlockArgument> l = mergeBlock->getArguments();
-    if (l.empty())
-      return failure();
-    mlir::Value start = l.back();
-    if (!isa<NoneType, handshake::ControlType>(start.getType()))
-      return failure();
-
-    // Check if there is an already existing INIT, i.e., a Merge fed from the
-    // iterCond
-    bool foundInit = false;
-    handshake::MergeOp existingInit;
-    for (auto iterCondRes : iterCond.getUsers()) {
-      if (isa_and_nonnull<handshake::MergeOp>(iterCondRes)) {
-        foundInit = true;
-        existingInit = cast<handshake::MergeOp>(iterCondRes);
-        break;
-      }
-    }
-
-    Value muxSel;
-    if (foundInit) {
-      muxSel = existingInit.getResult();
-    } else {
-      // Create a new ConstantOp in the same block as that of the branch
-      // forming the cycle
-      Type constantType = rewriter.getIntegerType(1);
-      rewriter.setInsertionPoint(mergeOp);
-      Value valueOfConstant = rewriter.create<handshake::ConstantOp>(
-          mergeOp->getLoc(), rewriter.getIntegerAttr(constantType, constVal),
-          start);
-
-      // 3rd) Add a new Merge operation to serve as the INIT
-      ValueRange operands = {iterCond, valueOfConstant};
-      rewriter.setInsertionPoint(mergeOp);
-      handshake::MergeOp initMergeOp =
-          rewriter.create<handshake::MergeOp>(mergeOp.getLoc(), operands);
-      inheritBB(mergeOp, initMergeOp);
-
-      muxSel = initMergeOp.getResult();
-    }
+    // 2nd) Add an Init that selects the input coming from outside the loop at
+    // the first iteration, and follows the loop condition afterwards
+    rewriter.setInsertionPoint(mergeOp);
+    Value muxSel = createLoopInit(rewriter, mergeOp, iterCond,
+                                  /*initialToken=*/mergeOuterInputIdx == 1);
 
     // Create a new muxOp and make it replace the mergeOp
     rewriter.setInsertionPoint(mergeOp);

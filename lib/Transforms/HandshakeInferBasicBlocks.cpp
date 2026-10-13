@@ -93,11 +93,13 @@ static LogicalResult inferLogicBB(Operation *op, unsigned &logicBB) {
 
   // Added an additional way for inferring a basic block which is important
   // for components added by the Term Rewrite Pass
-  if (llvm::isa_and_nonnull<handshake::ConditionalBranchOp>(op)) {
-    handshake::ConditionalBranchOp br =
-        cast<handshake::ConditionalBranchOp>(op);
-    logicBB = *getLogicBB(br.getConditionOperand().getDefiningOp());
-    return success();
+  if (auto br = dyn_cast<handshake::ConditionalBranchOp>(op)) {
+    Operation *condOp = br.getConditionOperand().getDefiningOp();
+    if (std::optional<unsigned> condBB =
+            condOp ? getLogicBB(condOp) : std::nullopt) {
+      logicBB = *condBB;
+      return success();
+    }
   }
 
   return failure();
