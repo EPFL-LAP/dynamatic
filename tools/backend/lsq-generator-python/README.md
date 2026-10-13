@@ -116,6 +116,10 @@ Configuration parameters needed for both chisel and Python based LSQ-generator c
     Pass `custom_suffix` (e.g. `'_ready'`) to replace the default `_i`/`_o` port
     suffix; it is appended after any array index (`io_ctrl` becomes `io_ctrl_0_ready`).
     The LSQ wrapper uses this to match the port names used by Dynamatic.
+    Note: this is only a workaround for Dynamatic's naming convention for the
+    handshake signals (`<name>_<index>_valid`/`_ready`, with the index before the
+    handshake suffix). It is currently only used in the wrapper; the core LSQ
+    signals should keep the default suffixes.
 
   - **core_gen/operators/**  
     Low-level functions that generate snippets:  
