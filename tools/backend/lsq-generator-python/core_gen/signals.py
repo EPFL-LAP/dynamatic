@@ -54,6 +54,8 @@ class Logic:
               instead of the default '_i'/'_o' port suffix,
               e.g. name 'io_ctrl' with custom_suffix '_ready' gives 'io_ctrl_0_ready'.
               Not allowed for registers, which need '_d'/'_q' to be distinguishable.
+              This is a workaround for the Dynamatic handshake naming convention
+              (<name>_<index>_valid/ready), currently only used by the LSQ wrapper.
         """
         # Type should be one of the four types.
         assert (type in ('i', 'o', 'w', 'r'))
@@ -89,7 +91,30 @@ class Logic:
             type = 'reg'
         return f'name: {self.name}\n' + f'type: {type}\n' + f'size: single bit\n'
 
-    def getNameRead(self, sufix='') -> str:
+    def getBaseNameRead(self, sufix='') -> str:
+        """
+        Returns the read name of the (sufix-indexed) signal, e.g. <name><sufix>_q for a register.
+        Not overridden, so subclasses use it to build their indexed names.
+        """
+        if (self.type == 'o'):
+            raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
+        name = self.name + sufix + self.suffix
+        if (self.type == 'r'):
+            return name + '_q'
+        return name
+
+    def getBaseNameWrite(self, sufix='') -> str:
+        """
+        Returns the write name of the (sufix-indexed) signal, e.g. <name><sufix>_d for a register.
+        """
+        if (self.type == 'i'):
+            raise TypeError(f'Cannot write to the input signal \"{self.name}\"!')
+        name = self.name + sufix + self.suffix
+        if (self.type == 'r'):
+            return name + '_d'
+        return name
+
+    def getNameRead(self) -> str:
         """
         Returns the name we should use when reading the signal.
 
@@ -97,45 +122,31 @@ class Logic:
             If you want to do "Logic a = Logic b + Logic c"
             -> getNameWrite(a) = getNameRead(b) + getNameRead(c)
         """
-        if (self.type == 'w'):
-            return self.add_sufix(sufix)
-        elif (self.type == 'r'):
-            return self.add_sufix(sufix) + '_q'
-        elif (self.type == 'i'):
-            return self.add_sufix(sufix)
-        elif (self.type == 'o'):
-            raise TypeError(f'Cannot read from the output signal \"{self.name}\"!')
+        return self.getBaseNameRead()
 
-    def getNameWrite(self, sufix='') -> str:
+    def getNameWrite(self) -> str:
         """
         Returns the name to write to.
 
         Example in the getNameRead() method.
         """
-        if (self.type == 'w'):
-            return self.add_sufix(sufix)
-        elif (self.type == 'r'):
-            return self.add_sufix(sufix) + '_d'
-        elif (self.type == 'i'):
-            raise TypeError(f'Cannot write to the input signal \"{self.name}\"!')
-        elif (self.type == 'o'):
-            return self.add_sufix(sufix)
+        return self.getBaseNameWrite()
 
     def signalInit(self, sufix='') -> None:
         """
         Appends the appropriate declaration or port line for this signal to a global buffer.
         """
         if (self.type == 'w'):
-            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)} : std_logic;\n')
+            self.ctx.add_signal_str(f'\tsignal {self.getBaseNameWrite(sufix)} : std_logic;\n')
         elif (self.type == 'r'):
-            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_d : std_logic;\n')
-            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_q : std_logic;\n')
+            self.ctx.add_signal_str(f'\tsignal {self.getBaseNameWrite(sufix)} : std_logic;\n')
+            self.ctx.add_signal_str(f'\tsignal {self.getBaseNameRead(sufix)} : std_logic;\n')
         elif (self.type == 'i'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)} : in std_logic')
+            self.ctx.add_port_str(f'\t\t{self.getBaseNameRead(sufix)} : in std_logic')
         elif (self.type == 'o'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)} : out std_logic')
+            self.ctx.add_port_str(f'\t\t{self.getBaseNameWrite(sufix)} : out std_logic')
 
     def regInit(self, enable=None, init=None) -> None:
         """
@@ -162,9 +173,6 @@ class Logic:
         else:
             self.ctx.add_reg_str(f'\t\t\t{self.getNameRead()} <= {self.getNameWrite()};\n')
         self.ctx.add_reg_str('\t\tend if;\n')
-
-    def add_sufix(self, sufix):
-        return self.name + sufix + self.suffix
 
 #
 # std_logic_vec
@@ -218,32 +226,32 @@ class LogicVec(Logic):
             type = 'reg'
         return f'name: {self.name}\n' + f'type: {type}\n' + f'size: {self.size}\n'
 
-    def getNameRead(self, i=None, sufix='') -> str:
+    def getNameRead(self, i=None) -> str:
         if (i == None):
-            return Logic.getNameRead(self, sufix)
+            return self.getBaseNameRead()
         else:
             assert (i < self.size)
-            return Logic.getNameRead(self, sufix) + f'({i})'
+            return self.getBaseNameRead() + f'({i})'
 
-    def getNameWrite(self, i=None, sufix='') -> str:
+    def getNameWrite(self, i=None) -> str:
         if (i == None):
-            return Logic.getNameWrite(self, sufix)
+            return self.getBaseNameWrite()
         else:
             assert (i < self.size)
-            return Logic.getNameWrite(self, sufix) + f'({i})'
+            return self.getBaseNameWrite() + f'({i})'
 
     def signalInit(self, sufix=''):
         if (self.type == 'w'):
-            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)} : std_logic_vector({self.size-1} downto 0);\n')
+            self.ctx.add_signal_str(f'\tsignal {self.getBaseNameWrite(sufix)} : std_logic_vector({self.size-1} downto 0);\n')
         elif (self.type == 'r'):
-            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_d : std_logic_vector({self.size-1} downto 0);\n')
-            self.ctx.add_signal_str(f'\tsignal {self.add_sufix(sufix)}_q : std_logic_vector({self.size-1} downto 0);\n')
+            self.ctx.add_signal_str(f'\tsignal {self.getBaseNameWrite(sufix)} : std_logic_vector({self.size-1} downto 0);\n')
+            self.ctx.add_signal_str(f'\tsignal {self.getBaseNameRead(sufix)} : std_logic_vector({self.size-1} downto 0);\n')
         elif (self.type == 'i'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)} : in std_logic_vector({self.size-1} downto 0)')
+            self.ctx.add_port_str(f'\t\t{self.getBaseNameRead(sufix)} : in std_logic_vector({self.size-1} downto 0)')
         elif (self.type == 'o'):
             self.ctx.add_port_str(';\n')
-            self.ctx.add_port_str(f'\t\t{self.add_sufix(sufix)} : out std_logic_vector({self.size-1} downto 0)')
+            self.ctx.add_port_str(f'\t\t{self.getBaseNameWrite(sufix)} : out std_logic_vector({self.size-1} downto 0)')
 
     def regInit(self, enable=None, init=None) -> None:
         assert (self.type == 'r')
@@ -297,11 +305,11 @@ class LogicArray(Logic):
 
     def getNameRead(self, i) -> str:
         assert i in range(0, self.length)
-        return Logic.getNameRead(self, f'_{i}')
+        return self.getBaseNameRead(f'_{i}')
 
     def getNameWrite(self, i) -> str:
         assert i in range(0, self.length)
-        return Logic.getNameWrite(self, f'_{i}')
+        return self.getBaseNameWrite(f'_{i}')
 
     def signalInit(self) -> None:
         for i in range(0, self.length):
@@ -367,11 +375,17 @@ class LogicVecArray(LogicVec):
 
     def getNameRead(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        return LogicVec.getNameRead(self, j, f'_{i}')
+        if (j == None):
+            return self.getBaseNameRead(f'_{i}')
+        assert (j < self.size)
+        return self.getBaseNameRead(f'_{i}') + f'({j})'
 
     def getNameWrite(self, i, j=None) -> str:
         assert i in range(0, self.length)
-        return LogicVec.getNameWrite(self, j, f'_{i}')
+        if (j == None):
+            return self.getBaseNameWrite(f'_{i}')
+        assert (j < self.size)
+        return self.getBaseNameWrite(f'_{i}') + f'({j})'
 
     def signalInit(self) -> None:
         for i in range(0, self.length):
