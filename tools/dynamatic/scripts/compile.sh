@@ -173,6 +173,8 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
 # - licm: moving the code outside the loops as much as possible
+# - instsimplify: fold leftovers of loop passes (e.g., "icmp eq 1, 0"), so that
+# memory ops are not erased in MLIR after the dependency analysis.
 #
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
@@ -183,7 +185,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,instsimplify,simplifycfg,dce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
