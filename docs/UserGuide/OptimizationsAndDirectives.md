@@ -131,6 +131,11 @@ The strategy for managing memory accesses is based on the concept of groups.
 
 Determining a correct order of accesses within a group can be done easily using static analysis and can be encoded into the LSQ at compile time. The LSQ component has as many load/store ports as there are load/store operations in the program. These ports are clustered by groups, with every port belonging to one group. Whenever a group is "activated", all load/store operations belonging to that group are allocated in the LSQ in the sequence that was determined by static analysis. Once a group has been allocated, the LSQ expects each of the corresponding ports to eventually get an access; dependencies will be resolved based on the order of entries in the LSQ.  
 
+By default, the load and store queues of each LSQ have a depth of 16. To size them from the CFDFCs and initiation intervals found by buffer placement, pass the `--lsq-sizing` flag to the `compile` command (this requires an MILP-based buffer placement algorithm, e.g., `--buffer-algorithm fpga20`; with `on-merges`, the LSQs keep the default depth):
+```sh
+compile <...> --buffer-algorithm fpga20 --lsq-sizing
+```
+
 > [!WARNING]  
 > A significant area improvement can be achieved by disabling the use of LSQs but this must be used cautiously.
 

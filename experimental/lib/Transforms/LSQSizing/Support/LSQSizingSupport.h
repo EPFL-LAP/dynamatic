@@ -13,6 +13,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef DYNAMATIC_EXPERIMENTAL_LIB_TRANSFORMS_LSQSIZING_SUPPORT_LSQSIZINGSUPPORT_H
+#define DYNAMATIC_EXPERIMENTAL_LIB_TRANSFORMS_LSQSIZING_SUPPORT_LSQSIZINGSUPPORT_H
+
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/TimingModels.h"
@@ -24,9 +27,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#ifndef DYNAMATIC_TRANSFORMS_LSQSIZING_LSQSIZINGSUPPORT_H
-#define DYNAMATIC_TRANSFORMS_LSQSIZING_LSQSIZINGSUPPORT_H
 
 namespace dynamatic {
 namespace experimental {
@@ -52,10 +52,10 @@ struct CFDFCNode {
 
 class CFDFCGraph {
 public:
-  /// Constructor for the graph, which takes a Vector of BBs, which make up a
-  /// single CFDFC
-  CFDFCGraph(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
-             TimingDatabase timingDB, unsigned II, double targetCP);
+  /// Constructor for the graph, which takes the units and channels of a
+  /// single CFDFC (as found by buffer placement)
+  CFDFCGraph(const buffer::CFDFC &cfdfc, const TimingDatabase &timingDB,
+             unsigned II, double targetCP);
 
   /// Adds the edges between the start node and the start node candidates, with
   /// their respective shifting in the start time These edges are necessary to
@@ -196,4 +196,4 @@ private:
 } // namespace experimental
 } // namespace dynamatic
 
-#endif // DYNAMATIC_TRANSFORMS_LSQSIZING_LSQSIZINGSUPPORT_H
+#endif // DYNAMATIC_EXPERIMENTAL_LIB_TRANSFORMS_LSQSIZING_SUPPORT_LSQSIZINGSUPPORT_H

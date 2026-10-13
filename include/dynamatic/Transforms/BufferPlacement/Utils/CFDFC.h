@@ -48,7 +48,7 @@ struct CFDFC {
   unsigned numExecs;
 
   /// (Available after placement) The achieved throughput after the placement
-  double throughput;
+  double throughput = 0.0;
   /// (Available after placement) The number of tokens held by each placed
   /// buffer.
   mlir::DenseMap<Operation *, double> bufferOccupancy;

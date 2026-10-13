@@ -26,6 +26,7 @@ ENABLE_SHORT_CIRCUIT=${16}
 ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
+USE_LSQ_SIZING=${20:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -376,6 +377,14 @@ if [[ $USE_SHARING -ne 0 ]]; then
 fi
 
 
+# LSQ sizing (runs right after buffer placement, whose CFDFC analysis it uses;
+# without one, e.g. with on-merges, LSQs keep the default depth)
+LSQ_SIZING_PASS=""
+if [[ $USE_LSQ_SIZING -ne 0 ]]; then
+  LSQ_SIZING_PASS="--handshake-size-lsqs=timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP"
+  echo_info "Set to size the LSQs after buffer placement."
+fi
+
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
@@ -384,6 +393,7 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER timing-models=$DYNAMATIC_DIR/data/components.json" \
+    ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
@@ -420,6 +430,7 @@ else
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$FAST_TOKEN_DELIVERY \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
+    ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     --handshake-size-select-depth \
     > "$F_HANDSHAKE_BUFFERED"
