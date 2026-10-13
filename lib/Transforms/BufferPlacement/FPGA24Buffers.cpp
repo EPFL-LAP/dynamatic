@@ -405,6 +405,11 @@ FailureOr<LatencyBalancingResult> FPGA24Buffers::solveLatencyBalancing(
 
   LatencyBalancingResult result = latencyBalancingLP.extractLatencyResults();
 
+  // Record the throughput of each CFDFC (the inverse of its target II) for the
+  // passes that use the CFDFC analysis (e.g., LSQ sizing)
+  for (auto &[cfdfc, ii] : result.cfdfcTargetIIs)
+    cfdfc->throughput = ii > 0.0 ? 1.0 / ii : 0.0;
+
   LLVM_DEBUG({
     llvm::errs() << "=== Verifying CFDFC Cycle Latencies After LP1 ===\n";
     for (auto [cfdfcIdx, cfdfc] : llvm::enumerate(cfdfcs)) {

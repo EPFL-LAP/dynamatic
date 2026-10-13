@@ -21,6 +21,7 @@
 #include <iostream>
 #include <optional>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -152,6 +153,8 @@ struct IntegrationTest {
   unsigned clockPeriod = 5;
   // Insert an II monitor per loop of the circuit.
   bool instrumentII = false;
+  // Size the LSQs from the buffer placement CFDFCs.
+  bool useLSQSizing = false;
 
   // Results
   int simTime;
@@ -195,6 +198,7 @@ int IntegrationTest::run() {
              << (this->useSpeculation ? " --speculation" : "")
              << (this->useDuplication ? " --enable-duplication" : "")
              << (this->instrumentII ? " --instrument-ii" : "")
+             << (this->useLSQSizing ? " --lsq-sizing" : "")
              << " --milp-solver " << this->milpSolver << std::endl;
   // clang-format on
 
@@ -297,6 +301,7 @@ class SpecFixture : public BaseFixture {};
 class DuplicationFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
+class LSQSizingFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
@@ -470,6 +475,38 @@ TEST_P(SharingFixture, sharing_NoCI) {
 
   RecordProperty("cycles", std::to_string(configWithSharing.simTime));
   logPerformance(configWithSharing.simTime);
+}
+
+/// Compiles the benchmark with LSQ sizing enabled, checks that the circuit is
+/// still correct, and that the sizing pass did set the depths of its LSQs.
+TEST_P(LSQSizingFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .useLSQSizing = true,
+      .simTime = -1,
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+
+  // The sized depths are stored as an attribute of each LSQ
+  fs::path exportPath = config.benchmarkPath / config.name /
+                        ("out_" + config.testName) / "comp" /
+                        "handshake_export.mlir";
+  std::ifstream exportFile(exportPath);
+  std::stringstream exportIR;
+  exportIR << exportFile.rdbuf();
+  EXPECT_NE(exportIR.str().find("handshake.lsqDepth"), std::string::npos)
+      << "No LSQ was sized in " << exportPath;
+
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
 }
 
 TEST_P(SpecFixture, spec) {
@@ -852,6 +889,11 @@ INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
     [](const auto &info) {
     return "sharing_" + info.param;
     });
+
+INSTANTIATE_TEST_SUITE_P(LSQSizingBenchmarks, LSQSizingFixture,
+                         testing::Values("atax", "bicg", "histogram",
+                                         "triangular"),
+                         [](const auto &info) { return info.param; });
 
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
     testing::Values(

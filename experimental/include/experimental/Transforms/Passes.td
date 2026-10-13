@@ -92,16 +92,22 @@ def HandshakePlaceBuffersCustom : Pass<"handshake-placebuffers-custom", "mlir::M
 def HandshakeSizeLSQs : Pass<"handshake-size-lsqs", "mlir::ModuleOp"> {
   let summary = "Size the LSQs based on the buffer placement information.";
   let description = [{
-    Calculates the necessary Load-Store-Queue depths, based on the buffer placement information, 
-    to ensure that the memory accesses are not restricting the circuits troughput, while 
-    trying to keep the area as low as possible.  
+    Calculates the necessary Load-Store-Queue depths, based on the buffer
+    placement information, to ensure that the memory accesses are not
+    restricting the circuit's throughput, while trying to keep the area as low
+    as possible. The CFDFCs and their throughputs are taken from the CFDFC
+    analysis of the buffer placement pass, which must run (with an MILP-based
+    algorithm) before this pass in the same pass pipeline. The resulting depths
+    are stored in the `handshake.lsqDepth` attribute of each LSQ.
   }];
-  
+
   let options = [Option<"timingModels", "timing-models", "std::string", "",
       "Path to JSON-formatted file containing timing models for dataflow "
       "components.">,
-      Option<"collisions", "collisions", "std::string", "",
-      "Three different cases for memory collsions: none/half/full">,
+      Option<"collisions", "collisions", "std::string", "\"none\"",
+      "Memory collisions assumed for sizing: 'none' (II from buffer "
+      "placement), 'full' (worst-case II of a memory dependency), or 'half' "
+      "(alternating between the two)">,
       Option<"targetCP", "target-period", "double", "4.0",
       "Target clock period for the LSQ pass">];
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];

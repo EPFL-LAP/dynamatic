@@ -1,4 +1,4 @@
-//===- HandshakeSizeLSQs.cpp - LSQ Sizing -----------------------*- C++ -*-===//
+//===- HandshakeSizeLSQ.cpp - LSQ Sizing ------------------------*- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,15 +12,14 @@
 
 #include <utility>
 
-#include <utility>
-
+#include "Support/LSQSizingSupport.h"
+#include "dynamatic/Analysis/CFDFCAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/Attribute.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/TimingModels.h"
-#include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -76,9 +75,9 @@ private:
 
   /// Determines the LSQ sizes, given a CFDFC and its II
   std::optional<LSQSizingResult>
-  sizeLSQsForCFDFC(handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
-                   TimingDatabase timingDB, unsigned initialII,
-                   const std::string &collisions, double targetCP);
+  sizeLSQsForCFDFC(const CFDFC &cfdfc, const TimingDatabase &timingDB,
+                   unsigned initialII, const std::string &collisions,
+                   double targetCP);
 
   /// Finds the Start Node in a CFDFC
   /// The start node, is the node with the longest non-cyclic path to any other
@@ -149,64 +148,52 @@ void HandshakeSizeLSQsPass::runOnOperation() {
   if (!namer.isAnalysisValid())
     return signalPassFailure();
 
-  llvm::SmallVector<LSQSizingResult> sizingResults;
+  mlir::ModuleOp mod = getOperation();
+
+  if (collisions != "none" && collisions != "half" && collisions != "full") {
+    mod.emitError() << "Unknown LSQ collisions '" << collisions
+                    << "', expected 'none', 'half', or 'full'";
+    return signalPassFailure();
+  }
+
+  // The CFDFCs and their throughputs are provided by the buffer placement pass,
+  // which must run before this pass in the same pass pipeline. Without them
+  // (e.g., when buffers are placed with the non-MILP on-merges algorithm), the
+  // LSQs keep their default depth
+  auto cfdfcAnalysis = getCachedAnalysis<CFDFCAnalysis>();
+  if (!cfdfcAnalysis) {
+    mod.emitWarning() << "No CFDFC analysis from MILP-based buffer placement "
+                         "(--handshake-place-buffers) in the same pass "
+                         "pipeline, LSQs keep their default depth";
+    markAllAnalysesPreserved();
+    return;
+  }
 
   // Read component latencies
   TimingDatabase timingDB;
   if (failed(TimingDatabase::readFromJSON(timingModels, timingDB)))
-    signalPassFailure();
+    return signalPassFailure();
 
-  mlir::ModuleOp mod = getOperation();
   for (handshake::FuncOp funcOp : mod.getOps<handshake::FuncOp>()) {
-
-    std::unordered_map<unsigned, llvm::SetVector<unsigned>> cfdfcBBLists;
-    std::unordered_map<unsigned, float> cfdfcIIMap;
-
-    // Extract CFDFCs and II from the Attributes
-    auto throughputAttr =
-        getDialectAttr<handshake::CFDFCThroughputAttr>(funcOp);
-    auto cfdfcAttr = getDialectAttr<handshake::CFDFCToBBListAttr>(funcOp);
-
-    if (throughputAttr == nullptr || cfdfcAttr == nullptr)
+    auto cfdfcsIt = cfdfcAnalysis->get().mapFuncOpToCFDFCs.find(funcOp);
+    if (cfdfcsIt == cfdfcAnalysis->get().mapFuncOpToCFDFCs.end())
       continue;
-
-    DictionaryAttr throughputDict = throughputAttr.getThroughputMap();
-    DictionaryAttr cfdfcDict = cfdfcAttr.getCfdfcMap();
-
-    // Convert Attribute into better usable data structure
-    for (const mlir::NamedAttribute attr : cfdfcDict) {
-      ArrayAttr bbList = llvm::dyn_cast<ArrayAttr>(attr.getValue());
-      llvm::SetVector<unsigned> cfdfcBBs;
-      for (auto bb : bbList)
-        cfdfcBBs.insert(bb.cast<IntegerAttr>().getUInt());
-
-      unsigned index;
-      if (attr.getName().getValue().getAsInteger(10, index))
-        signalPassFailure();
-
-      cfdfcBBLists.insert({index, cfdfcBBs});
-    }
-
-    // Extract II from Attribute
-    for (const NamedAttribute attr : throughputDict) {
-      FloatAttr throughput = llvm::dyn_cast<FloatAttr>(attr.getValue());
-      cfdfcIIMap.insert({std::stoi(attr.getName().str()),
-                         round(1 / throughput.getValueAsDouble())});
-    }
 
     std::map<mlir::Operation *, std::tuple<unsigned, unsigned>>
         maxLoadStoreSizes;
     // Size LSQs for each CFDFC
     // And extract maximum Queue sizes for each LSQ
-    for (auto &entry : cfdfcBBLists) {
-      // If there is no II corresponding to the CFDFC skip it
-      // Something is wrong with the attributes in that case
-      if (cfdfcIIMap.find(entry.first) == cfdfcIIMap.end())
+    for (const CFDFC &cfdfc : cfdfcsIt->second) {
+      // The II achieved by buffer placement; skip the CFDFC if it has none
+      if (cfdfc.throughput <= 0.0) {
+        funcOp.emitWarning() << "CFDFC has no throughput from buffer "
+                                "placement, skipping it for LSQ sizing";
         continue;
+      }
+      unsigned ii = std::max(1u, (unsigned)std::lround(1 / cfdfc.throughput));
 
       std::optional<LSQSizingResult> result =
-          sizeLSQsForCFDFC(funcOp, entry.second, timingDB,
-                           cfdfcIIMap.at(entry.first), collisions, targetCP);
+          sizeLSQsForCFDFC(cfdfc, timingDB, ii, collisions, targetCP);
 
       if (result) {
         for (auto &entry : result.value()) {
@@ -243,16 +230,16 @@ void HandshakeSizeLSQsPass::runOnOperation() {
   // do not currently have a name
   if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
     return signalPassFailure();
-  markAnalysesPreserved<NameAnalysis>();
+  // Only attributes are added, so the CFDFC analysis remains valid for the
+  // passes that follow (e.g., resource sharing)
+  markAllAnalysesPreserved();
 }
 
 std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
-    handshake::FuncOp funcOp, llvm::SetVector<unsigned> cfdfcBBs,
-    TimingDatabase timingDB, unsigned initialII, const std::string &collisions,
-    double targetCP) {
+    const CFDFC &cfdfc, const TimingDatabase &timingDB, unsigned initialII,
+    const std::string &collisions, double targetCP) {
 
-  CFDFCGraph graph(funcOp, std::move(cfdfcBBs), std::move(timingDB), initialII,
-                   targetCP);
+  CFDFCGraph graph(cfdfc, timingDB, initialII, targetCP);
 
   // We only want LSQ loads and stores (not MC loads and stores), therefore we
   // need to check if they are connected to an LSQ
@@ -314,11 +301,14 @@ std::optional<LSQSizingResult> HandshakeSizeLSQsPass::sizeLSQsForCFDFC(
   // would need further investigation by someone familiar with the buffer
   // placement pass
 
+  // The worst-case II is 0 when no load reaches a store of the same LSQ within
+  // the CFDFC; collisions can only slow the loop down, so never go below the
+  // buffer-placement II
   if (collisions == "full") {
-    IIs.push_back(graph.getWorstCaseII());
+    IIs.push_back(std::max(initialII, graph.getWorstCaseII()));
   } else if (collisions == "half") {
     IIs.push_back(initialII);
-    IIs.push_back(graph.getWorstCaseII());
+    IIs.push_back(std::max(initialII, graph.getWorstCaseII()));
   } else {
     // none is the default case
     IIs.push_back(initialII);
@@ -633,6 +623,7 @@ HandshakeSizeLSQsPass::calcQueueSize(
     // Alternate trough the different IIs in the order they are in the array
     while (startOffset < maxEndTime) {
       unsigned ii = listOfII[iter % listOfII.size()];
+      assert(ii > 0 && "II must be positive");
 
       for (auto &allocTime : std::get<0>(entry.second.at(ii))) {
         int t = allocTime + startOffset;
