@@ -815,6 +815,9 @@ LogicalResult experimental::ftd::addGsaGates(
             operands.emplace_back(be);
             // Remember how to resolve it later
             (*pendingMuxOperands)[val].push_back(be);
+            // The caller resolves the backedge and erases its placeholder, so
+            // the builder must not erase it when going out of scope
+            beb.abandon();
           }
         }
         operandIndex++;

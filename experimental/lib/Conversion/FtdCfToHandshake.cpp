@@ -476,8 +476,9 @@ static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
   // Get the start value of the current function
   auto startValue = (Value)funcOp.getArguments().back();
 
-  // For each undefined value
-  auto undefinedValues = funcOp.getBody().getOps<LLVM::UndefOp>();
+  // For each undefined value, which is replaced while iterating
+  auto undefinedValues =
+      llvm::make_early_inc_range(funcOp.getBody().getOps<LLVM::UndefOp>());
 
   for (auto undefOp : undefinedValues) {
     // Create an attribute of the appropriate type for the constant
@@ -540,8 +541,9 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
   auto startValue = (Value)funcOp.getArguments().back();
   llvm::DenseMap<Block *, Value> sourcesPerBlock;
 
-  // For each constant
-  auto constants = funcOp.getBody().getOps<mlir::arith::ConstantOp>();
+  // For each constant, which is replaced while iterating
+  auto constants = llvm::make_early_inc_range(
+      funcOp.getBody().getOps<mlir::arith::ConstantOp>());
   for (auto cstOp : constants) {
 
     rewriter.setInsertionPoint(cstOp);
@@ -602,6 +604,19 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
                          &pendingMuxOperands)))
     return failure();
 
+  // The pending operands are block arguments, which the signature conversion
+  // below replaces, possibly together with their block. Anchor each of them
+  // with a temporary use, which the conversion updates, to find their
+  // replacement afterwards
+  SmallVector<std::pair<Operation *, SmallVector<Backedge, 2>>> anchors;
+  for (auto &[originalValue, backedges] : pendingMuxOperands) {
+    rewriter.setInsertionPointAfterValue(originalValue);
+    auto anchor = rewriter.create<UnrealizedConversionCastOp>(
+        originalValue.getLoc(), originalValue.getType(), originalValue);
+    anchors.emplace_back(anchor, std::move(backedges));
+  }
+  pendingMuxOperands.clear();
+
   // First lower the parent function itself, without modifying its body
   auto funcOrFailure = lowerSignature(lowerFuncOp, rewriter);
   if (failed(funcOrFailure))
@@ -610,14 +625,17 @@ LogicalResult ftd::FtdLowerFuncToHandshake::matchAndRewrite(
   if (funcOp.isExternal())
     return success();
 
-  for (auto &[originalValue, backedges] : pendingMuxOperands) {
-    Value newVal = rewriter.getRemappedValue(originalValue);
+  for (auto &[anchor, backedges] : anchors) {
+    Value newVal = rewriter.getRemappedValue(anchor->getOperand(0));
     assert(newVal && "Failed to remap GSA mux operand!");
 
-    for (Backedge &be : backedges)
+    for (Backedge &be : backedges) {
+      Operation *placeholder = Value(be).getDefiningOp();
       be.setValue(newVal);
+      rewriter.eraseOp(placeholder);
+    }
+    rewriter.eraseOp(anchor);
   }
-  pendingMuxOperands.clear();
 
   // Stores mapping from each value that passes through a merge-like
   // operation to the data result of that merge operation
