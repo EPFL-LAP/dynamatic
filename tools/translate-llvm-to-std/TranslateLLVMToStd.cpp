@@ -19,6 +19,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
@@ -219,7 +220,50 @@ void TranslateLLVMToStd::translateLLVMModule() {
   }
 }
 
+/// Folds chains of byte-addressed GEPs (each with an i8 source element type
+/// and a single index) into a single GEP whose offset is the sum of theirs.
+/// LLVM can split the address of an aligned access into byte offsets that are
+/// not whole numbers of elements on their own (e.g., "%p = getelementptr i8,
+/// ptr %bank, i64 %i" then "getelementptr i8, ptr %p, i64 -1" to access the
+/// element at byte offset %i - 1), while the translation computes the element
+/// index of each GEP separately.
+static void foldByteGEPChains(llvm::Function *llvmFunc) {
+  auto isByteGEP = [](llvm::GetElementPtrInst *gep) {
+    return gep && gep->getSourceElementType()->isIntegerTy(8) &&
+           gep->getNumIndices() == 1;
+  };
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (llvm::BasicBlock &block : *llvmFunc) {
+      for (llvm::Instruction &inst : llvm::make_early_inc_range(block)) {
+        auto *outer = dyn_cast<llvm::GetElementPtrInst>(&inst);
+        if (!isByteGEP(outer))
+          continue;
+        auto *inner =
+            dyn_cast<llvm::GetElementPtrInst>(outer->getPointerOperand());
+        if (!isByteGEP(inner))
+          continue;
+        llvm::IRBuilder<> irBuilder(outer);
+        llvm::Value *innerIdx = *inner->idx_begin();
+        llvm::Value *outerIdx = *outer->idx_begin();
+        llvm::Type *idxType = outerIdx->getType();
+        innerIdx = irBuilder.CreateSExtOrTrunc(innerIdx, idxType);
+        llvm::Value *sum = irBuilder.CreateAdd(innerIdx, outerIdx);
+        llvm::Value *folded = irBuilder.CreateGEP(
+            irBuilder.getInt8Ty(), inner->getPointerOperand(), sum);
+        outer->replaceAllUsesWith(folded);
+        outer->eraseFromParent();
+        if (inner->use_empty())
+          inner->eraseFromParent();
+        changed = true;
+      }
+    }
+  }
+}
+
 void TranslateLLVMToStd::translateFunction(llvm::Function *llvmFunc) {
+  foldByteGEPChains(llvmFunc);
 
   SmallVector<mlir::Type> argTypes =
       getFuncArgTypes(llvmFunc->getName().str(), argMap, builder);
@@ -656,56 +700,69 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
   SmallVector<mlir::Value> multipliedIndices;
 
+  // The memory is flattened into a 1D memref, whose elements the computed
+  // index counts. The GEP's own element type may be narrower than them: e.g.,
+  // clang emits "getelementptr [4 x i8], ptr %a, i64 %i" to access the i32
+  // element %i, and LLVM canonicalizes constant offsets to
+  // "getelementptr i8, ptr %a, i64 4". The stride of each GEP index is thus
+  // computed in bits and converted into a number of memref elements
+  // Strides are counted in the elements' sizes in memory (e.g., 16 bits for
+  // a 12-bit integer), as given by the data layout
+  const llvm::DataLayout &dl = gepInst->getModule()->getDataLayout();
+  int64_t baseElemBitWidth =
+      dl.getTypeAllocSizeInBits(baseElementType).getFixedValue();
+  int64_t memrefElemBitWidth = baseElemBitWidth;
+  if (auto it = llvmPtrToMemRefMap.find(baseAddressLLVM);
+      it != llvmPtrToMemRefMap.end()) {
+    mlir::Type elemType =
+        cast<MemRefType>(it->second.getType()).getElementType();
+    llvm::Type *llvmElemType =
+        isa<FloatType>(elemType)
+            ? (elemType.isF64() ? llvm::Type::getDoubleTy(gepInst->getContext())
+                                : llvm::Type::getFloatTy(gepInst->getContext()))
+            : static_cast<llvm::Type *>(llvm::IntegerType::get(
+                  gepInst->getContext(), elemType.getIntOrFloatBitWidth()));
+    memrefElemBitWidth =
+        dl.getTypeAllocSizeInBits(llvmElemType).getFixedValue();
+  }
+
   // [START calculate the flattened array indices]
   for (size_t i = 0; i < gepIndices.size(); ++i) {
     mlir::Value mlirIndexValue = valueMap[gepIndices[i]];
 
-    // Calculate the partitial index
-    int64_t coeff = 1;
+    // Calculate the partitial index's stride, in bits
+    int64_t strideBitWidth = baseElemBitWidth;
     for (size_t j = i; j < multipliers.size(); j++)
-      coeff *= multipliers[j];
+      strideBitWidth *= multipliers[j];
 
-    if (coeff == 1) {
+    if (strideBitWidth % memrefElemBitWidth != 0) {
+      // The index advances by a fraction of a memref element (e.g., by bytes in
+      // "getelementptr i8, ptr %a, i64 %offset"). The access is aligned to an
+      // element, so the offset is a whole number of elements
+      assert(memrefElemBitWidth % strideBitWidth == 0 &&
+             "GEP stride is not a fraction of the element size");
+      int64_t ratio = memrefElemBitWidth / strideBitWidth;
       if (auto *constVal = dyn_cast<Constant>(gepIndices[i])) {
-        // Special case: when the GEP index is a constant number
-        //
-        // Here we need to handle tricky examples like this:
-        // %arrayidx2 = getelementptr inbounds nuw i8, ptr %2, i64 4
-        //
-        // Here we are using GEP to advance 4 * i8 = 32 bits. If the
-        // element of the original array was 32-bit wide, then here we need to
-        // increment 1 step (instead of 4).
-        auto memrefType = dyn_cast<MemRefType>(
-            this->llvmPtrToMemRefMap.at(baseAddressLLVM).getType());
-        assert(memrefType);
-
-        // This is the size of the actual element (i.e., for 32 in the example
-        // above).
-        unsigned actualBaseElementWidth = memrefType.getElementTypeBitWidth();
-
-        // This is the size that the current GEP assumes (i.e., for i8 in the
-        // example above).
-        unsigned currBaseElementBitWidth =
-            baseElementType->getScalarSizeInBits();
-
-        // This the the number of `currBaseElementBitWidth` that we need to skip
-        // (i.e., 4 in the example above).
         int64_t constInt = *constVal->getUniqueInteger().getRawData();
-
-        assert((currBaseElementBitWidth * constInt) % actualBaseElementWidth ==
-                   0 &&
-               "Incorrect alignment!");
-
-        unsigned actualAdvanceValue =
-            (currBaseElementBitWidth * constInt) / actualBaseElementWidth;
-
-        auto byteAlignedConstantValue = builder.create<arith::ConstantOp>(
-            UnknownLoc::get(ctx), builder.getIndexAttr(actualAdvanceValue));
-        multipliedIndices.push_back(byteAlignedConstantValue);
-      } else {
-        multipliedIndices.push_back(mlirIndexValue);
+        assert(constInt % ratio == 0 && "Incorrect alignment!");
+        multipliedIndices.push_back(builder.create<arith::ConstantOp>(
+            UnknownLoc::get(ctx), builder.getIndexAttr(constInt / ratio)));
+        continue;
       }
+      assert(llvm::isPowerOf2_64(ratio) &&
+             "element size is not a power-of-two multiple of the GEP stride");
+      auto shiftValue = builder.create<arith::ConstantOp>(
+          UnknownLoc::get(ctx), builder.getIntegerAttr(mlirIndexValue.getType(),
+                                                       llvm::Log2_64(ratio)));
+      multipliedIndices.push_back(builder.create<arith::ShRUIOp>(
+          UnknownLoc::get(ctx), mlirIndexValue, shiftValue));
+      continue;
+    }
 
+    // The stride, in memref elements
+    int64_t coeff = strideBitWidth / memrefElemBitWidth;
+    if (coeff == 1) {
+      multipliedIndices.push_back(mlirIndexValue);
     } else if (llvm::isPowerOf2_64(coeff)) {
       // Special case: the array dimension is a power of two.
       // Here we can apply the optimization: multiply by power of 2 is the same
