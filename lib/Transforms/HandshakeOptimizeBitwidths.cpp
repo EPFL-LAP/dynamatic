@@ -265,7 +265,9 @@ static unsigned getUsefulResultWidth(ChannelVal val) {
     unsigned truncWidth = truncOp.getOut().getType().getDataBitWidth();
     maxWidth = std::max(maxWidth.value_or(0), truncWidth);
   }
-  return maxWidth.value_or(0);
+  // A value whose data no user needs is still carried by a channel, which
+  // needs at least one bit
+  return std::max(maxWidth.value_or(0), 1u);
 }
 
 /// Produces a value that matches the content of the passed value but whose
