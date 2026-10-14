@@ -293,7 +293,7 @@ LowerFuncToHandshake::deriveNewAttributes(func::FuncOp funcOp) const {
   SmallVector<std::string> memRegionNames;
   bool hasArgNames = false;
 
-  for (const NamedAttribute &attr : funcOp->getAttrs()) {
+  for (const NamedAttribute &attr : funcOp->getAttrDictionary()) {
     StringAttr attrName = attr.getName();
 
     // The symbol and function type attributes are set directly by the

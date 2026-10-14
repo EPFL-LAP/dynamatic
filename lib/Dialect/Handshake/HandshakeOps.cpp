@@ -280,7 +280,7 @@ void MuxOp::print(OpAsmPrinter &p) {
   p << " [";
   p.printOperands(operands.drop_front());
   p << "]";
-  p.printOptionalAttrDict((*this)->getAttrs());
+  p.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
   p << " : ";
   p.printStrippedAttrOrType(getSelectOperand().getType());
   p << ", [";
@@ -353,7 +353,7 @@ ParseResult ControlMergeOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void ControlMergeOp::print(OpAsmPrinter &p) {
   p << " [" << getOperands() << "] ";
-  p.printOptionalAttrDict((*this)->getAttrs());
+  p.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
   p << " : [";
   int i = 0;
   for (auto op : getOperands()) {
@@ -624,9 +624,9 @@ LogicalResult ConstantOp::inferReturnTypes(
     DictionaryAttr attributes, mlir::OpaqueProperties properties,
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-  OperationName opName = OperationName(getOperationName(), context);
-  StringAttr attrName = getValueAttrName(opName);
-  auto attr = cast<TypedAttr>(attributes.get(attrName));
+  // The value is an inherent attribute, which may be stored in the properties
+  ConstantOp::Adaptor adaptor(operands, attributes, properties, regions);
+  auto attr = cast<TypedAttr>(adaptor.getValue());
 
   auto controlType = cast<ControlType>(operands[0].getType());
 
@@ -1128,7 +1128,7 @@ void LSQOp::print(OpAsmPrinter &p) {
   p << inputs.back() << ") ";
 
   // Print group sizes and other attributes
-  p.printOptionalAttrDict((*this)->getAttrs());
+  p.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
 
   // Print result types
   p << " : ";
@@ -1702,7 +1702,7 @@ ParseResult BundleOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void BundleOp::print(OpAsmPrinter &p) {
   p << " " << getOperands() << " ";
-  p.printOptionalAttrDict((*this)->getAttrs());
+  p.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
   p << " : _ to ";
   printHandshakeType(p, getChannelLike().getType());
 }
@@ -1892,7 +1892,7 @@ void UnbundleOp::print(OpAsmPrinter &p) {
   p << " " << getChannelLike() << " ";
   if (OperandRange upstreams = getUpstreams(); !upstreams.empty())
     p << "[ " << upstreams << " ] ";
-  p.printOptionalAttrDict((*this)->getAttrs());
+  p.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
   p << " : ";
   printHandshakeType(p, getChannelLike().getType());
   p << " to _ ";

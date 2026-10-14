@@ -44,8 +44,8 @@ LogicalResult dynamatic::doTypeConversion(Operation *op, ValueRange operands,
                                           const TypeConverter *typeConverter) {
   // Convert the TypeAttrs.
   llvm::SmallVector<NamedAttribute, 4> newAttrs;
-  newAttrs.reserve(op->getAttrs().size());
-  for (auto attr : op->getAttrs()) {
+  newAttrs.reserve(op->getAttrDictionary().getValue().size());
+  for (auto attr : op->getAttrDictionary().getValue()) {
     if (auto typeAttr = dyn_cast<TypeAttr>(attr.getValue())) {
       auto innerType = typeAttr.getValue();
       // TypeConvert::convertType doesn't handle function types, so we need to

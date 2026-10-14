@@ -253,7 +253,8 @@ void HWModulePortAccessor::setOutput(StringRef name, Value v) {
 void ConstantOp::print(OpAsmPrinter &p) {
   p << " ";
   p.printAttribute(getValueAttr());
-  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"value"});
+  p.printOptionalAttrDict((*this)->getAttrDictionary().getValue(),
+                          /*elidedAttrs=*/{"value"});
 }
 
 ParseResult ConstantOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1437,7 +1438,7 @@ void InstanceOp::print(OpAsmPrinter &p) {
   printOutputPortList(p, *this, getResultTypes(), getResultNames());
 
   p.printOptionalAttrDict(
-      (*this)->getAttrs(),
+      (*this)->getAttrDictionary().getValue(),
       /*elidedAttrs=*/{"instanceName",
                        InnerSymbolTable::getInnerSymbolAttrName(), "moduleName",
                        "argNames", "resultNames", "parameters"});
@@ -1569,7 +1570,7 @@ void InstanceChoiceOp::print(OpAsmPrinter &p) {
   printOutputPortList(p, *this, getResultTypes(), getResultNames());
 
   p.printOptionalAttrDict(
-      (*this)->getAttrs(),
+      (*this)->getAttrDictionary().getValue(),
       /*elidedAttrs=*/{"instanceName",
                        InnerSymbolTable::getInnerSymbolAttrName(),
                        "moduleNames", "targetNames", "argNames", "resultNames",
@@ -1659,7 +1660,7 @@ ParseResult ArrayCreateOp::parse(OpAsmParser &parser, OperationState &result) {
 void ArrayCreateOp::print(OpAsmPrinter &p) {
   p << " ";
   p.printOperands(getInputs());
-  p.printOptionalAttrDict((*this)->getAttrs());
+  p.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
   p << " : " << getInputs()[0].getType();
 }
 
@@ -2196,7 +2197,7 @@ void StructCreateOp::print(OpAsmPrinter &printer) {
   printer << " (";
   printer.printOperands(getInput());
   printer << ")";
-  printer.printOptionalAttrDict((*this)->getAttrs());
+  printer.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
   printer << " : " << getType();
 }
 
@@ -2258,7 +2259,7 @@ ParseResult StructExplodeOp::parse(OpAsmParser &parser,
 void StructExplodeOp::print(OpAsmPrinter &printer) {
   printer << " ";
   printer.printOperand(getInput());
-  printer.printOptionalAttrDict((*this)->getAttrs());
+  printer.printOptionalAttrDict((*this)->getAttrDictionary().getValue());
   printer << " : " << getInput().getType();
 }
 
@@ -2377,7 +2378,8 @@ static void printExtractOp(OpAsmPrinter &printer, AggType op) {
   printer << " ";
   printer.printOperand(op.getInput());
   printer << "[\"" << op.getFieldName() << "\"]";
-  printer.printOptionalAttrDict(op->getAttrs(), {"fieldIndex"});
+  printer.printOptionalAttrDict(op->getAttrDictionary().getValue(),
+                                {"fieldIndex"});
   printer << " : " << op.getInput().getType();
 }
 
@@ -2499,7 +2501,8 @@ void StructInjectOp::print(OpAsmPrinter &printer) {
   printer.printOperand(getInput());
   printer << "[\"" << getFieldName() << "\"], ";
   printer.printOperand(getNewValue());
-  printer.printOptionalAttrDict((*this)->getAttrs(), {"fieldIndex"});
+  printer.printOptionalAttrDict((*this)->getAttrDictionary().getValue(),
+                                {"fieldIndex"});
   printer << " : " << getInput().getType();
 }
 
@@ -2619,7 +2622,8 @@ ParseResult UnionCreateOp::parse(OpAsmParser &parser, OperationState &result) {
 void UnionCreateOp::print(OpAsmPrinter &printer) {
   printer << " \"" << getFieldName() << "\", ";
   printer.printOperand(getInput());
-  printer.printOptionalAttrDict((*this)->getAttrs(), {"fieldIndex"});
+  printer.printOptionalAttrDict((*this)->getAttrDictionary().getValue(),
+                                {"fieldIndex"});
   printer << " : " << getType();
 }
 

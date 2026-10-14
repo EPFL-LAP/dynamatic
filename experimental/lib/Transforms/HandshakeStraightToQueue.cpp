@@ -325,7 +325,7 @@ ensureLazyForkOutputCount(Block *bb, Value input, unsigned numResults,
   rewriter.setInsertionPoint(oldFork);
   auto newFork = rewriter.create<handshake::LazyForkOp>(
       oldFork.getLoc(), oldFork.getOperand(), numResults);
-  newFork->setAttrs(oldFork->getAttrs());
+  newFork->setAttrs(oldFork->getAttrDictionary().getValue());
 
   for (unsigned idx = 0, e = oldFork->getNumResults(); idx < e; ++idx)
     oldFork->getResult(idx).replaceAllUsesWith(newFork->getResult(idx));

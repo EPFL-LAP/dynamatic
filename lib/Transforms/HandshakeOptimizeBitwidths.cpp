@@ -931,7 +931,7 @@ struct HandshakeMuxSelect : public OpRewritePattern<handshake::MuxOp> {
     newOperands.append(dataOprds.begin(), dataOprds.end());
     auto newMuxOp = rewriter.create<handshake::MuxOp>(
         muxOp.getLoc(), muxOp->getResultTypes(), newOperands,
-        muxOp->getAttrs());
+        muxOp->getAttrDictionary().getValue());
     namer.replaceOp(muxOp, newMuxOp);
     rewriter.replaceOp(muxOp, newMuxOp);
     ++bitwidthReduced;
@@ -977,7 +977,7 @@ struct HandshakeCMergeIndex
     rewriter.setInsertionPoint(cmergeOp);
     auto newCmergeOp = rewriter.create<handshake::ControlMergeOp>(
         cmergeOp.getLoc(), newResultTypes, cmergeOp.getDataOperands(),
-        cmergeOp->getAttrs());
+        cmergeOp->getAttrDictionary().getValue());
     namer.replaceOp(cmergeOp, newCmergeOp);
     Value modIndex = modBitWidth({newCmergeOp.getIndex(), ExtType::ZEXT},
                                  indexWidth, rewriter);
@@ -1081,7 +1081,7 @@ struct MemInterfaceAddrOpt
     auto newMemOp = cast<handshake::MemoryOpInterface>(rewriter.create(
         memOp->getLoc(),
         StringAttr::get(getContext(), memOp->getName().getStringRef()),
-        newOperands, newResultTypes, memOp->getAttrs()));
+        newOperands, newResultTypes, memOp->getAttrDictionary().getValue()));
     SmallVector<Value> replacementValues(newMemOp->getResults());
     for (unsigned resIdx : addrResultIndices) {
       replacementValues[resIdx] = modBitWidth(
@@ -1135,7 +1135,7 @@ struct MemPortAddrOpt
     auto newPortOp = cast<handshake::MemPortOpInterface>(rewriter.create(
         portOp.getLoc(),
         StringAttr::get(getContext(), portOp->getName().getStringRef()),
-        newOperands, newResultTypes, portOp->getAttrs()));
+        newOperands, newResultTypes, portOp->getAttrDictionary().getValue()));
     namer.replaceOp(portOp, newPortOp);
     inheritBB(portOp, newPortOp);
     Value newAddrRes = modBitWidth(
