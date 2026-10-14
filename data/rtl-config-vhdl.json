@@ -512,6 +512,45 @@
     "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t minui -p bitwidth=$BITWIDTH extra_signals=$EXTRA_SIGNALS"
   },
   {
+    "name": "handshake.sqrtf",
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sqrtf -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "sqrtf_vitis_hls"
+    ]
+  },
+  {
+    "name": "handshake.sinf",
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t sinf -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "sinf_vitis_hls"
+    ]
+  },
+  {
+    "name": "handshake.cosf",
+    "parameters": [
+      {
+        "name": "LATENCY",
+        "type": "unsigned"
+      }
+    ],
+    "generator": "python $DYNAMATIC/tools/unit-generators/vhdl/vhdl-unit-generator.py -n $MODULE_NAME -o $OUTPUT_DIR/$MODULE_NAME.vhd -t cosf -p bitwidth=$BITWIDTH latency=$LATENCY extra_signals=$EXTRA_SIGNALS",
+    "dependencies": [
+      "cosf_vitis_hls"
+    ]
+  },
+  {
     "name": "handshake.sitofp",
     "parameters": [
       {
@@ -613,6 +652,15 @@
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/vitis_hls_cores.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/sqrtf_vitis_hls.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/sinf_vitis_hls.vhd"
+  },
+  {
+    "generic": "$DYNAMATIC/data/vhdl/support/cosf_vitis_hls.vhd"
   },
   {
     "generic": "$DYNAMATIC/data/vhdl/support/sharing_support.vhd"

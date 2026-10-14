@@ -1,4 +1,5 @@
 from generators.support.arith_binary import generate_arith_binary
+from generators.support.unary import generate_unary
 
 
 def generate_flopoco_ip_wrapper(name,
@@ -117,6 +118,56 @@ def generate_vivado_ip_wrapper(name,
         name=name,
         handshake_op=handshake_op,
         bitwidth=32,
+        body=body,
+        latency=latency,
+        extra_signals=extra_signals
+    )
+
+
+def generate_vitis_hls_unary_ip_wrapper(name,
+                                        handshake_op,
+                                        bitwidth,
+                                        latency,
+                                        ip_latency,
+                                        extra_signals):
+    """
+    Generates the handshake unit of a unary arithmetic operation implemented
+    with an IP core generated with Vitis HLS. The IP core is instantiated
+    through its wrapper `{handshake_op}_vitis_hls_wrapper` (see
+    data/vhdl/support/{handshake_op}_vitis_hls.vhd), whose pipeline advances
+    when its clock enable is high.
+
+    Args:
+        name: Unique name based on MLIR op name (e.g. sqrtf0).
+        handshake_op: Name of the handshake operation (e.g. sqrtf).
+        bitwidth: Bitwidth of the input and the output.
+        latency: Operation latency, from the timing model.
+        ip_latency: Latency of the IP core, which the timing model must match.
+        extra_signals: Extra signals on input/output channels, from IR.
+
+    Returns:
+        VHDL code as a string.
+    """
+    if latency != ip_latency:
+        raise ValueError(
+            f"{handshake_op}: the latency from the timing model ({latency}) "
+            f"does not match the latency of the IP core ({ip_latency})")
+
+    body = f"""
+  {handshake_op}_vitis_hls_wrapper_U1 : entity work.{handshake_op}_vitis_hls_wrapper
+    port map(
+      clk   => clk,
+      reset => rst,
+      ce    => valid_buffer_ready,
+      din0  => ins,
+      dout  => outs
+    );
+    """
+
+    return generate_unary(
+        name=name,
+        handshake_op=handshake_op,
+        bitwidth=bitwidth,
         body=body,
         latency=latency,
         extra_signals=extra_signals

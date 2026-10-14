@@ -1066,6 +1066,28 @@ void TranslateLLVMToStd::translateFunnelShiftIntrinsic(
   valueMap[callInst] = result;
 }
 
+bool TranslateLLVMToStd::translateMathLibraryCall(llvm::CallInst *callInst) {
+  Function *calledFunc = callInst->getCalledFunction();
+  StringRef name = calledFunc->getName();
+  Intrinsic::ID id = calledFunc->getIntrinsicID();
+
+  bool isSqrt = name == "sqrt" || name == "sqrtf" || id == Intrinsic::sqrt;
+  bool isSin = name == "sin" || name == "sinf" || id == Intrinsic::sin;
+  bool isCos = name == "cos" || name == "cosf" || id == Intrinsic::cos;
+  if (!isSqrt && !isSin && !isCos)
+    return false;
+
+  mlir::Value arg = valueMap[callInst->getArgOperand(0)];
+  auto retType = getMLIRType(callInst->getType(), ctx);
+  if (isSqrt)
+    naiveTranslation<math::SqrtOp>(retType, {arg}, callInst);
+  else if (isSin)
+    naiveTranslation<math::SinOp>(retType, {arg}, callInst);
+  else
+    naiveTranslation<math::CosOp>(retType, {arg}, callInst);
+  return true;
+}
+
 void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
 
   Function *calledFunc = callInst->getCalledFunction();
@@ -1080,6 +1102,11 @@ void TranslateLLVMToStd::translateCallInst(llvm::CallInst *callInst) {
     handlePredictMarker(callInst);
     return;
   }
+
+  // Calls to the math library functions that have a dedicated unit become the
+  // corresponding math dialect operation
+  if (translateMathLibraryCall(callInst))
+    return;
 
   assert(calledFunc->isIntrinsic() &&
          "Function calls are not currently supported");

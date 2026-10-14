@@ -364,7 +364,10 @@ struct FtdCfToHandshakePass
                  OneToOneConversion<arith::UIToFPOp, handshake::UIToFPOp>,
                  OneToOneConversion<arith::FPToSIOp, handshake::FPToSIOp>,
                  OneToOneConversion<arith::ExtFOp, handshake::ExtFOp>,
-                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>>(
+                 OneToOneConversion<math::AbsFOp, handshake::AbsFOp>,
+                 OneToOneConversion<math::SqrtOp, handshake::SqrtFOp>,
+                 OneToOneConversion<math::SinOp, handshake::SinFOp>,
+                 OneToOneConversion<math::CosOp, handshake::CosFOp>>(
         getAnalysis<NameAnalysis>(), converter, ctx);
 
     // All func-level functions must become handshake-level functions

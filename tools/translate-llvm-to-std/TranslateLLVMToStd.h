@@ -117,6 +117,10 @@ private:
   void translateCallInst(llvm::CallInst *callInst);
 
   void translateFunnelShiftIntrinsic(llvm::CallInst *callInst);
+  /// Translates a call to sqrt, sin, or cos (from the C math library or as an
+  /// LLVM intrinsic) into the corresponding math dialect operation. Returns
+  /// false if the call is not to one of these functions.
+  bool translateMathLibraryCall(llvm::CallInst *callInst);
   void translateMemsetIntrinsic(llvm::CallInst *callInst);
   void handleSpeculateMarker(llvm::CallInst *callInst);
   void handlePredictMarker(llvm::CallInst *callInst);

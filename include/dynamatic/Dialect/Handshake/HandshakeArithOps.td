@@ -87,10 +87,18 @@ class Handshake_Arith_FloatUnaryOp<string mnemonic, list<Trait> traits = []> :
     ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
     $cppClass::getRTLParameters() {
       ::mlir::MLIRContext *ctx = (*this)->getContext();
-      return ::llvm::SmallVector<::mlir::NamedAttribute>{
-        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
-         ::mlir::TypeAttr::get(getIns().getType())}
-      };
+      ::mlir::Type ui32 = ::mlir::IntegerType::get(ctx, 32, ::mlir::IntegerType::Unsigned);
+      ::llvm::SmallVector<::mlir::NamedAttribute> params;
+      params.push_back({::mlir::StringAttr::get(ctx, "BITWIDTH"),
+                        ::mlir::TypeAttr::get(getIns().getType())});
+      if (auto latencyIface = ::mlir::dyn_cast<LatencyInterface>(getOperation())) {
+        auto latency = latencyIface.getLatency();
+        if (::mlir::failed(latency))
+          return ::mlir::failure();
+        params.push_back({::mlir::StringAttr::get(ctx, "LATENCY"),
+                          ::mlir::IntegerAttr::get(ui32, (unsigned)latency.value())});
+      }
+      return params;
     }
   }];
 }
@@ -572,6 +580,33 @@ def Handshake_NegFOp : Handshake_Arith_FloatUnaryOp<"negf", [
   SimpleNamedIO
 ]> {
   let summary = "Floating-point sign negation.";
+}
+
+def Handshake_SqrtFOp : Handshake_Arith_FloatUnaryOp<"sqrtf", [
+  SimpleNamedIO,
+  IsFloatSizedChannel<32, "ins">,
+  LatencyInterface
+]> {
+  // NOTE: Only single precision is currently supported.
+  let summary = "Floating-point square root.";
+}
+
+def Handshake_SinFOp : Handshake_Arith_FloatUnaryOp<"sinf", [
+  SimpleNamedIO,
+  IsFloatSizedChannel<64, "ins">,
+  LatencyInterface
+]> {
+  // NOTE: Only double precision is currently supported.
+  let summary = "Floating-point sine.";
+}
+
+def Handshake_CosFOp : Handshake_Arith_FloatUnaryOp<"cosf", [
+  SimpleNamedIO,
+  IsFloatSizedChannel<64, "ins">,
+  LatencyInterface
+]> {
+  // NOTE: Only double precision is currently supported.
+  let summary = "Floating-point cosine.";
 }
 
 def Handshake_OrIOp : Handshake_Arith_IntBinaryOp<"ori", [

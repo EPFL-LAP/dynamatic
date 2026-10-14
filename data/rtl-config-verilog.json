@@ -386,6 +386,51 @@
     "hdl": "verilog"
   },
   {
+    "name": "handshake.sqrtf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 32, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/sqrtf.v",
+    "dependencies": ["delay_buffer", "oehb_dataless", "sqrtf_vitis_hls"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "sqrtf_vitis_hls",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/support/sqrtf_vitis_hls.vhd",
+    "module-name": "sqrtf_vitis_hls"
+  },
+  {
+    "name": "handshake.sinf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/sinf.v",
+    "dependencies": ["delay_buffer", "oehb_dataless", "sinf_vitis_hls"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "sinf_vitis_hls",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/support/sinf_vitis_hls.vhd",
+    "module-name": "sinf_vitis_hls"
+  },
+  {
+    "name": "handshake.cosf",
+    "parameters": [
+      { "name": "DATA_TYPE", "type": "dataflow", "data-eq": 64, "extra-eq": 0 }
+    ],
+    "generic": "$DYNAMATIC/data/verilog/arith/cosf.v",
+    "dependencies": ["delay_buffer", "oehb_dataless", "cosf_vitis_hls"],
+    "hdl": "verilog"
+  },
+  {
+    "name": "cosf_vitis_hls",
+    "parameters": [],
+    "generic": "$DYNAMATIC/data/vhdl/support/cosf_vitis_hls.vhd",
+    "module-name": "cosf_vitis_hls"
+  },
+  {
     "name": "handshake.sitofp",
     "parameters": [
       { "name": "DATA_TYPE", "type": "dataflow", "data-lb": 1, "extra-eq": 0 }
