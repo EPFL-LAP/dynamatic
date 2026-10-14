@@ -52,7 +52,7 @@ void dynamatic::printInputPortList(OpAsmPrinter &p, Operation *op,
                         [&](std::tuple<Value, Attribute> input) {
                           Value val = std::get<0>(input);
                           p.printKeywordOrString(
-                              std::get<1>(input).cast<StringAttr>().getValue());
+                              cast<StringAttr>(std::get<1>(input)).getValue());
                           p << ": " << val << ": " << val.getType();
                         });
   p << ")";
@@ -86,13 +86,12 @@ void dynamatic::printOutputPortList(OpAsmPrinter &p, Operation *op,
                                     TypeRange resultTypes,
                                     ArrayAttr resultNames) {
   p << "(";
-  llvm::interleaveComma(
-      llvm::zip(resultTypes, resultNames), p,
-      [&](std::tuple<Type, Attribute> result) {
-        p.printKeywordOrString(
-            std::get<1>(result).cast<StringAttr>().getValue());
-        p << ": " << std::get<0>(result);
-      });
+  llvm::interleaveComma(llvm::zip(resultTypes, resultNames), p,
+                        [&](std::tuple<Type, Attribute> result) {
+                          p.printKeywordOrString(
+                              cast<StringAttr>(std::get<1>(result)).getValue());
+                          p << ": " << std::get<0>(result);
+                        });
   p << ")";
 }
 
@@ -136,7 +135,7 @@ void dynamatic::printOptionalParameterList(OpAsmPrinter &p, Operation *op,
 
   p << '<';
   llvm::interleaveComma(parameters, p, [&](Attribute param) {
-    auto paramAttr = param.cast<ParamDeclAttr>();
+    auto paramAttr = cast<ParamDeclAttr>(param);
     p << paramAttr.getName().getValue() << ": " << paramAttr.getType();
     if (auto value = paramAttr.getValue()) {
       p << " = ";

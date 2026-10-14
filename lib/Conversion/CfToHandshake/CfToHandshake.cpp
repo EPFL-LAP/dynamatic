@@ -559,8 +559,7 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
             "might have accidentally maximized the SSA of a placeholder op "
             "like LSQ, MemoryController, or RAMOp.");
       }
-      assert(operand.getType()
-                     .cast<handshake::ExtraSignalsTypeInterface>()
+      assert(cast<handshake::ExtraSignalsTypeInterface>(operand.getType())
                      .getNumExtraSignals() == 0 &&
              "unexpected extra signals");
     }
@@ -1618,7 +1617,7 @@ struct GetGlobalOpConversion
     /// The initial value doesn't have any type constraints. Therefore we need
     /// to check if it is stored as dense elements.
     mlir::Attribute initValueAttr = global.getInitialValueAttr();
-    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+    if (auto denseAttr = dyn_cast<DenseElementsAttr>(initValueAttr)) {
       rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
                                                     denseAttr);
     } else {
@@ -1647,7 +1646,7 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
 
 /// Filters out block arguments of type MemRefType
 bool FuncSSAStrategy::maximizeArgument(BlockArgument arg) {
-  return !arg.getType().isa<mlir::MemRefType>();
+  return !isa<mlir::MemRefType>(arg.getType());
 }
 
 namespace {
