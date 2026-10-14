@@ -1275,7 +1275,6 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
   // parameterMap: Maps parameter name to its value
   llvm::DenseMap<StringRef, Attribute> parameterMap;
   // Store and later erase const that are used to define parameters
-  llvm::SmallVector<arith::ConstantOp, 4> parameterConstantOps;
   // check if the function is a handshake function
   auto calledHandshakeFuncOp = dyn_cast<handshake::FuncOp>(lookup);
 
@@ -1312,16 +1311,19 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
         InstanceOpParameterIndices.push_back(i);
         StringRef parameterName =
             nameAttr.getValue().drop_front(strlen("parameter_"));
+        // The constant may already have been converted to Handshake
         Value operand = callOp.getOperand(i);
-        if (auto constOp = operand.getDefiningOp<arith::ConstantOp>()) {
-          Attribute parameterValue = constOp.getValue();
-          parameterMap[parameterName] = parameterValue;
-          if (!llvm::is_contained(parameterConstantOps, constOp)) {
-            parameterConstantOps.push_back(constOp);
-          }
-        } else {
-          assert(false && "Parameter value is not a constant at call site");
-        }
+        while (auto castOp =
+                   operand.getDefiningOp<UnrealizedConversionCastOp>())
+          operand = castOp.getOperand(0);
+        Attribute parameterValue;
+        if (auto constOp = operand.getDefiningOp<arith::ConstantOp>())
+          parameterValue = constOp.getValue();
+        else if (auto constOp = operand.getDefiningOp<handshake::ConstantOp>())
+          parameterValue = constOp.getValue();
+        assert(parameterValue &&
+               "Parameter value is not a constant at call site");
+        parameterMap[parameterName] = parameterValue;
 
       } else {
         llvm::errs() << "Argument " << i
@@ -1462,6 +1464,22 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     }
   }
 
+  // In case __init was used to define output variables, find the __init calls
+  // whose only user is the current callOp: they can be safely deleted once it
+  // is replaced. This must be determined before the replacement, which drops
+  // the uses of the call's operands
+  SmallVector<Operation *> initCallsToErase;
+  for (Operation *initCall : initCalls) {
+    // Ensure the operation is still in the IR, valid & only has one result
+    if (!initCall->isRegistered() || !initCall->getParentRegion())
+      continue;
+    assert(initCall->getNumResults() == 1 &&
+           "Expected single-result __init call");
+    OpResult result = initCall->getResult(0);
+    if (result.hasOneUse() && *result.getUsers().begin() == callOp)
+      initCallsToErase.push_back(initCall);
+  }
+
   namer.replaceOp(callOp, instOp);
   if (callOp->getNumResults() == 0) {
     rewriter.eraseOp(callOp);
@@ -1474,26 +1492,11 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
     rewriter.replaceOp(callOp, instOp.getResults().drop_back());
   }
 
-  // in case __init was used to define output variables: go through all __init
-  // calls and check if the current callOp is the only user. If yes then safely
-  // delete the __init call
-  if (!initCalls.empty()) {
-    for (Operation *initCallToErase : initCalls) {
-      // Ensure the operation is still in the IR, valid & only has one result
-      if (initCallToErase->isRegistered() &&
-          initCallToErase->getParentRegion()) {
-        assert(initCallToErase->getNumResults() == 1 &&
-               "Expected single-result __init call");
-        for (OpResult result : initCallToErase->getResults()) {
-          // If the one user is the current callOp being rewritten, delete
-          // __init
-          if (result.hasOneUse() && *result.getUsers().begin() == callOp) {
-            result.dropAllUses();
-            rewriter.eraseOp(initCallToErase);
-          }
-        }
-      }
-    }
+  // The replaced call may still use the results of the __init calls until the
+  // conversion completes
+  for (Operation *initCall : initCallsToErase) {
+    initCall->dropAllUses();
+    rewriter.eraseOp(initCall);
   }
 
   return success();
@@ -1663,18 +1666,6 @@ struct GetGlobalOpConversion
   }
 };
 
-// TODO: Here we simply erase all the global variables and attach the initial
-// values to the RAMOps inside the handshake function.
-struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
-  using DynOpConversionPattern<memref::GlobalOp>::DynOpConversionPattern;
-  LogicalResult
-  matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
 //===-----------------------------------------------------------------------==//
 // Pass driver
 //===-----------------------------------------------------------------------==//
@@ -1721,7 +1712,6 @@ struct CfToHandshakePass
         ConvertCalls,
         ConvertUndefinedValues,
         GetGlobalOpConversion,
-        GlobalOpConversion,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -1767,6 +1757,9 @@ struct CfToHandshakePass
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
     target.addLegalOp<mlir::ModuleOp>();
+    // Globals are read when converting the operations accessing them, so they
+    // are erased once the conversion is done
+    target.addLegalOp<memref::GlobalOp>();
     target.addLegalDialect<handshake::HandshakeDialect>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
@@ -1791,6 +1784,12 @@ struct CfToHandshakePass
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // The initial values of the globals were attached to the RAMs replacing
+    // their accesses
+    for (auto global :
+         llvm::make_early_inc_range(modOp.getOps<memref::GlobalOp>()))
+      global.erase();
 
     // Clean up: Remove the definition of each __init* function, but only if it
     // has no remaining uses. This is safe because all valid calls to __init*

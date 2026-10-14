@@ -140,18 +140,6 @@ struct GetGlobalOpConversion
   }
 };
 
-// TODO: Here we simply erase all the global variables and attach the initial
-// values to the RAMOps inside the handshake function.
-struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
-  using DynOpConversionPattern<memref::GlobalOp>::DynOpConversionPattern;
-  LogicalResult
-  matchAndRewrite(memref::GlobalOp op, OpAdaptor adapter,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
 /// Same as `ConvertIndexCast`, but tolerates an operand that is already a
 /// `handshake::ChannelType`: in the FTD flow `addGsaGates` runs before
 /// `lowerSignature` and replaces phis with channelified mux results.
@@ -330,7 +318,6 @@ struct FtdCfToHandshakePass
         ctx);
 
     patterns.add<AllocaOpConversion, ConvertCalls, GetGlobalOpConversion,
-                 GlobalOpConversion,
                  FtdConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
                  FtdConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
                  OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -370,6 +357,9 @@ struct FtdCfToHandshakePass
     // All func-level functions must become handshake-level functions
     ConversionTarget target(*ctx);
     target.addLegalOp<mlir::ModuleOp>();
+    // Globals are read when converting the operations accessing them, so they
+    // are erased once the conversion is done
+    target.addLegalOp<memref::GlobalOp>();
     target.addLegalDialect<handshake::HandshakeDialect>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
@@ -394,6 +384,12 @@ struct FtdCfToHandshakePass
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
+
+    // The initial values of the globals were attached to the RAMs replacing
+    // their accesses
+    for (auto global :
+         llvm::make_early_inc_range(modOp.getOps<memref::GlobalOp>()))
+      global.erase();
 
     // Clean up: Remove the definition of each __init* function, but only if it
     // has no remaining uses. This is safe because all valid calls to __init*
