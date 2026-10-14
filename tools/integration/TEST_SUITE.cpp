@@ -145,6 +145,8 @@ struct IntegrationTest {
   // Use model checking to remove redundant logic.
   bool useRigidification = false;
   bool verifyInvariants = false;
+  // Use fast token delivery (FTD) and straight-to-the-queue
+  bool useFTD = false;
   // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
   bool useDuplication = false;
@@ -195,6 +197,7 @@ int IntegrationTest::run() {
              << " --buffer-algorithm " << this->bufferAlgorithm
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
+             << (this->useFTD ? " --straight-to-queue --fast-token-delivery" : "")
              << (this->useSpeculation ? " --speculation" : "")
              << (this->useDuplication ? " --enable-duplication" : "")
              << (this->instrumentII ? " --instrument-ii" : "")
@@ -299,6 +302,7 @@ class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 class DuplicationFixture : public BaseFixture {};
+class FtdFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
 class LSQSizingFixture : public BaseFixture {};
@@ -540,6 +544,27 @@ TEST_P(DuplicationFixture, basic) {
       .useDuplication = true,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+// The Verilog backend does not support handshake.init yet, so FTD circuits are
+// only simulated in VHDL
+TEST_P(FtdFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useFTD = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "on-merges",
       .simTime = -1
       // clang-format on
   };
@@ -920,6 +945,21 @@ INSTANTIATE_TEST_SUITE_P(DuplicationBenchmarks, DuplicationFixture,
       "wrap_if"
     ),
     [](const auto &info) { return "dup_" + info.param; });
+
+// Benchmarks of the FPL'22 FTD paper
+INSTANTIATE_TEST_SUITE_P(FtdBenchmarks, FtdFixture,
+    testing::Values(
+      "bicg",
+      "fir",
+      "gcd",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir",
+      "kernel_2mm",
+      "kernel_3mm",
+      "matvec"
+    ),
+    [](const auto &info) { return "ftd_" + info.param; });
 
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 // clang-format on
