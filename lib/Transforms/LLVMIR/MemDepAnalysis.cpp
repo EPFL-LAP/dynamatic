@@ -45,6 +45,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include <deque>
 #include <stdlib.h>
 #include <utility>
 
