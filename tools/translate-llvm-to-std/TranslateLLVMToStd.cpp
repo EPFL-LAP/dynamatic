@@ -881,10 +881,20 @@ void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
                                               builder.getIndexAttr(0));
   }
 
+  // An integer may be loaded with a wider type than the memory's elements,
+  // which is how clang represents a _BitInt(N) in memory (e.g., i8 for
+  // _BitInt(5)): load the element and extend it to the loaded type
+  mlir::Type elemType = cast<MemRefType>(memref.getType()).getElementType();
   auto newOp =
-      builder.create<memref::LoadOp>(UnknownLoc::get(ctx), resType, memref,
+      builder.create<memref::LoadOp>(UnknownLoc::get(ctx), elemType, memref,
                                      /*indices = */ index);
-  valueMap[loadInst] = newOp.getResult();
+  mlir::Value result = newOp.getResult();
+  if (elemType != resType && isa<mlir::IntegerType>(elemType) &&
+      isa<mlir::IntegerType>(resType) &&
+      elemType.getIntOrFloatBitWidth() < resType.getIntOrFloatBitWidth())
+    result =
+        builder.create<arith::ExtUIOp>(UnknownLoc::get(ctx), resType, result);
+  valueMap[loadInst] = result;
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
@@ -908,7 +918,16 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
                                               builder.getIndexAttr(0));
   }
 
+  // An integer may be stored with a wider type than the memory's elements (see
+  // translateLoadInst): truncate it to the element type
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
+  mlir::Type elemType = cast<MemRefType>(memref.getType()).getElementType();
+  if (storeValue.getType() != elemType && isa<mlir::IntegerType>(elemType) &&
+      isa<mlir::IntegerType>(storeValue.getType()) &&
+      elemType.getIntOrFloatBitWidth() <
+          storeValue.getType().getIntOrFloatBitWidth())
+    storeValue = builder.create<arith::TruncIOp>(UnknownLoc::get(ctx), elemType,
+                                                 storeValue);
   auto newOp =
       builder.create<memref::StoreOp>(UnknownLoc::get(ctx), storeValue, memref,
                                       /*indices = */ index);
