@@ -1368,7 +1368,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       Operation *sourceFuncLookup =
           mlir::SymbolTable::lookupNearestSymbolFrom(callOp, sourceCalleeAttr);
       auto sourceFunc = dyn_cast<func::FuncOp>(sourceFuncLookup);
-      assert(sourceFunc && sourceFunc.getSymName().startswith("__init") &&
+      assert(sourceFunc && sourceFunc.getSymName().starts_with("__init") &&
              "All placeholder outputs must be initialized via __init* calls");
 
       if (!llvm::is_contained(initCalls, sourceCallOp)) {
@@ -1746,14 +1746,14 @@ struct CfToHandshakePass
       // addIllegalDialect rule above and must be converted by a pattern.
       if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
               SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
-        return calledFn.getSymName().startswith("__init");
+        return calledFn.getSymName().starts_with("__init");
       }
       // If symbol lookup fails or it's not a func::FuncOp, treat as default
       // (illegal)
       return false;
     });
     target.addDynamicallyLegalOp<func::FuncOp>(
-        [](func::FuncOp op) { return op.getSymName().startswith("__init"); });
+        [](func::FuncOp op) { return op.getSymName().starts_with("__init"); });
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
@@ -1762,7 +1762,7 @@ struct CfToHandshakePass
     // has no remaining uses. This is safe because all valid calls to __init*
     // were tracked and deleted earlier.
     for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
-      if (func.getSymName().startswith("__init")) {
+      if (func.getSymName().starts_with("__init")) {
         assert(func.use_empty() &&
                "__init function should not have users after transformation");
         func.erase();

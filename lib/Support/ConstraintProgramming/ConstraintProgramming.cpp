@@ -52,13 +52,13 @@ mlir::LogicalResult CbcSoluParser::parseSolverOutput(StringRef soluFileName) {
     // "Optimal - objective value 999.00000000"
     StringRef line = *it;
 
-    if (line.startswith("Optimal")) {
+    if (line.starts_with("Optimal")) {
       status = CPSolver::Status::OPTIMAL;
-    } else if (line.startswith("Infeasible")) {
+    } else if (line.starts_with("Infeasible")) {
       status = CPSolver::Status::INFEASIBLE;
-    } else if (line.startswith("Unbounded")) {
+    } else if (line.starts_with("Unbounded")) {
       status = CPSolver::Status::UNBOUNDED;
-    } else if (line.startswith("Stopped on time")) {
+    } else if (line.starts_with("Stopped on time")) {
       status = CPSolver::Status::NONOPTIMAL;
     } else {
       status = CPSolver::Status::UNKNOWN;

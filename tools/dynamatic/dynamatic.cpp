@@ -710,7 +710,7 @@ CommandResult SetOutputDir::execute(CommandArguments &args) {
 
   // reject trivial bad cases
   if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
-      outputDir.endswith("/"))
+      outputDir.ends_with("/"))
     return CommandResult::FAIL;
 
   // reject illegal chars
