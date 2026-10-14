@@ -713,7 +713,7 @@ getOriginalValue(mlir::OpBuilder &builder, StringRef varName,
                  DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
                  ftd::ShadowCFG *shadow = nullptr) {
   StringRef lookupName = varName;
-  if (lookupName.startswith("~")) {
+  if (lookupName.starts_with("~")) {
     llvm::errs() << "[FTD Error] Negated variable '" << varName << "'.\n";
     lookupName = lookupName.drop_front();
   }
