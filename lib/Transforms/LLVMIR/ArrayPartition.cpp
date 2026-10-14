@@ -1003,15 +1003,27 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
 
   StringRef arrName = baseStorage->getName();
 
-  Instruction *baseGEPOrInst = findBaseGEP(inst);
-  auto *gepInst = dyn_cast<GetElementPtrInst>(baseGEPOrInst);
-
   auto *load = dyn_cast<LoadInst>(inst);
   auto *store = dyn_cast<StoreInst>(inst);
   StringRef opKind = load ? "load" : "store";
 
+  // NOTE: The address may be computed by a chain of GEPs (e.g., one GEP for
+  // the row and one for the column of a 2D array). We start from the GEP that
+  // directly feeds the access, and decomposeGEPIndices walks the chain down to
+  // the base. A constant GEP expression is materialized as an instruction so
+  // that it can be rewritten like any other access
+  unsigned ptrOpIdx = load ? 0 : 1;
+  if (auto *ce = dyn_cast<ConstantExpr>(inst->getOperand(ptrOpIdx))) {
+    if (isa<GEPOperator>(ce)) {
+      Instruction *ceInst = ce->getAsInstruction();
+      ceInst->insertBefore(inst->getIterator());
+      inst->setOperand(ptrOpIdx, ceInst);
+    }
+  }
+  auto *gepInst = dyn_cast<GetElementPtrInst>(inst->getOperand(ptrOpIdx));
+
   if (!gepInst) {
-    if (baseGEPOrInst != inst) {
+    if (inst->getOperand(ptrOpIdx)->stripPointerCasts() != baseStorage) {
       llvm::report_fatal_error(
           "__dyn_array_partition: expected a GEP for this access");
     }
@@ -1026,12 +1038,10 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
     return;
   }
 
-  // If the wanted dimension to partition from exceeds the available indices in
-  // the gep instruction we can not change the indices accordingly
-  if (partInfo.dimension >= gepInst->getNumIndices()) {
-    llvm::report_fatal_error("__dyn_array_partition: dimension exceeds the "
-                             "number of indices in this access");
-  }
+  // NOTE: The GEP's own indices do not reflect the array's dimensions, since
+  // LLVM canonicalizes GEPs to a byte stride (e.g., "getelementptr [4 x i8],
+  // ptr %arr, i64 %i" for "arr[i]" with 32-bit elements). The indices are
+  // instead recovered from the byte offsets and the storage's type below
 
   Function *f = inst->getParent()->getParent();
   LLVMContext &ctx = inst->getContext();
@@ -1062,7 +1072,7 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
   // well before the current instruction that we'd like to split on
   if (gepInst->getNextNode() != inst) {
     gepInst = cast<GetElementPtrInst>(gepInst->clone());
-    gepInst->insertBefore(inst);
+    gepInst->insertBefore(inst->getIterator());
   }
 
   // Splits origBB right before the GEP: everything from the GEP onward
