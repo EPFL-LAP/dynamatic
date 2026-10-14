@@ -8,7 +8,7 @@ on:
       - 'docs/**'
     branches: ["main"]
     types: [opened, synchronize, reopened, ready_for_review]
-  
+
   push:
     paths-ignore:
       - 'docs/**'
@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  unittests:
+  fast-unit-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -57,10 +57,53 @@ jobs:
         run: python3.12 --version
 
       - name: build
-        run: ./build.sh --release --use-prebuilt-llvm --enable-abc --enable-cbc --force
+        run: ./build.sh --release --use-prebuilt-llvm --enable-cbc --force
 
       - name: check-dynamatic
         if: steps.build.outputs.exit_code == 0
         run: ninja check-dynamatic
         working-directory: build
 
+  blif-equiv:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: cleanup
+        run: |
+          echo "Emptying folder"
+          rm -rf -- * .*
+          echo "Folder contents"
+          ls -la
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Update apt and install prerequisites
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install software-properties-common
+          sudo add-apt-repository ppa:deadsnakes/ppa
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get install -y \
+            --option APT::Immediate-Configure=false \
+            sudo vim clang lld ccache cmake wget \
+            ninja-build python3 graphviz git curl \
+            gzip libreadline-dev \
+            libboost-all-dev pkg-config python3.12 \
+            python3.12-venv python3.12-dev \
+            ghdl verilator
+
+      - name: Verify Python 3.12
+        run: python3.12 --version
+
+      - name: build
+        run: ./build.sh --release --use-prebuilt-llvm --enable-abc --force
+
+      - name: run-blif-equiv-tests
+        if: steps.build.outputs.exit_code == 0
+        run: ninja run-blif-equiv-tests
+        working-directory: build
