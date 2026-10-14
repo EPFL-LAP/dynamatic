@@ -56,6 +56,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/LowerSwitch.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
+#include <deque>
 #include <polly/Support/ISLOStream.h>
 
 #define DEBUG_TYPE "array-partition"

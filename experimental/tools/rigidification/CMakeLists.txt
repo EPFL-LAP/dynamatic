@@ -20,5 +20,6 @@ target_link_libraries(rigidification-testbench
   MLIROptLib
   MLIRParser
   MLIRFuncDialect
+  MLIRMathDialect
   MLIRSupport
 )

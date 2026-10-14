@@ -26,6 +26,7 @@ target_link_libraries(elastic-miter
   MLIROptLib
   MLIRParser
   MLIRFuncDialect
+  MLIRMathDialect
   MLIRSupport
   MLIRTransforms
 )
