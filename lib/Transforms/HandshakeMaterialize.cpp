@@ -181,7 +181,7 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
     // Replace the original fork's outputs that are part of the memory control
     // network with the first lazy fork's outputs
     for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults()))
-      from.replaceAllUsesWith(to);
+      Value(from).replaceAllUsesWith(to);
 
     if (hasValueWithoutLazyConstr) {
       // If some of the control fork's result go outside the memory control

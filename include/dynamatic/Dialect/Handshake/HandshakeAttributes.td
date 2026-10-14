@@ -405,7 +405,7 @@ def CFDFCThroughputAttr : Handshake_Attr<
       llvm::SmallVector<mlir::NamedAttribute, 10> attrs;
       mlir::Builder builder(context);
       for (const auto &pair: cfdfcThroughputMap) {
-        mlir::Type doubleType = mlir::FloatType::getF64(context);
+        mlir::Type doubleType = mlir::Float64Type::get(context);
         auto tmpCFDFCThroughputAttr = builder.getFloatAttr(doubleType, pair.second);
         attrs.push_back({builder.getStringAttr(std::to_string(pair.first)), tmpCFDFCThroughputAttr});
       }
