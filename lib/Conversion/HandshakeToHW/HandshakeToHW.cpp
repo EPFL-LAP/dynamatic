@@ -777,7 +777,7 @@ ModuleDiscriminator::ModuleDiscriminator(Operation *op) {
             initOp->getAttrOfType<mlir::DictionaryAttr>("hw.parameters");
         if (paramsAttr) {
           auto initTokenAttr =
-              paramsAttr.get("INIT_TOKEN").dyn_cast_or_null<mlir::BoolAttr>();
+              dyn_cast_or_null<mlir::BoolAttr>(paramsAttr.get("INIT_TOKEN"));
           int initialValue =
               (initTokenAttr && initTokenAttr.getValue()) ? 1 : 0;
           addUnsigned("INITIAL_VALUE", initialValue);

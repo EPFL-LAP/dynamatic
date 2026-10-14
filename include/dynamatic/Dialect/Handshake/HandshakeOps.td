@@ -104,7 +104,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       auto names = getArgNames();
       if (idx >= names.size())
         llvm::report_fatal_error("argument index too high");
-      return names[idx].cast<StringAttr>();
+      return cast<StringAttr>(names[idx]);
     }
 
     /// Returns the result name at the given index.
@@ -112,7 +112,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
       auto names = getResNames();
       if (idx >= names.size())
         llvm::report_fatal_error("result index too high");
-      return names[idx].cast<StringAttr>();
+      return cast<StringAttr>(names[idx]);
     }
 
     /// Hook for FunctionOpInterface, called after verifying that the 'type'
@@ -121,7 +121,7 @@ def FuncOp : Op<Handshake_Dialect, "func", [
     /// safely.
     LogicalResult verifyType() {
       auto type = getFunctionTypeAttr().getValue();
-      if (!type.isa<FunctionType>())
+      if (!isa<FunctionType>(type))
         return emitOpError(
             "requires '" + getFunctionTypeAttrName().getValue() +
             "' attribute of function type");
@@ -220,7 +220,7 @@ def InstanceOp : Handshake_Op<"instance", [
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
-      (*this)->setAttr(getModuleAttrName(), callee.get<mlir::SymbolRefAttr>());
+      (*this)->setAttr(getModuleAttrName(), cast<mlir::SymbolRefAttr>(callee));
     }
 
     /// Get the control operand of this instance op

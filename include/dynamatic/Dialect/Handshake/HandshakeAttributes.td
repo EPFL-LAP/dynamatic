@@ -78,6 +78,8 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
 
     /// Automatically implemented print method.
     void $cppClass::print(mlir::AsmPrinter &odsPrinter) const {
+      // The cast members of attributes hide the free function
+      using llvm::cast;
       mlir::DictionaryAttr operandAttrs = getOperandAttributes();
       if (operandAttrs.empty()) {
         odsPrinter << "{}";
@@ -88,7 +90,7 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
       size_t numProps = operandAttrs.size();
       for (auto [idx, attr] : llvm::enumerate(operandAttrs)) {
         odsPrinter << attr.getName() << ": ";
-        attr.getValue().cast<$cppClass::OperandAttr>().print(odsPrinter);
+        cast<$cppClass::OperandAttr>(attr.getValue()).print(odsPrinter);
         if (idx != numProps - 1)
           odsPrinter << ", ";
       }
@@ -132,6 +134,8 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
     LogicalResult
     $cppClass::verify(function_ref<InFlightDiagnostic()> emitError,
                       mlir::DictionaryAttr operandAttrs) {
+      // The isa member of attributes hides the free function
+      using llvm::isa;
       for (const mlir::NamedAttribute &attr : operandAttrs) {
         // Name must represent a number
         std::optional<size_t> idx = toIdx(attr.getName().str());
@@ -140,7 +144,7 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
                             << attr.getName();
 
         // Value must be channel buffering properties
-        if (!attr.getValue().isa<$cppClass::OperandAttr>())
+        if (!isa<$cppClass::OperandAttr>(attr.getValue()))
           return emitError() << "map values are not of the correct type";
       }
       return success();

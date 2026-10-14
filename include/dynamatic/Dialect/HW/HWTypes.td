@@ -91,7 +91,7 @@ def HWStringType :
 
 /// A flat symbol reference or a reference to a name within a module.
 def NameRefAttr : Attr<
-  CPred<"$_self.isa<::mlir::FlatSymbolRefAttr, ::dynamatic::hw::InnerRefAttr>()">,
+  CPred<"isa<::mlir::FlatSymbolRefAttr, ::dynamatic::hw::InnerRefAttr>($_self)">,
   "name reference attribute">{
   let returnType = "::mlir::Attribute";
   let convertFromStorage = "$_self";

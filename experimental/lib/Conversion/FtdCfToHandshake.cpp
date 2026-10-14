@@ -129,7 +129,7 @@ struct GetGlobalOpConversion
     /// The initial value doesn't have any type constraints. Therefore we need
     /// to check if it is stored as dense elements.
     mlir::Attribute initValueAttr = global.getInitialValueAttr();
-    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+    if (auto denseAttr = dyn_cast<DenseElementsAttr>(initValueAttr)) {
       rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
                                                     denseAttr);
     } else {
