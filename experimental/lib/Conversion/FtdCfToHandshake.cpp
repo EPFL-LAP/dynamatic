@@ -504,7 +504,6 @@ static LogicalResult convertUndefinedValues(ConversionPatternRewriter &rewriter,
     auto cstOp = rewriter.create<handshake::ConstantOp>(undefOp.getLoc(),
                                                         cstAttr, startValue);
     cstOp->setDialectAttrs(undefOp->getAttrDictionary());
-    undefOp.getResult().replaceAllUsesWith(cstOp.getResult());
     namer.replaceOp(cstOp, cstOp);
     rewriter.replaceOp(undefOp, cstOp.getResult());
   }
@@ -579,7 +578,6 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
 
     // Replace the constant and the usage of its result
     namer.replaceOp(cstOp, newCstOp);
-    cstOp.getResult().replaceAllUsesWith(newCstOp.getResult());
     rewriter.replaceOp(cstOp, newCstOp->getResults());
   }
   return success();
