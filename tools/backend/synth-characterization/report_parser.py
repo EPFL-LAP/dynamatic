@@ -48,6 +48,32 @@ def extract_single_rpt(rpt_file):
                 
     return max_delay  # Return 0.0 if no delay is found
 
+def extract_achieved_period(rpt_file):
+    """
+    Extract the clock period achieved by the worst path of a timing report, i.e.,
+    the required time of the path minus its slack.
+
+    Args:
+        rpt_file (str): Path to the report file.
+
+    Returns:
+        float: The achieved clock period in nanoseconds, or None if the report
+        has no path.
+    """
+    requirement = None
+    slack = None
+    with open(rpt_file, 'r') as f:
+        for line in f:
+            match = re.search(r'^\s*Requirement:\s+(-?[\d.]+)ns', line)
+            if match and requirement is None:
+                requirement = float(match.group(1))
+            match = re.search(r'^\s*Slack(?:\s+\(\w+\))?\s*:\s+(-?[\d.]+)ns', line)
+            if match and slack is None:
+                slack = float(match.group(1))
+    if requirement is None or slack is None:
+        return None
+    return requirement - slack
+
 def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
     """
     Extract the data from the map_unit_to_list_unit_chars dictionary and save it to a JSON file.
@@ -68,6 +94,7 @@ def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
         CRDelayFinal = 0.0
         VCDelayFinal = 0.0
         VDDelayFinal = 0.0
+        latencyDict = {}
         traversedUnitOnce = False
         for unit_char in list_unit_chars:
             traversedParamOnce = False
@@ -80,7 +107,7 @@ def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
                 # Extract delay from the report file
                 delay = extract_single_rpt(rpt_filename)
                 if delay_type == ("data", "data"):
-                    dataDict[str(unit_char.get_parameter_value("DATA_TYPE"))] = delay
+                    dataDict[str(unit_char.get_bitwidth())] = delay
                 elif delay_type == ("valid", "valid"):
                     validDict["1"] = max(validDict["1"], delay)
                 elif delay_type == ("ready", "ready"):
@@ -98,22 +125,31 @@ def extract_rpt_data(map_unit_to_list_unit_chars, json_output):
                 else:
                     print("\033[91m" + f"[ERROR] Unknown delay type {delay_type} in report file {rpt_filename} for unit {unit_name}. Skipping." + "\033[0m")
                     continue
+            # Latency of a pipelined unit, for the clock period it achieves
+            rpt_reg_to_reg = getattr(unit_char, "rpt_reg_to_reg", None)
+            if rpt_reg_to_reg and os.path.exists(rpt_reg_to_reg):
+                period = extract_achieved_period(rpt_reg_to_reg)
+                if period is not None:
+                    latencyDict.setdefault(str(unit_char.get_bitwidth()), {})[f"{period:.3f}"] = float(unit_char.get_parameter_value("LATENCY"))
             if traversedParamOnce == False:
-                param_value = unit_char.get_parameter_value("DATA_TYPE")
+                param_value = unit_char.get_bitwidth()
                 print("\033[93m" + f"[WARNING] Report file for unit {unit_name} for bitwidth {param_value} does not exist({rpt_filename}). Skipping." + "\033[0m")
 
         if traversedUnitOnce == False:
             print("\033[91m" + f"[ERROR] No reports found for unit {unit_name}." + "\033[0m")
             continue
 
-        output_data[unit_name] = {"delay":{"data": dataDict,
+        output_data[unit_name] = {}
+        if latencyDict:
+            output_data[unit_name]["latency"] = {"0": latencyDict}
+        output_data[unit_name]["delay"] = {"data": dataDict,
                                        "valid": validDict,
                                        "ready": readyDict,
                                        "VR": VRDelayFinal,
                                        "CV": CVDelayFinal,
                                        "CR": CRDelayFinal,
                                        "VC": VCDelayFinal,
-                                       "VD": VDDelayFinal}}
+                                       "VD": VDDelayFinal}
 
 
     # Save the output data to the JSON file

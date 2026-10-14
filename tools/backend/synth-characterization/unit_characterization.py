@@ -99,15 +99,18 @@ end entity;
 architecture tb_arch of tb is
 begin
 dut: entity work.{entity_name}
-generic map (
 """
 
-    for param in param_names:
-        if param != "PREDICATE":
-            wrapper_top += f"{param} => {param}_const_value,\n"
-    wrapper_top = wrapper_top.rstrip(",\n") + "\n" \
-                     ")\n" \
-                        "port map (\n"
+    # Generated units have no generics: their parameters are set when generating them
+    generic_names = [generic.split(":")[0].strip() for generic in generics]
+    if generic_names:
+        wrapper_top += "generic map (\n"
+        for param in param_names:
+            if param in generic_names:
+                wrapper_top += f"{param} => {param}_const_value,\n"
+        wrapper_top = wrapper_top.rstrip(",\n") + "\n" \
+                         ")\n"
+    wrapper_top += "port map (\n"
     for port in ports:
         port_name = port.split(":")[0].strip()  # Get the port name before the colon
         wrapper_top += f"{port_name} => {port_name},\n"
@@ -117,7 +120,7 @@ generic map (
 
     return wrapper_top, entity_name
 
-def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period):
+def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period, generator_params=None, ip_libraries=[], first_id=0):
     """
     Run characterization for a single unit using the specified synthesis tool.
     
@@ -131,6 +134,9 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
         rpt_dir (str): Directory where reports will be stored.
         log_dir (str): Directory where logs will be stored.
         clock_period (float): Clock period in nanoseconds for the synthesis tool.
+        generator_params (dict): Parameter values the unit was generated with, if it was generated (e.g., {"BITWIDTH": 32}). The unit is then characterized only for these values.
+        ip_libraries (list): Xilinx IP libraries needed by the unit, as (library, source file relative to the Vivado installation).
+        first_id (int): Unique identifier of the first characterized instance.
     
     Returns:
         List[UnitCharacterization]: List of UnitCharacterization objects for the unit.
@@ -139,11 +145,14 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     hdl_files = [f"{hdl_out_dir}/{file}" for file in os.listdir(hdl_out_dir) if os.path.isfile(os.path.join(hdl_out_dir, file))]
     # Generate top files for all the combination of parameters
     params_charact = {}
-    for param in list_params:
-        param_name = param["name"]
-        assert param_name in parameters_ranges, f"Parameter {param_name} not found in parameters_ranges."
-        param_values = parameters_ranges[param_name]
-        params_charact[param_name] = param_values
+    if generator_params is not None:
+        params_charact = {name: [value] for name, value in generator_params.items()}
+    else:
+        for param in list_params:
+            param_name = param["name"]
+            assert param_name in parameters_ranges, f"Parameter {param_name} not found in parameters_ranges."
+            param_values = parameters_ranges[param_name]
+            params_charact[param_name] = param_values
     # Compute all combinations of parameters
     param_combinations = list(product(*params_charact.values()))
     param_names = list(params_charact.keys())
@@ -161,7 +170,7 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
     list_tcls = []
     # List to hold objects of UnitCharacterization
     unit_characterization_list = []
-    id = 0
+    id = first_id
     for combination in param_combinations:
         top_file = f"{hdl_out_dir}/{top_entity_name}_top_{id}.vhd" 
         wrapper_top_combined = wrapper_top
@@ -172,12 +181,12 @@ def run_unit_characterization(unit_name, list_params, hdl_out_dir, synth_tool, t
             f.write(wrapper_top_combined)
         unit_char_obj = UnitCharacterization(unit_name, top_entity_name, dict(zip(param_names, combination)), [top_file] + hdl_files, vhdl_interface_info, id)
         # Write the tcl file for synthesis
-        list_tcls.append(unit_char_obj.generate_tcl(tcl_dir, rpt_dir, sdc_file))
+        list_tcls.append(unit_char_obj.generate_tcl(tcl_dir, rpt_dir, sdc_file, ip_libraries))
         id += 1
         unit_characterization_list.append(unit_char_obj)
 
     # Run the synthesis tool for each tcl file
-    log_file = f"{log_dir}/synth_{unit_name}_log.txt"
+    log_file = f"{log_dir}/synth_{unit_name}_{first_id}_log.txt"
     run_synthesis(list_tcls, synth_tool, log_file)    
 
     return unit_characterization_list

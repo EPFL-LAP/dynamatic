@@ -56,8 +56,43 @@ parameters_ranges = {
     "PREDICATE": ["ne"]
     }
 
+# Parameters of the generator command of a unit (e.g., "$BITWIDTH"), mapped to
+# the values to characterize. Each combination of values is generated and
+# synthesized separately, since the generated RTL has no generics.
+# A unit can restrict the values in unit_generator_parameters_ranges.
+generator_parameters_ranges = {
+    "BITWIDTH": [1, 2, 4, 8, 16, 32, 64],
+    }
+
+# Per-unit generator parameter values. The units below are IP cores that only
+# exist for one bitwidth, with a fixed latency.
+unit_generator_parameters_ranges = {
+    "handshake.sqrtf": {"BITWIDTH": [32], "LATENCY": [11]},
+    "handshake.sinf": {"BITWIDTH": [64], "LATENCY": [33]},
+    "handshake.cosf": {"BITWIDTH": [64], "LATENCY": [33]},
+    }
+
+# Value used for the extra signals of the generator command (no extra signals)
+GENERATOR_EXTRA_SIGNALS = "'{}'"
+
+# Xilinx IP libraries that a dependency (named after its RTL file) needs for
+# synthesis, as (library, source file relative to the Vivado installation).
+ip_library_sources = {
+    "sqrtf_vitis_hls": [
+        ("xbip_utils_v3_0_10", "data/ip/xilinx/xbip_utils_v3_0/hdl/xbip_utils_v3_0_vh_rfs.vhd"),
+        ("axi_utils_v2_0_6", "data/ip/xilinx/axi_utils_v2_0/hdl/axi_utils_v2_0_vh_rfs.vhd"),
+        ("xbip_pipe_v3_0_6", "data/ip/xilinx/xbip_pipe_v3_0/hdl/xbip_pipe_v3_0_vh_rfs.vhd"),
+        ("xbip_bram18k_v3_0_6", "data/ip/xilinx/xbip_bram18k_v3_0/hdl/xbip_bram18k_v3_0_vh_rfs.vhd"),
+        ("xbip_dsp48_wrapper_v3_0_4", "data/ip/xilinx/xbip_dsp48_wrapper_v3_0/hdl/xbip_dsp48_wrapper_v3_0_vh_rfs.vhd"),
+        ("xbip_dsp48_addsub_v3_0_6", "data/ip/xilinx/xbip_dsp48_addsub_v3_0/hdl/xbip_dsp48_addsub_v3_0_vh_rfs.vhd"),
+        ("xbip_dsp48_multadd_v3_0_6", "data/ip/xilinx/xbip_dsp48_multadd_v3_0/hdl/xbip_dsp48_multadd_v3_0_vh_rfs.vhd"),
+        ("mult_gen_v12_0_15", "data/ip/xilinx/mult_gen_v12_0/hdl/mult_gen_v12_0_vh_rfs.vhd"),
+        ("floating_point_v7_1_8", "data/ip/xilinx/floating_point_v7_1/hdl/floating_point_v7_1_vh_rfs.vhd"),
+    ],
+    }
+
 # Function to write the TCL file for synthesis
-def write_tcl(top_entity_name, hdl_files, tcl_file, sdc_file, map_rpt_to_ports):
+def write_tcl(top_entity_name, hdl_files, tcl_file, sdc_file, map_rpt_to_ports, ip_libraries=[], rpt_reg_to_reg=None):
     """
     Write the TCL file for synthesis based on the top file and HDL files.
     
@@ -67,8 +102,12 @@ def write_tcl(top_entity_name, hdl_files, tcl_file, sdc_file, map_rpt_to_ports):
         tcl_file (str): Path to the output TCL file.
         sdc_file (str): Path to the SDC file for constraints.
         map_rpt_to_ports (dict): Dictionary mapping report files to input and output ports. Expected format: {rpt_filename1: {"input_ports": [...], "output_ports": [...]}, ...}.
+        ip_libraries (list): Xilinx IP libraries to read, as (library, source file relative to the Vivado installation).
+        rpt_reg_to_reg (str): Report file for the worst path between registers, if needed.
     """
     with open(tcl_file, 'w') as f:
+        for library, source in ip_libraries:
+            f.write(f"read_vhdl -library {library} $::env(XILINX_VIVADO)/{source}\n")
         for hdl_file in hdl_files:
             f.write(f"read_vhdl -vhdl2008 {hdl_file}\n")
         f.write(f"read_xdc {sdc_file}\n")
@@ -86,6 +125,8 @@ def write_tcl(top_entity_name, hdl_files, tcl_file, sdc_file, map_rpt_to_ports):
                     continue  # Skip clock and reset ports
                 for oport in output_ports:
                     f.write(f"report_timing -from [get_ports {iport}] -to [get_ports {oport}] >> {rpt_timing}\n")
+        if rpt_reg_to_reg:
+            f.write(f"report_timing -from [all_registers] -to [all_registers] > {rpt_reg_to_reg}\n")
 
 
 # Class to hold VHDL interface information
@@ -281,7 +322,7 @@ class UnitCharacterization:
         self.map_signals_type_to_delay_rpt = {}
         self.tcl_file = None
 
-    def generate_tcl(self, tcl_dir: str, rpt_dir: str, sdc_file: str) -> List[str]:
+    def generate_tcl(self, tcl_dir: str, rpt_dir: str, sdc_file: str, ip_libraries=[]) -> List[str]:
         """
         Generate a TCL files for synthesis.
         
@@ -308,8 +349,13 @@ class UnitCharacterization:
                 "input_ports": input_ports,
                 "output_ports": output_ports
             }
+        # The clock period that a pipelined unit achieves is needed to store its
+        # latency in the timing model
+        self.rpt_reg_to_reg = None
+        if "LATENCY" in self.params:
+            self.rpt_reg_to_reg = f"{rpt_dir}/rpt_timing_{self.top_entity_name}_top_{self.unique_id}_reg_reg.txt"
         # Write the TCL file
-        write_tcl(self.top_entity_name, self.hdl_files, tcl_file, sdc_file, map_rpt_to_ports)
+        write_tcl(self.top_entity_name, self.hdl_files, tcl_file, sdc_file, map_rpt_to_ports, ip_libraries, self.rpt_reg_to_reg)
         self.tcl_file = tcl_file
         return tcl_file
     
@@ -322,6 +368,15 @@ class UnitCharacterization:
         """
         return self.map_signals_type_to_delay_rpt
     
+    def get_bitwidth(self) -> str:
+        """
+        Get the bitwidth of the characterized instance: the DATA_TYPE generic, or
+        the BITWIDTH parameter of the generator.
+        """
+        if "DATA_TYPE" in self.params:
+            return self.params["DATA_TYPE"]
+        return self.get_parameter_value("BITWIDTH")
+
     def get_parameter_value(self, param_name: str) -> str:
         """
         Get the value of a specific parameter.

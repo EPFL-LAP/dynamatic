@@ -2,10 +2,37 @@
 import argparse
 import json
 import os
+import re
+from itertools import product
 from report_parser import extract_rpt_data
 from hdl_manager import get_hdl_files
-from utils import VhdlInterfaceInfo, parameters_ranges, skipping_units
+from utils import VhdlInterfaceInfo, parameters_ranges, skipping_units, generator_parameters_ranges, unit_generator_parameters_ranges
 from unit_characterization import run_unit_characterization
+
+
+def get_generator_param_combinations(unit_name, generator):
+    """
+    Get the combinations of values of the parameters of a generator command
+    (e.g., "$BITWIDTH") to characterize.
+
+    Args:
+        unit_name (str): Name of the unit.
+        generator (str): Generator command of the unit, or None.
+
+    Returns:
+        list: List of dictionaries mapping parameter names to values, or None if
+        the RTL of the unit does not depend on generator parameters.
+    """
+    if not generator:
+        return None
+    unit_ranges = unit_generator_parameters_ranges.get(unit_name, {})
+    names = [name for name in re.findall(r"\$(\w+)", generator)
+             if name in unit_ranges or name in generator_parameters_ranges]
+    names = list(dict.fromkeys(names))
+    if not names:
+        return None
+    values = [unit_ranges.get(name, generator_parameters_ranges.get(name)) for name in names]
+    return [dict(zip(names, combination)) for combination in product(*values)]
 
 def extract_rtl_info(unit_info):
     """
@@ -72,7 +99,7 @@ def get_dependency_dict(dataflow_units):
     return dependency_dict
 
 
-def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period):
+def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period, units=None):
     """
     Run characterization of dataflow units based on the provided JSON input.
     
@@ -81,6 +108,7 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
         json_output (str): Path to the output JSON file where characterization results will be saved.
         dynamatic_dir (str): Path to the DYNAMATIC home directory.
         synth_tool (str): Synthesis tool to use for characterization (e.g., 'vivado').
+        units (list): Names of the units to characterize (all the units if None).
     """
     # Load the input JSON file
     with open(json_input, 'r') as f:
@@ -117,6 +145,8 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
         if unit_name == None:
             print("Skipping unit with no name.")
             continue
+        if units is not None and unit_name not in units:
+            continue
         if unit_name in skipping_units:
             print(f"Skipping unit {unit_name} as it is in the skipping list.")
             continue
@@ -132,14 +162,19 @@ def run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clo
                     break
             if skip_unit:
                 continue
-        # Clean previous RTL files and tcl files
-        os.system(f"rm -rf {hdl_dir}/*")
-        os.system(f"rm -rf {tcl_dir}/*")
-        # Copy the RTL files or generate them if necessary
         print(f"Processing unit: {unit_name}")
-        top_def_file = get_hdl_files(unit_name, generic, generator, hdl_dir, dynamatic_dir, all_dependencies_dict)
-        # After generating the HDL files, we can proceed with characterization
-        list_unit_chars = run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period)
+        # A generated unit is generated and characterized once per combination
+        # of its generator parameters, since its RTL has no generics
+        generator_param_combinations = get_generator_param_combinations(unit_name, None if generic else generator)
+        list_unit_chars = []
+        for generator_params in generator_param_combinations or [None]:
+            # Clean previous RTL files and tcl files
+            os.system(f"rm -rf {hdl_dir}/*")
+            os.system(f"rm -rf {tcl_dir}/*")
+            # Copy the RTL files or generate them if necessary
+            top_def_file, ip_libraries = get_hdl_files(unit_name, generic, generator, hdl_dir, dynamatic_dir, all_dependencies_dict, generator_params or {})
+            # After generating the HDL files, we can proceed with characterization
+            list_unit_chars += run_unit_characterization(unit_name, list_params, hdl_dir, synth_tool, top_def_file, tcl_dir, rpt_dir, log_dir, clock_period, generator_params, ip_libraries, len(list_unit_chars))
         # Store the results in the map_unit_to_list_unit_chars dictionary
         map_unit_to_list_unit_chars[unit_name] = list_unit_chars
     
@@ -178,6 +213,13 @@ if __name__ == "__main__":
         default=4.0,
         help="Clock period in nanoseconds to use for synthesis (default: 4.0 ns)",
     )
+    parser.add_argument(
+        "--units",
+        type=str,
+        nargs="+",
+        default=None,
+        help="Names of the units to characterize, e.g., handshake.sqrtf (default: all units)",
+    )
     args = parser.parse_args()
     json_input = args.json_input
     json_output = args.json_output
@@ -186,4 +228,4 @@ if __name__ == "__main__":
     clock_period = args.clock_period
     if not json_input:
         json_input = f"{dynamatic_dir}/data/rtl-config-vhdl-vivado.json"
-    run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period)
+    run_characterization(json_input, json_output, dynamatic_dir, synth_tool, clock_period, args.units)
