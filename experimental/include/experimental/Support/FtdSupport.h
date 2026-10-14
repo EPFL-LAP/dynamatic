@@ -20,6 +20,7 @@
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace dynamatic {
 namespace experimental {
@@ -183,6 +184,14 @@ bool isReachable(Block *start, Block *end);
 
 /// Return the channelified version of the input type.
 Type channelifyType(Type type);
+
+/// Replaces all uses of `from` with `to` through `rewriter`, by modifying each
+/// user in place. Unlike `RewriterBase::replaceAllUsesWith`, this replaces
+/// every use under a dialect conversion as well: the conversion rewriter of
+/// newer MLIR versions only replaces the uses that `to` dominates, which the IR
+/// built by FTD (where an operation may use a value defined later in its block)
+/// does not guarantee.
+void replaceAllUsesWith(mlir::RewriterBase &rewriter, Value from, Value to);
 
 /// Get an array of `size` elements all identical to the channelified type.
 SmallVector<Type> getListTypes(Type inputType, unsigned size = 2);

@@ -641,8 +641,10 @@ struct SimplifyKnownConditionBranch
           constOp->setAttr("handshake.bb", bbAttr);
 
         // Replace condition operand of downstream branch
-        br->setOperand(0, constOp.getResult());
-        refreshBranchAttrsFromCondition(br, br);
+        rewriter.updateRootInPlace(br, [&] {
+          br->setOperand(0, constOp.getResult());
+          refreshBranchAttrsFromCondition(br, br);
+        });
 
         changed = true;
       }

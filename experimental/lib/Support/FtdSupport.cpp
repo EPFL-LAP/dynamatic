@@ -288,6 +288,13 @@ bool ftd::isReachable(Block *start, Block *end) {
 // Type utilities
 // ===--------------------------------------------------------------------=== //
 
+void ftd::replaceAllUsesWith(RewriterBase &rewriter, Value from, Value to) {
+  for (OpOperand &use : llvm::make_early_inc_range(from.getUses())) {
+    Operation *user = use.getOwner();
+    rewriter.updateRootInPlace(user, [&] { use.set(to); });
+  }
+}
+
 Type ftd::channelifyType(Type type) {
   return llvm::TypeSwitch<Type, Type>(type)
       .Case<IndexType, IntegerType, FloatType>(

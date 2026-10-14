@@ -892,7 +892,7 @@ LogicalResult experimental::ftd::addGsaGates(
         oneInputGammaList.insert(mux);
 
       if (gate->isRoot)
-        rewriter.replaceAllUsesWith(gate->result, mux.getResult());
+        ftd::replaceAllUsesWith(rewriter, gate->result, mux.getResult());
 
       gsaList.insert({gate->index, mux});
 
@@ -909,14 +909,16 @@ LogicalResult experimental::ftd::addGsaGates(
     auto *operandMerge = gsaList[missingMerge.phiIndex];
     auto *resultMerge = gsaList[missingMerge.edgeIndex];
 
-    operandMerge->setOperand(missingMerge.operandInput + 1,
-                             resultMerge->getResult(0));
-
-    // In case of a one-input gamma, the other input must be replaced as well,
-    // to avoid errors when the block arguments are erased later on
-    if (oneInputGammaList.contains(operandMerge))
-      operandMerge->setOperand(2 - missingMerge.operandInput,
+    rewriter.updateRootInPlace(operandMerge, [&] {
+      operandMerge->setOperand(missingMerge.operandInput + 1,
                                resultMerge->getResult(0));
+
+      // In case of a one-input gamma, the other input must be replaced as
+      // well, to avoid errors when the block arguments are erased later on
+      if (oneInputGammaList.contains(operandMerge))
+        operandMerge->setOperand(2 - missingMerge.operandInput,
+                                 resultMerge->getResult(0));
+    });
   }
 
   // Get rid of the multiplexers adopted as place-holders of one input gamma
@@ -925,7 +927,8 @@ LogicalResult experimental::ftd::addGsaGates(
                            op->getOperand(1).getDefiningOp())
                            ? 1
                            : 2;
-    op->getResult(0).replaceAllUsesWith(op->getOperand(operandToUse));
+    ftd::replaceAllUsesWith(rewriter, op->getResult(0),
+                            op->getOperand(operandToUse));
 
     for (auto &[idx, mappedOp] : gsaList) {
       if (mappedOp == op)
@@ -1003,7 +1006,7 @@ LogicalResult experimental::ftd::addGsaGates(
             areEquivalentValues(mux1.getDataOperands()[1],
                                 mux2.getDataOperands()[1])) {
 
-          mux2.getResult().replaceAllUsesWith(mux1.getResult());
+          ftd::replaceAllUsesWith(rewriter, mux2.getResult(), mux1.getResult());
           rewriter.eraseOp(mux2);
           it2->second = nullptr;
           changed = true;
@@ -1024,7 +1027,8 @@ LogicalResult experimental::ftd::addGsaGates(
 
       if (areEquivalentValues(mux.getDataOperands()[0],
                               mux.getDataOperands()[1])) {
-        mux.getResult().replaceAllUsesWith(mux.getDataOperands()[0]);
+        ftd::replaceAllUsesWith(rewriter, mux.getResult(),
+                                mux.getDataOperands()[0]);
         rewriter.eraseOp(mux);
         op = nullptr;
         changed = true;
@@ -1074,7 +1078,7 @@ LogicalResult ftd::replaceMergeToGSA(handshake::FuncOp &funcOp,
       return failure();
 
     // Get rid of the merge
-    merge.erase();
+    rewriter.eraseOp(merge);
   }
 
   return success();
