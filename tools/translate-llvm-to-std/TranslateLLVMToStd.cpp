@@ -618,6 +618,9 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
   valueMap[inst] = op->getResult(0);
 }
 
+/// NOTE: Assumes that the canonicalize-geps pass (CanonicalizeGEPs.cpp) ran
+/// before: each GEP is translated separately, so chains of byte GEPs whose
+/// offsets are not whole elements on their own must be folded into one.
 void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
 
   // The GEP instruction calculates the index that the load/store need to use
@@ -656,56 +659,72 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
   SmallVector<mlir::Value> multipliedIndices;
 
+  // The memory is flattened into a 1D memref, whose elements the computed
+  // index counts. The GEP's indices may count smaller units than these
+  // elements: e.g., clang emits "getelementptr [4 x i8], ptr %a, i64 %i" to
+  // access the i32 element %i. The offset of each index is thus computed in
+  // bits and converted into a number of memref elements. Sizes are the ones in
+  // memory, as given by the data layout (e.g., 16 bits for a 12-bit integer)
+  const llvm::DataLayout &dl = gepInst->getModule()->getDataLayout();
+  // Size of the GEP's innermost element type, which its indices count (e.g.,
+  // i8 for "getelementptr [4 x i8]", i32 for "getelementptr [4 x [8 x i32]]")
+  int64_t baseElemBitWidth =
+      dl.getTypeAllocSizeInBits(baseElementType).getFixedValue();
+  // Size of the elements of the memref that the GEP accesses (e.g., i32 for
+  // "int a[N]"), which the translated index counts
+  int64_t memrefElemBitWidth = baseElemBitWidth;
+  if (auto it = llvmPtrToMemRefMap.find(baseAddressLLVM);
+      it != llvmPtrToMemRefMap.end()) {
+    mlir::Type elemType =
+        cast<MemRefType>(it->second.getType()).getElementType();
+    llvm::Type *llvmElemType =
+        isa<FloatType>(elemType)
+            ? (elemType.isF64() ? llvm::Type::getDoubleTy(gepInst->getContext())
+                                : llvm::Type::getFloatTy(gepInst->getContext()))
+            : static_cast<llvm::Type *>(llvm::IntegerType::get(
+                  gepInst->getContext(), elemType.getIntOrFloatBitWidth()));
+    memrefElemBitWidth =
+        dl.getTypeAllocSizeInBits(llvmElemType).getFixedValue();
+  }
+
   // [START calculate the flattened array indices]
   for (size_t i = 0; i < gepIndices.size(); ++i) {
     mlir::Value mlirIndexValue = valueMap[gepIndices[i]];
 
-    // Calculate the partitial index
-    int64_t coeff = 1;
+    // Number of bits the address advances when this index increases by one
+    int64_t offsetBitsPerIndex = baseElemBitWidth;
     for (size_t j = i; j < multipliers.size(); j++)
-      coeff *= multipliers[j];
+      offsetBitsPerIndex *= multipliers[j];
 
-    if (coeff == 1) {
+    if (offsetBitsPerIndex % memrefElemBitWidth != 0) {
+      // The index advances by a fraction of a memref element (e.g., by bytes in
+      // "getelementptr i8, ptr %a, i64 %offset"). The access is aligned to an
+      // element, so the offset is a whole number of elements
+      assert(memrefElemBitWidth % offsetBitsPerIndex == 0 &&
+             "GEP index offset is not a fraction of the element size");
+      int64_t ratio = memrefElemBitWidth / offsetBitsPerIndex;
+      assert(llvm::isPowerOf2_64(ratio) &&
+             "element size is not a power-of-two multiple of the index offset");
       if (auto *constVal = dyn_cast<Constant>(gepIndices[i])) {
-        // Special case: when the GEP index is a constant number
-        //
-        // Here we need to handle tricky examples like this:
-        // %arrayidx2 = getelementptr inbounds nuw i8, ptr %2, i64 4
-        //
-        // Here we are using GEP to advance 4 * i8 = 32 bits. If the
-        // element of the original array was 32-bit wide, then here we need to
-        // increment 1 step (instead of 4).
-        auto memrefType = dyn_cast<MemRefType>(
-            this->llvmPtrToMemRefMap.at(baseAddressLLVM).getType());
-        assert(memrefType);
-
-        // This is the size of the actual element (i.e., for 32 in the example
-        // above).
-        unsigned actualBaseElementWidth = memrefType.getElementTypeBitWidth();
-
-        // This is the size that the current GEP assumes (i.e., for i8 in the
-        // example above).
-        unsigned currBaseElementBitWidth =
-            baseElementType->getScalarSizeInBits();
-
-        // This the the number of `currBaseElementBitWidth` that we need to skip
-        // (i.e., 4 in the example above).
         int64_t constInt = *constVal->getUniqueInteger().getRawData();
-
-        assert((currBaseElementBitWidth * constInt) % actualBaseElementWidth ==
-                   0 &&
-               "Incorrect alignment!");
-
-        unsigned actualAdvanceValue =
-            (currBaseElementBitWidth * constInt) / actualBaseElementWidth;
-
-        auto byteAlignedConstantValue = builder.create<arith::ConstantOp>(
-            UnknownLoc::get(ctx), builder.getIndexAttr(actualAdvanceValue));
-        multipliedIndices.push_back(byteAlignedConstantValue);
-      } else {
-        multipliedIndices.push_back(mlirIndexValue);
+        assert(constInt % ratio == 0 && "Incorrect alignment!");
+        multipliedIndices.push_back(builder.create<arith::ConstantOp>(
+            UnknownLoc::get(ctx), builder.getIndexAttr(constInt / ratio)));
+        continue;
       }
+      auto shiftValue = builder.create<arith::ConstantOp>(
+          UnknownLoc::get(ctx), builder.getIntegerAttr(mlirIndexValue.getType(),
+                                                       llvm::Log2_64(ratio)));
+      multipliedIndices.push_back(builder.create<arith::ShRUIOp>(
+          UnknownLoc::get(ctx), mlirIndexValue, shiftValue));
+      continue;
+    }
 
+    // Number of memref elements the address advances when this index
+    // increases by one
+    int64_t coeff = offsetBitsPerIndex / memrefElemBitWidth;
+    if (coeff == 1) {
+      multipliedIndices.push_back(mlirIndexValue);
     } else if (llvm::isPowerOf2_64(coeff)) {
       // Special case: the array dimension is a power of two.
       // Here we can apply the optimization: multiply by power of 2 is the same
