@@ -64,6 +64,9 @@ private:
   void movePastFunctionBlock(
       DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &name,
       ModuleOp modOp);
+
+  void removeControlNetwork(handshake::FuncOp funcOp);
+  void rewireControlNetwork(handshake::FuncOp funcOp, dynamatic::NameAnalysis &namer);
 };
 
 /// Identifies conditional branches and converts them into suppressors which
@@ -663,6 +666,183 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
   }
 }
 
+/// Removes the isolated basic block control-token network (ControlMerges, 
+/// control-carrying Branches, and their associated dead constants/inverters)
+/// while leaving data paths, memory controllers, and sources intact.
+void EagerlyElasticAllPass::removeControlNetwork(handshake::FuncOp funcOp) {
+  // 1. Clean up constants triggered by control values.
+  for (auto cstOp : llvm::make_early_inc_range(funcOp.getOps<handshake::ConstantOp>())) {
+    if (llvm::isa<handshake::ControlType>(cstOp.getOperand().getType())) {
+      if (cstOp.use_empty()) {
+        cstOp.erase();
+      }
+    }
+  }
+
+  // Track potential dead condition drivers (e.g., suppressor noti ops)
+  llvm::SmallVector<Operation *, 16> candidateDeadDrivers;
+
+  // 2. Erase conditional branches whose data operand is a control token.
+  for (auto condBr : llvm::make_early_inc_range(funcOp.getOps<handshake::ConditionalBranchOp>())) {
+    if (llvm::isa<handshake::ControlType>(condBr.getDataOperand().getType())) {
+      if (Operation *condDef = condBr.getConditionOperand().getDefiningOp())
+        candidateDeadDrivers.push_back(condDef);
+      condBr->dropAllUses();
+      condBr.erase();
+    }
+  }
+
+  // 3. Erase unconditional control branches.
+  for (auto br : llvm::make_early_inc_range(funcOp.getOps<handshake::BranchOp>())) {
+    if (llvm::isa<handshake::ControlType>(br.getOperand().getType())) {
+      br->dropAllUses();
+      br.erase();
+    }
+  }
+
+  // 4. Erase all control merges.
+  // With step 1-3 finished, their operands and results have no remaining users.
+  for (auto cmerge : llvm::make_early_inc_range(funcOp.getOps<handshake::ControlMergeOp>())) {
+    // If anything still holds a reference, drop uses to prevent assertion failure
+    cmerge.getResult().dropAllUses();
+    cmerge.getIndex().dropAllUses();
+    cmerge.erase();
+  }
+
+  // 5. Clean up dangling predicate inverters (noti) whose only purpose was
+  // to feed the control branch conditions
+  for (Operation *op : candidateDeadDrivers) {
+    if (op && op->use_empty()) {
+      op->erase();
+    }
+  }
+}
+
+void EagerlyElasticAllPass::rewireControlNetwork(
+    handshake::FuncOp funcOp, dynamatic::NameAnalysis &namer) {
+  llvm::errs() << "rewire control network\n";
+
+  MLIRContext *ctx = funcOp.getContext();
+  auto ctrlType = handshake::ControlType::get(ctx);
+  DenseSet<Operation *> opsToErase;
+
+  // 1. Convert all BlockControlOp results (and the entry "control_constant")
+  //    from !handshake.channel<i32> to !handshake.control<>, and propagate
+  //    that type through all connected MuxOps and ConditionalBranchOps.
+  SmallVector<Value> worklist;
+  for (auto ctrlOp : funcOp.getOps<handshake::BlockControlOp>()) {
+    Value inToken = ctrlOp.getOperand(0);
+
+    // If the input is the entry "control_constant", bypass the constant
+    // and use its handshake::SourceOp (: <>) directly!
+    if (auto cstOp = inToken.getDefiningOp<handshake::ConstantOp>()) {
+      Value srcCtrl = cstOp.getCtrl(); // Already !handshake.control<>
+      ctrlOp.setOperand(0, srcCtrl);
+      opsToErase.insert(cstOp);
+    }
+
+    ctrlOp->getResult(0).setType(ctrlType);
+    worklist.push_back(ctrlOp.getResult());
+  }
+
+  // Propagate !handshake.control<> through the mux / cond_br steering network
+  while (!worklist.empty()) {
+    Value val = worklist.pop_back_val();
+    for (Operation *user : val.getUsers()) {
+      if (auto muxOp = dyn_cast<handshake::MuxOp>(user)) {
+        if (muxOp.getResult().getType() != ctrlType) {
+          muxOp.getResult().setType(ctrlType);
+          worklist.push_back(muxOp.getResult());
+        }
+      } else if (auto condBr = dyn_cast<handshake::ConditionalBranchOp>(user)) {
+        // Only update if this token is the data operand (operand 1), not condition
+        if (condBr.getDataOperand() == val &&
+            condBr.getTrueResult().getType() != ctrlType) {
+          condBr.getTrueResult().setType(ctrlType);
+          condBr.getFalseResult().setType(ctrlType);
+          worklist.push_back(condBr.getTrueResult());
+          worklist.push_back(condBr.getFalseResult());
+        }
+      }
+    }
+  }
+
+  Value finalExitToken = nullptr;
+
+  // 2. Process and bypass each handshake::BlockControlOp
+  for (auto ctrlOp : funcOp.getOps<handshake::BlockControlOp>()) {
+    auto bbAttr = ctrlOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+    Value inToken = ctrlOp.getOperand(0);
+
+    // Check if this BlockControlOp feeds the final exit ConditionalBranchOp
+    // (the one whose falseResult is unused because there is no outer loop).
+    for (Operation *user : ctrlOp.getResult().getUsers()) {
+      if (auto condBr = dyn_cast<handshake::ConditionalBranchOp>(user)) {
+        if (condBr.getDataOperand() == ctrlOp.getResult() &&
+            condBr.getFalseResult().use_empty()) {
+          finalExitToken = condBr.getFalseResult();
+        }
+      }
+    }
+
+    // Find all stores in that basic block
+    for (auto storeOp : funcOp.getOps<handshake::StoreOp>()) {
+      if (storeOp->getAttr(HANDSHAKEBB) != bbAttr)
+        continue;
+
+      auto addrBranch =
+          storeOp.getAddress().getDefiningOp<handshake::ConditionalBranchOp>();
+      Value conditionVal =
+          addrBranch ? addrBranch.getConditionOperand() : nullptr;
+
+      for (Operation *user : storeOp->getUsers()) {
+        auto mcOp = dyn_cast<handshake::MemoryControllerOp>(user);
+        if (!mcOp || mcOp.getInputs().size() < 3)
+          continue;
+
+        OpOperand &storeCtrlSlot = mcOp.getInputsMutable()[0];
+        auto oldCst = storeCtrlSlot.get().getDefiningOp<handshake::ConstantOp>();
+        if (!oldCst)
+          continue;
+
+        // Keep oldCst! It takes a !handshake.control<> trigger and outputs
+        // the 1 : i32 constant that the MemoryController's ctrl input expects.
+        if (conditionVal) {
+          OpBuilder builder(oldCst);
+          auto ctrlBranch = builder.create<handshake::ConditionalBranchOp>(
+              oldCst->getLoc(), conditionVal, inToken);
+          setHandshakeAttrs(bbAttr, namer, {ctrlBranch});
+          oldCst.getCtrlMutable().assign(ctrlBranch.getFalseResult());
+        } else {
+          oldCst.getCtrlMutable().assign(inToken);
+        }
+        break;
+      }
+    }
+
+    // Forward the input token to all consumers of BlockControlOp's result
+    ctrlOp.getResult().replaceAllUsesWith(inToken);
+
+    // Collect BlockControlOp for cleanup
+    opsToErase.insert(ctrlOp);
+  }
+
+  // 3. Route the final exit token (now !handshake.control<>) into memEnd
+  if (finalExitToken) {
+    for (auto mcOp : funcOp.getOps<handshake::MemoryControllerOp>()) {
+      OpOperand &memEndSlot = mcOp->getOpOperands().back();
+      memEndSlot.set(finalExitToken);
+    }
+  }
+
+  // 4. Clean up all matched operations
+  for (Operation *op : opsToErase) {
+    op->dropAllUses();
+    op->erase();
+  }
+}
+
+
 void EagerlyElasticAllPass::runOnOperation() {
   ModuleOp modOp = getOperation();
   NameAnalysis &namer = getAnalysis<NameAnalysis>();
@@ -671,13 +851,17 @@ void EagerlyElasticAllPass::runOnOperation() {
       cast<handshake::FuncOp>(&modOp.getBodyRegion().front().front());
   assert(funcOp && "No funcOp found!");
 
+  // handle control network
+  removeControlNetwork(funcOp);
+  rewireControlNetwork(funcOp, namer);
+
   // identify and prepare suppressors and return a list of all of them
   auto frontier = prepareSuppressors(funcOp, namer);
   // markMultiSuccessorHeaderBranches(frontier, modOp);
 
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
 
-  applyRewritesForRegion(frontier, namer, 2);
+  applyRewritesForRegion(frontier, namer, 1);
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   
   if (regionBased) {
@@ -699,66 +883,16 @@ void EagerlyElasticAllPass::runOnOperation() {
     // Erase the marker from the IR
     markerOp.erase();
   }
+  
+  
 
-  llvm::errs() << "rewire control network\n";
-
-  // index all trigger markers by bb
-  DenseMap<unsigned, SmallVector<Operation *, 2>> markersByBB;
-  for (auto sinkOp : llvm::make_early_inc_range(funcOp.getOps<handshake::SinkOp>())) {
-    if (auto bbAttr = sinkOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB)) {
-      markersByBB[bbAttr.getUInt()].push_back(sinkOp);
-    }
+  /*
+  // 6. Connect the constant to port 5 of each MemoryControllerOp
+  // Port 5 is 0-indexed position 4
+  for (auto mcOp : mcOps) {
+    unsigned endPortIdx = mcOp->getNumOperands() - 1;
+    mcOp->setOperand(endPortIdx, sourceOp.getResult());
   }
 
-  // single set to collect all operations to delete
-  DenseSet<Operation *> opsToErase;
-
-  // iterate through all memory controllers
-  for (auto mcOp : funcOp.getOps<handshake::MemoryControllerOp>()) {
-    ValueRange inputs = mcOp.getInputs();
-
-    // if there are only 2 access operands, it's only a load so we can skip
-    if (inputs.size() < 3) continue;
-
-    // the first input is the store control channel (=constant)
-    Value storeCtrlVal = inputs[0];
-    auto cstOp = storeCtrlVal.getDefiningOp<handshake::ConstantOp>();
-    if (!cstOp) continue;
-    auto bbAttr = cstOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
-    if (!bbAttr) continue;
-
-    // find a corresponding trigger marker (has to be in the same bb)
-    unsigned bb = bbAttr.getUInt();
-    auto markerIt = markersByBB.find(bb);
-    if (markerIt == markersByBB.end()) continue;
-
-    // pop the next marker inline
-    Operation *triggerMarker = markerIt->second.pop_back_val();
-    Value triggerMarkerInputVal = triggerMarker->getOperand(0);
-    triggerMarker->dump();
-    // find the suppression condition from the existing address suppressor
-    auto storeOp = inputs[1].getDefiningOp<handshake::StoreOp>();
-    if (!storeOp) continue;
-    auto addrSupp = storeOp.getAddress().getDefiningOp<handshake::ConditionalBranchOp>();
-    if (!addrSupp) continue;
-    Value conditionVal = addrSupp.getConditionOperand();
-
-    // insert the new suppressor branch after the constant
-    OpBuilder builder(cstOp);
-    builder.setInsertionPointAfter(cstOp);
-    auto ctrlBranch = builder.create<handshake::ConditionalBranchOp>(cstOp.getLoc(),
-        conditionVal, triggerMarkerInputVal);
-    setHandshakeAttrs(cstOp->getAttr(HANDSHAKEBB), namer, {ctrlBranch});
-
-    // rewire the branch data input to the marker's input stream
-    mcOp.getInputsMutable()[0].set(ctrlBranch.getFalseResult());
-    opsToErase.insert(cstOp);
-    opsToErase.insert(triggerMarker);
-  }
-
-  // clean up all matched operations
-  for (Operation *op : opsToErase) {
-    op->dropAllUses();
-    op->erase();
-  }
+  removeControlNetwork(funcOp); */
 }

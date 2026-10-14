@@ -316,18 +316,6 @@ void MarkSubloopPass::runOnOperation() {
         namer.setName(predOp);
         // Rewire the data operand safely using setOperand on its specific index
         storeOp.setOperand(0, predOp->getResult(0));
-
-        // check whether this memory controller already has a marker
-        Value targetMemref = storeOp.getMemRef();
-        if (markedMemrefs.contains(targetMemref)) continue;
-        markedMemrefs.insert(targetMemref);
-        targetMemref.dump();
-        llvm::errs() << markedMemrefs.size() << '\n';
-
-        // create the markerOp which will replace the control network
-        auto markerOp = builder.create<dynamatic::cf_extra::TriggerMarkerOp>(
-            storeOp.getLoc());
-        namer.setName(markerOp);
       }
     }
 
@@ -419,6 +407,94 @@ void MarkSubloopPass::runOnOperation() {
           }
         }
       }
+    }
+  }
+
+  Type controlType = builder.getI32Type();
+  Location loc = funcOp.getLoc();
+
+  llvm::DenseMap<Block *, dynamatic::cf_extra::BlockControlOp> blockControlMap;
+  llvm::DenseMap<Block *, BlockArgument> blockControlArgMap;  
+
+  // Pass 1: Insert BlockControlOp at the start of every block
+  llvm::errs() << funcOp.getBlocks().size();
+  for (Block &block : funcOp.getBlocks()) {
+    builder.setInsertionPointToStart(&block);
+    Location bLoc = block.empty() ? loc : block.front().getLoc();
+
+    if (block.isEntryBlock()) {
+      // 1. Create constant `true` at the very beginning of the entry block
+      auto initCst = builder.create<arith::ConstantOp>(
+          bLoc, builder.getI32IntegerAttr(1));
+      initCst->setAttr("handshake.name", builder.getStringAttr("control_constant"));
+
+      // 2. Feed the constant directly into block_control0
+      auto ctrlOp = builder.create<dynamatic::cf_extra::BlockControlOp>(
+          bLoc, controlType, ValueRange{initCst.getResult()});
+      namer.setName(ctrlOp);
+      blockControlMap[&block] = ctrlOp;
+      continue;
+    }
+
+    auto ctrlOp = builder.create<dynamatic::cf_extra::BlockControlOp>(
+        bLoc, controlType, ValueRange{});
+    namer.setName(ctrlOp);
+    blockControlMap[&block] = ctrlOp;
+  }
+
+  // Pass 2: Add exactly ONE control BlockArgument to each non-entry block,
+  // and wire it as the operand to that block's BlockControlOp.
+  for (Block &block : funcOp.getBlocks()) {
+    // The entry block has 0 predecessors, so it has no incoming branch edges
+    if (block.isEntryBlock())
+      continue;
+
+    // Add exactly ONE argument representing incoming predecessor control
+    BlockArgument ctrlArg = block.addArgument(controlType, block.front().getLoc());
+    blockControlArgMap[&block] = ctrlArg;
+
+    // Feed this incoming token into the block's BlockControlOp
+    cf_extra::BlockControlOp ctrlOp = blockControlMap[&block];
+    ctrlOp->insertOperands(0, {ctrlArg});
+  }
+
+  // Pass 3: Update all branch terminators to pass the source block's token
+  // along every branch edge to the successor's new argument slot.
+  for (Block &block : funcOp.getBlocks()) {
+    dynamatic::cf_extra::BlockControlOp currCtrlOp = blockControlMap[&block];
+    Value srcToken = currCtrlOp.getResult();
+    Operation *term = block.getTerminator();
+    if (!term)
+      continue;
+
+    // Case A: cf.br
+    if (auto brOp = dyn_cast<cf::BranchOp>(term)) {
+      Block *dest = brOp.getDest();
+      llvm::SmallVector<Value> destOperands(brOp.getDestOperands());
+      destOperands.push_back(srcToken);
+
+      builder.setInsertionPoint(brOp);
+      auto newBr = builder.create<cf::BranchOp>(brOp.getLoc(), dest, destOperands);
+      namer.setName(newBr);
+      brOp.erase();
+    }
+    // Case B: cf.cond_br
+    else if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+      Block *trueDest = condBr.getTrueDest();
+      Block *falseDest = condBr.getFalseDest();
+
+      llvm::SmallVector<Value> trueOperands(condBr.getTrueDestOperands());
+      trueOperands.push_back(srcToken);
+
+      llvm::SmallVector<Value> falseOperands(condBr.getFalseDestOperands());
+      falseOperands.push_back(srcToken);
+
+      builder.setInsertionPoint(condBr);
+      auto newCondBr = builder.create<cf::CondBranchOp>(
+          condBr.getLoc(), condBr.getCondition(), trueDest, trueOperands,
+          falseDest, falseOperands);
+      namer.setName(newCondBr);
+      condBr.erase();
     }
   }
 

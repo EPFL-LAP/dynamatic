@@ -52,11 +52,15 @@ def RegionInputOp : CFExtra_Op<"region_input", [AllTypesMatch<["input", "result"
   }];
 }
 
-def TriggerMarkerOp : CFExtra_Op<"trigger_marker"> {
-  let summary = "Marker operation in a basic block to request an FTD token";
-  let arguments = (ins);
-  let results = (outs);
-  let assemblyFormat = "attr-dict";
+def BlockControlOp : CFExtra_Op<"block_control"> {
+  let summary = "Collects predecessor control signals to yield a block completion token";
+
+  let arguments = (ins Variadic<I32>:$predecessors);
+  let results = (outs I32:$result);
+
+  let assemblyFormat = [{
+    `(` $predecessors `)` attr-dict `:` functional-type($predecessors, results)
+  }];
 }
 
 #endif // CF_EXTRA_OPS_TD

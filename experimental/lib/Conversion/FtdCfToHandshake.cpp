@@ -112,47 +112,32 @@ struct ConvertRegionInputOp
   }
 };
 
-struct ConvertTriggerMarkerOp
-    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::TriggerMarkerOp> {
-  using DynOpConversionPattern<dynamatic::cf_extra::TriggerMarkerOp>::DynOpConversionPattern;
+struct ConvertBlockControlOp
+    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::BlockControlOp> {
+  using DynOpConversionPattern<dynamatic::cf_extra::BlockControlOp>::DynOpConversionPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(dynamatic::cf_extra::TriggerMarkerOp srcOp, OpAdaptor adaptor,
+  matchAndRewrite(dynamatic::cf_extra::BlockControlOp srcOp, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto funcOp = srcOp->getParentOfType<handshake::FuncOp>();
-    if (!funcOp)
-      return rewriter.notifyMatchFailure(srcOp, "Expected handshake::FuncOp parent");
-
-    // 1. Function start token (last argument of handshake::FuncOp)
-    Value startValue = funcOp.getArguments().back();
-
-    // 2. Insert the seed constant in the entry block
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(&funcOp.getBody().front());
-
-    auto i32Type = rewriter.getIntegerType(32);
-    auto oneAttr = rewriter.getIntegerAttr(i32Type, 1);
-
-    // Create the constant in BB 0 triggered by startValue
-    auto seedCst = rewriter.create<handshake::ConstantOp>(
-        srcOp.getLoc(), oneAttr, startValue);
-    seedCst->setAttr("handshake.bb", rewriter.getUI32IntegerAttr(0));
-
-    // 3. Replace the marker in the target block with the consumer op
     rewriter.setInsertionPoint(srcOp);
 
-    // If you need a sink just to terminate the token:
-    auto consumerOp = rewriter.create<handshake::SinkOp>(
-        srcOp.getLoc(), seedCst.getResult());
+    // Channelify the output control type(s)
+    llvm::SmallVector<mlir::Type> newTypes;
+    for (mlir::Type resType : srcOp->getResultTypes())
+      newTypes.push_back(ftd::channelifyType(resType));
 
-    // Or if you have a custom Handshake op:
-    // auto consumerOp = rewriter.create<handshake::CustomOp>(
-    //     srcOp.getLoc(), seedCst.getResult());
+    // Create the handshake-level counterpart
+    auto newOp = rewriter.create<handshake::BlockControlOp>(
+        srcOp->getLoc(),
+        newTypes,
+        adaptor.getOperands(),
+        srcOp->getAttrDictionary().getValue());
 
-    inheritBB(srcOp, consumerOp);
-    namer.replaceOp(srcOp, consumerOp);
-    rewriter.eraseOp(srcOp);
+    // If your infrastructure uses inheritBB or similar metadata:
+    inheritBB(srcOp, newOp);
 
+    namer.replaceOp(srcOp, newOp);
+    rewriter.replaceOp(srcOp, newOp);
     return mlir::success();
   }
 };
@@ -394,7 +379,7 @@ struct FtdCfToHandshakePass
         /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
         ConvertPredicateOp,
         ConvertRegionInputOp,
-        ConvertTriggerMarkerOp,
+        ConvertBlockControlOp,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
