@@ -851,7 +851,7 @@ LogicalResult experimental::ftd::addGsaGates(
           conditionValue =
               getOrCreateCondPlaceholder(gate->conditionBlock, rewriter);
           // Ensure type consistency (Channel vs i1)
-          if (!conditionValue.getType().isa<handshake::ChannelType>())
+          if (!isa<handshake::ChannelType>(conditionValue.getType()))
             conditionValue.setType(channelifyType(conditionValue.getType()));
         }
       }

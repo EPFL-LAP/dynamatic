@@ -112,7 +112,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     // so that the LSQ can forward its loads and stores to the MC. We need
     // load address, store address, and store data channels from the LSQ to
     // the MC and a load data channel from the MC to the LSQ
-    MemRefType memrefType = memref.getType().cast<MemRefType>();
+    MemRefType memrefType = cast<MemRefType>(memref.getType());
 
     // Create 3 backedges (load address, store address, store data) for the MC
     // inputs that will eventually come from the LSQ.

@@ -79,7 +79,7 @@ def HWAggregateType : DialectType<HWDialect,
 
 // A handle to refer to dynamatic::hw::ModuleType in ODS.
 def ModuleType : DialectType<HWDialect,
-    CPred<"isa<dynamatic::hw::ModuleType>($_self)">,
+    CPred<"::llvm::isa<dynamatic::hw::ModuleType>($_self)">,
           "a module", "::dynamatic::hw::ModuleType">;
 
 // A handle to refer to dynamatic::hw::StringType in ODS.
@@ -91,7 +91,7 @@ def HWStringType :
 
 /// A flat symbol reference or a reference to a name within a module.
 def NameRefAttr : Attr<
-  CPred<"$_self.isa<::mlir::FlatSymbolRefAttr, ::dynamatic::hw::InnerRefAttr>()">,
+  CPred<"::llvm::isa<::mlir::FlatSymbolRefAttr, ::dynamatic::hw::InnerRefAttr>($_self)">,
   "name reference attribute">{
   let returnType = "::mlir::Attribute";
   let convertFromStorage = "$_self";

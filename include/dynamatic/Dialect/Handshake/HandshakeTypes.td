@@ -130,7 +130,7 @@ class valuesToExtraSignalArrays<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
     names,
-    "cast<ExtraSignalsTypeInterface>($" # name #
+    "::llvm::cast<ExtraSignalsTypeInterface>($" # name #
     ".getType()).getExtraSignals()"
   ), ", ") # "}";
 }
@@ -143,8 +143,8 @@ class valuesToDataTypes<list<string> names> {
     name, // variable name
     names,
     // Treat ControlType's data type as i0
-    "isa<ControlType>($" # name # ".getType()) ? IntegerType::get($_ctxt, 0) :"
-    "$" # name # ".getType().cast<ChannelType>().getDataType()"
+    "::llvm::isa<ControlType>($" # name # ".getType()) ? IntegerType::get($_ctxt, 0) : "
+    "::llvm::cast<ChannelType>($" # name # ".getType()).getDataType()"
   ), ", ") # "}";
 }
 
@@ -158,7 +158,7 @@ class variadicToExtraSignalArrays<string variadic> {
 
       for (Type type : variadic.getTypes()) {
         extraSignalArrays.push_back(
-          type.cast<ExtraSignalsTypeInterface>().getExtraSignals());
+          ::llvm::cast<ExtraSignalsTypeInterface>(type).getExtraSignals());
       }
 
       return extraSignalArrays;
@@ -175,11 +175,11 @@ class variadicToDataTypes<string variadic> {
       std::vector<Type> dataTypes;
 
       for (Type type : variadic.getTypes()) {
-        if (isa<ControlType>(type)) {
+        if (::llvm::isa<ControlType>(type)) {
           // Treat ControlType's data type as i0
           dataTypes.push_back(IntegerType::get($_ctxt, 0));
         } else {
-          dataTypes.push_back(type.cast<ChannelType>().getDataType());
+          dataTypes.push_back(::llvm::cast<ChannelType>(type).getDataType());
         }
       }
 
@@ -278,7 +278,7 @@ class IsFloatSizedChannel<int width, string name> : PredOpTrait<
 /// Constraint to ensure an operand/result shouldn't have any extra signals.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
-  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+  CPred<"::llvm::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
     ".getType()).getNumExtraSignals() == 0">
 >;
 
@@ -287,7 +287,7 @@ class IsSimpleHandshakeVariadic<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
   CPred<"llvm::all_of($" # name # ".getTypes(), "
     "[](Type type) {"
-    "  return type.cast<ExtraSignalsTypeInterface>().getNumExtraSignals() == 0;"
+    "  return ::llvm::cast<ExtraSignalsTypeInterface>(type).getNumExtraSignals() == 0;"
     "})">
 >;
 
@@ -407,7 +407,7 @@ class HasValidSpecTag<string operand> : PredOpTrait<
 
       return true;
     }
-  }] # "($" # operand # ".getType().cast<ExtraSignalsTypeInterface>())">
+  }] # "(::llvm::cast<ExtraSignalsTypeInterface>($" # operand # ".getType()))">
 >;
 
 class LacksSpecTag<string operand> : PredOpTrait<
@@ -422,12 +422,12 @@ class HasSpecTagIfPresentIn<string inputVariadic, string output> : PredOpTrait<
     [](OperandRange::type_range inputTypes,
         ExtraSignalsTypeInterface outputType) {
       bool inputHasSpecTag = llvm::any_of(inputTypes, [](Type type) {
-        return type.cast<ExtraSignalsTypeInterface>().hasExtraSignal("spec");
+        return ::llvm::cast<ExtraSignalsTypeInterface>(type).hasExtraSignal("spec");
       });
       return outputType.hasExtraSignal("spec") == inputHasSpecTag;
     }
   }] # "($" # inputVariadic # ".getTypes(), "
-  "$" # output # ".getType().cast<ExtraSignalsTypeInterface>())">
+  "::llvm::cast<ExtraSignalsTypeInterface>($" # output # ".getType()))">
 >;
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_TYPES_TD

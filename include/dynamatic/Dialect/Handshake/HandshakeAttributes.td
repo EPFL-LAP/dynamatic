@@ -88,7 +88,7 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
       size_t numProps = operandAttrs.size();
       for (auto [idx, attr] : llvm::enumerate(operandAttrs)) {
         odsPrinter << attr.getName() << ": ";
-        attr.getValue().cast<$cppClass::OperandAttr>().print(odsPrinter);
+        ::llvm::cast<$cppClass::OperandAttr>(attr.getValue()).print(odsPrinter);
         if (idx != numProps - 1)
           odsPrinter << ", ";
       }
@@ -140,7 +140,7 @@ class OperandContainerAttr<string name, string attrMnemonic, list<Trait> traits 
                             << attr.getName();
 
         // Value must be channel buffering properties
-        if (!attr.getValue().isa<$cppClass::OperandAttr>())
+        if (!::llvm::isa<$cppClass::OperandAttr>(attr.getValue()))
           return emitError() << "map values are not of the correct type";
       }
       return success();
