@@ -2053,8 +2053,12 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
       getInMutable().assign(src);
       return getResult();
     }
-    // Bypass the preceeding extension operation and the truncation
-    return src;
+    // Bypass the preceeding extension operation and the truncation, if the
+    // extension's operand has the type of the truncation's result. A narrower
+    // operand would need a narrower extension, which a fold cannot create
+    if (src.getType() == getOut().getType())
+      return src;
+    return nullptr;
   }
 
   // Identical operand and result types mean that the trunc is a no-op
