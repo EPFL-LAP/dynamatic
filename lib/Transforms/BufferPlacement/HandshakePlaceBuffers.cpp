@@ -443,7 +443,13 @@ static bool isBackedgeSourceLike(Operation *op) {
 /// the loop header. A Mux only qualifies if its select comes from an Init or a
 /// Control Merge, as for loop-header Muxes; Muxes selected by a condition
 /// (e.g., the Muxes of if-then-else structures) are never loop headers.
-static bool isLoopHeaderLike(Operation *op) {
+///
+/// Only the channel into the loop header itself is a backedge, so that each
+/// cycle gets exactly one. In particular, the channel into a NOT feeding an
+/// Init is not: since 'isBackedgeSourceLike' looks through NOTs, the channel
+/// from the NOT into the Init already is, and marking both would make the
+/// buffer placement MILP count two tokens on the cycle.
+static bool isBackedgeDestinationLike(Operation *op) {
   if (isa<handshake::InitOp>(op))
     return true;
   if (!isa<handshake::MergeLikeOpInterface>(op))
@@ -456,17 +462,6 @@ static bool isLoopHeaderLike(Operation *op) {
     selectOp = selectOp->getOperand(0).getDefiningOp();
   return isa_and_nonnull<handshake::InitOp, handshake::ControlMergeOp>(
       selectOp);
-}
-
-static bool isBackedgeDestinationLike(Operation *op) {
-  if (isLoopHeaderLike(op))
-    return true;
-
-  auto notOp = dyn_cast<handshake::NotIOp>(op);
-  if (!notOp)
-    return false;
-
-  return llvm::any_of(notOp.getResult().getUsers(), isLoopHeaderLike);
 }
 
 /// Finds all loop-feedback-source -> merge-like backward channels per cyclic
