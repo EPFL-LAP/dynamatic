@@ -202,13 +202,9 @@ The TimingModel provides several core methods:
 
 1. **[LogicalResult getTotalDataDelay(unsigned bitwidth, double &delay)]()**: queries the total data delay at a certain bitwidth `bitwidth` and it saves the delay as a double (in nanoseconds) in the `delay` variable.
 
-2. **[double getTotalValidDelay()]()**: returns the total valid delay as a double (in nanoseconds).
+2. **[bool fromJSON(const llvm::json::Value &jsonValue, TimingModel &model, llvm::json::Path path)]()**: extracts the TimingModel information from the JSON fragment `jsonValue` located at the specified path `path` relative to the root of the full JSON structure, and stores it in the variable `model`. 
 
-3. **[double getTotalReadyDelay()]()**: returns the total ready delay as a double (in nanoseconds).
-
-4. **[bool fromJSON(const llvm::json::Value &jsonValue, TimingModel &model, llvm::json::Path path)]()**: extracts the TimingModel information from the JSON fragment `jsonValue` located at the specified path `path` relative to the root of the full JSON structure, and stores it in the variable `model`. 
-
-5. **[bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model, llvm::json::Path path)]()**: extracts the PortModel information from the JSON fragment `jsonValue` located at the specified path `path` relative to the root of the full JSON structure, and stores it in the variable `model`. 
+3. **[bool fromJSON(const llvm::json::Value &jsonValue, TimingModel::PortModel &model, llvm::json::Path path)]()**: extracts the PortModel information from the JSON fragment `jsonValue` located at the specified path `path` relative to the root of the full JSON structure, and stores it in the variable `model`. 
 
 The LogicalResult or boolean types of these functions represent the successful or unsuccessful execution of the function.
 

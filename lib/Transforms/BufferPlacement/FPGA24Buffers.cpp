@@ -49,8 +49,8 @@ LatencyBalancingMILP::LatencyBalancingMILP(
     ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
     ArrayRef<SynchronizingCyclePair> syncCyclePairs,
     const SynchronizingCyclesFinderGraph &syncGraph, ArrayRef<CFDFC *> cfdfcs)
-    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                          targetPeriod),
+    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
+                          Algorithm::FPGA24),
       reconvergentPaths(reconvergentPaths.begin(), reconvergentPaths.end()),
       syncCyclePairs(syncCyclePairs.begin(), syncCyclePairs.end()),
       syncGraph(syncGraph), cfdfcs(cfdfcs.begin(), cfdfcs.end()) {
@@ -122,8 +122,8 @@ OccupancyBalancingLP::OccupancyBalancingLP(
     const LatencyBalancingResult &latencyResult,
     ArrayRef<ReconvergentPathWithGraph> reconvergentPaths,
     ArrayRef<CFDFC *> cfdfcs)
-    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB,
-                          targetPeriod),
+    : BufferPlacementMILP(solverKind, timeout, funcInfo, timingDB, targetPeriod,
+                          Algorithm::FPGA24),
       latencyResult(latencyResult),
       reconvergentPaths(reconvergentPaths.begin(), reconvergentPaths.end()),
       cfdfcs(cfdfcs.begin(), cfdfcs.end()) {

@@ -1,0 +1,3964 @@
+{
+  "handshake.speculator": {
+    "port2port": [
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.338
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.338
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.338
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.338
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.622
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.216
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.216
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "trigger",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.79
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.79
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.79
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.918
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.297
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.531
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.609
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.688
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.688
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.307
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.858
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.961
+          },
+          {
+            "bitwidth": 32,
+            "delay": 4.168
+          },
+          {
+            "bitwidth": 64,
+            "delay": 4.168
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.686
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.968
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.497
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.747
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.301
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.301
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.847
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.97
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.996
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.289
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.289
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.152
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.152
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.413
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.413
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.413
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.413
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.417
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.704
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.704
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_commit",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.407
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.952
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.952
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.604
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.73
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.908
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.377
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.377
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.377
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.377
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.377
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.377
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.377
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "trigger",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.861
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.906
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.231
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.046
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.046
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.307
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.357
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.514
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.418
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.418
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.044
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.166
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.299
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.551
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.603
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.633
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.633
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.25
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.25
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.25
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.25
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.25
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.205
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.205
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.205
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.205
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.205
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.403
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.403
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.844
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.844
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.117
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.117
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.117
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.123
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.123
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.451
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.451
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.451
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.451
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.451
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.451
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.451
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_commit",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.407
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.54
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.54
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.54
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.97
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.97
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.374
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.374
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.374
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.374
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.374
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.374
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.374
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "trigger",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.877
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.906
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.231
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.231
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.043
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.043
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.185
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.304
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.514
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.009
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.009
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.041
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.166
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.166
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.166
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.299
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.299
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.398
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.63
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.63
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.047
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.047
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.047
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.047
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.047
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.202
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.841
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.841
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.913
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.913
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.913
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.968
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.968
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "trigger",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.448
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.448
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.448
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.448
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.448
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.448
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.448
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.661
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.661
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.71
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.71
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.002
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.002
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.285
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "trigger",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.706
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.706
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.199
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.121
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.121
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.121
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.276
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.276
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.532
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.532
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.532
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.701
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.701
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.53
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.53
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.736
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.736
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.736
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.736
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.736
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.736
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.736
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.66
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.66
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.71
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.71
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.002
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.002
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.285
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "trigger",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.706
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.706
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.199
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.199
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.413
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.185
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.185
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.185
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.707
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.707
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.078
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.078
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.078
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.078
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.078
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.126
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.126
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.126
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.53
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.53
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.735
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.482
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.717
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.717
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.717
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.135
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.135
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "trigger",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.392
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.485
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.604
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.61
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.61
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.61
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.61
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.62
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.62
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.62
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.799
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.945
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.711
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.711
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.622
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.622
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.622
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.622
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.622
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.622
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.622
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.125
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.276
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.276
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.621
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.621
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.621
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.626
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.769
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.769
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.769
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_commit",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.427
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.427
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.427
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.427
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.427
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.427
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.427
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_commit",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.66
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.66
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.717
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.717
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.717
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.135
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.135
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_commit",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.735
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.735
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.202
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.727
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.727
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.069
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.069
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.069
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.069
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.069
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.873
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.873
+          }
+        ]
+      }
+    ],
+    "port2reg": [
+      {
+        "name": "ins",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.832
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.832
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.832
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.855
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.932
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.478
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.478
+          }
+        ]
+      },
+      {
+        "name": "ins",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.882
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.882
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.932
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.932
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.932
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.932
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.932
+          }
+        ]
+      },
+      {
+        "name": "trigger",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.879
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.879
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.879
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.879
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.879
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.879
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.913
+          }
+        ]
+      },
+      {
+        "name": "outs",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.724
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.724
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.984
+          }
+        ]
+      },
+      {
+        "name": "ctrl_issue",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.724
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.724
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.773
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.984
+          }
+        ]
+      },
+      {
+        "name": "ctrl_history",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 0.997
+          },
+          {
+            "bitwidth": 2,
+            "delay": 0.997
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.243
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.243
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.243
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.397
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.397
+          }
+        ]
+      },
+      {
+        "name": "ctrl_commit",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.09
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.09
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.353
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.353
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.353
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.397
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.397
+          }
+        ]
+      }
+    ],
+    "reg2port": [
+      {
+        "name": "ins",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 3.029
+          },
+          {
+            "bitwidth": 2,
+            "delay": 3.029
+          },
+          {
+            "bitwidth": 4,
+            "delay": 3.232
+          },
+          {
+            "bitwidth": 8,
+            "delay": 3.232
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.688
+          },
+          {
+            "bitwidth": 32,
+            "delay": 4.123
+          },
+          {
+            "bitwidth": 64,
+            "delay": 4.123
+          }
+        ]
+      },
+      {
+        "name": "trigger",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.582
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.582
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.611
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.706
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.437
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.539
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.634
+          }
+        ]
+      },
+      {
+        "name": "outs",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.382
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.382
+          },
+          {
+            "bitwidth": 4,
+            "delay": 3.205
+          },
+          {
+            "bitwidth": 8,
+            "delay": 3.646
+          },
+          {
+            "bitwidth": 16,
+            "delay": 4.101
+          },
+          {
+            "bitwidth": 32,
+            "delay": 5.176
+          },
+          {
+            "bitwidth": 64,
+            "delay": 5.176
+          }
+        ]
+      },
+      {
+        "name": "outs",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.38
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.742
+          },
+          {
+            "bitwidth": 4,
+            "delay": 3.098
+          },
+          {
+            "bitwidth": 8,
+            "delay": 3.286
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.887
+          },
+          {
+            "bitwidth": 32,
+            "delay": 4.309
+          },
+          {
+            "bitwidth": 64,
+            "delay": 4.309
+          }
+        ]
+      },
+      {
+        "name": "ctrl_issue",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.783
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.783
+          },
+          {
+            "bitwidth": 4,
+            "delay": 3.136
+          },
+          {
+            "bitwidth": 8,
+            "delay": 3.136
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.136
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.735
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.735
+          }
+        ]
+      },
+      {
+        "name": "ctrl_issue",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.541
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.744
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.93
+          },
+          {
+            "bitwidth": 8,
+            "delay": 3.078
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.422
+          },
+          {
+            "bitwidth": 32,
+            "delay": 4.16
+          },
+          {
+            "bitwidth": 64,
+            "delay": 4.16
+          }
+        ]
+      },
+      {
+        "name": "ctrl_history",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.994
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.994
+          },
+          {
+            "bitwidth": 4,
+            "delay": 3.003
+          },
+          {
+            "bitwidth": 8,
+            "delay": 3.003
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.003
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.881
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.881
+          }
+        ]
+      },
+      {
+        "name": "ctrl_history",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 3.103
+          },
+          {
+            "bitwidth": 2,
+            "delay": 3.103
+          },
+          {
+            "bitwidth": 4,
+            "delay": 3.103
+          },
+          {
+            "bitwidth": 8,
+            "delay": 3.103
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.483
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.712
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.712
+          }
+        ]
+      },
+      {
+        "name": "ctrl_commit",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.533
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.533
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.533
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.533
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.533
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.533
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.533
+          }
+        ]
+      },
+      {
+        "name": "ctrl_commit",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.83
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.184
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.886
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.886
+          },
+          {
+            "bitwidth": 16,
+            "delay": 3.67
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.727
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.922
+          }
+        ]
+      }
+    ]
+  },
+  "handshake.spec_save_commit": {
+    "port2port": [
+      {
+        "from": {
+          "name": "ins",
+          "signal": "data"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.259
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.614
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.597
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.31
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.31
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.117
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.045
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.294
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.036
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.349
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.082
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.566
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.875
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.224
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.092
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.33
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.813
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.586
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.036
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.723
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.638
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.113
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.185
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.558
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.667
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.36
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.348
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ins",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.172
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.3
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.7
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.361
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.57
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.624
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.514
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.045
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.294
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.036
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.349
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.277
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.41
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.219
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.876
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.982
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.289
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.875
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.219
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.975
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.232
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.584
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.296
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.185
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.518
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.668
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.098
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.436
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.172
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.3
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.169
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.361
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.896
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.361
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.995
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.56
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.702
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.546
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.322
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.626
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.487
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.613
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.045
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.294
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.036
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.349
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.277
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.566
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.032
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.876
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.982
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.289
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.875
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.804
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.036
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.973
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.713
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.296
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.185
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.518
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.383
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.36
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.435
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.172
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.3
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.169
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.361
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.485
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.624
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.995
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_issue",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.56
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.702
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.546
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.322
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.487
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.613
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.661
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.094
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.997
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.617
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.186
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.303
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.463
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.113
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.092
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.289
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.875
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.504
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.975
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.404
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.316
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.296
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.137
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.518
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.711
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.098
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.348
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.704
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.1
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.169
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.615
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.896
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.361
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.995
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "data"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.56
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.702
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.546
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.322
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.117
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.487
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.117
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.819
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.094
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.997
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.754
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.183
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.303
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.463
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.113
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.092
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.289
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.875
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.504
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.975
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.404
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "data"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.713
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.296
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.137
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.518
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.711
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.098
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.348
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "outs",
+          "signal": "valid"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.102
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.1
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.169
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.758
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.896
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.361
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.995
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "ctrl_history",
+          "signal": "valid"
+        },
+        "to": {
+          "name": "ins",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.56
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.702
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.546
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.322
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.117
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.487
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.117
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_issue",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.117
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.277
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.633
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.032
+          }
+        ]
+      },
+      {
+        "from": {
+          "name": "outs",
+          "signal": "ready"
+        },
+        "to": {
+          "name": "ctrl_history",
+          "signal": "ready"
+        },
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.639
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.52
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.737
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.416
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.805
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.614
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.973
+          }
+        ]
+      }
+    ],
+    "port2reg": [
+      {
+        "name": "ins",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 0.537
+          },
+          {
+            "bitwidth": 2,
+            "delay": 0.537
+          },
+          {
+            "bitwidth": 4,
+            "delay": 0.537
+          },
+          {
+            "bitwidth": 8,
+            "delay": 0.537
+          },
+          {
+            "bitwidth": 16,
+            "delay": 0.537
+          },
+          {
+            "bitwidth": 32,
+            "delay": 0.537
+          },
+          {
+            "bitwidth": 64,
+            "delay": 0.537
+          }
+        ]
+      },
+      {
+        "name": "ins",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.676
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.55
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.597
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.592
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.573
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.82
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.533
+          }
+        ]
+      },
+      {
+        "name": "ctrl_issue",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.748
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.052
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.894
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.744
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.992
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.942
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.106
+          }
+        ]
+      },
+      {
+        "name": "ctrl_issue",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.748
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.052
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.894
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.744
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.769
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.942
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.051
+          }
+        ]
+      },
+      {
+        "name": "ctrl_history",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.748
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.052
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.894
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.744
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.216
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.942
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.959
+          }
+        ]
+      },
+      {
+        "name": "ctrl_history",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.748
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.052
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.894
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.744
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.216
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.942
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.959
+          }
+        ]
+      },
+      {
+        "name": "outs",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.092
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.248
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.172
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.167
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.769
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.184
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.618
+          }
+        ]
+      }
+    ],
+    "reg2port": [
+      {
+        "name": "ctrl_issue",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.276
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.401
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.08
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.78
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.349
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.773
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.973
+          }
+        ]
+      },
+      {
+        "name": "ctrl_history",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.509
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.195
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.551
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.936
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.57
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.243
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.915
+          }
+        ]
+      },
+      {
+        "name": "outs",
+        "signal": "data",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.998
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.616
+          },
+          {
+            "bitwidth": 4,
+            "delay": 2.672
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.837
+          },
+          {
+            "bitwidth": 16,
+            "delay": 2.965
+          },
+          {
+            "bitwidth": 32,
+            "delay": 3.567
+          },
+          {
+            "bitwidth": 64,
+            "delay": 3.684
+          }
+        ]
+      },
+      {
+        "name": "outs",
+        "signal": "valid",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 2.403
+          },
+          {
+            "bitwidth": 2,
+            "delay": 2.407
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.906
+          },
+          {
+            "bitwidth": 8,
+            "delay": 2.792
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.66
+          },
+          {
+            "bitwidth": 32,
+            "delay": 2.831
+          },
+          {
+            "bitwidth": 64,
+            "delay": 2.2
+          }
+        ]
+      },
+      {
+        "name": "ins",
+        "signal": "ready",
+        "delayList": [
+          {
+            "bitwidth": 1,
+            "delay": 1.308
+          },
+          {
+            "bitwidth": 2,
+            "delay": 1.208
+          },
+          {
+            "bitwidth": 4,
+            "delay": 1.257
+          },
+          {
+            "bitwidth": 8,
+            "delay": 1.628
+          },
+          {
+            "bitwidth": 16,
+            "delay": 1.296
+          },
+          {
+            "bitwidth": 32,
+            "delay": 1.316
+          },
+          {
+            "bitwidth": 64,
+            "delay": 1.831
+          }
+        ]
+      }
+    ]
+  }
+}

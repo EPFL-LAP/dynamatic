@@ -33,6 +33,9 @@ namespace dynamatic {
 static constexpr llvm::StringLiteral producerOutputAttrMarkerName =
     "dynamatic.producer_output_attr_marker";
 
+static constexpr llvm::StringLiteral predictionMarkerName =
+    "dynamatic.prediction_marker";
+
 // Only attributes in the dynamatic namespace are moved
 // from the marker to the producer
 static constexpr llvm::StringLiteral dynamaticNamespace = "dynamatic.";
@@ -49,7 +52,8 @@ struct ConsumeProducerOutputAttrMarkerPass
     // collect all of the producer-output attribute marker ops
     SmallVector<Operation *> markers;
     modOp.walk([&](Operation *op) {
-      if (op->getName().getStringRef() == producerOutputAttrMarkerName)
+      if (op->getName().getStringRef() == producerOutputAttrMarkerName ||
+          op->getName().getStringRef() == predictionMarkerName)
         markers.push_back(op);
     });
 

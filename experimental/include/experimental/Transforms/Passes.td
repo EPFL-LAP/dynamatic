@@ -150,4 +150,17 @@ def MarkSubloop : Pass<"mark-subloop", "mlir::ModuleOp"> {
   let dependentDialects = ["cf_extra::CFExtraDialect"];
 }
 
+def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir::ModuleOp"> {
+  let summary = "Value prediction from a compile-time-fixed finite list.";
+  let description = [{
+    The pass duplicates a sequence of operations, replacing a variable operand with a 
+    predicted constant value. It identifies the exact operations to duplicate by using 
+    custom pragmas, which also specify the target variable and give a finite list for its 
+    predicted constant values. This makes it possible to convert data dependencies to control
+    flow dependencies. It can be run with compile and the flag "--enable-duplication".
+  }];
+}
+
+
+
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

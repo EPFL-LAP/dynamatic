@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 #include "experimental/Support/FormalProperty.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/JSON/JSON.h"
 #include "llvm/Support/JSON.h"
 #include <memory>
@@ -190,9 +190,6 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
   Operation *ownerOp = res.getOwner();
   Operation *userOp = *res.getUsers().begin();
 
-  handshake::PortNamer ownerNamer(ownerOp);
-  handshake::PortNamer userNamer(userOp);
-
   unsigned long operandIndex = userOp->getNumOperands();
   for (auto [j, arg] : llvm::enumerate(userOp->getOperands())) {
     if (arg == res) {
@@ -207,8 +204,11 @@ AbsenceOfBackpressure::AbsenceOfBackpressure(uint64_t id, TAG tag,
   ownerChannel.channelIndex = res.getResultNumber();
   userChannel.channelIndex = operandIndex;
   ownerChannel.channelName =
-      ownerNamer.getOutputName(res.getResultNumber()).str();
-  userChannel.channelName = userNamer.getInputName(operandIndex).str();
+      mlir::cast<handshake::NamedIOInterface>(ownerOp).getResultName(
+          res.getResultNumber());
+  userChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(userOp).getOperandName(
+          operandIndex);
 }
 
 llvm::json::Value AbsenceOfBackpressure::extraInfoToJSON() const {
@@ -246,18 +246,18 @@ ValidEquivalence::ValidEquivalence(uint64_t id, TAG tag, const OpResult &res1,
     : FormalProperty(id, tag, TYPE::ValidEquivalence) {
   Operation *op1 = res1.getOwner();
   unsigned int i = res1.getResultNumber();
-  handshake::PortNamer namer1(op1);
 
   Operation *op2 = res2.getOwner();
   unsigned int j = res2.getResultNumber();
-  handshake::PortNamer namer2(op2);
 
   ownerChannel.operationName = getUniqueName(op1).str();
   targetChannel.operationName = getUniqueName(op2).str();
   ownerChannel.channelIndex = i;
   targetChannel.channelIndex = j;
-  ownerChannel.channelName = namer1.getOutputName(i).str();
-  targetChannel.channelName = namer2.getOutputName(j).str();
+  ownerChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(op1).getResultName(i);
+  targetChannel.channelName =
+      mlir::cast<handshake::NamedIOInterface>(op2).getResultName(j);
 }
 
 llvm::json::Value ValidEquivalence::extraInfoToJSON() const {
@@ -378,10 +378,10 @@ CopiedSlotsOfActiveForkAreFull::fromJSON(const llvm::json::Value &value,
 EagerForkPathTokenCopiedMaximumOnce::EagerForkPathTokenCopiedMaximumOnce(
     uint64_t id, TAG tag, ForkOp &op)
     : FormalProperty(id, tag, TYPE::EagerForkPathTokenCopiedMaximumOnce) {
-  PortNamer namer(op);
   // ForkOp has only 1 input
   validOp = getUniqueName(op);
-  validChannel = namer.getInputName(0).str();
+  validChannel = mlir::cast<handshake::NamedIOInterface>(op.getOperation())
+                     .getOperandName(0);
   sentStateNamers = op.getInternalSentStateNamers();
 }
 

@@ -179,6 +179,10 @@ protected:
   /// Gurobi model holding the MILP's state.
   std::unique_ptr<CPSolver> model;
 
+  /// Path to a file at which to store the MILP's model and its solution after
+  /// optimization. Empty disables logging.
+  std::string writeTo;
+
   /// Fills in the argument with the desired results extract from the MILP's
   /// solution. Called by `MILP::getResult` after checking that the underlying
   /// MILP model was optimized successfully. This cannot fail.
@@ -199,11 +203,6 @@ private:
 
   /// MILP's state, which changes during the object's lifetime.
   State state = State::FAILED_TO_SETUP;
-  /// Path to a file at which to store the MILP's model and its solution after
-  /// optimization. The model will be stored under `writeTo`_model.lp and the
-  /// solution under `writeTo`_solution.json. Nothing will be stored if the
-  /// string is empty.
-  std::string writeTo;
 
   /// Returns a description of the MILP's current state.
   StringRef getStateMessage() {
@@ -222,18 +221,6 @@ private:
     }
   }
 };
-
-/// Creates, optimizes, and extract results from an MILP in one go. Fails and
-/// displays an error message to stderr if any step along the process fails.
-/// Otherwise succeeds and stores the MILP's results in the first function
-/// argument.
-template <typename MILP, typename MILPRes, typename... Args>
-LogicalResult solveMILP(MILPRes &milpResult, Args &&...args) {
-  MILP milp = MILP(std::forward<Args>(args)...);
-  if (failed(milp.optimize()) || failed(milp.getResult(milpResult)))
-    return failure();
-  return success();
-}
 
 } // namespace dynamatic
 

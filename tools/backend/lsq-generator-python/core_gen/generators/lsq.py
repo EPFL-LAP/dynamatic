@@ -599,6 +599,8 @@ class LSQ:
         if self.configs.pipe0:
             can_bypass_p0.regInit(init=[0]*self.configs.numLdqEntries)
 
+        ldq_head_oh_pcomp = LogicVec(
+            ctx, 'ldq_head_oh_pcomp', pipe_comp_type, self.configs.numLdqEntries)
         ldq_alloc_pcomp = LogicArray(
             ctx, 'ldq_alloc_pcomp', pipe_comp_type, self.configs.numLdqEntries)
         ldq_addr_valid_pcomp = LogicArray(
@@ -626,6 +628,7 @@ class LSQ:
         store_completed = LogicArray(ctx, 'store_completed', 'w', self.configs.numStqEntries)
 
         if self.configs.pipeComp:
+            ldq_head_oh_pcomp.regInit(init=0)
             ldq_alloc_pcomp.regInit(init=[0]*self.configs.numLdqEntries)
             ldq_addr_valid_pcomp.regInit()
             stq_alloc_pcomp.regInit(init=[0]*self.configs.numStqEntries)
@@ -635,6 +638,7 @@ class LSQ:
             addr_same_pcomp.regInit()
             store_is_older_pcomp.regInit()
 
+        arch += Op(ctx, ldq_head_oh_pcomp, ldq_head_oh)
         for i in range(0, self.configs.numLdqEntries):
             arch += Op(ctx, (ldq_alloc_pcomp, i), (ldq_alloc, i))
             arch += Op(ctx, (ldq_addr_valid_pcomp, i),
@@ -747,7 +751,7 @@ class LSQ:
             ctx, 'ldq_head_oh_p0', pipe0_type, self.configs.numLdqEntries)
         if self.configs.pipe0:
             ldq_head_oh_p0.regInit()
-        arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh)
+        arch += Op(ctx, ldq_head_oh_p0, ldq_head_oh_pcomp)
 
         can_load_list = []
         can_load_list.append(can_load)

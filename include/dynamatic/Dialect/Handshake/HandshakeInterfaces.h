@@ -35,53 +35,107 @@
 namespace dynamatic {
 namespace handshake {
 
-class NamedIOInterface;
 class LatencyInterface;
+class NamedIOInterface;
 class FuncOp;
-
-/// Provides an opaque interface for generating the port names of an operation;
-/// handshake operations generate names by the `handshake::NamedIOInterface`;
-/// other operations, such as arithmetic ones, are assigned default names.
-class PortNamer {
-public:
-  /// Does nothing; no port name will be generated.
-  PortNamer() = default;
-
-  /// Derives port names for the operation on object creation.
-  PortNamer(Operation *op);
-
-  /// Returs the port name of the input at the specified index.
-  StringRef getInputName(unsigned idx) const { return inputs[idx]; }
-
-  /// Returs the port name of the output at the specified index.
-  StringRef getOutputName(unsigned idx) const { return outputs[idx]; }
-
-private:
-  /// Maps the index of an input or output to its port name.
-  using IdxToStrF = const std::function<std::string(unsigned)> &;
-
-  /// Infers port names for the operation using the provided callbacks.
-  void infer(Operation *op, IdxToStrF &inF, IdxToStrF &outF);
-
-  /// Infers default port names when nothing better can be achieved.
-  void inferDefault(Operation *op);
-
-  /// Infers port names for an operation implementing the
-  /// `handshake::NamedIOInterface` interface.
-  void inferFromNamedOpInterface(NamedIOInterface namedIO);
-
-  /// Infers port names for a Handshake function.
-  void inferFromFuncOp(FuncOp funcOp);
-
-  /// List of input port names.
-  SmallVector<std::string> inputs;
-  /// List of output port names.
-  SmallVector<std::string> outputs;
-};
 
 class ControlType;
 
 } // end namespace handshake
+} // end namespace dynamatic
+
+namespace dynamatic {
+namespace handshake {
+
+// Trait with useful functionality for use
+// in getting string representations of operand and result names
+template <typename ConcreteOp>
+class NamedIOUtilities
+    : public mlir::OpTrait::TraitBase<ConcreteOp, NamedIOUtilities> {
+public:
+  static void validateOperandIdx(unsigned idx, unsigned count) {
+    assert(idx < count && "operand index too high");
+  }
+
+  void validateOperandIdx(unsigned idx) {
+    validateOperandIdx(idx, this->getOperation()->getNumOperands());
+  }
+
+  static void validateResultIdx(unsigned idx, unsigned count) {
+    assert(idx < count && "result index too high");
+  }
+
+  void validateResultIdx(unsigned idx) {
+    validateResultIdx(idx, this->getOperation()->getNumResults());
+  }
+
+  static std::string simpleOperandName(unsigned idx, unsigned count) {
+    validateOperandIdx(idx, count);
+
+    // TODO: remove 2D io packing
+    // but the underscore marking is needed currently
+    // as the netlist printer uses it to identify 2D signals
+    if (count == 1)
+      return "ins";
+    return "ins_" + std::to_string(idx);
+  }
+
+  std::string simpleOperandName(unsigned idx) {
+    return simpleOperandName(idx, this->getOperation()->getNumOperands());
+  }
+
+  static std::string simpleResultName(unsigned idx, unsigned count) {
+    validateResultIdx(idx, count);
+
+    // TODO: remove 2D io packing
+    // but the underscore marking is needed currently
+    // as the netlist printer uses it to identify 2D signals
+    if (count == 1)
+      return "outs";
+    return "outs_" + std::to_string(idx);
+  }
+
+  std::string simpleResultName(unsigned idx) {
+    return simpleResultName(idx, this->getOperation()->getNumResults());
+  }
+};
+
+// Trait that calls simpleOperandName and simpleResultName
+// for the NamedIOInterface functions
+// so ops with this behaviour can just declare the trait
+template <typename ConcreteOp>
+class SimpleNamedIO
+    : public mlir::OpTrait::TraitBase<ConcreteOp, SimpleNamedIO> {
+public:
+  std::string getOperandName(unsigned idx) {
+    return static_cast<ConcreteOp *>(this)->simpleOperandName(idx);
+  }
+  std::string getResultName(unsigned idx) {
+    return static_cast<ConcreteOp *>(this)->simpleResultName(idx);
+  }
+};
+
+// Trait that returns "lhs"/"rhs" and "result"
+// for the NamedIOInterface functions
+// so ops with this behaviour can just declare the trait
+template <typename ConcreteOp>
+class BinaryArithNamedIO
+    : public mlir::OpTrait::TraitBase<ConcreteOp, BinaryArithNamedIO> {
+public:
+  static std::string getOperandName(unsigned idx) {
+    ConcreteOp::validateOperandIdx(idx, 2);
+    return (idx == 0) ? "lhs" : "rhs";
+  }
+  static std::string getResultName(unsigned idx) {
+    ConcreteOp::validateResultIdx(idx, 1);
+    return "result";
+  }
+};
+
+} // namespace handshake
+} // namespace dynamatic
+
+namespace dynamatic {
 
 namespace buffer {
 
