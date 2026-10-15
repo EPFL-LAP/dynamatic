@@ -1,10 +1,10 @@
-from core_gen.context import VHDLContext
-from core_gen.utils import *
 from core_gen.signals import *
-from core_gen.operators import *
+from core_gen.ir import Val, Bit, BinOp
+from core_gen.emitters import Emitter
+from core_gen.operators import Reduce
 
 
-def VecToArray(ctx: VHDLContext, dout, din) -> str:
+def VecToArray(em: Emitter, dout, din) -> str:
     """
     Converts LogicVec to LogicArray
 
@@ -18,13 +18,11 @@ def VecToArray(ctx: VHDLContext, dout, din) -> str:
     """
     size = din.size
     assert dout.length == size
-    str_ret = ''
     for i in range(0, size):
-        str_ret += Op(ctx, (dout, i), (din, i))
-    return str_ret
+        em.add_assignment((dout, i), Val(din, i))
 
 
-def BitsToOH(ctx: VHDLContext, dout, din) -> str:
+def BitsToOH(em: Emitter, dout, din) -> str:
     """
     Convert a binary vector into its one-hot representation in VHDL.
 
@@ -32,16 +30,16 @@ def BitsToOH(ctx: VHDLContext, dout, din) -> str:
         din  = "01"
         dout = "0010"
     """
-    str_ret = ctx.get_current_indent() + '-- Bits To One-Hot Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- BitsToOH({dout.name}, {din.name})\n'
+    em.add_comment('Bits To One-Hot Begin')
+    em.add_comment(f'BitsToOH({dout.name}, {din.name})')
     for i in range(0, dout.size):
-        str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= ' \
-            f'\'1\' when {din.getNameRead()} = {IntToBits(i, din.size)} else \'0\';\n'
-    str_ret += ctx.get_current_indent() + '-- Bits To One-Hot End\n\n'
-    return str_ret
+        em.add_assignment(
+            (dout, i), Bit(1).when(din == Val(i, size=din.size)).else_(Bit(0))
+        )
+    em.add_comment('Bits To One-Hot End\n')
 
 
-def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
+def BitsToOHSub1(em: Emitter, dout, din) -> str:
     """
     Convert a binary vector into its one-hot representation in VHDL.
     The result one-hot representation should be cyclic right shifted.
@@ -50,16 +48,17 @@ def BitsToOHSub1(ctx: VHDLContext, dout, din) -> str:
         din  = "01"
         dout = "0001"
     """
-    str_ret = ctx.get_current_indent() + '-- Bits To One-Hot Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- BitsToOHSub1({dout.name}, {din.name})\n'
+    em.add_comment('Bits To One-Hot Begin')
+    em.add_comment(f'BitsToOHSub1({dout.name}, {din.name})')
     for i in range(0, dout.size):
-        str_ret += ctx.get_current_indent() + f'{dout.getNameWrite(i)} <= ' \
-            f'\'1\' when {din.getNameRead()} = {IntToBits((i+1) % dout.size, din.size)} else \'0\';\n'
-    str_ret += ctx.get_current_indent() + '-- Bits To One-Hot End\n\n'
-    return str_ret
+        em.add_assignment(
+            (dout, i),
+            Bit(1).when(din == Val((i + 1) % dout.size, size=din.size)).else_(Bit(0)),
+        )
+    em.add_comment('Bits To One-Hot End\n')
 
 
-def OHToBits(ctx: VHDLContext, dout, din) -> str:
+def OHToBits(em: Emitter, dout, din) -> str:
     """
     Generate code to convert a one-hot vector into its binary index.
 
@@ -68,20 +67,19 @@ def OHToBits(ctx: VHDLContext, dout, din) -> str:
         dout = "01"
     """
 
-    str_ret = ctx.get_current_indent() + '-- One-Hot To Bits Begin\n'
-    str_ret += ctx.get_current_indent() + f'-- OHToBits({dout.name}, {din.name})\n'
+    em.add_comment('One-Hot To Bits Begin')
+    em.add_comment(f'OHToBits({dout.name}, {din.name})')
     size = dout.size
     size_in = din.size
-    ctx.use_temp()
+    em.use_temp()
     for i in range(0, size):
-        temp_in = LogicArray(ctx, ctx.get_temp(f'in_{i}'), 'w', size_in)
-        temp_out = Logic(ctx, ctx.get_temp(f'out_{i}'), 'w')
+        temp_in = LogicArray(em, em.get_temp(f'in_{i}'), 'w', size_in)
+        temp_out = Logic(em, em.get_temp(f'out_{i}'), 'w')
         for j in range(0, size_in):
-            if ((j // (2**i)) % 2 == 1):
-                str_ret += Op(ctx, (temp_in, j), (din, j))
+            if (j // (2**i)) % 2 == 1:
+                em.add_assignment((temp_in, j), Val(din, j))
             else:
-                str_ret += Op(ctx, (temp_in, j), '\'0\'')
-        str_ret += Reduce(ctx, temp_out, temp_in, 'or', False)
-        str_ret += Op(ctx, (dout, i), temp_out)
-    str_ret += ctx.get_current_indent() + '-- One-Hot To Bits End\n\n'
-    return str_ret
+                em.add_assignment((temp_in, j), Bit(0))
+        Reduce(em, temp_out, temp_in, BinOp.OR, False)
+        em.add_assignment((dout, i), temp_out)
+    em.add_comment('One-Hot To Bits End\n')
