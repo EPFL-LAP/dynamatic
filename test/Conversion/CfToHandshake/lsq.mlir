@@ -110,10 +110,10 @@ func.func @mixLSQAndMCLoads(%mem: memref<64xi32>) -> i32 {
 // CHECK:           %[[VAL_19:.*]] = br %[[VAL_1]] {handshake.bb = 0 : ui32} : <i32>
 // CHECK:           %[[VAL_20:.*]] = br %[[VAL_18]] {handshake.bb = 0 : ui32} : <i32>
 // CHECK:           %[[VAL_21:.*]] = br %[[VAL_3]] {handshake.bb = 0 : ui32} : <>
-// CHECK:           %[[VAL_9]] = constant %[[VAL_11]] {handshake.bb = 1 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_22:.*]] = merge %[[VAL_19]] {handshake.bb = 1 : ui32} : <i32>
 // CHECK:           %[[VAL_23:.*]] = merge %[[VAL_20]] {handshake.bb = 1 : ui32} : <i32>
 // CHECK:           %[[VAL_11]], %[[VAL_24:.*]] = control_merge [%[[VAL_21]]]  {handshake.bb = 1 : ui32} : [<>] to <>, <i1>
+// CHECK:           %[[VAL_9]] = constant %[[VAL_11]] {handshake.bb = 1 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_14]], %[[VAL_15]] = store{{\[}}%[[VAL_23]]] %[[VAL_22]] {handshake.bb = 1 : ui32} : <i32>, <i32>
 // CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_22]], %[[VAL_5]], %[[VAL_3]] : <i32>, <>, <>
 // CHECK:         }
@@ -159,10 +159,10 @@ func.func @mixLSQAndMCStores(%mem: memref<64xi32>, %data : i32) -> i32 {
 // CHECK:           %[[VAL_39:.*]] = br %[[VAL_38]] {handshake.bb = 2 : ui32} : <i32>
 // CHECK:           %[[VAL_40:.*]] = br %[[VAL_32]] {handshake.bb = 2 : ui32} : <i32>
 // CHECK:           %[[VAL_41:.*]] = br %[[VAL_33]] {handshake.bb = 2 : ui32} : <>
-// CHECK:           %[[VAL_8]] = constant %[[VAL_10]] {handshake.bb = 3 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_42:.*]] = mux %[[VAL_43:.*]] {{\[}}%[[VAL_29]], %[[VAL_39]]] {handshake.bb = 3 : ui32} : <i1>, [<i32>, <i32>] to <i32>
 // CHECK:           %[[VAL_44:.*]] = mux %[[VAL_43]] {{\[}}%[[VAL_30]], %[[VAL_40]]] {handshake.bb = 3 : ui32} : <i1>, [<i32>, <i32>] to <i32>
 // CHECK:           %[[VAL_10]], %[[VAL_43]] = control_merge [%[[VAL_31]], %[[VAL_41]]]  {handshake.bb = 3 : ui32} : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_8]] = constant %[[VAL_10]] {handshake.bb = 3 : ui32, value = 1 : i32} : <>, <i32>
 // CHECK:           %[[VAL_12]], %[[VAL_13]] = store{{\[}}%[[VAL_44]]] %[[VAL_42]] {handshake.bb = 3 : ui32} : <i32>, <i32>
 // CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_42]], %[[VAL_5]], %[[VAL_3]] : <i32>, <>, <>
 // CHECK:         }
