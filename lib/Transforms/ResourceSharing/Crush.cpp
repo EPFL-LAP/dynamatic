@@ -309,9 +309,11 @@ struct CreditBasedSharingPass
                                 FuncPerfInfo &funcPerfInfo, NameAnalysis &namer,
                                 TimingDatabase &timingDB, double targetCP);
 
-  LogicalResult sharingWrapperInsertion(
-      handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
-      MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB);
+  LogicalResult
+  sharingWrapperInsertion(handshake::FuncOp &funcOp,
+                          SharingGroups &sharingGroups,
+                          llvm::MapVector<Operation *, double> &opOccupancy,
+                          TimingDatabase &timingDB);
 
   // This class method finds all sharing targets for a given handshake function
   SmallVector<mlir::Operation *> getSharingTargets(handshake::FuncOp funcOp) {
@@ -347,7 +349,8 @@ struct CreditBasedSharingPass
 //    operations and dispatches the result to the correct outputs.
 LogicalResult CreditBasedSharingPass::sharingWrapperInsertion(
     handshake::FuncOp &funcOp, SharingGroups &sharingGroups,
-    MapVector<Operation *, double> &opOccupancy, TimingDatabase &timingDB) {
+    llvm::MapVector<Operation *, double> &opOccupancy,
+    TimingDatabase &timingDB) {
   MLIRContext *ctx = &getContext();
   OpBuilder builder(ctx);
   for (Group group : sharingGroups) {
