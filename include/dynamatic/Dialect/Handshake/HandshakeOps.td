@@ -2325,5 +2325,40 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 }
 
+def BlockControlOp : Handshake_Op<"block_control", [
+  Pure,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Handshake synchronization block control operation";
+
+  let arguments = (ins Variadic<ChannelType>:$predecessors);
+  let results = (outs ChannelType:$result);
+
+  let assemblyFormat = [{
+    `(` $predecessors `)` attr-dict `:` functional-type($predecessors, results)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "ins" + std::to_string(idx);
+    }
+
+    std::string $cppClass::getResultName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BlockControlOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "NUM_INPUTS"),
+         ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32),
+                                  getPredecessors().size())}
+      };
+    }
+  }];
+}
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

@@ -321,6 +321,8 @@ struct FtdCfToHandshakePass
     CfToHandshakeTypeConverter converter;
     RewritePatternSet patterns(ctx);
 
+    ftd::insertBlockControlNetwork(modOp, namer);
+
     // Capture CFG topology before conversion flattens everything.
     auto cfgTopologies = captureAllCFGTopologies(modOp);
 
@@ -406,6 +408,8 @@ struct FtdCfToHandshakePass
       }
     }
 
+    modOp.dump();
+
     for (auto funcOp : modOp.getOps<handshake::FuncOp>()) {
       mlir::OpBuilder builder(funcOp.getContext());
 
@@ -459,7 +463,12 @@ struct FtdCfToHandshakePass
       ftd::finalizeCondPlaceholders(funcOp);
 
       shadow.destroy();
-    }
+
+      // Rewire the control network using my block control operations
+      ftd::removeControlNetwork(funcOp);
+      ftd::rewireControlNetwork(funcOp, namer);
+      modOp.dump();
+    }    
 
     // Make sure all operation names are still unique and name operations that
     // do not currently have a name

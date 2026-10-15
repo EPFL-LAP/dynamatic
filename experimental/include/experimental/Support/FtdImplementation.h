@@ -103,6 +103,13 @@ LogicalResult createPhiNetworkDeps(
     Region &funcRegion, PatternRewriter &rewriter,
     const DenseMap<OpOperand *, SmallVector<Value>> &dependenciesMap);
 
+/// Inserts block control operations and threads control tokens across basic blocks.
+void insertBlockControlNetwork(mlir::ModuleOp modOp, NameAnalysis &namer);
+
+void removeControlNetwork(handshake::FuncOp funcOp);
+
+void rewireControlNetwork(handshake::FuncOp funcOp, dynamatic::NameAnalysis &namer);
+
 } // namespace ftd
 } // namespace experimental
 } // namespace dynamatic
