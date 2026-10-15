@@ -403,8 +403,23 @@ struct CircuitEdge {
 /// Determines whether a loop-feedback source (a branch, or a comparison
 /// computing a loop condition) can be reached backwards from the operation
 /// through any of its inputs, only traversing operations that forward or
-/// combine values. Loop conditions may be combined by logical operations and
-/// Muxes before reaching the loop header.
+/// combine values.
+///
+/// In FTD circuits, the select of a loop-header Mux is an Init fed by the loop
+/// condition, rather than a value leaving the loop through a branch:
+///
+///   cmpi (iteration i) --> Init --> Mux select (iteration i + 1)
+///
+/// The channel into the Init carries the condition of one iteration to the
+/// next and is thus a backedge, but it starts at the comparison computing the
+/// condition. With several exit conditions (e.g., a loop with a break, or a
+/// condition joined by &&), the comparisons are combined by logical operations
+/// and Muxes before reaching the Init.
+///
+/// A comparison is not a backedge source on its own: the channel must also be
+/// in a cycle, go backwards in the basic-block order, and end at a loop header
+/// (see 'isBackedgeDestinationLike'), which comparisons feeding the loop body
+/// or the select of an if-then-else Mux do not.
 static bool isBackedgeSourceLike(Operation *op) {
   mlir::DenseSet<Operation *> visited;
   std::function<bool(Operation *)> reachesSource = [&](Operation *op) {
