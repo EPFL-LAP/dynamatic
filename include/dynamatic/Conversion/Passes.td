@@ -60,8 +60,8 @@ def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
       their handshake counterparts,
       which represent dataflow circuits that can ultimately be converted to an
           RTL design.
+  }];
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
-}];
 }
 
 //===----------------------------------------------------------------------===//
