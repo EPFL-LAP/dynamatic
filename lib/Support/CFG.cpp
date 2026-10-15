@@ -150,10 +150,14 @@ static bool followToBlock(Operation *op, unsigned &bb,
 }
 
 /// Determines whether the operation is of a nature which can be traversed
-/// backwards during backedge source identification.
-static inline bool canBacktrackToLoopSourceThrough(Operation *op) {
+/// backwards during backedge source identification. In FTD circuits, loop
+/// conditions may also be combined by logical operations before reaching the
+/// loop header; these are traversed through their first operand.
+static inline bool canBacktrackToLoopSourceThrough(Operation *op, bool ftd) {
   return isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
-             handshake::TruncIOp>(op);
+             handshake::TruncIOp>(op) ||
+         (ftd &&
+          isa<handshake::NotIOp, handshake::AndIOp, handshake::OrIOp>(op));
 }
 
 /// Determines whether the operation is of a nature which can be traversed
@@ -176,7 +180,7 @@ static Operation *backtrackToLoopSource(Operation *op, bool ftd) {
       return op;
     if (ftd && isa<handshake::CmpIOp, handshake::CmpFOp>(op))
       return op;
-    if (canBacktrackToLoopSourceThrough(op))
+    if (canBacktrackToLoopSourceThrough(op, ftd))
       op = op->getOperand(0).getDefiningOp();
     else
       break;

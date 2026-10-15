@@ -400,32 +400,58 @@ struct CircuitEdge {
   Value channel;
 };
 
+/// Determines whether a loop-feedback source (a branch, or a comparison
+/// computing a loop condition) can be reached backwards from the operation
+/// through any of its inputs, only traversing operations that forward or
+/// combine values. Loop conditions may be combined by logical operations and
+/// Muxes before reaching the loop header.
 static bool isBackedgeSourceLike(Operation *op) {
-  do {
-    if (!op)
+  mlir::DenseSet<Operation *> visited;
+  std::function<bool(Operation *)> reachesSource = [&](Operation *op) {
+    if (!op || !visited.insert(op).second)
       return false;
     if (isa<handshake::BranchOp, handshake::ConditionalBranchOp,
             handshake::CmpIOp, handshake::CmpFOp>(op))
       return true;
-    if (isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
-            handshake::TruncIOp>(op))
-      op = op->getOperand(0).getDefiningOp();
-    else
+    if (!isa<handshake::ForkOp, handshake::ExtUIOp, handshake::ExtSIOp,
+             handshake::TruncIOp, handshake::NotIOp, handshake::AndIOp,
+             handshake::OrIOp, handshake::MuxOp>(op))
       return false;
-  } while (true);
+    return llvm::any_of(op->getOperands(), [&](Value operand) {
+      return reachesSource(operand.getDefiningOp());
+    });
+  };
+  return reachesSource(op);
+}
+
+/// Determines whether the operation can be where a loop's feedback re-enters
+/// the loop header. A Mux only qualifies if its select comes from an Init or a
+/// Control Merge, as for loop-header Muxes; Muxes selected by a condition
+/// (e.g., the Muxes of if-then-else structures) are never loop headers.
+static bool isLoopHeaderLike(Operation *op) {
+  if (isa<handshake::InitOp>(op))
+    return true;
+  if (!isa<handshake::MergeLikeOpInterface>(op))
+    return false;
+  auto muxOp = dyn_cast<handshake::MuxOp>(op);
+  if (!muxOp)
+    return true;
+  Operation *selectOp = muxOp.getSelectOperand().getDefiningOp();
+  while (isa_and_nonnull<handshake::ForkOp, handshake::NotIOp>(selectOp))
+    selectOp = selectOp->getOperand(0).getDefiningOp();
+  return isa_and_nonnull<handshake::InitOp, handshake::ControlMergeOp>(
+      selectOp);
 }
 
 static bool isBackedgeDestinationLike(Operation *op) {
-  if (isa<handshake::InitOp, handshake::MergeLikeOpInterface>(op))
+  if (isLoopHeaderLike(op))
     return true;
 
   auto notOp = dyn_cast<handshake::NotIOp>(op);
   if (!notOp)
     return false;
 
-  return llvm::any_of(notOp.getResult().getUsers(), [](Operation *user) {
-    return isa<handshake::InitOp, handshake::MergeLikeOpInterface>(user);
-  });
+  return llvm::any_of(notOp.getResult().getUsers(), isLoopHeaderLike);
 }
 
 /// Finds all loop-feedback-source -> merge-like backward channels per cyclic
