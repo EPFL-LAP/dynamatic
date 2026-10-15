@@ -559,8 +559,7 @@ void LowerFuncToHandshake::insertMerge(BlockArgument blockArg,
             "might have accidentally maximized the SSA of a placeholder op "
             "like LSQ, MemoryController, or RAMOp.");
       }
-      assert(operand.getType()
-                     .cast<handshake::ExtraSignalsTypeInterface>()
+      assert(cast<handshake::ExtraSignalsTypeInterface>(operand.getType())
                      .getNumExtraSignals() == 0 &&
              "unexpected extra signals");
     }
@@ -1368,7 +1367,7 @@ ConvertCalls::matchAndRewrite(func::CallOp callOp, OpAdaptor adaptor,
       Operation *sourceFuncLookup =
           mlir::SymbolTable::lookupNearestSymbolFrom(callOp, sourceCalleeAttr);
       auto sourceFunc = dyn_cast<func::FuncOp>(sourceFuncLookup);
-      assert(sourceFunc && sourceFunc.getSymName().startswith("__init") &&
+      assert(sourceFunc && sourceFunc.getSymName().starts_with("__init") &&
              "All placeholder outputs must be initialized via __init* calls");
 
       if (!llvm::is_contained(initCalls, sourceCallOp)) {
@@ -1618,7 +1617,7 @@ struct GetGlobalOpConversion
     /// The initial value doesn't have any type constraints. Therefore we need
     /// to check if it is stored as dense elements.
     mlir::Attribute initValueAttr = global.getInitialValueAttr();
-    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+    if (auto denseAttr = dyn_cast<DenseElementsAttr>(initValueAttr)) {
       rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
                                                     denseAttr);
     } else {
@@ -1647,7 +1646,7 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
 
 /// Filters out block arguments of type MemRefType
 bool FuncSSAStrategy::maximizeArgument(BlockArgument arg) {
-  return !arg.getType().isa<mlir::MemRefType>();
+  return !isa<mlir::MemRefType>(arg.getType());
 }
 
 namespace {
@@ -1658,7 +1657,13 @@ namespace {
 struct CfToHandshakePass
     : public dynamatic::impl::CfToHandshakeBase<CfToHandshakePass> {
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
@@ -1740,14 +1745,14 @@ struct CfToHandshakePass
       // addIllegalDialect rule above and must be converted by a pattern.
       if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
               SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
-        return calledFn.getSymName().startswith("__init");
+        return calledFn.getSymName().starts_with("__init");
       }
       // If symbol lookup fails or it's not a func::FuncOp, treat as default
       // (illegal)
       return false;
     });
     target.addDynamicallyLegalOp<func::FuncOp>(
-        [](func::FuncOp op) { return op.getSymName().startswith("__init"); });
+        [](func::FuncOp op) { return op.getSymName().starts_with("__init"); });
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
@@ -1756,12 +1761,18 @@ struct CfToHandshakePass
     // has no remaining uses. This is safe because all valid calls to __init*
     // were tracked and deleted earlier.
     for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
-      if (func.getSymName().startswith("__init")) {
+      if (func.getSymName().starts_with("__init")) {
         assert(func.use_empty() &&
                "__init function should not have users after transformation");
         func.erase();
       }
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace

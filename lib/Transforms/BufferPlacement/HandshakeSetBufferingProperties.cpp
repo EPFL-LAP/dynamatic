@@ -272,7 +272,13 @@ struct HandshakeSetBufferingPropertiesPass
   using HandshakeSetBufferingPropertiesBase::
       HandshakeSetBufferingPropertiesBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     // Check that the provided version is valid
     if (version != "fpga20") {
@@ -291,6 +297,12 @@ struct HandshakeSetBufferingPropertiesPass
       if (failed(setFPGA20Properties(funcOp)))
         return signalPassFailure();
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   };
 };
 

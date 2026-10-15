@@ -129,7 +129,7 @@ struct GetGlobalOpConversion
     /// The initial value doesn't have any type constraints. Therefore we need
     /// to check if it is stored as dense elements.
     mlir::Attribute initValueAttr = global.getInitialValueAttr();
-    if (auto denseAttr = initValueAttr.dyn_cast<DenseElementsAttr>()) {
+    if (auto denseAttr = dyn_cast<DenseElementsAttr>(initValueAttr)) {
       rewriter.replaceOpWithNewOp<handshake::RAMOp>(op, op.getType(),
                                                     denseAttr);
     } else {
@@ -211,7 +211,7 @@ captureAllCFGTopologies(ModuleOp moduleOp) {
   DenseMap<StringRef, OriginalCFGInfo> result;
 
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-    if (funcOp.isExternal() || funcOp.getSymName().startswith("__init"))
+    if (funcOp.isExternal() || funcOp.getSymName().starts_with("__init"))
       continue;
 
     Region &region = funcOp.getBody();
@@ -308,7 +308,13 @@ struct FtdCfToHandshakePass
     : public dynamatic::experimental::impl::FtdCfToHandshakeBase<
           FtdCfToHandshakePass> {
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
@@ -377,14 +383,14 @@ struct FtdCfToHandshakePass
       // addIllegalDialect rule above and must be converted by a pattern.
       if (auto calledFn = dyn_cast_or_null<func::FuncOp>(
               SymbolTable::lookupNearestSymbolFrom(op, op.getCalleeAttr()))) {
-        return calledFn.getSymName().startswith("__init");
+        return calledFn.getSymName().starts_with("__init");
       }
       // If symbol lookup fails or it's not a func::FuncOp, treat as default
       // (illegal)
       return false;
     });
     target.addDynamicallyLegalOp<func::FuncOp>(
-        [](func::FuncOp op) { return op.getSymName().startswith("__init"); });
+        [](func::FuncOp op) { return op.getSymName().starts_with("__init"); });
 
     if (failed(applyFullConversion(modOp, target, std::move(patterns))))
       return signalPassFailure();
@@ -393,7 +399,7 @@ struct FtdCfToHandshakePass
     // has no remaining uses. This is safe because all valid calls to __init*
     // were tracked and deleted earlier.
     for (auto func : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
-      if (func.getSymName().startswith("__init")) {
+      if (func.getSymName().starts_with("__init")) {
         assert(func.use_empty() &&
                "__init function should not have users after transformation");
         func.erase();
@@ -454,6 +460,12 @@ struct FtdCfToHandshakePass
 
       shadow.destroy();
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace

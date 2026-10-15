@@ -143,7 +143,7 @@ MyNewInvariant::MyNewInvariant(unsigned long id, TAG tag, const Operation& op)
 
 ### Update the `annotate-properties` Pass to Add Your Property
 
-Define your annotation function and add it to the `runDynamaticPass` method:
+Define your annotation function and add it to the `runOnOperation` method:
 
 ```
 LogicalResult

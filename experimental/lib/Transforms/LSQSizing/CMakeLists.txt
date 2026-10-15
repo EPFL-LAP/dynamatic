@@ -1,9 +1,9 @@
 add_dynamatic_library(DynamaticLSQSizing
-  HandshakeSizeLSQs.cpp
-  LSQSizingSupport.cpp
+  HandshakeSizeLSQ.cpp
+  Support/LSQSizingSupport.cpp
 
   DEPENDS
-  DynamaticTransformsPassIncGen
+  DynamaticExperimentalTransformsPassIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR
@@ -13,6 +13,6 @@ add_dynamatic_library(DynamaticLSQSizing
   MLIRTransformUtils
   DynamaticHandshake
   DynamaticSupport
-  DynamaticExperimentalSupport
+  DynamaticAnalysis
   DynamaticBufferPlacement
   )

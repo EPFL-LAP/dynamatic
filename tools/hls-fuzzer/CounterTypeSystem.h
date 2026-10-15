@@ -1,6 +1,7 @@
 #ifndef DYNAMATIC_HLS_FUZZER_VISITOR_TYPE_SYSTEM
 #define DYNAMATIC_HLS_FUZZER_VISITOR_TYPE_SYSTEM
 
+#include "TemplateTypeSystem.h"
 #include "TypeSystem.h"
 
 namespace dynamatic::gen {
@@ -20,10 +21,10 @@ namespace dynamatic::gen {
 /// 'TypingContext merge(const TypingContext& rhs) const' which can be used
 /// to calculate the current maximum/minimum of all contexts generated so far.
 template <typename TypingContext, typename Self>
-class CounterTypeSystem : public TypeSystem<TypingContext, Self> {
+class CounterTypeSystem : public TemplateTypeSystem<TypingContext, Self> {
 
 public:
-  using Base = TypeSystem<TypingContext, Self>;
+  using Base = TemplateTypeSystem<TypingContext, Self>;
 
 protected:
   /// Returns a 'TransferFn' which merges all present contexts of 'indices' and
@@ -100,92 +101,12 @@ protected:
   }
 
 public:
-  TransferFnArray<ast::Function> getFunctionTransferFns() override {
-    return getMergingTransferFnArray<ast::Function>();
-  }
-
-  TransferFnArray<ast::ScalarType> getScalarTypeTransferFns() override {
-    return getMergingTransferFnArray<ast::ScalarType>();
-  }
-
-  TransferFnArray<ast::ReturnType> getReturnTypeTransferFns() override {
-    return getMergingTransferFnArray<ast::ReturnType>();
-  }
-
-  TransferFnArray<ast::ReturnStatement>
-  getReturnStatementTransferFns() override {
-    return getMergingTransferFnArray<ast::ReturnStatement>();
-  }
-
-  TransferFnArray<ast::BinaryExpression>
-  getBinaryExpressionTransferFns(ast::BinaryExpression::Op op) override {
-    return getMergingTransferFnArray<ast::BinaryExpression>();
-  }
-
-  TransferFnArray<ast::UnaryExpression>
-  getUnaryExpressionTransferFns(ast::UnaryExpression::Op op) override {
-    return getMergingTransferFnArray<ast::UnaryExpression>();
-  }
-
-  TransferFnArray<ast::Variable> getVariableTransferFns() override {
-    return getMergingTransferFnArray<ast::Variable>();
-  }
-
-  TransferFnArray<ast::CastExpression> getCastExpressionTransferFns() override {
-    return getMergingTransferFnArray<ast::CastExpression>();
-  }
-
-  TransferFnArray<ast::ConditionalExpression>
-  getConditionalExpressionTransferFns() override {
-    return getMergingTransferFnArray<ast::ConditionalExpression>();
-  }
-
-  TransferFnArray<ast::Constant> getConstantTransferFns() override {
-    return getMergingTransferFnArray<ast::Constant>();
-  }
-
-  TransferFnArray<ast::ScalarParameter>
-  getFreshScalarParameterTransferFns() override {
-    return getMergingTransferFnArray<ast::ScalarParameter>();
-  }
-
-  TransferFnArray<ast::ExistingScalarParameter>
-  getExistingScalarParameterTransferFns() override {
-    return getMergingTransferFnArray<ast::ExistingScalarParameter>();
-  }
-
-  TransferFnArray<ast::ArrayReadExpression>
-  getArrayReadExpressionTransferFns() override {
-    return getMergingTransferFnArray<ast::ArrayReadExpression>();
-  }
-
-  TransferFnArray<ast::ArrayParameter>
-  getFreshArrayParameterTransferFns() override {
-    return getMergingTransferFnArray<ast::ArrayParameter>();
-  }
-
-  TransferFnArray<ast::ExistingArrayParameter>
-  getExistingArrayParameterTransferFns() override {
-    return getMergingTransferFnArray<ast::ExistingArrayParameter>();
-  }
-
-  TransferFnArray<ast::ArrayAssignmentStatement>
-  getArrayAssignmentStatementTransferFns() override {
-    return getMergingTransferFnArray<ast::ArrayAssignmentStatement>();
-  }
-
-  TransferFnArray<ast::StatementList> getStatementListTransferFns() override {
-    return getMergingTransferFnArray<ast::StatementList>();
-  }
-
-  TransferFnArray<ast::StructuredForStatement>
-  getStructuredForStatementTransferFns() override {
-    return getMergingTransferFnArray<ast::StructuredForStatement>();
-  }
-
-  TransferFnArray<ast::ScalarAssignmentStatement>
-  getScalarAssignmentStatementTransferFns() override {
-    return getMergingTransferFnArray<ast::ScalarAssignmentStatement>();
+  /// Every AST node is treated the same way: its transfer functions merge, and
+  /// nothing else. The extra arguments some AST nodes come with (e.g. the
+  /// operator of a binary expression) are of no interest to a counter.
+  template <typename ASTNode, typename... Args>
+  static TransferFnArray<ASTNode> getTransferFnImpl(const Args &...) {
+    return getMergingTransferFnArray<ASTNode>();
   }
 };
 

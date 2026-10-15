@@ -26,6 +26,7 @@ ENABLE_SHORT_CIRCUIT=${16}
 ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
+USE_LSQ_SIZING=${20:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -172,6 +173,10 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
 # - licm: moving the code outside the loops as much as possible
+# - instsimplify: fold leftovers of loop passes (e.g., "icmp eq 1, 0"), so that
+# memory ops are not erased in MLIR after the dependency analysis.
+# - adce: unlike dce, also removes dead phis and branches only feeding dead
+# code, for the same reason.
 #
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
@@ -182,7 +187,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,instsimplify,simplifycfg,adce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -263,6 +268,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
+  --sort-blocks-rpo \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
   "Applied CF transformations"
@@ -293,12 +299,14 @@ exit_on_fail "Failed to consume markers" \
 if [[ $DISABLE_LSQ -ne 0 ]]; then
   "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --force-memory-interface="force-mc=true" \
+    --sort-blocks-rpo \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to force usage of MC interface" \
     "Forced usage of MC interface in cf"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_CONSUMED_PRAGMARKERS" \
     --mark-memory-interfaces \
+    --sort-blocks-rpo \
     > "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED"
   exit_on_fail "Failed to mark memory interfaces in cf" \
     "Marked memory accesses with the corresponding interfaces in cf"
@@ -373,6 +381,14 @@ if [[ $USE_SHARING -ne 0 ]]; then
 fi
 
 
+# LSQ sizing (runs right after buffer placement, whose CFDFC analysis it uses;
+# without one, e.g. with on-merges, LSQs keep the default depth)
+LSQ_SIZING_PASS=""
+if [[ $USE_LSQ_SIZING -ne 0 ]]; then
+  LSQ_SIZING_PASS="--handshake-size-lsqs=timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP"
+  echo_info "Set to size the LSQs after buffer placement."
+fi
+
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
@@ -381,6 +397,7 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER timing-models=$DYNAMATIC_DIR/data/components.json" \
+    ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
@@ -417,7 +434,9 @@ else
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$FAST_TOKEN_DELIVERY \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
+    ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \
+    --handshake-size-select-depth \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

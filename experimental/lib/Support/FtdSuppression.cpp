@@ -713,7 +713,7 @@ getOriginalValue(mlir::OpBuilder &builder, StringRef varName,
                  DenseMap<Value, SmallVector<Backedge, 2>> *pendingMuxOperands,
                  ftd::ShadowCFG *shadow = nullptr) {
   StringRef lookupName = varName;
-  if (lookupName.startswith("~")) {
+  if (lookupName.starts_with("~")) {
     llvm::errs() << "[FTD Error] Negated variable '" << varName << "'.\n";
     lookupName = lookupName.drop_front();
   }
@@ -765,7 +765,7 @@ static Value boolExpressionToCircuit(
         assert(val && "Signal missing from IR");
       }
 
-      if (!val.getType().isa<handshake::ChannelType>()) {
+      if (!isa<handshake::ChannelType>(val.getType())) {
         val.setType(ftd::channelifyType(val.getType()));
       }
     }
@@ -822,7 +822,7 @@ Value ftd::bddToCircuit(
     muxCond =
         getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
     assert(muxCond && "Mux condition not found");
-    if (!muxCond.getType().isa<handshake::ChannelType>())
+    if (!isa<handshake::ChannelType>(muxCond.getType()))
       muxCond.setType(ftd::channelifyType(muxCond.getType()));
   }
 
@@ -976,9 +976,9 @@ static void buildBranchTreeRecursive(
   assert(conditionVal && "Splitter condition value not found");
 
   // Ensure Types are compatible with Handshake channels.
-  if (!conditionVal.getType().isa<handshake::ChannelType>())
+  if (!isa<handshake::ChannelType>(conditionVal.getType()))
     conditionVal.setType(ftd::channelifyType(conditionVal.getType()));
-  if (!sourceVal.getType().isa<handshake::ChannelType>())
+  if (!isa<handshake::ChannelType>(sourceVal.getType()))
     sourceVal.setType(ftd::channelifyType(sourceVal.getType()));
 
   // 4. Register Outputs and Recurse
@@ -1006,7 +1006,7 @@ static void buildBranchTreeRecursive(
       builder, sourceVal.getParentBlock(), requirements, baseNextPath, registry,
       bi, scanDepth, pendingMuxOperands, shadow);
 
-  if (!suppressCondition.getType().isa<handshake::ChannelType>())
+  if (!isa<handshake::ChannelType>(suppressCondition.getType()))
     suppressCondition.setType(ftd::channelifyType(suppressCondition.getType()));
 
   // [Suppression Branch]
@@ -1153,7 +1153,7 @@ void ftd::buildDistributionNetwork(
                      << "' not found in BlockIndexing during registration.\n";
         assert(rawVal && "Signal missing from IR");
       }
-      if (!rawVal.getType().isa<handshake::ChannelType>())
+      if (!isa<handshake::ChannelType>(rawVal.getType()))
         rawVal.setType(ftd::channelifyType(rawVal.getType()));
       registry.registerSignal(var, {}, rawVal);
     }
@@ -1808,7 +1808,7 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
       depValue = getValueAtLevel(depVar, fromLevel);
     }
     if (depValue) {
-      if (!depValue.getType().isa<handshake::ChannelType>())
+      if (!isa<handshake::ChannelType>(depValue.getType()))
         depValue.setType(ftd::channelifyType(depValue.getType()));
       levelRegistry.registerSignal(depVar, {}, depValue);
     }
@@ -1852,7 +1852,7 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
           else
             vVal = getValueAtLevel(v, fromLevel);
           if (vVal) {
-            if (!vVal.getType().isa<handshake::ChannelType>())
+            if (!isa<handshake::ChannelType>(vVal.getType()))
               vVal.setType(ftd::channelifyType(vVal.getType()));
             levelRegistry.registerSignal(v, {}, vVal);
           }
@@ -1869,7 +1869,7 @@ Value CyclicDemotionHelper::demoteOneLevel(Value currentValue, Block *origBlock,
 
   // 7. Build suppression circuit
   Value result = currentValue;
-  if (!currentValue.getType().isa<handshake::ChannelType>())
+  if (!isa<handshake::ChannelType>(currentValue.getType()))
     currentValue.setType(ftd::channelifyType(currentValue.getType()));
 
   if (fSup->type != experimental::boolean::ExpressionType::Zero) {
@@ -1921,7 +1921,7 @@ Value CyclicDemotionHelper::getValueAtLevel(const std::string &varName,
   if (native <= targetLevel) {
     // Variable is at or below target level — use original value
     val = getOriginalValue(builder, varName, bi, pendingMuxOperands, shadow);
-    if (val && !val.getType().isa<handshake::ChannelType>())
+    if (val && !isa<handshake::ChannelType>(val.getType()))
       val.setType(ftd::channelifyType(val.getType()));
   } else {
     // Recursively get value one level above, then demote
@@ -2688,7 +2688,7 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
         auto src = builder.create<handshake::SourceOp>(consumer->getLoc());
         setBBAttrWithFallback(src, targetBBAttr, producerIRBlock, builder);
         auto innerType =
-            connection.getType().cast<handshake::ChannelType>().getDataType();
+            cast<handshake::ChannelType>(connection.getType()).getDataType();
         auto attr =
             builder.getIntegerAttr(innerType, (use.getOperandNumber() == 2));
         auto cst = builder.create<handshake::ConstantOp>(

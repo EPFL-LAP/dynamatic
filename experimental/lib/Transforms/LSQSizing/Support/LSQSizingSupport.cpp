@@ -13,7 +13,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Transforms/LSQSizing/LSQSizingSupport.h"
+#include "LSQSizingSupport.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -50,61 +50,19 @@ static int extractNodeLatency(mlir::Operation *op,
   return 0;
 }
 
-CFDFCGraph::CFDFCGraph(handshake::FuncOp funcOp,
-                       llvm::SetVector<unsigned> cfdfcBBs,
-                       TimingDatabase timingDB, unsigned ii, double targetCP) {
+CFDFCGraph::CFDFCGraph(const buffer::CFDFC &cfdfc,
+                       const TimingDatabase &timingDB, unsigned ii,
+                       double targetCP) {
+  // Add the units of the CFDFC
+  for (Operation *op : cfdfc.units)
+    addNode(op, extractNodeLatency(op, timingDB, targetCP));
 
-  for (Operation &op : funcOp.getOps()) {
-    // Get operation's basic block
-    unsigned srcBB;
-    if (auto optBB = getLogicBB(&op); !optBB.has_value())
-      continue;
-    else
-      srcBB = *optBB;
-
-    // The basic block the operation belongs to must be selected
-    if (!cfdfcBBs.contains(srcBB))
-      continue;
-
-    // Add the unit and valid outgoing channels to the CFDFC
-    addNode(&op, extractNodeLatency(&op, timingDB, targetCP));
-
-    for (OpResult res : op.getResults()) {
-      assert(std::distance(res.getUsers().begin(), res.getUsers().end()) == 1 &&
-             "value must have unique user");
-
-      // Get the value's unique user and its basic block
-      Operation *user = *res.getUsers().begin();
-      unsigned dstBB;
-      if (std::optional<unsigned> optBB = getLogicBB(user); !optBB.has_value())
-        continue;
-      else
-        dstBB = *optBB;
-
-      if (srcBB != dstBB) {
-        // The channel is in the CFDFC if it belongs belong to a selected arch
-        // between two basic blocks
-        for (size_t i = 0; i < cfdfcBBs.size(); ++i) {
-          unsigned nextBB = i == cfdfcBBs.size() - 1 ? 0 : i + 1;
-          if (srcBB == cfdfcBBs[i] && dstBB == cfdfcBBs[nextBB]) {
-            addChannelEdges(res);
-            if (buffer::CFDFC::isCFDFCBackedge(res))
-              addChannelBackedges(res, (ii * -1));
-            break;
-          }
-        }
-      } else if (cfdfcBBs.size() == 1) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the CFDFC is just a block looping to itself
-        addChannelEdges(res);
-        if (buffer::CFDFC::isCFDFCBackedge(res))
-          addChannelBackedges(res, (ii * -1));
-      } else if (!isBackedge(res)) {
-        // The channel is in the CFDFC if its producer/consumer belong to the
-        // same basic block and the channel is not a backedge
-        addChannelEdges(res);
-      }
-    }
+  // Add the channels of the CFDFC; a backedge carries a latency of -II, since
+  // its token belongs to the previous iteration
+  for (Value channel : cfdfc.channels) {
+    addChannelEdges(channel);
+    if (cfdfc.backedges.contains(channel))
+      addChannelBackedges(channel, (ii * -1));
   }
 }
 

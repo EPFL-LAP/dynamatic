@@ -245,7 +245,13 @@ struct ScfSimpleIfToSelectPass
 
   using ScfSimpleIfToSelectBase::ScfSimpleIfToSelectBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    dynamatic::NameAnalysis &namer = getAnalysis<dynamatic::NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     auto *ctx = &getContext();
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
@@ -257,6 +263,12 @@ struct ScfSimpleIfToSelectPass
     if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
                                             config)))
       signalPassFailure();
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(dynamatic::NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<dynamatic::NameAnalysis>();
   };
 };
 } // namespace

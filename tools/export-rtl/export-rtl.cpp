@@ -1177,8 +1177,7 @@ std::optional<std::string> SMVWriter::getUserSignal(Value val) const {
   std::string argName;
   auto argNamesAttr = userInstance->getArgNames();
   if (operandIndex < argNamesAttr.size()) {
-    if (auto strAttr =
-            argNamesAttr[operandIndex].dyn_cast<mlir::StringAttr>()) {
+    if (auto strAttr = dyn_cast<mlir::StringAttr>(argNamesAttr[operandIndex])) {
       argName = strAttr.getValue().str();
       return instName + "." + argName;
     }
@@ -1485,7 +1484,7 @@ void SMVWriter::constructIOMappings(
     auto signal = getValueName(oprd);
     std::string signalName = signal.str();
 
-    if (oprd.isa<BlockArgument>())
+    if (isa<BlockArgument>(oprd))
       std::replace(signalName.begin(), signalName.end(), '.', '_');
 
     llvm::TypeSwitch<Type, void>(portType)

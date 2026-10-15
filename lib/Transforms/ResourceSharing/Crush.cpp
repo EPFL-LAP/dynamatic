@@ -538,4 +538,10 @@ void CreditBasedSharingPass::runOnOperation() {
       signalPassFailure();
     }
   }
+
+  // Keep the analyses (e.g., the CFDFCs from buffer placement) for the passes
+  // that follow. Note that the CFDFCs still refer to the units before sharing,
+  // so a pass that runs after this one must not rely on their units and
+  // channels
+  markAllAnalysesPreserved();
 }
