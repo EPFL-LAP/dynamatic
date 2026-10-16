@@ -2328,7 +2328,8 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
 def RepeatingInitOp : Handshake_Op<"repeating_init", [
   HasClock, SameOperandsAndResultType,
   IsIntSizedChannel<1, "operand">,
-  IsIntSizedChannel<1, "result">
+  IsIntSizedChannel<1, "result">,
+  SimpleNamedIO
 ]> {
   let summary = "repeating init operation";
   let description = [{

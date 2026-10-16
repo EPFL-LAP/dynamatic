@@ -206,12 +206,31 @@ void MarkSubloopPass::runOnOperation() {
   }
   llvm::errs() << "size of validRegions: " << validRegions.size() << '\n';
 
+  // 1. Copy the DenseMap entries into a vector
+  llvm::SmallVector<std::pair<mlir::Block *, RegionInfo>> sortedRegions(
+      validRegions.begin(), validRegions.end());
+
+  // 2. Build a deterministic index map from the parent mlir::Region's block order
+  llvm::DenseMap<mlir::Block *, unsigned> blockOrder;
+  if (!sortedRegions.empty()) {
+    if (mlir::Region *parentRegion = sortedRegions.front().first->getParent()) {
+      unsigned idx = 0;
+      for (mlir::Block &b : *parentRegion)
+        blockOrder[&b] = idx++;
+    }
+  }
+
+  // 3. Sort deterministically by block position
+  llvm::sort(sortedRegions, [&](const auto &lhs, const auto &rhs) {
+    return blockOrder.lookup(lhs.first) < blockOrder.lookup(rhs.first);
+  });
+
   llvm::SmallVector<Attribute> allRegionsMetadata;
   // track the targeted memory controllers
   llvm::DenseSet<Value> markedMemrefs;
 
   // Process all discovered regions
-  for (auto &[entryBlock, region] : validRegions) {
+  for (auto &[entryBlock, region] : sortedRegions) {
     llvm::SetVector<mlir::Block *> &subblocks = region.subblocks;
     mlir::Block *exitBlock = region.exitBlock;
     for (mlir::Block *b : subblocks) {
@@ -275,7 +294,15 @@ void MarkSubloopPass::runOnOperation() {
           }
         }
       }
-    }    
+    }
+    
+    // add the entry operation for the control
+    unsigned exitBlockIdx = blockIndices[exitBlock];
+    NamedAttribute entries[] = {
+        builder.getNamedAttr("op", builder.getStringAttr("fake_control")),
+        builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(exitBlockIdx))
+    };
+    entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
 
     // find all the stores in the subblocks
     llvm::SmallVector<memref::StoreOp> storesToModify;
@@ -338,6 +365,8 @@ void MarkSubloopPass::runOnOperation() {
   for (auto &[block, idx] : blockIndices)
     blocksByIndex[idx] = block;
 
+  llvm::DenseSet<Block *> multiPredEntryBlocks;
+
   // collect external values used within subblocks if we are at an if/else region
   for (Attribute regionAttr : allRegionsMetadata) {
     auto dict = dyn_cast<DictionaryAttr>(regionAttr);
@@ -356,6 +385,7 @@ void MarkSubloopPass::runOnOperation() {
     unsigned entryBBIdx = entryBBAttr.getInt();
     if (entryBBIdx >= blocksByIndex.size()) continue;
     Block *entryBlock = blocksByIndex[entryBBIdx];
+    multiPredEntryBlocks.insert(entryBlock);
 
     // Look up subblocks for this region
     auto it = validRegions.find(entryBlock);
@@ -367,54 +397,66 @@ void MarkSubloopPass::runOnOperation() {
     // Map each external Value to its marker in this specific entryBlock
     llvm::DenseMap<Value, Value> markedValues;
     Operation *terminator = entryBlock->getTerminator();
-    
-    // iterate over all operations in the subblocks
+
+    auto processOperand = [&](OpOperand &use) {
+      Value val = use.get();
+      if (isa<MemRefType>(val.getType())) return;
+
+      Block *defBlock = getTrueDefiningBlock(val);
+      // we only care about values originating from outside the subblocks
+      if (!defBlock || subblocks.contains(defBlock)) return;
+
+      // Check if we already created a marker in entryBlock for this value
+      auto markedIt = markedValues.find(val);
+      if (markedIt != markedValues.end()) {
+        use.set(markedIt->second);
+        return;
+      }
+
+      // insert marker directly above entryBlock's terminator
+      builder.setInsertionPoint(terminator);
+      auto markerOp = builder.create<dynamatic::cf_extra::RegionInputOp>(
+          terminator->getLoc(), val.getType(), val);
+      namer.setName(markerOp);
+
+      Value markedVal = markerOp.getResult();
+      markedValues[val] = markedVal;
+
+      // Rewire use to read from the marker output
+      use.set(markedVal);
+
+      if (Operation *defOp = val.getDefiningOp()) {
+        llvm::errs() << "Operation producing marked value: " << *defOp << "\n";
+      } else if (auto arg = dyn_cast<BlockArgument>(val)) {
+        llvm::errs() << "Marked value is a BlockArgument of block: ";
+        arg.getOwner()->printAsOperand(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    };
+
+    // 1. Also mark the condition of entryBlock's conditional branch terminator (e.g., cmpi0)
+    if (auto condBr = dyn_cast<cf::CondBranchOp>(terminator)) {
+      processOperand(condBr.getConditionMutable()[0]);
+    }
+
+    // 2. Iterate over all operations in the subblocks
     for (Block *block : subblocks) {
       for (Operation &op : block->getOperations()) {
         for (OpOperand &use : op.getOpOperands()) {
-          Value val = use.get();
-          if (isa<MemRefType>(val.getType())) continue;
-
-          Block *defBlock = getTrueDefiningBlock(val);
-          // we only care about values originating from outside the subblocks
-          if (!defBlock || subblocks.contains(defBlock)) continue;
-
-          // Check if we already created a marker in entryBlock for this value
-          auto it = markedValues.find(val);
-          if (it != markedValues.end()) {
-            use.set(it->second);
-            continue;
-          }
-
-          // insert marker directly above entryBlock's terminator
-          builder.setInsertionPoint(terminator);
-          auto markerOp = builder.create<dynamatic::cf_extra::RegionInputOp>(
-          terminator->getLoc(), val.getType(), val);
-          namer.setName(markerOp);
-
-          Value markedVal = markerOp.getResult();
-          markedValues[val] = markedVal;
-
-          // Rewire uses in the subblocks to read from the marker output
-          use.set(markedVal);
-
-          if (Operation *defOp = val.getDefiningOp()) {
-            llvm::errs() << "Operation producing marked value: " << *defOp << "\n";
-          } else if (auto arg = dyn_cast<BlockArgument>(val)) {
-            llvm::errs() << "Marked value is a BlockArgument of block: ";
-            arg.getOwner()->printAsOperand(llvm::errs());
-            llvm::errs() << "\n";
-          }
+          processOperand(use);
         }
       }
     }
   }
 
+  // Insert a BlockControlOp in every basic block, such that it can 
+  // later be turned into a correct control network
   Type controlType = builder.getI32Type();
   Location loc = funcOp.getLoc();
 
   llvm::DenseMap<Block *, dynamatic::cf_extra::BlockControlOp> blockControlMap;
-  llvm::DenseMap<Block *, BlockArgument> blockControlArgMap;  
+  llvm::DenseMap<Block *, BlockArgument> blockControlArgMap;
+  llvm::DenseMap<Block *, Value> blockControlValueMap;  
 
   // Pass 1: Insert BlockControlOp at the start of every block
   llvm::errs() << funcOp.getBlocks().size();
@@ -433,6 +475,7 @@ void MarkSubloopPass::runOnOperation() {
           bLoc, controlType, ValueRange{initCst.getResult()});
       namer.setName(ctrlOp);
       blockControlMap[&block] = ctrlOp;
+      blockControlValueMap[&block] = ctrlOp.getResult();
       continue;
     }
 
@@ -440,6 +483,23 @@ void MarkSubloopPass::runOnOperation() {
         bLoc, controlType, ValueRange{});
     namer.setName(ctrlOp);
     blockControlMap[&block] = ctrlOp;
+
+    // Default control output is the BlockControlOp result
+    Value currentControlVal = ctrlOp.getResult();
+
+    // Check if this block is an entry basic block with multiple predecessors/successors
+    if (multiPredEntryBlocks.count(&block)) {
+      builder.setInsertionPointAfter(ctrlOp);
+      // Create the RegionInputOp right after the BlockControlOp
+      auto regionInputOp = builder.create<dynamatic::cf_extra::RegionInputOp>(
+          bLoc, controlType, ctrlOp.getResult());
+      namer.setName(regionInputOp);
+      
+      // Update the control output to point to the RegionInputOp instead
+      currentControlVal = regionInputOp.getResult();
+    }
+
+    blockControlValueMap[&block] = currentControlVal;
   }
 
   // Pass 2: Add exactly ONE control BlockArgument to each non-entry block,
@@ -461,8 +521,7 @@ void MarkSubloopPass::runOnOperation() {
   // Pass 3: Update all branch terminators to pass the source block's token
   // along every branch edge to the successor's new argument slot.
   for (Block &block : funcOp.getBlocks()) {
-    dynamatic::cf_extra::BlockControlOp currCtrlOp = blockControlMap[&block];
-    Value srcToken = currCtrlOp.getResult();
+    Value srcToken = blockControlValueMap[&block];
     Operation *term = block.getTerminator();
     if (!term)
       continue;
