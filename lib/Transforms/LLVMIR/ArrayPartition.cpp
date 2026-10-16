@@ -1012,8 +1012,7 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
   //                  decomposeGEPIndices
   //
   // so we give it GEPN, the GEP feeding the access, to count every offset
-  auto *gepInst =
-      dyn_cast<GetElementPtrInst>(getLoadStorePointerOperand(inst));
+  auto *gepInst = dyn_cast<GetElementPtrInst>(getLoadStorePointerOperand(inst));
 
   auto *load = dyn_cast<LoadInst>(inst);
   auto *store = dyn_cast<StoreInst>(inst);
