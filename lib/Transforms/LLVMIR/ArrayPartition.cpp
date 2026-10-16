@@ -1030,11 +1030,6 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
     return;
   }
 
-  // NOTE: The GEP's own indices do not reflect the array's dimensions, since
-  // LLVM canonicalizes GEPs to a byte stride (e.g., "getelementptr [4 x i8],
-  // ptr %arr, i64 %i" for "arr[i]" with 32-bit elements). The indices are
-  // instead recovered from the byte offsets and the storage's type below
-
   Function *f = inst->getParent()->getParent();
   LLVMContext &ctx = inst->getContext();
 
