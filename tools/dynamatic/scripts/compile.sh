@@ -52,6 +52,7 @@ F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_PARTITIONED="$COMP_DIR/clang.opt.part.ll"
 F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY="$COMP_DIR/clang.opt.part.dep.ll"
+F_CLANG_CANONICALIZED="$COMP_DIR/clang.opt.part.dep.canon.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
@@ -245,8 +246,16 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
-$LLVM_TO_STD_TRANSLATION_BIN \
+$LLVM_OPT -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/CanonicalizeGEPs.so" \
+  -passes="canonicalize-geps" \
   "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY" \
+  > "$F_CLANG_CANONICALIZED"
+exit_on_fail "Failed to canonicalize GEPs in LLVM IR" \
+  "Canonicalized GEPs in LLVM IR"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_CANONICALIZED" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
