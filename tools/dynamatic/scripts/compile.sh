@@ -246,6 +246,10 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
+# - "canonicalize-geps": Collapse each chain of GEPs computing a memory address
+# into a single GEP with a single index, the offset from the base pointer with
+# the arrays flattened in row-major order. The translation to the std dialect
+# below expects this form.
 $LLVM_OPT -S \
   -load-pass-plugin "$DYNAMATIC_DIR/build/lib/CanonicalizeGEPs.so" \
   -passes="canonicalize-geps" \
