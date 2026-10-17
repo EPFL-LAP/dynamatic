@@ -180,8 +180,13 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
 
     // Replace the original fork's outputs that are part of the memory control
     // network with the first lazy fork's outputs
-    for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults()))
-      from.replaceAllUsesWith(to);
+    for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults())) {
+      // The elements of a SetVector are const, while replaceAllUsesWith is a
+      // non-const method of Value in newer LLVM versions. Value is a handle to
+      // the IR value, so replacing the uses through a copy replaces them in the
+      // IR
+      Value(from).replaceAllUsesWith(to);
+    }
 
     if (hasValueWithoutLazyConstr) {
       // If some of the control fork's result go outside the memory control
