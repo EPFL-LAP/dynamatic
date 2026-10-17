@@ -619,60 +619,34 @@ void TranslateLLVMToStd::translateFCmpInst(llvm::FCmpInst *inst) {
 }
 
 /// NOTE: Assumes that the canonicalize-geps pass (CanonicalizeGEPs.cpp) ran
-/// before: each GEP is translated separately, so chains of byte GEPs whose
-/// offsets are not whole elements on their own must be folded into one.
+/// before: each GEP has a single index, the offset from its base pointer with
+/// the arrays flattened in row-major order.
 void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
+  assert(gepInst->getNumIndices() == 1 &&
+         !isa<llvm::GetElementPtrInst>(gepInst->getPointerOperand()) &&
+         "GEP is not canonical, run canonicalize-geps before");
 
   // The GEP instruction calculates the index that the load/store need to use
-  // the access memory.
-  //
-  // For instance A[i][j][k] would be GEP -> ... -> GEP -> load
-  //
-  // In TranslateLLVMToStd, we convert it to additions and multiplications.
-  //
-  // Also, we flatten the memory into 1D. Since it is very hard to reliably
-  // reverse engineer the order between the accesses.
-  //
-  // An example of flattening a multi-dimension array in a row-major order.
-  // Given an array: my_array[A][B][C][D];
-  // we access it as my_array[i][j][k][l];
-  // The flattened index is computed as:
-  //
-  // (B * C * D) * i + (C * D) * j + (D) * k + l
-
-  // Convert the GEP instruction into a series of "idx * dim + idx * dim ..."
-  llvm::Type *baseElementType = gepInst->getSourceElementType();
-
-  // Get the dimensions of the original array from the function type.
-  // For the example above, it would be {A, B, C, D}
-  SmallVector<int64_t> multipliers;
-  while (baseElementType->isArrayTy()) {
-    multipliers.push_back(baseElementType->getArrayNumElements());
-    baseElementType = baseElementType->getArrayElementType();
-  }
-
-  SmallVector<llvm::Value *> gepIndices(gepInst->indices());
+  // the access memory. The memory is flattened into a 1D memref, whose elements
+  // the translated index counts.
+  llvm::Value *gepIndex = *gepInst->idx_begin();
+  mlir::Value mlirIndexValue = valueMap[gepIndex];
 
   const llvm::Value *baseAddressLLVM = findBase(gepInst->getPointerOperand());
 
-  // A list of value to be accumulated. For the example above:
-  // multipliedIndices = { (B * C * D) * i, (C * D) * j, (D) * k + l }
-  SmallVector<mlir::Value> multipliedIndices;
-
-  // The memory is flattened into a 1D memref, whose elements the computed
-  // index counts. The GEP's indices may count smaller units than these
-  // elements: e.g., clang emits "getelementptr [4 x i8], ptr %a, i64 %i" to
-  // access the i32 element %i. The offset of each index is thus computed in
-  // bits and converted into a number of memref elements. Sizes are the ones in
-  // memory, as given by the data layout (e.g., 16 bits for a 12-bit integer)
+  // The GEP's index may count smaller units than the memref's elements: e.g.,
+  // "getelementptr i8, ptr %a, i64 %offset" accesses the i32 element
+  // %offset / 4. The index is thus converted into a number of memref elements.
+  // Sizes are the ones in memory, as given by the data layout (e.g., 16 bits
+  // for a 12-bit integer)
   const llvm::DataLayout &dl = gepInst->getModule()->getDataLayout();
-  // Size of the GEP's innermost element type, which its indices count (e.g.,
-  // i8 for "getelementptr [4 x i8]", i32 for "getelementptr [4 x [8 x i32]]")
-  int64_t baseElemBitWidth =
-      dl.getTypeAllocSizeInBits(baseElementType).getFixedValue();
+  // Number of bits the address advances when the index increases by one
+  int64_t offsetBitsPerIndex =
+      dl.getTypeAllocSizeInBits(gepInst->getSourceElementType())
+          .getFixedValue();
   // Size of the elements of the memref that the GEP accesses (e.g., i32 for
   // "int a[N]"), which the translated index counts
-  int64_t memrefElemBitWidth = baseElemBitWidth;
+  int64_t memrefElemBitWidth = offsetBitsPerIndex;
   if (auto it = llvmPtrToMemRefMap.find(baseAddressLLVM);
       it != llvmPtrToMemRefMap.end()) {
     mlir::Type elemType =
@@ -687,98 +661,40 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
         dl.getTypeAllocSizeInBits(llvmElemType).getFixedValue();
   }
 
-  // [START calculate the flattened array indices]
-  for (size_t i = 0; i < gepIndices.size(); ++i) {
-    mlir::Value mlirIndexValue = valueMap[gepIndices[i]];
-
-    // Number of bits the address advances when this index increases by one
-    int64_t offsetBitsPerIndex = baseElemBitWidth;
-    for (size_t j = i; j < multipliers.size(); j++)
-      offsetBitsPerIndex *= multipliers[j];
-
-    if (offsetBitsPerIndex % memrefElemBitWidth != 0) {
-      // The index advances by a fraction of a memref element (e.g., by bytes in
-      // "getelementptr i8, ptr %a, i64 %offset"). The access is aligned to an
-      // element, so the offset is a whole number of elements
-      assert(memrefElemBitWidth % offsetBitsPerIndex == 0 &&
-             "GEP index offset is not a fraction of the element size");
-      int64_t ratio = memrefElemBitWidth / offsetBitsPerIndex;
-      assert(llvm::isPowerOf2_64(ratio) &&
-             "element size is not a power-of-two multiple of the index offset");
-      if (auto *constVal = dyn_cast<Constant>(gepIndices[i])) {
-        int64_t constInt = *constVal->getUniqueInteger().getRawData();
-        assert(constInt % ratio == 0 && "Incorrect alignment!");
-        multipliedIndices.push_back(builder.create<arith::ConstantOp>(
-            UnknownLoc::get(ctx), builder.getIndexAttr(constInt / ratio)));
-        continue;
-      }
+  mlir::Value index;
+  if (offsetBitsPerIndex % memrefElemBitWidth != 0) {
+    // The index advances by a fraction of a memref element (e.g., by bytes in
+    // "getelementptr i8, ptr %a, i64 %offset"). The access is aligned to an
+    // element, so the offset is a whole number of elements
+    assert(memrefElemBitWidth % offsetBitsPerIndex == 0 &&
+           "GEP index offset is not a fraction of the element size");
+    int64_t ratio = memrefElemBitWidth / offsetBitsPerIndex;
+    assert(llvm::isPowerOf2_64(ratio) &&
+           "element size is not a power-of-two multiple of the index offset");
+    if (auto *constVal = dyn_cast<Constant>(gepIndex)) {
+      int64_t constInt = *constVal->getUniqueInteger().getRawData();
+      assert(constInt % ratio == 0 && "Incorrect alignment!");
+      index = builder.create<arith::ConstantOp>(
+          UnknownLoc::get(ctx), builder.getIndexAttr(constInt / ratio));
+    } else {
       auto shiftValue = builder.create<arith::ConstantOp>(
           UnknownLoc::get(ctx), builder.getIntegerAttr(mlirIndexValue.getType(),
                                                        llvm::Log2_64(ratio)));
-      multipliedIndices.push_back(builder.create<arith::ShRUIOp>(
-          UnknownLoc::get(ctx), mlirIndexValue, shiftValue));
-      continue;
+      index = builder.create<arith::ShRUIOp>(UnknownLoc::get(ctx),
+                                             mlirIndexValue, shiftValue);
     }
-
-    // Number of memref elements the address advances when this index
-    // increases by one
-    int64_t coeff = offsetBitsPerIndex / memrefElemBitWidth;
-    if (coeff == 1) {
-      multipliedIndices.push_back(mlirIndexValue);
-    } else if (llvm::isPowerOf2_64(coeff)) {
-      // Special case: the array dimension is a power of two.
-      // Here we can apply the optimization: multiply by power of 2 is the same
-      // as shifting
-      auto shiftValue = builder.create<arith::ConstantOp>(
-          UnknownLoc::get(ctx),
-          builder.getIntegerAttr(builder.getI64Type(), llvm::Log2_64(coeff)));
-      auto idx = builder.create<arith::ShLIOp>(UnknownLoc::get(ctx),
-                                               mlirIndexValue, shiftValue);
-      multipliedIndices.push_back(idx);
-    } else {
-      // Regular case: calculate the (paritial) flattened index
-      auto multipliedValue = builder.create<arith::ConstantOp>(
-          UnknownLoc::get(ctx),
-          builder.getIntegerAttr(builder.getI64Type(), coeff));
-      auto idx = builder.create<arith::MulIOp>(UnknownLoc::get(ctx),
-                                               mlirIndexValue, multipliedValue);
-      multipliedIndices.push_back(idx);
-    }
-  }
-  // [END calculate the flattened array indices]
-
-  // If we do not start from a memref type, then it must be from a chain of
-  // GEPs. Here we accumulate our result onto that.
-  if (auto pointerOperand = valueMap[gepInst->getPointerOperand()];
-      pointerOperand && !isa<MemRefType>(pointerOperand.getType())) {
-    multipliedIndices.push_back(valueMap[gepInst->getPointerOperand()]);
+  } else {
+    // canonicalize-geps flattened the index into memref elements
+    assert(offsetBitsPerIndex == memrefElemBitWidth &&
+           "GEP index does not count the memref's elements");
+    index = mlirIndexValue;
   }
 
-  // [START accumulate the array index]
-  // We construct a balanced tree of additions to accumulate the final index.
-  // Build balanced tree
-  std::function<mlir::Value(ArrayRef<mlir::Value>)> buildAdderTree =
-      [&](ArrayRef<mlir::Value> vals) -> mlir::Value {
-    assert(!vals.empty());
-    if (vals.size() == 1)
-      return vals[0];
-    auto mid = vals.size() / 2;
-    auto lhs = buildAdderTree(vals.take_front(mid));
-    if (!isa<IndexType>(lhs.getType())) {
-      lhs = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
-                                               builder.getIndexType(), lhs);
-    }
-    auto rhs = buildAdderTree(vals.drop_front(mid));
-    if (!isa<IndexType>(rhs.getType())) {
-      rhs = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
-                                               builder.getIndexType(), rhs);
-    }
-    return builder.create<arith::AddIOp>(UnknownLoc::get(ctx), lhs, rhs);
-  };
-  mlir::Value accumulatedArrayIndex = buildAdderTree(multipliedIndices);
-  // [END accumulate the array index]
-
-  valueMap[gepInst] = accumulatedArrayIndex;
+  // The users of the GEP (e.g., loads, stores, selects) expect an index
+  if (!isa<IndexType>(index.getType()))
+    index = builder.create<arith::IndexCastOp>(UnknownLoc::get(ctx),
+                                               builder.getIndexType(), index);
+  valueMap[gepInst] = index;
 }
 
 void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
