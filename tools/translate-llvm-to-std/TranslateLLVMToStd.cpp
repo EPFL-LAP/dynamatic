@@ -51,7 +51,7 @@ static mlir::Type getMLIRType(llvm::Type *llvmType,
   if (llvmType->isX86_FP80Ty()) {
     llvm::errs() << "Warning: using x86_fp80 type in MLIR translation. This "
                     "type is not currently supported\n";
-    return mlir::FloatType::getF80(context);
+    return mlir::Float80Type::get(context);
   }
   if (llvmType->isPointerTy())
     return mlir::IndexType::get(context);
