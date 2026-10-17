@@ -280,8 +280,13 @@ void TranslateLLVMToStd::translateGlobalVars() {
     StringAttr visibilityAttr = StringAttr::get(ctx, Twine("private"));
     TypeAttr typeAttr = TypeAttr::get(memrefType);
     UnitAttr isConstantAttr = UnitAttr::get(ctx);
+    // Alignment of the global in bytes: its address is a multiple of it. A
+    // global without an alignment gets 1, i.e., it can start at any address.
+    // The value does not affect the circuit: the lowering to Handshake erases
+    // the globals and only keeps their initial values, as the contents of the
+    // memories accessed by the circuit
     IntegerAttr alignmentAttr =
-        builder.getI64IntegerAttr(globalVar->getAlignment());
+        builder.getI64IntegerAttr(globalVar->getAlign().valueOrOne().value());
     DenseElementsAttr initialValueAttr;
 
     if (globalVar->hasInitializer()) {
