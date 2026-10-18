@@ -40,15 +40,17 @@ class MemoryInterfaceBuilder {
 public:
   /// Constructs the memory interface builder from the function in which to
   /// instantiate the interface(s), the memory region that the interface(s) must
-  /// reference, the memory start and control end signals, and a mapping between
-  /// basic block IDs within the function and their respective control value,
-  /// the latter of which which will be used to trigger the start of memory
-  /// access groups in the interface(s).
+  /// reference, the memory start and control end signals, and two mappings
+  /// between basic block IDs within the function and a control value. The
+  /// first mapping triggers the MC's store counts, the second triggers the
+  /// start of memory access groups in the LSQ. A lowering with one control
+  /// value per block passes the same mapping twice.
   MemoryInterfaceBuilder(handshake::FuncOp funcOp, Value memref, Value memStart,
                          Value ctrlEnd,
-                         const DenseMap<unsigned, Value> &ctrlVals)
+                         const DenseMap<unsigned, Value> &ctrlVals,
+                         const DenseMap<unsigned, Value> &lsqCtrlVals)
       : funcOp(funcOp), memref(memref), memStart(memStart), ctrlEnd(ctrlEnd),
-        ctrlVals(ctrlVals) {};
+        ctrlVals(ctrlVals), lsqCtrlVals(lsqCtrlVals) {};
 
   /// Adds an access port to an MC. The operation must be a load or store
   /// access to an MC. The operation must be tagged with the basic block it
@@ -116,8 +118,11 @@ private:
   /// Control end signal, indicating that no more request will come.
   Value ctrlEnd;
   /// Mapping between basic block ID and their respective entry control signal,
-  /// for connecting the interface(s)'s control ports.
+  /// for connecting the MC's control ports.
   DenseMap<unsigned, Value> ctrlVals;
+  /// Mapping between basic block ID and their respective entry control signal,
+  /// for connecting the LSQ's group control ports.
+  DenseMap<unsigned, Value> lsqCtrlVals;
 
   /// Memory access ports for the MC.
   InterfacePorts mcPorts;
@@ -140,6 +145,11 @@ private:
   /// `ctrlVals` map. Produces an error on stderr and returns nullptr if no
   /// value exists for the block.
   Value getCtrl(unsigned block);
+
+  /// Returns the LSQ group control signal for a specific block, as contained
+  /// in the `lsqCtrlVals` map. Produces an error on stderr and returns nullptr
+  /// if no value exists for the block.
+  Value getLSQCtrl(unsigned block);
 
   using FConnectLoad = std::function<void(handshake::LoadOp, Value)>;
 

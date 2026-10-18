@@ -180,7 +180,7 @@ static std::optional<Value> oneToOneVoidMaterialization(OpBuilder &builder,
   return inputs[0];
 }
 
-static Type channelifyType(Type type) {
+Type dynamatic::channelifyType(Type type) {
   return llvm::TypeSwitch<Type, Type>(type)
       .Case<IndexType, IntegerType, FloatType>(
           [](auto type) { return handshake::ChannelType::get(type); })
@@ -456,8 +456,8 @@ FailureOr<handshake::FuncOp> LowerFuncToHandshake::lowerSignature(
 
 /// Returns the value from the predecessor block that should be used as the data
 /// operand for the merge that will eventually replace the block argument.
-static Value getMergeOperand(BlockArgument blockArg, Block *predBlock,
-                             bool firstTimePred) {
+Value dynamatic::getMergeOperand(BlockArgument blockArg, Block *predBlock,
+                                 bool firstTimePred) {
   // The block the merge operation belongs to
   Block *block = blockArg.getOwner();
 
@@ -490,10 +490,10 @@ static Value getMergeOperand(BlockArgument blockArg, Block *predBlock,
 /// is added twice to the list and the branhc's "false destinatiob" is
 /// associated with a false boolean value; in all other situatuions predecessor
 /// blocks are associated a true boolean value.
-static SmallVector<std::pair<Block *, bool>>
-getRealBlockPredecessors(Block *targetBlock) {
+SmallVector<std::pair<Block *, bool>>
+dynamatic::getRealBlockPredecessors(Block *targetBlock) {
   SmallVector<std::pair<Block *, bool>> predecessors;
-  for (Block &block : cast<handshake::FuncOp>(targetBlock->getParentOp())) {
+  for (Block &block : *targetBlock->getParent()) {
     Operation *termOp = block.getTerminator();
     if (auto condBrOp = dyn_cast<cf::CondBranchOp>(termOp)) {
       if (condBrOp.getTrueDest() == targetBlock)
@@ -992,7 +992,7 @@ LogicalResult LowerFuncToHandshake::verifyAndCreateMemInterfaces(
     SmallPtrSet<Block *, 4> controlBlocks;
 
     MemoryInterfaceBuilder memBuilder(funcOp, memref, memAccesses.memStart,
-                                      ctrlEnd, ctrlVals);
+                                      ctrlEnd, ctrlVals, ctrlVals);
 
     // Add MC ports to the interface builder
     for (auto &[_, mcBlockOps] : memAccesses.mcPorts)

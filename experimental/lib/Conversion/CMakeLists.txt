@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticExperimentalConversion
   FtdCfToHandshake.cpp
+  OperandRoutingCfToHandshake.cpp
 
   DEPENDS
   DynamaticConversionPassIncGen
@@ -7,6 +8,7 @@ add_dynamatic_library(DynamaticExperimentalConversion
   LINK_LIBS PUBLIC
   DynamaticSupport
   DynamaticHandshake
+  DynamaticBufferPlacement
   MLIRIR
   MLIRPass
   MLIRArithDialect

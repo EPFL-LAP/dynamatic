@@ -271,6 +271,25 @@ public:
                   ConversionPatternRewriter &rewriter) const override;
 };
 
+/// Returns the handshake-level type for a cf-level type: integers and floats
+/// become channels, memrefs of index become memrefs of i32, handshake types
+/// are returned unchanged and anything else gives null.
+Type channelifyType(Type type);
+
+/// Returns the predecessor edges of the block in the order the block's merge
+/// operands are created in. A conditional branch whose two destinations are
+/// both the block contributes two edges: first the true destination, paired
+/// with true, then the false destination, paired with false. Every other edge
+/// is paired with true.
+SmallVector<std::pair<Block *, bool>> getRealBlockPredecessors(Block *block);
+
+/// Returns the value the predecessor block's terminator passes into the block
+/// argument. `firstTimePred` distinguishes the two edges of a conditional
+/// branch whose destinations are both the argument's block, as paired by
+/// `getRealBlockPredecessors`.
+Value getMergeOperand(BlockArgument blockArg, Block *predBlock,
+                      bool firstTimePred);
+
 } // namespace dynamatic
 
 #endif // DYNAMATIC_CONVERSION_CF_TO_HANDSHAKE_H

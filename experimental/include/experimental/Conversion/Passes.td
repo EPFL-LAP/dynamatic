@@ -36,5 +36,33 @@ def FtdCfToHandshake : Pass<"ftd-lower-cf-to-handshake", "mlir::ModuleOp"> {
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
+//===----------------------------------------------------------------------===//
+// OperandRoutingCfToHandshake
+//===----------------------------------------------------------------------===//
+
+def OperandRoutingCfToHandshake
+    : Pass<"operand-routing-lower-cf-to-handshake", "mlir::ModuleOp"> {
+  let summary = "Lowers func and cf dialects to handshake, routing every "
+                "consumer operand through its own control network";
+  let description = [{
+    Same lowering as `CfToHandshake`, except that every operand of a consumer
+    that reads a block argument gets its own copy of the control network and
+    its own branches and muxes from the producers to the consumer. Used
+    through the "--operand-routing" flag of the compile command.
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+  let options = [
+    Option<"maxCfgs", "max-cfgs", "unsigned", "0",
+           "Maximum number of distinct folded CFGs, and so of control "
+           "networks, the consumers are clustered into. 0 means no limit: "
+           "only consumers with identical folded CFGs share one.">,
+    Option<"mergeThreshold", "merge-threshold", "unsigned", "0",
+           "Consumers share a folded CFG when every one of them has at most "
+           "this many edges in the shared CFG that its own folded CFG does "
+           "not have. Applied before max-cfgs. 0 means only identical "
+           "folded CFGs are shared.">
+  ];
+}
+
 #endif // EXPERIMENTAL_CONVERSION_PASSES_TD
 

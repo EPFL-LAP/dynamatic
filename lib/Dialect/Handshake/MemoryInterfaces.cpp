@@ -194,7 +194,7 @@ MemoryInterfaceBuilder::determineInterfaceInputs(InterfaceInputs &inputs,
     std::optional<unsigned> block = getLogicBB(firstOpInGroup);
     if (!block)
       return firstOpInGroup->emitError() << "LSQ port must belong to a BB.";
-    Value groupCtrl = getCtrl(*block);
+    Value groupCtrl = getLSQCtrl(*block);
     if (!groupCtrl)
       return failure();
     inputs.lsqInputs.push_back(groupCtrl);
@@ -282,6 +282,16 @@ Value MemoryInterfaceBuilder::getCtrl(unsigned block) {
   auto groupCtrl = ctrlVals.find(block);
   if (groupCtrl == ctrlVals.end()) {
     llvm::errs() << "Cannot determine control signal for BB " << block << "\n";
+    return nullptr;
+  }
+  return groupCtrl->second;
+}
+
+Value MemoryInterfaceBuilder::getLSQCtrl(unsigned block) {
+  auto groupCtrl = lsqCtrlVals.find(block);
+  if (groupCtrl == lsqCtrlVals.end()) {
+    llvm::errs() << "Cannot determine LSQ group control signal for BB " << block
+                 << "\n";
     return nullptr;
   }
   return groupCtrl->second;
