@@ -892,7 +892,7 @@ LogicalResult experimental::ftd::addGsaGates(
         oneInputGammaList.insert(mux);
 
       if (gate->isRoot)
-        rewriter.replaceAllUsesWith(gate->result, mux.getResult());
+        gate->result.replaceAllUsesWith(mux.getResult());
 
       gsaList.insert({gate->index, mux});
 

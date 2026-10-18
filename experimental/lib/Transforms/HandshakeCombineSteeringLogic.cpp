@@ -640,9 +640,12 @@ struct SimplifyKnownConditionBranch
         if (auto bbAttr = br->getAttr("handshake.bb"))
           constOp->setAttr("handshake.bb", bbAttr);
 
-        // Replace condition operand of downstream branch
-        br->setOperand(0, constOp.getResult());
-        refreshBranchAttrsFromCondition(br, br);
+        // Replace the downstream branch with one conditioned on the constant
+        auto newBr = rewriter.create<handshake::ConditionalBranchOp>(
+            br.getLoc(), constOp.getResult(), br.getDataOperand());
+        newBr->setDiscardableAttrs(br->getDiscardableAttrDictionary());
+        refreshBranchAttrsFromCondition(newBr, br);
+        rewriter.replaceOp(br, newBr->getResults());
 
         changed = true;
       }
