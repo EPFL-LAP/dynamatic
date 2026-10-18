@@ -39,7 +39,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Plugins/PassPlugin.h"
 #include <cstdlib>
 #include <numeric>
 
@@ -47,7 +47,8 @@ using namespace llvm;
 
 namespace {
 
-struct CanonicalizeGEPsPass : public PassInfoMixin<CanonicalizeGEPsPass> {
+struct CanonicalizeGEPsPass
+    : public OptionalPassInfoMixin<CanonicalizeGEPsPass> {
   PreservedAnalyses run(Function &f, FunctionAnalysisManager &);
 };
 
