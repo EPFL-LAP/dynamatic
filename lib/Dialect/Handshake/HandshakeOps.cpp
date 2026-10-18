@@ -624,9 +624,8 @@ LogicalResult ConstantOp::inferReturnTypes(
     DictionaryAttr attributes, mlir::OpaqueProperties properties,
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-  OperationName opName = OperationName(getOperationName(), context);
-  StringAttr attrName = getValueAttrName(opName);
-  auto attr = cast<TypedAttr>(attributes.get(attrName));
+  ConstantOp::Adaptor adaptor(operands, attributes, properties, regions);
+  auto attr = cast<TypedAttr>(adaptor.getValue());
 
   auto controlType = cast<ControlType>(operands[0].getType());
 
