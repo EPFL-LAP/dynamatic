@@ -422,8 +422,8 @@ struct PromoteSignedCmp : public OpRewritePattern<arith::CmpIOp> {
     // Promote the signed comparison to an equivalent unsigned one if possible
     if (!isPromotionPossible(cmpOp))
       return failure();
-    rewriter.updateRootInPlace(cmpOp,
-                               [&]() { cmpOp.setPredicate(newPredicate); });
+    rewriter.modifyOpInPlace(cmpOp,
+                             [&]() { cmpOp.setPredicate(newPredicate); });
     return success();
   }
 
@@ -458,8 +458,9 @@ struct ArithReduceStrengthPass
     MLIRContext *ctx = &getContext();
 
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Disabled);
 
     RewritePatternSet patterns{ctx};
     patterns.add<ReplaceMulNegOneUsers
@@ -473,8 +474,8 @@ struct ArithReduceStrengthPass
     /// (area, performance, mixed)
     patterns.add<MulReduceStrength>(maxAdderDepthMul, ctx);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(patterns), config)))
       signalPassFailure();
 
     // Make sure all operation names are still unique and name operations that
