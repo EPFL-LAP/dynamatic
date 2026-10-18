@@ -66,7 +66,8 @@ AbstractWorker::VerificationResult BitwidthOptimizationsGenerator::verify(
   switch (options.kind) {
   case OracleKind::Functional:
     return performDifferentialTesting(sourceFile,
-                                      options.dynamaticExecutablePath, 1000000);
+                                      options.dynamaticExecutablePath,
+                                      DynamaticOptions{}.withTimeout(1000000));
   case OracleKind::NonFunctional:
     return performNonFunctionalTesting(
         sourceFile, options.dynamaticExecutablePath,
