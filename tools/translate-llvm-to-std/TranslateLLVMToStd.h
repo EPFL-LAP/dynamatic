@@ -109,7 +109,8 @@ private:
   void translateCastInst(llvm::CastInst *inst);
   void translateICmpInst(llvm::ICmpInst *inst);
   void translateFCmpInst(llvm::FCmpInst *inst);
-  void translateBranchInst(llvm::BranchInst *inst);
+  void translateBranchInst(llvm::UncondBrInst *inst);
+  void translateBranchInst(llvm::CondBrInst *inst);
   void translateGEPInst(llvm::GetElementPtrInst *gepInst);
   void translateLoadInst(llvm::LoadInst *loadInst);
   void translateStoreInst(llvm::StoreInst *storeInst);

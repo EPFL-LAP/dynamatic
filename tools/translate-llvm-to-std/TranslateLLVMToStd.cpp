@@ -336,7 +336,9 @@ void TranslateLLVMToStd::translateInstruction(llvm::Instruction *inst) {
         selInst
         // clang-format on
     );
-  } else if (auto *branchInst = dyn_cast<llvm::BranchInst>(inst)) {
+  } else if (auto *branchInst = dyn_cast<llvm::UncondBrInst>(inst)) {
+    translateBranchInst(branchInst);
+  } else if (auto *branchInst = dyn_cast<llvm::CondBrInst>(inst)) {
     translateBranchInst(branchInst);
   } else if (auto *allocaOp = dyn_cast<llvm::AllocaInst>(inst)) {
     translateAllocaInst(allocaOp);
@@ -459,12 +461,12 @@ void TranslateLLVMToStd::createConstants(llvm::Function *llvmFunc) {
           const APFloat &floatVal = floatConst->getValue();
           if (&floatVal.getSemantics() == &llvm::APFloat::IEEEsingle()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF32Type());
+                loc, builder.getF32Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           } else if (&floatVal.getSemantics() == &llvm::APFloat::IEEEdouble()) {
             auto constOp = builder.create<arith::ConstantFloatOp>(
-                loc, floatVal, builder.getF64Type());
+                loc, builder.getF64Type(), floatVal);
             valueMap[val] = constOp->getResult(0);
             loc = constOp->getLoc();
           }
@@ -702,46 +704,33 @@ void TranslateLLVMToStd::translateGEPInst(llvm::GetElementPtrInst *gepInst) {
   valueMap[gepInst] = index;
 }
 
-void TranslateLLVMToStd::translateBranchInst(llvm::BranchInst *inst) {
+void TranslateLLVMToStd::translateBranchInst(llvm::UncondBrInst *inst) {
   BasicBlock *currLLVMBB = inst->getParent();
-  Location loc = UnknownLoc::get(ctx);
-  if (inst->isUnconditional()) {
-    BasicBlock *nextLLVMBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(0));
-    assert(nextLLVMBB &&
-           "The unconditional branch doesn't have a BB as operand!");
+  BasicBlock *nextLLVMBB = inst->getSuccessor();
+  auto branchOprds = getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB);
+  builder.create<cf::BranchOp>(UnknownLoc::get(ctx), blockMap[nextLLVMBB],
+                               branchOprds);
+}
 
-    auto branchOprds = getBranchOperandsForCFGEdge(currLLVMBB, nextLLVMBB);
-
-    builder.create<cf::BranchOp>(
-        // clang-format off
-        loc,
-        blockMap[nextLLVMBB],
-        branchOprds
-        // clang-format on
-    );
-  } else {
-    // NOTE: operands of the branch instruction [Cond, FalseDest,] TrueDest
-    // (from the C++ API).
-    BasicBlock *falseDestBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(1));
-    assert(falseDestBB);
-    BasicBlock *trueDestBB = dyn_cast_or_null<BasicBlock>(inst->getOperand(2));
-    assert(trueDestBB);
-    SmallVector<mlir::Value> falseOperands =
-        getBranchOperandsForCFGEdge(currLLVMBB, falseDestBB);
-    SmallVector<mlir::Value> trueOperands =
-        getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
-    mlir::Value condition = valueMap[inst->getCondition()];
-    builder.create<cf::CondBranchOp>(
-        // clang-format off
-        loc,
-        condition,
-        blockMap[trueDestBB],
-        trueOperands,
-        blockMap[falseDestBB],
-        falseOperands
-        // clang-format on
-    );
-  }
+void TranslateLLVMToStd::translateBranchInst(llvm::CondBrInst *inst) {
+  BasicBlock *currLLVMBB = inst->getParent();
+  BasicBlock *trueDestBB = inst->getSuccessor(0);
+  BasicBlock *falseDestBB = inst->getSuccessor(1);
+  SmallVector<mlir::Value> falseOperands =
+      getBranchOperandsForCFGEdge(currLLVMBB, falseDestBB);
+  SmallVector<mlir::Value> trueOperands =
+      getBranchOperandsForCFGEdge(currLLVMBB, trueDestBB);
+  mlir::Value condition = valueMap[inst->getCondition()];
+  builder.create<cf::CondBranchOp>(
+      // clang-format off
+      UnknownLoc::get(ctx),
+      condition,
+      blockMap[trueDestBB],
+      trueOperands,
+      blockMap[falseDestBB],
+      falseOperands
+      // clang-format on
+  );
 }
 
 void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
@@ -764,10 +753,20 @@ void TranslateLLVMToStd::translateLoadInst(llvm::LoadInst *loadInst) {
                                               builder.getIndexAttr(0));
   }
 
+  // An integer may be loaded with a wider type than the memory's elements,
+  // which is how clang represents a _BitInt(N) in memory (e.g., i8 for
+  // _BitInt(5)): load the element and extend it to the loaded type
+  mlir::Type elemType = cast<MemRefType>(memref.getType()).getElementType();
   auto newOp =
-      builder.create<memref::LoadOp>(UnknownLoc::get(ctx), resType, memref,
+      builder.create<memref::LoadOp>(UnknownLoc::get(ctx), elemType, memref,
                                      /*indices = */ index);
-  valueMap[loadInst] = newOp.getResult();
+  mlir::Value result = newOp.getResult();
+  if (elemType != resType && isa<mlir::IntegerType>(elemType) &&
+      isa<mlir::IntegerType>(resType) &&
+      elemType.getIntOrFloatBitWidth() < resType.getIntOrFloatBitWidth())
+    result =
+        builder.create<arith::ExtUIOp>(UnknownLoc::get(ctx), resType, result);
+  valueMap[loadInst] = result;
   translateMemDepAndNameAttrs(loadInst, newOp, *ctx, builder);
 }
 
@@ -791,7 +790,16 @@ void TranslateLLVMToStd::translateStoreInst(llvm::StoreInst *storeInst) {
                                               builder.getIndexAttr(0));
   }
 
+  // An integer may be stored with a wider type than the memory's elements (see
+  // translateLoadInst): truncate it to the element type
   mlir::Value storeValue = valueMap[storeInst->getValueOperand()];
+  mlir::Type elemType = cast<MemRefType>(memref.getType()).getElementType();
+  if (storeValue.getType() != elemType && isa<mlir::IntegerType>(elemType) &&
+      isa<mlir::IntegerType>(storeValue.getType()) &&
+      elemType.getIntOrFloatBitWidth() <
+          storeValue.getType().getIntOrFloatBitWidth())
+    storeValue = builder.create<arith::TruncIOp>(UnknownLoc::get(ctx), elemType,
+                                                 storeValue);
   auto newOp =
       builder.create<memref::StoreOp>(UnknownLoc::get(ctx), storeValue, memref,
                                       /*indices = */ index);
