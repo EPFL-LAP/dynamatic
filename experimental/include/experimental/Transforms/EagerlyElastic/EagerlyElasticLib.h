@@ -77,3 +77,20 @@ void applyRewriteH(handshake::MuxOp dataMux,
                    handshake::InitOp initOp,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer);
+
+DictionaryAttr findMatchingRegion(handshake::ConditionalBranchOp branchOp,
+                                  Operation *user, ArrayAttr infoArray);
+
+bool collectAndValidateFrontier(
+    handshake::ConditionalBranchOp branchOp, Operation *user,
+    DenseSet<handshake::ConditionalBranchOp> &branchesToDelete);
+
+void insertExitSuppressors(
+    ArrayAttr entryOpsArray, Value condition, OpBuilder &builder,
+    NameAnalysis &namer,
+    const DenseMap<int64_t, Value> &blockEntryControlTokens,
+    DenseSet<handshake::ConditionalBranchOp> &frontier);
+
+void bypassAndEraseOldBranches(
+    ArrayRef<handshake::ConditionalBranchOp> sortedBranches, Operation *user,
+    DenseSet<handshake::ConditionalBranchOp> &frontier);

@@ -440,140 +440,23 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
 
   for (auto branchOp : initialFrontier) {
     for (auto *user : branchOp.getFalseResult().getUsers()) {
-      DictionaryAttr matchedRegionDict = nullptr;
-      auto mux = dyn_cast<handshake::MuxOp>(user);
-      auto inputMarker = dyn_cast<handshake::RegionInputOp>(user);
-      int targetHeaderBB = 0;
-      int muxBB;
 
-      // ------- Check whether we are at the start of an eligible region -------
-      if (mux) {
-        // check that we wouldn't apply another rewrite
-        if (mux.getDataOperands()[1] == branchOp.getFalseResult())
-          continue;
-
-        // check that it's an actual loop mux
-        if (!isa<handshake::InitOp>(mux.getSelectOperand().getDefiningOp()))
-          continue;
-
-        // check that this branch is a header and find matching entry
-        muxBB = mux->getAttrOfType<IntegerAttr>(HANDSHAKEBB).getInt();
-        for (Attribute attr : infoArray) {
-          auto dict = dyn_cast<DictionaryAttr>(attr);
-          auto successorBBsArray = dict.getAs<ArrayAttr>(SUCCESSOR_BBS);
-          if (!successorBBsArray || successorBBsArray.size() != 1)
-            continue;
-
-          // Check only the first successor entry in the array
-          int firstSuccBB = cast<IntegerAttr>(successorBBsArray[0]).getInt();
-          if (muxBB && firstSuccBB == muxBB) {
-            matchedRegionDict = dict;
-            llvm::errs() << "found mux in bb: " << muxBB << '\n';
-            break;
-          }
-        }
-      } else if (inputMarker) {
-        // verify the marker has a handshake.bb attribute
-        auto markerBBAttr =
-            inputMarker->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
-        if (!markerBBAttr)
-          continue;
-
-        // find matching subregion entry
-        for (Attribute attr : infoArray) {
-          auto dict = dyn_cast<DictionaryAttr>(attr);
-          if (!dict)
-            continue;
-          auto entryBBAttr = dict.getAs<IntegerAttr>(ENTRY_BB);
-          if (!entryBBAttr)
-            continue;
-          if (entryBBAttr.getValue() == markerBBAttr.getValue()) {
-            matchedRegionDict = dict;
-            targetHeaderBB = markerBBAttr.getInt();
-            llvm::errs() << "found inputmarker\n";
-            break;
-          }
-        }
-      }
-
+      // verify that we are at the start of an eligible region
+      DictionaryAttr matchedRegionDict =
+          findMatchingRegion(branchOp, user, infoArray);
       if (!matchedRegionDict)
         continue;
-      llvm::errs() << "found matching region dict!\n";
-      llvm::errs() << "branchOp: ";
-      branchOp.dump();
+      llvm::errs() << "Found matching region dict!\n";
 
-      // ------- Check that the frontier doesn't get broken -------
-      bool frontierValid = true;
-      llvm::DenseSet<handshake::ConditionalBranchOp> branchesToDelete = {
-          branchOp};
-
-      // collect all incomingValues that also go into the next block
-      SmallVector<Value> incomingValues;
-      Block *currentBlock = mux ? mux->getBlock() : inputMarker->getBlock();
-
-      if (mux) {
-        for (Operation &op : *currentBlock) {
-          if (&op == mux || !isa<handshake::MuxOp>(&op))
-            continue;
-
-          // only look at muxes / cmerges in this basic block
-          auto bbAttr = op.getAttrOfType<IntegerAttr>(HANDSHAKEBB);
-          if (!bbAttr || bbAttr.getInt() != muxBB) {
-            continue;
-          }
-
-          // check input for this Mux (not the loop backedge, that would be 1)
-          if (auto muxOp = dyn_cast<handshake::MuxOp>(&op))
-            incomingValues.push_back(muxOp.getDataOperands()[0]);
-        }
-      } else {
-        for (auto markerOp : currentBlock->getOps<handshake::RegionInputOp>()) {
-          // only look at markers in this basic block
-          auto bbAttr = markerOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
-          if (!bbAttr || bbAttr.getInt() != targetHeaderBB)
-            continue;
-
-          incomingValues.push_back(markerOp->getOperand(0));
-        }
-      }
-
-      // check that all incomingValues have a suppressor in front
-      // of them with the same condition as branchOp (or are sourced/valid).
-      for (Value operand : incomingValues) {
-        Operation *defOp = operand.getDefiningOp();
-
-        // is it a sibling conditional branch with a matching condition
-        if (auto siblingBranch =
-                dyn_cast<handshake::ConditionalBranchOp>(defOp)) {
-          // check whether condition matches
-          if (!checkConditionsMatch(branchOp.getConditionOperand(),
-                                    siblingBranch.getConditionOperand(),
-                                    true)) {
-            llvm::errs() << "conditions do not match...\n";
-            siblingBranch.dump();
-            frontierValid = false;
-            break;
-          }
-          branchesToDelete.insert(siblingBranch);
-        } else if (!isSourced(operand)) {
-          llvm::errs() << "not sourced\n";
-          if (defOp)
-            defOp->dump();
-          frontierValid = false;
-          break;
-        }
-      }
-
-      if (!frontierValid) {
+      // verify that the frontier doesn't get broken
+      DenseSet<handshake::ConditionalBranchOp> branchesToDelete = {branchOp};
+      if (!collectAndValidateFrontier(branchOp, user, branchesToDelete)) {
         llvm::errs() << "frontier invalid!\n";
         continue;
       }
+      llvm::errs() << branchesToDelete.size() << " branches to delete\n";
 
-      llvm::errs() << branchesToDelete.size() << " branches to delete:\n";
-      for (auto branch : branchesToDelete) {
-        branch.dump();
-      }
-
+      // sort the frontier branches by name to get determinism
       SmallVector<handshake::ConditionalBranchOp> sortedBranches(
           branchesToDelete.begin(), branchesToDelete.end());
       llvm::sort(sortedBranches, [](handshake::ConditionalBranchOp a,
@@ -586,96 +469,29 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         return nameA < nameB;
       });
 
-      // ------- Start Actual Moving Past! --------
+      // move the suppressors past the region to its exit operations
       auto stores = matchedRegionDict.getAs<BoolAttr>(STORES);
       auto entryOpsArray = matchedRegionDict.getAs<ArrayAttr>(ENTRY_OPS);
-      auto entryBB = matchedRegionDict.getAs<IntegerAttr>(ENTRY_BB);
+      auto entryBB = matchedRegionDict.getAs<IntegerAttr>(ENTRY_BB).getInt();
       Value condition = sortedBranches[0].getConditionOperand();
-      llvm::errs() << "start moving past subblocks after entryBB"
-                   << entryBB.getInt() << "\n";
+      llvm::errs() << "start moving past blocks after bb" << entryBB << "\n";
 
-      // --- place a suppressor in front of all identified entry ops ---
-      for (Attribute attr : entryOpsArray) {
-        auto entryDict = cast<DictionaryAttr>(attr);
-        StringRef opName = entryDict.getAs<StringAttr>("op").getValue();
-        int64_t operandIdx =
-            entryDict.getAs<IntegerAttr>("operand_idx").getInt();
+      OpBuilder builder(branchOp);
+      insertExitSuppressors(entryOpsArray, condition, builder, namer,
+                            blockEntryControlTokens, frontier);
 
-        Value incomingData;
-        Attribute bbAttr;
-        OpBuilder builder(branchOp);
-
-        if (opName == "fake_control") {
-          llvm::errs() << "exitBB is: " << operandIdx << '\n';
-          incomingData = blockEntryControlTokens.lookup(operandIdx);
-          if (!incomingData)
-            continue;
-          bbAttr = builder.getUI32IntegerAttr(operandIdx);
-          builder.setInsertionPointAfterValue(incomingData);
-        } else {
-
-          // Find the target operation by handshake.name
-          Operation *targetOp = namer.getOp(opName);
-          if (!targetOp)
-            continue;
-
-          if (isa<handshake::StoreOp>(targetOp)) {
-            // memref::StoreOp had: 0 = data, 1 = memref, 2 = address
-            // handshake::StoreOp has: 0 = address, 1 = data
-            operandIdx = (operandIdx == 0) ? 1 : 0;
-          }
-
-          OpOperand &targetOperand = targetOp->getOpOperand(operandIdx);
-          incomingData = targetOperand.get();
-
-          // If incomingData comes from a cond_br_predicate, step one operation
-          // above
-          if (auto predBr =
-                  incomingData
-                      .getDefiningOp<handshake::ConditionalBranchOp>()) {
-            if (auto defName =
-                    predBr->getAttrOfType<StringAttr>(HANDSHAKENAME)) {
-              if (defName.getValue().starts_with("cond_br_predicate")) {
-                incomingData = predBr.getDataOperand();
-              }
-            }
-          }
-
-          bbAttr = targetOp->getAttr(HANDSHAKEBB);
-          builder.setInsertionPoint(targetOp);
-        }
-
-        // Insert suppressor
-        auto newBranch = builder.create<handshake::ConditionalBranchOp>(
-            incomingData.getLoc(), condition, incomingData);
-        setHandshakeAttrs(bbAttr, namer, {newBranch});
-        llvm::errs() << "placed an entryOp after:\n";
-        incomingData.dump();
-
-        // Replace ALL downstream uses of incomingData (except the newBranch
-        // itself!) so that the later fork materialization pass places the fork
-        // after newBranch.
-        incomingData.replaceAllUsesExcept(newBranch.getFalseResult(),
-                                          newBranch);
-        frontier.insert(newBranch);
-      }
-
-      // --- rewire the condition for the suppressors in front of stores ---
+      // update store predicate conditions inside the region, if any
       if (stores && stores.getValue()) {
         // find the corresponding pseudo constant
-        std::string pseudoName =
-            "pseudo_cond" + std::to_string(entryBB.getInt());
+        std::string pseudoName = "pseudo_cond" + std::to_string(entryBB);
         auto pseudoConstant =
             dyn_cast_or_null<handshake::ConstantOp>(namer.getOp(pseudoName));
-        if (!pseudoConstant || pseudoConstant.getResult().use_empty()) {
-          llvm::errs() << "ABORT NO PSEUDOCONSTANT??\n";
+        if (!pseudoConstant || pseudoConstant.getResult().use_empty())
           continue;
-        }
 
         // create a new OrIOp directly after the pseudoconstant
         OpBuilder builder(pseudoConstant);
         builder.setInsertionPointAfter(pseudoConstant);
-
         Value currentVal = pseudoConstant.getResult();
 
         // create the OrIOp combining the constant with the condition
@@ -685,54 +501,11 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
 
         // rewire all existing uses of pseudoConstant to the OrIOp result
         currentVal.replaceAllUsesExcept(orOp.getResult(), orOp);
-      } else {
-        llvm::errs() << "no stores\n";
       }
 
-      // --- remove the suppressors that have just been bypassed ---
+      // bypass and remove the old suppressors at the region entry
+      bypassAndEraseOldBranches(sortedBranches, user, frontier);
 
-      // rewire the original muxes to bypass the old branchOps
-      for (auto branchToDelete : sortedBranches) {
-        Value falseResult = branchToDelete.getFalseResult();
-        Value dataOperand = branchToDelete.getDataOperand();
-
-        // iterate over every branchToDelete's falseResult uses
-        for (OpOperand &use :
-             llvm::make_early_inc_range(falseResult.getUses())) {
-          Operation *owner = use.getOwner();
-
-          // check if the consumer is a MuxOp or CMergeOp located inside
-          // the same bb as the original mux. Only necessary for mux blocks
-          if (isa<handshake::MuxOp>(owner)) { // removed cmergeop
-            auto targetBB =
-                owner->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
-            if (targetBB && muxBB && targetBB.getInt() == muxBB) {
-              llvm::errs() << "Bypassing suppressor directly into mux/cmerge\n";
-              use.set(dataOperand);
-              continue;
-            }
-          }
-
-          // check if the consumer is a RegionInputOp in the entryBB
-          if (auto inputMarker = dyn_cast<handshake::RegionInputOp>(owner)) {
-            auto markerBB =
-                inputMarker->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
-            if (markerBB && markerBB.getInt() == entryBB.getInt()) {
-              llvm::errs()
-                  << "Bypassing suppressor directly into RegionInputOp\n";
-              use.set(dataOperand);
-              continue;
-            }
-          }
-        }
-
-        // if the branchOp has no uses anymore, delete it
-        if (falseResult.use_empty()) {
-          llvm::errs() << "deleted branch\n";
-          frontier.erase(branchToDelete);
-          branchToDelete.erase();
-        }
-      }
       llvm::errs() << "finished movePastFunctionBlock\n";
       return;
     }
@@ -740,10 +513,10 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
 }
 
 /// Removes the isolated basic block control-token network (ControlMerges,
-/// control-carrying Branches, and their associated dead constants/inverters)
+/// control-carrying branches, and their associated dead constants/inverters)
 /// while leaving data paths, memory controllers, and sources intact.
 void EagerlyElasticAllPass::removeControlNetwork(handshake::FuncOp funcOp) {
-  // 1. Clean up constants triggered by control values.
+  // Clean up constants triggered by control values.
   for (auto cstOp :
        llvm::make_early_inc_range(funcOp.getOps<handshake::ConstantOp>())) {
     if (llvm::isa<handshake::ControlType>(cstOp.getOperand().getType())) {
@@ -756,7 +529,7 @@ void EagerlyElasticAllPass::removeControlNetwork(handshake::FuncOp funcOp) {
   // Track potential dead condition drivers (e.g., suppressor noti ops)
   llvm::SmallVector<Operation *, 16> candidateDeadDrivers;
 
-  // 2. Erase conditional branches whose data operand is a control token.
+  // Erase conditional branches whose data operand is a control token.
   for (auto condBr : llvm::make_early_inc_range(
            funcOp.getOps<handshake::ConditionalBranchOp>())) {
     if (llvm::isa<handshake::ControlType>(condBr.getDataOperand().getType())) {
@@ -767,7 +540,7 @@ void EagerlyElasticAllPass::removeControlNetwork(handshake::FuncOp funcOp) {
     }
   }
 
-  // 3. Erase unconditional control branches.
+  // Erase unconditional control branches.
   for (auto br :
        llvm::make_early_inc_range(funcOp.getOps<handshake::BranchOp>())) {
     if (llvm::isa<handshake::ControlType>(br.getOperand().getType())) {
@@ -776,19 +549,16 @@ void EagerlyElasticAllPass::removeControlNetwork(handshake::FuncOp funcOp) {
     }
   }
 
-  // 4. Erase all control merges.
-  // With step 1-3 finished, their operands and results have no remaining users.
+  // Erase all control merges, they should have no remaining users
   for (auto cmerge :
        llvm::make_early_inc_range(funcOp.getOps<handshake::ControlMergeOp>())) {
     // If anything still holds a reference, drop uses to prevent assertion
-    // failure
     cmerge.getResult().dropAllUses();
     cmerge.getIndex().dropAllUses();
     cmerge.erase();
   }
 
-  // 5. Clean up dangling predicate inverters (noti) whose only purpose was
-  // to feed the control branch conditions
+  // Clean up any dangling predicate inverters (e.g. noti)
   for (Operation *op : candidateDeadDrivers) {
     if (op && op->use_empty()) {
       op->erase();
@@ -799,7 +569,6 @@ void EagerlyElasticAllPass::removeControlNetwork(handshake::FuncOp funcOp) {
 DenseMap<int64_t, Value>
 EagerlyElasticAllPass::rewireControlNetwork(handshake::FuncOp funcOp,
                                             dynamatic::NameAnalysis &namer) {
-  llvm::errs() << "rewire control network\n";
 
   MLIRContext *ctx = funcOp.getContext();
   auto ctrlType = handshake::ControlType::get(ctx);
@@ -835,8 +604,7 @@ EagerlyElasticAllPass::rewireControlNetwork(handshake::FuncOp funcOp,
           worklist.push_back(muxOp.getResult());
         }
       } else if (auto condBr = dyn_cast<handshake::ConditionalBranchOp>(user)) {
-        // Only update if this token is the data operand (operand 1), not
-        // condition
+        // Only update if this token is the data operand (op. 1), not condition
         if (condBr.getDataOperand() == val &&
             condBr.getTrueResult().getType() != ctrlType) {
           condBr.getTrueResult().setType(ctrlType);
@@ -867,7 +635,6 @@ EagerlyElasticAllPass::rewireControlNetwork(handshake::FuncOp funcOp,
     blockEntryControlTokens[bbAttr.getValue().getZExtValue()] = inToken;
 
     // Check if this BlockControlOp feeds the final exit ConditionalBranchOp
-    // (the one whose falseResult is unused because there is no outer loop).
     for (Operation *user : ctrlOp.getResult().getUsers()) {
       if (auto condBr = dyn_cast<handshake::ConditionalBranchOp>(user)) {
         if (condBr.getDataOperand() == ctrlOp.getResult() &&
@@ -877,7 +644,8 @@ EagerlyElasticAllPass::rewireControlNetwork(handshake::FuncOp funcOp,
       }
     }
 
-    // Find all stores in that basic block
+    // Check for stores and connect to the constant from the memory controller
+    // to the inToken of the corresponding BlockControlOp (same bb)
     for (auto storeOp : funcOp.getOps<handshake::StoreOp>()) {
       if (storeOp->getAttr(HANDSHAKEBB) != bbAttr)
         continue;

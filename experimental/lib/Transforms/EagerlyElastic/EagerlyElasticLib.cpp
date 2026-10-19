@@ -541,3 +541,207 @@ void applyRewriteH(handshake::MuxOp dataMux,
 
   moveSuppressorPastOp(trueBranch, dataMux, frontier, namer);
 }
+
+/// Checks if `user` is the entry of a valid loop or conditional subregion by
+/// iterating over all the info. If valid, returns the matching region
+/// DictionaryAttr.
+DictionaryAttr findMatchingRegion(handshake::ConditionalBranchOp branchOp,
+                                  Operation *user, ArrayAttr infoArray) {
+
+  auto userBBAttr = user->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+  if (!userBBAttr)
+    return nullptr;
+  int userBB = userBBAttr.getInt();
+
+  // Case 1: Loop Header MuxOp
+  if (auto mux = dyn_cast<handshake::MuxOp>(user)) {
+    // check that we can't apply rewrite D and that it's a loop mux
+    if (mux.getDataOperands()[1] == branchOp.getFalseResult())
+      return nullptr;
+    if (!isa<handshake::InitOp>(mux.getSelectOperand().getDefiningOp()))
+      return nullptr;
+
+    for (Attribute attr : infoArray) {
+      auto dict = dyn_cast<DictionaryAttr>(attr);
+      if (!dict)
+        continue;
+      auto succBBs = dict.getAs<ArrayAttr>(SUCCESSOR_BBS);
+      if (!succBBs || succBBs.size() != 1)
+        continue;
+
+      // Check only the first successor entry in the array
+      int firstSuccBB = cast<IntegerAttr>(succBBs[0]).getInt();
+      if (firstSuccBB == userBB) {
+        llvm::errs() << "Found mux in bb: " << userBB << '\n';
+        return dict;
+      }
+    }
+    return nullptr;
+  }
+
+  // Case 2: Conditional region RegionInputOp marker
+  if (auto inputMarker = dyn_cast<handshake::RegionInputOp>(user)) {
+    for (Attribute attr : infoArray) {
+      auto dict = dyn_cast<DictionaryAttr>(attr);
+      if (!dict)
+        continue;
+      auto entryBBAttr = dict.getAs<IntegerAttr>(ENTRY_BB);
+      if (entryBBAttr && entryBBAttr.getInt() == userBB) {
+        llvm::errs() << "Found inputmarker\n";
+        return dict;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+/// Verifies that all sibling inputs to the region are also gated by a matching
+/// suppressor (or are valid sources), populating `branchesToDelete`.
+bool collectAndValidateFrontier(
+    handshake::ConditionalBranchOp branchOp, Operation *user,
+    DenseSet<handshake::ConditionalBranchOp> &branchesToDelete) {
+
+  Block *currentBlock = user->getBlock();
+  int userBB = user->getAttrOfType<IntegerAttr>(HANDSHAKEBB).getInt();
+
+  // collect all values that also go into the subregion
+  SmallVector<Value> incomingValues;
+
+  if (auto mux = dyn_cast<handshake::MuxOp>(user)) {
+    for (auto otherMux : currentBlock->getOps<handshake::MuxOp>()) {
+      // only look at muxes / cmerges in this basic block
+      auto bbAttr = otherMux->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+      if (otherMux != mux && bbAttr && bbAttr.getInt() == userBB)
+        incomingValues.push_back(otherMux.getDataOperands()[0]);
+    }
+  } else {
+    for (auto markerOp : currentBlock->getOps<handshake::RegionInputOp>()) {
+      // only look at markers in this basic block
+      auto bbAttr = markerOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+      if (bbAttr && bbAttr.getInt() == userBB)
+        incomingValues.push_back(markerOp->getOperand(0));
+    }
+  }
+
+  // check that all incomingValues have a suppressor in front
+  // of them with the same condition as branchOp (or are sourced/valid).
+  for (Value operand : incomingValues) {
+    // is it a sibling conditional branch with a matching condition
+    if (auto siblingBranch =
+            operand.getDefiningOp<handshake::ConditionalBranchOp>()) {
+      // check whether condition matches
+      if (!checkConditionsMatch(branchOp.getConditionOperand(),
+                                siblingBranch.getConditionOperand(), true)) {
+        llvm::errs() << "conditions do not match...\n";
+        siblingBranch.dump();
+        return false;
+      }
+      branchesToDelete.insert(siblingBranch);
+    } else if (!isSourced(operand)) {
+      llvm::errs() << "not sourced\n";
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/// Inserts new suppressors at the exit of the bypassed subregion.
+void insertExitSuppressors(
+    ArrayAttr entryOpsArray, Value condition, OpBuilder &builder,
+    NameAnalysis &namer,
+    const DenseMap<int64_t, Value> &blockEntryControlTokens,
+    DenseSet<handshake::ConditionalBranchOp> &frontier) {
+
+  for (Attribute attr : entryOpsArray) {
+    auto entryDict = cast<DictionaryAttr>(attr);
+    StringRef opName = entryDict.getAs<StringAttr>("op").getValue();
+    int64_t operandIdx = entryDict.getAs<IntegerAttr>("operand_idx").getInt();
+
+    Value incomingData;
+    Attribute bbAttr;
+
+    if (opName == "fake_control") {
+      incomingData = blockEntryControlTokens.lookup(operandIdx);
+      if (!incomingData)
+        continue;
+      bbAttr = builder.getUI32IntegerAttr(operandIdx);
+      builder.setInsertionPointAfterValue(incomingData);
+    } else {
+      // Find the target operation by handshake.name
+      Operation *targetOp = namer.getOp(opName);
+      if (!targetOp)
+        continue;
+
+      if (isa<handshake::StoreOp>(targetOp)) {
+        // memref::StoreOp had: 0 = data, 1 = memref, 2 = address
+        // handshake::StoreOp has: 0 = address, 1 = data
+        operandIdx = (operandIdx == 0) ? 1 : 0;
+      }
+
+      incomingData = targetOp->getOpOperand(operandIdx).get();
+      // Step past cond_br_predicate if present
+      if (auto predBr =
+              incomingData.getDefiningOp<handshake::ConditionalBranchOp>()) {
+        if (auto defName = predBr->getAttrOfType<StringAttr>(HANDSHAKENAME)) {
+          if (defName.getValue().starts_with("cond_br_predicate"))
+            incomingData = predBr.getDataOperand();
+        }
+      }
+
+      bbAttr = targetOp->getAttr(HANDSHAKEBB);
+      builder.setInsertionPoint(targetOp);
+    }
+
+    // insert suppressor
+    auto newBranch = builder.create<handshake::ConditionalBranchOp>(
+        incomingData.getLoc(), condition, incomingData);
+    setHandshakeAttrs(bbAttr, namer, {newBranch});
+    llvm::errs() << "placed an entryOp after:\n";
+    incomingData.dump();
+
+    // Replace all downstream uses of incomingData except the newBranch
+    incomingData.replaceAllUsesExcept(newBranch.getFalseResult(), newBranch);
+    frontier.insert(newBranch);
+  }
+}
+
+/// Bypasses and erases the old suppressors at the entry of the region.
+void bypassAndEraseOldBranches(
+    ArrayRef<handshake::ConditionalBranchOp> sortedBranches, Operation *user,
+    DenseSet<handshake::ConditionalBranchOp> &frontier) {
+
+  int userBB = user->getAttrOfType<IntegerAttr>(HANDSHAKEBB).getInt();
+
+  for (auto branchToDelete : sortedBranches) {
+    Value falseResult = branchToDelete.getFalseResult();
+    Value dataOperand = branchToDelete.getDataOperand();
+
+    // iterate over every branchToDelete's falseResult uses
+    for (OpOperand &use : llvm::make_early_inc_range(falseResult.getUses())) {
+      Operation *owner = use.getOwner();
+      auto ownerBB = owner->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+      if (!ownerBB)
+        continue;
+
+      // check if the owner is in the same bb as the original branch
+      if (ownerBB.getInt() != userBB)
+        continue;
+
+      // check if the consumer is a MuxOp located inside the same bb
+      if (isa<handshake::MuxOp, handshake::RegionInputOp>(owner)) {
+        // llvm::errs() << "Bypassing suppressor.\n";
+        use.set(dataOperand);
+        continue;
+      }
+    }
+
+    // if the branchOp has no uses anymore, delete it
+    if (falseResult.use_empty()) {
+      // llvm::errs() << "deleted branch\n";
+      frontier.erase(branchToDelete);
+      branchToDelete.erase();
+    }
+  }
+}
