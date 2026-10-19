@@ -56,10 +56,11 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 using namespace dynamatic::experimental::ftd;
 
-struct ConvertPredicateOp
-    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::PredicateOp> {
-  using DynOpConversionPattern<dynamatic::cf_extra::PredicateOp>::DynOpConversionPattern;
-  
+struct ConvertPredicateOp : public dynamatic::DynOpConversionPattern<
+                                dynamatic::cf_extra::PredicateOp> {
+  using DynOpConversionPattern<
+      dynamatic::cf_extra::PredicateOp>::DynOpConversionPattern;
+
   // Convert the inputs and outputs of all PredicateOps into handshake channels
   mlir::LogicalResult
   matchAndRewrite(dynamatic::cf_extra::PredicateOp srcOp, OpAdaptor adaptor,
@@ -72,11 +73,8 @@ struct ConvertPredicateOp
     }
 
     auto newOp = rewriter.create<dynamatic::cf_extra::PredicateOp>(
-        srcOp->getLoc(), 
-        newTypes, 
-        adaptor.getOperands(),
-        srcOp->getAttrDictionary().getValue()
-    );
+        srcOp->getLoc(), newTypes, adaptor.getOperands(),
+        srcOp->getAttrDictionary().getValue());
     namer.replaceOp(srcOp, newOp);
     rewriter.replaceOp(srcOp, newOp);
 
@@ -84,9 +82,10 @@ struct ConvertPredicateOp
   }
 };
 
-struct ConvertRegionInputOp
-    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::RegionInputOp> {
-  using DynOpConversionPattern<dynamatic::cf_extra::RegionInputOp>::DynOpConversionPattern;
+struct ConvertRegionInputOp : public dynamatic::DynOpConversionPattern<
+                                  dynamatic::cf_extra::RegionInputOp> {
+  using DynOpConversionPattern<
+      dynamatic::cf_extra::RegionInputOp>::DynOpConversionPattern;
 
   mlir::LogicalResult
   matchAndRewrite(dynamatic::cf_extra::RegionInputOp srcOp, OpAdaptor adaptor,
@@ -100,11 +99,8 @@ struct ConvertRegionInputOp
 
     // Create the handshake-level counterpart
     auto newOp = rewriter.create<handshake::RegionInputOp>(
-        srcOp->getLoc(),
-        newTypes,
-        adaptor.getOperands(),
-        srcOp->getAttrDictionary().getValue()
-    );
+        srcOp->getLoc(), newTypes, adaptor.getOperands(),
+        srcOp->getAttrDictionary().getValue());
 
     namer.replaceOp(srcOp, newOp);
     rewriter.replaceOp(srcOp, newOp);
@@ -112,9 +108,10 @@ struct ConvertRegionInputOp
   }
 };
 
-struct ConvertBlockControlOp
-    : public dynamatic::DynOpConversionPattern<dynamatic::cf_extra::BlockControlOp> {
-  using DynOpConversionPattern<dynamatic::cf_extra::BlockControlOp>::DynOpConversionPattern;
+struct ConvertBlockControlOp : public dynamatic::DynOpConversionPattern<
+                                   dynamatic::cf_extra::BlockControlOp> {
+  using DynOpConversionPattern<
+      dynamatic::cf_extra::BlockControlOp>::DynOpConversionPattern;
 
   mlir::LogicalResult
   matchAndRewrite(dynamatic::cf_extra::BlockControlOp srcOp, OpAdaptor adaptor,
@@ -128,9 +125,7 @@ struct ConvertBlockControlOp
 
     // Create the handshake-level counterpart
     auto newOp = rewriter.create<handshake::BlockControlOp>(
-        srcOp->getLoc(),
-        newTypes,
-        adaptor.getOperands(),
+        srcOp->getLoc(), newTypes, adaptor.getOperands(),
         srcOp->getAttrDictionary().getValue());
 
     // If your infrastructure uses inheritBB or similar metadata:
@@ -377,9 +372,7 @@ struct FtdCfToHandshakePass
         // LowerFuncToHandshake,
         /*ConvertConstants,*/ AllocaOpConversion, ConvertCalls,
         /*ConvertUndefinedValues,*/ GetGlobalOpConversion, GlobalOpConversion,
-        ConvertPredicateOp,
-        ConvertRegionInputOp,
-        ConvertBlockControlOp,
+        ConvertPredicateOp, ConvertRegionInputOp, ConvertBlockControlOp,
         ConvertIndexCast<arith::IndexCastOp, handshake::ExtSIOp>,
         ConvertIndexCast<arith::IndexCastUIOp, handshake::ExtUIOp>,
         OneToOneConversion<arith::AddFOp, handshake::AddFOp>,
@@ -422,13 +415,13 @@ struct FtdCfToHandshakePass
     target.addLegalDialect<handshake::HandshakeDialect>();
     target.addIllegalDialect<func::FuncDialect, cf::ControlFlowDialect,
                              arith::ArithDialect, math::MathDialect,
-                             BuiltinDialect, dynamatic::cf_extra::CFExtraDialect>();
+                             BuiltinDialect,
+                             dynamatic::cf_extra::CFExtraDialect>();
 
-                             
     target.addDynamicallyLegalOp<dynamatic::cf_extra::PredicateOp>(
-    [](dynamatic::cf_extra::PredicateOp op) {
-      return llvm::isa<handshake::ChannelType>(op.getType());
-    });
+        [](dynamatic::cf_extra::PredicateOp op) {
+          return llvm::isa<handshake::ChannelType>(op.getType());
+        });
 
     target.addDynamicallyLegalOp<func::CallOp>([](func::CallOp op) {
       // If the call is to __init, consider it legal for now.
@@ -516,28 +509,32 @@ struct FtdCfToHandshakePass
       shadow.destroy();
 
       // Iterate over all store operations
-      for (auto storeOp : llvm::make_early_inc_range(
-              funcOp.getOps<handshake::StoreOp>())) {
+      for (auto storeOp :
+           llvm::make_early_inc_range(funcOp.getOps<handshake::StoreOp>())) {
         OpBuilder builder(storeOp);
 
         // We only care about store operations that have a predicateOp in front
         Value currData = storeOp.getData();
-        auto firstPred = currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>();
+        auto firstPred =
+            currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>();
         if (!firstPred)
           continue;
 
         std::string basePredName = "";
-        if (auto predNameAttr = firstPred->getAttrOfType<StringAttr>("handshake.name"))
+        if (auto predNameAttr =
+                firstPred->getAttrOfType<StringAttr>("handshake.name"))
           basePredName = predNameAttr.getValue().str();
 
         // collect the chained predicate conditions
         SmallVector<Value> conds;
         SmallVector<dynamatic::cf_extra::PredicateOp> predsToErase;
-        while (auto predOp = currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>()) {
+        while (auto predOp =
+                   currData.getDefiningOp<dynamatic::cf_extra::PredicateOp>()) {
           conds.push_back(predOp.getCond());
           predsToErase.push_back(predOp);
           currData = predOp.getData();
-          if (auto predNameAttr = predOp->getAttrOfType<StringAttr>("handshake.name"))
+          if (auto predNameAttr =
+                  predOp->getAttrOfType<StringAttr>("handshake.name"))
             basePredName = predNameAttr.getValue().str();
         }
         Value rawData = currData;
@@ -546,8 +543,8 @@ struct FtdCfToHandshakePass
         builder.setInsertionPoint(storeOp);
         Value combinedCond = conds[0];
         for (size_t i = 1; i < conds.size(); ++i) {
-          auto orOp = builder.create<handshake::OrIOp>(
-              storeOp.getLoc(), combinedCond, conds[i]);
+          auto orOp = builder.create<handshake::OrIOp>(storeOp.getLoc(),
+                                                       combinedCond, conds[i]);
           inheritBB(storeOp, orOp);
           combinedCond = orOp.getResult();
         }
@@ -557,21 +554,24 @@ struct FtdCfToHandshakePass
             storeOp.getLoc(), combinedCond, rawData);
         inheritBB(storeOp, dataBranch);
         std::string dataBranchName = "cond_br_" + basePredName;
-        dataBranch->setAttr("handshake.name", builder.getStringAttr(dataBranchName));
+        dataBranch->setAttr("handshake.name",
+                            builder.getStringAttr(dataBranchName));
 
         // Set the store's data operand
         storeOp.getDataMutable().assign(dataBranch.getFalseResult());
 
-        // create the matching Address suppressor branch using the same condition
+        // create the matching Address suppressor branch using the same
+        // condition
         Value currentAddr = storeOp.getAddress();
         auto addrBranch = builder.create<handshake::ConditionalBranchOp>(
             storeOp.getLoc(), combinedCond, currentAddr);
         inheritBB(storeOp, addrBranch);
         std::string addrBranchName = "cond_br_" + basePredName + "_addr";
-        addrBranch->setAttr("handshake.name", builder.getStringAttr(addrBranchName));
+        addrBranch->setAttr("handshake.name",
+                            builder.getStringAttr(addrBranchName));
 
         // Set the store's address operand
-        storeOp.getAddressMutable().assign(addrBranch.getFalseResult());        
+        storeOp.getAddressMutable().assign(addrBranch.getFalseResult());
 
         // erase all cf_extra::PredicateOps
         for (auto predOp : predsToErase)

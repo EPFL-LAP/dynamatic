@@ -28,7 +28,8 @@ static Value traceConditionRoot(Value val, bool &inverted) {
     } else if (auto mux = dyn_cast<handshake::MuxOp>(defOp)) {
       if (mux->hasAttr("cmerge_mux")) {
         val = mux.getDataOperands()[1];
-      } else break;
+      } else
+        break;
     } else {
       break;
     }
@@ -110,7 +111,8 @@ BypassResult isEligibleForBypass(handshake::ConditionalBranchOp branchOp,
     return BypassResult::Ineligible;
   }
 
-  // do not move past ors that guard the stores TODO: make sure other ones can be bypassed
+  // do not move past ors that guard the stores TODO: make sure other ones can
+  // be bypassed
   if (isa<handshake::OrIOp>(targetOp)) {
     return BypassResult::Ineligible;
   }
@@ -144,8 +146,7 @@ void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
                           DenseSet<handshake::ConditionalBranchOp> &frontier,
                           NameAnalysis &namer, int DRewrite) {
 
-  llvm::errs() << "Moving past: " << targetOp->getAttr(HANDSHAKENAME)
-               << '\n';
+  llvm::errs() << "Moving past: " << targetOp->getAttr(HANDSHAKENAME) << '\n';
 
   Location loc = targetOp->getLoc();
   Value condition = branchOp.getConditionOperand();
@@ -165,7 +166,7 @@ void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
 
     // rewire the target operand directly to the suppressor's input data
     use.set(incomingBranch.getDataOperand());
-    
+
     if (!headerBBAttr)
       headerBBAttr = branchOp->getAttr("subloop_header_bb");
 
@@ -207,8 +208,8 @@ void applyRewriteB(handshake::MuxOp dataMux,
                    NameAnalysis &namer) {
   Location loc = dataMux->getLoc();
   auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
-  llvm::errs() << "Perform Rewrite B for: "
-               << dataMux->getAttr(HANDSHAKENAME) << '\n';
+  llvm::errs() << "Perform Rewrite B for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
 
   Value conditionC = dataMux.getSelectOperand();
 
@@ -256,8 +257,8 @@ void applyRewriteC(handshake::MuxOp dataMux,
 
   Location loc = dataMux->getLoc();
   auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
-  llvm::errs() << "Perform Rewrite C for: "
-               << dataMux->getAttr(HANDSHAKENAME) << '\n';
+  llvm::errs() << "Perform Rewrite C for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
 
   Value conditionC = dataMux.getSelectOperand();
 
@@ -309,8 +310,8 @@ void applyRewriteD(handshake::MuxOp dataMux,
 
   Location loc = dataMux->getLoc();
   auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
-  llvm::errs() << "Perform Rewrite D for: "
-               << dataMux->getAttr(HANDSHAKENAME) << '\n';
+  llvm::errs() << "Perform Rewrite D for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
   Value conditionC = initOp.getOperand();
 
   // build the additional control structure for the rewrite
@@ -348,8 +349,8 @@ void applyRewriteE(handshake::MuxOp dataMux,
                    NameAnalysis &namer, int inverted) {
   Location loc = dataMux->getLoc();
   auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
-  llvm::errs() << "Perform Rewrite E for: "
-               << dataMux->getAttr(HANDSHAKENAME) << '\n';
+  llvm::errs() << "Perform Rewrite E for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
 
   // identify the inputs
   Value inputA = dataMux.getSelectOperand();
@@ -437,8 +438,8 @@ void applyRewriteG(handshake::MuxOp dataMux,
                    NameAnalysis &namer) {
   Location loc = dataMux->getLoc();
   auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
-  llvm::errs() << "Perform Rewrite G for: "
-               << dataMux->getAttr(HANDSHAKENAME) << '\n';
+  llvm::errs() << "Perform Rewrite G for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
 
   // capture the shared control signal D from one of the top suppressors
   Value conditionD = topSuppressorA.getConditionOperand();
@@ -507,8 +508,8 @@ void applyRewriteH(handshake::MuxOp dataMux,
                    NameAnalysis &namer) {
   Location loc = dataMux->getLoc();
   auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
-  llvm::errs() << "Perform Rewrite H for: "
-               << dataMux->getAttr(HANDSHAKENAME) << '\n';
+  llvm::errs() << "Perform Rewrite H for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
 
   // find the condition signal C
   Value conditionC = trueBranch.getConditionOperand();

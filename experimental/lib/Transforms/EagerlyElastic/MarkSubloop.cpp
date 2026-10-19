@@ -1,11 +1,11 @@
+#include "dynamatic/Dialect/CFExtra/CFExtraOps.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "dynamatic/Dialect/CFExtra/CFExtraOps.h"
 
 #define DEBUG_TYPE "mark-subloop"
 
@@ -34,46 +34,48 @@ namespace experimental {
 // [END Boilerplate code for the MLIR pass]
 
 struct MarkSubloopPass
-    : public dynamatic::experimental::impl::MarkSubloopBase<
-          MarkSubloopPass> {
+    : public dynamatic::experimental::impl::MarkSubloopBase<MarkSubloopPass> {
   using MarkSubloopBase::MarkSubloopBase;
 
   void runOnOperation() override;
 
 private:
-  void getRealConsumers(Value val, Block *targetBlock, llvm::SmallVectorImpl<EntryOpInfo> &results);
+  void getRealConsumers(Value val, Block *targetBlock,
+                        llvm::SmallVectorImpl<EntryOpInfo> &results);
+
   Block *getTrueDefiningBlock(Value val);
 
-  /// Discovers valid single-entry/single-exit and loop subregions.
   llvm::SmallVector<std::pair<Block *, RegionInfo>>
   discoverRegions(Region &cfg, DominanceInfo &domInfo,
                   PostDominanceInfo &postDomInfo,
                   const llvm::DenseMap<Block *, unsigned> &blockIndices);
 
-  /// Processes a single region, predicating stores and returning its metadata.
-  DictionaryAttr processRegion(RegionInfo &region,
-                               const llvm::DenseMap<Block *, unsigned> &blockIndices,
-                               OpBuilder &builder, NameAnalysis &namer);
+  DictionaryAttr
+  processRegion(RegionInfo &region,
+                const llvm::DenseMap<Block *, unsigned> &blockIndices,
+                OpBuilder &builder, NameAnalysis &namer);
 
-  /// Inserts RegionInputOp markers for values entering multi-successor regions.
-  void markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>> sortedRegions,
-                          llvm::DenseSet<Block *> &multiPredEntryBlocks,
-                          OpBuilder &builder, NameAnalysis &namer);
+  void
+  markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>> sortedRegions,
+                     llvm::DenseSet<Block *> &multiSuccEntryBlocks,
+                     OpBuilder &builder, NameAnalysis &namer);
 
   /// Wires BlockControlOps and control tokens across the function's CFG.
-  void insertBlockControlNetwork(func::FuncOp funcOp,
-                                 const llvm::DenseSet<Block *> &multiPredBlocks,
-                                 OpBuilder &builder, NameAnalysis &namer);
-
+  void
+  insertBlockControlNetwork(func::FuncOp funcOp,
+                            const llvm::DenseSet<Block *> &multiSuccEntryBlocks,
+                            OpBuilder &builder, NameAnalysis &namer);
 };
 
-
-// Helper function to move past cast operations 
+// Helper function to move past cast operations
 // keeps track of the operand index
-void MarkSubloopPass::getRealConsumers(Value val, Block *targetBlock, llvm::SmallVectorImpl<EntryOpInfo> &results) {
+void MarkSubloopPass::getRealConsumers(
+    Value val, Block *targetBlock,
+    llvm::SmallVectorImpl<EntryOpInfo> &results) {
   for (OpOperand &use : val.getUses()) {
     Operation *user = use.getOwner();
-    if (user->getBlock() != targetBlock) continue;
+    if (user->getBlock() != targetBlock)
+      continue;
 
     // if it's a cast/ext, trace past it recursively
     if (isa<arith::ExtUIOp, arith::ExtSIOp, arith::IndexCastOp>(user)) {
@@ -119,10 +121,11 @@ Block *MarkSubloopPass::getTrueDefiningBlock(Value val) {
   return nullptr;
 }
 
+/// Discovers valid single-entry/single-exit and loop subregions.
 llvm::SmallVector<std::pair<Block *, RegionInfo>>
-MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
-                                 PostDominanceInfo &postDomInfo,
-                                 const llvm::DenseMap<Block *, unsigned> &blockIndices) {
+MarkSubloopPass::discoverRegions(
+    Region &cfg, DominanceInfo &domInfo, PostDominanceInfo &postDomInfo,
+    const llvm::DenseMap<Block *, unsigned> &blockIndices) {
   llvm::DenseMap<Block *, RegionInfo> validRegions;
 
   // iterate over all dom / postdom pairs
@@ -140,12 +143,13 @@ MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
         }
       }
 
-      if (!latch) continue;
+      if (!latch)
+        continue;
 
       // collect all subblocks
       llvm::SetVector<mlir::Block *> subBlocksSet;
       subBlocksSet.insert(loopHeader);
-      subBlocksSet.insert(latch);    
+      subBlocksSet.insert(latch);
       for (mlir::Block &subblock : cfg) {
         // subblock is dominated by the entry and postdominated by the exit
         if (domInfo.properlyDominates(loopHeader, &subblock) &&
@@ -153,7 +157,7 @@ MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
           subBlocksSet.insert(&subblock);
         }
       }
-      
+
       // find the exitBlock after the latch
       Block *exit = nullptr;
       for (mlir::Block *succ : latch->getSuccessors()) {
@@ -176,14 +180,17 @@ MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
       continue;
 
     for (mlir::Block &exit : cfg) {
-      if (&entry == &exit) continue;
+      if (&entry == &exit)
+        continue;
 
       // must be a valid dom / postdom pair
-      if (!domInfo.dominates(&entry, &exit)) continue;
-      if (!postDomInfo.postDominates(&exit, &entry)) continue;
-      
+      if (!domInfo.dominates(&entry, &exit))
+        continue;
+      if (!postDomInfo.postDominates(&exit, &entry))
+        continue;
+
       // collect all subblocks
-      llvm::SetVector<mlir::Block *> subBlocksSet;      
+      llvm::SetVector<mlir::Block *> subBlocksSet;
       for (mlir::Block &subblock : cfg) {
         // subblock is dominated by the entry and postdominated by the exit
         if (domInfo.properlyDominates(&entry, &subblock) &&
@@ -191,11 +198,13 @@ MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
           subBlocksSet.insert(&subblock);
         }
       }
-      if (subBlocksSet.empty()) continue;
+      if (subBlocksSet.empty())
+        continue;
 
       // If we already have a region for this entry that is smaller, skip
       auto it = validRegions.find(&entry);
-      if (it != validRegions.end() && it->second.subblocks.size() <= subBlocksSet.size())
+      if (it != validRegions.end() &&
+          it->second.subblocks.size() <= subBlocksSet.size())
         continue;
       // Insert or overwrite with the shorter region
       validRegions[&entry] = {&entry, std::move(subBlocksSet), &exit};
@@ -203,8 +212,8 @@ MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
   }
 
   // Sort deterministically by block order in the parent region
-  llvm::SmallVector<std::pair<Block *, RegionInfo>> sortedRegions(validRegions.begin(),
-                                              validRegions.end());
+  llvm::SmallVector<std::pair<Block *, RegionInfo>> sortedRegions(
+      validRegions.begin(), validRegions.end());
   llvm::sort(sortedRegions, [&](const auto &lhs, const auto &rhs) {
     return blockIndices.lookup(lhs.first) < blockIndices.lookup(rhs.first);
   });
@@ -216,9 +225,9 @@ MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
 /// Collects all entry operations = operations that are defined in the subblock
 /// and used directly in the exitBlock. Finds all store operation and adds
 /// a pseudo constant and a predicate in front of every store.
-DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
-                              const llvm::DenseMap<Block *, unsigned> &blockIndices,
-                              OpBuilder &builder, NameAnalysis &namer) {
+DictionaryAttr MarkSubloopPass::processRegion(
+    RegionInfo &region, const llvm::DenseMap<Block *, unsigned> &blockIndices,
+    OpBuilder &builder, NameAnalysis &namer) {
 
   Block *entryBlock = region.entryBlock;
   Block *exitBlock = region.exitBlock;
@@ -252,21 +261,23 @@ DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
 
     NamedAttribute entries[] = {
         builder.getNamedAttr("op", builder.getStringAttr(nameStr)),
-        builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(idx))
-    };
+        builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(idx))};
     entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
   };
 
   // trace values defined in the subblocks used directly in the exitBlock
   for (Operation &op : exitBlock->getOperations()) {
     // Skip constants
-    if (isa<arith::ConstantOp>(&op)) continue;
+    if (isa<arith::ConstantOp>(&op))
+      continue;
 
     for (OpOperand &use : op.getOpOperands()) {
       Value operand = use.get();
-      if (isa<MemRefType>(operand.getType())) continue;
+      if (isa<MemRefType>(operand.getType()))
+        continue;
 
-      // determine the defining block whether it's an OpResult or a BlockArgument
+      // determine the defining block no matter whether it's an
+      // OpResult or a BlockArgument
       Block *definingBlock = getTrueDefiningBlock(operand);
 
       // Check if the defining block belongs to subblocks
@@ -284,7 +295,7 @@ DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
       }
     }
   }
-  
+
   // add the entry operation for the control
   unsigned exitBlockIdx = blockIndices.lookup(exitBlock);
   entryOpAttrs.push_back(builder.getDictionaryAttr({
@@ -300,8 +311,8 @@ DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
       storesToModify.push_back(storeOp);
     }
   }
-  llvm::errs() << "found " << storesToModify.size() << 
-    " stores in the subblocks\n";
+  llvm::errs() << "found " << storesToModify.size()
+               << " stores in the subblocks\n";
 
   // insert one pseudo constant and a predicate in front of all the stores
   bool hasStores = !storesToModify.empty();
@@ -310,10 +321,8 @@ DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
 
     // create pseudo-constant in entryBlock
     auto pseudoCondOp = builder.create<arith::ConstantOp>(
-        builder.getUnknownLoc(), 
-        builder.getI1Type(), 
-        builder.getBoolAttr(false)
-    );
+        builder.getUnknownLoc(), builder.getI1Type(),
+        builder.getBoolAttr(false));
     std::string pseudoName = "pseudo_cond" + std::to_string(entryBBIdx);
     pseudoCondOp->setAttr("handshake.name", builder.getStringAttr(pseudoName));
 
@@ -323,11 +332,8 @@ DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
       // predicate data
       Value incomingData = storeOp.getValueToStore();
       auto predOp = builder.create<dynamatic::cf_extra::PredicateOp>(
-          storeOp.getLoc(),
-          incomingData.getType(),
-          pseudoCondOp.getResult(),
-          incomingData
-      );
+          storeOp.getLoc(), incomingData.getType(), pseudoCondOp.getResult(),
+          incomingData);
       namer.setName(predOp);
       // Rewire the data operand safely using setOperand on its specific index
       storeOp.setOperand(0, predOp->getResult(0));
@@ -344,16 +350,18 @@ DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
 }
 
 /// Inserts RegionInputOp markers for values entering multi-successor regions.
-void MarkSubloopPass::markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>> sortedRegions,
-                        llvm::DenseSet<Block *> &multiPredEntryBlocks,
-                        OpBuilder &builder, NameAnalysis &namer) {
+void MarkSubloopPass::markExternalInputs(
+    ArrayRef<std::pair<Block *, RegionInfo>> sortedRegions,
+    llvm::DenseSet<Block *> &multiSuccEntryBlocks, OpBuilder &builder,
+    NameAnalysis &namer) {
 
   for (const auto &[entryBlock, region] : sortedRegions) {
     // Only look at if/else regions
     if (entryBlock->getNumSuccessors() <= 1)
       continue;
 
-    multiPredEntryBlocks.insert(entryBlock);
+    // save all entryBlocks that mark the input to an if/else region
+    multiSuccEntryBlocks.insert(entryBlock);
     const llvm::SetVector<Block *> &subblocks = region.subblocks;
 
     // Map each external Value to its marker in this specific entryBlock
@@ -362,11 +370,13 @@ void MarkSubloopPass::markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>
 
     auto processOperand = [&](OpOperand &use) {
       Value val = use.get();
-      if (isa<MemRefType>(val.getType())) return;
+      if (isa<MemRefType>(val.getType()))
+        return;
 
       Block *defBlock = getTrueDefiningBlock(val);
       // we only care about values originating from outside the subblocks
-      if (!defBlock || subblocks.contains(defBlock)) return;
+      if (!defBlock || subblocks.contains(defBlock))
+        return;
 
       // Check if we already created a marker in entryBlock for this value
       auto markedIt = markedValues.find(val);
@@ -388,7 +398,7 @@ void MarkSubloopPass::markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>
       use.set(markedVal);
     };
 
-    // mark the condition of entryBlock's conditional branch terminator (e.g., cmpi0)
+    // mark the condition of entryBlock's conditional branch terminator (cmpi)
     if (auto condBr = dyn_cast<cf::CondBranchOp>(terminator)) {
       processOperand(condBr.getConditionMutable()[0]);
     }
@@ -405,13 +415,13 @@ void MarkSubloopPass::markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>
 }
 
 /// Wires BlockControlOps and control tokens across the function's CFG.
-void MarkSubloopPass::insertBlockControlNetwork(func::FuncOp funcOp,
-                                const llvm::DenseSet<Block *> &multiPredBlocks,
-                                OpBuilder &builder, NameAnalysis &namer) {
+void MarkSubloopPass::insertBlockControlNetwork(
+    func::FuncOp funcOp, const llvm::DenseSet<Block *> &multiSuccEntryBlocks,
+    OpBuilder &builder, NameAnalysis &namer) {
 
   Type controlType = builder.getI32Type();
   Location loc = funcOp.getLoc();
-  llvm::DenseMap<Block *, Value> blockControlValueMap; 
+  llvm::DenseMap<Block *, Value> blockControlValueMap;
 
   // Insert BlockControlOp at the start of every block
   for (Block &block : funcOp.getBlocks()) {
@@ -420,9 +430,10 @@ void MarkSubloopPass::insertBlockControlNetwork(func::FuncOp funcOp,
 
     if (block.isEntryBlock()) {
       // create constant `true` at the very beginning of the entry block
-      auto initCst = builder.create<arith::ConstantOp>(
-          bLoc, builder.getI32IntegerAttr(1));
-      initCst->setAttr("handshake.name", builder.getStringAttr("control_constant"));
+      auto initCst =
+          builder.create<arith::ConstantOp>(bLoc, builder.getI32IntegerAttr(1));
+      initCst->setAttr("handshake.name",
+                       builder.getStringAttr("control_constant"));
 
       // feed the constant directly into the first blockControlOp
       auto ctrlOp = builder.create<dynamatic::cf_extra::BlockControlOp>(
@@ -441,14 +452,14 @@ void MarkSubloopPass::insertBlockControlNetwork(func::FuncOp funcOp,
     // Default control output is the BlockControlOp result
     Value currentControlVal = ctrlOp.getResult();
 
-    // Check if this block is an entry basic block with multiple predecessors/successors
-    if (multiPredBlocks.contains(&block)) {
+    // Check if this block is an entry basic block with multiple successors
+    if (multiSuccEntryBlocks.contains(&block)) {
       builder.setInsertionPointAfter(ctrlOp);
       // Create the RegionInputOp right after the BlockControlOp
       auto regionInputOp = builder.create<dynamatic::cf_extra::RegionInputOp>(
           bLoc, controlType, ctrlOp.getResult());
       namer.setName(regionInputOp);
-      
+
       // Update the control output to point to the RegionInputOp instead
       currentControlVal = regionInputOp.getResult();
     }
@@ -496,7 +507,7 @@ void MarkSubloopPass::runOnOperation() {
 
   // Discover and sort valid regions
   llvm::SmallVector<std::pair<mlir::Block *, RegionInfo>> sortedRegions =
-    discoverRegions(cfg, domInfo, postDomInfo, blockIndices);
+      discoverRegions(cfg, domInfo, postDomInfo, blockIndices);
   if (sortedRegions.empty()) {
     llvm::errs() << "No valid dom / postdom pairs with subblocks found!\n";
     return;
@@ -510,14 +521,15 @@ void MarkSubloopPass::runOnOperation() {
         processRegion(region, blockIndices, builder, namer));
   }
   // attach the attribute directly to modOp
-  modOp->setAttr("handshake.subregion_info", builder.getArrayAttr(allRegionsMetadata));
+  modOp->setAttr("handshake.subregion_info",
+                 builder.getArrayAttr(allRegionsMetadata));
 
   // mark external inputs entering if/else regions
-  llvm::DenseSet<Block *> multiPredEntryBlocks;
-  markExternalInputs(sortedRegions, multiPredEntryBlocks, builder, namer);
+  llvm::DenseSet<Block *> multiSuccEntryBlocks;
+  markExternalInputs(sortedRegions, multiSuccEntryBlocks, builder, namer);
 
-  // Build the BlockControl network across all basic blocks
-  insertBlockControlNetwork(funcOp, multiPredEntryBlocks, builder, namer);
+  // build the BlockControl network across all basic blocks
+  insertBlockControlNetwork(funcOp, multiSuccEntryBlocks, builder, namer);
 
   llvm::errs() << "finished mark subregion\n";
 }
