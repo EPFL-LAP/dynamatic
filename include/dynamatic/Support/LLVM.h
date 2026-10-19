@@ -134,7 +134,6 @@ class OpOperand;
 class OpResult;
 template <typename OpTy>
 class OwningOpRef;
-class ParseResult;
 class Pass;
 class PatternRewriter;
 class Region;
@@ -160,13 +159,10 @@ class VectorType;
 class WalkResult;
 enum class RegionKind;
 struct CallInterfaceCallable;
-struct LogicalResult;
 struct MemRefAccess;
 struct OperationState;
 class OperationName;
 
-template <typename T>
-class FailureOr;
 template <typename SourceOp>
 class OpConversionPattern;
 template <typename T>
