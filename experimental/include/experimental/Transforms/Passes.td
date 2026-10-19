@@ -115,6 +115,41 @@ def HandshakeRigidification : DynamaticPass<"handshake-rigidification"> {
     "Path to JSON-formatted file where the properties' information is stored.">];
 }
 
+def EagerlyElasticAD : Pass<"eagerly-elastic-a-d", "mlir::ModuleOp"> {
+  let summary = "Applies the Rewrites A and D of the EagerlyElastic Paper";
+  let description = [{
+    This pass prepares the conditional branches into suppressors and then applies Rewrite A 
+    as often as possible. In the next step it applies Rewrite D and then again Rewrite A and
+    repeats this `numRewriteD` times.
+  }];
+  let options =
+    [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
+            "The number of times that Rewrite D should be applied.">];
+}
+
+def EagerlyElasticAll : Pass<"eagerly-elastic-all", "mlir::ModuleOp"> {
+  let summary = "Applies all Rewrites of the EagerlyElastic Paper";
+  let description = [{
+    This pass prepares the conditional branches into suppressors and then applies all rewrites.
+  }];
+  let options =
+    [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
+            "The number of times that Rewrite D should be applied.">,
+     Option<"regionBased", "region-based", "bool", "true",
+            "Whether region-based eager execution should also be used.">];
+}
+
+def MarkSubloop : Pass<"mark-subloop", "mlir::ModuleOp"> {
+  let summary = "Marks the entire subloop with an attribute";
+  let description = [{
+    Marks the entire subloop with an attribute.
+  }];
+  let options =
+    [Option<"numRewriteD", "num-rewrite-d", "unsigned", "1",
+            "The number of times that Rewrite D should be applied.">];
+  let dependentDialects = ["cf_extra::CFExtraDialect"];
+}
+
 def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir::ModuleOp"> {
   let summary = "Value prediction from a compile-time-fixed finite list.";
   let description = [{

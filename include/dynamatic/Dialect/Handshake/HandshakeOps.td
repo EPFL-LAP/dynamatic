@@ -367,10 +367,6 @@ def InitOp : Handshake_Op<"init", [
   let arguments = (ins HandshakeType:$operand);
   let results = (outs HandshakeType:$result);
 
-  let extraClassDeclaration = [{
-    static constexpr ::llvm::StringLiteral INIT_TOKEN_ATTR_NAME = "INIT_TOKEN",
-                                           TIMING_ATTR_NAME = "TIMING";
-  }];
 
   let assemblyFormat = [{
     $operand attr-dict `:` custom<HandshakeType>(type($operand))
@@ -2329,5 +2325,124 @@ def ValidMergerOp : Handshake_Op<"valid_merger",[
   }];
 }
 
+def RepeatingInitOp : Handshake_Op<"repeating_init", [
+  HasClock, SameOperandsAndResultType,
+  IsIntSizedChannel<1, "operand">,
+  IsIntSizedChannel<1, "result">,
+  SimpleNamedIO
+]> {
+  let summary = "repeating init operation";
+  let description = [{
+    A single-slot buffer which contains a token in its reset state.
+    Similar to a buffer, its timing behavior is configurable.
+  }];
+  
+  let arguments = (ins ChannelType:$operand, UI1Attr:$initialValue);
+  let results = (outs ChannelType:$result);
+
+  let extraClassDeclaration = [{
+    static constexpr ::llvm::StringLiteral INITIAL_VALUE_ATTR_NAME = "INITIAL_VALUE",
+                                           TIMING_ATTR_NAME = "TIMING";
+  }];
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand)
+  }];
+
+  let extraClassDefinition = [{
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    RepeatingInitOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "INITIAL_VALUE"),
+         getInitialValueAttr()}
+      };
+    }
+  }];
+}
+
+def RegionInputOp : Handshake_Op<"region_input", [
+  Pure,
+  SameOperandsAndResultType,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Marker node for tokens entering an eager subregion.";
+  let description = [{
+    The region_input operation acts as an identity channel marker for data 
+    entering an eager subregion. It carries the handshake channel unaltered 
+    and indicates the placement point for input suppressors before subregion 
+    logic.
+
+    Example:
+
+    ```mlir
+    %outs = handshake.region_input %ins : !handshake.channel<i32>
+    ```
+  }];
+
+  let arguments = (ins HandshakeType:$ins);
+  let results = (outs HandshakeType:$outs);
+
+  let assemblyFormat = [{
+    $ins attr-dict `:` custom<HandshakeType>(type($ins))
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "ins";
+    }
+
+    std::string $cppClass::getResultName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    RegionInputOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "BITWIDTH"),
+         ::mlir::TypeAttr::get(getIns().getType())}
+      };
+    }
+  }];
+}
+
+def BlockControlOp : Handshake_Op<"block_control", [
+  Pure,
+  DeclareOpInterfaceMethods<NamedIOInterface, ["getOperandName", "getResultName"]>
+]> {
+  let summary = "Handshake synchronization block control operation";
+
+  let arguments = (ins Variadic<ChannelType>:$predecessors);
+  let results = (outs ChannelType:$result);
+
+  let assemblyFormat = [{
+    `(` $predecessors `)` attr-dict `:` functional-type($predecessors, results)
+  }];
+
+  let extraClassDefinition = [{
+    std::string $cppClass::getOperandName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumOperands() && "index too high");
+      return "ins" + std::to_string(idx);
+    }
+
+    std::string $cppClass::getResultName(unsigned idx = 0) {
+      assert(idx < getOperation()->getNumResults() && "index too high");
+      return "outs";
+    }
+
+    ::mlir::FailureOr<::llvm::SmallVector<::mlir::NamedAttribute>>
+    BlockControlOp::getRTLParameters() {
+      ::mlir::MLIRContext *ctx = (*this)->getContext();
+      return ::llvm::SmallVector<::mlir::NamedAttribute>{
+        {::mlir::StringAttr::get(ctx, "NUM_INPUTS"),
+         ::mlir::IntegerAttr::get(::mlir::IntegerType::get(ctx, 32),
+                                  getPredecessors().size())}
+      };
+    }
+  }];
+}
 
 #endif // DYNAMATIC_DIALECT_HANDSHAKE_HANDSHAKE_OPS_TD

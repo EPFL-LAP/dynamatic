@@ -117,6 +117,7 @@ if __name__ == "__main__":
     generators.add("handshake.speculation", "speculating_branch")
     generators.add("handshake.speculation", "speculator")
     generators.add("handshake.speculation", "non_spec")
+    generators.add("handshake", "repeating_init")
     generators.add("support", "mem_to_bram")
     generators.add("handshake", "extui")
     generators.add("handshake", "shli")
@@ -136,5 +137,6 @@ if __name__ == "__main__":
     generators.add("handshake", "remsi")
     generators.add("handshake", "ram")
     generators.add("handshake", "sharing_wrapper")
+    generators.add("handshake", "init")
 
     main(generators)

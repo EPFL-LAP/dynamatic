@@ -1,0 +1,747 @@
+#include "experimental/Transforms/EagerlyElastic/EagerlyElasticLib.h"
+#include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
+#include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "dynamatic/Support/DynamaticPass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
+
+/// Helper function to add the bbAttr and name to new operations.
+void setHandshakeAttrs(Attribute bbAttr, NameAnalysis &namer,
+                       ArrayRef<Operation *> ops) {
+  for (Operation *op : ops) {
+    assert(op);
+    if (bbAttr)
+      op->setAttr(HANDSHAKEBB, bbAttr);
+    namer.setName(op);
+  }
+}
+
+/// Helper to trace a condition value back through NotIOps AND RepeatingInits
+static Value traceConditionRoot(Value val, bool &inverted) {
+  while (Operation *defOp = val.getDefiningOp()) {
+    if (auto notOp = dyn_cast<handshake::NotIOp>(defOp)) {
+      inverted = !inverted;
+      val = notOp.getOperand();
+    } else if (auto repInit = dyn_cast<handshake::RepeatingInitOp>(defOp)) {
+      val = repInit.getOperand();
+    } else if (auto mux = dyn_cast<handshake::MuxOp>(defOp)) {
+      if (mux->hasAttr("cmerge_mux")) {
+        val = mux.getDataOperands()[1];
+      } else
+        break;
+    } else {
+      break;
+    }
+  }
+  return val;
+}
+
+/// Checks whether two condition values originate from the same root source.
+bool checkConditionsMatch(Value valA, Value valB, bool expectSamePolarity) {
+  bool invA = false, invB = false;
+
+  /* // Trace valA back through NotIOps
+  while (auto notOp =
+             dyn_cast_or_null<handshake::NotIOp>(valA.getDefiningOp())) {
+    invA = !invA;
+    valA = notOp.getOperand();
+  }
+
+  // Trace valB back through NotIOps
+  while (auto notOp =
+             dyn_cast_or_null<handshake::NotIOp>(valB.getDefiningOp())) {
+    invB = !invB;
+    valB = notOp.getOperand();
+  }  */
+  valA = traceConditionRoot(valA, invA);
+  valB = traceConditionRoot(valB, invB);
+
+  // They must originate from the exact same root wire
+  if (valA != valB)
+    return false;
+
+  return expectSamePolarity ? (invA == invB) : (invA != invB);
+}
+
+/// Recursive function to determine whether a value originates from a constant
+/// source.
+bool isSourced(Value value) {
+  Operation *definingOp = value.getDefiningOp();
+  if (!definingOp)
+    return false;
+
+  // No constant source possible here
+  if (isa<handshake::MuxOp>(definingOp) or
+      isa<handshake::RepeatingInitOp>(definingOp))
+    return false;
+
+  if (isa<handshake::SourceOp>(definingOp))
+    return true;
+
+  // If all operands of the defining operation are sourced, the value is also
+  // sourced.
+  return llvm::all_of(definingOp->getOperands(),
+                      [](Value v) { return isSourced(v); });
+}
+
+/// Checks if a suppressor (BranchOp) can be pushed past its downstream
+/// operation (for Rewrite A). Eligible operations are pure and matched and need
+/// to have the same condition on all their input operands or a source.
+BypassResult isEligibleForBypass(handshake::ConditionalBranchOp branchOp,
+                                 Operation *targetOp) {
+
+  // verify the targetOp is a PM unit
+  if (!isa<handshake::ArithOpInterface, handshake::ForkOp, handshake::NotIOp,
+           handshake::LazyForkOp, handshake::BufferOp, handshake::LoadOp,
+           handshake::BranchOp>(targetOp) ||
+      ((isa<handshake::MergeOp, handshake::ControlMergeOp>(targetOp)) &&
+       targetOp->getNumOperands() != 1)) {
+    return BypassResult::Ineligible; // reject anything that isn't a PM unit or
+                                     // a 1-input merge
+  }
+
+  // loadOps receive address control independently, the can always be bypassed
+  if (isa<handshake::LoadOp>(targetOp)) {
+    return BypassResult::Eligible;
+  }
+
+  // only move past NotOps if they aren't part of a suppressor condition
+  if (targetOp->hasAttr("is_suppressor_not")) {
+    return BypassResult::Ineligible;
+  }
+
+  // do not move past ors that guard the stores TODO: make sure other ones can
+  // be bypassed
+  if (isa<handshake::OrIOp>(targetOp)) {
+    return BypassResult::Ineligible;
+  }
+
+  // ensure all other inputs to the target op match this suppressor's condition
+  Value currentCond = branchOp.getConditionOperand();
+  for (Value operand : targetOp->getOperands()) {
+    // if we have a branch it must have the same condition
+    if (auto siblingBranch = dyn_cast_or_null<handshake::ConditionalBranchOp>(
+            operand.getDefiningOp())) {
+      if (siblingBranch == branchOp)
+        continue;
+
+      // check whether condition matches indirectly
+      if (!checkConditionsMatch(currentCond,
+                                siblingBranch.getConditionOperand(), true)) {
+        return BypassResult::Ineligible;
+      }
+    } else if (!isSourced(operand)) {
+      return BypassResult::Ineligible;
+    }
+  }
+  return BypassResult::Eligible;
+}
+
+/// Move the suppressors past the following operation, targetOp. Erase all the
+/// suppressors going into targetOp and create new suppressors on every output
+/// of targetOp.
+void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
+                          Operation *targetOp,
+                          DenseSet<handshake::ConditionalBranchOp> &frontier,
+                          NameAnalysis &namer, int DRewrite) {
+
+  llvm::errs() << "Moving past: " << targetOp->getAttr(HANDSHAKENAME) << '\n';
+
+  Location loc = targetOp->getLoc();
+  Value condition = branchOp.getConditionOperand();
+  mlir::Attribute headerBBAttr = nullptr;
+
+  // rewire the suppressor
+  for (OpOperand &use : targetOp->getOpOperands()) {
+    auto incomingBranch = dyn_cast_or_null<handshake::ConditionalBranchOp>(
+        use.get().getDefiningOp());
+    if (!incomingBranch)
+      continue;
+
+    // for Rewrite D, move only the suppressor connected to A of the Mux
+    if (incomingBranch != branchOp && DRewrite) {
+      continue;
+    }
+
+    // rewire the target operand directly to the suppressor's input data
+    use.set(incomingBranch.getDataOperand());
+
+    if (!headerBBAttr)
+      headerBBAttr = branchOp->getAttr("subloop_header_bb");
+
+    // check if the suppressor has any remaining downstream uses
+    if (incomingBranch.getFalseResult().use_empty()) {
+      frontier.erase(incomingBranch);
+      incomingBranch->erase();
+    }
+  }
+
+  OpBuilder builder(targetOp);
+  builder.setInsertionPointAfter(targetOp);
+
+  // place the new suppressors on every result of the targetOp
+  for (Value result : targetOp->getResults()) {
+    // If this is a LoadOp, skip index 0 (the address output going to the MC)
+    if (isa<handshake::LoadOp>(targetOp) &&
+        llvm::cast<mlir::OpResult>(result).getResultNumber() == 0) {
+      continue;
+    }
+
+    auto newBranch =
+        builder.create<handshake::ConditionalBranchOp>(loc, condition, result);
+    setHandshakeAttrs(targetOp->getAttr(HANDSHAKEBB), namer, {newBranch});
+    if (headerBBAttr) {
+      newBranch->setAttr("subloop_header_bb", headerBBAttr);
+    }
+
+    // reroute downstream consumers to look at the new branch's FalseResult
+    result.replaceAllUsesExcept(newBranch.getFalseResult(), newBranch);
+    frontier.insert(newBranch);
+  }
+}
+
+void applyRewriteB(handshake::MuxOp dataMux,
+                   handshake::ConditionalBranchOp trueBranch,
+                   handshake::ConditionalBranchOp falseBranch,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer) {
+  Location loc = dataMux->getLoc();
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
+  llvm::errs() << "Perform Rewrite B for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
+
+  Value conditionC = dataMux.getSelectOperand();
+
+  // build the additional control structure
+  OpBuilder builder(dataMux);
+
+  // create the feedback loop: not -> initOp -> mux, not
+  // initialize initOp with conditionC temporarily
+  auto initOp = builder.create<handshake::InitOp>(loc, conditionC);
+  auto redNot = builder.create<handshake::NotIOp>(loc, initOp.getResult());
+  setHandshakeAttrs(bbAttr, namer, {initOp, redNot});
+  // Close the loop: connect the output of redNot back into the InitOp's input
+  initOp.getOperandMutable().assign(redNot.getResult());
+  // connect the new structure back to the old one
+  dataMux.getSelectOperandMutable().assign(initOp.getResult());
+
+  // create the green loop
+  auto greenNot = builder.create<handshake::NotIOp>(loc, conditionC);
+  llvm::SmallVector<Value, 2> greenMuxInputs = {greenNot, conditionC};
+  auto greenMux = builder.create<handshake::MuxOp>(
+      loc, conditionC.getType(), initOp.getResult(), greenMuxInputs);
+  setHandshakeAttrs(bbAttr, namer, {greenNot, greenMux});
+
+  // update the suppressor's condition (TODO: put this into function for B,C,D?)
+  auto notOp = dyn_cast_or_null<handshake::NotIOp>(
+      trueBranch.getConditionOperand().getDefiningOp());
+  if (notOp && notOp.getResult().hasOneUse())
+    notOp.getOperandMutable().assign(greenMux.getResult());
+  else { // create a new isolated NotIOp
+    builder.setInsertionPoint(notOp ? notOp : trueBranch);
+    auto newNotOp = builder.create<handshake::NotIOp>(trueBranch.getLoc(),
+                                                      greenMux.getResult());
+    setHandshakeAttrs(bbAttr, namer, {newNotOp});
+    newNotOp->setAttr("is_suppressor_not", builder.getUnitAttr());
+    trueBranch.getConditionOperandMutable().assign(newNotOp.getResult());
+  }
+
+  moveSuppressorPastOp(trueBranch, dataMux, frontier, namer);
+}
+
+void applyRewriteC(handshake::MuxOp dataMux,
+                   handshake::ConditionalBranchOp branchOp,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer) {
+
+  Location loc = dataMux->getLoc();
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
+  llvm::errs() << "Perform Rewrite C for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
+
+  Value conditionC = dataMux.getSelectOperand();
+
+  // build the additional control structure for the rewrite
+  OpBuilder builder(dataMux);
+
+  auto repeatingInit =
+      builder.create<handshake::RepeatingInitOp>(loc, conditionC, 1);
+  setHandshakeAttrs(bbAttr, namer, {repeatingInit});
+
+  // create a mux with a true on false and on true the condition
+  auto sourceOp = builder.create<handshake::SourceOp>(loc);
+  auto cnstTrue = builder.create<handshake::ConstantOp>(
+      loc, builder.getBoolAttr(true), sourceOp.getResult());
+  llvm::SmallVector<Value, 2> muxGreenInputs = {cnstTrue.getResult(),
+                                                conditionC};
+  auto muxGreen = builder.create<handshake::MuxOp>(
+      loc, conditionC.getType(), repeatingInit.getResult(), muxGreenInputs);
+  setHandshakeAttrs(bbAttr, namer, {sourceOp, cnstTrue, muxGreen});
+
+  // connect the repeatingInit to the loop mux
+  dataMux.getSelectOperandMutable().assign(repeatingInit.getResult());
+
+  /// update the suppressor's condition
+  auto notOp = dyn_cast_or_null<handshake::NotIOp>(
+      branchOp.getConditionOperand().getDefiningOp());
+  if (notOp && notOp.getResult().hasOneUse())
+    notOp.getOperandMutable().assign(muxGreen.getResult());
+  else { // create a new isolated NotIOp
+    builder.setInsertionPoint(notOp ? notOp : branchOp);
+    auto newNotOp = builder.create<handshake::NotIOp>(branchOp.getLoc(),
+                                                      muxGreen.getResult());
+    setHandshakeAttrs(bbAttr, namer, {newNotOp});
+    newNotOp->setAttr("is_suppressor_not", builder.getUnitAttr());
+    branchOp.getConditionOperandMutable().assign(newNotOp.getResult());
+  }
+
+  // move suppressor past the mux
+  moveSuppressorPastOp(branchOp, dataMux, frontier, namer, 1);
+}
+
+/// Apply Rewrite D once by connecting a repeatingInitOp to the circuit and then
+/// moving the suppressor past the mux.
+void applyRewriteD(handshake::MuxOp dataMux,
+                   handshake::ConditionalBranchOp branchOp,
+                   handshake::InitOp initOp,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer) {
+
+  Location loc = dataMux->getLoc();
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
+  llvm::errs() << "Perform Rewrite D for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
+  Value conditionC = initOp.getOperand();
+
+  // build the additional control structure for the rewrite
+  OpBuilder builder(dataMux);
+
+  auto repeatingInit =
+      builder.create<handshake::RepeatingInitOp>(loc, conditionC, 1);
+  setHandshakeAttrs(bbAttr, namer, {repeatingInit});
+  Value specOutput = repeatingInit.getResult();
+
+  // connect the repeatingInit to the loop init
+  initOp.getOperandMutable().assign(specOutput);
+
+  // update the suppressor's condition - must be inverted relative to the init
+  auto notOp = dyn_cast_or_null<handshake::NotIOp>(
+      branchOp.getConditionOperand().getDefiningOp());
+  if (notOp && notOp.getResult().hasOneUse())
+    notOp.getOperandMutable().assign(specOutput);
+  else { // create a new isolated NotIOp
+    builder.setInsertionPoint(notOp ? notOp : branchOp);
+    auto newNotOp =
+        builder.create<handshake::NotIOp>(branchOp.getLoc(), specOutput);
+    setHandshakeAttrs(bbAttr, namer, {newNotOp});
+    newNotOp->setAttr("is_suppressor_not", builder.getUnitAttr());
+    branchOp.getConditionOperandMutable().assign(newNotOp.getResult());
+  }
+
+  // move suppressor past the mux
+  moveSuppressorPastOp(branchOp, dataMux, frontier, namer, 1);
+}
+
+void applyRewriteE(handshake::MuxOp dataMux,
+                   handshake::ConditionalBranchOp trueBranch,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer, int inverted) {
+  Location loc = dataMux->getLoc();
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
+  llvm::errs() << "Perform Rewrite E for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
+
+  // identify the inputs
+  Value inputA = dataMux.getSelectOperand();
+  Value inputB = trueBranch.getDataOperand();
+
+  // build the new AND gate
+  OpBuilder builder(dataMux);
+  Value newInputA = inputA;
+  if (inverted) {
+    auto notOp = builder.create<handshake::NotIOp>(loc, inputA);
+    setHandshakeAttrs(bbAttr, namer, {notOp});
+    newInputA = notOp.getResult();
+  }
+  auto andOp = builder.create<handshake::AndIOp>(loc, newInputA, inputB);
+  setHandshakeAttrs(bbAttr, namer, {andOp});
+
+  // reroute all downstream operations from the dataMux to the new AND
+  dataMux.getResult().replaceAllUsesWith(andOp.getResult());
+
+  // clean up
+  dataMux.erase();
+  if (trueBranch.getFalseResult().use_empty()) {
+    frontier.erase(trueBranch);
+    trueBranch.erase();
+  }
+}
+
+void applyRewriteF(handshake::ConditionalBranchOp branchOp,
+                   handshake::ConditionalBranchOp topSuppLeft,
+                   handshake::ConditionalBranchOp topSuppRight,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer) {
+
+  Location loc = branchOp->getLoc();
+  OpBuilder builder(branchOp);
+  llvm::errs() << "Applying Rewrite F!\n";
+
+  Value conditionB = topSuppLeft.getConditionOperand();
+  auto notOpB = dyn_cast<handshake::NotIOp>(conditionB.getDefiningOp());
+  if (notOpB) {
+    conditionB = notOpB.getOperand();
+  } else {
+    // input to the and gate for B must be inverted - add a NotIOp
+    auto newNotB = builder.create<handshake::NotIOp>(loc, conditionB);
+    setHandshakeAttrs(branchOp->getAttr(HANDSHAKEBB), namer, {newNotB});
+    conditionB = newNotB.getResult();
+  }
+  Value conditionC = topSuppRight.getDataOperand();
+
+  // create the new AND gate
+  auto andOp = builder.create<handshake::AndIOp>(loc, conditionB, conditionC);
+  setHandshakeAttrs(branchOp->getAttr(HANDSHAKEBB), namer, {andOp});
+
+  // safely bypass or remove topSuppLeft
+  Value wireLeft = topSuppLeft.getFalseResult();
+  branchOp->replaceUsesOfWith(wireLeft, topSuppLeft.getDataOperand());
+  if (wireLeft.use_empty()) {
+    frontier.erase(topSuppLeft);
+    topSuppLeft->erase();
+  }
+
+  // safely bypass or remove topSuppRight
+  Value wireRight = topSuppRight.getFalseResult();
+
+  // check whether we have to reconnect the notOp or the branchOp directly
+  if (auto notOp = dyn_cast_or_null<handshake::NotIOp>(
+          branchOp.getConditionOperand().getDefiningOp())) {
+    notOp->replaceUsesOfWith(wireRight, andOp.getResult());
+  } else {
+    branchOp.getConditionOperandMutable().assign(andOp.getResult());
+  }
+  if (wireRight.use_empty()) {
+    frontier.erase(topSuppRight);
+    topSuppRight->erase();
+  }
+}
+
+void applyRewriteG(handshake::MuxOp dataMux,
+                   handshake::ConditionalBranchOp blueBranchA,
+                   handshake::ConditionalBranchOp blueBranchB,
+                   handshake::ConditionalBranchOp topSuppressorA,
+                   handshake::ConditionalBranchOp topSuppressorB,
+                   handshake::ConditionalBranchOp topSuppressorC,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer) {
+  Location loc = dataMux->getLoc();
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
+  llvm::errs() << "Perform Rewrite G for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
+
+  // capture the shared control signal D from one of the top suppressors
+  Value conditionD = topSuppressorA.getConditionOperand();
+
+  // safely bypass topSuppA
+  Value wireA = topSuppressorA.getFalseResult();
+  blueBranchA->replaceUsesOfWith(wireA, topSuppressorA.getDataOperand());
+  if (wireA.use_empty()) {
+    frontier.erase(topSuppressorA);
+    topSuppressorA->erase();
+  }
+
+  // safely bypass topSuppB
+  Value wireB = topSuppressorB.getFalseResult();
+  blueBranchB->replaceUsesOfWith(wireB, topSuppressorB.getDataOperand());
+  if (wireB.use_empty()) {
+    frontier.erase(topSuppressorB);
+    topSuppressorB->erase();
+  }
+
+  // bypass topSuppC
+  SmallPtrSet<Operation *, 3> expectedRewriteOps;
+  if (auto notA = dyn_cast_or_null<handshake::NotIOp>(
+          blueBranchA.getConditionOperand().getDefiningOp()))
+    expectedRewriteOps.insert(notA);
+  else
+    expectedRewriteOps.insert(blueBranchA);
+  if (auto notB = dyn_cast_or_null<handshake::NotIOp>(
+          blueBranchB.getConditionOperand().getDefiningOp()))
+    expectedRewriteOps.insert(notB);
+  else
+    expectedRewriteOps.insert(blueBranchB);
+  expectedRewriteOps.insert(dataMux);
+
+  // safely rewire only the operands belonging to these specific operations
+  Value wireC = topSuppressorC.getFalseResult();
+  Value inputC = topSuppressorC.getDataOperand();
+
+  wireC.replaceUsesWithIf(inputC, [&](OpOperand &use) {
+    return expectedRewriteOps.contains(use.getOwner());
+  });
+
+  if (wireC.use_empty()) {
+    frontier.erase(topSuppressorC);
+    topSuppressorC->erase();
+  }
+
+  // build the new suppressor
+  OpBuilder builder(dataMux);
+  builder.setInsertionPointAfter(dataMux);
+
+  auto movedSuppressor = builder.create<handshake::ConditionalBranchOp>(
+      loc, conditionD, dataMux.getResult());
+  setHandshakeAttrs(bbAttr, namer, {movedSuppressor});
+  frontier.insert(movedSuppressor);
+
+  // reroute all downstream operations to the new moved suppressor's result
+  dataMux.getResult().replaceAllUsesExcept(movedSuppressor.getFalseResult(),
+                                           movedSuppressor);
+}
+
+void applyRewriteH(handshake::MuxOp dataMux,
+                   handshake::ConditionalBranchOp trueBranch,
+                   handshake::InitOp initOp,
+                   DenseSet<handshake::ConditionalBranchOp> &frontier,
+                   NameAnalysis &namer) {
+  Location loc = dataMux->getLoc();
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
+  llvm::errs() << "Perform Rewrite H for: " << dataMux->getAttr(HANDSHAKENAME)
+               << '\n';
+
+  // find the condition signal C
+  Value conditionC = trueBranch.getConditionOperand();
+  auto notOp = dyn_cast<handshake::NotIOp>(
+      trueBranch.getConditionOperand().getDefiningOp());
+  if (notOp) {
+    conditionC = notOp.getOperand();
+  }
+
+  // build the new Mux
+  OpBuilder builder(dataMux);
+  llvm::SmallVector<Value, 2> newMuxInputs = {conditionC, conditionC};
+  auto newMux = builder.create<handshake::MuxOp>(
+      loc, conditionC.getType(), initOp.getResult(), newMuxInputs);
+  setHandshakeAttrs(bbAttr, namer, {newMux});
+
+  // rewire the input to the suppressor to the new mux
+  if (notOp.getResult().hasOneUse()) {
+    notOp.getOperandMutable().assign(newMux.getResult());
+  } else {
+    // if other operations share this NotIOp, create a new isolated one
+    builder.setInsertionPoint(notOp);
+    auto newNotOp =
+        builder.create<handshake::NotIOp>(notOp->getLoc(), newMux.getResult());
+    setHandshakeAttrs(notOp->getAttr(HANDSHAKEBB), namer, {newNotOp});
+
+    trueBranch.getConditionOperandMutable().assign(newNotOp.getResult());
+  }
+
+  moveSuppressorPastOp(trueBranch, dataMux, frontier, namer);
+}
+
+/// Checks if `user` is the entry of a valid loop or conditional subregion by
+/// iterating over all the info. If valid, returns the matching region
+/// DictionaryAttr.
+DictionaryAttr findMatchingRegion(handshake::ConditionalBranchOp branchOp,
+                                  Operation *user, ArrayAttr infoArray) {
+
+  auto userBBAttr = user->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+  if (!userBBAttr)
+    return nullptr;
+  int userBB = userBBAttr.getInt();
+
+  // Case 1: Loop Header MuxOp
+  if (auto mux = dyn_cast<handshake::MuxOp>(user)) {
+    // check that we can't apply rewrite D and that it's a loop mux
+    if (mux.getDataOperands()[1] == branchOp.getFalseResult())
+      return nullptr;
+    if (!isa<handshake::InitOp>(mux.getSelectOperand().getDefiningOp()))
+      return nullptr;
+
+    for (Attribute attr : infoArray) {
+      auto dict = dyn_cast<DictionaryAttr>(attr);
+      if (!dict)
+        continue;
+      auto succBBs = dict.getAs<ArrayAttr>(SUCCESSOR_BBS);
+      if (!succBBs || succBBs.size() != 1)
+        continue;
+
+      // Check only the first successor entry in the array
+      int firstSuccBB = cast<IntegerAttr>(succBBs[0]).getInt();
+      if (firstSuccBB == userBB) {
+        llvm::errs() << "Found mux in bb: " << userBB << '\n';
+        return dict;
+      }
+    }
+    return nullptr;
+  }
+
+  // Case 2: Conditional region RegionInputOp marker
+  if (auto inputMarker = dyn_cast<handshake::RegionInputOp>(user)) {
+    for (Attribute attr : infoArray) {
+      auto dict = dyn_cast<DictionaryAttr>(attr);
+      if (!dict)
+        continue;
+      auto entryBBAttr = dict.getAs<IntegerAttr>(ENTRY_BB);
+      if (entryBBAttr && entryBBAttr.getInt() == userBB) {
+        llvm::errs() << "Found inputmarker\n";
+        return dict;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+/// Verifies that all sibling inputs to the region are also gated by a matching
+/// suppressor (or are valid sources), populating `branchesToDelete`.
+bool collectAndValidateFrontier(
+    handshake::ConditionalBranchOp branchOp, Operation *user,
+    DenseSet<handshake::ConditionalBranchOp> &branchesToDelete) {
+
+  Block *currentBlock = user->getBlock();
+  int userBB = user->getAttrOfType<IntegerAttr>(HANDSHAKEBB).getInt();
+
+  // collect all values that also go into the subregion
+  SmallVector<Value> incomingValues;
+
+  if (auto mux = dyn_cast<handshake::MuxOp>(user)) {
+    for (auto otherMux : currentBlock->getOps<handshake::MuxOp>()) {
+      // only look at muxes / cmerges in this basic block
+      auto bbAttr = otherMux->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+      if (otherMux != mux && bbAttr && bbAttr.getInt() == userBB)
+        incomingValues.push_back(otherMux.getDataOperands()[0]);
+    }
+  } else {
+    for (auto markerOp : currentBlock->getOps<handshake::RegionInputOp>()) {
+      // only look at markers in this basic block
+      auto bbAttr = markerOp->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+      if (bbAttr && bbAttr.getInt() == userBB)
+        incomingValues.push_back(markerOp->getOperand(0));
+    }
+  }
+
+  // check that all incomingValues have a suppressor in front
+  // of them with the same condition as branchOp (or are sourced/valid).
+  for (Value operand : incomingValues) {
+    // is it a sibling conditional branch with a matching condition
+    if (auto siblingBranch =
+            operand.getDefiningOp<handshake::ConditionalBranchOp>()) {
+      // check whether condition matches
+      if (!checkConditionsMatch(branchOp.getConditionOperand(),
+                                siblingBranch.getConditionOperand(), true)) {
+        llvm::errs() << "conditions do not match...\n";
+        siblingBranch.dump();
+        return false;
+      }
+      branchesToDelete.insert(siblingBranch);
+    } else if (!isSourced(operand)) {
+      llvm::errs() << "not sourced\n";
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/// Inserts new suppressors at the exit of the bypassed subregion.
+void insertExitSuppressors(
+    ArrayAttr entryOpsArray, Value condition, OpBuilder &builder,
+    NameAnalysis &namer,
+    const DenseMap<int64_t, Value> &blockEntryControlTokens,
+    DenseSet<handshake::ConditionalBranchOp> &frontier) {
+
+  for (Attribute attr : entryOpsArray) {
+    auto entryDict = cast<DictionaryAttr>(attr);
+    StringRef opName = entryDict.getAs<StringAttr>("op").getValue();
+    int64_t operandIdx = entryDict.getAs<IntegerAttr>("operand_idx").getInt();
+
+    Value incomingData;
+    Attribute bbAttr;
+
+    if (opName == "fake_control") {
+      incomingData = blockEntryControlTokens.lookup(operandIdx);
+      if (!incomingData)
+        continue;
+      bbAttr = builder.getUI32IntegerAttr(operandIdx);
+      builder.setInsertionPointAfterValue(incomingData);
+    } else {
+      // Find the target operation by handshake.name
+      Operation *targetOp = namer.getOp(opName);
+      if (!targetOp)
+        continue;
+
+      if (isa<handshake::StoreOp>(targetOp)) {
+        // memref::StoreOp had: 0 = data, 1 = memref, 2 = address
+        // handshake::StoreOp has: 0 = address, 1 = data
+        operandIdx = (operandIdx == 0) ? 1 : 0;
+      }
+
+      incomingData = targetOp->getOpOperand(operandIdx).get();
+      // Step past cond_br_predicate if present
+      if (auto predBr =
+              incomingData.getDefiningOp<handshake::ConditionalBranchOp>()) {
+        if (auto defName = predBr->getAttrOfType<StringAttr>(HANDSHAKENAME)) {
+          if (defName.getValue().starts_with("cond_br_predicate"))
+            incomingData = predBr.getDataOperand();
+        }
+      }
+
+      bbAttr = targetOp->getAttr(HANDSHAKEBB);
+      builder.setInsertionPoint(targetOp);
+    }
+
+    // insert suppressor
+    auto newBranch = builder.create<handshake::ConditionalBranchOp>(
+        incomingData.getLoc(), condition, incomingData);
+    setHandshakeAttrs(bbAttr, namer, {newBranch});
+    llvm::errs() << "placed an entryOp after:\n";
+    incomingData.dump();
+
+    // Replace all downstream uses of incomingData except the newBranch
+    incomingData.replaceAllUsesExcept(newBranch.getFalseResult(), newBranch);
+    frontier.insert(newBranch);
+  }
+}
+
+/// Bypasses and erases the old suppressors at the entry of the region.
+void bypassAndEraseOldBranches(
+    ArrayRef<handshake::ConditionalBranchOp> sortedBranches, Operation *user,
+    DenseSet<handshake::ConditionalBranchOp> &frontier) {
+
+  int userBB = user->getAttrOfType<IntegerAttr>(HANDSHAKEBB).getInt();
+
+  for (auto branchToDelete : sortedBranches) {
+    Value falseResult = branchToDelete.getFalseResult();
+    Value dataOperand = branchToDelete.getDataOperand();
+
+    // iterate over every branchToDelete's falseResult uses
+    for (OpOperand &use : llvm::make_early_inc_range(falseResult.getUses())) {
+      Operation *owner = use.getOwner();
+      auto ownerBB = owner->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
+      if (!ownerBB)
+        continue;
+
+      // check if the owner is in the same bb as the original branch
+      if (ownerBB.getInt() != userBB)
+        continue;
+
+      // check if the consumer is a MuxOp located inside the same bb
+      if (isa<handshake::MuxOp, handshake::RegionInputOp>(owner)) {
+        // llvm::errs() << "Bypassing suppressor.\n";
+        use.set(dataOperand);
+        continue;
+      }
+    }
+
+    // if the branchOp has no uses anymore, delete it
+    if (falseResult.use_empty()) {
+      // llvm::errs() << "deleted branch\n";
+      frontier.erase(branchToDelete);
+      branchToDelete.erase();
+    }
+  }
+}

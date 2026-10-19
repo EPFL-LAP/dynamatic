@@ -6,9 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Declares some utility functions which are useful for both the fast token
-// delivery algorithm and for the GSA analysis pass. All the functions are about
-// analyzing relationships between blocks and handshake operations.
+// Declares utility functions and data structures shared across the FTD
+// algorithm. Includes CFG analysis helpers, type utilities, annotation
+// constants, and the ShadowCFG bridge between the original CFG and the
+// flattened handshake IR.
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,10 +19,87 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace dynamatic {
 namespace experimental {
 namespace ftd {
+
+// ===--------------------------------------------------------------------=== //
+// Annotation constants used throughout the FTD algorithm.
+// ===--------------------------------------------------------------------=== //
+
+/// Annotation to use in the IR when an operation needs to be skipped by the FTD
+/// algorithm.
+constexpr llvm::StringLiteral FTD_OP_TO_SKIP("ftd.skip");
+/// Annotation to identify muxes inserted with the `addGsaGates`
+/// functionalities.
+constexpr llvm::StringLiteral FTD_EXPLICIT_MU("ftd.MU");
+constexpr llvm::StringLiteral FTD_EXPLICIT_GAMMA("ftd.GAMMA");
+/// Temporary annotation to be used with merges created with the
+/// `createPhiNetwork` functionality, which will then be converted into muxes.
+constexpr llvm::StringLiteral NEW_PHI("nphi");
+/// Annotation to use for initial merges and initial false constants.
+constexpr llvm::StringLiteral FTD_INIT_MERGE("ftd.imerge");
+/// Annotation to use for regeneration multiplexers.
+constexpr llvm::StringLiteral FTD_REGEN("ftd.regen");
+/// Annotation for condition variable placeholders.
+constexpr llvm::StringLiteral FTD_COND_VAR("ftd.cvar");
+
+// ===--------------------------------------------------------------------=== //
+// ShadowCFG
+// ===--------------------------------------------------------------------=== //
+
+/// A temporary shadow of the original CFG, built after CfToHandshake
+/// conversion flattens everything.  Encapsulates the shadow Region
+/// (with real CF terminators) plus a condition-value map that bridges
+/// shadow analysis to real handshake Values.
+///
+/// All analysis infrastructure (BlockIndexing, CFGLoopInfo, path
+/// enumeration, dominance) operates on getRegion() as if the original
+/// CFG were still alive.  The only thing the shadow cannot provide
+/// natively is the real handshake condition Value for each cond_br
+/// block — getCondition() provides that.
+struct ShadowCFG {
+  mlir::func::FuncOp shadowFunc;
+  llvm::DenseMap<unsigned, mlir::Value> conditionMap;
+
+  mlir::Region &getRegion() { return shadowFunc.getBody(); }
+
+  mlir::Block *getBlock(unsigned bbIdx) {
+    for (auto [i, blk] : llvm::enumerate(getRegion()))
+      if (i == bbIdx)
+        return &blk;
+    llvm_unreachable("BB index out of range in shadow CFG");
+  }
+
+  unsigned getBlockIndex(mlir::Block *block) {
+    for (auto [i, blk] : llvm::enumerate(getRegion()))
+      if (&blk == block)
+        return i;
+    llvm_unreachable("Block not found in shadow CFG");
+  }
+
+  /// Get the real handshake condition Value for the cond_br in block bbIdx.
+  /// Returns nullptr if the block had an unconditional branch.
+  mlir::Value getCondition(unsigned bbIdx) {
+    auto it = conditionMap.find(bbIdx);
+    return (it != conditionMap.end()) ? it->second : nullptr;
+  }
+
+  mlir::Value getCondition(mlir::Block *block) {
+    return getCondition(getBlockIndex(block));
+  }
+
+  void destroy() {
+    if (shadowFunc)
+      shadowFunc.erase();
+  }
+};
+
+// ===--------------------------------------------------------------------=== //
+// BlockIndexing
+// ===--------------------------------------------------------------------=== //
 
 /// Class to associate an index to each block, so that if block Bi dominates
 /// block Bj then i < j. While this is guaranteed by the MLIR CFG construction,
@@ -49,10 +127,10 @@ public:
   /// Get the index of a block.
   std::optional<unsigned> getIndexFromBlock(Block *bb) const;
 
-  /// Return true if the index of bb1 is greater than then index of bb2.
+  /// Return true if the index of bb1 is greater than the index of bb2.
   bool isGreater(Block *bb1, Block *bb2) const;
 
-  /// Return true if the index of bb1 is smaller than then index of bb2.
+  /// Return true if the index of bb1 is smaller than the index of bb2.
   bool isLess(Block *bb1, Block *bb2) const;
 
   /// Given a block whose name is `^BBN` (where N is an integer) return a string
@@ -60,6 +138,10 @@ public:
   /// to be executed. The adopted index is retrieved from the BlockIndexing.
   std::string getBlockCondition(Block *block) const;
 };
+
+// ===--------------------------------------------------------------------=== //
+// CFG Analysis Utilities
+// ===--------------------------------------------------------------------=== //
 
 /// Checks if the source and destination are in a loop
 /// (including any of their ancestor loops).
@@ -92,11 +174,42 @@ getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
                   const DenseSet<Block *> &deps = DenseSet<Block *>(),
                   bool ignoreDeps = true);
 
+/// A lightweight DFS to check if 'end' is reachable from 'start'.
+bool isReachable(Block *start, Block *end);
+
+// ===--------------------------------------------------------------------=== //
+// Type Utilities
+// ===--------------------------------------------------------------------=== //
+
 /// Return the channelified version of the input type.
 Type channelifyType(Type type);
 
-/// Get an array of `size` elements all identical to the
+/// Get an array of `size` elements all identical to the channelified type.
 SmallVector<Type> getListTypes(Type inputType, unsigned size = 2);
+
+// ===--------------------------------------------------------------------=== //
+// IR Attribute Utilities
+// ===--------------------------------------------------------------------=== //
+
+/// Compute the positional index of `block` in its parent region and set
+/// the handshake.bb attribute on `op`.
+void setBBAttr(Operation *op, Block *block, OpBuilder &builder);
+
+/// Set the handshake.bb attribute on `op` from an existing attribute.
+void setBBAttr(Operation *op, IntegerAttr bbAttr);
+
+/// Set the handshake.bb attribute on `op`, preferring `bbAttr` if available,
+/// otherwise computing from `block`.
+void setBBAttrWithFallback(Operation *op, IntegerAttr bbAttr, Block *block,
+                           OpBuilder &builder);
+
+/// Build a `handshake.bb` IntegerAttr (32-bit unsigned) for `bbIdx`.
+IntegerAttr getBBIndexAttr(MLIRContext *ctx, unsigned bbIdx);
+
+/// Get or create a SourceOp placeholder in `condBlock` representing the
+/// condition of that block's terminator. Reuses existing placeholder if one
+/// exists. Tagged with FTD_COND_VAR and FTD_OP_TO_SKIP so that FTD skips it.
+Value getOrCreateCondPlaceholder(Block *condBlock, OpBuilder &builder);
 
 } // namespace ftd
 } // namespace experimental

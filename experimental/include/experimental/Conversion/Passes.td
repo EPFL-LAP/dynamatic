@@ -33,6 +33,7 @@ def FtdCfToHandshake : DynamaticPass<"ftd-lower-cf-to-handshake"> {
     As the algorithm does not require any parameter, no input is necessary. This pass can 
     be used through the flag "--fast-token-delivery" at compile tile in dynamatic.
   }];
+  let dependentDialects = ["cf_extra::CFExtraDialect"];
 }
 
 #endif // EXPERIMENTAL_CONVERSION_PASSES_TD

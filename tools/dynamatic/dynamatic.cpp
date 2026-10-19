@@ -304,6 +304,7 @@ public:
   static constexpr llvm::StringLiteral ENABLE_SHORT_CIRCUIT =
       "enable-short-circuit";
   static constexpr llvm::StringLiteral SPECULATION = "speculation";
+  static constexpr llvm::StringLiteral EAGERLYELASTIC = "eagerlyelastic";
   static constexpr llvm::StringLiteral ENABLE_DUPLICATION =
       "enable-duplication";
   static constexpr llvm::StringLiteral CALCULATE_PATH_DELAYS =
@@ -351,6 +352,8 @@ public:
              "After buffer placement, re-run the MILP with the buffering "
              "decisions locked in to calculate the path delays the MILP "
              "believes are present in the circuit."});
+    addFlag({EAGERLYELASTIC,
+             "Enable eager execution. Requires fast token delivery."});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -793,6 +796,7 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string enableShortCircuit =
       args.flags.contains(ENABLE_SHORT_CIRCUIT) ? "1" : "0";
   std::string speculation = args.flags.contains(SPECULATION) ? "1" : "0";
+  std::string eagerlyelastic = args.flags.contains(EAGERLYELASTIC) ? "1" : "0";
   std::string enableDuplication =
       args.flags.contains(ENABLE_DUPLICATION) ? "1" : "0";
   std::string calculatePathDelays =
@@ -803,7 +807,8 @@ CommandResult Compile::execute(CommandArguments &args) {
                  floatToString(state.targetCP, 3), sharing,
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
-                 enableShortCircuit, enableDuplication, calculatePathDelays);
+                 enableShortCircuit, enableDuplication, calculatePathDelays,
+                 eagerlyelastic);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

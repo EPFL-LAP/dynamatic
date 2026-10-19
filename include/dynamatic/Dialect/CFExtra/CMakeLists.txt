@@ -1,0 +1,3 @@
+add_dynamatic_dialect(CFExtra cf_extra)
+
+add_dependencies(dynamatic-headers MLIRCFExtraIncGen)

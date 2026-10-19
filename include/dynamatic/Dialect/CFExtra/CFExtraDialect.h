@@ -1,0 +1,8 @@
+#ifndef DYNAMATIC_DIALECT_CFEXTRA_CFEXTRADIALECT_H
+#define DYNAMATIC_DIALECT_CFEXTRA_CFEXTRADIALECT_H
+
+#include "mlir/IR/Dialect.h"
+
+#include "dynamatic/Dialect/CFExtra/CFExtraDialect.h.inc"
+
+#endif // DYNAMATIC_DIALECT_CFEXTRA_CFEXTRADIALECT_H
