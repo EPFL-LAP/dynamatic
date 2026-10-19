@@ -29,7 +29,6 @@ enum class RewriteStrategy {
   RewriteB,
   RewriteC,
   RewriteD,
-  RewriteD2,
   RewriteE,
   RewriteF,
   RewriteG,
@@ -46,9 +45,6 @@ struct EagerlyElasticAllPass
 private:
   DenseSet<handshake::ConditionalBranchOp>
   prepareSuppressors(handshake::FuncOp funcOp, NameAnalysis &namer);
-
-  void applyMuxRewrites(DenseSet<handshake::ConditionalBranchOp> &frontier,
-                        NameAnalysis &namer, RewriteStrategy rewrite);
 
   void applyRewriteXAsOftenAsPossible(
       DenseSet<handshake::ConditionalBranchOp> &frontier, NameAnalysis &namer,
@@ -90,11 +86,6 @@ EagerlyElasticAllPass::prepareSuppressors(handshake::FuncOp funcOp,
     // if the true result has no uses it is a sink, as desired
     if (branchOp.getTrueResult().use_empty()) {
       continue;
-    }
-
-    if (branchOp->hasAttr("store_suppressor")) {
-      llvm::errs() << "skipping store suppressor\n";
-      // continue;
     }
 
     OpBuilder builder(branchOp);
@@ -143,9 +134,9 @@ void EagerlyElasticAllPass::applyRewriteXAsOftenAsPossible(
     SmallVector<handshake::ConditionalBranchOp> sortedFrontier(frontier.begin(), frontier.end());
     llvm::sort(sortedFrontier, [](handshake::ConditionalBranchOp a, handshake::ConditionalBranchOp b) {
       StringRef nameA, nameB;
-      if (auto attrA = a->getAttrOfType<StringAttr>("handshake.name"))
+      if (auto attrA = a->getAttrOfType<StringAttr>(HANDSHAKENAME))
         nameA = attrA.getValue();
-      if (auto attrB = b->getAttrOfType<StringAttr>("handshake.name"))
+      if (auto attrB = b->getAttrOfType<StringAttr>(HANDSHAKENAME))
         nameB = attrB.getValue();
       return nameA < nameB;
     });
@@ -158,13 +149,6 @@ void EagerlyElasticAllPass::applyRewriteXAsOftenAsPossible(
           if (isEligibleForBypass(branchOp, user) == BypassResult::Ineligible) {
             if (regionBased || !isa<handshake::RegionInputOp>(user))
               continue;
-          }
-          auto nameAttr = user->getAttrOfType<mlir::StringAttr>("handshake.name");
-          if (nameAttr && nameAttr.getValue() == "constant21") { // mux18
-            continue;
-          }
-          if (nameAttr && nameAttr.getValue() == "constant22") { // mux18
-            continue;
           }
           frontierUpdated = true;
           moveSuppressorPastOp(branchOp, user, frontier, namer);
@@ -382,12 +366,6 @@ void EagerlyElasticAllPass::applyRewriteXOnce(
                        << " should not be applied only once\n";
           break;
         }
-      } else if (auto merge = dyn_cast<handshake::ControlMergeOp>(user)) {
-        auto nameAttr = merge->getAttrOfType<mlir::StringAttr>("handshake.name");
-        if (nameAttr && nameAttr.getValue() == "control_merge1" && rewrite == RewriteStrategy::RewriteD2) { // mux18
-          applyRewriteDMerged(merge, branchOp, frontier, namer);
-          return;
-        }
       }
     }
   }
@@ -430,10 +408,11 @@ void EagerlyElasticAllPass::applyRewritesForRegion(
         // check whether the suppressor is connected to path A of the mux
         if (mux.getDataOperands()[1] == branchOp.getFalseResult()) {
           auto bbAttr =
-              mux->getAttrOfType<mlir::IntegerAttr>("handshake.bb");
+              mux->getAttrOfType<mlir::IntegerAttr>(HANDSHAKEBB);
           if (bbAttr && bbAttr.getValue() == expectedBB) {
-            std::string muxName = mux->getAttrOfType<StringAttr>("handshake.name").getValue().str();
+            std::string muxName = mux->getAttrOfType<StringAttr>(HANDSHAKENAME).getValue().str();
             candidates.push_back({mux, branchOp, init, muxName});
+            seenMuxes.insert(mux);
           }
         }
       }
@@ -493,7 +472,7 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
         }
       } else if (inputMarker) {
         // verify the marker has a handshake.bb attribute
-        auto markerBBAttr = inputMarker->getAttrOfType<IntegerAttr>("handshake.bb");
+        auto markerBBAttr = inputMarker->getAttrOfType<IntegerAttr>(HANDSHAKEBB);
         if (!markerBBAttr)
           continue;
 
@@ -588,9 +567,9 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
       SmallVector<handshake::ConditionalBranchOp> sortedBranches(branchesToDelete.begin(), branchesToDelete.end());
       llvm::sort(sortedBranches, [](handshake::ConditionalBranchOp a, handshake::ConditionalBranchOp b) {
         StringRef nameA, nameB;
-        if (auto attrA = a->getAttrOfType<StringAttr>("handshake.name"))
+        if (auto attrA = a->getAttrOfType<StringAttr>(HANDSHAKENAME))
           nameA = attrA.getValue();
-        if (auto attrB = b->getAttrOfType<StringAttr>("handshake.name"))
+        if (auto attrB = b->getAttrOfType<StringAttr>(HANDSHAKENAME))
           nameB = attrB.getValue();
         return nameA < nameB;
       });
@@ -636,7 +615,7 @@ void EagerlyElasticAllPass::movePastFunctionBlock(
 
           // If incomingData comes from a cond_br_predicate, step one operation above
           if (auto predBr = incomingData.getDefiningOp<handshake::ConditionalBranchOp>()) {
-            if (auto defName = predBr->getAttrOfType<StringAttr>("handshake.name")) {
+            if (auto defName = predBr->getAttrOfType<StringAttr>(HANDSHAKENAME)) {
               if (defName.getValue().starts_with("cond_br_predicate")) {
                 incomingData = predBr.getDataOperand();
               }

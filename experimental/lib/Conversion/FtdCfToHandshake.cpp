@@ -555,7 +555,6 @@ struct FtdCfToHandshakePass
         // create the data suppressor branch using combinedCond
         auto dataBranch = builder.create<handshake::ConditionalBranchOp>(
             storeOp.getLoc(), combinedCond, rawData);
-        dataBranch->setAttr("store_suppressor", builder.getUnitAttr());
         inheritBB(storeOp, dataBranch);
         std::string dataBranchName = "cond_br_" + basePredName;
         dataBranch->setAttr("handshake.name", builder.getStringAttr(dataBranchName));
@@ -567,7 +566,6 @@ struct FtdCfToHandshakePass
         Value currentAddr = storeOp.getAddress();
         auto addrBranch = builder.create<handshake::ConditionalBranchOp>(
             storeOp.getLoc(), combinedCond, currentAddr);
-        addrBranch->setAttr("store_suppressor", builder.getUnitAttr());
         inheritBB(storeOp, addrBranch);
         std::string addrBranchName = "cond_br_" + basePredName + "_addr";
         addrBranch->setAttr("handshake.name", builder.getStringAttr(addrBranchName));
@@ -669,12 +667,7 @@ static LogicalResult convertConstants(ConversionPatternRewriter &rewriter,
     // constant is considered as sourcable, this will be the output of a source
     // component, otherwise it remains startValue
     Value controlValue;
-   /*  if (cstOp->hasAttr("ftd.pseudo_cond")) {
-      // Trigger from the block argument / block control signal instead of startValue!
-      Block *cstBlock = cstOp->getBlock();
-      controlValue = cstBlock->getArguments().back(); // Block control token!
-    }
-    else  */if (isCstSourcable(cstOp)) {
+    if (isCstSourcable(cstOp)) {
       auto sourceOp = rewriter.create<handshake::SourceOp>(cstOp.getLoc());
       inheritBB(cstOp, sourceOp);
       controlValue = sourceOp.getResult();

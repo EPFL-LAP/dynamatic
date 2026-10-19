@@ -7,6 +7,8 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "dynamatic/Dialect/CFExtra/CFExtraOps.h"
 
+#define DEBUG_TYPE "mark-subloop"
+
 using namespace dynamatic;
 using namespace mlir;
 
@@ -41,6 +43,27 @@ struct MarkSubloopPass
 private:
   void getRealConsumers(Value val, Block *targetBlock, llvm::SmallVectorImpl<EntryOpInfo> &results);
   Block *getTrueDefiningBlock(Value val);
+
+  /// Discovers valid single-entry/single-exit and loop subregions.
+  llvm::SmallVector<std::pair<Block *, RegionInfo>>
+  discoverRegions(Region &cfg, DominanceInfo &domInfo,
+                  PostDominanceInfo &postDomInfo,
+                  const llvm::DenseMap<Block *, unsigned> &blockIndices);
+
+  /// Processes a single region, predicating stores and returning its metadata.
+  DictionaryAttr processRegion(RegionInfo &region,
+                               const llvm::DenseMap<Block *, unsigned> &blockIndices,
+                               OpBuilder &builder, NameAnalysis &namer);
+
+  /// Inserts RegionInputOp markers for values entering multi-successor regions.
+  void markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>> sortedRegions,
+                          llvm::DenseSet<Block *> &multiPredEntryBlocks,
+                          OpBuilder &builder, NameAnalysis &namer);
+
+  /// Wires BlockControlOps and control tokens across the function's CFG.
+  void insertBlockControlNetwork(func::FuncOp funcOp,
+                                 const llvm::DenseSet<Block *> &multiPredBlocks,
+                                 OpBuilder &builder, NameAnalysis &namer);
 
 };
 
@@ -96,28 +119,11 @@ Block *MarkSubloopPass::getTrueDefiningBlock(Value val) {
   return nullptr;
 }
 
-
-void MarkSubloopPass::runOnOperation() {
-  ModuleOp modOp = getOperation();
-  NameAnalysis &namer = getAnalysis<NameAnalysis>();
-  MLIRContext *ctx = &getContext();
-  OpBuilder builder(ctx);
-
-  auto funcOps = modOp.getBody()->getOps<mlir::func::FuncOp>();
-  assert(!funcOps.empty() && "No funcOp found!");
-
-  mlir::func::FuncOp funcOp = *funcOps.begin();
-  mlir::Region &cfg = funcOp.getBody();
-
-  // precompute block indices
-  llvm::DenseMap<Block *, unsigned> blockIndices;
-  for (auto [idx, block] : llvm::enumerate(cfg))
-    blockIndices[&block] = idx;
-
-  // Compute Dominance Info for the cfg
-  DominanceInfo domInfo(funcOp);
-  PostDominanceInfo postDomInfo(funcOp);
-  llvm::DenseMap<mlir::Block *, RegionInfo> validRegions;
+llvm::SmallVector<std::pair<Block *, RegionInfo>>
+MarkSubloopPass::discoverRegions(Region &cfg, DominanceInfo &domInfo,
+                                 PostDominanceInfo &postDomInfo,
+                                 const llvm::DenseMap<Block *, unsigned> &blockIndices) {
+  llvm::DenseMap<Block *, RegionInfo> validRegions;
 
   // iterate over all dom / postdom pairs
   for (mlir::Block &entry : cfg) {
@@ -163,13 +169,9 @@ void MarkSubloopPass::runOnOperation() {
     }
 
     // latches cannot be entries
-    bool isLatch = false;
-    for (mlir::Block *succ : entry.getSuccessors()) {
-      if (domInfo.dominates(succ, &entry)) {
-        isLatch = true;
-        break;
-      }
-    }
+    bool isLatch = llvm::any_of(entry.getSuccessors(), [&](Block *succ) {
+      return domInfo.dominates(succ, &entry);
+    });
     if (isLatch)
       continue;
 
@@ -200,200 +202,160 @@ void MarkSubloopPass::runOnOperation() {
     }
   }
 
-  if (validRegions.empty()) {
-    llvm::errs() << "No valid dom / postdom pairs with subblocks found!\n";
-    return;
-  }
-  llvm::errs() << "size of validRegions: " << validRegions.size() << '\n';
-
-  // 1. Copy the DenseMap entries into a vector
-  llvm::SmallVector<std::pair<mlir::Block *, RegionInfo>> sortedRegions(
-      validRegions.begin(), validRegions.end());
-
-  // 2. Build a deterministic index map from the parent mlir::Region's block order
-  llvm::DenseMap<mlir::Block *, unsigned> blockOrder;
-  if (!sortedRegions.empty()) {
-    if (mlir::Region *parentRegion = sortedRegions.front().first->getParent()) {
-      unsigned idx = 0;
-      for (mlir::Block &b : *parentRegion)
-        blockOrder[&b] = idx++;
-    }
-  }
-
-  // 3. Sort deterministically by block position
+  // Sort deterministically by block order in the parent region
+  llvm::SmallVector<std::pair<Block *, RegionInfo>> sortedRegions(validRegions.begin(),
+                                              validRegions.end());
   llvm::sort(sortedRegions, [&](const auto &lhs, const auto &rhs) {
-    return blockOrder.lookup(lhs.first) < blockOrder.lookup(rhs.first);
+    return blockIndices.lookup(lhs.first) < blockIndices.lookup(rhs.first);
   });
 
-  llvm::SmallVector<Attribute> allRegionsMetadata;
-  // track the targeted memory controllers
-  llvm::DenseSet<Value> markedMemrefs;
+  return sortedRegions;
+}
 
-  // Process all discovered regions
-  for (auto &[entryBlock, region] : sortedRegions) {
-    llvm::SetVector<mlir::Block *> &subblocks = region.subblocks;
-    mlir::Block *exitBlock = region.exitBlock;
-    for (mlir::Block *b : subblocks) {
-      b->printAsOperand(llvm::errs());
-      llvm::errs() << ", ";
+/// Processes a single region, predicating stores and returning its metadata.
+/// Collects all entry operations = operations that are defined in the subblock
+/// and used directly in the exitBlock. Finds all store operation and adds
+/// a pseudo constant and a predicate in front of every store.
+DictionaryAttr MarkSubloopPass::processRegion(RegionInfo &region,
+                              const llvm::DenseMap<Block *, unsigned> &blockIndices,
+                              OpBuilder &builder, NameAnalysis &namer) {
+
+  Block *entryBlock = region.entryBlock;
+  Block *exitBlock = region.exitBlock;
+  llvm::SetVector<Block *> &subblocks = region.subblocks;
+  for (mlir::Block *b : subblocks) {
+    b->printAsOperand(llvm::errs());
+    llvm::errs() << ", ";
+  }
+  llvm::errs() << "\n";
+
+  unsigned entryBBIdx = blockIndices.lookup(entryBlock);
+
+  // collect the block indices of all successors
+  llvm::SmallVector<Attribute> successorAttrs;
+  for (mlir::Block *successor : entryBlock->getSuccessors()) {
+    int succIdx = blockIndices.lookup(successor);
+    successorAttrs.push_back(builder.getI64IntegerAttr(succIdx));
+  }
+
+  // Collect the names and operandIDs of entry operations in exitBlock
+  llvm::SmallVector<Attribute> entryOpAttrs;
+
+  // Helper to format entry info into a DictionaryAttr
+  auto addEntryOpAttr = [&](Operation *op, unsigned idx) {
+    StringAttr nameAttr = op->getAttrOfType<StringAttr>("handshake.name");
+    std::string nameStr = nameAttr.getValue().str();
+
+    if (isa<dynamatic::cf_extra::PredicateOp>(op)) {
+      nameStr = "cond_br_" + nameStr;
     }
-    llvm::errs() << "\n";
 
-    int entryBBIdx = blockIndices[entryBlock];
-    bool storesInSubblock = false;
-
-    // collect the block indices of all successors
-    llvm::SmallVector<Attribute> successorAttrs;
-    for (mlir::Block *successor : entryBlock->getSuccessors()) {
-      int succIdx = blockIndices[successor];
-      successorAttrs.push_back(builder.getI64IntegerAttr(succIdx));
-    }
-
-    // Collect the names and operandIDs of entry operations in exitBlock
-    llvm::SmallVector<Attribute> entryOpAttrs;
-
-    // Helper to format entry info into a DictionaryAttr
-    auto addEntryOpAttr = [&](Operation *op, unsigned idx) {
-      StringAttr nameAttr = op->getAttrOfType<StringAttr>("handshake.name");
-      std::string nameStr = nameAttr.getValue().str();
-
-      if (isa<dynamatic::cf_extra::PredicateOp>(op)) {
-        nameStr = "cond_br_" + nameStr;
-      }
-
-      NamedAttribute entries[] = {
-          builder.getNamedAttr("op", builder.getStringAttr(nameStr)),
-          builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(idx))
-      };
-      entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
+    NamedAttribute entries[] = {
+        builder.getNamedAttr("op", builder.getStringAttr(nameStr)),
+        builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(idx))
     };
+    entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
+  };
 
-    // trace values defined in the subblocks used directly in the exitBlock
-    for (Operation &op : exitBlock->getOperations()) {
-      // Skip constants
-      if (isa<arith::ConstantOp>(&op)) continue;
+  // trace values defined in the subblocks used directly in the exitBlock
+  for (Operation &op : exitBlock->getOperations()) {
+    // Skip constants
+    if (isa<arith::ConstantOp>(&op)) continue;
 
-      for (OpOperand &use : op.getOpOperands()) {
-        Value operand = use.get();
-        if (isa<MemRefType>(operand.getType())) continue;
+    for (OpOperand &use : op.getOpOperands()) {
+      Value operand = use.get();
+      if (isa<MemRefType>(operand.getType())) continue;
 
-        // determine the defining block whether it's an OpResult or a BlockArgument
-        Block *definingBlock = getTrueDefiningBlock(operand);
+      // determine the defining block whether it's an OpResult or a BlockArgument
+      Block *definingBlock = getTrueDefiningBlock(operand);
 
-        // Check if the defining block belongs to subblocks
-        if (subblocks.contains(definingBlock)) {
-          if (isa<arith::ExtUIOp, arith::ExtSIOp, arith::IndexCastOp>(&op)) {
-            // Trace past casts
-            llvm::SmallVector<EntryOpInfo, 2> consumers;
-            getRealConsumers(op.getResult(0), exitBlock, consumers);
-            for (const auto &info : consumers) {
-              addEntryOpAttr(info.op, info.operandIdx);
-            }
-          } else {
-            addEntryOpAttr(&op, use.getOperandNumber());
+      // Check if the defining block belongs to subblocks
+      if (subblocks.contains(definingBlock)) {
+        if (isa<arith::ExtUIOp, arith::ExtSIOp, arith::IndexCastOp>(&op)) {
+          // Trace past casts
+          llvm::SmallVector<EntryOpInfo, 2> consumers;
+          getRealConsumers(op.getResult(0), exitBlock, consumers);
+          for (const auto &info : consumers) {
+            addEntryOpAttr(info.op, info.operandIdx);
           }
+        } else {
+          addEntryOpAttr(&op, use.getOperandNumber());
         }
       }
     }
-    
-    // add the entry operation for the control
-    unsigned exitBlockIdx = blockIndices[exitBlock];
-    NamedAttribute entries[] = {
-        builder.getNamedAttr("op", builder.getStringAttr("fake_control")),
-        builder.getNamedAttr("operand_idx", builder.getI64IntegerAttr(exitBlockIdx))
-    };
-    entryOpAttrs.push_back(builder.getDictionaryAttr(entries));
+  }
+  
+  // add the entry operation for the control
+  unsigned exitBlockIdx = blockIndices.lookup(exitBlock);
+  entryOpAttrs.push_back(builder.getDictionaryAttr({
+      builder.getNamedAttr("op", builder.getStringAttr("fake_control")),
+      builder.getNamedAttr("operand_idx",
+                           builder.getI64IntegerAttr(exitBlockIdx)),
+  }));
 
-    // find all the stores in the subblocks
-    llvm::SmallVector<memref::StoreOp> storesToModify;
-    for (mlir::Block *block : subblocks) {
-      for (auto storeOp : block->getOps<memref::StoreOp>()) {
-        storesInSubblock = true;
-        storesToModify.push_back(storeOp);
-      }
+  // find all the stores in the subblocks
+  llvm::SmallVector<memref::StoreOp> storesToModify;
+  for (mlir::Block *block : subblocks) {
+    for (auto storeOp : block->getOps<memref::StoreOp>()) {
+      storesToModify.push_back(storeOp);
     }
-    llvm::errs() << "found " << storesToModify.size() << " stores in the subblocks\n";
+  }
+  llvm::errs() << "found " << storesToModify.size() << 
+    " stores in the subblocks\n";
 
-    // insert one pseudo constant and a predicate in front of all the stores
-    if (storesInSubblock) {
-      builder.setInsertionPoint(entryBlock->getTerminator());
-      Location loc = builder.getUnknownLoc();
+  // insert one pseudo constant and a predicate in front of all the stores
+  bool hasStores = !storesToModify.empty();
+  if (hasStores) {
+    builder.setInsertionPoint(entryBlock->getTerminator());
 
-      // create pseudo-constant in entryBlock
-      auto pseudoCondOp = builder.create<arith::ConstantOp>(
-          loc, 
-          builder.getI1Type(), 
-          builder.getBoolAttr(false)
+    // create pseudo-constant in entryBlock
+    auto pseudoCondOp = builder.create<arith::ConstantOp>(
+        builder.getUnknownLoc(), 
+        builder.getI1Type(), 
+        builder.getBoolAttr(false)
+    );
+    std::string pseudoName = "pseudo_cond" + std::to_string(entryBBIdx);
+    pseudoCondOp->setAttr("handshake.name", builder.getStringAttr(pseudoName));
+
+    for (memref::StoreOp storeOp : storesToModify) {
+      builder.setInsertionPoint(storeOp);
+
+      // predicate data
+      Value incomingData = storeOp.getValueToStore();
+      auto predOp = builder.create<dynamatic::cf_extra::PredicateOp>(
+          storeOp.getLoc(),
+          incomingData.getType(),
+          pseudoCondOp.getResult(),
+          incomingData
       );
-      std::string pseudoName = "pseudo_cond" + std::to_string(entryBBIdx);
-      pseudoCondOp->setAttr("handshake.name", builder.getStringAttr(pseudoName));
-      pseudoCondOp->setAttr("ftd.pseudo_cond", builder.getUnitAttr());
-
-      for (memref::StoreOp storeOp : storesToModify) {
-        builder.setInsertionPoint(storeOp);
-
-        // predicate data
-        Value incomingData = storeOp.getValueToStore();
-        auto predOp = builder.create<dynamatic::cf_extra::PredicateOp>(
-            storeOp.getLoc(),
-            incomingData.getType(),
-            pseudoCondOp.getResult(),
-            incomingData
-        );
-        namer.setName(predOp);
-        // Rewire the data operand safely using setOperand on its specific index
-        storeOp.setOperand(0, predOp->getResult(0));
-      }
+      namer.setName(predOp);
+      // Rewire the data operand safely using setOperand on its specific index
+      storeOp.setOperand(0, predOp->getResult(0));
     }
-
-    // construct the Metadata Dictionary
-    allRegionsMetadata.push_back(builder.getDictionaryAttr({
-        builder.getNamedAttr("entry_bb",
-                             builder.getI64IntegerAttr(entryBBIdx)),
-        builder.getNamedAttr("successor_bbs", 
-                             builder.getArrayAttr(successorAttrs)),
-        builder.getNamedAttr("stores", builder.getBoolAttr(storesInSubblock)),
-        builder.getNamedAttr("entry_ops", builder.getArrayAttr(entryOpAttrs)),
-    }));
   }
 
-  // attach the attribute directly to modOp
-  modOp->setAttr("handshake.subregion_info", builder.getArrayAttr(allRegionsMetadata));
+  return builder.getDictionaryAttr({
+      builder.getNamedAttr("entry_bb", builder.getI64IntegerAttr(entryBBIdx)),
+      builder.getNamedAttr("successor_bbs",
+                           builder.getArrayAttr(successorAttrs)),
+      builder.getNamedAttr("stores", builder.getBoolAttr(hasStores)),
+      builder.getNamedAttr("entry_ops", builder.getArrayAttr(entryOpAttrs)),
+  });
+}
 
-  // Precompute reverse lookup from block index to Block*
-  SmallVector<Block *> blocksByIndex(blockIndices.size());
-  for (auto &[block, idx] : blockIndices)
-    blocksByIndex[idx] = block;
+/// Inserts RegionInputOp markers for values entering multi-successor regions.
+void MarkSubloopPass::markExternalInputs(ArrayRef<std::pair<Block *, RegionInfo>> sortedRegions,
+                        llvm::DenseSet<Block *> &multiPredEntryBlocks,
+                        OpBuilder &builder, NameAnalysis &namer) {
 
-  llvm::DenseSet<Block *> multiPredEntryBlocks;
-
-  // collect external values used within subblocks if we are at an if/else region
-  for (Attribute regionAttr : allRegionsMetadata) {
-    auto dict = dyn_cast<DictionaryAttr>(regionAttr);
-    if (!dict)
+  for (const auto &[entryBlock, region] : sortedRegions) {
+    // Only look at if/else regions
+    if (entryBlock->getNumSuccessors() <= 1)
       continue;
 
-    // only look at if / else blocks - blocks that have 2 successors
-    auto successorAttrs = dict.getAs<ArrayAttr>("successor_bbs");
-    if (!successorAttrs || successorAttrs.size() <= 1)
-      continue;
-
-    auto entryBBAttr = dict.getAs<IntegerAttr>("entry_bb");
-    if (!entryBBAttr)
-      continue;
-
-    unsigned entryBBIdx = entryBBAttr.getInt();
-    if (entryBBIdx >= blocksByIndex.size()) continue;
-    Block *entryBlock = blocksByIndex[entryBBIdx];
     multiPredEntryBlocks.insert(entryBlock);
+    const llvm::SetVector<Block *> &subblocks = region.subblocks;
 
-    // Look up subblocks for this region
-    auto it = validRegions.find(entryBlock);
-    if (it == validRegions.end()) continue;
-    llvm::SetVector<Block *> &subblocks = it->second.subblocks;
-
-    llvm::errs() << "collect external values used within subblocks\n";
-    
     // Map each external Value to its marker in this specific entryBlock
     llvm::DenseMap<Value, Value> markedValues;
     Operation *terminator = entryBlock->getTerminator();
@@ -424,22 +386,14 @@ void MarkSubloopPass::runOnOperation() {
 
       // Rewire use to read from the marker output
       use.set(markedVal);
-
-      if (Operation *defOp = val.getDefiningOp()) {
-        llvm::errs() << "Operation producing marked value: " << *defOp << "\n";
-      } else if (auto arg = dyn_cast<BlockArgument>(val)) {
-        llvm::errs() << "Marked value is a BlockArgument of block: ";
-        arg.getOwner()->printAsOperand(llvm::errs());
-        llvm::errs() << "\n";
-      }
     };
 
-    // 1. Also mark the condition of entryBlock's conditional branch terminator (e.g., cmpi0)
+    // mark the condition of entryBlock's conditional branch terminator (e.g., cmpi0)
     if (auto condBr = dyn_cast<cf::CondBranchOp>(terminator)) {
       processOperand(condBr.getConditionMutable()[0]);
     }
 
-    // 2. Iterate over all operations in the subblocks
+    // iterate over all operations in the subblocks
     for (Block *block : subblocks) {
       for (Operation &op : block->getOperations()) {
         for (OpOperand &use : op.getOpOperands()) {
@@ -448,47 +402,47 @@ void MarkSubloopPass::runOnOperation() {
       }
     }
   }
+}
 
-  // Insert a BlockControlOp in every basic block, such that it can 
-  // later be turned into a correct control network
+/// Wires BlockControlOps and control tokens across the function's CFG.
+void MarkSubloopPass::insertBlockControlNetwork(func::FuncOp funcOp,
+                                const llvm::DenseSet<Block *> &multiPredBlocks,
+                                OpBuilder &builder, NameAnalysis &namer) {
+
   Type controlType = builder.getI32Type();
   Location loc = funcOp.getLoc();
+  llvm::DenseMap<Block *, Value> blockControlValueMap; 
 
-  llvm::DenseMap<Block *, dynamatic::cf_extra::BlockControlOp> blockControlMap;
-  llvm::DenseMap<Block *, BlockArgument> blockControlArgMap;
-  llvm::DenseMap<Block *, Value> blockControlValueMap;  
-
-  // Pass 1: Insert BlockControlOp at the start of every block
-  llvm::errs() << funcOp.getBlocks().size();
+  // Insert BlockControlOp at the start of every block
   for (Block &block : funcOp.getBlocks()) {
     builder.setInsertionPointToStart(&block);
     Location bLoc = block.empty() ? loc : block.front().getLoc();
 
     if (block.isEntryBlock()) {
-      // 1. Create constant `true` at the very beginning of the entry block
+      // create constant `true` at the very beginning of the entry block
       auto initCst = builder.create<arith::ConstantOp>(
           bLoc, builder.getI32IntegerAttr(1));
       initCst->setAttr("handshake.name", builder.getStringAttr("control_constant"));
 
-      // 2. Feed the constant directly into block_control0
+      // feed the constant directly into the first blockControlOp
       auto ctrlOp = builder.create<dynamatic::cf_extra::BlockControlOp>(
           bLoc, controlType, ValueRange{initCst.getResult()});
       namer.setName(ctrlOp);
-      blockControlMap[&block] = ctrlOp;
       blockControlValueMap[&block] = ctrlOp.getResult();
       continue;
     }
 
+    // Non-entry block: add incoming control taken argument and wire directly
+    BlockArgument ctrlArg = block.addArgument(controlType, bLoc);
     auto ctrlOp = builder.create<dynamatic::cf_extra::BlockControlOp>(
-        bLoc, controlType, ValueRange{});
+        bLoc, controlType, ValueRange{ctrlArg});
     namer.setName(ctrlOp);
-    blockControlMap[&block] = ctrlOp;
 
     // Default control output is the BlockControlOp result
     Value currentControlVal = ctrlOp.getResult();
 
     // Check if this block is an entry basic block with multiple predecessors/successors
-    if (multiPredEntryBlocks.count(&block)) {
+    if (multiPredBlocks.contains(&block)) {
       builder.setInsertionPointAfter(ctrlOp);
       // Create the RegionInputOp right after the BlockControlOp
       auto regionInputOp = builder.create<dynamatic::cf_extra::RegionInputOp>(
@@ -502,23 +456,7 @@ void MarkSubloopPass::runOnOperation() {
     blockControlValueMap[&block] = currentControlVal;
   }
 
-  // Pass 2: Add exactly ONE control BlockArgument to each non-entry block,
-  // and wire it as the operand to that block's BlockControlOp.
-  for (Block &block : funcOp.getBlocks()) {
-    // The entry block has 0 predecessors, so it has no incoming branch edges
-    if (block.isEntryBlock())
-      continue;
-
-    // Add exactly ONE argument representing incoming predecessor control
-    BlockArgument ctrlArg = block.addArgument(controlType, block.front().getLoc());
-    blockControlArgMap[&block] = ctrlArg;
-
-    // Feed this incoming token into the block's BlockControlOp
-    cf_extra::BlockControlOp ctrlOp = blockControlMap[&block];
-    ctrlOp->insertOperands(0, {ctrlArg});
-  }
-
-  // Pass 3: Update all branch terminators to pass the source block's token
+  // Update all branch terminators to pass the source block's token
   // along every branch edge to the successor's new argument slot.
   for (Block &block : funcOp.getBlocks()) {
     Value srcToken = blockControlValueMap[&block];
@@ -526,36 +464,60 @@ void MarkSubloopPass::runOnOperation() {
     if (!term)
       continue;
 
-    // Case A: cf.br
+    // Update branches and conditional branches separately
     if (auto brOp = dyn_cast<cf::BranchOp>(term)) {
-      Block *dest = brOp.getDest();
-      llvm::SmallVector<Value> destOperands(brOp.getDestOperands());
-      destOperands.push_back(srcToken);
-
-      builder.setInsertionPoint(brOp);
-      auto newBr = builder.create<cf::BranchOp>(brOp.getLoc(), dest, destOperands);
-      namer.setName(newBr);
-      brOp.erase();
-    }
-    // Case B: cf.cond_br
-    else if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
-      Block *trueDest = condBr.getTrueDest();
-      Block *falseDest = condBr.getFalseDest();
-
-      llvm::SmallVector<Value> trueOperands(condBr.getTrueDestOperands());
-      trueOperands.push_back(srcToken);
-
-      llvm::SmallVector<Value> falseOperands(condBr.getFalseDestOperands());
-      falseOperands.push_back(srcToken);
-
-      builder.setInsertionPoint(condBr);
-      auto newCondBr = builder.create<cf::CondBranchOp>(
-          condBr.getLoc(), condBr.getCondition(), trueDest, trueOperands,
-          falseDest, falseOperands);
-      namer.setName(newCondBr);
-      condBr.erase();
+      brOp.getDestOperandsMutable().append(srcToken);
+    } else if (auto condBr = dyn_cast<cf::CondBranchOp>(term)) {
+      condBr.getTrueDestOperandsMutable().append(srcToken);
+      condBr.getFalseDestOperandsMutable().append(srcToken);
     }
   }
+}
+
+void MarkSubloopPass::runOnOperation() {
+  ModuleOp modOp = getOperation();
+  NameAnalysis &namer = getAnalysis<NameAnalysis>();
+  MLIRContext *ctx = &getContext();
+  OpBuilder builder(ctx);
+
+  auto funcOps = modOp.getBody()->getOps<mlir::func::FuncOp>();
+  assert(!funcOps.empty() && "No funcOp found!");
+  mlir::func::FuncOp funcOp = *funcOps.begin();
+  mlir::Region &cfg = funcOp.getBody();
+
+  // precompute block indices
+  llvm::DenseMap<Block *, unsigned> blockIndices;
+  for (auto [idx, block] : llvm::enumerate(cfg))
+    blockIndices[&block] = idx;
+
+  // Compute Dominance Info for the cfg
+  DominanceInfo domInfo(funcOp);
+  PostDominanceInfo postDomInfo(funcOp);
+
+  // Discover and sort valid regions
+  llvm::SmallVector<std::pair<mlir::Block *, RegionInfo>> sortedRegions =
+    discoverRegions(cfg, domInfo, postDomInfo, blockIndices);
+  if (sortedRegions.empty()) {
+    llvm::errs() << "No valid dom / postdom pairs with subblocks found!\n";
+    return;
+  }
+  llvm::errs() << "size of validRegions: " << sortedRegions.size() << '\n';
+
+  // Process regions and attach metadata to the modOp
+  llvm::SmallVector<Attribute> allRegionsMetadata;
+  for (auto &[entryBlock, region] : sortedRegions) {
+    allRegionsMetadata.push_back(
+        processRegion(region, blockIndices, builder, namer));
+  }
+  // attach the attribute directly to modOp
+  modOp->setAttr("handshake.subregion_info", builder.getArrayAttr(allRegionsMetadata));
+
+  // mark external inputs entering if/else regions
+  llvm::DenseSet<Block *> multiPredEntryBlocks;
+  markExternalInputs(sortedRegions, multiPredEntryBlocks, builder, namer);
+
+  // Build the BlockControl network across all basic blocks
+  insertBlockControlNetwork(funcOp, multiPredEntryBlocks, builder, namer);
 
   llvm::errs() << "finished mark subregion\n";
 }

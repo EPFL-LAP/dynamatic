@@ -9,6 +9,7 @@ using namespace dynamatic;
 using namespace mlir;
 
 #define HANDSHAKEBB "handshake.bb"
+#define HANDSHAKENAME "handshake.name"
 #define SUBREG_INFO_ATTR "handshake.subregion_info"
 #define ENTRY_OPS "entry_ops"
 #define STORES "stores"
@@ -48,11 +49,6 @@ void applyRewriteC(handshake::MuxOp dataMux,
 void applyRewriteD(handshake::MuxOp dataMux,
                    handshake::ConditionalBranchOp branchOp,
                    handshake::InitOp initOp,
-                   DenseSet<handshake::ConditionalBranchOp> &frontier,
-                   NameAnalysis &namer);
-
-void applyRewriteDMerged(handshake::ControlMergeOp mergeOp,
-                   handshake::ConditionalBranchOp branchOp,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer);
 

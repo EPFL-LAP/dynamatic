@@ -12,7 +12,7 @@ void setHandshakeAttrs(Attribute bbAttr, NameAnalysis &namer,
   for (Operation *op : ops) {
     assert(op);
     if (bbAttr)
-      op->setAttr("handshake.bb", bbAttr);
+      op->setAttr(HANDSHAKEBB, bbAttr);
     namer.setName(op);
   }
 }
@@ -144,7 +144,7 @@ void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
                           DenseSet<handshake::ConditionalBranchOp> &frontier,
                           NameAnalysis &namer, int DRewrite) {
 
-  llvm::errs() << "Moving past: " << targetOp->getAttr("handshake.name")
+  llvm::errs() << "Moving past: " << targetOp->getAttr(HANDSHAKENAME)
                << '\n';
 
   Location loc = targetOp->getLoc();
@@ -189,7 +189,7 @@ void moveSuppressorPastOp(handshake::ConditionalBranchOp branchOp,
 
     auto newBranch =
         builder.create<handshake::ConditionalBranchOp>(loc, condition, result);
-    setHandshakeAttrs(targetOp->getAttr("handshake.bb"), namer, {newBranch});
+    setHandshakeAttrs(targetOp->getAttr(HANDSHAKEBB), namer, {newBranch});
     if (headerBBAttr) {
       newBranch->setAttr("subloop_header_bb", headerBBAttr);
     }
@@ -206,9 +206,9 @@ void applyRewriteB(handshake::MuxOp dataMux,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer) {
   Location loc = dataMux->getLoc();
-  auto bbAttr = dataMux->getAttr("handshake.bb");
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
   llvm::errs() << "Perform Rewrite B for: "
-               << dataMux->getAttr("handshake.name") << '\n';
+               << dataMux->getAttr(HANDSHAKENAME) << '\n';
 
   Value conditionC = dataMux.getSelectOperand();
 
@@ -255,9 +255,9 @@ void applyRewriteC(handshake::MuxOp dataMux,
                    NameAnalysis &namer) {
 
   Location loc = dataMux->getLoc();
-  auto bbAttr = dataMux->getAttr("handshake.bb");
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
   llvm::errs() << "Perform Rewrite C for: "
-               << dataMux->getAttr("handshake.name") << '\n';
+               << dataMux->getAttr(HANDSHAKENAME) << '\n';
 
   Value conditionC = dataMux.getSelectOperand();
 
@@ -308,9 +308,9 @@ void applyRewriteD(handshake::MuxOp dataMux,
                    NameAnalysis &namer) {
 
   Location loc = dataMux->getLoc();
-  auto bbAttr = dataMux->getAttr("handshake.bb");
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
   llvm::errs() << "Perform Rewrite D for: "
-               << dataMux->getAttr("handshake.name") << '\n';
+               << dataMux->getAttr(HANDSHAKENAME) << '\n';
   Value conditionC = initOp.getOperand();
 
   // build the additional control structure for the rewrite
@@ -342,79 +342,14 @@ void applyRewriteD(handshake::MuxOp dataMux,
   moveSuppressorPastOp(branchOp, dataMux, frontier, namer, 1);
 }
 
-void applyRewriteDMerged(handshake::ControlMergeOp mergeOp,
-                   handshake::ConditionalBranchOp branchOp,
-                   DenseSet<handshake::ConditionalBranchOp> &frontier,
-                   NameAnalysis &namer) {
-
-  Location loc = mergeOp->getLoc();
-  auto bbAttr = mergeOp->getAttr("handshake.bb");
-  llvm::errs() << "Perform Rewrite D for: "
-               << mergeOp->getAttr("handshake.name") << '\n';
-
-  Value branchOut = branchOp.getFalseResult();
-  int suppressedIdx = -1;
-  for (auto [idx, operand] : llvm::enumerate(mergeOp.getDataOperands())) {
-    if (operand == branchOut) {
-      suppressedIdx = static_cast<int>(idx);
-      break;
-    }
-  }
-
-  // Extract the original input condition driving the suppressor
-  Value suppCond = branchOp.getConditionOperand();
-  auto notOp = dyn_cast_or_null<handshake::NotIOp>(suppCond.getDefiningOp());
-  Value conditionC = notOp ? notOp.getOperand() : suppCond;
-
-  Value rawData = branchOp.getDataOperand();
-  mergeOp->getOpOperand(suppressedIdx).set(rawData);
-
-  // 4. Create a constant false (<i1>) in the same basic block
-  OpBuilder builder(mergeOp);
-  builder.setInsertionPointAfter(mergeOp);
-
-  auto sourceOp = builder.create<handshake::SourceOp>(loc);
-  auto constFalse = builder.create<handshake::ConstantOp>(
-      loc, builder.getBoolAttr(true), sourceOp.getResult());
-  setHandshakeAttrs(bbAttr, namer, {sourceOp, constFalse});
-
-  // 5. Construct Mux data inputs: conditionC at suppressedIdx, false elsewhere
-  unsigned numOperands = mergeOp.getDataOperands().size();
-  SmallVector<Value> muxInputs(numOperands, constFalse.getResult());
-  muxInputs[suppressedIdx] = conditionC;
-
-  // 6. Create the Mux driven by the cmerge index output
-  Value cmergeIndex = mergeOp.getIndex();
-  auto condMux = builder.create<handshake::MuxOp>(loc, conditionC.getType(), cmergeIndex, muxInputs);
-  setHandshakeAttrs(bbAttr, namer, {condMux});
-  condMux->setAttr("cmerge_mux", builder.getUnitAttr());
-
-  // 7. Update and move the NOT operation after the Mux
-  notOp->moveAfter(condMux);
-  notOp.getOperandMutable().assign(condMux.getResult());
-  notOp->setAttr("handshake.bb", bbAttr);
-
-  // 8. Move the suppressor branchOp after the NOT operation
-  branchOp->moveAfter(notOp);
-  branchOp.getConditionOperandMutable().assign(notOp.getResult());
-  branchOp->setAttr("handshake.bb", bbAttr);
-
-  // 9. Attach the cmerge result to branchOp and rewire downstream consumers
-  Value rawCmergeRes = mergeOp.getResult();
-  branchOp.getDataOperandMutable().assign(rawCmergeRes);
-  rawCmergeRes.replaceAllUsesExcept(branchOp.getFalseResult(), branchOp);
-
-  frontier.insert(branchOp);
-}
-
 void applyRewriteE(handshake::MuxOp dataMux,
                    handshake::ConditionalBranchOp trueBranch,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer, int inverted) {
   Location loc = dataMux->getLoc();
-  auto bbAttr = dataMux->getAttr("handshake.bb");
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
   llvm::errs() << "Perform Rewrite E for: "
-               << dataMux->getAttr("handshake.name") << '\n';
+               << dataMux->getAttr(HANDSHAKENAME) << '\n';
 
   // identify the inputs
   Value inputA = dataMux.getSelectOperand();
@@ -459,14 +394,14 @@ void applyRewriteF(handshake::ConditionalBranchOp branchOp,
   } else {
     // input to the and gate for B must be inverted - add a NotIOp
     auto newNotB = builder.create<handshake::NotIOp>(loc, conditionB);
-    setHandshakeAttrs(branchOp->getAttr("handshake.bb"), namer, {newNotB});
+    setHandshakeAttrs(branchOp->getAttr(HANDSHAKEBB), namer, {newNotB});
     conditionB = newNotB.getResult();
   }
   Value conditionC = topSuppRight.getDataOperand();
 
   // create the new AND gate
   auto andOp = builder.create<handshake::AndIOp>(loc, conditionB, conditionC);
-  setHandshakeAttrs(branchOp->getAttr("handshake.bb"), namer, {andOp});
+  setHandshakeAttrs(branchOp->getAttr(HANDSHAKEBB), namer, {andOp});
 
   // safely bypass or remove topSuppLeft
   Value wireLeft = topSuppLeft.getFalseResult();
@@ -501,9 +436,9 @@ void applyRewriteG(handshake::MuxOp dataMux,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer) {
   Location loc = dataMux->getLoc();
-  auto bbAttr = dataMux->getAttr("handshake.bb");
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
   llvm::errs() << "Perform Rewrite G for: "
-               << dataMux->getAttr("handshake.name") << '\n';
+               << dataMux->getAttr(HANDSHAKENAME) << '\n';
 
   // capture the shared control signal D from one of the top suppressors
   Value conditionD = topSuppressorA.getConditionOperand();
@@ -571,9 +506,9 @@ void applyRewriteH(handshake::MuxOp dataMux,
                    DenseSet<handshake::ConditionalBranchOp> &frontier,
                    NameAnalysis &namer) {
   Location loc = dataMux->getLoc();
-  auto bbAttr = dataMux->getAttr("handshake.bb");
+  auto bbAttr = dataMux->getAttr(HANDSHAKEBB);
   llvm::errs() << "Perform Rewrite H for: "
-               << dataMux->getAttr("handshake.name") << '\n';
+               << dataMux->getAttr(HANDSHAKENAME) << '\n';
 
   // find the condition signal C
   Value conditionC = trueBranch.getConditionOperand();
@@ -598,7 +533,7 @@ void applyRewriteH(handshake::MuxOp dataMux,
     builder.setInsertionPoint(notOp);
     auto newNotOp =
         builder.create<handshake::NotIOp>(notOp->getLoc(), newMux.getResult());
-    setHandshakeAttrs(notOp->getAttr("handshake.bb"), namer, {newNotOp});
+    setHandshakeAttrs(notOp->getAttr(HANDSHAKEBB), namer, {newNotOp});
 
     trueBranch.getConditionOperandMutable().assign(newNotOp.getResult());
   }
