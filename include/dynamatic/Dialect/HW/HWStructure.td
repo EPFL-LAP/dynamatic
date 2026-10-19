@@ -37,7 +37,9 @@ class HWModuleOpBase<string mnemonic, list<Trait> traits = []> :
       DeclareOpInterfaceMethods<PortList>,
       DeclareOpInterfaceMethods<HWModuleLike>,
       DeclareOpInterfaceMethods<HWMutableModuleLike>,
-      Symbol, InnerSymbolTable,
+      // The symbol interface requires the name and visibility accessors, which
+      // these traits implement from the sym_name and sym_visibility attributes
+      SymbolName, SymbolVisibility, Symbol, InnerSymbolTable,
       OpAsmOpInterface, HasParent<"mlir::ModuleOp">]> {
   /// Additional class declarations inside the module op.
   code extraModuleClassDeclaration = ?;
@@ -125,6 +127,7 @@ def HWModuleOp : HWModuleOpBase<"module",
     connections within the module.
   }];
   let arguments = (ins SymbolNameAttr:$sym_name,
+                       OptionalAttr<StrAttr>:$sym_visibility,
                        TypeAttrOf<ModuleType>:$module_type,
                        OptionalAttr<DictArrayAttr>:$per_port_attrs,
                        OptionalAttr<LocationArrayAttr>:$port_locs,
@@ -198,6 +201,7 @@ def HWModuleExternOp : HWModuleOpBase<"module.extern"> {
     parameterized types instead of just concrete types.
   }];
   let arguments = (ins SymbolNameAttr:$sym_name,
+                       OptionalAttr<StrAttr>:$sym_visibility,
                        TypeAttrOf<ModuleType>:$module_type,
                        OptionalAttr<DictArrayAttr>:$per_port_attrs,
                        OptionalAttr<LocationArrayAttr>:$port_locs,
@@ -252,8 +256,10 @@ def HWModuleExternOp : HWModuleOpBase<"module.extern"> {
   let hasVerifier = 1;
 }
 
-def HWGeneratorSchemaOp : HWOp<"generator.schema",
-      [Symbol, HasParent<"mlir::ModuleOp">]> {
+def HWGeneratorSchemaOp : HWOp<"generator.schema", [
+    // The symbol interface requires the name and visibility accessors, which
+    // these traits implement from the sym_name and sym_visibility attributes
+    SymbolName, SymbolVisibility, Symbol, HasParent<"mlir::ModuleOp">]> {
   let summary = "HW Generator Schema declaration";
   let description = [{
     The "hw.generator.schema" operation declares a kind of generated module by
@@ -269,8 +275,9 @@ def HWGeneratorSchemaOp : HWOp<"generator.schema",
       -> (ports) {write_latency=1, read_latency=1, ports=["read","write"]}
   }];
 
-  let arguments = (ins SymbolNameAttr:$sym_name, StrAttr:$descriptor,
-                       StrArrayAttr:$requiredAttrs);
+  let arguments = (ins SymbolNameAttr:$sym_name,
+                       OptionalAttr<StrAttr>:$sym_visibility,
+                       StrAttr:$descriptor, StrArrayAttr:$requiredAttrs);
   let results = (outs);
   let assemblyFormat = "$sym_name `,` $descriptor `,` $requiredAttrs attr-dict";
 }
@@ -288,6 +295,7 @@ def HWModuleGeneratedOp : HWModuleOpBase<"module.generated", [
     module name in Verilog we can use.  See hw.module for an explanation.
   }];
   let arguments = (ins SymbolNameAttr:$sym_name,
+                       OptionalAttr<StrAttr>:$sym_visibility,
                        FlatSymbolRefAttr:$generatorKind,
                        TypeAttrOf<ModuleType>:$module_type,
                        OptionalAttr<DictArrayAttr>:$per_port_attrs,
