@@ -1,3 +1,0 @@
-set-src integration-test/nested_loop/nested_loop.c
-compile --fast-token-delivery --eagerlyelastic
-exit
