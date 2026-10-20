@@ -100,18 +100,43 @@ getBaseAndOffsetTerms(GetElementPtrInst *gep, const DataLayout &dl) {
   return {ptr, terms};
 }
 
+/// Returns the larger of the two types in memory, or the other one if one of
+/// them is nullptr.
+static Type *getLargerType(Type *lhs, Type *rhs, const DataLayout &dl) {
+  if (!lhs || !rhs)
+    return lhs ? lhs : rhs;
+  return dl.getTypeAllocSize(rhs).getFixedValue() >
+                 dl.getTypeAllocSize(lhs).getFixedValue()
+             ? rhs
+             : lhs;
+}
+
 /// Returns the largest of the element types of the chain of GEPs ending at
 /// `gep`.
-static Type *getLargestScalarType(GetElementPtrInst *gep,
-                                  const DataLayout &dl) {
+static Type *getLargestGEPScalarType(GetElementPtrInst *gep,
+                                     const DataLayout &dl) {
   Type *scalarType = nullptr;
   for (auto *chainGEP = gep; chainGEP;
-       chainGEP = dyn_cast<GetElementPtrInst>(chainGEP->getPointerOperand())) {
-    Type *gepScalarType = getScalarType(chainGEP->getSourceElementType());
-    if (!scalarType || dl.getTypeAllocSize(gepScalarType).getFixedValue() >
-                           dl.getTypeAllocSize(scalarType).getFixedValue())
-      scalarType = gepScalarType;
-  }
+       chainGEP = dyn_cast<GetElementPtrInst>(chainGEP->getPointerOperand()))
+    scalarType = getLargerType(
+        scalarType, getScalarType(chainGEP->getSourceElementType()), dl);
+  return scalarType;
+}
+
+/// Returns the largest of the types that the users of `gep` load or store
+/// through it, or nullptr if no user is a load or a store. The accessed types
+/// matter when the GEPs only have byte element types: e.g., newer clang
+/// versions access the elements of "int a[N][32]" (i.e., i32) through
+/// "getelementptr [128 x i8]" and "getelementptr [4 x i8]", and load them as
+/// i32.
+static Type *getLargestAccessedScalarType(GetElementPtrInst *gep,
+                                          const DataLayout &dl) {
+  Type *scalarType = nullptr;
+  for (User *user : gep->users())
+    if (isa<LoadInst, StoreInst>(user) &&
+        getLoadStorePointerOperand(user) == gep)
+      scalarType =
+          getLargerType(scalarType, getScalarType(getLoadStoreType(user)), dl);
   return scalarType;
 }
 
@@ -135,9 +160,12 @@ static GetElementPtrInst *collapseGEPChain(GetElementPtrInst *gep,
     return nullptr;
   // NOTE: This does not guarantee that the type has the same bitwidth as the
   // array's elements in the original C code: e.g., clang may access a
-  // _BitInt(5) array through i8 GEPs, or an int array through byte GEPs. The
+  // _BitInt(5) array through i8 GEPs and i8 loads, or an int array through
+  // byte GEPs whose users are not loads or stores (e.g., selects). The
   // translator compares sizes in memory against the memref's element type
-  Type *scalarType = getLargestScalarType(gep, dl);
+  Type *scalarType = getLargerType(getLargestGEPScalarType(gep, dl),
+                                   getLargestAccessedScalarType(gep, dl), dl);
+  assert(scalarType && "chain of GEPs without element type");
   uint64_t scalarSize = dl.getTypeAllocSize(scalarType).getFixedValue();
   if (scalarSize == 0)
     return nullptr;

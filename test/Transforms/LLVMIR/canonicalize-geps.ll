@@ -15,6 +15,22 @@ define i32 @collapse2D(ptr %mat, i64 %i, i64 %j) {
   ret i32 %v
 }
 
+; Loads mat[i][j] of int mat[N][32] through byte array GEPs, as newer clang
+; versions emit them: the offset counts the loaded elements
+; CHECK-LABEL: define i32 @collapseByteArrayGEPs(
+; CHECK-SAME:    ptr %[[MAT:.*]], i64 %[[I:.*]], i64 %[[J:.*]])
+define i32 @collapseByteArrayGEPs(ptr %mat, i64 %i, i64 %j) {
+  ; CHECK:       %[[MUL:.*]] = mul i64 %[[I]], 32
+  ; CHECK:       %[[IDX:.*]] = add i64 %[[MUL]], %[[J]]
+  ; CHECK:       %[[ADDR:.*]] = getelementptr i32, ptr %[[MAT]], i64 %[[IDX]]
+  ; CHECK-NOT:   getelementptr
+  ; CHECK:       load i32, ptr %[[ADDR]]
+  %row = getelementptr inbounds [128 x i8], ptr %mat, i64 %i
+  %elem = getelementptr inbounds [4 x i8], ptr %row, i64 %j
+  %v = load i32, ptr %elem, align 4
+  ret i32 %v
+}
+
 ; Loads the element of int values[N] at byte offset %i - 1, split into two byte
 ; GEPs that are not whole elements on their own
 ; CHECK-LABEL: define i32 @collapseByteGEPs(
