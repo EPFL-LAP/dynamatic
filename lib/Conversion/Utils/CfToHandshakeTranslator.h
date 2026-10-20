@@ -56,10 +56,10 @@ LogicalResult lowerCfToHandshake(mlir::ModuleOp modOp, NameAnalysis &namer);
 /// virtual hooks (e.g., see FtdCfToHandshakeTranslator).
 class CfToHandshakeTranslator {
 public:
-  CfToHandshakeTranslator(mlir::func::FuncOp srcFunc, mlir::OpBuilder &builder,
+  CfToHandshakeTranslator(mlir::func::FuncOp cfFunc, mlir::OpBuilder &builder,
                           NameAnalysis &namer)
-      : srcFunc(srcFunc), builder(builder), namer(namer),
-        edgeBuilder(builder, srcFunc.getLoc()) {}
+      : cfFunc(cfFunc), builder(builder), namer(namer),
+        edgeBuilder(builder, cfFunc.getLoc()) {}
   virtual ~CfToHandshakeTranslator() = default;
 
   /// Creates the Handshake function before the func-level one. The func-level
@@ -81,15 +81,21 @@ protected:
     Value memStart;
   };
 
-  /// A memory port, along with the func-level memory operation it replaces and
+  /// A Handshake memory port, along with the memory operation it replaces and
   /// the memory region it references.
   struct MemPort {
-    Operation *srcOp;
+    /// The memory operation (memref.load or memref.store) in the func-level
+    /// function that the port replaces.
+    Operation *cfOp;
+    /// The memory region (in the func-level function) the port accesses.
     Value memref;
     handshake::MemPortOpInterface portOp;
   };
 
-  mlir::func::FuncOp srcFunc;
+  /// The func-level function being translated, whose control flow is
+  /// expressed with cf operations.
+  mlir::func::FuncOp cfFunc;
+  /// The Handshake function the translation creates.
   handshake::FuncOp funcOp;
   mlir::OpBuilder &builder;
   NameAnalysis &namer;
@@ -126,10 +132,10 @@ protected:
   /// Operands of the func-level returns, with the ID of their block.
   SmallVector<std::pair<unsigned, SmallVector<Value>>> returns;
 
-  /// Transfers the name of the func-level operation, if it has one, to the
-  /// Handshake operation. Unnamed operations are named at the end of the pass
-  /// in IR order.
-  void transferName(Operation *srcOp, Operation *newOp);
+  /// Transfers the name of the func-level operation (`cfOp`), if it has one, to
+  /// the Handshake operation. Unnamed operations are named at the end of the
+  /// pass in IR order.
+  void transferName(Operation *cfOp, Operation *newOp);
 
   /// Returns the Handshake equivalent of the func-level values, which must
   /// already be translated.
@@ -176,16 +182,18 @@ protected:
 
   /// Returns the condition of the conditional branch terminating a block.
   virtual Value getBranchCondition(mlir::cf::CondBranchOp condBrOp) {
-    return valueMap.lookup(condBrOp.getCondition());
+    return this->valueMap.lookup(condBrOp.getCondition());
   }
 
   /// Returns whether an arith-level constant can be triggered by a source
   /// operation without compromising the circuit semantics.
   virtual bool isCstSourcable(mlir::arith::ConstantOp cstOp);
 
-  /// Returns the control value that triggers the constants (that cannot be
+  /// Returns the control channel that triggers the constants (that cannot be
   /// triggered by a source) and undefined values of a block.
-  virtual Value getTrigger(Block *block) { return blockCtrl[block]; }
+  virtual Value getBlockControlChannel(Block *block) {
+    return this->blockCtrl[block];
+  }
 
   /// Called after the memory interfaces are created, before the staging blocks
   /// are flattened.
@@ -208,7 +216,7 @@ protected:
   LogicalResult translateGeneric(Operation *op);
 
   /// Records a memory port referencing a memory region.
-  LogicalResult addMemPort(Operation *srcOp, Value memref,
+  LogicalResult addMemPort(Operation *cfOp, Value memref,
                            handshake::MemPortOpInterface portOp);
   LogicalResult createMemInterfaces();
   void createEnd();

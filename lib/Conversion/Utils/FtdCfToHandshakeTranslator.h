@@ -35,10 +35,10 @@ namespace dynamatic {
 /// untouched until the end of the translation.
 class FtdCfToHandshakeTranslator : public CfToHandshakeTranslator {
 public:
-  FtdCfToHandshakeTranslator(mlir::func::FuncOp srcFunc,
+  FtdCfToHandshakeTranslator(mlir::func::FuncOp cfFunc,
                              mlir::OpBuilder &builder, NameAnalysis &namer,
                              const experimental::gsa::GSAAnalysis &gsaAnalysis)
-      : CfToHandshakeTranslator(srcFunc, builder, namer),
+      : CfToHandshakeTranslator(cfFunc, builder, namer),
         gsaAnalysis(gsaAnalysis) {}
 
 protected:
@@ -62,7 +62,7 @@ protected:
                                         unsigned succIdx) override;
   Value getBranchCondition(mlir::cf::CondBranchOp condBrOp) override;
   bool isCstSourcable(mlir::arith::ConstantOp cstOp) override;
-  Value getTrigger(Block *block) override;
+  Value getBlockControlChannel(Block *block) override;
   void finalizeBlocks() override;
   LogicalResult finalizeTranslation() override;
 

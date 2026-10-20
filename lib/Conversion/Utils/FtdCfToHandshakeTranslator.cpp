@@ -45,31 +45,31 @@ using namespace dynamatic::experimental;
 using namespace dynamatic::experimental::boolean;
 
 LogicalResult FtdCfToHandshakeTranslator::initTranslation() {
-  Region &srcRegion = srcFunc.getBody();
-  blockIndexing.emplace(srcRegion);
-  cfgView.shadowFunc = srcFunc;
+  Region &cfRegion = this->cfFunc.getBody();
+  this->blockIndexing.emplace(cfRegion);
+  this->cfgView.shadowFunc = this->cfFunc;
 
   // The GSA gates may need the condition of a block that is translated later
   // (e.g., a loop's exit condition), so each condition starts as a placeholder
   // in the block's staging block
-  Type condType = handshake::ChannelType::get(builder.getI1Type());
-  for (Block &block : srcRegion) {
+  Type condType = handshake::ChannelType::get(this->builder.getI1Type());
+  for (Block &block : cfRegion) {
     if (!isa<cf::CondBranchOp>(block.getTerminator()))
       continue;
-    builder.setInsertionPointToStart(stagingBlock[&block]);
-    Backedge cond = edgeBuilder.get(condType);
-    condPlaceholders.emplace_back(&block, cond);
-    cfgView.conditionMap[blockID[&block]] = cond;
+    this->builder.setInsertionPointToStart(this->stagingBlock[&block]);
+    Backedge cond = this->edgeBuilder.get(condType);
+    this->condPlaceholders.emplace_back(&block, cond);
+    this->cfgView.conditionMap[this->blockID[&block]] = cond;
   }
   return createGsaGates();
 }
 
 LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
   using namespace experimental::gsa;
-  Region &srcRegion = srcFunc.getBody();
-  if (srcRegion.hasOneBlock())
+  Region &cfRegion = this->cfFunc.getBody();
+  if (cfRegion.hasOneBlock())
     return success();
-  const ftd::BlockIndexing &bi = *blockIndexing;
+  const ftd::BlockIndexing &bi = *this->blockIndexing;
 
   // A GAMMA gate is translated into a mux driven by a block condition and fed
   // by two operands; a MU gate is translated into a mux driven by an init. The
@@ -95,11 +95,11 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
   // replacement once the muxes are simplified
   SmallVector<std::pair<Value, Operation *>> rootAnchors;
 
-  for (Block &block : llvm::drop_begin(srcRegion)) {
-    Block *staging = stagingBlock[&block];
-    for (Gate *gate : gsaAnalysis.getGatesPerBlock(&block)) {
+  for (Block &block : llvm::drop_begin(cfRegion)) {
+    Block *staging = this->stagingBlock[&block];
+    for (Gate *gate : this->gsaAnalysis.getGatesPerBlock(&block)) {
       Location loc = block.front().getLoc();
-      builder.setInsertionPointToStart(staging);
+      this->builder.setInsertionPointToStart(staging);
       SmallVector<Value> operands;
       // Index of the empty operand of a single-input GAMMA gate, if any
       int nullOperand = -1;
@@ -107,7 +107,7 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
         if (operand->isTypeGate()) {
           // The other gate's mux replaces the placeholder later on
           Gate *operandGate = operand->getGate();
-          operands.push_back(edgeBuilder.get(
+          operands.push_back(this->edgeBuilder.get(
               ftd::channelifyType(operandGate->result.getType())));
           missingGates.push_back({/*gateIndex=*/gate->index,
                                   /*operandGateIndex=*/operandGate->index,
@@ -118,8 +118,8 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
         } else {
           Value val = operand->getValue();
           Backedge placeholder =
-              edgeBuilder.get(ftd::channelifyType(val.getType()));
-          gateOperandPlaceholders.emplace_back(val, placeholder);
+              this->edgeBuilder.get(ftd::channelifyType(val.getType()));
+          this->gateOperandPlaceholders.emplace_back(val, placeholder);
           operands.push_back(placeholder);
         }
       }
@@ -130,24 +130,26 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
         // header is reached again from itself
         Block *loopHeader = gate->getBlock();
         conditionValue = ftd::computeLoopBackedgeCondition(
-            builder, loopHeader, stagingBlock[loopHeader], bi, nullptr,
-            &cfgView);
+            this->builder, loopHeader, this->stagingBlock[loopHeader], bi,
+            nullptr, &this->cfgView);
       } else if (size(gate->cofactorList) > 1) {
         // Convert the BDD expansion of the gate's condition to a circuit. The
         // registry is empty since the condition does not require distribution
         BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
         ftd::SignalRegistry emptyRegistry;
-        conditionValue =
-            ftd::bddToCircuit(builder, bdd, stagingBlock[gate->getBlock()],
-                              emptyRegistry, {}, bi, nullptr, &cfgView);
+        conditionValue = ftd::bddToCircuit(
+            this->builder, bdd, this->stagingBlock[gate->getBlock()],
+            emptyRegistry, {}, bi, nullptr, &this->cfgView);
       } else {
-        conditionValue = cfgView.getCondition(blockID[gate->conditionBlock]);
+        conditionValue =
+            this->cfgView.getCondition(this->blockID[gate->conditionBlock]);
       }
 
       // A MU gate's mux is driven by an init fed by its condition
       if (gate->gsaGateFunction == MuGate) {
-        auto initOp = builder.create<handshake::InitOp>(loc, conditionValue);
-        initOp->setAttr(ftd::FTD_INIT_MERGE, builder.getUnitAttr());
+        auto initOp =
+            this->builder.create<handshake::InitOp>(loc, conditionValue);
+        initOp->setAttr(ftd::FTD_INIT_MERGE, this->builder.getUnitAttr());
         conditionValue = initOp->getResult(0);
         conditionValue.setType(ftd::channelifyType(conditionValue.getType()));
       }
@@ -159,20 +161,20 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
         operands[1] = operands[1 - nullOperand];
       }
 
-      auto mux = builder.create<handshake::MuxOp>(
+      auto mux = this->builder.create<handshake::MuxOp>(
           loc, ftd::channelifyType(gate->result.getType()), conditionValue,
           operands);
       if (nullOperand >= 0)
         oneInputGammas.insert(mux);
       if (gate->isRoot) {
-        auto anchor = builder.create<UnrealizedConversionCastOp>(
+        auto anchor = this->builder.create<UnrealizedConversionCastOp>(
             loc, mux.getResult().getType(), mux.getResult());
         rootAnchors.emplace_back(gate->result, anchor);
       }
       gateMuxes.insert({gate->index, mux});
       mux->setAttr(gate->gsaGateFunction == MuGate ? ftd::FTD_EXPLICIT_MU
                                                    : ftd::FTD_EXPLICIT_GAMMA,
-                   builder.getUnitAttr());
+                   this->builder.getUnitAttr());
     }
   }
 
@@ -206,16 +208,16 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
 
   // Two values are equivalent if they are the same value or the placeholders
   // of the same func-level value
-  DenseMap<Value, Value> placeholderToSrc;
-  for (auto &[srcVal, placeholder] : gateOperandPlaceholders)
-    placeholderToSrc[placeholder] = srcVal;
+  DenseMap<Value, Value> placeholderToCfVal;
+  for (auto &[cfVal, placeholder] : this->gateOperandPlaceholders)
+    placeholderToCfVal[placeholder] = cfVal;
   auto areEquivalent = [&](Value lhs, Value rhs) {
     if (lhs == rhs)
       return true;
     if (!lhs || !rhs)
       return false;
-    return placeholderToSrc.lookup(lhs) &&
-           placeholderToSrc.lookup(lhs) == placeholderToSrc.lookup(rhs);
+    return placeholderToCfVal.lookup(lhs) &&
+           placeholderToCfVal.lookup(lhs) == placeholderToCfVal.lookup(rhs);
   };
 
   // Simplify the mux trees until they converge: merge muxes with equivalent
@@ -257,12 +259,12 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
 
   // Map each block argument to what replaces its gate's mux
   for (auto &[blockArg, anchor] : rootAnchors) {
-    valueMap.map(blockArg, anchor->getOperand(0));
+    this->valueMap.map(blockArg, anchor->getOperand(0));
     anchor->erase();
   }
-  for (Block &block : llvm::drop_begin(srcRegion)) {
+  for (Block &block : llvm::drop_begin(cfRegion)) {
     for (BlockArgument arg : block.getArguments()) {
-      if (!valueMap.contains(arg))
+      if (!this->valueMap.contains(arg))
         return emitError(arg.getLoc()) << "block argument has no GSA gate";
     }
   }
@@ -272,7 +274,7 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
 LogicalResult FtdCfToHandshakeTranslator::createMerges(Block *block) {
   // The block arguments are the GSA gates' muxes, so only the control needs a
   // merge
-  if (preds[block].empty())
+  if (this->preds[block].empty())
     return block->front().emitError() << "block must have predecessors";
   createControlMerge(block);
   return success();
@@ -288,7 +290,7 @@ FtdCfToHandshakeTranslator::getForwardedValues(Operation *termOp,
 Value FtdCfToHandshakeTranslator::getBranchCondition(
     cf::CondBranchOp condBrOp) {
   // The block's own branches also read the condition through the proxy
-  return cfgView.getCondition(blockID[condBrOp->getBlock()]);
+  return this->cfgView.getCondition(this->blockID[condBrOp->getBlock()]);
 }
 
 bool FtdCfToHandshakeTranslator::isCstSourcable(arith::ConstantOp cstOp) {
@@ -304,16 +306,16 @@ bool FtdCfToHandshakeTranslator::isCstSourcable(arith::ConstantOp cstOp) {
   });
 }
 
-Value FtdCfToHandshakeTranslator::getTrigger(Block *block) {
+Value FtdCfToHandshakeTranslator::getBlockControlChannel(Block *block) {
   // The FTD circuits regenerate and suppress the constants as needed
-  return funcOp.getArguments().back();
+  return this->funcOp.getArguments().back();
 }
 
 void FtdCfToHandshakeTranslator::finalizeBlocks() {
   // Operations belong to the block whose staging block they are in, including
   // the ones that the FTD circuits created with another "bb" attribute. Memory
   // interfaces do not naturally belong to any block
-  for (auto [idx, staging] : llvm::enumerate(funcOp.getBody())) {
+  for (auto [idx, staging] : llvm::enumerate(this->funcOp.getBody())) {
     for (Operation &op : staging) {
       if (!isa<handshake::MemoryOpInterface>(op))
         setBB(&op, idx);
@@ -322,34 +324,35 @@ void FtdCfToHandshakeTranslator::finalizeBlocks() {
 }
 
 LogicalResult FtdCfToHandshakeTranslator::finalizeTranslation() {
-  for (auto &[srcVal, placeholder] : gateOperandPlaceholders)
-    placeholder.setValue(valueMap.lookup(srcVal));
-  Type condType = handshake::ChannelType::get(builder.getI1Type());
-  for (auto &[block, placeholder] : condPlaceholders) {
+  for (auto &[cfVal, placeholder] : this->gateOperandPlaceholders)
+    placeholder.setValue(this->valueMap.lookup(cfVal));
+  Type condType = handshake::ChannelType::get(this->builder.getI1Type());
+  for (auto &[block, placeholder] : this->condPlaceholders) {
     auto condBrOp = cast<cf::CondBranchOp>(block->getTerminator());
-    Value cond = valueMap.lookup(condBrOp.getCondition());
+    Value cond = this->valueMap.lookup(condBrOp.getCondition());
     if (Operation *defOp = cond.getDefiningOp())
-      builder.setInsertionPointAfter(defOp);
+      this->builder.setInsertionPointAfter(defOp);
     else
-      builder.setInsertionPointToStart(funcOp.getBodyBlock());
-    auto proxyOp =
-        builder.create<handshake::NotIOp>(condBrOp.getLoc(), condType, cond);
-    proxyOp->setAttr(ftd::FTD_COND_VAR, builder.getUnitAttr());
+      this->builder.setInsertionPointToStart(this->funcOp.getBodyBlock());
+    auto proxyOp = this->builder.create<handshake::NotIOp>(condBrOp.getLoc(),
+                                                           condType, cond);
+    proxyOp->setAttr(ftd::FTD_COND_VAR, this->builder.getUnitAttr());
     setBlock(proxyOp, block);
     placeholder.setValue(proxyOp.getResult());
-    cfgView.conditionMap[blockID[block]] = proxyOp.getResult();
+    this->cfgView.conditionMap[this->blockID[block]] = proxyOp.getResult();
   }
 
-  cfg::annotateCFG(funcOp, srcFunc.getBody(), [&](Value cond) {
-    return namer.getName(valueMap.lookup(cond).getDefiningOp()).str();
+  cfg::annotateCFG(this->funcOp, this->cfFunc.getBody(), [&](Value cond) {
+    return this->namer.getName(this->valueMap.lookup(cond).getDefiningOp())
+        .str();
   });
 
-  if (!srcFunc.getBody().hasOneBlock()) {
-    ftd::addRegen(funcOp, builder, cfgView);
-    ftd::addSupp(funcOp, builder, cfgView);
+  if (!this->cfFunc.getBody().hasOneBlock()) {
+    ftd::addRegen(this->funcOp, this->builder, this->cfgView);
+    ftd::addSupp(this->funcOp, this->builder, this->cfgView);
   }
   // Bypass the condition proxies
-  ftd::finalizeCondPlaceholders(funcOp);
+  ftd::finalizeCondPlaceholders(this->funcOp);
   return success();
 }
 
