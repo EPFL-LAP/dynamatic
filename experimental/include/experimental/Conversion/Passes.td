@@ -36,5 +36,22 @@ def FtdCfToHandshake : Pass<"ftd-lower-cf-to-handshake", "mlir::ModuleOp"> {
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
+//===----------------------------------------------------------------------===//
+// ExpCfToHandshake
+//===----------------------------------------------------------------------===//
+
+def ExpCfToHandshake : Pass<"exp-lower-cf-to-handshake", "mlir::ModuleOp"> {
+  let summary = "Lowers func and cf dialects to handshake without the dialect "
+                "conversion framework.";
+  let description = [{
+    Experimental version of --lower-cf-to-handshake that produces the same
+    circuit. Instead of relying on the dialect conversion framework, each
+    func-level function is translated into a new handshake-level function
+    using an OpBuilder and a mapping between func-level and handshake-level
+    values. Functions must be in maximal SSA form (see --func-maximize-ssa).
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
 #endif // EXPERIMENTAL_CONVERSION_PASSES_TD
 
