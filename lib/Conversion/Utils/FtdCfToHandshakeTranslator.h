@@ -45,9 +45,13 @@ protected:
   const experimental::gsa::GSAAnalysis &gsaAnalysis;
   /// Indexing of the func-level blocks used by the FTD analyses.
   std::optional<experimental::ftd::BlockIndexing> blockIndexing;
-  /// The func-level function and the Handshake condition of each of its
-  /// conditional blocks, which the FTD circuits read their conditions from.
-  /// Until the blocks are translated, the conditions are placeholders.
+  /// The CFG that the FTD functions (e.g., ftd::addSupp) take as input. Their
+  /// interface (ftd::ShadowCFG) bundles the CFG with the Handshake condition of
+  /// each conditional block, which the circuits they create read. The CFG is
+  /// the func-level function itself, which stays alive until the end of the
+  /// translation, so no shadow copy of it is built; only the conditions are
+  /// tracked here. Until the blocks are translated, the conditions are
+  /// placeholders.
   experimental::ftd::ShadowCFG cfgView;
   /// Placeholder for the condition of each conditional block, replaced by the
   /// block's condition proxy once the blocks are translated.
