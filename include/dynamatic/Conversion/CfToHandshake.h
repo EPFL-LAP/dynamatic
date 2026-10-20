@@ -19,7 +19,6 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "dynamatic/Support/LLVM.h"
-#include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -192,13 +191,6 @@ protected:
       llvm::MapVector<Block *, SmallVector<handshake::MemPortOpInterface>>
           &opsPerBlock,
       SmallVector<Block *> &dominanceOrder) const;
-};
-
-/// Strategy to use when putting the matched func-level function into maximal
-/// SSA form.
-class FuncSSAStrategy : public dynamatic::SSAMaximizationStrategy {
-  /// Filters out block arguments of type MemRefType
-  bool maximizeArgument(BlockArgument arg) override;
 };
 
 template <typename SrcOp, typename DstOp>

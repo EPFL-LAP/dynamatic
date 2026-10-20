@@ -60,6 +60,7 @@ def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
       their handshake counterparts,
       which represent dataflow circuits that can ultimately be converted to an
           RTL design.
+    Functions must be in maximal SSA form (see --func-maximize-ssa).
   }];
   let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }

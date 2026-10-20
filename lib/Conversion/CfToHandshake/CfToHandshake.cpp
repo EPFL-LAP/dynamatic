@@ -28,6 +28,7 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
+#include "dynamatic/Transforms/FuncMaximizeSSA.h"
 #include "mlir/Dialect/Affine/Analysis/AffineAnalysis.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -1679,11 +1680,6 @@ struct GlobalOpConversion : public DynOpConversionPattern<memref::GlobalOp> {
 // Pass driver
 //===-----------------------------------------------------------------------==//
 
-/// Filters out block arguments of type MemRefType
-bool FuncSSAStrategy::maximizeArgument(BlockArgument arg) {
-  return !isa<mlir::MemRefType>(arg.getType());
-}
-
 namespace {
 
 /// FPGA18's elastic pass. Runs elastic pass on every function (func::FuncOp)
@@ -1702,13 +1698,12 @@ struct CfToHandshakePass
     MLIRContext *ctx = &getContext();
     ModuleOp modOp = getOperation();
 
-    // Put all non-external functions into maximal SSA form
+    // The conversion relies on all live-ins of each block being passed through
+    // block arguments, which become merge-like operations
+    SSAMaximizationStrategy strategy;
     for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-      if (!funcOp.isExternal()) {
-        FuncSSAStrategy strategy;
-        if (failed(dynamatic::maximizeSSA(funcOp.getBody(), strategy)))
-          return signalPassFailure();
-      }
+      if (failed(verifySSAMaximized(funcOp.getBody(), strategy)))
+        return signalPassFailure();
     }
 
     CfToHandshakeTypeConverter converter;
