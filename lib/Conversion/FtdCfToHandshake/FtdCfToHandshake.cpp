@@ -1,5 +1,4 @@
-//===- ExpCfToHandshake.cpp - Exp. lowering of func/cf to handshake -*- C++
-//-*-===//
+//===- FtdCfToHandshake.cpp - FTD conversion cf -> handshake --*--- C++ -*-===//
 //
 // Dynamatic is under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,22 +6,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the --exp-lower-cf-to-handshake pass. See
-// Utils/CfToHandshakeTranslator.h for the translation.
+// Implements the --ftd-lower-cf-to-handshake pass. See
+// lib/Conversion/Utils/FtdCfToHandshakeTranslator.h for the translation.
 //
 //===----------------------------------------------------------------------===//
 
-#include "Utils/CfToHandshakeTranslator.h"
+#include "../Utils/FtdCfToHandshakeTranslator.h"
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
+#include "dynamatic/Support/DynamaticPass.h"
+#include "experimental/Analysis/GSAAnalysis.h"
 
 // [START Boilerplate code for the MLIR pass]
-#include "experimental/Conversion/Passes.h" // IWYU pragma: keep
+#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
-namespace experimental {
-#define GEN_PASS_DEF_EXPCFTOHANDSHAKE
-#include "experimental/Conversion/Passes.h.inc"
-} // namespace experimental
+#define GEN_PASS_DEF_FTDCFTOHANDSHAKE
+#include "dynamatic/Conversion/Passes.h.inc"
 } // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
 
@@ -30,9 +29,8 @@ using namespace dynamatic;
 
 namespace {
 
-struct ExpCfToHandshakePass
-    : public dynamatic::experimental::impl::ExpCfToHandshakeBase<
-          ExpCfToHandshakePass> {
+struct FtdCfToHandshakePass
+    : public dynamatic::impl::FtdCfToHandshakeBase<FtdCfToHandshakePass> {
 
   void runOnOperation() override {
     // Make sure all operation names are unique and haven't changed from what is
@@ -41,7 +39,9 @@ struct ExpCfToHandshakePass
     if (!namer.isAnalysisValid())
       return signalPassFailure();
 
-    if (failed(experimental::lowerCfToHandshake(getOperation(), namer)))
+    if (failed(ftdLowerCfToHandshake(
+            getOperation(), namer,
+            getAnalysis<experimental::gsa::GSAAnalysis>())))
       return signalPassFailure();
 
     // Make sure all operation names are still unique and name operations that

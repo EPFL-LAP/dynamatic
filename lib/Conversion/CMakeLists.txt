@@ -1,5 +1,7 @@
 add_subdirectory(AffineToScf)
+add_subdirectory(Utils)
 add_subdirectory(CfToHandshake)
+add_subdirectory(FtdCfToHandshake)
 add_subdirectory(ScfToCf)
 add_subdirectory(HandshakeToHW)
 add_subdirectory(HandshakeToSynth)

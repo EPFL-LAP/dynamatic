@@ -1,4 +1,4 @@
-// RUN: dynamatic-opt --func-maximize-ssa --exp-lower-cf-to-handshake %s --verify-diagnostics
+// RUN: dynamatic-opt --func-maximize-ssa --lower-cf-to-handshake %s --verify-diagnostics
 
 // All accesses of an LSQ group must belong to the same basic block, since the
 // group is allocated by the control signal of a single block.

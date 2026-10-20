@@ -7,14 +7,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Implements the translation behind --exp-lower-cf-to-handshake, which
-// produces the same circuit as --lower-cf-to-handshake but without the dialect
-// conversion framework. Instead of rewriting the func-level function in place,
-// the pass translates it into a fresh Handshake function with an OpBuilder (in
-// the style of tools/translate-llvm-to-std):
+// Implements the translation behind the --lower-cf-to-handshake pass, i.e., the
+// elastic pass introduced in
+// https://dl.acm.org/doi/abs/10.1145/3174243.3174264. Instead of rewriting the
+// func-level function in place with the dialect conversion framework, the
+// translation creates a fresh Handshake function with an OpBuilder (in the
+// style of tools/translate-llvm-to-std):
 //
-// 1. The Handshake function is created with the lowered signature; its body is
-//    a single block (Handshake functions are graph regions).
+// 1. The Handshake function is created with the lowered signature. During the
+//    translation, its body has one staging block per func-level block; the
+//    staging blocks are merged into a single block at the end (Handshake
+//    functions are graph regions).
 // 2. For every non-entry block, merge-like operations are created upfront for
 //    each block argument (and for the block's control), with one backedge per
 //    incoming CFG edge.
@@ -22,7 +25,8 @@
 //    translated using a value mapping from func-level to Handshake values.
 //    Block terminators create branch-like operations, whose results are
 //    recorded per CFG edge and later used to resolve the merges' backedges.
-// 4. Memory interfaces and the function's end are instantiated.
+// 4. Memory interfaces are instantiated, the body is flattened, and the
+//    function's end is instantiated.
 // 5. The func-level function is erased.
 //
 // The source IR is never modified by the translation (except for the
@@ -60,7 +64,6 @@
 
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental;
 
 //===----------------------------------------------------------------------===//
 // Helper functions
@@ -193,10 +196,9 @@ static SmallVector<NamedAttribute> deriveNewAttributes(func::FuncOp funcOp) {
   return attributes;
 }
 
-/// Determines whether an arith-level constant can be triggered by a source
-/// operation without compromising the circuit semantics, i.e., whether none of
-/// its users becomes a branch-like or memory port operation.
-static bool isCstSourcable(arith::ConstantOp cstOp) {
+/// A constant can be triggered by a source if none of its users becomes a
+/// branch-like or memory port operation.
+bool CfToHandshakeTranslator::isCstSourcable(arith::ConstantOp cstOp) {
   return llvm::none_of(cstOp->getUsers(), [](Operation *user) {
     return isa<cf::BranchOp, cf::CondBranchOp, memref::LoadOp, memref::StoreOp>(
         user);
@@ -248,19 +250,27 @@ LogicalResult CfToHandshakeTranslator::translate() {
 }
 
 LogicalResult CfToHandshakeTranslator::translateBody() {
-  // The Handshake function's body is a single block whose arguments are the
-  // original function's arguments followed by the memory start signals and the
-  // global start signal
+  // The arguments of the Handshake function's entry block are the original
+  // function's arguments followed by the memory start signals and the global
+  // start signal
   Block *body = funcOp.addEntryBlock();
   Block *srcEntry = &srcFunc.front();
   for (BlockArgument arg : srcEntry->getArguments())
     valueMap.map(arg, body->getArgument(arg.getArgNumber()));
   blockCtrl[srcEntry] = body->getArguments().back();
 
-  for (auto [idx, block] : llvm::enumerate(srcFunc))
+  // The entry block is the entry's staging block
+  for (auto [idx, block] : llvm::enumerate(srcFunc)) {
     blockID[&block] = idx;
+    if (block.isEntryBlock()) {
+      stagingBlock[&block] = body;
+    } else {
+      stagingBlock[&block] = new Block();
+      funcOp.getBody().push_back(stagingBlock[&block]);
+    }
+  }
   computePredecessors();
-  if (failed(initMemories()))
+  if (failed(initMemories()) || failed(initTranslation()))
     return failure();
 
   // Translate blocks in reverse post-order so that values are translated
@@ -279,18 +289,30 @@ LogicalResult CfToHandshakeTranslator::translateBody() {
 
   if (failed(createMemInterfaces()))
     return failure();
+  finalizeBlocks();
+  flattenBody();
   createEnd();
-  return success();
+  return finalizeTranslation();
+}
+
+void CfToHandshakeTranslator::flattenBody() {
+  Block *body = &funcOp.getBody().front();
+  for (Block &block :
+       llvm::make_early_inc_range(llvm::drop_begin(funcOp.getBody()))) {
+    body->getOperations().splice(body->end(), block.getOperations());
+    block.erase();
+  }
 }
 
 void CfToHandshakeTranslator::computePredecessors() {
   // Each successor of a terminator is an incoming edge of the successor block.
   // If a conditional branch's two successors are the same block, that block
-  // has two incoming edges from the branch's block
+  // has two incoming edges from the branch's block. The edges are ordered by
+  // predecessor block, then by successor index (rather than in the order of
+  // the block's uses), which determines the order of the merges' operands
   for (Block &block : srcFunc) {
-    SmallVector<Edge> &blockPreds = preds[&block];
-    for (auto it = block.pred_begin(), e = block.pred_end(); it != e; ++it)
-      blockPreds.emplace_back(*it, it.getSuccessorIndex());
+    for (auto [succIdx, succ] : llvm::enumerate(block.getSuccessors()))
+      preds[succ].emplace_back(&block, succIdx);
   }
 }
 
@@ -326,19 +348,37 @@ LogicalResult CfToHandshakeTranslator::initMemories() {
   return success();
 }
 
+/// Creates a placeholder operand for each incoming edge, replaced by the value
+/// flowing along the edge once all predecessor terminators are translated.
+static SmallVector<Value> makeMergeOperands(BackedgeBuilder &edgeBuilder,
+                                            unsigned numPreds, Type type) {
+  SmallVector<Value> operands;
+  for (unsigned i = 0; i < numPreds; ++i)
+    operands.push_back(edgeBuilder.get(type));
+  return operands;
+}
+
+handshake::ControlMergeOp
+CfToHandshakeTranslator::createControlMerge(Block *block) {
+  // Every block needs to feed its entry control into a control merge
+  auto ctrlType = handshake::ControlType::get(builder.getContext());
+  auto cmergeOp = builder.create<handshake::ControlMergeOp>(
+      block->front().getLoc(),
+      makeMergeOperands(edgeBuilder, preds[block].size(), ctrlType));
+  setBlock(cmergeOp, block);
+  blockCtrl[block] = cmergeOp.getResult();
+  mergeOps[block].push_back(cmergeOp);
+  return cmergeOp;
+}
+
 LogicalResult CfToHandshakeTranslator::createMerges(Block *block) {
   ArrayRef<Edge> blockPreds = preds[block];
   if (blockPreds.empty())
     return block->front().emitError() << "block must have predecessors";
   Location loc = block->front().getLoc();
   SmallVector<handshake::MergeLikeOpInterface> &ops = mergeOps[block];
-
-  // Creates a placeholder operand for each incoming edge, replaced by the value
-  // flowing along the edge once all predecessor terminators are translated
-  auto makeMergeOperands = [&](Type type) {
-    return llvm::map_to_vector(blockPreds, [&](const Edge &) -> Value {
-      return edgeBuilder.get(type);
-    });
+  auto makeOperands = [&](Type type) {
+    return makeMergeOperands(edgeBuilder, blockPreds.size(), type);
   };
 
   // Every live-in value to a non-entry block is passed through a merge-like
@@ -353,8 +393,7 @@ LogicalResult CfToHandshakeTranslator::createMerges(Block *block) {
 
     handshake::MergeLikeOpInterface mergeOp;
     if (blockPreds.size() == 1) {
-      mergeOp =
-          builder.create<handshake::MergeOp>(loc, makeMergeOperands(type));
+      mergeOp = builder.create<handshake::MergeOp>(loc, makeOperands(type));
     } else {
       // The select operand is the block's control merge index output, which is
       // created last
@@ -362,54 +401,33 @@ LogicalResult CfToHandshakeTranslator::createMerges(Block *block) {
           handshake::getOptimizedIndexValType(builder, blockPreds.size());
       Value index = edgeBuilder.get(handshake::ChannelType::get(idxType));
       mergeOp = muxes.emplace_back(builder.create<handshake::MuxOp>(
-          loc, type, index, makeMergeOperands(type)));
+          loc, type, index, makeOperands(type)));
     }
     setBlock(mergeOp, block);
     valueMap.map(arg, mergeOp.getDataResult());
     ops.push_back(mergeOp);
   }
 
-  // Every block needs to feed its entry control into a control merge
-  auto ctrlType = handshake::ControlType::get(builder.getContext());
-  auto cmergeOp = builder.create<handshake::ControlMergeOp>(
-      loc, makeMergeOperands(ctrlType));
-  setBlock(cmergeOp, block);
-  blockCtrl[block] = cmergeOp.getResult();
-  ops.push_back(cmergeOp);
+  handshake::ControlMergeOp cmergeOp = createControlMerge(block);
   for (handshake::MuxOp mux : muxes)
     mux.getSelectOperandMutable().assign(cmergeOp.getIndex());
   return success();
 }
 
 LogicalResult CfToHandshakeTranslator::translateBlock(Block *block) {
-  // Insert the block's operations before those of the first already translated
-  // block that comes after it in the func-level function
-  Block *body = funcOp.getBodyBlock();
-  Operation *nextStart = nullptr;
-  for (Block *next = block->getNextNode(); next && !nextStart;
-       next = next->getNextNode())
-    nextStart = blockStart.lookup(next);
-  Operation *prevOp = nextStart ? nextStart->getPrevNode()
-                                : (body->empty() ? nullptr : &body->back());
-  if (nextStart)
-    builder.setInsertionPoint(nextStart);
-  else
-    builder.setInsertionPointToEnd(body);
-
+  // Hooks may move the insertion point (e.g., to build circuits at the start
+  // of a block), so it is reset before each operation
+  Block *staging = stagingBlock[block];
+  builder.setInsertionPointToEnd(staging);
   if (!block->isEntryBlock() && failed(createMerges(block)))
     return failure();
   for (Operation &op : block->without_terminator()) {
+    builder.setInsertionPointToEnd(staging);
     if (failed(translateOp(&op)))
       return failure();
   }
-  if (failed(translateTerminator(block->getTerminator())))
-    return failure();
-
-  Operation *firstOp = prevOp ? prevOp->getNextNode()
-                              : (body->empty() ? nullptr : &body->front());
-  if (firstOp && firstOp != nextStart)
-    blockStart[block] = firstOp;
-  return success();
+  builder.setInsertionPointToEnd(staging);
+  return translateTerminator(block->getTerminator());
 }
 
 LogicalResult CfToHandshakeTranslator::translateOp(Operation *op) {
@@ -478,9 +496,8 @@ LogicalResult CfToHandshakeTranslator::translateTerminator(Operation *termOp) {
   // arguments followed by the block's control
   SmallVector<SmallVector<Value>> succValues;
   for (unsigned i = 0, e = termOp->getNumSuccessors(); i < e; ++i) {
-    auto succOperands = cast<BranchOpInterface>(termOp).getSuccessorOperands(i);
     SmallVector<Value> &values =
-        succValues.emplace_back(lookup(succOperands.getForwardedOperands()));
+        succValues.emplace_back(getForwardedValues(termOp, i));
     values.push_back(blockCtrl[block]);
   }
 
@@ -488,7 +505,7 @@ LogicalResult CfToHandshakeTranslator::translateTerminator(Operation *termOp) {
   // block
   Value cond;
   if (auto condBrOp = dyn_cast<cf::CondBranchOp>(termOp))
-    cond = valueMap.lookup(condBrOp.getCondition());
+    cond = getBranchCondition(condBrOp);
   Location loc = termOp->getLoc();
   DenseMap<Value, Operation *> branches;
   for (ArrayRef<Value> values : succValues) {
@@ -513,6 +530,14 @@ LogicalResult CfToHandshakeTranslator::translateTerminator(Operation *termOp) {
       outValues.push_back(branches[val]->getResult(succIdx));
   }
   return success();
+}
+
+SmallVector<Value>
+CfToHandshakeTranslator::getForwardedValues(Operation *termOp,
+                                            unsigned succIdx) {
+  auto succOperands =
+      cast<BranchOpInterface>(termOp).getSuccessorOperands(succIdx);
+  return lookup(succOperands.getForwardedOperands());
 }
 
 void CfToHandshakeTranslator::resolveMerges() {
@@ -570,8 +595,8 @@ LogicalResult CfToHandshakeTranslator::translateIndexCast(Operation *op) {
 
 LogicalResult
 CfToHandshakeTranslator::translateConstant(arith::ConstantOp cstOp) {
-  // Constants are triggered by a source if their users are not branch-like or
-  // memory operations. Otherwise they are triggered by the block's control
+  // Constants are triggered by a source if possible, otherwise by the block's
+  // trigger
   Block *block = cstOp->getBlock();
   Value ctrl;
   if (isCstSourcable(cstOp)) {
@@ -579,7 +604,7 @@ CfToHandshakeTranslator::translateConstant(arith::ConstantOp cstOp) {
     setBlock(sourceOp, block);
     ctrl = sourceOp.getResult();
   } else {
-    ctrl = blockCtrl[block];
+    ctrl = getTrigger(block);
   }
 
   // Convert IndexType'd values to equivalent signless integers
@@ -598,7 +623,7 @@ CfToHandshakeTranslator::translateConstant(arith::ConstantOp cstOp) {
 }
 
 LogicalResult CfToHandshakeTranslator::translateUndef(LLVM::UndefOp undefOp) {
-  // Undefined values become a "0" constant triggered by the block's control
+  // Undefined values become a "0" constant triggered by the block's trigger
   Type resType = undefOp.getRes().getType();
   TypedAttr cstAttr;
   if (isa<IndexType>(resType)) {
@@ -613,7 +638,7 @@ LogicalResult CfToHandshakeTranslator::translateUndef(LLVM::UndefOp undefOp) {
 
   Block *block = undefOp->getBlock();
   auto cstOp = builder.create<handshake::ConstantOp>(undefOp.getLoc(), cstAttr,
-                                                     blockCtrl[block]);
+                                                     getTrigger(block));
   cstOp->setDialectAttrs(undefOp->getAttrDictionary());
   setBlock(cstOp, block);
   transferName(undefOp, cstOp);
@@ -904,11 +929,7 @@ LogicalResult CfToHandshakeTranslator::createMemInterfaces() {
     for (Block *block : retBlocks)
       controls.push_back(blockCtrl[block]);
     Block *lastRetBlock = retBlocks.back();
-    if (Operation *startOp = blockStart.lookup(lastRetBlock);
-        startOp && !lastRetBlock->isEntryBlock())
-      builder.setInsertionPoint(startOp);
-    else
-      builder.setInsertionPointToStart(funcOp.getBodyBlock());
+    builder.setInsertionPointToStart(stagingBlock[lastRetBlock]);
     auto mergeOp = builder.create<handshake::MergeOp>(
         lastRetBlock->getTerminator()->getLoc(), controls);
     setBB(mergeOp, blockID[lastRetBlock]);
@@ -1028,24 +1049,14 @@ void CfToHandshakeTranslator::createEnd() {
 // lowerCfToHandshake
 //===----------------------------------------------------------------------===//
 
-LogicalResult dynamatic::experimental::lowerCfToHandshake(ModuleOp modOp,
-                                                          NameAnalysis &namer) {
-  // The translation relies on all live-ins of each block being passed through
-  // block arguments, which become merge-like operations
-  SSAMaximizationStrategy strategy;
-  for (auto funcOp : modOp.getOps<func::FuncOp>()) {
-    if (failed(verifySSAMaximized(funcOp.getBody(), strategy)))
-      return failure();
-  }
-
+LogicalResult dynamatic::lowerFuncsToHandshake(
+    ModuleOp modOp, function_ref<LogicalResult(func::FuncOp)> translateFunc) {
   // Translate all functions in order. __init functions only declare the
   // outputs of placeholder functions and are removed afterwards
-  OpBuilder builder(modOp.getContext());
   for (auto funcOp : llvm::make_early_inc_range(modOp.getOps<func::FuncOp>())) {
     if (funcOp.getSymName().starts_with("__init"))
       continue;
-    CfToHandshakeTranslator translator(funcOp, builder, namer);
-    if (failed(translator.translate()))
+    if (failed(translateFunc(funcOp)))
       return failure();
     funcOp.erase();
   }
@@ -1062,4 +1073,20 @@ LogicalResult dynamatic::experimental::lowerCfToHandshake(ModuleOp modOp,
     }
   }
   return success();
+}
+
+LogicalResult dynamatic::lowerCfToHandshake(ModuleOp modOp,
+                                            NameAnalysis &namer) {
+  // The translation relies on all live-ins of each block being passed through
+  // block arguments, which become merge-like operations
+  SSAMaximizationStrategy strategy;
+  for (auto funcOp : modOp.getOps<func::FuncOp>()) {
+    if (failed(verifySSAMaximized(funcOp.getBody(), strategy)))
+      return failure();
+  }
+
+  OpBuilder builder(modOp.getContext());
+  return lowerFuncsToHandshake(modOp, [&](func::FuncOp funcOp) {
+    return CfToHandshakeTranslator(funcOp, builder, namer).translate();
+  });
 }

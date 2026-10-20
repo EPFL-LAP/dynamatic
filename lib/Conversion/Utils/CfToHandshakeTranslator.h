@@ -9,12 +9,12 @@
 //
 // Translation of func-level functions with unstructured control flow into
 // Handshake functions, without the dialect conversion framework. Used by the
-// --exp-lower-cf-to-handshake pass.
+// --lower-cf-to-handshake pass.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef EXPERIMENTAL_LIB_CONVERSION_UTILS_CFTOHANDSHAKETRANSLATOR_H
-#define EXPERIMENTAL_LIB_CONVERSION_UTILS_CFTOHANDSHAKETRANSLATOR_H
+#ifndef DYNAMATIC_LIB_CONVERSION_UTILS_CFTOHANDSHAKETRANSLATOR_H
+#define DYNAMATIC_LIB_CONVERSION_UTILS_CFTOHANDSHAKETRANSLATOR_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -22,6 +22,7 @@
 #include "dynamatic/Support/Backedge.h"
 #include "dynamatic/Support/LLVM.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -31,13 +32,18 @@
 #include "llvm/ADT/MapVector.h"
 
 namespace dynamatic {
-namespace experimental {
 
-/// Lowers all func-level functions of the module to Handshake functions. The
-/// functions must be in maximal SSA form (see --func-maximize-ssa); they are
-/// translated in order by a `CfToHandshakeTranslator`. Memory globals and
-/// __init functions (which only declare the outputs of placeholder functions)
-/// are removed.
+/// Lowers all func-level functions of the module to Handshake functions, in
+/// order, with `translateFunc`, which must leave the func-level function in
+/// place. Memory globals and __init functions (which only declare the outputs
+/// of placeholder functions) are removed.
+LogicalResult lowerFuncsToHandshake(
+    mlir::ModuleOp modOp,
+    llvm::function_ref<LogicalResult(mlir::func::FuncOp)> translateFunc);
+
+/// Lowers all func-level functions of the module to Handshake functions with
+/// a `CfToHandshakeTranslator`. The functions must be in maximal SSA form (see
+/// --func-maximize-ssa).
 LogicalResult lowerCfToHandshake(mlir::ModuleOp modOp, NameAnalysis &namer);
 
 /// Translates a single func-level function (in maximal SSA form) into a
@@ -45,18 +51,22 @@ LogicalResult lowerCfToHandshake(mlir::ModuleOp modOp, NameAnalysis &namer);
 /// Handshake-level values. The Handshake function's body is a single block; the
 /// func-level blocks only determine the "bb" attribute of the operations and
 /// the merge-like and branch-like operations that implement the control flow.
+///
+/// Subclasses can change how the control flow is implemented by overriding the
+/// virtual hooks (e.g., see FtdCfToHandshakeTranslator).
 class CfToHandshakeTranslator {
 public:
   CfToHandshakeTranslator(mlir::func::FuncOp srcFunc, mlir::OpBuilder &builder,
                           NameAnalysis &namer)
       : srcFunc(srcFunc), builder(builder), namer(namer),
         edgeBuilder(builder, srcFunc.getLoc()) {}
+  virtual ~CfToHandshakeTranslator() = default;
 
   /// Creates the Handshake function before the func-level one. The func-level
   /// function is left untouched and must be erased by the caller.
   LogicalResult translate();
 
-private:
+protected:
   /// An incoming CFG edge to a block, identified by the predecessor block and
   /// the index of the successor in the predecessor's terminator.
   using Edge = std::pair<Block *, unsigned>;
@@ -91,10 +101,11 @@ private:
   DenseMap<Block *, unsigned> blockID;
   /// Control value of each func-level block.
   DenseMap<Block *, Value> blockCtrl;
-  /// First Handshake operation created for each func-level block. Blocks are
-  /// translated in reverse post-order, but their operations are laid out in
-  /// the Handshake function's body in the func-level block order.
-  DenseMap<Block *, Operation *> blockStart;
+  /// Handshake block holding the operations of each func-level block until
+  /// the translation flattens the Handshake function's body. The Handshake
+  /// blocks are in the same order as the func-level ones, so the position of
+  /// a Handshake block is the "bb" attribute of its operations.
+  DenseMap<Block *, Block *> stagingBlock;
   /// Incoming CFG edges of each block. The order of the edges determines the
   /// order of the operands of the block's merge-like operations.
   DenseMap<Block *, SmallVector<Edge>> preds;
@@ -132,11 +143,56 @@ private:
   LogicalResult translateBody();
   LogicalResult initMemories();
   void computePredecessors();
-  LogicalResult createMerges(Block *block);
   LogicalResult translateBlock(Block *block);
   LogicalResult translateOp(Operation *op);
   LogicalResult translateTerminator(Operation *termOp);
   void resolveMerges();
+  /// Moves the operations of all staging blocks into the entry block and
+  /// erases the other blocks.
+  void flattenBody();
+
+  /// Creates the control merge of a non-entry block, with one placeholder
+  /// operand per incoming edge, and records it as the block's control.
+  handshake::ControlMergeOp createControlMerge(Block *block);
+
+  //===--------------------------------------------------------------------===//
+  // Hooks
+  //===--------------------------------------------------------------------===//
+
+  /// Called before the blocks are translated.
+  virtual LogicalResult initTranslation() { return success(); }
+
+  /// Creates the merge-like operations at the beginning of a non-entry block:
+  /// one per block argument and the control merge. Their data operands are
+  /// placeholders (one per incoming edge) that `resolveMerges` replaces with
+  /// the values in `edgeValues`.
+  virtual LogicalResult createMerges(Block *block);
+
+  /// Returns the values that a block terminator forwards to the successor's
+  /// block arguments; the terminator branches each of them, along with the
+  /// block's control, to the successor.
+  virtual SmallVector<Value> getForwardedValues(Operation *termOp,
+                                                unsigned succIdx);
+
+  /// Returns the condition of the conditional branch terminating a block.
+  virtual Value getBranchCondition(mlir::cf::CondBranchOp condBrOp) {
+    return valueMap.lookup(condBrOp.getCondition());
+  }
+
+  /// Returns whether an arith-level constant can be triggered by a source
+  /// operation without compromising the circuit semantics.
+  virtual bool isCstSourcable(mlir::arith::ConstantOp cstOp);
+
+  /// Returns the control value that triggers the constants (that cannot be
+  /// triggered by a source) and undefined values of a block.
+  virtual Value getTrigger(Block *block) { return blockCtrl[block]; }
+
+  /// Called after the memory interfaces are created, before the staging blocks
+  /// are flattened.
+  virtual void finalizeBlocks() {}
+
+  /// Called after the Handshake function's body is flattened and terminated.
+  virtual LogicalResult finalizeTranslation() { return success(); }
 
   template <typename DstOp>
   LogicalResult translateOneToOne(Operation *op);
@@ -158,7 +214,6 @@ private:
   void createEnd();
 };
 
-} // namespace experimental
 } // namespace dynamatic
 
-#endif // EXPERIMENTAL_LIB_CONVERSION_UTILS_CFTOHANDSHAKETRANSLATOR_H
+#endif // DYNAMATIC_LIB_CONVERSION_UTILS_CFTOHANDSHAKETRANSLATOR_H

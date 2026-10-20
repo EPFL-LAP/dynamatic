@@ -34,10 +34,10 @@ func.func @selfLoop(%arg0: i32, %arg1: i32) {
 // CHECK:           %[[VAL_4:.*]], %[[VAL_5:.*]] = cond_br %[[VAL_0]], %[[VAL_1]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_6:.*]], %[[VAL_7:.*]] = cond_br %[[VAL_0]], %[[VAL_2]] {handshake.bb = 0 : ui32} : <i1>, <i32>
 // CHECK:           %[[VAL_8:.*]], %[[VAL_9:.*]] = cond_br %[[VAL_0]], %[[VAL_3]] {handshake.bb = 0 : ui32} : <i1>, <>
-// CHECK:           %[[VAL_10:.*]] = mux %[[VAL_11:.*]] {{\[}}%[[VAL_4]], %[[VAL_6]]] {handshake.bb = 1 : ui32} : <i1>, [<i32>, <i32>] to <i32>
-// CHECK:           %[[VAL_12:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_7]], %[[VAL_6]]] {handshake.bb = 1 : ui32} : <i1>, [<i32>, <i32>] to <i32>
-// CHECK:           %[[VAL_13:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_4]], %[[VAL_6]]] {handshake.bb = 1 : ui32} : <i1>, [<i32>, <i32>] to <i32>
-// CHECK:           %[[VAL_14:.*]], %[[VAL_11]] = control_merge {{\[}}%[[VAL_9]], %[[VAL_8]]]  {handshake.bb = 1 : ui32} : [<>, <>] to <>, <i1>
+// CHECK:           %[[VAL_10:.*]] = mux %[[VAL_11:.*]] {{\[}}%[[VAL_4]], %[[VAL_7]]] {handshake.bb = 1 : ui32} : <i1>, [<i32>, <i32>] to <i32>
+// CHECK:           %[[VAL_12:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_6]], %[[VAL_7]]] {handshake.bb = 1 : ui32} : <i1>, [<i32>, <i32>] to <i32>
+// CHECK:           %[[VAL_13:.*]] = mux %[[VAL_11]] {{\[}}%[[VAL_4]], %[[VAL_7]]] {handshake.bb = 1 : ui32} : <i1>, [<i32>, <i32>] to <i32>
+// CHECK:           %[[VAL_14:.*]], %[[VAL_11]] = control_merge {{\[}}%[[VAL_8]], %[[VAL_9]]]  {handshake.bb = 1 : ui32} : [<>, <>] to <>, <i1>
 // CHECK:           end {handshake.bb = 1 : ui32} %[[VAL_3]] : <>
 // CHECK:         }
 func.func @duplicateLiveOut(%arg0: i1, %arg1: i32, %arg2: i32) {

@@ -5,6 +5,7 @@ add_dynamatic_library(DynamaticCfToHandshake
   DynamaticConversionPassIncGen
 
   LINK_LIBS PUBLIC
+  DynamaticConversionUtils
   DynamaticSupport
   DynamaticHandshake
   MLIRIR
