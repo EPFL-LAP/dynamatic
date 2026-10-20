@@ -182,7 +182,7 @@ protected:
 
   /// Returns the condition of the conditional branch terminating a block.
   virtual Value getBranchCondition(mlir::cf::CondBranchOp condBrOp) {
-    return this->valueMap.lookup(condBrOp.getCondition());
+    return valueMap.lookup(condBrOp.getCondition());
   }
 
   /// Returns whether an arith-level constant can be triggered by a source
@@ -192,7 +192,7 @@ protected:
   /// Returns the control channel that triggers the constants (that cannot be
   /// triggered by a source) and undefined values of a block.
   virtual Value getBlockControlChannel(Block *block) {
-    return this->blockCtrl[block];
+    return blockCtrl[block];
   }
 
   /// Called after the memory interfaces are created, before the staging blocks

@@ -223,55 +223,55 @@ static DenseElementsAttr getZeroFilledDenseAttr(ShapedType type) {
 }
 
 SmallVector<Value> CfToHandshakeTranslator::lookup(ValueRange values) {
-  return llvm::map_to_vector(
-      values, [&](Value val) { return this->valueMap.lookup(val); });
+  return llvm::map_to_vector(values,
+                             [&](Value val) { return valueMap.lookup(val); });
 }
 
 void CfToHandshakeTranslator::transferName(Operation *cfOp, Operation *newOp) {
-  if (this->namer.hasName(cfOp))
-    this->namer.replaceOp(cfOp, newOp);
+  if (namer.hasName(cfOp))
+    namer.replaceOp(cfOp, newOp);
 }
 
 void CfToHandshakeTranslator::setBlock(Operation *op, Block *block) {
-  setBB(op, this->blockID.at(block));
+  setBB(op, blockID.at(block));
 }
 
 LogicalResult CfToHandshakeTranslator::translate() {
   // Create a Handshake-level function corresponding to the func-level one
-  this->builder.setInsertionPoint(this->cfFunc);
-  this->funcOp = this->builder.create<handshake::FuncOp>(
-      this->cfFunc.getLoc(), this->cfFunc.getName(),
-      lowerFunctionType(this->cfFunc), deriveNewAttributes(this->cfFunc));
-  if (this->cfFunc.isExternal())
+  builder.setInsertionPoint(cfFunc);
+  funcOp = builder.create<handshake::FuncOp>(cfFunc.getLoc(), cfFunc.getName(),
+                                             lowerFunctionType(cfFunc),
+                                             deriveNewAttributes(cfFunc));
+  if (cfFunc.isExternal())
     return success();
 
   if (failed(translateBody())) {
     // The translation stopped midway, so some backedges may still be in use;
     // only report the error that caused the failure
-    this->edgeBuilder.abandon();
+    edgeBuilder.abandon();
     return failure();
   }
-  return this->edgeBuilder.clearOrEmitError();
+  return edgeBuilder.clearOrEmitError();
 }
 
 LogicalResult CfToHandshakeTranslator::translateBody() {
   // The arguments of the Handshake function's entry block are the original
   // function's arguments followed by the memory start signals and the global
   // start signal
-  Block *body = this->funcOp.addEntryBlock();
-  Block *cfEntry = &this->cfFunc.front();
+  Block *body = funcOp.addEntryBlock();
+  Block *cfEntry = &cfFunc.front();
   for (BlockArgument arg : cfEntry->getArguments())
-    this->valueMap.map(arg, body->getArgument(arg.getArgNumber()));
-  this->blockCtrl[cfEntry] = body->getArguments().back();
+    valueMap.map(arg, body->getArgument(arg.getArgNumber()));
+  blockCtrl[cfEntry] = body->getArguments().back();
 
   // The entry block is the entry's staging block
-  for (auto [idx, block] : llvm::enumerate(this->cfFunc)) {
-    this->blockID[&block] = idx;
+  for (auto [idx, block] : llvm::enumerate(cfFunc)) {
+    blockID[&block] = idx;
     if (block.isEntryBlock()) {
-      this->stagingBlock[&block] = body;
+      stagingBlock[&block] = body;
     } else {
-      this->stagingBlock[&block] = new Block();
-      this->funcOp.getBody().push_back(this->stagingBlock[&block]);
+      stagingBlock[&block] = new Block();
+      funcOp.getBody().push_back(stagingBlock[&block]);
     }
   }
   computePredecessors();
@@ -283,7 +283,7 @@ LogicalResult CfToHandshakeTranslator::translateBody() {
   SetVector<Block *> order;
   for (Block *block : llvm::ReversePostOrderTraversal<Block *>(cfEntry))
     order.insert(block);
-  for (Block &block : this->cfFunc)
+  for (Block &block : cfFunc)
     order.insert(&block);
 
   for (Block *block : order) {
@@ -301,9 +301,9 @@ LogicalResult CfToHandshakeTranslator::translateBody() {
 }
 
 void CfToHandshakeTranslator::flattenBody() {
-  Block *body = &this->funcOp.getBody().front();
+  Block *body = &funcOp.getBody().front();
   for (Block &block :
-       llvm::make_early_inc_range(llvm::drop_begin(this->funcOp.getBody()))) {
+       llvm::make_early_inc_range(llvm::drop_begin(funcOp.getBody()))) {
     body->getOperations().splice(body->end(), block.getOperations());
     block.erase();
   }
@@ -315,9 +315,9 @@ void CfToHandshakeTranslator::computePredecessors() {
   // has two incoming edges from the branch's block. The edges are ordered by
   // predecessor block, then by successor index (rather than in the order of
   // the block's uses), which determines the order of the merges' operands
-  for (Block &block : this->cfFunc) {
+  for (Block &block : cfFunc) {
     for (auto [succIdx, succ] : llvm::enumerate(block.getSuccessors()))
-      this->preds[succ].emplace_back(&block, succIdx);
+      preds[succ].emplace_back(&block, succIdx);
   }
 }
 
@@ -325,32 +325,30 @@ LogicalResult CfToHandshakeTranslator::initMemories() {
   // Record memories passed as function arguments, even if they aren't used by
   // any memory operation. Each one has a dedicated start signal in the function
   // arguments
-  auto funcArgs = this->funcOp.getArguments();
+  auto funcArgs = funcOp.getArguments();
   unsigned numMemories = llvm::count_if(
       funcArgs, [](auto arg) { return isa<MemRefType>(arg.getType()); });
   unsigned memStartIdx = funcArgs.size() - numMemories - 1;
-  for (BlockArgument arg : this->cfFunc.getArguments()) {
+  for (BlockArgument arg : cfFunc.getArguments()) {
     if (auto memrefTy = dyn_cast<MemRefType>(arg.getType())) {
       if (!isValidMemrefType(arg.getLoc(), memrefTy))
         return failure();
-      this->memInfo.insert({arg,
-                            {/*mcPorts=*/{}, /*lsqPorts=*/{},
-                             /*memStart=*/funcArgs[memStartIdx++]}});
+      memInfo.insert({arg,
+                      {/*mcPorts=*/{}, /*lsqPorts=*/{},
+                       /*memStart=*/funcArgs[memStartIdx++]}});
     }
   }
 
   // Internally allocated memories use the function's start as their memory
   // start signal
   Value start = funcArgs.back();
-  this->cfFunc.walk([&](memref::AllocaOp op) {
-    this->memInfo.insert(
-        {op.getResult(),
-         {/*mcPorts=*/{}, /*lsqPorts=*/{}, /*memStart=*/start}});
+  cfFunc.walk([&](memref::AllocaOp op) {
+    memInfo.insert({op.getResult(),
+                    {/*mcPorts=*/{}, /*lsqPorts=*/{}, /*memStart=*/start}});
   });
-  this->cfFunc.walk([&](memref::GetGlobalOp op) {
-    this->memInfo.insert(
-        {op.getResult(),
-         {/*mcPorts=*/{}, /*lsqPorts=*/{}, /*memStart=*/start}});
+  cfFunc.walk([&](memref::GetGlobalOp op) {
+    memInfo.insert({op.getResult(),
+                    {/*mcPorts=*/{}, /*lsqPorts=*/{}, /*memStart=*/start}});
   });
   return success();
 }
@@ -368,25 +366,24 @@ static SmallVector<Value> makeMergeOperands(BackedgeBuilder &edgeBuilder,
 handshake::ControlMergeOp
 CfToHandshakeTranslator::createControlMerge(Block *block) {
   // Every block needs to feed its entry control into a control merge
-  auto ctrlType = handshake::ControlType::get(this->builder.getContext());
-  auto cmergeOp = this->builder.create<handshake::ControlMergeOp>(
+  auto ctrlType = handshake::ControlType::get(builder.getContext());
+  auto cmergeOp = builder.create<handshake::ControlMergeOp>(
       block->front().getLoc(),
-      makeMergeOperands(this->edgeBuilder, this->preds[block].size(),
-                        ctrlType));
+      makeMergeOperands(edgeBuilder, preds[block].size(), ctrlType));
   setBlock(cmergeOp, block);
-  this->blockCtrl[block] = cmergeOp.getResult();
-  this->mergeOps[block].push_back(cmergeOp);
+  blockCtrl[block] = cmergeOp.getResult();
+  mergeOps[block].push_back(cmergeOp);
   return cmergeOp;
 }
 
 LogicalResult CfToHandshakeTranslator::createMerges(Block *block) {
-  ArrayRef<CFGEdge> blockPreds = this->preds[block];
+  ArrayRef<CFGEdge> blockPreds = preds[block];
   if (blockPreds.empty())
     return block->front().emitError() << "block must have predecessors";
   Location loc = block->front().getLoc();
-  SmallVector<handshake::MergeLikeOpInterface> &ops = this->mergeOps[block];
+  SmallVector<handshake::MergeLikeOpInterface> &ops = mergeOps[block];
   auto makeOperands = [&](Type type) {
-    return makeMergeOperands(this->edgeBuilder, blockPreds.size(), type);
+    return makeMergeOperands(edgeBuilder, blockPreds.size(), type);
   };
 
   // Every live-in value to a non-entry block is passed through a merge-like
@@ -401,19 +398,18 @@ LogicalResult CfToHandshakeTranslator::createMerges(Block *block) {
 
     handshake::MergeLikeOpInterface mergeOp;
     if (blockPreds.size() == 1) {
-      mergeOp =
-          this->builder.create<handshake::MergeOp>(loc, makeOperands(type));
+      mergeOp = builder.create<handshake::MergeOp>(loc, makeOperands(type));
     } else {
       // The select operand is the block's control merge index output, which is
       // created last
       Type idxType =
-          handshake::getOptimizedIndexValType(this->builder, blockPreds.size());
-      Value index = this->edgeBuilder.get(handshake::ChannelType::get(idxType));
-      mergeOp = muxes.emplace_back(this->builder.create<handshake::MuxOp>(
+          handshake::getOptimizedIndexValType(builder, blockPreds.size());
+      Value index = edgeBuilder.get(handshake::ChannelType::get(idxType));
+      mergeOp = muxes.emplace_back(builder.create<handshake::MuxOp>(
           loc, type, index, makeOperands(type)));
     }
     setBlock(mergeOp, block);
-    this->valueMap.map(arg, mergeOp.getDataResult());
+    valueMap.map(arg, mergeOp.getDataResult());
     ops.push_back(mergeOp);
   }
 
@@ -426,16 +422,16 @@ LogicalResult CfToHandshakeTranslator::createMerges(Block *block) {
 LogicalResult CfToHandshakeTranslator::translateBlock(Block *block) {
   // Hooks may move the insertion point (e.g., to build circuits at the start
   // of a block), so it is reset before each operation
-  Block *staging = this->stagingBlock[block];
-  this->builder.setInsertionPointToEnd(staging);
+  Block *staging = stagingBlock[block];
+  builder.setInsertionPointToEnd(staging);
   if (!block->isEntryBlock() && failed(createMerges(block)))
     return failure();
   for (Operation &op : block->without_terminator()) {
-    this->builder.setInsertionPointToEnd(staging);
+    builder.setInsertionPointToEnd(staging);
     if (failed(translateOp(&op)))
       return failure();
   }
-  this->builder.setInsertionPointToEnd(staging);
+  builder.setInsertionPointToEnd(staging);
   return translateTerminator(block->getTerminator());
 }
 
@@ -497,8 +493,7 @@ LogicalResult CfToHandshakeTranslator::translateTerminator(Operation *termOp) {
     return termOp->emitError() << "unsupported block terminator";
   Block *block = termOp->getBlock();
   if (isa<func::ReturnOp>(termOp)) {
-    this->returns.emplace_back(this->blockID[block],
-                               lookup(termOp->getOperands()));
+    returns.emplace_back(blockID[block], lookup(termOp->getOperands()));
     return success();
   }
 
@@ -515,7 +510,7 @@ LogicalResult CfToHandshakeTranslator::translateTerminator(Operation *termOp) {
        ++succIdx) {
     SmallVector<Value> &values = valuesPerSuccIdx[succIdx];
     values = getForwardedValues(termOp, succIdx);
-    values.push_back(this->blockCtrl[block]);
+    values.push_back(blockCtrl[block]);
   }
 
   // Insert a branch-like operation for each unique value flowing out of the
@@ -531,10 +526,9 @@ LogicalResult CfToHandshakeTranslator::translateTerminator(Operation *termOp) {
         continue;
       Operation *brOp;
       if (cond)
-        brOp = this->builder.create<handshake::ConditionalBranchOp>(loc, cond,
-                                                                    val);
+        brOp = builder.create<handshake::ConditionalBranchOp>(loc, cond, val);
       else
-        brOp = this->builder.create<handshake::BranchOp>(loc, val);
+        brOp = builder.create<handshake::BranchOp>(loc, val);
       setBlock(brOp, block);
       branches[val] = brOp;
     }
@@ -543,7 +537,7 @@ LogicalResult CfToHandshakeTranslator::translateTerminator(Operation *termOp) {
   // Record the branch-like operations' results flowing along each edge (the
   // successor index determines the conditional branch's result)
   for (auto &[succIdx, values] : valuesPerSuccIdx) {
-    SmallVector<Value> &outValues = this->edgeValues[{block, succIdx}];
+    SmallVector<Value> &outValues = edgeValues[{block, succIdx}];
     for (Value val : values)
       outValues.push_back(branches[val]->getResult(succIdx));
   }
@@ -561,10 +555,9 @@ CfToHandshakeTranslator::getForwardedValues(Operation *termOp,
 void CfToHandshakeTranslator::resolveMerges() {
   // The placeholder operands become unused and are erased with the other
   // backedges
-  for (auto &[block, ops] : this->mergeOps) {
-    for (auto [edgeIdx, edge] : llvm::enumerate(this->preds[block])) {
-      for (auto [mergeOp, val] :
-           llvm::zip_equal(ops, this->edgeValues.at(edge)))
+  for (auto &[block, ops] : mergeOps) {
+    for (auto [edgeIdx, edge] : llvm::enumerate(preds[block])) {
+      for (auto [mergeOp, val] : llvm::zip_equal(ops, edgeValues.at(edge)))
         mergeOp.setDataOperand(edgeIdx, val);
     }
   }
@@ -575,12 +568,12 @@ LogicalResult CfToHandshakeTranslator::translateOneToOne(Operation *op) {
   SmallVector<Type> resTypes;
   for (Type resType : op->getResultTypes())
     resTypes.push_back(channelifyType(resType));
-  auto newOp = this->builder.create<DstOp>(op->getLoc(), resTypes,
-                                           lookup(op->getOperands()),
-                                           op->getAttrDictionary().getValue());
+  auto newOp =
+      builder.create<DstOp>(op->getLoc(), resTypes, lookup(op->getOperands()),
+                            op->getAttrDictionary().getValue());
   setBlock(newOp, op->getBlock());
   transferName(op, newOp);
-  this->valueMap.map(op->getResults(), newOp->getResults());
+  valueMap.map(op->getResults(), newOp->getResults());
   return success();
 }
 
@@ -593,21 +586,20 @@ LogicalResult CfToHandshakeTranslator::translateIndexCast(Operation *op) {
   };
   unsigned srcWidth = getWidth(op->getOperand(0).getType());
   unsigned dstWidth = getWidth(op->getResult(0).getType());
-  Type dstType =
-      handshake::ChannelType::get(this->builder.getIntegerType(dstWidth));
+  Type dstType = handshake::ChannelType::get(builder.getIntegerType(dstWidth));
 
   SmallVector<Value> operands = lookup(op->getOperands());
   ArrayRef<NamedAttribute> attrs = op->getAttrDictionary().getValue();
   Operation *newOp;
   if (srcWidth < dstWidth) {
-    newOp = this->builder.create<ExtOp>(op->getLoc(), dstType, operands, attrs);
+    newOp = builder.create<ExtOp>(op->getLoc(), dstType, operands, attrs);
   } else {
-    newOp = this->builder.create<handshake::TruncIOp>(op->getLoc(), dstType,
-                                                      operands, attrs);
+    newOp = builder.create<handshake::TruncIOp>(op->getLoc(), dstType, operands,
+                                                attrs);
   }
   setBlock(newOp, op->getBlock());
   transferName(op, newOp);
-  this->valueMap.map(op->getResult(0), newOp->getResult(0));
+  valueMap.map(op->getResult(0), newOp->getResult(0));
   return success();
 }
 
@@ -618,7 +610,7 @@ CfToHandshakeTranslator::translateConstant(arith::ConstantOp cstOp) {
   Block *block = cstOp->getBlock();
   Value ctrl;
   if (isCstSourcable(cstOp)) {
-    auto sourceOp = this->builder.create<handshake::SourceOp>(cstOp.getLoc());
+    auto sourceOp = builder.create<handshake::SourceOp>(cstOp.getLoc());
     setBlock(sourceOp, block);
     ctrl = sourceOp.getResult();
   } else {
@@ -628,15 +620,15 @@ CfToHandshakeTranslator::translateConstant(arith::ConstantOp cstOp) {
   // Convert IndexType'd values to equivalent signless integers
   TypedAttr cstAttr = cstOp.getValue();
   if (isa<IndexType>(cstAttr.getType())) {
-    cstAttr = IntegerAttr::get(this->builder.getIntegerType(32),
+    cstAttr = IntegerAttr::get(builder.getIntegerType(32),
                                cast<IntegerAttr>(cstAttr).getValue().trunc(32));
   }
-  auto newCstOp = this->builder.create<handshake::ConstantOp>(cstOp.getLoc(),
-                                                              cstAttr, ctrl);
+  auto newCstOp =
+      builder.create<handshake::ConstantOp>(cstOp.getLoc(), cstAttr, ctrl);
   newCstOp->setDialectAttrs(cstOp->getDialectAttrs());
   setBlock(newCstOp, block);
   transferName(cstOp, newCstOp);
-  this->valueMap.map(cstOp.getResult(), newCstOp.getResult());
+  valueMap.map(cstOp.getResult(), newCstOp.getResult());
   return success();
 }
 
@@ -645,31 +637,31 @@ LogicalResult CfToHandshakeTranslator::translateUndef(LLVM::UndefOp undefOp) {
   Type resType = undefOp.getRes().getType();
   TypedAttr cstAttr;
   if (isa<IndexType>(resType)) {
-    cstAttr = this->builder.getIntegerAttr(this->builder.getIntegerType(32), 0);
+    cstAttr = builder.getIntegerAttr(builder.getIntegerType(32), 0);
   } else if (isa<IntegerType>(resType)) {
-    cstAttr = this->builder.getIntegerAttr(resType, 0);
+    cstAttr = builder.getIntegerAttr(resType, 0);
   } else if (FloatType floatType = dyn_cast<FloatType>(resType)) {
-    cstAttr = this->builder.getFloatAttr(floatType, 0.0);
+    cstAttr = builder.getFloatAttr(floatType, 0.0);
   } else {
     return undefOp->emitError() << "operation has unsupported result type";
   }
 
   Block *block = undefOp->getBlock();
-  auto cstOp = this->builder.create<handshake::ConstantOp>(
+  auto cstOp = builder.create<handshake::ConstantOp>(
       undefOp.getLoc(), cstAttr, getBlockControlChannel(block));
   cstOp->setDialectAttrs(undefOp->getAttrDictionary());
   setBlock(cstOp, block);
   transferName(undefOp, cstOp);
-  this->valueMap.map(undefOp.getRes(), cstOp.getResult());
+  valueMap.map(undefOp.getRes(), cstOp.getResult());
   return success();
 }
 
 LogicalResult
 CfToHandshakeTranslator::addMemPort(Operation *cfOp, Value memref,
                                     handshake::MemPortOpInterface portOp) {
-  if (!this->memInfo.count(memref))
+  if (!memInfo.count(memref))
     return cfOp->emitError() << "unknown memory region";
-  this->memPorts.push_back({cfOp, memref, portOp});
+  memPorts.push_back({cfOp, memref, portOp});
   return success();
 }
 
@@ -686,13 +678,13 @@ LogicalResult CfToHandshakeTranslator::translateLoad(memref::LoadOp loadOp) {
 
   // The data input comes from the memory interface, which is created later
   Type dataTy = channelifyType(loadOp.getMemRefType().getElementType());
-  Value data = this->edgeBuilder.get(dataTy);
-  auto newOp = this->builder.create<handshake::LoadOp>(
-      loadOp.getLoc(), this->valueMap.lookup(indices.front()), data);
+  Value data = edgeBuilder.get(dataTy);
+  auto newOp = builder.create<handshake::LoadOp>(
+      loadOp.getLoc(), valueMap.lookup(indices.front()), data);
   copyDialectAttr<handshake::MemDependenceArrayAttr>(loadOp, newOp);
   setBlock(newOp, loadOp->getBlock());
   transferName(loadOp, newOp);
-  this->valueMap.map(loadOp.getResult(), newOp.getDataResult());
+  valueMap.map(loadOp.getResult(), newOp.getDataResult());
   return addMemPort(loadOp, loadOp.getMemRef(), newOp);
 }
 
@@ -707,9 +699,9 @@ LogicalResult CfToHandshakeTranslator::translateStore(memref::StoreOp storeOp) {
   if (indices.size() != 1)
     return storeOp->emitError() << "store must be unidimensional";
 
-  auto newOp = this->builder.create<handshake::StoreOp>(
-      storeOp.getLoc(), this->valueMap.lookup(indices.front()),
-      this->valueMap.lookup(storeOp.getValueToStore()));
+  auto newOp = builder.create<handshake::StoreOp>(
+      storeOp.getLoc(), valueMap.lookup(indices.front()),
+      valueMap.lookup(storeOp.getValueToStore()));
   copyDialectAttr<handshake::MemDependenceArrayAttr>(storeOp, newOp);
   setBlock(newOp, storeOp->getBlock());
   transferName(storeOp, newOp);
@@ -721,9 +713,9 @@ CfToHandshakeTranslator::translateAlloca(memref::AllocaOp allocaOp) {
   // HACK: By default, we initialize the memory with all zeros. According to the
   // C standard, this only happens for arrays.
   MemRefType type = allocaOp.getType();
-  auto ramOp = this->builder.create<handshake::RAMOp>(
-      allocaOp.getLoc(), type, getZeroFilledDenseAttr(type));
-  this->valueMap.map(allocaOp.getResult(), ramOp.getResult());
+  auto ramOp = builder.create<handshake::RAMOp>(allocaOp.getLoc(), type,
+                                                getZeroFilledDenseAttr(type));
+  valueMap.map(allocaOp.getResult(), ramOp.getResult());
   return success();
 }
 
@@ -740,9 +732,9 @@ CfToHandshakeTranslator::translateGetGlobal(memref::GetGlobalOp getGlobalOp) {
     return global->emitError()
            << "the initial value must be denoted in DenseElementsAttr";
   }
-  auto ramOp = this->builder.create<handshake::RAMOp>(
+  auto ramOp = builder.create<handshake::RAMOp>(
       getGlobalOp.getLoc(), getGlobalOp.getType(), denseAttr);
-  this->valueMap.map(getGlobalOp.getResult(), ramOp.getResult());
+  valueMap.map(getGlobalOp.getResult(), ramOp.getResult());
   return success();
 }
 
@@ -827,7 +819,7 @@ LogicalResult CfToHandshakeTranslator::translateCall(func::CallOp callOp) {
                  << " cannot be initialized by an __init call";
         }
         newInputs.push_back(calledType.getInput(i));
-        operands.push_back(this->valueMap.lookup(operand));
+        operands.push_back(valueMap.lookup(operand));
       } else if (name.starts_with("output_")) {
         newResults.push_back(calledType.getInput(i));
         outputIndices.push_back(i);
@@ -844,7 +836,7 @@ LogicalResult CfToHandshakeTranslator::translateCall(func::CallOp callOp) {
                  << "placeholder parameter " << i << " must be a constant";
         }
         parameters.emplace_back(
-            this->builder.getStringAttr(name.drop_front(strlen("parameter_"))),
+            builder.getStringAttr(name.drop_front(strlen("parameter_"))),
             cstOp.getValue());
       } else {
         return callOp->emitError() << "placeholder argument " << i
@@ -860,19 +852,18 @@ LogicalResult CfToHandshakeTranslator::translateCall(func::CallOp callOp) {
     // The placeholder's signature only keeps its inputs, and its outputs
     // become results
     calledFuncOp.setType(
-        FunctionType::get(this->builder.getContext(), newInputs, newResults));
+        FunctionType::get(builder.getContext(), newInputs, newResults));
     resultTypes = newResults;
   }
 
   // The instance has an extra control-only start input coming from the call's
   // block, and an extra control-only end output
-  operands.push_back(this->blockCtrl[block]);
+  operands.push_back(blockCtrl[block]);
   for (Type &type : resultTypes)
     type = channelifyType(type);
-  resultTypes.push_back(
-      handshake::ControlType::get(this->builder.getContext()));
+  resultTypes.push_back(handshake::ControlType::get(builder.getContext()));
 
-  auto instOp = this->builder.create<handshake::InstanceOp>(
+  auto instOp = builder.create<handshake::InstanceOp>(
       callOp.getLoc(), callOp.getCallee(), resultTypes, operands);
   instOp->setDialectAttrs(callOp->getDialectAttrs());
   for (NamedAttribute param : parameters)
@@ -881,17 +872,17 @@ LogicalResult CfToHandshakeTranslator::translateCall(func::CallOp callOp) {
   transferName(callOp, instOp);
 
   if (outputIndices.empty()) {
-    this->valueMap.map(callOp.getResults(),
-                       instOp.getResults().take_front(callOp.getNumResults()));
+    valueMap.map(callOp.getResults(),
+                 instOp.getResults().take_front(callOp.getNumResults()));
     return success();
   }
 
   // All users of the values produced by the __init calls now use the outputs
   // of the instance
   for (auto [resIdx, argIdx] : llvm::enumerate(outputIndices))
-    this->valueMap.map(callOp.getOperand(argIdx), instOp.getResult(resIdx));
+    valueMap.map(callOp.getOperand(argIdx), instOp.getResult(resIdx));
   if (callOp.getNumResults() != 0)
-    this->valueMap.map(callOp.getResult(0), instOp.getResult(0));
+    valueMap.map(callOp.getResult(0), instOp.getResult(0));
   return success();
 }
 
@@ -901,28 +892,26 @@ LogicalResult CfToHandshakeTranslator::translateGeneric(Operation *op) {
           cf::ControlFlowDialect, BuiltinDialect>(op->getDialect()))
     return op->emitError() << "unsupported operation";
 
-  Operation *newOp = this->builder.clone(*op, this->valueMap);
+  Operation *newOp = builder.clone(*op, valueMap);
   setBlock(newOp, op->getBlock());
   return success();
 }
 
 LogicalResult CfToHandshakeTranslator::createMemInterfaces() {
-  if (this->memInfo.empty())
+  if (memInfo.empty())
     return success();
 
   // Associate each memory port with the interface it should connect to. Ports
   // are considered in program order (blocks were translated in reverse
   // post-order), which determines their order in the memory interfaces
-  llvm::stable_sort(this->memPorts,
-                    [&](const MemPort &lhs, const MemPort &rhs) {
-                      return this->blockID[lhs.cfOp->getBlock()] <
-                             this->blockID[rhs.cfOp->getBlock()];
-                    });
-  for (MemPort &port : this->memPorts) {
+  llvm::stable_sort(memPorts, [&](const MemPort &lhs, const MemPort &rhs) {
+    return blockID[lhs.cfOp->getBlock()] < blockID[rhs.cfOp->getBlock()];
+  });
+  for (MemPort &port : memPorts) {
     auto memAttr = getDialectAttr<handshake::MemInterfaceAttr>(port.cfOp);
     Block *block = port.cfOp->getBlock();
-    this->portBlock[port.portOp] = block;
-    MemAccesses &accesses = this->memInfo.find(port.memref)->second;
+    portBlock[port.portOp] = block;
+    MemAccesses &accesses = memInfo.find(port.memref)->second;
     if (memAttr.connectsToMC())
       accesses.mcPorts[block].push_back(port.portOp);
     else
@@ -932,42 +921,41 @@ LogicalResult CfToHandshakeTranslator::createMemInterfaces() {
   // Find the control value indicating the last control flow decision in the
   // function; it will be fed to memory interfaces to indicate that no more
   // group allocations will be coming
-  assert(!this->returns.empty() && "no returns in function");
+  assert(!returns.empty() && "no returns in function");
   SmallVector<Block *> retBlocks;
-  for (Block &block : this->cfFunc) {
+  for (Block &block : cfFunc) {
     if (isa<func::ReturnOp>(block.getTerminator()))
       retBlocks.push_back(&block);
   }
   Value ctrlEnd;
   if (retBlocks.size() == 1) {
-    ctrlEnd = this->blockCtrl[retBlocks.front()];
+    ctrlEnd = blockCtrl[retBlocks.front()];
   } else {
     // Merge the control signals of all blocks with a return, at the beginning
     // of the last of these blocks
     SmallVector<Value> controls;
     for (Block *block : retBlocks)
-      controls.push_back(this->blockCtrl[block]);
+      controls.push_back(blockCtrl[block]);
     Block *lastRetBlock = retBlocks.back();
-    this->builder.setInsertionPointToStart(this->stagingBlock[lastRetBlock]);
-    auto mergeOp = this->builder.create<handshake::MergeOp>(
+    builder.setInsertionPointToStart(stagingBlock[lastRetBlock]);
+    auto mergeOp = builder.create<handshake::MergeOp>(
         lastRetBlock->getTerminator()->getLoc(), controls);
-    setBB(mergeOp, this->blockID[lastRetBlock]);
+    setBB(mergeOp, blockID[lastRetBlock]);
     ctrlEnd = mergeOp.getResult();
   }
 
   // Create a mapping between each block and its control value in the right
   // format for the memory interface builder
   DenseMap<unsigned, Value> ctrlVals;
-  for (auto [block, id] : this->blockID)
-    ctrlVals.insert({id, this->blockCtrl[block]});
+  for (auto [block, id] : blockID)
+    ctrlVals.insert({id, blockCtrl[block]});
 
   // Each memory region is independent from the others
-  for (auto &[memref, memAccesses] : this->memInfo) {
+  for (auto &[memref, memAccesses] : memInfo) {
 #ifndef NDEBUG
     SmallPtrSet<Block *, 4> controlBlocks;
 #endif
-    MemoryInterfaceBuilder memBuilder(this->funcOp,
-                                      this->valueMap.lookup(memref),
+    MemoryInterfaceBuilder memBuilder(funcOp, valueMap.lookup(memref),
                                       memAccesses.memStart, ctrlEnd, ctrlVals);
 
     for (auto &[_, mcBlockOps] : memAccesses.mcPorts)
@@ -978,9 +966,9 @@ LogicalResult CfToHandshakeTranslator::createMemInterfaces() {
     // all of its ports must belong to that block. Ports are already in program
     // order, which determines their order in the group
     for (auto &[group, groupOps] : memAccesses.lsqPorts) {
-      Block *groupBlock = this->portBlock[groupOps.front()];
+      Block *groupBlock = portBlock[groupOps.front()];
       for (handshake::MemPortOpInterface portOp : groupOps) {
-        if (this->portBlock[portOp] != groupBlock) {
+        if (portBlock[portOp] != groupBlock) {
           return portOp->emitError()
                  << "LSQ group " << group
                  << " has memory accesses in multiple basic blocks; all "
@@ -1002,25 +990,25 @@ LogicalResult CfToHandshakeTranslator::createMemInterfaces() {
 
     handshake::MemoryControllerOp mcOp;
     handshake::LSQOp lsqOp;
-    if (failed(memBuilder.instantiateInterfaces(this->builder, mcOp, lsqOp)))
+    if (failed(memBuilder.instantiateInterfaces(builder, mcOp, lsqOp)))
       return failure();
   }
   return success();
 }
 
 void CfToHandshakeTranslator::createEnd() {
-  Block *body = this->funcOp.getBodyBlock();
-  this->builder.setInsertionPointToEnd(body);
-  Location loc = this->cfFunc.front().getTerminator()->getLoc();
+  Block *body = funcOp.getBodyBlock();
+  builder.setInsertionPointToEnd(body);
+  Location loc = cfFunc.front().getTerminator()->getLoc();
 
   // Returns are ordered by their block in the func-level function. When
   // identifying basic blocks, the end node is either put in the same block as
   // the function's single return statement or, in the case of multiple return
   // statements, it is put in a "fake block" along with the merges that feed it
   // its data inputs
-  llvm::stable_sort(this->returns, llvm::less_first());
-  size_t exitBlockID = this->blockID.size();
-  if (this->returns.size() == 1)
+  llvm::stable_sort(returns, llvm::less_first());
+  size_t exitBlockID = blockID.size();
+  if (returns.size() == 1)
     exitBlockID -= 1;
 
   // The terminator's operands are, in order
@@ -1028,29 +1016,29 @@ void CfToHandshakeTranslator::createEnd() {
   // 2. a control for each memory region signaling completion
   // 3. a control signaling eventual function completion (the function's start)
   SmallVector<Value, 8> endOprds;
-  if (this->returns.size() == 1) {
-    endOprds.append(this->returns.front().second);
+  if (returns.size() == 1) {
+    endOprds.append(returns.front().second);
   } else {
     // Return values from multiple returns need to be merged together
     Location mergeLoc = body->empty() ? loc : body->back().getLoc();
-    for (size_t i = 0, e = this->returns.front().second.size(); i < e; ++i) {
+    for (size_t i = 0, e = returns.front().second.size(); i < e; ++i) {
       SmallVector<Value, 4> mergeOperands;
-      for (auto &[_, operands] : this->returns)
+      for (auto &[_, operands] : returns)
         mergeOperands.push_back(operands[i]);
       auto mergeOp =
-          this->builder.create<handshake::MergeOp>(mergeLoc, mergeOperands);
+          builder.create<handshake::MergeOp>(mergeLoc, mergeOperands);
       setBB(mergeOp, exitBlockID);
       endOprds.push_back(mergeOp.getResult());
     }
   }
 
-  for (BlockArgument arg : this->funcOp.getArguments()) {
+  for (BlockArgument arg : funcOp.getArguments()) {
     if (!isa<MemRefType>(arg.getType()))
       continue;
     if (arg.use_empty()) {
       // When the memory region is not accessed, just a create a constant source
       // of valid "memory end" tokens for it
-      auto sourceOp = this->builder.create<handshake::SourceOp>(loc);
+      auto sourceOp = builder.create<handshake::SourceOp>(loc);
       setBB(sourceOp, exitBlockID);
       endOprds.push_back(sourceOp.getResult());
       continue;
@@ -1063,9 +1051,9 @@ void CfToHandshakeTranslator::createEnd() {
       }
     }
   }
-  endOprds.push_back(this->funcOp.getArguments().back());
+  endOprds.push_back(funcOp.getArguments().back());
 
-  auto endOp = this->builder.create<handshake::EndOp>(loc, endOprds);
+  auto endOp = builder.create<handshake::EndOp>(loc, endOprds);
   setBB(endOp, exitBlockID);
 }
 
