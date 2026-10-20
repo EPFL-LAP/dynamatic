@@ -69,7 +69,7 @@ public:
 protected:
   /// An incoming CFG edge to a block, identified by the predecessor block and
   /// the index of the successor in the predecessor's terminator.
-  using Edge = std::pair<Block *, unsigned>;
+  using CFGEdge = std::pair<Block *, unsigned>;
 
   /// Groups memory operations by interface and group for a given memory
   /// region.
@@ -108,14 +108,14 @@ protected:
   DenseMap<Block *, Block *> stagingBlock;
   /// Incoming CFG edges of each block. The order of the edges determines the
   /// order of the operands of the block's merge-like operations.
-  DenseMap<Block *, SmallVector<Edge>> preds;
+  DenseMap<Block *, SmallVector<CFGEdge>> preds;
   /// Merge-like operations of each block, one per block argument followed by
   /// the control merge. Their data operands are placeholders, one per incoming
   /// edge, until all predecessor terminators are translated.
   DenseMap<Block *, SmallVector<handshake::MergeLikeOpInterface>> mergeOps;
   /// Values flowing along each CFG edge: one per successor block argument,
   /// followed by the control.
-  DenseMap<Edge, SmallVector<Value>> edgeValues;
+  DenseMap<CFGEdge, SmallVector<Value>> edgeValues;
   /// Maps func-level memory regions to their memory accesses.
   llvm::MapVector<Value, MemAccesses> memInfo;
   /// Memory ports with the func-level memory operations they replace and the

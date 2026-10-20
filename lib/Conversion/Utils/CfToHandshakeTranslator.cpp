@@ -372,7 +372,7 @@ CfToHandshakeTranslator::createControlMerge(Block *block) {
 }
 
 LogicalResult CfToHandshakeTranslator::createMerges(Block *block) {
-  ArrayRef<Edge> blockPreds = preds[block];
+  ArrayRef<CFGEdge> blockPreds = preds[block];
   if (blockPreds.empty())
     return block->front().emitError() << "block must have predecessors";
   Location loc = block->front().getLoc();
