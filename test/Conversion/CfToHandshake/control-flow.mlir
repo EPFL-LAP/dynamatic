@@ -1,4 +1,4 @@
-// RUN: dynamatic-opt --lower-cf-to-handshake --remove-operation-names %s --split-input-file | FileCheck %s
+// RUN: dynamatic-opt --func-maximize-ssa --lower-cf-to-handshake --remove-operation-names %s --split-input-file | FileCheck %s
 
 // CHECK-LABEL:   handshake.func @selfLoop(
 // CHECK-SAME:                             %[[VAL_0:.*]]: !handshake.channel<i32>, %[[VAL_1:.*]]: !handshake.channel<i32>,

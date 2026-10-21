@@ -86,7 +86,9 @@ def FuncMaximizeSSA : Pass<"func-maximize-ssa", "::mlir::func::FuncOp"> {
     ensures that every value used within a block is also defined within the
     block, making dataflow explicit and removing block dominance-based dataflow
     semantics. The pass achieves this by adding block arguments wherever
-    necessary to forward values to the block(s) where they are used.
+    necessary to forward values to the block(s) where they are used. Memory
+    regions (memref-typed block arguments and results of memory allocation
+    operations) are not forwarded.
   }];
 }
 

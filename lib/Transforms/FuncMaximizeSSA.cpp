@@ -77,11 +77,41 @@ bool dynamatic::isRegionSSAMaximized(Region &region) {
   return true;
 }
 
+/// Determines whether the strategy selects the value for SSA maximization.
+static bool isSelectedForMaximization(Value value,
+                                      SSAMaximizationStrategy &strategy) {
+  if (!strategy.maximizeBlock(*getDefiningBlock(value)))
+    return false;
+  if (auto arg = dyn_cast<BlockArgument>(value))
+    return strategy.maximizeArgument(arg);
+  OpResult res = cast<OpResult>(value);
+  return strategy.maximizeOp(*res.getOwner()) && strategy.maximizeResult(res);
+}
+
+LogicalResult dynamatic::verifySSAMaximized(Region &region,
+                                            SSAMaximizationStrategy &strategy) {
+  for (Block &block : region) {
+    for (Operation &op : block) {
+      for (OpOperand &oprd : op.getOpOperands()) {
+        Value value = oprd.get();
+        if (getDefiningBlock(value) != &block &&
+            isSelectedForMaximization(value, strategy)) {
+          return op.emitError()
+                 << "operand #" << oprd.getOperandNumber()
+                 << " is defined in another block, but the region is expected "
+                    "to be in maximal SSA form (see --func-maximize-ssa)";
+        }
+      }
+    }
+  }
+  return success();
+}
+
 bool dynamatic::SSAMaximizationStrategy::maximizeBlock(Block &block) {
   return true;
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeArgument(BlockArgument arg) {
-  return true;
+  return !isa<MemRefType>(arg.getType());
 }
 bool dynamatic::SSAMaximizationStrategy::maximizeOp(Operation &op) {
   return !isa<
