@@ -653,7 +653,7 @@ void insertExitSuppressors(
     NameAnalysis &namer,
     const DenseMap<int64_t, Value> &blockEntryControlTokens,
     DenseSet<handshake::ConditionalBranchOp> &frontier) {
-
+  entryOpsArray.dump();
   for (Attribute attr : entryOpsArray) {
     auto entryDict = cast<DictionaryAttr>(attr);
     StringRef opName = entryDict.getAs<StringAttr>("op").getValue();

@@ -1,5 +1,6 @@
 add_dynamatic_library(DynamaticDuplication
   PredictedConstantDuplication.cpp
+  LoopPrediction.cpp
 
   DEPENDS
   DynamaticTransformsPassIncGen

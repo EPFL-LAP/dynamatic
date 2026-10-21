@@ -161,6 +161,13 @@ def PredictedConstantDuplication : Pass<"predicted-constant-duplication", "mlir:
   }];
 }
 
+def LoopPrediction : Pass<"loop-prediction", "mlir::ModuleOp"> {
+  let summary = "Prediction of a loop variable.";
+  let description = [{
+    The pass tries to predict a the value of sum for sparse.
+  }];
+}
+
 
 
 #endif // EXPERIMENTAL_TRANSFORMS_PASSES_TD

@@ -723,8 +723,10 @@ void EagerlyElasticAllPass::runOnOperation() {
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   // applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
 
-  applyRewritesForRegion(frontier, namer, 2);
-  applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
+  for (int i = 0; i < 1; i++) {
+    applyRewritesForRegion(frontier, namer, 2);
+    applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
+  }
 
   if (regionBased) {
     llvm::errs() << "regionbased enabled\n";
