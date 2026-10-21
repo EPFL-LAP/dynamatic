@@ -88,9 +88,8 @@ static bool isSelectedForMaximization(Value value,
   return strategy.maximizeOp(*res.getOwner()) && strategy.maximizeResult(res);
 }
 
-LogicalResult
-dynamatic::verifySSAMaximized(Region &region,
-                              SSAMaximizationStrategy &strategy) {
+LogicalResult dynamatic::verifySSAMaximized(Region &region,
+                                            SSAMaximizationStrategy &strategy) {
   for (Block &block : region) {
     for (Operation &op : block) {
       for (OpOperand &oprd : op.getOpOperands()) {
