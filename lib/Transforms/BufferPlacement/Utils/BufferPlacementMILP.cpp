@@ -632,6 +632,16 @@ void BufferPlacementMILP::addUnitTimingConstraints(Operation *unit,
     // The delay of the unit must be positive.
     delay = std::max(delay, 0.001);
 
+    if (delay > targetPeriod) {
+      std::string msg = llvm::formatv(
+          "Combinational delay of the {0} path of '{1}' ({2}) is {3:F3} ns, "
+          "which exceeds the target clock period of {4:F3} ns. Check the "
+          "unit's timing model or increase the target clock period.",
+          getSignalName(signalType), getUniqueName(unit), unit->getName(),
+          delay, targetPeriod);
+      llvm::report_fatal_error(llvm::Twine(msg), /*gen_crash_diag=*/false);
+    }
+
     // The unit is not pipelined, add a path constraint for each input/output
     // port pair in the unit
     forEachIOPair(unit, [&](Value in, Value out) {
