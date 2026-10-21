@@ -861,7 +861,7 @@ void TranslateLLVMToStd::translateMemsetIntrinsic(llvm::CallInst *callInst) {
   } else {
     // Normal case
     const llvm::Value *baseAddressLLVM = findBase(callInst->getArgOperand(0));
-    memref = valueMap.at(baseAddressLLVM);
+    memref = llvmPtrToMemRefMap.at(baseAddressLLVM);
     offset = valueMap[callInst->getArgOperand(0)];
   }
 
