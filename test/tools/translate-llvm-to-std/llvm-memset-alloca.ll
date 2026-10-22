@@ -11,7 +11,7 @@ entry:
   %arr = alloca [4 x i8], align 1
 ; CHECK-COUNT-4: memref.store %{{.*}}, %[[ARRAY]][%{{.*}}] : memref<4xi8>
   call void @llvm.memset.p0.i64(ptr align 1 %arr, i8 0, i64 4, i1 false)
-  %idx = getelementptr inbounds [4 x i8], ptr %arr, i64 0, i64 2
+  %idx = getelementptr inbounds i8, ptr %arr, i64 2
   %val = load i8, ptr %idx, align 1
   ret i8 %val
 }
