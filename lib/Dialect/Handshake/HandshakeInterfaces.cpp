@@ -221,7 +221,10 @@ static bool isShiftByConstantImpl(Operation *op) {
         }
         return isa<handshake::ConstantOp>(op);
       };
-  return isShiftByConstantRecursive(rhs.getDefiningOp());
+  // The shift amount may be a function argument
+  if (Operation *defOp = rhs.getDefiningOp())
+    return isShiftByConstantRecursive(defOp);
+  return false;
 }
 
 bool ShLIOp::isShiftByConstant() {
