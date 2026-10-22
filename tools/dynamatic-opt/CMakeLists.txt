@@ -22,6 +22,7 @@ target_link_libraries(dynamatic-opt
   DynamaticFormalPropertyAnnotation
   DynamaticResourceSharing
   DynamaticCfToHandshake
+  DynamaticFtdCfToHandshake
   DynamaticHandshake
   DynamaticHandshakeToHW
   DynamaticHandshakeToSynth
@@ -30,7 +31,6 @@ target_link_libraries(dynamatic-opt
   DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
-  DynamaticExperimentalConversion 
   DynamaticExperimentalTestTransforms
   DynamaticExperimentalSupport
   DynamaticExperimentalTransforms

@@ -49,6 +49,17 @@ def MergeLikeOpInterface : OpInterface<"MergeLikeOpInterface"> {
       }],
       "mlir::OpResult", "getDataResult", (ins)
     >,
+    InterfaceMethod<[{
+        Replaces the data operand at index `idx` among the data operands (i.e.,
+        `getDataOperands()[idx]`) with `value`.
+      }],
+      "void", "setDataOperand", (ins "unsigned":$idx, "mlir::Value":$value),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        unsigned firstDataIdx = $_op.getDataOperands().getBeginOperandIndex();
+        $_op->setOperand(firstDataIdx + idx, value);
+      }]
+    >,
   ];
 }
 
