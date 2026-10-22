@@ -21,6 +21,8 @@ endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
+# Compile with -std=c++17 instead of -std=gnu++17, as LLVM does
+set(CMAKE_CXX_EXTENSIONS NO)
 
 if (MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHs-c- /GR-")
