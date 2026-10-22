@@ -77,7 +77,9 @@ if (DYNAMATIC_BUILD_LLVM)
   list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
   set(MLIR_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/mlir")
   list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
-  set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang")
+  # Clang writes its CMake modules to the library directory of LLVM, which is
+  # in the build directory of LLVM (unlike MLIR)
+  set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/llvm-project/lib/cmake/clang")
   list(APPEND CMAKE_MODULE_PATH ${CLANG_CMAKE_DIR})
   set(LLVM_EXTERNAL_LIT "${CMAKE_CURRENT_SOURCE_DIR}/llvm-project/llvm/utils/lit/lit.py" CACHE STRING "" FORCE)
   set(LLVM_INCLUDE_DIRS
