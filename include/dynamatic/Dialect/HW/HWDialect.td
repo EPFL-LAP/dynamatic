@@ -33,8 +33,11 @@ def HWDialect : Dialect {
   let hasConstantMaterializer = 1;
   let useDefaultTypePrinterParser = 1;
 
-  // Opt-out of properties for now, must migrate by LLVM 19.  #5273.
-  let usePropertiesForAttributes = 0;
+  // Keep printing inherent attributes in `attr-dict` (e.g., the visibility of
+  // hw.module), as before properties became mandatory.
+  // FIXME: This option is deprecated: bind the inherent attributes in the
+  // assembly formats or use `prop-dict` instead.
+  let useStrictPropertiesInAssemblyFormat = 0;
 
   let extraClassDeclaration = [{
     /// Register all HW types.

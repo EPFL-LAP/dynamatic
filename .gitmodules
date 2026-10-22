@@ -8,5 +8,5 @@
 	url = https://github.com/ETHZ-DYNAMO/dataflow-aig-library
 [submodule "llvm-project"]
 	path = llvm-project
-  url = https://github.com/EPFL-LAP/llvm-project.git
+  url = https://github.com/ETHZ-DYNAMO/llvm-project.git
   shallow = true

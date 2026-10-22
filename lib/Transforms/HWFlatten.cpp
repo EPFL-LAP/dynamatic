@@ -15,6 +15,7 @@
 #include "dynamatic/Transforms/Passes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 #define DEBUG_TYPE "hw-flatten-modules"
@@ -50,11 +51,11 @@ struct HWInliner : public mlir::InlinerInterface {
   }
 
   void handleTerminator(Operation *op,
-                        ArrayRef<Value> valuesToReplace) const override {
+                        ValueRange valuesToReplace) const override {
     assert(isa<hw::OutputOp>(op));
     for (auto [toReplace, replacement] :
          llvm::zip(valuesToReplace, op->getOperands()))
-      toReplace.replaceAllUsesWith(replacement);
+      Value(toReplace).replaceAllUsesWith(replacement);
   }
 };
 
@@ -76,6 +77,7 @@ void FlattenModulesPass::runOnOperation() {
   // Inline every hw.instance, restarting the walk after each mutation until
   // no instances remain.
   HWInliner inliner(&getContext());
+  mlir::InlinerConfig inlinerConfig;
   bool changed = true;
   while (changed) {
     changed = false;
@@ -88,9 +90,10 @@ void FlattenModulesPass::runOnOperation() {
       // Mark this module as instantiated so we know to erase it later.
       instantiated.insert(target.getNameAttr());
 
-      if (failed(mlir::inlineRegion(inliner, &target.getBody(), inst,
-                                    inst.getOperands(), inst.getResults(),
-                                    std::nullopt, /*shouldClone=*/true))) {
+      if (failed(mlir::inlineRegion(inliner, inlinerConfig.getCloneCallback(),
+                                    &target.getBody(), inst, inst.getOperands(),
+                                    inst.getResults(), std::nullopt,
+                                    /*shouldClone=*/true))) {
         inst.emitError("failed to inline '") << target.getName() << "'";
         signalPassFailure();
         return WalkResult::interrupt();

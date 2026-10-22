@@ -33,6 +33,7 @@ add_dynamatic_library(DynamaticTransforms
 
   LINK_LIBS PUBLIC
   MLIRIR
+  MLIRControlFlowTransforms
   MLIRMemRefDialect
   MLIRFuncDialect
   MLIRSupport

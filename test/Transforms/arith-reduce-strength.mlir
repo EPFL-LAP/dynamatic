@@ -19,8 +19,8 @@ func.func @replaceMulAddWithSub(%arg0: i32, %arg1: i32) -> i32 {
 // CHECK-LABEL:   func.func @replaceMulSubLhsWithAdd(
 // CHECK-SAME:                                       %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                                       %[[VAL_1:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_2:.*]] = arith.constant -1 : i32
-// CHECK:           %[[VAL_3:.*]] = arith.constant 1 : i32
+// CHECK-DAG:           %[[VAL_2:.*]] = arith.constant -1 : i32
+// CHECK-DAG:           %[[VAL_3:.*]] = arith.constant 1 : i32
 // CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_0]], %[[VAL_1]] : i32
 // CHECK:           %[[VAL_5:.*]] = arith.xori %[[VAL_4]], %[[VAL_2]] : i32
 // CHECK:           %[[VAL_6:.*]] = arith.addi %[[VAL_5]], %[[VAL_3]] : i32
@@ -54,7 +54,7 @@ func.func @replaceMulSubRhsWithAdd(%arg0: i32, %arg1: i32) -> i32 {
 // CHECK-LABEL:   func.func @replaceMulAddWithSubWrongCst(
 // CHECK-SAME:                                            %[[VAL_0:.*]]: i32,
 // CHECK-SAME:                                            %[[VAL_1:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_2:.*]] = arith.constant -2 : i32
+// CHECK-DAG:           %[[VAL_2:.*]] = arith.constant -2 : i32
 // CHECK:           %[[VAL_3:.*]] = arith.muli %[[VAL_0]], %[[VAL_2]] : i32
 // CHECK:           %[[VAL_4:.*]] = arith.addi %[[VAL_3]], %[[VAL_1]] : i32
 // CHECK:           return %[[VAL_4]] : i32
@@ -85,7 +85,7 @@ func.func @replaceMulAddWithSubNoCst(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 
 
 // CHECK-LABEL:   func.func @reduceStrengthMul3(
 // CHECK-SAME:                                  %[[VAL_0:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_1:.*]] = arith.constant 1 : i32
+// CHECK-DAG:           %[[VAL_1:.*]] = arith.constant 1 : i32
 // CHECK:           %[[VAL_2:.*]] = arith.shli %[[VAL_0]], %[[VAL_1]] : i32
 // CHECK:           %[[VAL_3:.*]] = arith.addi %[[VAL_0]], %[[VAL_2]] : i32
 // CHECK:           return %[[VAL_3]] : i32
@@ -100,10 +100,10 @@ func.func @reduceStrengthMul3(%arg0: i32) -> i32 {
 
 // CHECK-LABEL:   func.func @reduceStrengthMul30(
 // CHECK-SAME:                                   %[[VAL_0:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_1:.*]] = arith.constant 1 : i32
-// CHECK:           %[[VAL_2:.*]] = arith.constant 2 : i32
-// CHECK:           %[[VAL_3:.*]] = arith.constant 3 : i32
-// CHECK:           %[[VAL_4:.*]] = arith.constant 4 : i32
+// CHECK-DAG:           %[[VAL_1:.*]] = arith.constant 1 : i32
+// CHECK-DAG:           %[[VAL_2:.*]] = arith.constant 2 : i32
+// CHECK-DAG:           %[[VAL_3:.*]] = arith.constant 3 : i32
+// CHECK-DAG:           %[[VAL_4:.*]] = arith.constant 4 : i32
 // CHECK:           %[[VAL_5:.*]] = arith.shli %[[VAL_0]], %[[VAL_1]] : i32
 // CHECK:           %[[VAL_6:.*]] = arith.shli %[[VAL_0]], %[[VAL_2]] : i32
 // CHECK:           %[[VAL_7:.*]] = arith.addi %[[VAL_5]], %[[VAL_6]] : i32
@@ -123,7 +123,7 @@ func.func @reduceStrengthMul30(%arg0: i32) -> i32 {
 
 // CHECK-LABEL:   func.func @reduceStrengthMulTooDeep(
 // CHECK-SAME:                                        %[[VAL_0:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_1:.*]] = arith.constant 511 : i32
+// CHECK-DAG:           %[[VAL_1:.*]] = arith.constant 511 : i32
 // CHECK:           %[[VAL_2:.*]] = arith.muli %[[VAL_0]], %[[VAL_1]] : i32
 // CHECK:           return %[[VAL_2]] : i32
 // CHECK:         }
@@ -137,7 +137,7 @@ func.func @reduceStrengthMulTooDeep(%arg0: i32) -> i32 {
 
 // CHECK-LABEL:   func.func @reduceStrengthMulPowTwo(
 // CHECK-SAME:                                       %[[VAL_0:.*]]: i32) -> i32 {
-// CHECK:           %[[VAL_1:.*]] = arith.constant 9 : i32
+// CHECK-DAG:           %[[VAL_1:.*]] = arith.constant 9 : i32
 // CHECK:           %[[VAL_2:.*]] = arith.shli %[[VAL_0]], %[[VAL_1]] : i32
 // CHECK:           return %[[VAL_2]] : i32
 // CHECK:         }

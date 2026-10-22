@@ -568,9 +568,17 @@ LogicalResult CfToHandshakeTranslator::translateOneToOne(Operation *op) {
   SmallVector<Type> resTypes;
   for (Type resType : op->getResultTypes())
     resTypes.push_back(channelifyType(resType));
-  auto newOp =
-      builder.create<DstOp>(op->getLoc(), resTypes, lookup(op->getOperands()),
-                            op->getAttrDictionary().getValue());
+  // Copy the discardable attributes, and the inherent attributes that the
+  // Handshake operation also has (e.g., the predicate of comparisons). Other
+  // inherent attributes (e.g., overflow flags) have no meaning in Handshake
+  SmallVector<NamedAttribute> attrs(op->getDiscardableAttrs());
+  for (StringRef name : DstOp::getAttributeNames()) {
+    if (std::optional<Attribute> attr = op->getInherentAttr(name);
+        attr && *attr)
+      attrs.emplace_back(builder.getStringAttr(name), *attr);
+  }
+  auto newOp = builder.create<DstOp>(op->getLoc(), resTypes,
+                                     lookup(op->getOperands()), attrs);
   setBlock(newOp, op->getBlock());
   transferName(op, newOp);
   valueMap.map(op->getResults(), newOp->getResults());
