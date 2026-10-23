@@ -409,7 +409,7 @@ LogicalResult FuncOp::verify() {
                            << ".";
 
     if (llvm::any_of(portNames,
-                     [&](Attribute attr) { return !attr.isa<StringAttr>(); }))
+                     [&](Attribute attr) { return !isa<StringAttr>(attr); }))
       return emitOpError() << "expected all entries in attribute '" << attrName
                            << "' to be strings.";
 
@@ -624,9 +624,8 @@ LogicalResult ConstantOp::inferReturnTypes(
     DictionaryAttr attributes, mlir::OpaqueProperties properties,
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-  OperationName opName = OperationName(getOperationName(), context);
-  StringAttr attrName = getValueAttrName(opName);
-  auto attr = cast<TypedAttr>(attributes.get(attrName));
+  ConstantOp::Adaptor adaptor(operands, attributes, properties, regions);
+  auto attr = cast<TypedAttr>(adaptor.getValue());
 
   auto controlType = cast<ControlType>(operands[0].getType());
 
@@ -764,7 +763,7 @@ void MemoryControllerOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   odsState.addOperands(ctrlEnd);
 
   // Data outputs (get their type from memref)
-  MemRefType memrefType = memRef.getType().cast<MemRefType>();
+  MemRefType memrefType = cast<MemRefType>(memRef.getType());
   MLIRContext *ctx = odsBuilder.getContext();
   odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
   odsState.types.push_back(handshake::ControlType::get(ctx));
@@ -1031,7 +1030,7 @@ void LSQOp::build(OpBuilder &odsBuilder, OperationState &odsState, Value memref,
   odsState.addOperands(ctrlEnd);
 
   // Data outputs (get their type from memref)
-  MemRefType memrefType = memref.getType().cast<MemRefType>();
+  MemRefType memrefType = cast<MemRefType>(memref.getType());
   MLIRContext *ctx = odsBuilder.getContext();
   odsState.types.append(numLoads, wrapChannel(memrefType.getElementType()));
   odsState.types.push_back(handshake::ControlType::get(ctx));
@@ -1945,7 +1944,7 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
       // - operand[0] is a channel type
       // - all operands have the same extra signals
       // Note that this cast throws an error if the assumption is not met
-      operands[0].getType().cast<ChannelType>().getExtraSignals()));
+      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 
@@ -1967,7 +1966,7 @@ CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
       // - operand[0] is a channel type
       // - all operands have the same extra signals
       // Note that this cast throws an error if the assumption is not met
-      operands[0].getType().cast<ChannelType>().getExtraSignals()));
+      cast<ChannelType>(operands[0].getType()).getExtraSignals()));
   return success();
 }
 
@@ -2037,12 +2036,15 @@ LogicalResult ExtUIOp::verify() { return verifyExtOp(*this); }
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
+  // trunci(trunci(x)) -> trunci(x)
   if (auto defTruncOp = getIn().getDefiningOp<TruncIOp>()) {
     // Bypass the preceeding truncation operation
     getInMutable().assign(defTruncOp.getIn());
     return getResult();
   }
 
+  // trunci(ext(x)) -> trunci(x) when x is wider than the result, or x when it
+  // has the result's type
   Operation *defOp = getIn().getDefiningOp();
   if (isa_and_present<ExtSIOp, ExtUIOp>(defOp)) {
     Value src = defOp->getOperand(0);
@@ -2053,11 +2055,14 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
       getInMutable().assign(src);
       return getResult();
     }
-    // Bypass the preceeding extension operation and the truncation
-    return src;
+    // Bypass the preceeding extension operation and the truncation, if the
+    // extension's operand has the type of the truncation's result. A narrower
+    // operand would need a narrower extension, which a fold cannot create
+    if (src.getType() == getOut().getType())
+      return src;
   }
 
-  // Identical operand and result types mean that the trunc is a no-op
+  // trunci(x) -> x when x has the result's width: the trunc is a no-op
   unsigned srcWidth = getIn().getType().getDataBitWidth();
   unsigned dstWidth = getOut().getType().getDataBitWidth();
   if (srcWidth == dstWidth)

@@ -56,6 +56,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/LowerSwitch.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
+#include <deque>
 #include <polly/Support/ISLOStream.h>
 
 #define DEBUG_TYPE "array-partition"
@@ -306,7 +307,7 @@ void changeGEPOperands(Instruction *gepInst, Value *newBasePtr,
   }
 
   if (!isa<GetElementPtrInst>(gepInst)) {
-    LLVM_DEBUG(gepInst->dump(););
+    LLVM_DEBUG(llvm::dbgs() << *gepInst << "\n";);
     llvm::report_fatal_error(
         "Trying to change the operands of an operation with unhandled type.");
   }
@@ -1002,19 +1003,22 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
 
   StringRef arrName = baseStorage->getName();
 
-  Instruction *baseGEPOrInst = findBaseGEP(inst);
-  auto *gepInst = dyn_cast<GetElementPtrInst>(baseGEPOrInst);
+  // The address may be computed by a chain of GEPs (e.g., one for the row and
+  // one for the column of a 2D array). decomposeGEPIndices follows the pointer
+  // operands from the GEP it is given down to the base address:
+  //
+  //   baseAddress -> GEP1 -> GEP2 -> ... -> GEPN -> load/store
+  //               <------------------------------
+  //                  decomposeGEPIndices
+  //
+  // so we give it GEPN, the GEP feeding the access, to count every offset
+  auto *gepInst = dyn_cast<GetElementPtrInst>(getLoadStorePointerOperand(inst));
 
   auto *load = dyn_cast<LoadInst>(inst);
   auto *store = dyn_cast<StoreInst>(inst);
   StringRef opKind = load ? "load" : "store";
 
   if (!gepInst) {
-    if (baseGEPOrInst != inst) {
-      llvm::report_fatal_error(
-          "__dyn_array_partition: expected a GEP for this access");
-    }
-
     // Early return in case we have a 0 access in to an array. i.e. there is no
     // gep construction. In this case we also do not need to change the access
     // pattern since the 0th element is always in the 0th bank
@@ -1023,13 +1027,6 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
     else if (store)
       store->setOperand(1, banks[0]);
     return;
-  }
-
-  // If the wanted dimension to partition from exceeds the available indices in
-  // the gep instruction we can not change the indices accordingly
-  if (partInfo.dimension >= gepInst->getNumIndices()) {
-    llvm::report_fatal_error("__dyn_array_partition: dimension exceeds the "
-                             "number of indices in this access");
   }
 
   Function *f = inst->getParent()->getParent();
@@ -1061,7 +1058,7 @@ void rewriteAccessWithBranching(Instruction *inst, Value *baseStorage,
   // well before the current instruction that we'd like to split on
   if (gepInst->getNextNode() != inst) {
     gepInst = cast<GetElementPtrInst>(gepInst->clone());
-    gepInst->insertBefore(inst);
+    gepInst->insertBefore(inst->getIterator());
   }
 
   // Splits origBB right before the GEP: everything from the GEP onward

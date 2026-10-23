@@ -180,8 +180,13 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
 
     // Replace the original fork's outputs that are part of the memory control
     // network with the first lazy fork's outputs
-    for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults()))
-      from.replaceAllUsesWith(to);
+    for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults())) {
+      // The elements of a SetVector are const, while replaceAllUsesWith is a
+      // non-const method of Value in newer LLVM versions. Value is a handle to
+      // the IR value, so replacing the uses through a copy replaces them in the
+      // IR
+      Value(from).replaceAllUsesWith(to);
+    }
 
     if (hasValueWithoutLazyConstr) {
       // If some of the control fork's result go outside the memory control
@@ -409,7 +414,13 @@ struct HandshakeMaterializePass
 
   using HandshakeMaterializeBase::HandshakeMaterializeBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
     MLIRContext *ctx = &getContext();
 
@@ -450,6 +461,12 @@ struct HandshakeMaterializePass
       promoteEagerToLazyForks(funcOp);
 
     assert(succeeded(verifyIRMaterialized(modOp)) && "IR is not materialized");
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 };
 } // namespace

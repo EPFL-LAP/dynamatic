@@ -833,7 +833,13 @@ struct EliminateMuxWithIdenticalInputs
 struct HandshakeCombineSteeringLogicPass
     : public dynamatic::experimental::impl::HandshakeCombineSteeringLogicBase<
           HandshakeCombineSteeringLogicPass> {
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     MLIRContext *ctx = &getContext();
     ModuleOp mod = getOperation();
     GreedyRewriteConfig config;
@@ -853,6 +859,12 @@ struct HandshakeCombineSteeringLogicPass
         ctx);
     if (failed(applyPatternsAndFoldGreedily(mod, std::move(patterns), config)))
       return signalPassFailure();
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   };
 };
 } // namespace

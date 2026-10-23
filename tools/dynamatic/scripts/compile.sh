@@ -26,6 +26,7 @@ ENABLE_SHORT_CIRCUIT=${16}
 ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
+USE_LSQ_SIZING=${20:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -51,6 +52,7 @@ F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_PARTITIONED="$COMP_DIR/clang.opt.part.ll"
 F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY="$COMP_DIR/clang.opt.part.dep.ll"
+F_CLANG_CANONICALIZED="$COMP_DIR/clang.opt.part.dep.canon.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
@@ -110,6 +112,11 @@ export_cfg() {
 }
 
 # ============================================================================ #
+
+if [[ -z "$OUTPUT_DIR" || "$OUTPUT_DIR" == "/" ]]; then
+  echo "[FATAL] Invalid output directory"
+  exit 1
+fi
 
 # Reset output directory
 rm -rf "$OUTPUT_DIR"/*/
@@ -172,6 +179,10 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # - consthoist: moving constants around
 # - simplifycfg: merge BBs
 # - licm: moving the code outside the loops as much as possible
+# - instsimplify: fold leftovers of loop passes (e.g., "icmp eq 1, 0"), so that
+# memory ops are not erased in MLIR after the dependency analysis.
+# - adce: unlike dce, also removes dead phis and branches only feeding dead
+# code, for the same reason.
 #
 # NOTE: the optnone attribute sliently disables all the optimization in the
 # passes; Check out the complete list: https://llvm.org/docs/Passes.html
@@ -182,7 +193,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,dce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,instsimplify,simplifycfg,adce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -240,8 +251,20 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
-$LLVM_TO_STD_TRANSLATION_BIN \
+# - "canonicalize-geps": Collapse each chain of GEPs computing a memory address
+# into a single GEP with a single index, the offset from the base pointer with
+# the arrays flattened in row-major order. The translation to the std dialect
+# below expects this form.
+$LLVM_OPT -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/CanonicalizeGEPs.so" \
+  -passes="canonicalize-geps" \
   "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY" \
+  > "$F_CLANG_CANONICALIZED"
+exit_on_fail "Failed to canonicalize GEPs in LLVM IR" \
+  "Canonicalized GEPs in LLVM IR"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_CANONICALIZED" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
@@ -316,7 +339,8 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --func-maximize-ssa --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
@@ -376,6 +400,14 @@ if [[ $USE_SHARING -ne 0 ]]; then
 fi
 
 
+# LSQ sizing (runs right after buffer placement, whose CFDFC analysis it uses;
+# without one, e.g. with on-merges, LSQs keep the default depth)
+LSQ_SIZING_PASS=""
+if [[ $USE_LSQ_SIZING -ne 0 ]]; then
+  LSQ_SIZING_PASS="--handshake-size-lsqs=timing-models=$DYNAMATIC_DIR/data/components.json target-period=$TARGET_CP"
+  echo_info "Set to size the LSQs after buffer placement."
+fi
+
 # Buffer placement
 if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
   # Simple buffer placement
@@ -384,6 +416,7 @@ if [[ "$BUFFER_ALGORITHM" == "on-merges" ]]; then
     --handshake-set-unit-impl-attr="target-period=$TARGET_CP timing-models=$DYNAMATIC_DIR/data/components.json impl=$FPUNITS_GEN" \
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER timing-models=$DYNAMATIC_DIR/data/components.json" \
+    ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place simple buffers" "Placed simple buffers"
@@ -420,7 +453,9 @@ else
     --handshake-set-buffering-properties="version=fpga20" \
     --handshake-place-buffers="algorithm=$BUFFER_ALGORITHM solver=$MILP_SOLVER frequencies=$F_FREQUENCIES timing-models=$DYNAMATIC_DIR/data/components.json spec-timing-models=$DYNAMATIC_DIR/data/spec-timing.json target-period=$TARGET_CP timeout=300 dump-milp-models $CALCULATE_PATH_DELAYS_FLAG ftd=$FAST_TOKEN_DELIVERY \
     blif-files=$DYNAMATIC_DIR/data/aig/ lut-delay=0.55 lut-size=6 acyclic-type" \
+    ${LSQ_SIZING_PASS:+"$LSQ_SIZING_PASS"} \
     ${SHARING_PASS:+"$SHARING_PASS"} \
+    --handshake-size-select-depth \
     > "$F_HANDSHAKE_BUFFERED"
   exit_on_fail "Failed to place smart buffers" "Placed smart buffers"
   cd - > /dev/null

@@ -18,6 +18,6 @@ add_dynamatic_library(DynamaticExperimentalTransforms
 )
 
 add_subdirectory(Speculation)
-add_subdirectory(LSQSizing)
 add_subdirectory(Rigidification)
 add_subdirectory(Duplication)
+add_subdirectory(LSQSizing)

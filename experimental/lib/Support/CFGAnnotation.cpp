@@ -138,18 +138,17 @@ unserializeEdges(handshake::FuncOp &funcOp) {
 
 /// Extract the CFG information from a region. Each basic block with an out
 /// edge is marked with the successor basic blocks, related to the structure
-/// `CFGEdge` for edges.
-static cfg::CFGAnnotation getCFGEdges(Region &funcRegion, NameAnalysis &namer) {
+/// `CFGEdge` for edges. `getCondName` returns the name of a branch condition.
+static cfg::CFGAnnotation
+getCFGEdges(Region &funcRegion, function_ref<std::string(Value)> getCondName) {
 
   cfg::CFGAnnotation edgeMap;
 
-  // Get the ID of a block through the ID annotated in the terminator operation
-  auto getIDBlock = [&](Block *bb) -> unsigned {
-    auto idOptional = getLogicBB(bb->getTerminator());
-    if (!idOptional.has_value())
-      bb->getTerminator()->emitError() << "Operation has no BB annotated\n";
-    return idOptional.value();
-  };
+  // The ID of a block is its position in the region
+  DenseMap<Block *, unsigned> blockIDs;
+  for (auto [idx, block] : llvm::enumerate(funcRegion))
+    blockIDs[&block] = idx;
+  auto getIDBlock = [&](Block *bb) { return blockIDs.lookup(bb); };
 
   // For each block in the IR
   for (auto &block : funcRegion.getBlocks()) {
@@ -167,9 +166,7 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion, NameAnalysis &namer) {
                condBranchOp) {
       // Get the name of the operation which defines the condition used for the
       // branch
-      Operation *conditionOperation =
-          condBranchOp.getOperand(0).getDefiningOp();
-      std::string conditionName = namer.getName(conditionOperation).str();
+      std::string conditionName = getCondName(condBranchOp.getCondition());
 
       // Get IDs of both true and false destinations
       unsigned trueDestID = getIDBlock(condBranchOp.getTrueDest());
@@ -185,12 +182,12 @@ static cfg::CFGAnnotation getCFGEdges(Region &funcRegion, NameAnalysis &namer) {
   return edgeMap;
 }
 
-void dynamatic::experimental::cfg::annotateCFG(handshake::FuncOp &funcOp,
-                                               PatternRewriter &rewriter,
-                                               NameAnalysis &namer) {
+void dynamatic::experimental::cfg::annotateCFG(
+    handshake::FuncOp &funcOp, Region &cfgRegion,
+    function_ref<std::string(Value)> getCondName) {
 
   // Get the CFG information
-  const auto edgeMap = getCFGEdges(funcOp.getRegion(), namer);
+  const auto edgeMap = getCFGEdges(cfgRegion, getCondName);
 
   std::string result = "";
 
@@ -213,7 +210,7 @@ void dynamatic::experimental::cfg::annotateCFG(handshake::FuncOp &funcOp,
     appendSymbol(CLOSE_EDGE);
   }
 
-  funcOp->setAttr(CFG_EDGES, rewriter.getStringAttr(result));
+  funcOp->setAttr(CFG_EDGES, StringAttr::get(funcOp.getContext(), result));
 }
 
 LogicalResult

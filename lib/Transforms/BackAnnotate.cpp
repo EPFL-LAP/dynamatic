@@ -214,7 +214,13 @@ struct BackAnnotatePass
 
   using BackAnnotateBase::BackAnnotateBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     // Open the back-annotation file
     std::ifstream inputFile(filepath);
     if (!inputFile.is_open()) {
@@ -243,6 +249,12 @@ struct BackAnnotatePass
       jsonRoot.printErrorContext(*value, llvm::errs());
       return signalPassFailure();
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   };
 
 private:

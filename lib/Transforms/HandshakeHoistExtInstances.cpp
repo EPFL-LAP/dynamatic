@@ -51,11 +51,16 @@ struct HandshakeHoistExtInstancesPass
 
   using HandshakeHoistExtInstancesBase::HandshakeHoistExtInstancesBase;
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     mlir::ModuleOp modOp = getOperation();
 
     // Make sure all operations are named
-    NameAnalysis &namer = getAnalysis<NameAnalysis>();
     namer.nameAllUnnamedOps();
 
     // Hoist external instances from each internal Handshake function
@@ -73,6 +78,12 @@ struct HandshakeHoistExtInstancesPass
       if (funcOp.isExternal())
         eraseIfUnused(funcOp);
     }
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   }
 
 private:
@@ -134,7 +145,7 @@ HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     auto namedArguments =
         llvm::zip_equal(instFuncOp.getArgNames(), instOp.getOperandTypes());
     for (auto [argNameAttr, argType] : namedArguments) {
-      StringRef argName = argNameAttr.cast<StringAttr>().strref();
+      StringRef argName = cast<StringAttr>(argNameAttr).strref();
       resTypes.push_back(argType);
       resNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
     }
@@ -144,7 +155,7 @@ HandshakeHoistExtInstancesPass::hoistInstances(handshake::FuncOp funcOp,
     auto namedResults =
         llvm::zip_equal(instFuncOp.getResNames(), instOp.getResultTypes());
     for (auto [argNameAttr, resType] : namedResults) {
-      StringRef argName = argNameAttr.cast<StringAttr>().strref();
+      StringRef argName = cast<StringAttr>(argNameAttr).strref();
       argTypes.push_back(resType);
       argNames.push_back(StringAttr::get(ctx, instFuncName + "_" + argName));
     }

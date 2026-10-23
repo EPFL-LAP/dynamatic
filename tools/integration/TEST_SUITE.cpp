@@ -21,6 +21,7 @@
 #include <iostream>
 #include <optional>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -144,6 +145,8 @@ struct IntegrationTest {
   // Use model checking to remove redundant logic.
   bool useRigidification = false;
   bool verifyInvariants = false;
+  // Use fast token delivery (FTD) and straight-to-the-queue
+  bool useFTD = false;
   // Enable speculation, using the speculate pragma
   bool useSpeculation = false;
   bool useDuplication = false;
@@ -152,6 +155,8 @@ struct IntegrationTest {
   unsigned clockPeriod = 5;
   // Insert an II monitor per loop of the circuit.
   bool instrumentII = false;
+  // Size the LSQs from the buffer placement CFDFCs.
+  bool useLSQSizing = false;
 
   // Results
   int simTime;
@@ -192,9 +197,11 @@ int IntegrationTest::run() {
              << " --buffer-algorithm " << this->bufferAlgorithm
              << (this->useSharing ? " --sharing" : "")
              << (this->useRigidification ? " --rigidification" : "")
+             << (this->useFTD ? " --straight-to-queue --fast-token-delivery" : "")
              << (this->useSpeculation ? " --speculation" : "")
              << (this->useDuplication ? " --enable-duplication" : "")
              << (this->instrumentII ? " --instrument-ii" : "")
+             << (this->useLSQSizing ? " --lsq-sizing" : "")
              << " --milp-solver " << this->milpSolver << std::endl;
   // clang-format on
 
@@ -295,8 +302,10 @@ class SharingFixture : public BaseFixture {};
 class SharingUnitTestFixture : public BaseFixture {};
 class SpecFixture : public BaseFixture {};
 class DuplicationFixture : public BaseFixture {};
+class FtdFixture : public BaseFixture {};
 
 class RigidificationFixture : public BaseFixture {};
+class LSQSizingFixture : public BaseFixture {};
 class VerifyInvariantsFixture : public BaseFixture {};
 
 TEST_P(BasicFixture, basic) {
@@ -472,6 +481,38 @@ TEST_P(SharingFixture, sharing_NoCI) {
   logPerformance(configWithSharing.simTime);
 }
 
+/// Compiles the benchmark with LSQ sizing enabled, checks that the circuit is
+/// still correct, and that the sizing pass did set the depths of its LSQs.
+TEST_P(LSQSizingFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "fpga20",
+      .useLSQSizing = true,
+      .simTime = -1,
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+
+  // The sized depths are stored as an attribute of each LSQ
+  fs::path exportPath = config.benchmarkPath / config.name /
+                        ("out_" + config.testName) / "comp" /
+                        "handshake_export.mlir";
+  std::ifstream exportFile(exportPath);
+  std::stringstream exportIR;
+  exportIR << exportFile.rdbuf();
+  EXPECT_NE(exportIR.str().find("handshake.lsqDepth"), std::string::npos)
+      << "No LSQ was sized in " << exportPath;
+
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
 TEST_P(SpecFixture, spec) {
   IntegrationTest config{
       // clang-format off
@@ -503,6 +544,27 @@ TEST_P(DuplicationFixture, basic) {
       .useDuplication = true,
       .milpSolver = "gurobi",
       .bufferAlgorithm = "fpga20",
+      .simTime = -1
+      // clang-format on
+  };
+  EXPECT_EQ(config.run(), 0);
+  RecordProperty("cycles", std::to_string(config.simTime));
+  logPerformance(config.simTime);
+}
+
+// The Verilog backend does not support handshake.init yet, so FTD circuits are
+// only simulated in VHDL
+TEST_P(FtdFixture, basic) {
+  IntegrationTest config{
+      // clang-format off
+      .name = GetParam(),
+      .testName = getVerboseOutdirSuffix(),
+      .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
+      .testVerilog = false,
+      .useSharing = false,
+      .useFTD = true,
+      .milpSolver = "gurobi",
+      .bufferAlgorithm = "on-merges",
       .simTime = -1
       // clang-format on
   };
@@ -853,6 +915,11 @@ INSTANTIATE_TEST_SUITE_P(SharingBenchmarks, SharingFixture,
     return "sharing_" + info.param;
     });
 
+INSTANTIATE_TEST_SUITE_P(LSQSizingBenchmarks, LSQSizingFixture,
+                         testing::Values("atax", "bicg", "histogram",
+                                         "triangular"),
+                         [](const auto &info) { return info.param; });
+
 INSTANTIATE_TEST_SUITE_P(SpecBenchmarks, SpecFixture,
     testing::Values(
       "single_loop",
@@ -878,6 +945,21 @@ INSTANTIATE_TEST_SUITE_P(DuplicationBenchmarks, DuplicationFixture,
       "wrap_if"
     ),
     [](const auto &info) { return "dup_" + info.param; });
+
+// Benchmarks of the FPL'22 FTD paper
+INSTANTIATE_TEST_SUITE_P(FtdBenchmarks, FtdFixture,
+    testing::Values(
+      "bicg",
+      "fir",
+      "gcd",
+      "if_loop_add",
+      "if_loop_mul",
+      "iir",
+      "kernel_2mm",
+      "kernel_3mm",
+      "matvec"
+    ),
+    [](const auto &info) { return "ftd_" + info.param; });
 
 // Smoke test: Using the CBC MILP solver to optimize some simple benchmarks
 // clang-format on

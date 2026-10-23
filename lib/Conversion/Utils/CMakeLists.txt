@@ -1,22 +1,18 @@
-add_dynamatic_library(DynamaticExperimentalConversion
-  FtdCfToHandshake.cpp
-
-  DEPENDS
-  DynamaticConversionPassIncGen
+add_dynamatic_library(DynamaticConversionUtils
+  CfToHandshakeTranslator.cpp
+  FtdCfToHandshakeTranslator.cpp
 
   LINK_LIBS PUBLIC
   DynamaticSupport
   DynamaticHandshake
+  DynamaticTransforms
   MLIRIR
-  MLIRPass
   MLIRArithDialect
   MLIRControlFlowDialect
   MLIRFuncDialect
   MLIRSupport
-  MLIRTransforms
-  MLIRAffineToStandard
   DynamaticExperimentalSupportBooleanLogic
   DynamaticSupportEspresso
   DynamaticExperimentalSupport
+  DynamaticExperimentalAnalysis
   )
-

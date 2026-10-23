@@ -21,6 +21,7 @@
 #include "dynamatic/Dialect/HW/HWDialect.h"
 #include "dynamatic/Dialect/HW/HWOpInterfaces.h"
 #include "dynamatic/Dialect/HW/HWTypes.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OpImplementation.h"
@@ -31,6 +32,7 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "llvm/ADT/StringExtras.h"
+#include <variant>
 
 namespace dynamatic {
 namespace hw {

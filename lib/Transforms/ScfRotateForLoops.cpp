@@ -133,7 +133,13 @@ namespace {
 struct ScfForLoopRotationPass
     : public dynamatic::impl::ScfForLoopRotationBase<ScfForLoopRotationPass> {
 
-  void runDynamaticPass() override {
+  void runOnOperation() override {
+    // Make sure all operation names are unique and haven't changed from what is
+    // cached (if anything is cached)
+    NameAnalysis &namer = getAnalysis<NameAnalysis>();
+    if (!namer.isAnalysisValid())
+      return signalPassFailure();
+
     auto *ctx = &getContext();
     mlir::GreedyRewriteConfig config;
     config.useTopDownTraversal = true;
@@ -145,6 +151,12 @@ struct ScfForLoopRotationPass
     if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
                                             config)))
       signalPassFailure();
+
+    // Make sure all operation names are still unique and name operations that
+    // do not currently have a name
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+      return signalPassFailure();
+    markAnalysesPreserved<NameAnalysis>();
   };
 };
 } // namespace

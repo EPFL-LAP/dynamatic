@@ -29,6 +29,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -309,6 +310,7 @@ public:
   static constexpr llvm::StringLiteral CALCULATE_PATH_DELAYS =
       "calculate-path-delays";
   static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
+  static constexpr llvm::StringLiteral LSQ_SIZING = "lsq-sizing";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -355,6 +357,10 @@ public:
     addFlag({INSTRUMENT_II,
              "Instrument the generated netlist so that each loop reports "
              "the initiation of each of its iterations during simulation"});
+    addFlag({LSQ_SIZING,
+             "Size the load and store queues of the LSQs from the CFDFCs "
+             "found by buffer placement (requires an MILP-based buffer "
+             "placement algorithm); otherwise LSQs use the default depth"});
   }
 
   CommandResult execute(CommandArguments &args) override;
@@ -705,7 +711,7 @@ CommandResult SetOutputDir::execute(CommandArguments &args) {
 
   // reject trivial bad cases
   if (outputDir.empty() || outputDir == "." || outputDir == ".." ||
-      outputDir.endswith("/"))
+      outputDir.ends_with("/"))
     return CommandResult::FAIL;
 
   // reject illegal chars
@@ -802,13 +808,15 @@ CommandResult Compile::execute(CommandArguments &args) {
   std::string calculatePathDelays =
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
+  std::string lsqSizing = args.flags.contains(LSQ_SIZING) ? "1" : "0";
 
-  return execCmd(
-      script, state.dynamaticPath, state.getKernelDir(), state.getOutputDir(),
-      state.getKernelName(), buffers, floatToString(state.targetCP, 3), sharing,
-      state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
-      fastTokenDelivery, milpSolver, straightToQueue, speculation,
-      enableShortCircuit, enableDuplication, calculatePathDelays, instrumentII);
+  return execCmd(script, state.dynamaticPath, state.getKernelDir(),
+                 state.getOutputDir(), state.getKernelName(), buffers,
+                 floatToString(state.targetCP, 3), sharing,
+                 state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
+                 fastTokenDelivery, milpSolver, straightToQueue, speculation,
+                 enableShortCircuit, enableDuplication, calculatePathDelays,
+                 instrumentII, lsqSizing);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

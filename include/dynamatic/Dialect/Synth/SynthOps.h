@@ -20,6 +20,7 @@
 
 #include "dynamatic/Dialect/Synth/SynthDialect.h"
 #include "dynamatic/Support/LLVM.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"

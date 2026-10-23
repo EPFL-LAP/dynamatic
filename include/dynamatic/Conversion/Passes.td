@@ -20,10 +20,7 @@ include "dynamatic/Support/Passes.td"
 // AffineToScf
 //===----------------------------------------------------------------------===//
 
-def AffineToScf : DynamaticPass<"lower-affine-to-scf", [
-  "mlir::memref::MemRefDialect", "mlir::scf::SCFDialect",
-  "mlir::vector::VectorDialect"
-]> {
+def AffineToScf : Pass<"lower-affine-to-scf", "mlir::ModuleOp"> {
   let summary =
       "Lower affine operations to a mix of SCF and standard operations";
   let description = [{
@@ -33,14 +30,14 @@ def AffineToScf : DynamaticPass<"lower-affine-to-scf", [
     dependence information between memory accesses to lower IR levels, in
     particular to the std-to-handshake lowering pass. 
   }];
+  let dependentDialects = ["mlir::memref::MemRefDialect", "mlir::scf::SCFDialect", "mlir::vector::VectorDialect", "dynamatic::handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//
 // ScfToCf
 //===----------------------------------------------------------------------===//
 
-def ScfToCf : DynamaticPass<"lower-scf-to-cf", [
-    "mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect"]> {
+def ScfToCf : Pass<"lower-scf-to-cf", "mlir::ModuleOp"> {
   let summary = "Lower scf dialect to unstructured control flow (cf)";
   let description = [{
     Very close analog to the SCFToControlFlow pass from MLIR that replaces the
@@ -49,20 +46,43 @@ def ScfToCf : DynamaticPass<"lower-scf-to-cf", [
     instead of a signed one (lt) if the loop's iterator can be proven to be
     always positive.
   }];
+  let dependentDialects = ["mlir::cf::ControlFlowDialect", "mlir::arith::ArithDialect", "dynamatic::handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//
 // CfToHandshake
 //===----------------------------------------------------------------------===//
 
-def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
+def CfToHandshake : Pass<"lower-cf-to-handshake", "mlir::ModuleOp"> {
   let summary = "Lowers func and cf dialects to handshake.";
   let description = [{
     Lowers func-level functions whose body have unstructured control flow into
       their handshake counterparts,
       which represent dataflow circuits that can ultimately be converted to an
           RTL design.
-}];
+    Functions must be in maximal SSA form (see --func-maximize-ssa).
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
+//===----------------------------------------------------------------------===//
+// FtdCfToHandshake
+//===----------------------------------------------------------------------===//
+
+def FtdCfToHandshake : Pass<"ftd-lower-cf-to-handshake", "mlir::ModuleOp"> {
+  let summary = "Lowers func and cf dialects to handshake with fast token delivery";
+  let description = [{
+    The fast token delivery (FTD) methodology was described by 
+    Elakhras et al. in FPGA'22, and it represents an optimized way to obtain
+    the final elastic circuit in terms of resources occupation and execution time.
+    The study by Elakhras et al. in FPGA'23 is a natural continuation of the aforementioned
+    work, improving the allocation of operations for LSQ.
+
+    This pass aims at implementing this work, by substituting the current `CfToHandshake` pass.
+    As the algorithm does not require any parameter, no input is necessary. This pass can 
+    be used through the flag "--fast-token-delivery" at compile tile in dynamatic.
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//
@@ -70,7 +90,7 @@ def CfToHandshake : DynamaticPass<"lower-cf-to-handshake"> {
 //===----------------------------------------------------------------------===//
 
 def HandshakeToHW
-    : DynamaticPass<"lower-handshake-to-hw", ["dynamatic::hw::HWDialect"]> {
+    : Pass<"lower-handshake-to-hw", "mlir::ModuleOp"> {
   let summary = "Lowers Handshake to HW.";
   let description = [{
     Lowers Handshake IR into a "netlist-style" representation made up of HW
@@ -81,6 +101,7 @@ def HandshakeToHW
       "Instrument the generated netlist with a simulation-only monitor per "
       "loop that reports the initiation of each of its iterations during "
       "simulation.">];
+  let dependentDialects = ["dynamatic::hw::HWDialect", "dynamatic::handshake::HandshakeDialect"];
 }
 
 //===----------------------------------------------------------------------===//

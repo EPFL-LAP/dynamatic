@@ -278,7 +278,7 @@ unbundleChannel(const std::string &handshakePortName,
   // Depending on the type, the unbundling will be different
   if (auto channel = dyn_cast<handshake::ChannelType>(type)) {
     // For a channel type, we unbundle into ready, valid, and data ports
-    unsigned dataWidth = channel.getDataType().cast<IntegerType>().getWidth();
+    unsigned dataWidth = cast<IntegerType>(channel.getDataType()).getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
       unbundledPorts.push_back(std::make_unique<DataPortInfo>(
           legalizeDataPortName(handshakePortName, bit, dataWidth),
@@ -302,7 +302,7 @@ unbundleChannel(const std::string &handshakePortName,
         legalizeControlPortName(handshakePortName, "_ready"),
         flip(handshakePortDir), handshakePort));
   } else if (auto mem = dyn_cast<MemRefType>(type)) {
-    unsigned dataWidth = mem.getElementType().cast<IntegerType>().getWidth();
+    unsigned dataWidth = cast<IntegerType>(mem.getElementType()).getWidth();
     for (unsigned bit = 0; bit < dataWidth; ++bit) {
       unbundledPorts.push_back(std::make_unique<DataPortInfo>(
           legalizeDataPortName(handshakePortName, bit, dataWidth),
@@ -345,11 +345,10 @@ static HandshakeUnitPortList unbundlePorts(Operation *handshakeOp,
   if (auto funcOp = dyn_cast<handshake::FuncOp>(handshakeOp)) {
     // Extract the port names from the function argument
     for (auto [i, argNameAttr] : llvm::enumerate(funcOp.getArgNames()))
-      handshakeInPortNames.push_back(argNameAttr.dyn_cast<StringAttr>().data());
+      handshakeInPortNames.push_back(dyn_cast<StringAttr>(argNameAttr).data());
     // Extract the port names from the function results
     for (auto [i, resNameAttr] : llvm::enumerate(funcOp.getResNames()))
-      handshakeOutPortNames.push_back(
-          resNameAttr.dyn_cast<StringAttr>().data());
+      handshakeOutPortNames.push_back(dyn_cast<StringAttr>(resNameAttr).data());
   } else {
     // For other ops we use the op name as base for the port names
     // We have to fix the names of the ports so that the root_N pattern is
@@ -800,11 +799,11 @@ LogicalResult HandshakeUnbundler::convertHandshakeFunc() {
   for (Value operand : endOp.getOperands()) {
     // Get the data bitwidth of the operand
     unsigned dataBitwidth = 0;
-    if (auto channelType = operand.getType().dyn_cast<handshake::ChannelType>())
-      dataBitwidth = channelType.getDataType().cast<IntegerType>().getWidth();
-    else if (auto memType = operand.getType().dyn_cast<MemRefType>())
-      dataBitwidth = memType.getElementType().cast<IntegerType>().getWidth();
-    else if (auto intType = operand.getType().dyn_cast<IntegerType>())
+    if (auto channelType = dyn_cast<handshake::ChannelType>(operand.getType()))
+      dataBitwidth = cast<IntegerType>(channelType.getDataType()).getWidth();
+    else if (auto memType = dyn_cast<MemRefType>(operand.getType()))
+      dataBitwidth = cast<IntegerType>(memType.getElementType()).getWidth();
+    else if (auto intType = dyn_cast<IntegerType>(operand.getType()))
       dataBitwidth = intType.getWidth();
     else
       dataBitwidth =

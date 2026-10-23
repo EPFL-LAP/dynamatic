@@ -45,6 +45,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include <deque>
 #include <stdlib.h>
 #include <utility>
 
@@ -696,7 +697,9 @@ const Value *findBaseInternal(Value *addr) {
           << "The index value is calculated from multiple base addresses!\n";
       llvm::errs() << "List of addresses:\n";
       for (const auto *addr : baseArray) {
-        addr->dump();
+        // Use print() since dump() is unavailable in release builds of LLVM
+        addr->print(llvm::errs());
+        llvm::errs() << "\n";
       }
     });
     llvm::report_fatal_error(
@@ -890,8 +893,8 @@ MemDepAnalysisPass::getDependencyPairs(Function &llvmFunction,
             llvm::dbgs() << "The following memory access instruction pair "
                             "proven to be independent according to polyhedral "
                             "analysis:\n";
-            loadInst->dump();
-            storeInst->dump();
+            // Use print() since dump() is unavailable in release builds of LLVM
+            llvm::dbgs() << *loadInst << "\n" << *storeInst << "\n";
           }
         });
         continue;
