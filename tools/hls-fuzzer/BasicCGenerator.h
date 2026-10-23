@@ -113,6 +113,9 @@ private:
   std::optional<std::pair<ast::StructuredForStatement, OpaqueContext>>
   generateStructuredForStatement(OpaqueContext &&context);
 
+  std::optional<std::pair<ast::IfElseStatement, OpaqueContext>>
+  generateIfElseStatement(OpaqueContext &&context);
+
   Randomly &random;
   std::optional<ast::ReturnType> maybeReturnType;
   std::vector<ast::ScalarParameter> scalarParameters;

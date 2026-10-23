@@ -904,6 +904,12 @@ public:
   virtual TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() = 0;
 
+  virtual bool
+  discardIfElseStatementOpaque(const OpaqueContext &context) = 0;
+
+  virtual TransferFnArray<ast::IfElseStatement>
+  getIfElseStatementTransferFns() = 0;
+
   using ExpressionKey =
       std::variant<ast::Constant::Tag, ast::CastExpression::Tag,
                    ast::Variable::Tag, ast::ArrayReadExpression::Tag,
@@ -919,6 +925,7 @@ public:
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
 
   using StatementKey = std::variant<ast::StructuredForStatement::Tag,
+                                    ast::IfElseStatement::Tag,
                                     ast::ArrayAssignmentStatement::Tag,
                                     ast::ScalarAssignmentStatement::Tag>;
 
@@ -1302,6 +1309,20 @@ public:
     };
   }
 
+  static bool discardIfElseStatement(const TypingContext &) {
+    return false;
+  }
+
+  TransferFnArray<ast::IfElseStatement>
+  getIfElseStatementTransferFns() override {
+    return {
+        /*condition=*/copyFromInput<ast::IfElseStatement>(),
+        /*if clause=*/copyFromInput<ast::IfElseStatement>(),
+        /*else clause=*/copyFromInput<ast::IfElseStatement>(),
+        /*output=*/copyInputToOutput<ast::IfElseStatement>(),
+    };
+  }
+
   static ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTable(const TypingContext &) {
     return {};
@@ -1407,6 +1428,10 @@ public:
     return self().discardStructuredForStatement(context.cast<TypingContext>());
   }
 
+  bool discardIfElseStatementOpaque(const OpaqueContext &context) final {
+    return self().discardIfElseStatement(context.cast<TypingContext>());
+  }
+
   ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) final {
     return self().getExpressionProbabilityTable(context.cast<TypingContext>());
@@ -1494,6 +1519,9 @@ public:
           std::forward<Args>(args)...);
     else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
       return target.Target::getStructuredForStatementTransferFns(
+          std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::IfElseStatement>)
+      return target.Target::getIfElseStatementTransferFns(
           std::forward<Args>(args)...);
     else {
       static_assert(sizeof(ASTNode) == 0,
@@ -1584,6 +1612,9 @@ public:
                                                  std::forward<Args>(args)...);
     else if constexpr (std::is_same_v<ASTNode, ast::StructuredForStatement>)
       return target.Target::discardStructuredForStatement(
+          context, std::forward<Args>(args)...);
+    else if constexpr (std::is_same_v<ASTNode, ast::IfElseStatement>)
+      return target.Target::discardIfElseStatement(
           context, std::forward<Args>(args)...);
     else {
       static_assert(sizeof(ASTNode) == 0,
