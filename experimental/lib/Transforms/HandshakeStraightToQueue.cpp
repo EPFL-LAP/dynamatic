@@ -467,8 +467,9 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
   DenseSet<Operation *> completionNetwork;
   while (!completionWorklist.empty()) {
     Operation *op = completionWorklist.pop_back_val().getDefiningOp();
-    if (!op || !isa<handshake::ControlMergeOp, handshake::BranchOp,
-                    handshake::ConditionalBranchOp>(op) ||
+    if (!op ||
+        !isa<handshake::ControlMergeOp, handshake::BranchOp,
+             handshake::ConditionalBranchOp>(op) ||
         !completionNetwork.insert(op).second)
       continue;
     for (Value operand : op->getOperands())

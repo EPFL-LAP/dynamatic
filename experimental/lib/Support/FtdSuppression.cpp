@@ -2233,8 +2233,7 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
           // Add this block and its all-dependency blocks to the dependency set
           // so path enumeration observes it.
           locConsControlDepsFull.insert(condBlockLocal);
-          for (Block *dep :
-               locBlockDeps[condBlockLocal].allControlDeps) {
+          for (Block *dep : locBlockDeps[condBlockLocal].allControlDeps) {
             locConsControlDepsFull.insert(dep);
           }
 
