@@ -552,15 +552,14 @@ TEST_P(DuplicationFixture, basic) {
   logPerformance(config.simTime);
 }
 
-// The Verilog backend does not support handshake.init yet, so FTD circuits are
-// only simulated in VHDL
+// Exercise FTD and straight-to-the-queue with on-merges buffers in both HDLs.
 TEST_P(FtdFixture, basic) {
   IntegrationTest config{
       // clang-format off
       .name = GetParam(),
       .testName = getVerboseOutdirSuffix(),
       .benchmarkPath = fs::path(DYNAMATIC_ROOT) / "integration-test",
-      .testVerilog = false,
+      .testVerilog = true,
       .useSharing = false,
       .useFTD = true,
       .milpSolver = "gurobi",
@@ -946,18 +945,34 @@ INSTANTIATE_TEST_SUITE_P(DuplicationBenchmarks, DuplicationFixture,
     ),
     [](const auto &info) { return "dup_" + info.param; });
 
-// Benchmarks of the FPL'22 FTD paper
+// FTD and straight-to-the-queue regression benchmarks.
 INSTANTIATE_TEST_SUITE_P(FtdBenchmarks, FtdFixture,
     testing::Values(
-      "bicg",
       "fir",
-      "gcd",
       "if_loop_add",
       "if_loop_mul",
       "iir",
+      "matvec",
       "kernel_2mm",
       "kernel_3mm",
-      "matvec"
+      "kmp",
+      "gcd",
+      "bicg",
+      "get_tanh",
+      "covariance",
+      "jacobi_1d_imper",
+      "atax",
+      "triangular",
+      "histogram",
+      "gsum",
+      "gemm",
+      "mvt_float",
+      "binary_search",
+      "gemver",
+      "sobel",
+      "spmv",
+      "stencil_2d",
+      "gaussian"
     ),
     [](const auto &info) { return "ftd_" + info.param; });
 
