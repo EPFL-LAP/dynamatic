@@ -423,10 +423,11 @@ connectForkGraphs(handshake::FuncOp &funcOp,
   return ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, deps);
 }
 
-/// Remove the network of cmerges in case the function is void. The SQ pass
-/// guarantees that no network is required any longer. All the remaining
-/// connections (to the number of store constants and to the memory controllers)
-/// are substitued with start.
+/// Remove control-network operations that are no longer needed after LSQ
+/// allocation has been replaced. Preserve the control paths that tell memory
+/// interfaces when the function's accesses have finished. A returned value can
+/// be constant or independent of the accesses, so it cannot establish memory
+/// completion on its own.
 static void removeNetworkCMerges(handshake::FuncOp &funcOp,
                                  PatternRewriter &rewriter) {
 
@@ -440,7 +441,7 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
     return v.getType() != operands[0].getType();
   });
 
-  // Cannot remove the network if the function is void
+  // Retain the existing behavior for void functions.
   if (!hasReturnValue)
     return;
 
@@ -451,20 +452,48 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
   if (branchOps.empty())
     return;
 
-  // Operations that needs to be removed
+  // S2Q replaces allocation dependencies, but memory completion must still
+  // wait for the original exit control. Replacing that control with start can
+  // finish a memory transaction before its first allocation has even arrived.
+  SmallVector<Value> completionWorklist;
+  funcOp.walk([&](Operation *op) {
+    if (auto memory = dyn_cast<handshake::MemoryOpInterface>(op))
+      completionWorklist.push_back(memory.getCtrlEnd());
+  });
+  for (Value operand : operands)
+    if (isa<handshake::ControlType>(operand.getType()))
+      completionWorklist.push_back(operand);
+
+  DenseSet<Operation *> completionNetwork;
+  while (!completionWorklist.empty()) {
+    Operation *op = completionWorklist.pop_back_val().getDefiningOp();
+    if (!op ||
+        !isa<handshake::ControlMergeOp, handshake::BranchOp,
+             handshake::ConditionalBranchOp>(op) ||
+        !completionNetwork.insert(op).second)
+      continue;
+    for (Value operand : op->getOperands())
+      if (isa<handshake::ControlType>(operand.getType()))
+        completionWorklist.push_back(operand);
+  }
+
+  // Keep traversal bookkeeping separate from the removal set: preserved
+  // operations may participate in cycles too.
+  DenseSet<Operation *> visited;
   DenseSet<Operation *> operationsToRemove;
   // Operations that needs to be traversed via BFS, handled in a FIFO approach
   SmallVector<Operation *> operationsToTraverse;
 
-  // Insert in both the sets the list of
+  // Start traversing the original control network.
   operationsToTraverse.push_back((Operation *)(*branchOps.begin()));
-  operationsToRemove.insert(operationsToTraverse.front());
 
   auto startValue = (Value)funcOp.getArguments().back();
 
   // While there are operations to be traversed
   while (!operationsToTraverse.empty()) {
     Operation *toTraverse = operationsToTraverse.pop_back_val();
+    if (!visited.insert(toTraverse).second)
+      continue;
 
     // The network is made of control merges, branches and conditional branches:
     // ignore anything else.
@@ -474,17 +503,18 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
       continue;
     }
 
-    // The operation needs to be removed
-    operationsToRemove.insert(toTraverse);
-
     // Consider all the users of some results of the operations, and add them to
     // the operations to traverse
     for (auto result : toTraverse->getResults()) {
       for (auto *user : result.getUsers()) {
-        if (!operationsToRemove.contains(user))
+        if (!visited.contains(user))
           operationsToTraverse.push_back(user);
       }
     }
+
+    if (completionNetwork.contains(toTraverse))
+      continue;
+    operationsToRemove.insert(toTraverse);
 
     // Since the operations is to be remove, its results are not needed anymore,
     // and can be substitued with `start`. This is useful to guarantee that any
