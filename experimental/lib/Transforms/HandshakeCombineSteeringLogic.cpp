@@ -260,13 +260,22 @@ bool isSelfRegenerateMux(handshake::MuxOp muxOp, int &muxCycleInputIdx) {
   return foundCycle;
 }
 
-// Apply DFS on the producers of a particular Mux feeding a particular input,
-// returning the first non-Mux producer's result value
+// Returns the value that input `idx` of a Mux regenerates. The search goes
+// through the producer Mux only if it is a self regenerating Mux, whose output
+// is then the value at its input from outside its loop. Any other Mux (e.g., a
+// MU, whose loop input is not its own output) produces a value of its own and
+// ends the search.
 Value returnNonMuxProducerVal(handshake::MuxOp muxOp, int idx) {
   Value val = muxOp.getDataOperands()[idx];
-  Operation *prod = val.getDefiningOp();
-  if (isa_and_nonnull<handshake::MuxOp>(prod))
-    return returnNonMuxProducerVal(cast<handshake::MuxOp>(prod), idx);
+  auto prodMux = val.getDefiningOp<handshake::MuxOp>();
+  int prodCycleIdx;
+  // 3 operands = the select and two data inputs, one from inside the loop
+  // (index prodCycleIdx) and one from outside it. With exactly two data
+  // inputs, the input from outside is the other one: 1 - prodCycleIdx. With
+  // more data inputs, that index could be wrong or out of range
+  if (prodMux && prodMux.getNumOperands() == 3 &&
+      isSelfRegenerateMux(prodMux, prodCycleIdx))
+    return returnNonMuxProducerVal(prodMux, 1 - prodCycleIdx);
   return val;
 }
 
@@ -327,9 +336,18 @@ struct CombineMuxes : public OpRewritePattern<handshake::MuxOp> {
       Operation *returnedMux = returnMuxAtSameDepth(dataUser, muxOp);
       if (returnedMux != nullptr) {
         auto muxUser = cast<handshake::MuxOp>(returnedMux);
-        int tempValue;
-        if (isSelfRegenerateMux(muxOp, tempValue))
-          dataMuxUsers.insert(muxUser);
+        // The candidate must regenerate the same value, which is not the case
+        // if a Mux that is not self regenerating lies on the way (see
+        // returnNonMuxProducerVal). As for muxOp, 1 - userCycleIdx is the
+        // input from outside the loop of a Mux with two data inputs
+        int userCycleIdx;
+        if (isSelfRegenerateMux(muxUser, userCycleIdx)) {
+          assert(muxUser.getNumOperands() == 3 &&
+                 "self regenerating Mux must have two data inputs");
+          if (returnNonMuxProducerVal(muxUser, 1 - userCycleIdx) ==
+              valProducedByNonMux)
+            dataMuxUsers.insert(muxUser);
+        }
       }
     }
 
