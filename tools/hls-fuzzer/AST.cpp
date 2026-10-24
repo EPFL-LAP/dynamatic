@@ -100,7 +100,7 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
 
 llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
                                    const IfElseStatement &ifElse) {
-  os << "if ( " << ifElse.getCondition() << " ) {\n";
+  os << "if (" << ifElse.getCondition() << ") {\n";
   {
     mlir::raw_indented_ostream ss(os);
     ss.indent();
@@ -108,7 +108,7 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
       ss << iter << '\n';
   }
   os << '}';
-  os << "else {\n";
+  os << " else {\n";
 {
     mlir::raw_indented_ostream ss(os);
     ss.indent();
