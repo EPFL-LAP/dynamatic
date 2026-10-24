@@ -666,13 +666,11 @@ gen::BasicCGenerator::generateIfElseStatement(OpaqueContext &&context) {
       /*if clause=*/
       [&](OpaqueContext &&context) {
         auto scopeExit = pushNewScope();
-        addVariable(ast::PrimitiveType::UInt32, varName);
         return generateStatementList(std::move(context));
       },
       /*else clause=*/
       [&](OpaqueContext &&context) {
         auto scopeExit = pushNewScope();
-        addVariable(ast::PrimitiveType::UInt32, varName);
         return generateStatementList(std::move(context));
       },
       /*constructor=*/
