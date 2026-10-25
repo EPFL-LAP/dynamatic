@@ -418,18 +418,6 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     return getDrawBlock(userOp);
   };
 
-  // Whether a function argument or result is a memory controller's start
-  // or end port, which is not drawn
-  auto isControllerPort = [&](Value val) -> bool {
-    if (Operation *producer = val.getDefiningOp())
-      return isa<handshake::MemoryControllerOp>(producer);
-    for (Operation *user : val.getUsers()) {
-      if (!isa<handshake::MemoryControllerOp>(user))
-        return false;
-    }
-    return !val.use_empty();
-  };
-
   // The DOT endpoints of an operand edge: node and port names and indices
   // on both sides
   struct EdgeEndpoints {
@@ -597,9 +585,8 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
       mcResultNodes[{mcOp, lsqPort.getLoadDataOutputIndex()}] = lsqName;
     }
 
-    // The end node takes the end control; it is drawn where that control
-    // comes from. The controller's memory start and memory end are function
-    // ports that are not drawn.
+    // The end node takes the end control and gives the memory end; it is
+    // drawn where that control comes from.
     std::string endName = mcName + "_end";
     std::optional<unsigned> endBlock;
     if (Operation *endProducer = mcOp.getCtrlEnd().getDefiningOp())
@@ -608,6 +595,18 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     for (OpOperand &oprd : mcOp->getOpOperands()) {
       if (oprd.get() == mcOp.getCtrlEnd())
         mcOperandNodes[{mcOp, oprd.getOperandNumber()}] = endName;
+    }
+    mcResultNodes[{mcOp, cast<OpResult>(mcOp.getMemEnd()).getResultNumber()}] =
+        endName;
+
+    // The start node takes the memory start, which comes from a function
+    // argument, either directly or through a fork when the memory start also
+    // feeds something else; it is drawn in the entry block
+    std::string startName = mcName + "_start";
+    addAbstractionNode(startName, mcName + "\\nstart", mcOp, /*bb=*/0);
+    for (OpOperand &oprd : mcOp->getOpOperands()) {
+      if (oprd.get() == mcOp.getMemStart())
+        mcOperandNodes[{mcOp, oprd.getOperandNumber()}] = startName;
     }
   }
 
@@ -652,9 +651,8 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   std::string funcOpName = funcOp->getName().getStringRef().str();
   for (const auto &[idx, arg] : llvm::enumerate(funcOp.getArguments())) {
     // Arguments with memref types are represented by memory interfaces
-    // inside the function, and a memory start only feeds one; neither is
-    // displayed
-    if (isa<MemRefType>(arg.getType()) || isControllerPort(arg))
+    // inside the function, and are not displayed
+    if (isa<MemRefType>(arg.getType()))
       continue;
 
     StringRef argName = funcOp.getArgName(idx);
@@ -683,16 +681,20 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
   }
 
   // Create nodes for all function results, each in the block of its
-  // producer. A memory end comes from a memory controller and is not
-  // displayed.
+  // producer. A memory end is drawn in the block of its memory controller's
+  // end node.
   ValueRange results = funcOp.getBodyBlock()->getTerminator()->getOperands();
   for (const auto &[idx, res] : llvm::enumerate(results)) {
-    if (isControllerPort(res))
-      continue;
     StringRef resName = funcOp.getResName(idx);
     DOTGraph::Subgraph *subgraph = root;
     if (Operation *producer = res.getDefiningOp()) {
-      if (std::optional<unsigned> bb = getDrawBlock(producer))
+      std::optional<unsigned> bb;
+      if (isa<handshake::MemoryControllerOp>(producer))
+        bb = abstractionBlocks[mcResultNodes[{
+            producer, cast<OpResult>(res).getResultNumber()}]];
+      else
+        bb = getDrawBlock(producer);
+      if (bb)
         subgraph = &getBlockCluster(*bb);
     }
     DOTGraph::Node *node = builder.addNode(resName, *subgraph);
@@ -726,12 +728,8 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     // the root.
     for (OpResult res : op.getResults()) {
       std::optional<unsigned> srcBB = bb;
-      if (isController) {
-        // The memory end is a function port that is not drawn
-        if (res == cast<handshake::MemoryControllerOp>(op).getMemEnd())
-          continue;
+      if (isController)
         srcBB = abstractionBlocks[mcResultNodes[{&op, res.getResultNumber()}]];
-      }
       for (OpOperand &oprd : res.getUses()) {
         std::optional<unsigned> dstBB = getUseBlock(oprd);
         if (srcBB && dstBB && isBackedge(res, oprd.getOwner())) {

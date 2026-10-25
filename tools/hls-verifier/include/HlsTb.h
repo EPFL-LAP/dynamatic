@@ -121,21 +121,6 @@ begin
   end if;
 end process generate_idle_signal;
 
-generate_start_signal : process(tb_clk, tb_rst)
-begin
-  if (tb_rst = '1') then
-    tb_start_valid <= '0';
-    tb_started <= '0';
-  elsif rising_edge(tb_clk) then
-    if (tb_started = '0') then
-      tb_start_valid <= '1';
-      tb_started <= '1';
-    else
-      tb_start_valid <= tb_start_valid and (not tb_start_ready);
-    end if;
-  end if;
-end process generate_start_signal;
-
 transaction_increment : process
 begin
   wait until tb_rst = '0';
@@ -218,21 +203,6 @@ always @(posedge tb_clk or posedge tb_rst) begin
 
         if (tb_stop)
             tb_temp_idle <= 1'b1;
-    end
-end
-
-// Equivalent of VHDL generate_start_signal
-always @(posedge tb_clk or posedge tb_rst) begin
-    if (tb_rst) begin
-        tb_start_valid <= 1'b0;
-        tb_started <= 1'b0;
-    end else begin
-        if (!tb_started) begin
-            tb_start_valid <= 1'b1;
-            tb_started <= 1'b1;
-        end else begin
-            tb_start_valid <= tb_start_valid & (~tb_start_ready);
-        end
     end
 end
 

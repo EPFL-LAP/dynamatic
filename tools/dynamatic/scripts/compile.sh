@@ -30,6 +30,7 @@ USE_LSQ_SIZING=${20:-0}
 OPERAND_ROUTING=${21:-0}
 OPERAND_ROUTING_MAX_CFGS=${22:-0}
 OPERAND_ROUTING_MERGE_THRESHOLD=${23:-0}
+OPERAND_ROUTING_2=${24:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -89,10 +90,6 @@ export_dot() {
   "$DYNAMATIC_EXPORT_DOT_BIN" "$f_handshake" "--edge-style=spline" "--label-type=uname" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
-
-  # Convert DOT graph to PNG
-  dot -Tpng "$f_dot" > "$f_png"
-  exit_on_fail "Failed to convert $2 DOT to PNG" "Converted $2 DOT to PNG"
   return 0
 }
 
@@ -106,10 +103,6 @@ export_cfg() {
   "$DYNAMATIC_EXPORT_CFG_BIN" "$f_cf" \
     > "$f_dot"
   exit_on_fail "Failed to create $2 DOT" "Created $2 DOT"
-
-  # Convert DOT graph to PNG
-  dot -Tpng "$f_dot" > "$f_png"
-  exit_on_fail "Failed to convert $2 DOT to PNG" "Converted $2 DOT to PNG"
   return 0
 }
 
@@ -271,6 +264,7 @@ $DYNAMATIC_OPT_BIN \
   --canonicalize \
   --arith-reduce-strength="max-adder-depth-mul=3" \
   --push-constants \
+  --func-merge-returns \
   --sort-blocks-rpo \
   > "$F_CF_TRANSFORMED"
 exit_on_fail "Failed to apply CF transformations" \
@@ -330,6 +324,13 @@ elif [[ $OPERAND_ROUTING -ne 0 ]]; then
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with operand routing" \
     "Compiled cf to handshake with operand routing"
+elif [[ $OPERAND_ROUTING_2 -ne 0 ]]; then
+  echo_info "Running operand routing 2 for handshake conversion"
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --operand-routing-2-lower-cf-to-handshake \
+    > "$F_HANDSHAKE"
+  exit_on_fail "Failed to compile cf to handshake with operand routing 2" \
+    "Compiled cf to handshake with operand routing 2"
 else
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
@@ -359,7 +360,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
 
-elif [[ $OPERAND_ROUTING -ne 0 ]]; then
+elif [[ $OPERAND_ROUTING -ne 0 || $OPERAND_ROUTING_2 -ne 0 ]]; then
 
   # handshake transformations, without the LSQ minimization passes: operand
   # routing is incompatible with them for now
@@ -451,7 +452,8 @@ else
   # Operand routing, like FTD, connects blocks that are not adjacent in the
   # CFG, so buffer placement must find backedges from the circuit itself
   BUFFER_FTD=0
-  if [[ $FAST_TOKEN_DELIVERY -ne 0 || $OPERAND_ROUTING -ne 0 ]]; then
+  if [[ $FAST_TOKEN_DELIVERY -ne 0 || $OPERAND_ROUTING -ne 0 ||
+        $OPERAND_ROUTING_2 -ne 0 ]]; then
     BUFFER_FTD=1
   fi
   # To enable debug information, make sure that Dynamatic is built with Debug

@@ -64,5 +64,22 @@ def OperandRoutingCfToHandshake
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// OperandRouting2CfToHandshake
+//===----------------------------------------------------------------------===//
+
+def OperandRouting2CfToHandshake
+    : Pass<"operand-routing-2-lower-cf-to-handshake", "mlir::ModuleOp"> {
+  let summary = "Lowers func and cf dialects to handshake, routing every "
+                "consumer on its own optimized CFG";
+  let description = [{
+    Same lowering as `CfToHandshake`, except that every consumer is routed
+    with the control-network routing algorithm on a CFG optimized to that
+    consumer. Used through the "--operand-routing-2" flag of the compile
+    command.
+  }];
+  let dependentDialects = ["dynamatic::handshake::HandshakeDialect"];
+}
+
 #endif // EXPERIMENTAL_CONVERSION_PASSES_TD
 

@@ -315,6 +315,7 @@ public:
       "operand-routing-max-cfgs";
   static constexpr llvm::StringLiteral OPERAND_ROUTING_MERGE_THRESHOLD =
       "operand-routing-merge-threshold";
+  static constexpr llvm::StringLiteral OPERAND_ROUTING_2 = "operand-routing-2";
 
   Compile(FrontendState &state)
       : Command("compile",
@@ -350,6 +351,9 @@ public:
                "shared folded CFG that its own folded CFG does not have. "
                "Applied before the maximum. 0 (default) shares only "
                "identical folded CFGs"});
+    addFlag({OPERAND_ROUTING_2,
+             "Route every block use on its own optimized CFG, with the "
+             "control-network routing algorithm"});
     addFlag({RIGIDIFICATION, "Use model-checking for rigidification"});
     addOption(
         {K_INDUCTION, "Use the k-induction algorithm for rigidification"});
@@ -838,6 +842,8 @@ CommandResult Compile::execute(CommandArguments &args) {
       it != args.options.end()) {
     operandRoutingMergeThreshold = it->second;
   }
+  std::string operandRouting2 =
+      args.flags.contains(OPERAND_ROUTING_2) ? "1" : "0";
 
   return execCmd(script, state.dynamaticPath, state.getKernelDir(),
                  state.getOutputDir(), state.getKernelName(), buffers,
@@ -846,7 +852,8 @@ CommandResult Compile::execute(CommandArguments &args) {
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
                  enableShortCircuit, enableDuplication, calculatePathDelays,
                  instrumentII, lsqSizing, operandRouting,
-                 operandRoutingMaxCfgs, operandRoutingMergeThreshold);
+                 operandRoutingMaxCfgs, operandRoutingMergeThreshold,
+                 operandRouting2);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

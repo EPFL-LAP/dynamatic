@@ -95,9 +95,10 @@ struct MarkMemoryInterfacesPass
     for (func::FuncOp funcOp : getOperation().getOps<func::FuncOp>())
       markMemoryInterfaces(funcOp);
 
-    // Make sure all operation names are still unique and name operations that
-    // do not currently have a name
-    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::NAME)))
+    // Make sure all operation names are still unique. Unnamed operations are
+    // left unnamed: only memory accesses need names at the cf level, and the
+    // cf-to-handshake lowering names everything else
+    if (failed(namer.walk(NameAnalysis::UnnamedBehavior::DO_NOTHING)))
       return signalPassFailure();
     markAnalysesPreserved<NameAnalysis>();
   }

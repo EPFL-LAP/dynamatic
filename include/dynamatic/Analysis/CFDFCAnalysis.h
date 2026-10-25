@@ -6,7 +6,6 @@
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
-using namespace llvm;
 using namespace dynamatic::buffer;
 
 namespace dynamatic {
