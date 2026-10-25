@@ -21,17 +21,6 @@
 using namespace mlir;
 using namespace dynamatic::json;
 
-bool llvm::json::fromJSON(const json::Value &value, unsigned &number,
-                          json::Path path) {
-  std::optional<uint64_t> opt = value.getAsUINT64();
-  if (!opt.has_value()) {
-    path.report("expected unsigned number");
-    return false;
-  }
-  number = opt.value();
-  return true;
-}
-
 namespace {
 
 /// Serializes MLIR attributes to JSON. Only supports a restricted number of

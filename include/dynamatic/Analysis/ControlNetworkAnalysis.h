@@ -51,6 +51,11 @@ public:
   /// Returns the nodes that have a control channel to this one.
   ArrayRef<ControlNode *> getPredecessors() const { return preds; }
 
+  /// Returns the index of this node in its graph (the virtual entry node is
+  /// 0). Required by the dominator tree and the loop info, which store
+  /// per-node information in vectors indexed by these numbers.
+  unsigned getNumber() const { return number; }
+
   /// Required by the dominator tree.
   void printAsOperand(raw_ostream &os, bool printType = false) const;
 
@@ -60,6 +65,7 @@ private:
 
   Operation *op = nullptr;
   ControlGraph *graph = nullptr;
+  unsigned number = 0;
   SmallVector<ControlNode *> succs;
   SmallVector<ControlNode *> preds;
 };
@@ -81,6 +87,10 @@ public:
   /// The graph's nodes, the virtual entry node first.
   iterator begin() { return iterator(nodes.begin()); }
   iterator end() { return iterator(nodes.end()); }
+
+  /// Returns the number of nodes, which is one more than the largest node
+  /// number.
+  unsigned size() const { return nodes.size(); }
 
   /// Returns the node standing for 'op', or nullptr if the operation is not
   /// part of the graph (memory interfaces are not).
@@ -117,6 +127,21 @@ struct GraphTraits<dynamatic::ControlNode *> {
   static ChildIteratorType child_end(NodeRef node) {
     return node->getSuccessors().end();
   }
+  static unsigned getNumber(NodeRef node) { return node->getNumber(); }
+};
+
+template <>
+struct GraphTraits<const dynamatic::ControlNode *> {
+  using NodeRef = const dynamatic::ControlNode *;
+  using ChildIteratorType = ArrayRef<dynamatic::ControlNode *>::iterator;
+  static NodeRef getEntryNode(NodeRef node) { return node; }
+  static ChildIteratorType child_begin(NodeRef node) {
+    return node->getSuccessors().begin();
+  }
+  static ChildIteratorType child_end(NodeRef node) {
+    return node->getSuccessors().end();
+  }
+  static unsigned getNumber(NodeRef node) { return node->getNumber(); }
 };
 
 template <>
@@ -147,6 +172,11 @@ struct GraphTraits<dynamatic::ControlGraph *>
   static nodes_iterator nodes_end(dynamatic::ControlGraph *graph) {
     return graph->end();
   }
+  static unsigned getMaxNumber(dynamatic::ControlGraph *graph) {
+    return graph->size();
+  }
+  /// Nodes are never renumbered.
+  static unsigned getNumberEpoch(dynamatic::ControlGraph *graph) { return 0; }
 };
 
 template <>
@@ -178,9 +208,6 @@ public:
 private:
   friend class llvm::LoopBase<ControlNode, ControlLoop>;
   friend class llvm::LoopInfoBase<ControlNode, ControlLoop>;
-
-  explicit ControlLoop(ControlNode *node)
-      : llvm::LoopBase<ControlNode, ControlLoop>(node) {}
 };
 
 /// Analysis recovering the loops of a Handshake function from its control

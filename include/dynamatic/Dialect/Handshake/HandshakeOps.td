@@ -43,6 +43,10 @@ class Handshake_Op<string mnemonic, list<Trait> traits = []>
 def FuncOp : Op<Handshake_Dialect, "func", [
    IsolatedFromAbove,
    FunctionOpInterface,
+   // The symbol interface requires the name and visibility accessors, which
+   // these traits implement from the sym_name and sym_visibility attributes
+   SymbolName,
+   SymbolVisibility,
    Symbol,
    RegionKindInterface,
    OpAsmOpInterface,
@@ -61,6 +65,8 @@ def FuncOp : Op<Handshake_Dialect, "func", [
   }];
 
   let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
@@ -180,7 +186,9 @@ def InstanceOp : Handshake_Op<"instance", [
     ```
   }];
 
-  let arguments = (ins FlatSymbolRefAttr:$module, Variadic<AnyType>:$opOperands);
+  let arguments = (ins FlatSymbolRefAttr:$module, Variadic<AnyType>:$opOperands,
+                       OptionalAttr<DictArrayAttr>:$arg_attrs,
+                       OptionalAttr<DictArrayAttr>:$res_attrs);
   let results = (outs Variadic<AnyType>);
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
@@ -1087,7 +1095,7 @@ def MemoryControllerOp : Handshake_Op<"mem_controller", [
     mlir::SmallVector<unsigned> getMCBlocks() {
       mlir::SmallVector<unsigned> blocks;
       for (mlir::Attribute attr : getConnectedBlocks())
-        blocks.push_back(cast<IntegerAttr>(attr).getValue().getZExtValue());
+        blocks.push_back(::llvm::cast<IntegerAttr>(attr).getValue().getZExtValue());
       return blocks;
     }
 
@@ -1185,7 +1193,7 @@ def LSQOp : Handshake_Op<"lsq", [
     mlir::SmallVector<unsigned> getLSQGroupSizes() {
       mlir::SmallVector<unsigned> sizes;
       for (mlir::Attribute attr : getGroupSizes())
-        sizes.push_back(cast<IntegerAttr>(attr).getValue().getZExtValue());
+        sizes.push_back(::llvm::cast<IntegerAttr>(attr).getValue().getZExtValue());
       return sizes;
     }
 
@@ -1195,7 +1203,7 @@ def LSQOp : Handshake_Op<"lsq", [
 
     /// Determines whether the LSQ is connected to an MC.
     bool isConnectedToMC() {
-      return !isa<mlir::MemRefType>(getInputs().front().getType());
+      return !::llvm::isa<mlir::MemRefType>(getInputs().front().getType());
     }
 
     /// Returns the MC connected to the LSQ, if it exists.
