@@ -130,7 +130,7 @@ class valuesToExtraSignalArrays<list<string> names> {
   string result = "{" # !interleave(!foreach(
     name, // variable name
     names,
-    "cast<ExtraSignalsTypeInterface>($" # name #
+    "::llvm::cast<ExtraSignalsTypeInterface>($" # name #
     ".getType()).getExtraSignals()"
   ), ", ") # "}";
 }
@@ -175,7 +175,7 @@ class variadicToDataTypes<string variadic> {
       std::vector<Type> dataTypes;
 
       for (Type type : variadic.getTypes()) {
-        if (isa<ControlType>(type)) {
+        if (::llvm::isa<ControlType>(type)) {
           // Treat ControlType's data type as i0
           dataTypes.push_back(IntegerType::get($_ctxt, 0));
         } else {
@@ -278,7 +278,7 @@ class IsFloatSizedChannel<int width, string name> : PredOpTrait<
 /// Constraint to ensure an operand/result shouldn't have any extra signals.
 class IsSimpleHandshake<string name> : PredOpTrait<
   name # " shouldn't have any extra signals",
-  CPred<"cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
+  CPred<"::llvm::cast<::dynamatic::handshake::ExtraSignalsTypeInterface>($" # name #
     ".getType()).getNumExtraSignals() == 0">
 >;
 

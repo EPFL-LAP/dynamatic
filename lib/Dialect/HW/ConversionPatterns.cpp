@@ -78,7 +78,7 @@ LogicalResult dynamatic::doTypeConversion(Operation *op, ValueRange operands,
   Operation *newOp = rewriter.create(state);
 
   // Move the regions over, converting the signatures as we go.
-  rewriter.startRootUpdate(newOp);
+  rewriter.startOpModification(newOp);
   for (size_t i = 0, e = op->getNumRegions(); i < e; ++i) {
     Region &region = op->getRegion(i);
     Region *newRegion = &newOp->getRegion(i);
@@ -90,9 +90,10 @@ LogicalResult dynamatic::doTypeConversion(Operation *op, ValueRange operands,
             newRegion->getArgumentTypes(), result)))
       return rewriter.notifyMatchFailure(op->getLoc(),
                                          "type conversion failed");
-    rewriter.applySignatureConversion(newRegion, result, typeConverter);
+    rewriter.applySignatureConversion(&newRegion->front(), result,
+                                      typeConverter);
   }
-  rewriter.finalizeRootUpdate(newOp);
+  rewriter.finalizeOpModification(newOp);
 
   rewriter.replaceOp(op, newOp->getResults());
   return success();

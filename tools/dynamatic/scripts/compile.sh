@@ -52,6 +52,7 @@ F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_PARTITIONED="$COMP_DIR/clang.opt.part.ll"
 F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY="$COMP_DIR/clang.opt.part.dep.ll"
+F_CLANG_CANONICALIZED="$COMP_DIR/clang.opt.part.dep.canon.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
@@ -111,6 +112,11 @@ export_cfg() {
 }
 
 # ============================================================================ #
+
+if [[ -z "$OUTPUT_DIR" || "$OUTPUT_DIR" == "/" ]]; then
+  echo "[FATAL] Invalid output directory"
+  exit 1
+fi
 
 # Reset output directory
 rm -rf "$OUTPUT_DIR"/*/
@@ -187,7 +193,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,instsimplify,simplifycfg,adce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lower-switch,simplifycfg,instsimplify,simplifycfg,adce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -245,8 +251,20 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
-$LLVM_TO_STD_TRANSLATION_BIN \
+# - "canonicalize-geps": Collapse each chain of GEPs computing a memory address
+# into a single GEP with a single index, the offset from the base pointer with
+# the arrays flattened in row-major order. The translation to the std dialect
+# below expects this form.
+$LLVM_OPT -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/CanonicalizeGEPs.so" \
+  -passes="canonicalize-geps" \
   "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY" \
+  > "$F_CLANG_CANONICALIZED"
+exit_on_fail "Failed to canonicalize GEPs in LLVM IR" \
+  "Canonicalized GEPs in LLVM IR"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_CANONICALIZED" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
@@ -321,7 +339,8 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --func-maximize-ssa --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi

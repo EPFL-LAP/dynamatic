@@ -451,7 +451,7 @@ private:
     indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
 
     return OpaqueTransferFn<ASTNode>(
-        llvm::identity<Context>{}, std::move(indices),
+        llvm::type_identity<Context>{}, std::move(indices),
         [transferFnPerTypeSystem = std::move(transferFnPerTypeSystem)](
             const SubElementsTuple<ASTNode> &subElements,
             const TypedContextTuple<ASTNode, Context> &contexts) -> Context {
@@ -481,7 +481,7 @@ private:
       std::array<OpaqueOutputTransferFn<ASTNode>, sizeof...(SubTypeSystems)>
           &&outputTransferFnPerTypeSystem) {
     return OpaqueOutputTransferFn<ASTNode>(
-        llvm::identity<Context>{},
+        llvm::type_identity<Context>{},
         [outputTransferFnPerTypeSystem =
              std::move(outputTransferFnPerTypeSystem)](
             const ASTNode &astNode,

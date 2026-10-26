@@ -634,7 +634,7 @@ static ftd::ShadowCFG buildShadowFromCapturedTopology(
 static LogicalResult runPostCmergeFtd(handshake::FuncOp funcOp,
                                       MLIRContext *ctx,
                                       bool resolveCondPlaceholders) {
-  ConversionPatternRewriter rewriter(ctx);
+  PatternRewriter rewriter(ctx);
 
   experimental::cfg::markBasicBlocks(funcOp, rewriter);
 
@@ -686,7 +686,7 @@ static LogicalResult runPostCmergeFtd(handshake::FuncOp funcOp,
 static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
                                           MLIRContext *ctx) {
 
-  ConversionPatternRewriter rewriter(ctx);
+  PatternRewriter rewriter(ctx);
 
   // Return if there are no LSQs in the function
   if (funcOp.getOps<handshake::LSQOp>().empty()) {

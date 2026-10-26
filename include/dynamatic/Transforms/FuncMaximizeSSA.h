@@ -26,7 +26,8 @@ namespace dynamatic {
 /// block arguments, operations, and operation results should be put into
 /// maximal SSA form. All filter functions should return true whenever the
 /// entity they operate on should be considered for SSA maximization. By
-/// default, all filter functions always return true.
+/// default, memory regions (block arguments of type MemRefType and results of
+/// memory allocation operations) are not maximized; everything else is.
 class SSAMaximizationStrategy {
 public:
   /// Determines whether a block should have the values it defines (i.e., block
@@ -45,6 +46,13 @@ public:
 /// Determines whether the region is into maximal SSA form i.e., if all the
 /// values within the region are in maximal SSA form.
 bool isRegionSSAMaximized(Region &region);
+
+/// Checks whether the region is in maximal SSA form with respect to the
+/// strategy, i.e., whether all values that the strategy selects for SSA
+/// maximization are only used within the block that defines them. On failure,
+/// emits an error at the first operation using such a value in another block.
+LogicalResult verifySSAMaximized(Region &region,
+                                 SSAMaximizationStrategy &strategy);
 
 /// Converts a single value within a function into maximal SSA form. This
 /// removes any implicit dataflow of this specific value within the enclosing

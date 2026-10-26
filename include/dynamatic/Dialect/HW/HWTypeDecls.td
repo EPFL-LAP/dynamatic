@@ -25,8 +25,11 @@ include "mlir/IR/SymbolInterfaces.td"
 // Declaration operations
 //===----------------------------------------------------------------------===//
 
-def TypeScopeOp : HWOp<"type_scope",
-      [Symbol, SymbolTable, SingleBlock, NoTerminator, NoRegionArguments]> {
+def TypeScopeOp : HWOp<"type_scope", [
+    // The symbol interface requires the name and visibility accessors, which
+    // these traits implement from the sym_name and sym_visibility attributes
+    SymbolName, SymbolVisibility, Symbol, SymbolTable, SingleBlock,
+    NoTerminator, NoRegionArguments]> {
   let summary = "Type declaration wrapper.";
   let description = [{
     An operation whose one body block contains type declarations. This op
@@ -36,7 +39,9 @@ def TypeScopeOp : HWOp<"type_scope",
   }];
 
   let regions = (region SizedRegion<1>:$body);
-  let arguments = (ins SymbolNameAttr:$sym_name);
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility);
 
   let assemblyFormat = "$sym_name $body attr-dict";
 
@@ -45,12 +50,16 @@ def TypeScopeOp : HWOp<"type_scope",
   }];
 }
 
-def TypedeclOp : HWOp<"typedecl", [Symbol, HasParent<"TypeScopeOp">]> {
+def TypedeclOp : HWOp<"typedecl", [
+    // The symbol interface requires the name and visibility accessors, which
+    // these traits implement from the sym_name and sym_visibility attributes
+    SymbolName, SymbolVisibility, Symbol, HasParent<"TypeScopeOp">]> {
   let summary = "Type declaration.";
   let description = "Associate a symbolic name with a type.";
 
   let arguments = (ins
     SymbolNameAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttr:$type,
     OptionalAttr<StrAttr>:$verilogName
   );

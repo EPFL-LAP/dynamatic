@@ -127,7 +127,7 @@ private:
 
   [[nodiscard]] auto pushNewScope() {
     localVariableStack.emplace_back();
-    return llvm::make_scope_exit([&] { localVariableStack.pop_back(); });
+    return llvm::scope_exit([&] { localVariableStack.pop_back(); });
   }
 
   void addVariable(ast::ScalarType type, std::string name) {

@@ -9,7 +9,7 @@
 
 namespace dynamatic {
 
-class OptionsParser : llvm::opt::GenericOptTable {
+class OptionsParser : llvm::opt::OptTable {
 public:
   OptionsParser(llvm::ArrayRef<char *> args);
 
@@ -17,7 +17,7 @@ public:
   bool shouldDisplayHelp() const;
 
   void printHelp(llvm::raw_ostream &os) const {
-    GenericOptTable::printHelp(os, "hls-fuzzer <dynamatic-path>", "hls-fuzzer");
+    OptTable::printHelp(os, "hls-fuzzer <dynamatic-path>", "hls-fuzzer");
   }
 
   /// Returns the number of generator threads that should be used for fuzzing.
