@@ -904,8 +904,7 @@ public:
   virtual TransferFnArray<ast::StructuredForStatement>
   getStructuredForStatementTransferFns() = 0;
 
-  virtual bool
-  discardIfElseStatementOpaque(const OpaqueContext &context) = 0;
+  virtual bool discardIfElseStatementOpaque(const OpaqueContext &context) = 0;
 
   virtual TransferFnArray<ast::IfElseStatement>
   getIfElseStatementTransferFns() = 0;
@@ -924,10 +923,10 @@ public:
   virtual ProbabilityTable<ExpressionKey>
   getExpressionProbabilityTableOpaque(const OpaqueContext &context) = 0;
 
-  using StatementKey = std::variant<ast::StructuredForStatement::Tag,
-                                    ast::IfElseStatement::Tag,
-                                    ast::ArrayAssignmentStatement::Tag,
-                                    ast::ScalarAssignmentStatement::Tag>;
+  using StatementKey =
+      std::variant<ast::StructuredForStatement::Tag, ast::IfElseStatement::Tag,
+                   ast::ArrayAssignmentStatement::Tag,
+                   ast::ScalarAssignmentStatement::Tag>;
 
   /// Returns the probability table for a given statement, represented by their
   /// tag, to be selected.
@@ -1309,9 +1308,7 @@ public:
     };
   }
 
-  static bool discardIfElseStatement(const TypingContext &) {
-    return false;
-  }
+  static bool discardIfElseStatement(const TypingContext &) { return false; }
 
   TransferFnArray<ast::IfElseStatement>
   getIfElseStatementTransferFns() override {
@@ -1614,8 +1611,8 @@ public:
       return target.Target::discardStructuredForStatement(
           context, std::forward<Args>(args)...);
     else if constexpr (std::is_same_v<ASTNode, ast::IfElseStatement>)
-      return target.Target::discardIfElseStatement(
-          context, std::forward<Args>(args)...);
+      return target.Target::discardIfElseStatement(context,
+                                                   std::forward<Args>(args)...);
     else {
       static_assert(sizeof(ASTNode) == 0,
                     "'ASTNode' is not a non-terminal that can be discarded");

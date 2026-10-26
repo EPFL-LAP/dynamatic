@@ -674,13 +674,10 @@ gen::BasicCGenerator::generateIfElseStatement(OpaqueContext &&context) {
         return generateStatementList(std::move(context));
       },
       /*constructor=*/
-      [&](ast::Expression &&condition,
-          ast::StatementList &&ifClause,
+      [&](ast::Expression &&condition, ast::StatementList &&ifClause,
           ast::StatementList &&elseClause) {
-
-        return ast::IfElseStatement(
-            std::move(condition),
-            std::move(ifClause), std::move(elseClause));
+        return ast::IfElseStatement(std::move(condition), std::move(ifClause),
+                                    std::move(elseClause));
       });
 }
 
@@ -718,9 +715,8 @@ void gen::BasicCGenerator::initGenerators() {
   statementGenerators.emplace_back(
       &BasicCGenerator::generateStructuredForStatement,
       ast::StructuredForStatement::Tag{});
-  statementGenerators.emplace_back(
-      &BasicCGenerator::generateIfElseStatement,
-      ast::IfElseStatement::Tag{});
+  statementGenerators.emplace_back(&BasicCGenerator::generateIfElseStatement,
+                                   ast::IfElseStatement::Tag{});
   statementGenerators.emplace_back(
       &BasicCGenerator::generateScalarAssignmentStatement,
       ast::ScalarAssignmentStatement::Tag{});

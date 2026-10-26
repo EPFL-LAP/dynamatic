@@ -269,12 +269,16 @@ public:
             }),
         /*else-clause=*/
         TransferFn<ast::IfElseStatement, INPUT_DEPENDENCY,
-                         ast::IfElseStatement::IF>(
-            [this](DepthTypingContext context, const DepthTypingContext &ifClause, const ast::StatementList&) {
+                   ast::IfElseStatement::IF>(
+            [this](DepthTypingContext context,
+                   const DepthTypingContext &ifClause,
+                   const ast::StatementList &) {
               // Give the else-clause some budget for the number of
               // statements it should generate.
-              // TODO: currently else branch has at least one statement, make 0 possible
-              context.totalNumberOfStatements = ifClause.totalNumberOfStatements;
+              // TODO: currently else branch has at least one statement, make 0
+              // possible
+              context.totalNumberOfStatements =
+                  ifClause.totalNumberOfStatements;
               context.statementBudget = drawNestedBudget(context);
               return context;
             }),
@@ -283,9 +287,10 @@ public:
                          ast::IfElseStatement::ELSE>(
             [](const ast::IfElseStatement &, DepthTypingContext context,
                const DepthTypingContext &elseClause) {
-              // The only thing about the clauses that outlives the if statement is how
-              // many statements they generated.
-              context.totalNumberOfStatements = elseClause.totalNumberOfStatements;
+              // The only thing about the clauses that outlives the if statement
+              // is how many statements they generated.
+              context.totalNumberOfStatements =
+                  elseClause.totalNumberOfStatements;
               return context;
             }),
     };

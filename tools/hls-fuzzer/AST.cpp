@@ -109,7 +109,7 @@ llvm::raw_ostream &ast::operator<<(llvm::raw_ostream &os,
   }
   os << '}';
   os << " else {\n";
-{
+  {
     mlir::raw_indented_ostream ss(os);
     ss.indent();
     for (auto &iter : ifElse.getElseClause())
