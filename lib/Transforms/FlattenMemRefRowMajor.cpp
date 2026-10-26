@@ -24,6 +24,7 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/ControlFlow/Transforms/StructuralTypeConversions.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -293,22 +294,6 @@ struct OperandConversionPattern : public OpConversionPattern<TOp> {
   }
 };
 
-// Cannot use OperandConversionPattern for branch op since the default builder
-// doesn't provide a method for communicating block successors.
-struct CondBranchOpConversion
-    : public OpConversionPattern<mlir::cf::CondBranchOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(mlir::cf::CondBranchOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
-        op, adaptor.getCondition(), adaptor.getTrueDestOperands(),
-        adaptor.getFalseDestOperands(), op.getTrueDest(), op.getFalseDest());
-    return success();
-  }
-};
-
 // Rewrites a call op signature to flattened types. If rewriteFunctions is set,
 // will also replace the callee with a private definition of the called
 // function of the updated signature.
@@ -382,9 +367,11 @@ static void populateFlattenMemRefsLegality(ConversionTarget &target) {
                                memref::CopyOp>(target);
 
   target.addDynamicallyLegalOp<func::FuncOp>([](func::FuncOp op) {
-    auto argsConverted = llvm::none_of(op.getBlocks(), [](auto &block) {
-      return hasMultiDimMemRef(block.getArguments());
-    });
+    // Only the entry block's arguments are the function's: the branch
+    // conversions convert the arguments of the other blocks, which may happen
+    // after the function's conversion
+    auto argsConverted =
+        op.isExternal() || !hasMultiDimMemRef(op.front().getArguments());
 
     auto resultsConverted = llvm::all_of(op.getResultTypes(), [](Type type) {
       if (auto memref = dyn_cast<MemRefType>(type))
@@ -435,7 +422,6 @@ public:
         GlobalOpConversion,
         OperandConversionPattern<func::ReturnOp>,
         OperandConversionPattern<memref::DeallocOp>,
-        CondBranchOpConversion,
         OperandConversionPattern<memref::DeallocOp>,
         OperandConversionPattern<memref::CopyOp>, CallOpConversion
         // clang-format on
@@ -444,6 +430,10 @@ public:
                                                       ctx);
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
+    // The function conversion only converts the signature of the entry block.
+    // The branch conversions also convert the signatures of their destination
+    // blocks
+    cf::populateCFStructuralTypeConversions(typeConverter, patterns);
 
     ConversionTarget target(*ctx);
     populateFlattenMemRefsLegality(target);

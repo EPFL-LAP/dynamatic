@@ -18,7 +18,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "dynamatic/Analysis/NameAnalysis.h"
-#include "dynamatic/Conversion/CfToHandshake.h"
+#include "dynamatic/Conversion/OperandRouting2/AnnotatedCfg.h"
+#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
+#include "dynamatic/Conversion/OperandRouting2/ControlNetworkRouting.h"
+#include "dynamatic/Conversion/OperandRouting2/TempOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Dialect/Handshake/HandshakeDialect.h"
 #include "dynamatic/Dialect/Handshake/HandshakeInterfaces.h"
@@ -29,10 +32,6 @@
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "dynamatic/Transforms/FuncMaximizeSSA.h"
-#include "experimental/Conversion/OperandRouting2/AnnotatedCfg.h"
-#include "experimental/Conversion/OperandRouting2/BaseCfg.h"
-#include "experimental/Conversion/OperandRouting2/ControlNetworkRouting.h"
-#include "experimental/Conversion/OperandRouting2/TempOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -46,12 +45,10 @@
 #include "llvm/Support/ErrorHandling.h"
 
 // [START Boilerplate code for the MLIR pass]
-#include "experimental/Conversion/Passes.h" // IWYU pragma: keep
+#include "dynamatic/Conversion/Passes.h" // IWYU pragma: keep
 namespace dynamatic {
-namespace experimental {
 #define GEN_PASS_DEF_OPERANDROUTING2CFTOHANDSHAKE
-#include "experimental/Conversion/Passes.h.inc"
-} // namespace experimental
+#include "dynamatic/Conversion/Passes.h.inc"
 } // namespace dynamatic
 // [END Boilerplate code for the MLIR pass]
 
@@ -841,7 +838,10 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   }
 
   // build one cfg per set of block uses
-  SmallVector<Cfg> useCfgs;
+  //
+  // using small vector on the heap over std::vector
+  // based on the programmers manual
+  SmallVector<Cfg, 0> useCfgs;
   for (const SetVector<BlockUse> &blockUseSet : blockUseSets)
     useCfgs.push_back(buildCfg(base, blockUseSet));
 
@@ -984,7 +984,7 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
 }
 
 struct OperandRouting2CfToHandshakePass
-    : public dynamatic::experimental::impl::OperandRouting2CfToHandshakeBase<
+    : public dynamatic::impl::OperandRouting2CfToHandshakeBase<
           OperandRouting2CfToHandshakePass> {
   using OperandRouting2CfToHandshakeBase::OperandRouting2CfToHandshakeBase;
 

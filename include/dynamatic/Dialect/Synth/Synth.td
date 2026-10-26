@@ -31,6 +31,11 @@ def Synth_Dialect : Dialect {
   }];
 
   let hasConstantMaterializer = 1;
+  // Keep printing inherent attributes in `attr-dict` (e.g., the latch type of
+  // synth.latch), as before properties became mandatory.
+  // FIXME: This option is deprecated: bind the inherent attributes in the
+  // assembly formats or use `prop-dict` instead.
+  let useStrictPropertiesInAssemblyFormat = 0;
 }
 
 include "dynamatic/Dialect/Synth/SynthOps.td"

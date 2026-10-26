@@ -74,7 +74,7 @@ LogicalResult MemoryInterfaceBuilder::instantiateInterfaces(
     handshake::LSQOp &lsqOp) {
   BackedgeBuilder edgeBuilder(rewriter, memref.getLoc());
   FConnectLoad connect = [&](LoadOp loadOp, Value dataIn) {
-    rewriter.updateRootInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
+    rewriter.modifyOpInPlace(loadOp, [&] { loadOp->setOperand(1, dataIn); });
   };
   return instantiateInterfaces(rewriter, edgeBuilder, connect, mcOp, lsqOp);
 }

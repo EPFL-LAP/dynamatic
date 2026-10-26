@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Conversion/OperandRouting2/AnnotatedCfg.h"
+#include "dynamatic/Conversion/OperandRouting2/AnnotatedCfg.h"
 #include "dynamatic/Dialect/Handshake/HandshakeAttributes.h"
 #include "dynamatic/Support/Attribute.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"

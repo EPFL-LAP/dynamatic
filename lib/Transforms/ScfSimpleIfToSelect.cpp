@@ -254,14 +254,15 @@ struct ScfSimpleIfToSelectPass
 
     auto *ctx = &getContext();
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Disabled);
 
     RewritePatternSet patterns{ctx};
     patterns.add<ConvertIfToSelect>(ctx);
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns),
-                                            config)))
+    if (failed(
+            applyPatternsGreedily(getOperation(), std::move(patterns), config)))
       signalPassFailure();
 
     // Make sure all operation names are still unique and name operations that

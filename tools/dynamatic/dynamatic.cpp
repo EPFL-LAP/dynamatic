@@ -29,6 +29,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -310,11 +311,6 @@ public:
       "calculate-path-delays";
   static constexpr llvm::StringLiteral INSTRUMENT_II = "instrument-ii";
   static constexpr llvm::StringLiteral LSQ_SIZING = "lsq-sizing";
-  static constexpr llvm::StringLiteral OPERAND_ROUTING = "operand-routing";
-  static constexpr llvm::StringLiteral OPERAND_ROUTING_MAX_CFGS =
-      "operand-routing-max-cfgs";
-  static constexpr llvm::StringLiteral OPERAND_ROUTING_MERGE_THRESHOLD =
-      "operand-routing-merge-threshold";
   static constexpr llvm::StringLiteral OPERAND_ROUTING_2 = "operand-routing-2";
 
   Compile(FrontendState &state)
@@ -338,19 +334,6 @@ public:
     addFlag({SHARING, "Use credit-based resource sharing"});
     addFlag({FAST_TOKEN_DELIVERY,
              "Use fast token delivery strategy to build the circuit"});
-    addFlag({OPERAND_ROUTING,
-             "Route every consumer operand through its own control network"});
-    addOption({OPERAND_ROUTING_MAX_CFGS,
-               "With --operand-routing, the maximum number of control "
-               "networks the consumers are clustered into. 0 (default) means "
-               "no limit: only consumers with identical folded CFGs share "
-               "one"});
-    addOption({OPERAND_ROUTING_MERGE_THRESHOLD,
-               "With --operand-routing, consumers share a control network "
-               "when every one of them has at most this many edges in the "
-               "shared folded CFG that its own folded CFG does not have. "
-               "Applied before the maximum. 0 (default) shares only "
-               "identical folded CFGs"});
     addFlag({OPERAND_ROUTING_2,
              "Route every block use on its own optimized CFG, with the "
              "control-network routing algorithm"});
@@ -484,7 +467,7 @@ public:
 std::string FrontendState::makeAbsolutePath(StringRef path) {
   SmallString<128> str;
   path::append(str, path);
-  fs::make_absolute(cwd, str);
+  llvm::sys::path::make_absolute(cwd, str);
   return str.str().str();
 }
 
@@ -830,18 +813,6 @@ CommandResult Compile::execute(CommandArguments &args) {
       args.flags.contains(CALCULATE_PATH_DELAYS) ? "1" : "0";
   std::string instrumentII = args.flags.contains(INSTRUMENT_II) ? "1" : "0";
   std::string lsqSizing = args.flags.contains(LSQ_SIZING) ? "1" : "0";
-  std::string operandRouting =
-      args.flags.contains(OPERAND_ROUTING) ? "1" : "0";
-  std::string operandRoutingMaxCfgs = "0";
-  if (auto it = args.options.find(OPERAND_ROUTING_MAX_CFGS);
-      it != args.options.end()) {
-    operandRoutingMaxCfgs = it->second;
-  }
-  std::string operandRoutingMergeThreshold = "0";
-  if (auto it = args.options.find(OPERAND_ROUTING_MERGE_THRESHOLD);
-      it != args.options.end()) {
-    operandRoutingMergeThreshold = it->second;
-  }
   std::string operandRouting2 =
       args.flags.contains(OPERAND_ROUTING_2) ? "1" : "0";
 
@@ -851,9 +822,7 @@ CommandResult Compile::execute(CommandArguments &args) {
                  state.fpUnitsGenerator, rigidification, kInduction, disableLSQ,
                  fastTokenDelivery, milpSolver, straightToQueue, speculation,
                  enableShortCircuit, enableDuplication, calculatePathDelays,
-                 instrumentII, lsqSizing, operandRouting,
-                 operandRoutingMaxCfgs, operandRoutingMergeThreshold,
-                 operandRouting2);
+                 instrumentII, lsqSizing, operandRouting2);
 }
 
 CommandResult WriteHDL::execute(CommandArguments &args) {

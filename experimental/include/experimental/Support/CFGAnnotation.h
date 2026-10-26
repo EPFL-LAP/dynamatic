@@ -27,6 +27,7 @@
 
 #include "dynamatic/Analysis/NameAnalysis.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include <variant>
 
 namespace dynamatic {
 namespace experimental {
@@ -97,9 +98,12 @@ using CFGAnnotation = llvm::DenseMap<unsigned, CFGNode>;
 /// ConditionalEdge = [source,destTrue,destFalse,condName]
 /// UnconditionalEdge = [source,dest]
 ///
-/// Add the string as annotation of the handshake function.
-void annotateCFG(handshake::FuncOp &funcOp, PatternRewriter &rewriter,
-                 NameAnalysis &namer);
+/// Add the string as annotation of the handshake function. The CFG comes from
+/// `cfgRegion` (e.g., the func-level function the handshake function is
+/// translated from), whose blocks are identified by their position.
+/// `getCondName` returns the name of a branch condition.
+void annotateCFG(handshake::FuncOp &funcOp, Region &cfgRegion,
+                 function_ref<std::string(Value)> getCondName);
 
 /// Use an handshake function ot build the cf structure again, thanks to the
 /// information in `edges`.

@@ -27,10 +27,7 @@ ENABLE_DUPLICATION=${17:-0}
 CALCULATE_PATH_DELAYS=${18}
 INSTRUMENT_II=${19}
 USE_LSQ_SIZING=${20:-0}
-OPERAND_ROUTING=${21:-0}
-OPERAND_ROUTING_MAX_CFGS=${22:-0}
-OPERAND_ROUTING_MERGE_THRESHOLD=${23:-0}
-OPERAND_ROUTING_2=${24:-0}
+OPERAND_ROUTING_2=${21:-0}
 
 LLVM=$DYNAMATIC_DIR/llvm-project
 DYNAMATIC_BINS=$DYNAMATIC_DIR/bin
@@ -56,6 +53,7 @@ F_CLANG="$COMP_DIR/clang.ll"
 F_CLANG_OPTIMIZED="$COMP_DIR/clang.opt.ll"
 F_CLANG_OPTIMIZED_PARTITIONED="$COMP_DIR/clang.opt.part.ll"
 F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY="$COMP_DIR/clang.opt.part.dep.ll"
+F_CLANG_CANONICALIZED="$COMP_DIR/clang.opt.part.dep.canon.ll"
 F_CF="$COMP_DIR/cf.mlir"
 F_CF_TRANSFORMED="$COMP_DIR/cf_transformed.mlir"
 F_CF_CONSUMED_PRAGMARKERS="$COMP_DIR/cf_consumed_pragmarkers.mlir"
@@ -107,6 +105,11 @@ export_cfg() {
 }
 
 # ============================================================================ #
+
+if [[ -z "$OUTPUT_DIR" || "$OUTPUT_DIR" == "/" ]]; then
+  echo "[FATAL] Invalid output directory"
+  exit 1
+fi
 
 # Reset output directory
 rm -rf "$OUTPUT_DIR"/*/
@@ -183,7 +186,7 @@ sed -i "s/^target triple = .*$//g" "$F_CLANG"
 # ------------------------------------------------------------------------------
 
 $LLVM_OPT -S \
-  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000;no-use-loop-info>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lowerswitch,simplifycfg,instsimplify,simplifycfg,adce" \
+  -passes="inline,mem2reg,consthoist,instcombine<max-iterations=1000>,gvn,function(loop-mssa(licm<no-allowspeculation>)),function(loop(loop-idiom,indvars,loop-deletion)),simplifycfg,loop-rotate,simplifycfg,sink,lower-switch,simplifycfg,instsimplify,simplifycfg,adce" \
   "$F_CLANG" \
   > "$F_CLANG_OPTIMIZED"
 exit_on_fail "Failed to apply optimization to LLVM IR" \
@@ -241,8 +244,20 @@ $LLVM_OPT -S \
 exit_on_fail "Failed to apply memory dependency analysis to LLVM IR" \
   "Applied memory dependency analysis to LLVM IR"
 
-$LLVM_TO_STD_TRANSLATION_BIN \
+# - "canonicalize-geps": Collapse each chain of GEPs computing a memory address
+# into a single GEP with a single index, the offset from the base pointer with
+# the arrays flattened in row-major order. The translation to the std dialect
+# below expects this form.
+$LLVM_OPT -S \
+  -load-pass-plugin "$DYNAMATIC_DIR/build/lib/CanonicalizeGEPs.so" \
+  -passes="canonicalize-geps" \
   "$F_CLANG_OPTIMIZED_PARTITIONED_DEPENDENCY" \
+  > "$F_CLANG_CANONICALIZED"
+exit_on_fail "Failed to canonicalize GEPs in LLVM IR" \
+  "Canonicalized GEPs in LLVM IR"
+
+$LLVM_TO_STD_TRANSLATION_BIN \
+  "$F_CLANG_CANONICALIZED" \
   -function-name "$KERNEL_NAME" \
   -csource "$F_C_SOURCE" \
   -dynamatic-path "$DYNAMATIC_DIR" \
@@ -317,13 +332,6 @@ if [[ $FAST_TOKEN_DELIVERY -ne 0 ]]; then
     --handshake-combine-steering-logic \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake with FTD" "Compiled cf to handshake with FTD"
-elif [[ $OPERAND_ROUTING -ne 0 ]]; then
-  echo_info "Running operand routing for handshake conversion"
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
-    --operand-routing-lower-cf-to-handshake="max-cfgs=$OPERAND_ROUTING_MAX_CFGS merge-threshold=$OPERAND_ROUTING_MERGE_THRESHOLD" \
-    > "$F_HANDSHAKE"
-  exit_on_fail "Failed to compile cf to handshake with operand routing" \
-    "Compiled cf to handshake with operand routing"
 elif [[ $OPERAND_ROUTING_2 -ne 0 ]]; then
   echo_info "Running operand routing 2 for handshake conversion"
   "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
@@ -332,7 +340,8 @@ elif [[ $OPERAND_ROUTING_2 -ne 0 ]]; then
   exit_on_fail "Failed to compile cf to handshake with operand routing 2" \
     "Compiled cf to handshake with operand routing 2"
 else
-  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" --lower-cf-to-handshake \
+  "$DYNAMATIC_OPT_BIN" "$F_CF_DYN_TRANSFORMED_MEM_DEP_MARKED" \
+    --func-maximize-ssa --lower-cf-to-handshake \
     > "$F_HANDSHAKE"
   exit_on_fail "Failed to compile cf to handshake" "Compiled cf to handshake"
 fi
@@ -360,7 +369,7 @@ if [[ $STRAIGHT_TO_QUEUE -ne 0 ]]; then
   exit_on_fail "Failed to apply transformations to handshake" \
     "Applied transformations to handshake"
 
-elif [[ $OPERAND_ROUTING -ne 0 || $OPERAND_ROUTING_2 -ne 0 ]]; then
+elif [[ $OPERAND_ROUTING_2 -ne 0 ]]; then
 
   # handshake transformations, without the LSQ minimization passes: operand
   # routing is incompatible with them for now
@@ -452,8 +461,7 @@ else
   # Operand routing, like FTD, connects blocks that are not adjacent in the
   # CFG, so buffer placement must find backedges from the circuit itself
   BUFFER_FTD=0
-  if [[ $FAST_TOKEN_DELIVERY -ne 0 || $OPERAND_ROUTING -ne 0 ||
-        $OPERAND_ROUTING_2 -ne 0 ]]; then
+  if [[ $FAST_TOKEN_DELIVERY -ne 0 || $OPERAND_ROUTING_2 -ne 0 ]]; then
     BUFFER_FTD=1
   fi
   # To enable debug information, make sure that Dynamatic is built with Debug

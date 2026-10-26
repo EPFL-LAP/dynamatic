@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Conversion/OperandRouting2/BaseCfg.h"
+#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "llvm/Support/ErrorHandling.h"

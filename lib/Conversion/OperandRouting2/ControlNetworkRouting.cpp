@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "experimental/Conversion/OperandRouting2/ControlNetworkRouting.h"
+#include "dynamatic/Conversion/OperandRouting2/ControlNetworkRouting.h"
+#include "dynamatic/Conversion/OperandRouting2/TempOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
-#include "experimental/Conversion/OperandRouting2/TempOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 

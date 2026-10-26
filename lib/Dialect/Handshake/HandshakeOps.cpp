@@ -493,7 +493,7 @@ parseFuncOpArgs(OpAsmParser &parser,
                 SmallVectorImpl<Type> &resTypes,
                 SmallVectorImpl<DictionaryAttr> &resAttrs) {
   bool isVariadic;
-  if (mlir::function_interface_impl::parseFunctionSignature(
+  if (mlir::function_interface_impl::parseFunctionSignatureWithArguments(
           parser, /*allowVariadic=*/true, entryArgs, isVariadic, resTypes,
           resAttrs)
           .failed())
@@ -550,7 +550,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
                              result.attributes) ||
       parseFuncOpArgs(parser, args, resTypes, resAttributes))
     return failure();
-  mlir::function_interface_impl::addArgAndResultAttrs(
+  mlir::call_interface_impl::addArgAndResultAttrs(
       builder, result, args, resAttributes,
       handshake::FuncOp::getArgAttrsAttrName(result.name),
       handshake::FuncOp::getResAttrsAttrName(result.name));
@@ -621,12 +621,11 @@ bool ConditionalBranchOp::isControl() {
 
 LogicalResult ConstantOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    DictionaryAttr attributes, ::mlir::PropertyRef properties,
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
-  OperationName opName = OperationName(getOperationName(), context);
-  StringAttr attrName = getValueAttrName(opName);
-  auto attr = cast<TypedAttr>(attributes.get(attrName));
+  ConstantOp::Adaptor adaptor(operands, attributes, properties, regions);
+  auto attr = cast<TypedAttr>(adaptor.getValue());
 
   auto controlType = cast<ControlType>(operands[0].getType());
 
@@ -1900,7 +1899,7 @@ void UnbundleOp::print(OpAsmPrinter &p) {
 
 LogicalResult UnbundleOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, mlir::OpaqueProperties properties,
+    DictionaryAttr attributes, ::mlir::PropertyRef properties,
     mlir::RegionRange regions,
     SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
 
@@ -1934,7 +1933,7 @@ LogicalResult UnbundleOp::verify() {
 LogicalResult
 CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          ValueRange operands, DictionaryAttr attributes,
-                         mlir::OpaqueProperties properties,
+                         ::mlir::PropertyRef properties,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
@@ -1956,7 +1955,7 @@ CmpFOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
 LogicalResult
 CmpIOp::inferReturnTypes(MLIRContext *context, std::optional<Location> location,
                          ValueRange operands, DictionaryAttr attributes,
-                         mlir::OpaqueProperties properties,
+                         ::mlir::PropertyRef properties,
                          mlir::RegionRange regions,
                          SmallVectorImpl<mlir::Type> &inferredReturnTypes) {
   OpBuilder builder(context);
@@ -2037,12 +2036,15 @@ LogicalResult ExtUIOp::verify() { return verifyExtOp(*this); }
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
+  // trunci(trunci(x)) -> trunci(x)
   if (auto defTruncOp = getIn().getDefiningOp<TruncIOp>()) {
     // Bypass the preceeding truncation operation
     getInMutable().assign(defTruncOp.getIn());
     return getResult();
   }
 
+  // trunci(ext(x)) -> trunci(x) when x is wider than the result, or x when it
+  // has the result's type
   Operation *defOp = getIn().getDefiningOp();
   if (isa_and_present<ExtSIOp, ExtUIOp>(defOp)) {
     Value src = defOp->getOperand(0);
@@ -2053,11 +2055,14 @@ OpFoldResult TruncIOp::fold(FoldAdaptor adaptor) {
       getInMutable().assign(src);
       return getResult();
     }
-    // Bypass the preceeding extension operation and the truncation
-    return src;
+    // Bypass the preceeding extension operation and the truncation, if the
+    // extension's operand has the type of the truncation's result. A narrower
+    // operand would need a narrower extension, which a fold cannot create
+    if (src.getType() == getOut().getType())
+      return src;
   }
 
-  // Identical operand and result types mean that the trunc is a no-op
+  // trunci(x) -> x when x has the result's width: the trunc is a no-op
   unsigned srcWidth = getIn().getType().getDataBitWidth();
   unsigned dstWidth = getOut().getType().getDataBitWidth();
   if (srcWidth == dstWidth)

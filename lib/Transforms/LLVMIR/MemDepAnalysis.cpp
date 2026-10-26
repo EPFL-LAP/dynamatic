@@ -30,8 +30,8 @@
 ///
 ///
 //===----------------------------------------------------------------------===//
+#include "polly/ScopDetection.h"
 #include "polly/ScopInfo.h"
-#include "polly/ScopPass.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -39,12 +39,18 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Plugins/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/OptimizationRemarkEmitter.h"
+#include "llvm/Analysis/RegionInfo.h"
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include <deque>
 #include <stdlib.h>
 #include <utility>
 
@@ -120,7 +126,7 @@ bool instructionAlwaysDepends(const CFGPath &currentPath, Instruction *srcInst,
   /// themselves added as active dependences.
   for (auto rit = curBB->rbegin(); rit != curBB->rend(); ++rit) {
     auto *inst = &*rit;
-    if (isa<BranchInst>(inst) || isa<DbgInfoIntrinsic>(inst))
+    if (isa<UncondBrInst, CondBrInst>(inst) || isa<DbgInfoIntrinsic>(inst))
       continue;
 
     // If this instruction is an not active dependence, ignore it
@@ -207,7 +213,7 @@ static bool instructionAlwaysRevDepends(CFGPath path, Instruction *dstInst,
   /// If so, the instruction which has the operand is itself reverse
   /// dependent.
   for (auto &inst : *curBb) {
-    if (isa<BranchInst>(&inst) || isa<DbgInfoIntrinsic>(&inst))
+    if (isa<UncondBrInst, CondBrInst>(&inst) || isa<DbgInfoIntrinsic>(&inst))
       continue;
 
     std::vector<Value *> operands;
@@ -503,7 +509,7 @@ public:
     // }
     // clang-format on
 
-    auto *bb = scop.begin()->getBasicBlock();
+    auto *bb = scop.begin()->getEntryBlock();
     auto *loop = loopInfo->getLoopFor(bb);
     scopMinDepth = loopInfo->getLoopDepth(bb) - scop.getRelativeLoopDepth(loop);
     assert(scopMinDepth > 0);
@@ -514,7 +520,7 @@ public:
   /// \brief: Use addScopStmt() to add all ScopStmt's in a Scop. Then,
   /// computeIntersections() and finally getIntersectionList()
   void addScopStmt(ScopStmt &stmt) {
-    int depth = loopInfo->getLoopDepth(stmt.getBasicBlock());
+    int depth = loopInfo->getLoopDepth(stmt.getEntryBlock());
 
     for (auto *inst : stmt.getInstructions())
       // NOTE (@Jiahui17): the call `memcpy` (or any other function that may
@@ -728,7 +734,7 @@ bool equalBase(Instruction *a, Instruction *b) {
 /// \brief: an LLVM pass that combines polyhedral and alias analysis to compute
 /// a set of dependency edges from the LLVM IR. It further uses dataflow
 /// analysis to eliminate dependency edges enforced by the dataflow.
-struct MemDepAnalysisPass : PassInfoMixin<MemDepAnalysisPass> {
+struct MemDepAnalysisPass : OptionalPassInfoMixin<MemDepAnalysisPass> {
 
   // This struct keeps track for every memory instruction:
   // - Is it in any scop (i.e., it is in `instToScopId`)?
@@ -824,7 +830,7 @@ void MemDepAnalysisPass::processScop(Scop &scop,
   auto meta = ScopAnalysisInfo(scop);
 
   for (auto &stmt : scop) {
-    auto *bb = stmt.getBasicBlock();
+    auto *bb = stmt.getEntryBlock();
     indexAnalysis.bbList.insert(bb);
     indexAnalysis.bbToScopMap[bb] = scopMeta.size();
 
@@ -1166,7 +1172,15 @@ PreservedAnalyses MemDepAnalysisPass::runPollyBasedInLegacyDynamatic(
 
   auto &regionInfoAnalysis = fam.getResult<RegionInfoAnalysis>(llvmFunction);
 
-  auto &scopInfoAnalysis = fam.getResult<ScopInfoAnalysis>(llvmFunction);
+  // Polly builds the scop of a region on demand, from its scop detection
+  ScopInfo scopInfoAnalysis(
+      llvmFunction.getDataLayout(), fam.getResult<ScopAnalysis>(llvmFunction),
+      fam.getResult<ScalarEvolutionAnalysis>(llvmFunction),
+      fam.getResult<LoopAnalysis>(llvmFunction),
+      fam.getResult<AAManager>(llvmFunction),
+      fam.getResult<DominatorTreeAnalysis>(llvmFunction),
+      fam.getResult<AssumptionAnalysis>(llvmFunction),
+      fam.getResult<OptimizationRemarkEmitterAnalysis>(llvmFunction));
 
   std::vector<ScopAnalysisInfo> scopMetaInfos;
 
@@ -1177,7 +1191,8 @@ PreservedAnalyses MemDepAnalysisPass::runPollyBasedInLegacyDynamatic(
 
   Scop *scop;
   for (Region *region : regionQueue) {
-    if ((scop = scopInfoAnalysis.getScop(region)))
+    // Polly builds scops on demand, including scops without any statement
+    if ((scop = scopInfoAnalysis.getScop(region)) && !scop->isEmpty())
       processScop(*scop, scopMetaInfos);
   }
 
@@ -1264,6 +1279,11 @@ extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "MemDepAnalysis", LLVM_VERSION_STRING,
           [](PassBuilder &pb) {
+            // The pass builds Polly's scop information from its scop detection
+            pb.registerAnalysisRegistrationCallback(
+                [](FunctionAnalysisManager &fam) {
+                  fam.registerPass([] { return ScopAnalysis(); });
+                });
             pb.registerPipelineParsingCallback(
                 [](StringRef name, FunctionPassManager &fpm,
                    ArrayRef<PassBuilder::PipelineElement>) {

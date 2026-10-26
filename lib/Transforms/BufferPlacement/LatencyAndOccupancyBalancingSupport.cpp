@@ -31,6 +31,7 @@
 #include <numeric>
 #include <queue>
 #include <set>
+#include <stack>
 
 #define DEBUG_TYPE "latency-and-occupancy-balancing-support"
 

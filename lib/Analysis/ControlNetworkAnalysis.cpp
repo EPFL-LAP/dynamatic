@@ -32,6 +32,7 @@ ControlNode *ControlGraph::addNode(Operation *op) {
   ControlNode &node = nodes.emplace_back();
   node.op = op;
   node.graph = this;
+  node.number = nodes.size() - 1;
   return &node;
 }
 

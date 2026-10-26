@@ -16,7 +16,7 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Conversion/OperandRouting2/BaseCfg.h"
+#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
 #include "llvm/ADT/MapVector.h"
 #include <utility>
 
@@ -24,7 +24,7 @@ namespace dynamatic {
 namespace experimental {
 namespace operand_routing2 {
 
-using llvm::MapVector;
+using mlir::MapVector;
 using mlir::TypedValue;
 
 /// Returns every block use of the function exactly once,

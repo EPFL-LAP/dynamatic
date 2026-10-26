@@ -85,14 +85,18 @@ static Any readValueWithType(mlir::Type type, std::stringstream &arg) {
     int64_t x;
     arg >> x;
     int64_t width = IndexType::kInternalStorageBitWidth;
-    APInt aparg(width, x);
+    // FIXME: The value is signed, but isSigned=false (the previous default)
+    // does not sign-extend it to widths above 64 bits
+    APInt aparg(width, x, /*isSigned=*/false, /*implicitTrunc=*/true);
     return aparg;
   }
   if (isa<mlir::IntegerType>(type)) {
     int64_t x;
     arg >> x;
     int64_t width = type.getIntOrFloatBitWidth();
-    APInt aparg(width, x);
+    // FIXME: The value is signed, but isSigned=false (the previous default)
+    // does not sign-extend it to widths above 64 bits
+    APInt aparg(width, x, /*isSigned=*/false, /*implicitTrunc=*/true);
     return aparg;
   }
   if (type.isF32()) {
@@ -226,8 +230,11 @@ LogicalResult StdExecuter::execute(mlir::arith::ShLIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+  // FIXME: The value is signed, but isSigned=false (the previous default) does
+  // not sign-extend it to widths above 64 bits
   auto shifted =
-      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift << shiftAmount);
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift << shiftAmount,
+            /*isSigned=*/false, /*implicitTrunc=*/true);
   out[0] = shifted;
   return success();
 }
@@ -236,8 +243,11 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRSIOp, std::vector<Any> &in,
                                    std::vector<Any> &out) {
   auto toShift = any_cast<APInt>(in[0]).getSExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
+  // FIXME: The value is signed, but isSigned=false (the previous default) does
+  // not sign-extend it to widths above 64 bits
   auto shifted =
-      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount,
+            /*isSigned=*/false, /*implicitTrunc=*/true);
   out[0] = shifted;
   return success();
 }
@@ -247,7 +257,8 @@ LogicalResult StdExecuter::execute(mlir::arith::ShRUIOp, std::vector<Any> &in,
   auto toShift = any_cast<APInt>(in[0]).getZExtValue();
   auto shiftAmount = any_cast<APInt>(in[1]).getZExtValue();
   auto shifted =
-      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount);
+      APInt(any_cast<APInt>(in[0]).getBitWidth(), toShift >> shiftAmount,
+            /*isSigned=*/false, /*implicitTrunc=*/true);
   out[0] = shifted;
   return success();
 }
@@ -397,9 +408,11 @@ LogicalResult StdExecuter::execute(mlir::arith::IndexCastOp op,
   APInt outValue;
   if (outType.isIndex())
     outValue =
-        APInt(IndexType::kInternalStorageBitWidth, inValue.getZExtValue());
+        APInt(IndexType::kInternalStorageBitWidth, inValue.getZExtValue(),
+              /*isSigned=*/false, /*implicitTrunc=*/true);
   else if (outType.isIntOrFloat())
-    outValue = APInt(outType.getIntOrFloatBitWidth(), inValue.getZExtValue());
+    outValue = APInt(outType.getIntOrFloatBitWidth(), inValue.getZExtValue(),
+                     /*isSigned=*/false, /*implicitTrunc=*/true);
   else {
     return op.emitOpError() << "unhandled output type";
   }

@@ -180,8 +180,13 @@ static void promoteEagerToLazyForks(handshake::FuncOp funcOp) {
 
     // Replace the original fork's outputs that are part of the memory control
     // network with the first lazy fork's outputs
-    for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults()))
-      from.replaceAllUsesWith(to);
+    for (auto [from, to] : llvm::zip(lazyResults, lazyForkOp->getResults())) {
+      // The elements of a SetVector are const, while replaceAllUsesWith is a
+      // non-const method of Value in newer LLVM versions. Value is a handle to
+      // the IR value, so replacing the uses through a copy replaces them in the
+      // IR
+      Value(from).replaceAllUsesWith(to);
+    }
 
     if (hasValueWithoutLazyConstr) {
       // If some of the control fork's result go outside the memory control
@@ -433,8 +438,9 @@ struct HandshakeMaterializePass
 
     // Then, greedily optimize forks
     mlir::GreedyRewriteConfig config;
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = false;
+    config.setUseTopDownTraversal(true);
+    config.setRegionSimplificationLevel(
+        mlir::GreedySimplifyRegionLevel::Disabled);
     RewritePatternSet patterns{ctx};
     patterns.add<
         // clang-format off
@@ -447,8 +453,7 @@ struct HandshakeMaterializePass
     if (this->replicateConstants)
       patterns.add<ReplicateSourceIntoConstant>(ctx);
 
-    if (failed(
-            applyPatternsAndFoldGreedily(modOp, std::move(patterns), config)))
+    if (failed(applyPatternsGreedily(modOp, std::move(patterns), config)))
       return signalPassFailure();
 
     // Finally, promote forks to lazy wherever necessary

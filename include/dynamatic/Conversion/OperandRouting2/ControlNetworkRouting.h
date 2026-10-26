@@ -13,9 +13,9 @@
 #ifndef EXPERIMENTAL_CONVERSION_OPERANDROUTING2_CONTROLNETWORKROUTING_H
 #define EXPERIMENTAL_CONVERSION_OPERANDROUTING2_CONTROLNETWORKROUTING_H
 
+#include "dynamatic/Conversion/OperandRouting2/AnnotatedCfg.h"
+#include "dynamatic/Conversion/OperandRouting2/BaseCfg.h"
 #include "dynamatic/Support/LLVM.h"
-#include "experimental/Conversion/OperandRouting2/AnnotatedCfg.h"
-#include "experimental/Conversion/OperandRouting2/BaseCfg.h"
 #include "mlir/IR/Builders.h"
 
 namespace dynamatic {
