@@ -655,7 +655,6 @@ gen::BasicCGenerator::generateIfElseStatement(OpaqueContext &&context) {
   if (typeSystem.discardIfElseStatementOpaque(context))
     return std::nullopt;
 
-  std::string varName = generateFreshVarName();
   return generateWithDependencies<ast::IfElseStatement>(
       std::move(context), typeSystem.getIfElseStatementTransferFns(),
 
