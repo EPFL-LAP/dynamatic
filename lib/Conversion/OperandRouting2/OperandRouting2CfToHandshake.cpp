@@ -185,6 +185,13 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
     memrefs.push_back(cast<MemrefValue>(ramOp.getResult()));
   }
 
+  // every memory region must be statically sized and one-dimensional
+  for (MemrefValue memref : memrefs) {
+    assert(memref.getType().hasStaticShape() &&
+           memref.getType().getRank() == 1 &&
+           "memory region must be statically sized and one-dimensional");
+  }
+
   // after them come a start control per memory region, then the start
   // for each memory region
   for (const std::string &memName : memNames)

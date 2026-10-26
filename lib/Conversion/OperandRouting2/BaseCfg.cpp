@@ -99,6 +99,9 @@ Cfg dynamatic::experimental::operand_routing2::getBaseCfg(Region &body) {
                            /*liveOuts=*/{}});
     } else if (isa<func::ReturnOp>(terminator)) {
       cfg.exit = &block;
+    } else {
+      llvm_unreachable("block terminator must be a cf.br, cf.cond_br or "
+                       "func.return");
     }
   }
 
