@@ -129,6 +129,7 @@ struct HandshakeFunction {
 /// The terminators stay in place,
 /// converted instead at the end of the pass.
 static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
+                                                 NameAnalysis &namer,
                                                  OpBuilder &builder) {
   // Handle the MLIR context
   MLIRContext *ctx = builder.getContext();
@@ -150,13 +151,14 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
   SmallVector<Attribute> argNames;
   SmallVector<Attribute> resNames;
 
-  // We also use the names of the memref args (which become array inputs)
-  // to produce the extra mem start args and mem end results.
+  // We also use the names of the memory regions
+  // (the memref args, which become array inputs, and the RAM ops)
+  // to produce the names of the extra mem start args and mem end results.
   // we store the mem names as strings as the memref name doesn't correspond
   // directly to the attributes we make from them
   // then the attribute made goes on the handshake function op
   //
-  // Also store the memref args directly
+  // Also store the memrefs directly
   // as we need to add a control for each of them to the entry block also
   SmallVector<std::string> memNames;
   SmallVector<MemrefValue> memrefs;
@@ -174,6 +176,13 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
       memNames.push_back(name.str());
       memrefs.push_back(memref);
     }
+  }
+
+  // for each RAM op
+  for (auto ramOp : funcOp.getBody().getOps<handshake::RAMOp>()) {
+    // store in mem names also
+    memNames.push_back(namer.getName(ramOp).str());
+    memrefs.push_back(cast<MemrefValue>(ramOp.getResult()));
   }
 
   // after them come a start control per memory region, then the start
@@ -226,8 +235,8 @@ static HandshakeFunction createHandshakeFunction(func::FuncOp funcOp,
 
   // create the handshake function next to the original
   builder.setInsertionPoint(funcOp);
-  auto newFuncOp = builder.create<handshake::FuncOp>(
-      funcOp.getLoc(), funcOp.getName(),
+  auto newFuncOp = handshake::FuncOp::create(
+      builder, funcOp.getLoc(), funcOp.getName(),
       builder.getFunctionType(argTypes, resTypes), attrs);
 
   // Make the struct that we will return
@@ -341,11 +350,11 @@ static LogicalResult convertConstants(Region &body, Value start,
       // what triggers it: a source, or start
       Value trigger = start;
       if (isSourcable(&op))
-        trigger = builder.create<handshake::SourceOp>(loc).getResult();
+        trigger = handshake::SourceOp::create(builder, loc).getResult();
 
       // replace the original with the handshake constant,
       // which takes over its uses
-      auto newOp = builder.create<handshake::ConstantOp>(loc, value, trigger);
+      auto newOp = handshake::ConstantOp::create(builder, loc, value, trigger);
       op.replaceAllUsesWith(newOp);
       op.erase();
     }
@@ -395,207 +404,220 @@ static LogicalResult replaceArithOp(Operation &op, TypeRange resultTypes,
 
       if (srcWidth > 32) {
         // if its wider, we need to truncate
-        return builder
-            .create<handshake::TruncIOp>(loc, resultTypes, operands, attrs)
+        return handshake::TruncIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
             .getOut();
       }
       if (indexCastOp) {
         // if its narrower, either sign extend
-        return builder
-            .create<handshake::ExtSIOp>(loc, resultTypes, operands, attrs)
+        return handshake::ExtSIOp::create(builder, loc, resultTypes, operands,
+                                          attrs)
             .getOut();
       }
       // or unsign extend
-      return builder
-          .create<handshake::ExtUIOp>(loc, resultTypes, operands, attrs)
+      return handshake::ExtUIOp::create(builder, loc, resultTypes, operands,
+                                        attrs)
           .getOut();
     }
 
     // every other operation has a handshake operation of the same kind
     return llvm::TypeSwitch<Operation *, FailureOr<Value>>(&op)
         .Case<arith::AddFOp>([&](auto) {
-          return builder
-              .create<handshake::AddFOp>(loc, resultTypes, operands, attrs)
+          return handshake::AddFOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::AddIOp>([&](auto) {
-          return builder
-              .create<handshake::AddIOp>(loc, resultTypes, operands, attrs)
+          return handshake::AddIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::AndIOp>([&](auto) {
-          return builder
-              .create<handshake::AndIOp>(loc, resultTypes, operands, attrs)
+          return handshake::AndIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
-        .Case<arith::CmpFOp>([&](auto) {
-          return builder
-              .create<handshake::CmpFOp>(loc, resultTypes, operands, attrs)
+        .Case<arith::CmpFOp>([&](arith::CmpFOp cmpFOp) {
+          // handshake's predicates have the same values as arith's
+          auto predicate =
+              static_cast<handshake::CmpFPredicate>(cmpFOp.getPredicate());
+          return handshake::CmpFOp::create(
+                     builder, loc,
+                     handshake::ChannelType::get(builder.getI1Type()),
+                     predicate, cmpFOp.getLhs(), cmpFOp.getRhs())
               .getResult();
         })
-        .Case<arith::CmpIOp>([&](auto) {
-          return builder
-              .create<handshake::CmpIOp>(loc, resultTypes, operands, attrs)
+        .Case<arith::CmpIOp>([&](arith::CmpIOp cmpIOp) {
+          // handshake's predicates have the same values as arith's
+          auto predicate =
+              static_cast<handshake::CmpIPredicate>(cmpIOp.getPredicate());
+          return handshake::CmpIOp::create(
+                     builder, loc,
+                     handshake::ChannelType::get(builder.getI1Type()),
+                     predicate, cmpIOp.getLhs(), cmpIOp.getRhs())
               .getResult();
         })
         .Case<arith::DivFOp>([&](auto) {
-          return builder
-              .create<handshake::DivFOp>(loc, resultTypes, operands, attrs)
+          return handshake::DivFOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::DivSIOp>([&](auto) {
-          return builder
-              .create<handshake::DivSIOp>(loc, resultTypes, operands, attrs)
+          return handshake::DivSIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::DivUIOp>([&](auto) {
-          return builder
-              .create<handshake::DivUIOp>(loc, resultTypes, operands, attrs)
+          return handshake::DivUIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::RemSIOp>([&](auto) {
-          return builder
-              .create<handshake::RemSIOp>(loc, resultTypes, operands, attrs)
+          return handshake::RemSIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::RemUIOp>([&](auto) {
-          return builder
-              .create<handshake::RemUIOp>(loc, resultTypes, operands, attrs)
+          return handshake::RemUIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::ExtSIOp>([&](auto) {
-          return builder
-              .create<handshake::ExtSIOp>(loc, resultTypes, operands, attrs)
+          return handshake::ExtSIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getOut();
         })
         .Case<arith::ExtUIOp>([&](auto) {
-          return builder
-              .create<handshake::ExtUIOp>(loc, resultTypes, operands, attrs)
+          return handshake::ExtUIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getOut();
         })
         .Case<arith::MaximumFOp>([&](auto) {
-          return builder
-              .create<handshake::MaximumFOp>(loc, resultTypes, operands, attrs)
+          return handshake::MaximumFOp::create(builder, loc, resultTypes,
+                                               operands, attrs)
               .getResult();
         })
         .Case<arith::MinimumFOp>([&](auto) {
-          return builder
-              .create<handshake::MinimumFOp>(loc, resultTypes, operands, attrs)
+          return handshake::MinimumFOp::create(builder, loc, resultTypes,
+                                               operands, attrs)
               .getResult();
         })
         .Case<arith::MaxSIOp>([&](auto) {
-          return builder
-              .create<handshake::MaxSIOp>(loc, resultTypes, operands, attrs)
+          return handshake::MaxSIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::MaxUIOp>([&](auto) {
-          return builder
-              .create<handshake::MaxUIOp>(loc, resultTypes, operands, attrs)
+          return handshake::MaxUIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::MinSIOp>([&](auto) {
-          return builder
-              .create<handshake::MinSIOp>(loc, resultTypes, operands, attrs)
+          return handshake::MinSIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::MinUIOp>([&](auto) {
-          return builder
-              .create<handshake::MinUIOp>(loc, resultTypes, operands, attrs)
+          return handshake::MinUIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::MulFOp>([&](auto) {
-          return builder
-              .create<handshake::MulFOp>(loc, resultTypes, operands, attrs)
+          return handshake::MulFOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::MulIOp>([&](auto) {
-          return builder
-              .create<handshake::MulIOp>(loc, resultTypes, operands, attrs)
+          return handshake::MulIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::NegFOp>([&](auto) {
-          return builder
-              .create<handshake::NegFOp>(loc, resultTypes, operands, attrs)
+          return handshake::NegFOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getOuts();
         })
         .Case<arith::OrIOp>([&](auto) {
-          return builder
-              .create<handshake::OrIOp>(loc, resultTypes, operands, attrs)
+          return handshake::OrIOp::create(builder, loc, resultTypes, operands,
+                                          attrs)
               .getResult();
         })
-        .Case<arith::SelectOp>([&](auto) {
-          return builder
-              .create<handshake::SelectOp>(loc, resultTypes, operands, attrs)
+        .Case<arith::SelectOp>([&](arith::SelectOp selectOp) {
+          return handshake::SelectOp::create(
+                     builder, loc, getHandshakeType(selectOp.getType()),
+                     selectOp.getCondition(), selectOp.getTrueValue(),
+                     selectOp.getFalseValue(),
+                     /*antitokenDepth=*/IntegerAttr())
               .getResult();
         })
         .Case<arith::ShLIOp>([&](auto) {
-          return builder
-              .create<handshake::ShLIOp>(loc, resultTypes, operands, attrs)
+          return handshake::ShLIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::ShRSIOp>([&](auto) {
-          return builder
-              .create<handshake::ShRSIOp>(loc, resultTypes, operands, attrs)
+          return handshake::ShRSIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::ShRUIOp>([&](auto) {
-          return builder
-              .create<handshake::ShRUIOp>(loc, resultTypes, operands, attrs)
+          return handshake::ShRUIOp::create(builder, loc, resultTypes, operands,
+                                            attrs)
               .getResult();
         })
         .Case<arith::SubFOp>([&](auto) {
-          return builder
-              .create<handshake::SubFOp>(loc, resultTypes, operands, attrs)
+          return handshake::SubFOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::SubIOp>([&](auto) {
-          return builder
-              .create<handshake::SubIOp>(loc, resultTypes, operands, attrs)
+          return handshake::SubIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::TruncIOp>([&](auto) {
-          return builder
-              .create<handshake::TruncIOp>(loc, resultTypes, operands, attrs)
+          return handshake::TruncIOp::create(builder, loc, resultTypes,
+                                             operands, attrs)
               .getOut();
         })
         .Case<arith::TruncFOp>([&](auto) {
-          return builder
-              .create<handshake::TruncFOp>(loc, resultTypes, operands, attrs)
+          return handshake::TruncFOp::create(builder, loc, resultTypes,
+                                             operands, attrs)
               .getOut();
         })
         .Case<arith::XOrIOp>([&](auto) {
-          return builder
-              .create<handshake::XOrIOp>(loc, resultTypes, operands, attrs)
+          return handshake::XOrIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getResult();
         })
         .Case<arith::SIToFPOp>([&](auto) {
-          return builder
-              .create<handshake::SIToFPOp>(loc, resultTypes, operands, attrs)
+          return handshake::SIToFPOp::create(builder, loc, resultTypes,
+                                             operands, attrs)
               .getOut();
         })
         .Case<arith::UIToFPOp>([&](auto) {
-          return builder
-              .create<handshake::UIToFPOp>(loc, resultTypes, operands, attrs)
+          return handshake::UIToFPOp::create(builder, loc, resultTypes,
+                                             operands, attrs)
               .getOut();
         })
         .Case<arith::FPToSIOp>([&](auto) {
-          return builder
-              .create<handshake::FPToSIOp>(loc, resultTypes, operands, attrs)
+          return handshake::FPToSIOp::create(builder, loc, resultTypes,
+                                             operands, attrs)
               .getOut();
         })
         .Case<arith::ExtFOp>([&](auto) {
-          return builder
-              .create<handshake::ExtFOp>(loc, resultTypes, operands, attrs)
+          return handshake::ExtFOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getOut();
         })
         .Case<math::AbsFOp>([&](auto) {
-          return builder
-              .create<handshake::AbsFOp>(loc, resultTypes, operands, attrs)
+          return handshake::AbsFOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getOut();
         })
         .Case<math::AbsIOp>([&](auto) {
-          return builder
-              .create<handshake::AbsIOp>(loc, resultTypes, operands, attrs)
+          return handshake::AbsIOp::create(builder, loc, resultTypes, operands,
+                                           attrs)
               .getOut();
         })
         .Default([&](Operation *) -> FailureOr<Value> {
@@ -692,8 +714,8 @@ static void convertLoadsAndStores(
         loadDataTemps.push_back(dataTemp);
 
         // make the handshake load op
-        auto loadHandshake = builder.create<handshake::LoadOp>(
-            op.getLoc(), address, dataTemp.getValue());
+        auto loadHandshake = handshake::LoadOp::create(
+            builder, op.getLoc(), address, dataTemp.getValue());
 
         // copy across the annotations from the memory analysis passes
         copyDialectAttr<handshake::MemDependenceArrayAttr>(&op, loadHandshake);
@@ -726,8 +748,8 @@ static void convertLoadsAndStores(
         Value address = storeOp.getIndices().front();
 
         // make the handshake store op
-        auto storeHandshake = builder.create<handshake::StoreOp>(
-            op.getLoc(), address, storeOp.getValueToStore());
+        auto storeHandshake = handshake::StoreOp::create(
+            builder, op.getLoc(), address, storeOp.getValueToStore());
 
         // copy across the annotations from the memory analysis passes
         copyDialectAttr<handshake::MemDependenceArrayAttr>(&op, storeHandshake);
@@ -762,6 +784,79 @@ static void bufferContinuingTokens(const DenseMap<unsigned, Value> &controls) {
   }
 }
 
+/// Converts each cf internal array op (alloca and get_global) to a RAM op
+static LogicalResult convertInternalArrays(func::FuncOp funcOp,
+                                           NameAnalysis &namer,
+                                           OpBuilder &builder) {
+  for (Block &block : funcOp.getBody()) {
+    // converting ops breaks a normal iterator
+    for (Operation &op : llvm::make_early_inc_range(block)) {
+      // only cf internal array ops get converted to RAM ops
+      if (!isa<memref::AllocaOp, memref::GetGlobalOp>(op)) {
+        continue;
+      }
+
+      // lambda for converting the cf internal array op to a RAM op
+      auto makeRamOp = [&]() -> FailureOr<handshake::RAMOp> {
+        if (auto allocaOp = dyn_cast<memref::AllocaOp>(op)) {
+          // local array
+
+          MemRefType type = allocaOp.getType();
+          // a local array starts as all zeros
+          auto zeros = DenseElementsAttr::get(
+              type, builder.getZeroAttr(type.getElementType()));
+          // make the RAM op holding all zeros
+          return handshake::RAMOp::create(builder, op.getLoc(), type, zeros);
+        } else if (auto getGlobalOp = dyn_cast<memref::GetGlobalOp>(op)) {
+          // read-only global array
+
+          // find the global the get_global op reads
+          auto global = SymbolTable::lookupNearestSymbolFrom<memref::GlobalOp>(
+              getGlobalOp, getGlobalOp.getNameAttr());
+          if (!global) {
+            return getGlobalOp->emitError() << "reference to unknown global";
+          }
+          // A const global array becomes an internal read-only memory unit.
+          // A non-const global array is rejected:
+          // it is not guaranteed to be reset to an initial value per
+          // invocation, which could imply state across invocations of the
+          // kernel, which we do not currently support
+          if (!global.getConstant()) {
+            return global->emitError()
+                   << "a global must be constant to become a RAM";
+          }
+          // a global array starts as its initial value
+          auto initialValue = dyn_cast_if_present<DenseElementsAttr>(
+              global.getInitialValueAttr());
+          if (!initialValue) {
+            return global->emitError()
+                   << "the initial value must be denoted in DenseElementsAttr";
+          }
+          // make the RAM op holding the global's initial value
+          return handshake::RAMOp::create(builder, op.getLoc(),
+                                          getGlobalOp.getType(), initialValue);
+        }
+        llvm_unreachable("op is not a cf internal array op");
+      };
+
+      // make the RAM op in place of the cf internal array op
+      builder.setInsertionPoint(&op);
+      FailureOr<handshake::RAMOp> ramOp = makeRamOp();
+      if (failed(ramOp)) {
+        return failure();
+      }
+
+      // name the RAM op
+      namer.setName(*ramOp);
+
+      // the loads and stores now access the RAM op
+      op.replaceAllUsesWith(*ramOp);
+      op.erase();
+    }
+  }
+  return success();
+}
+
 /// Lowers one function to handshake.
 static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
                                    OpBuilder &builder) {
@@ -778,7 +873,7 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // create the handshake function op
   // and get the struct containing the info on it
   HandshakeFunction handshakeFunctionInfo =
-      createHandshakeFunction(funcOp, builder);
+      createHandshakeFunction(funcOp, namer, builder);
 
   // pull the function op and body from the info
   handshake::FuncOp newFuncOp = handshakeFunctionInfo.funcOp;
@@ -797,7 +892,10 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   // because we find the loads and stores of each memory region
   // by walking the memref
   MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> memoryCfgs =
-      collectMemoryInterfaceCfgs(base, newFuncOp);
+      collectMemoryInterfaceCfgs(base, memStarts);
+
+  // map each basic block to its branch condition, for routing
+  BlockToCond blockToCond(body, builder);
 
   // convert constants
   if (failed(convertConstants(body, start, builder)))
@@ -854,7 +952,7 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
 
   // run the control-network routing algorithm once per cfg
   MapVector<MemrefValue, MemoryInterfaceInputs> memoryInputs =
-      routeCfgs(body, memStarts, useCfgs, memoryCfgs, builder);
+      routeCfgs(body, blockToCond, memStarts, useCfgs, memoryCfgs, builder);
 
   // label every op with the number of its basic block (its bb attribute).
   // the memory interface builder reads it off each memory access
@@ -953,6 +1051,10 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
   for (Block &block : body)
     block.getTerminator()->erase();
 
+  // erase the BlockToCond temporaries,
+  // now that the cf.cond_br ops are erased
+  blockToCond.eraseTemps();
+
   // flatten the handshake function into a single "basic block"
   // (the entry basic block)
   // because our elastic routing is incompatible with block arguments
@@ -973,7 +1075,7 @@ static LogicalResult lowerFunction(func::FuncOp funcOp, NameAnalysis &namer,
 
   // actually create the end op
   builder.setInsertionPointToEnd(&entry);
-  auto endOp = builder.create<handshake::EndOp>(loc, endOperands);
+  auto endOp = handshake::EndOp::create(builder, loc, endOperands);
   setBB(endOp, exitNumber);
 
   // delete the func.func op
@@ -1035,13 +1137,14 @@ struct OperandRouting2CfToHandshakePass
       return signalPassFailure();
     }
 
-    // constant internal arrays (memref globals) are not supported yet
-    for (auto getGlobalOp : funcOp.getBody().getOps<memref::GetGlobalOp>()) {
-      getGlobalOp.emitError() << "operand routing does not support constant "
-                                 "internal arrays (memref globals) yet";
+    // Convert all CF internal array ops to RAM ops as step 1.
+    // This is helpful for internal array processing,
+    // as it makes the memrefs easy to process
+    if (failed(convertInternalArrays(funcOp, namer, builder)))
       return signalPassFailure();
-    }
-    // so any global left is unused, e.g. one from the dropped testbench
+
+    // remove global ops
+    // (both internal arrays and external functions have been processed)
     for (auto globalOp :
          llvm::make_early_inc_range(modOp.getOps<memref::GlobalOp>()))
       globalOp.erase();

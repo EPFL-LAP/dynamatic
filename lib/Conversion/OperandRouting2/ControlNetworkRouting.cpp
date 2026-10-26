@@ -17,43 +17,6 @@ using namespace dynamatic;
 using namespace dynamatic::experimental::operand_routing2;
 
 namespace {
-/// Dictionary mapping from each basic block to its branch condition
-class BlockToCond {
-public:
-  /// Place the cond readers on each CondBranchOp in the IR
-  /// and store each under the basic block it comes from
-  BlockToCond(Region &body, OpBuilder &builder) {
-    // iterate over the cond br ops
-    for (auto condBrOp : body.getOps<cf::CondBranchOp>()) {
-      // add a cond reader and store it
-      // under the basic block
-      builder.setInsertionPoint(condBrOp);
-      blockToCondReader[condBrOp->getBlock()] =
-          TempCons(builder, condBrOp.getCondition());
-    }
-  }
-
-  // remove the cond readers from the IR once routing is done
-  ~BlockToCond() {
-    // iterate over the basic blocks
-    // and their cond readers
-    for (auto &[block, condReader] : blockToCondReader)
-      // and remove the cond reader from the IR
-      condReader.erase();
-  }
-
-  /// index by basic block to get branch condition
-  Value operator[](Block *block) const {
-    assert(blockToCondReader.contains(block) &&
-           "basic block has no branch condition");
-    return blockToCondReader.lookup(block).getValue();
-  }
-
-private:
-  // dense map internally
-  DenseMap<Block *, TempCons> blockToCondReader;
-};
-
 /// Whether two edges are the same edge of the function's CFG,
 /// even when they belong to different copies of it.
 static bool isSameEdge(const CfgEdge &first, const CfgEdge &second) {
@@ -251,7 +214,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
 
       // make the cmerge from the input list
       auto cmergeOp =
-          builder.create<handshake::ControlMergeOp>(loc, cmergeInputs);
+          handshake::ControlMergeOp::create(builder, loc, cmergeInputs);
 
       // record the select, and the edge each of its indices stands for,
       // for the basic block's multiplexers
@@ -271,7 +234,7 @@ static Selects buildControlNetwork(const Cfg &cfg,
     Value sdpOut = routedIn;
     // but in the entry block, it's an init op
     if (block == controlNetworkCfg.entry)
-      sdpOut = builder.create<handshake::InitOp>(loc, controlType, sdpOut)
+      sdpOut = handshake::InitOp::create(builder, loc, controlType, sdpOut)
                    .getResult();
 
     // in the control network, a basic block has either one or two live-outs
@@ -294,8 +257,8 @@ static Selects buildControlNetwork(const Cfg &cfg,
 
       // add the cond control branch to the IR, using blockToCond
       // to get the branch condition of this basic block
-      auto condBrOp = builder.create<handshake::ConditionalBranchOp>(
-          loc, TypeRange{controlType, controlType},
+      auto condBrOp = handshake::ConditionalBranchOp::create(
+          builder, loc, TypeRange{controlType, controlType},
           ValueRange{blockToCond[block], sdpOut});
 
       // then store the real value of the live-outs of this basic block
@@ -428,8 +391,8 @@ static void buildRouting(const Cfg &cfg, const BlockToCond &blockToCond,
         }
 
         // make the mux from the input list
-        auto muxOp = builder.create<handshake::MuxOp>(
-            loc, blockInput.getType(), select, muxInputs);
+        auto muxOp = handshake::MuxOp::create(
+            builder, loc, blockInput.getType(), select, muxInputs);
 
         // the value in the basic block comes from the mux output
         routedIns[blockInput] = muxOp.getResult();
@@ -497,8 +460,9 @@ static void buildRouting(const Cfg &cfg, const BlockToCond &blockToCond,
 
           // add the cond branch to the IR, using blockToCond
           // to get the branch condition of this basic block
-          auto condBrOp = builder.create<handshake::ConditionalBranchOp>(
-              loc, TypeRange{liveOutValue.getType(), liveOutValue.getType()},
+          auto condBrOp = handshake::ConditionalBranchOp::create(
+              builder, loc,
+              TypeRange{liveOutValue.getType(), liveOutValue.getType()},
               ValueRange{blockToCond[block], liveOutValue});
 
           // then store the real value of the live-out
@@ -630,7 +594,7 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
       // make the merge from the input list
       // and the value in the basic block comes from the merge output
       routedIn =
-          builder.create<handshake::MergeOp>(loc, controlType, mergeInputs)
+          handshake::MergeOp::create(builder, loc, controlType, mergeInputs)
               .getResult();
     } else {
       llvm_unreachable(
@@ -643,7 +607,7 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
     // in an interfacing basic block, the straight data path is a lazy fork:
     // one output to the interface, one passing the token on
     if (memoryCfg.interfacingBlocks.contains(block)) {
-      auto forkOp = builder.create<handshake::LazyForkOp>(loc, sdpOut, 2);
+      auto forkOp = handshake::LazyForkOp::create(builder, loc, sdpOut, 2);
       controls[getBlockNumber(block)] = forkOp->getResult(0);
       sdpOut = forkOp->getResult(1);
     }
@@ -670,8 +634,8 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
 
       // add the cond control branch to the IR, using blockToCond
       // to get the branch condition of this basic block
-      auto condBrOp = builder.create<handshake::ConditionalBranchOp>(
-          loc, TypeRange{controlType, controlType},
+      auto condBrOp = handshake::ConditionalBranchOp::create(
+          builder, loc, TypeRange{controlType, controlType},
           ValueRange{blockToCond[block], sdpOut});
 
       // then store the real value of the live-outs of this basic block
@@ -713,12 +677,11 @@ static void buildMemoryRouting(MemoryInterfaceCfg &memoryCfg, McOrLsq mcOrLsq,
 
 MapVector<MemrefValue, MemoryInterfaceInputs>
 dynamatic::experimental::operand_routing2::routeCfgs(
-    Region &body, const MapVector<MemrefValue, ControlValue> &memStarts,
+    Region &body, const BlockToCond &blockToCond,
+    const MapVector<MemrefValue, ControlValue> &memStarts,
     ArrayRef<Cfg> useCfgs,
     MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> &memoryCfgs,
     OpBuilder &builder) {
-  BlockToCond blockToCond(body, builder);
-
   for (const Cfg &cfg : useCfgs)
     route(cfg, blockToCond, builder);
 

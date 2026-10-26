@@ -36,8 +36,8 @@ public:
 
   /// Creates a temporary of the type, at the builder's position.
   TempProd(OpBuilder &builder, Type type) {
-    castOp = builder.create<UnrealizedConversionCastOp>(
-        builder.getUnknownLoc(), TypeRange{type}, ValueRange{});
+    castOp = UnrealizedConversionCastOp::create(
+        builder, builder.getUnknownLoc(), TypeRange{type}, ValueRange{});
   }
 
   Value getValue() const { return castOp->getResult(0); }
@@ -74,8 +74,8 @@ public:
 
   /// Creates a temporary consumer of the value, at the builder's position.
   TempCons(OpBuilder &builder, Value value) {
-    castOp = builder.create<UnrealizedConversionCastOp>(
-        builder.getUnknownLoc(), TypeRange{}, ValueRange{value});
+    castOp = UnrealizedConversionCastOp::create(
+        builder, builder.getUnknownLoc(), TypeRange{}, ValueRange{value});
   }
 
   Value getValue() const { return castOp->getOperand(0); }

@@ -44,13 +44,15 @@ dynamatic::experimental::operand_routing2::collectBlockUses(Region &body) {
         // operations means branch data operands
         // are not true uses belonging to this block
         // but the basic block forwarding the value
-        if (isa<cf::BranchOp>(op))
-          continue;
-        // the condition operand is a true use belonging to this block
-        // the data operands are not
-        cf::CondBranchOp condBrOp;
-        if ((condBrOp = dyn_cast<cf::CondBranchOp>(op)) &&
-            arg != condBrOp.getCondition())
+        //
+        // The construction of BlockToCond,
+        // which is how routing finds branch conditions,
+        // handles the weirdness of "block uses and cf cond brs",
+        // so we skip the cf cond brs here.
+        // Branch condition block uses are detected
+        // through the operands of the TempCons "condition readers"
+        // placed by BlockToCond
+        if (isa<cf::BranchOp, cf::CondBranchOp>(op))
           continue;
         // store block use in set
         uses.insert(arg);
@@ -232,7 +234,7 @@ static Cfg buildMemoryInterfaceCfg(const Cfg &base, ArrayRef<Block *> blocks) {
 
 MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg>
 dynamatic::experimental::operand_routing2::collectMemoryInterfaceCfgs(
-    const Cfg &base, handshake::FuncOp funcOp) {
+    const Cfg &base, const MapVector<MemrefValue, ControlValue> &memStarts) {
   // the memory's start produces the token in the entry block
   Block *entryBlock = base.entry;
 
@@ -241,11 +243,9 @@ dynamatic::experimental::operand_routing2::collectMemoryInterfaceCfgs(
 
   MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg> cfgs;
 
-  // each memory region is a memref argument of the function
-  for (BlockArgument arg : funcOp.getArguments()) {
-    auto memref = dyn_cast<MemrefValue>(arg);
-    if (!memref)
-      continue;
+  // each memory region is a memref with a memStart
+  // (a memref argument of the function or a RAM op)
+  for (auto [memref, memStart] : memStarts) {
 
     // collect the loads and stores to this region
     SmallVector<Operation *> accesses;

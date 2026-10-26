@@ -63,11 +63,12 @@ struct MemoryInterfaceCfg {
 
 /// Builds the CFGs for routing the control inputs
 /// of each memory interface of the function:
-/// per memory region,
+/// per memory region (each memref with a memStart),
 /// one for its memory controller if it has one,
 /// and one for its LSQ if it has one.
 MapVector<std::pair<MemrefValue, McOrLsq>, MemoryInterfaceCfg>
-collectMemoryInterfaceCfgs(const Cfg &base, handshake::FuncOp funcOp);
+collectMemoryInterfaceCfgs(
+    const Cfg &base, const MapVector<MemrefValue, ControlValue> &memStarts);
 
 /// Optimizes the CFG for routing:
 /// removes the control flow

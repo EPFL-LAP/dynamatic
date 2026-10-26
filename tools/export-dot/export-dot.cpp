@@ -102,6 +102,10 @@ static StringRef getArrowheadStyle(OpOperand &oprd) {
 /// operand of a memory interface. Returns an empty reference if the memref
 /// cannot be found in the arguments.
 static StringRef getMemName(Value memref) {
+  // a RAM op's memory is named after the RAM op
+  if (auto ramOp = memref.getDefiningOp<handshake::RAMOp>())
+    return getUniqueName(ramOp);
+
   Operation *parentOp = memref.getParentBlock()->getParentOp();
   handshake::FuncOp funcOp = dyn_cast<handshake::FuncOp>(parentOp);
   for (auto [name, funArg] :
@@ -710,8 +714,10 @@ static LogicalResult getDOTGraph(handshake::FuncOp funcOp, DOTGraph &graph) {
     // The end is drawn as the function's result nodes. A source only
     // triggers a constant; it is not drawn and neither is its edge, so the
     // constant appears with no input. A memory controller is drawn as its
-    // abstraction nodes, added above.
-    if (isa<handshake::EndOp, handshake::SourceOp>(op))
+    // abstraction nodes, added above. A RAM op, like a memref argument, is
+    // represented by its memory interfaces, which are labelled with its name,
+    // so it is not drawn and neither is its edge.
+    if (isa<handshake::EndOp, handshake::SourceOp, handshake::RAMOp>(op))
       continue;
     bool isController = isa<handshake::MemoryControllerOp>(op);
 
