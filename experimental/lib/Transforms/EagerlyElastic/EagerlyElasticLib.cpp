@@ -325,10 +325,27 @@ void applyRewriteD(handshake::MuxOp dataMux,
   // connect the repeatingInit to the loop init
   initOp.getOperandMutable().assign(specOutput);
 
+  // Save the previous stage's suppressor condition in case branchOp stays
+  // behind to guard other users (like outer loop exits).
+  Value oldSuppressorCond = branchOp.getConditionOperand();
+  bool sharedBranch = !branchOp.getFalseResult().hasOneUse();
+
   // update the suppressor's condition - must be inverted relative to the init
   auto notOp = dyn_cast_or_null<handshake::NotIOp>(
       branchOp.getConditionOperand().getDefiningOp());
-  if (notOp && notOp.getResult().hasOneUse())
+
+  // only reuse notOp in-place if branchOp is not shared with other users
+  if (!sharedBranch && notOp && notOp.getResult().hasOneUse()) {
+    notOp.getOperandMutable().assign(specOutput);
+  } else { // create a new isolated NotIOp for the new speculation stage
+    builder.setInsertionPoint(notOp ? notOp : branchOp);
+    auto newNotOp =
+        builder.create<handshake::NotIOp>(branchOp.getLoc(), specOutput);
+    setHandshakeAttrs(bbAttr, namer, {newNotOp});
+    newNotOp->setAttr("is_suppressor_not", builder.getUnitAttr());
+    branchOp.getConditionOperandMutable().assign(newNotOp.getResult());
+  }
+  /* if (notOp && notOp.getResult().hasOneUse())
     notOp.getOperandMutable().assign(specOutput);
   else { // create a new isolated NotIOp
     builder.setInsertionPoint(notOp ? notOp : branchOp);
@@ -337,10 +354,16 @@ void applyRewriteD(handshake::MuxOp dataMux,
     setHandshakeAttrs(bbAttr, namer, {newNotOp});
     newNotOp->setAttr("is_suppressor_not", builder.getUnitAttr());
     branchOp.getConditionOperandMutable().assign(newNotOp.getResult());
-  }
+  } */
 
   // move suppressor past the mux
   moveSuppressorPastOp(branchOp, dataMux, frontier, namer, 1);
+
+  // If branchOp stayed alive because it still feeds other users, restore its
+  // Stage 1 condition
+  if (sharedBranch && branchOp && !branchOp.getFalseResult().use_empty()) {
+    branchOp.getConditionOperandMutable().assign(oldSuppressorCond);
+  }
 }
 
 void applyRewriteE(handshake::MuxOp dataMux,

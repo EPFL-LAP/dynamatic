@@ -153,6 +153,14 @@ void EagerlyElasticAllPass::applyRewriteXAsOftenAsPossible(
             if (regionBased || !isa<handshake::RegionInputOp>(user))
               continue;
           }
+
+          /* StringRef opName;
+          if (auto attr = user->getAttrOfType<StringAttr>(HANDSHAKENAME))
+            opName = attr.getValue();
+
+          if (!opName.contains("dup"))
+            continue; */
+
           frontierUpdated = true;
           moveSuppressorPastOp(branchOp, user, frontier, namer);
           break;
@@ -637,9 +645,12 @@ EagerlyElasticAllPass::rewireControlNetwork(handshake::FuncOp funcOp,
     // Check if this BlockControlOp feeds the final exit ConditionalBranchOp
     for (Operation *user : ctrlOp.getResult().getUsers()) {
       if (auto condBr = dyn_cast<handshake::ConditionalBranchOp>(user)) {
-        if (condBr.getDataOperand() == ctrlOp.getResult() &&
-            condBr.getFalseResult().use_empty()) {
-          finalExitToken = condBr.getFalseResult();
+        if (condBr.getDataOperand() == ctrlOp.getResult()) {
+          if (condBr.getFalseResult().use_empty()) {
+            finalExitToken = condBr.getFalseResult();
+          } else if (condBr.getTrueResult().use_empty()) {
+            finalExitToken = condBr.getTrueResult();
+          }
         }
       }
     }
@@ -721,10 +732,11 @@ void EagerlyElasticAllPass::runOnOperation() {
   auto frontier = prepareSuppressors(funcOp, namer);
 
   applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
-  // applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
+  // applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteB);
 
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 2; i++) {
     applyRewritesForRegion(frontier, namer, 2);
+    // applyRewriteXOnce(frontier, namer, RewriteStrategy::RewriteD);
     applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
   }
 
@@ -734,7 +746,7 @@ void EagerlyElasticAllPass::runOnOperation() {
   } else {
     llvm::errs() << "no region based\n";
   }
-  applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
+  // applyRewriteXAsOftenAsPossible(frontier, namer, RewriteStrategy::RewriteA);
 
   // Erase all handshake::RegionInputOp markers and bypass them directly
   for (auto markerOp :

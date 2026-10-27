@@ -103,6 +103,7 @@ void LoopPredictionPass::runOnOperation() {
   Block *latchBlock = latchBr->getBlock();
   Block *innerHeader = latchBr.getTrueDest();
   Block *exitBlock = latchBr.getFalseDest();
+  llvm::errs() << "Applying loop prediction.\n";
 
   // Ensure the loop header has the 2 arguments: (%i : i32, %sum : f32)
   // Index 1 is our target block argument (`sum`).
