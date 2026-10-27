@@ -62,9 +62,7 @@ func.func @multipleReturns(%arg0 : i1) -> i32 {
 // CHECK:           %[[VAL_19:.*]] = merge %[[VAL_13]] {handshake.bb = 2 : ui32} : <i32>
 // CHECK:           %[[VAL_18]], %[[VAL_20:.*]] = control_merge [%[[VAL_11]]]  {handshake.bb = 2 : ui32} : [<>] to <>, <i1>
 // CHECK:           %[[VAL_21:.*]] = merge %[[VAL_14]], %[[VAL_19]] {handshake.bb = 3 : ui32} : <i32>
-// CHECK:           %[[VAL_22:.*]] = source {handshake.bb = 3 : ui32}
-// CHECK:           %[[VAL_23:.*]] = source {handshake.bb = 3 : ui32}
-// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_21]], %[[VAL_22]], %[[VAL_23]], %[[VAL_5]] : <i32>, <>, <>, <>
+// CHECK:           end {handshake.bb = 3 : ui32} %[[VAL_21]], %[[VAL_3]], %[[VAL_4]], %[[VAL_5]] : <i32>, <>, <>, <>
 // CHECK:         }
 func.func @memoryConnect(%arg0: i1, %arg1: memref<4xi32>, %arg2: memref<4xi32>) -> i32 {
   %c0 = arith.constant 0 : i32

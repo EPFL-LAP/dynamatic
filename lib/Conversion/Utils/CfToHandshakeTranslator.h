@@ -124,6 +124,8 @@ protected:
   DenseMap<CFGEdge, SmallVector<Value>> edgeValues;
   /// Maps func-level memory regions to their memory accesses.
   llvm::MapVector<Value, MemAccesses> memInfo;
+  /// Maps internal array memrefs to a unique number
+  llvm::MapVector<Value, unsigned> memrefToInternalArrayID;
   /// Memory ports with the func-level memory operations they replace and the
   /// memory regions they reference, in translation order.
   SmallVector<MemPort> memPorts;
@@ -147,7 +149,6 @@ protected:
   /// Translates the func-level function's body into the Handshake function's
   /// body.
   LogicalResult translateBody();
-  LogicalResult initMemories();
   void computePredecessors();
   LogicalResult translateBlock(Block *block);
   LogicalResult translateOp(Operation *op);
