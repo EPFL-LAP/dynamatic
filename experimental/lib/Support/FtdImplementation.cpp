@@ -634,6 +634,18 @@ void ftd::addSuppOperandConsumer(mlir::OpBuilder &builder,
     return;
   }
 
+  // Allocation enables originate at the function start. In particular, the
+  // initial token of a regeneration mux must not enter a loop that is skipped.
+  // Function arguments have no defining operation, so the normal producer
+  // dispatch below cannot handle these control edges.
+  if (!operand.getDefiningOp()) {
+    if (isa<handshake::ControlType>(operand.getType()) &&
+        (isa<handshake::LazyForkOp>(consumerOp) ||
+         consumerOp->hasAttr(FTD_REGEN)))
+      insertDirectSuppression(builder, funcOp, consumerOp, operand, shadow);
+    return;
+  }
+
   if (Operation *producerOp = operand.getDefiningOp(); producerOp) {
 
     // A conditional branch already performs suppression on the value.
