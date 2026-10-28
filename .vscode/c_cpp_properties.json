@@ -6,8 +6,6 @@
         "${workspaceFolder}/include/",
         "${workspaceFolder}/build/",
         "${workspaceFolder}/build/include/",
-        "${workspaceFolder}/experimental/include/",
-        "${workspaceFolder}/build/experimental/include/",
         "${workspaceFolder}/tutorials/CreatingPasses/include/",
         "${workspaceFolder}/build/tutorials/CreatingPasses/include/",
         "${workspaceFolder}/polygeist/llvm-project/clang/include/",

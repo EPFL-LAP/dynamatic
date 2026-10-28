@@ -1073,7 +1073,7 @@ void BufferPlacementMILP::addBlackboxConstraints(
 }
 
 void BufferPlacementMILP::addCutSelectionConstraints(
-    std::vector<experimental::Cut> &cutVector) {
+    std::vector<Cut> &cutVector) {
   LinExpr cutSelectionSum = 0;
   for (size_t i = 0; i < cutVector.size(); ++i) {
     // Loop over cuts of the node
@@ -1091,10 +1091,10 @@ void BufferPlacementMILP::addCutSelectionConstraints(
   model->addConstr(cutSelectionSum == 1, "cut_selection_constraint");
 }
 
-void BufferPlacementMILP::addCutSelectionConflicts(
-    experimental::Node *root, experimental::Node *leaf, CPVar &cutSelectionVar,
-    experimental::LogicNetwork *blifData,
-    std::vector<experimental::Node *> &path) {
+void BufferPlacementMILP::addCutSelectionConflicts(Node *root, Node *leaf,
+                                                   CPVar &cutSelectionVar,
+                                                   LogicNetwork *blifData,
+                                                   std::vector<Node *> &path) {
   // Loop over edges in the path from the leaf to the root.
   for (auto &nodePath : path) {
     if (nodePath->nodeMLIRValue) {
@@ -1109,7 +1109,7 @@ void BufferPlacementMILP::addCutSelectionConflicts(
   }
 }
 
-void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
+void BufferPlacementMILP::addNodeVars(LogicNetwork *blifData) {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
     // CPVar variables of the node
     CPVar &nodeVarIn = node->subjectGraphVars->tIn;
@@ -1143,7 +1143,7 @@ void BufferPlacementMILP::addNodeVars(experimental::LogicNetwork *blifData) {
 }
 
 void BufferPlacementMILP::addClockPeriodConstraintsNodes(
-    experimental::LogicNetwork *blifData) {
+    LogicNetwork *blifData) {
   for (auto *node : blifData->getNodesInTopologicalOrder()) {
     // CPVar variables of the node
     CPVar &nodeVarIn = node->subjectGraphVars->tIn;
@@ -1169,12 +1169,12 @@ void BufferPlacementMILP::addClockPeriodConstraintsNodes(
 }
 
 void BufferPlacementMILP::addDelayAndCutConflictConstraints(
-    experimental::Node *root, std::vector<experimental::Cut> &cutVector,
-    experimental::LogicNetwork *blifData, double lutDelay) {
+    Node *root, std::vector<Cut> &cutVector, LogicNetwork *blifData,
+    double lutDelay) {
   // Using cuts map to loop over subject graph edges, and adds delay
   // propagation constraints to the nodes that have cuts
   CPVar &nodeVar = root->subjectGraphVars->tIn;
-  std::set<experimental::Node *> fanIns = root->fanins;
+  std::set<Node *> fanIns = root->fanins;
 
   if (fanIns.size() == 1) {
     // If a node has single fanin, then it is not mapped to LUT. The
@@ -1187,8 +1187,7 @@ void BufferPlacementMILP::addDelayAndCutConflictConstraints(
   for (auto &cut : cutVector) {
     // Loop over the cuts of the subject graph edge
     CPVar &cutSelectionVar = cut.getCutSelectionVariable();
-    auto addDelayPropagationConstraint = [&](experimental::Node *leaf,
-                                             const char *name) {
+    auto addDelayPropagationConstraint = [&](Node *leaf, const char *name) {
       CPVar &leafVar = leaf->subjectGraphVars->tOut;
       // Add delay propagation constraint
       model->addConstr(
@@ -1322,8 +1321,8 @@ void BufferPlacementMILP::cutGraphEdges(Value channel) {
       vars.channelVars[channel].signalVars[SignalType::DATA].bufPresent;
   model->addConstr(bufVarData == 1, "backedge_data");
   // Insert buffers in the Subject Graph
-  experimental::BufferSubjectGraph::createAndInsertNewBuffer(
-      producer, consumer, "one_slot_break_dvr");
+  BufferSubjectGraph::createAndInsertNewBuffer(producer, consumer,
+                                               "one_slot_break_dvr");
 }
 
 unsigned BufferPlacementMILP::getChannelNumExecs(Value channel) {

@@ -44,7 +44,7 @@
 using namespace llvm;
 using namespace mlir;
 using namespace dynamatic;
-using namespace dynamatic::experimental;
+using namespace dynamatic;
 using namespace dynamatic::buffer;
 
 // [START Boilerplate code for the MLIR pass]

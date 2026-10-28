@@ -743,7 +743,7 @@ void SynchronizingCyclesFinderGraph::computeSccsAndBuildNonCyclicSubgraph() {
 
   /// Kosaraju's algorithm for SCCs
   /// NOTE: Similar SCC code exists in
-  /// experimental/Transforms/ResourceSharing/SharingSupport.cpp
+  /// lib/Transforms/ResourceSharing/SharingSupport.cpp
   ///  Kept separate because we need the non-cyclic adjacency list.
 
   // DFS to compute finishing order

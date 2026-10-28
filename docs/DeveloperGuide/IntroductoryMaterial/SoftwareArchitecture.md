@@ -13,7 +13,6 @@ This section is intended to give an overview of the project's directory structur
 │       └── include
 │           └── dynamatic # Compiled TableGen headers (*.h.inc)
 ├── docs # Documentation and tutorials, where this file lies
-├── experimental # Experimental passes and tools
 ├── include
 │   ├── dynamatic # All header files (*.h)
 ├── integration-test # Integration tests
@@ -27,6 +26,7 @@ This section is intended to give an overview of the project's directory structur
 │   └── dynamatic-opt # Dynamatic optimizer
 ├── tutorials # Dynamatic tutorials
 ├── visual-dataflow # Interactive dataflow visualizer (depends on Godot)
+├── xls-interop # Integration with the XLS HLS tool (optional)
 ├── build.sh # Build script to build the entire project
 └── CMakeLists.txt # Top level CMake file for building the superproject
 ```

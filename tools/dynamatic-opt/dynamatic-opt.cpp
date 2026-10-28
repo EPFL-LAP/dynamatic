@@ -15,7 +15,6 @@
 
 #include "dynamatic/InitAllDialects.h"
 #include "dynamatic/InitAllPasses.h"
-#include "experimental/InitAllPasses.h"
 #include "mlir/Dialect/Affine/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -26,29 +25,21 @@
 #include "tutorials/InitAllPasses.h"
 
 #ifdef DYNAMATIC_ENABLE_XLS
-#include "experimental/xls/InitAllDialects.h"
-#include "experimental/xls/InitAllPasses.h"
+#include "xls-interop/InitAllDialects.h"
+#include "xls-interop/InitAllPasses.h"
 #endif // DYNAMATIC_ENABLE_XLS
 
 // Test passes, no public header.
 namespace dynamatic {
 namespace test {
 void registerTestRTLSuppport();
-} // namespace test
-} // namespace dynamatic
-
-// Experimental test passes, no public header.
-namespace dynamatic {
-namespace experimental {
-namespace test {
 void registerTestHandshakeSimulator();
 } // namespace test
-} // namespace experimental
 } // namespace dynamatic
 
 void registerTestPasses() {
   dynamatic::test::registerTestRTLSuppport();
-  dynamatic::experimental::test::registerTestHandshakeSimulator();
+  dynamatic::test::registerTestHandshakeSimulator();
 }
 
 int main(int argc, char **argv) {
@@ -66,13 +57,12 @@ int main(int argc, char **argv) {
   dynamatic::registerAllDialects(registry);
   dynamatic::registerAllPasses();
   dynamatic::tutorials::registerAllPasses();
-  dynamatic::experimental::registerAllPasses();
   registerTestPasses();
 
   // If XLS integration is enabled, register the XLS dialect and passes
 #ifdef DYNAMATIC_ENABLE_XLS
-  dynamatic::experimental::xls::registerAllDialects(registry);
-  dynamatic::experimental::xls::registerAllPasses();
+  dynamatic::xls::registerAllDialects(registry);
+  dynamatic::xls::registerAllPasses();
 #endif // DYNAMATIC_ENABLE_XLS
 
   // Register the standard passes we want

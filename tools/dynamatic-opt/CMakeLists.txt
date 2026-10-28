@@ -31,10 +31,6 @@ target_link_libraries(dynamatic-opt
   DynamaticTestTransforms
   DynamaticTransforms
   DynamaticTutorialsCreatingPasses
-  DynamaticExperimentalTestTransforms
-  DynamaticExperimentalSupport
-  DynamaticExperimentalTransforms
-  DynamaticExperimentalAnalysis
   DynamaticDuplication
 
   MLIRIR

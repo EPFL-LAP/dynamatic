@@ -741,7 +741,7 @@ CommandResult VerifyInvariants::execute(CommandArguments &args) {
     return CommandResult::FAIL;
 
   std::string script = state.dynamaticPath + getSeparator() +
-                       "experimental/tools/rigidification/rigidification.sh";
+                       "dynamatic/tools/rigidification/rigidification.sh";
 
   std::string handshakeExport = state.getOutputDir() + getSeparator() + "comp" +
                                 getSeparator() + "handshake_export.mlir";

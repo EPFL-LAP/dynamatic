@@ -177,15 +177,15 @@ You'll need to update the appropriate JSON file to enable RTL matching for your 
 
 To complete support for your op, you need to provide an RTL implementation for the relevant backend.
 
-- For the **beta backend**, add a **VHDL module generator written in Python** under `experimental/tools/unit-generators/vhdl/generators/handshake/`. To implement your generator, please refer to the existing implementations in this directory for guidance.
+- For the **beta backend**, add a **VHDL module generator written in Python** under `tools/unit-generators/vhdl/generators/handshake/`. To implement your generator, please refer to the existing implementations in this directory for guidance.
 
   Your generator should define a function named `generate_<unit_name>(name, params)`, as shown in this example:
 
-  https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/experimental/tools/unit-generators/vhdl/generators/handshake/addi.py#L5-L12
+  https://github.com/EPFL-LAP/dynamatic/blob/c618f58e7909a4cc9cf53e432e49f451210a8c76/tools/unit-generators/vhdl/generators/handshake/addi.py#L5-L12
 
-  After that, register your generator in `experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py`:
+  After that, register your generator in `tools/unit-generators/vhdl/vhdl-unit-generator.py`:
 
-  https://github.com/EPFL-LAP/dynamatic/blob/2e7db304ae26a122b65512811e53d222537372ac/experimental/tools/unit-generators/vhdl/vhdl-unit-generator.py#L74-L78
+  https://github.com/EPFL-LAP/dynamatic/blob/2e7db304ae26a122b65512811e53d222537372ac/tools/unit-generators/vhdl/vhdl-unit-generator.py#L74-L78
 
 - You may also need to implement RTL for other backends, such as Verilog and SMV. Additionally, to support XLS generation, you'll need to update the `HandshakeToXls` pass accordingly.
 

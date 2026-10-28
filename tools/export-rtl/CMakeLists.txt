@@ -12,5 +12,5 @@ target_link_libraries(export-rtl PRIVATE
   DynamaticSupportRTL
   DynamaticHandshake
   DynamaticHW
-  DynamaticExperimentalSupport
+  DynamaticFormalVerification
 )

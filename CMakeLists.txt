@@ -156,7 +156,6 @@ set(DYNAMATIC_SOURCE_DIR ${CMAKE_SOURCE_DIR})
 set(DYNAMATIC_INCLUDE_DIR ${DYNAMATIC_SOURCE_DIR}/include)
 set(DYNAMATIC_BINARY_DIR ${CMAKE_BINARY_DIR})
 set(DYNAMATIC_TOOLS_DIR ${DYNAMATIC_BINARY_DIR}/bin)
-set(DYNAMATIC_EXPERIMENTAL_DIR ${DYNAMATIC_SOURCE_DIR}/experimental)
 set(DYNAMATIC_BIN_INCLUDE_DIR ${DYNAMATIC_BINARY_DIR}/include)
 
 # Add our own directory to the list of search paths for CMake modules 
@@ -166,8 +165,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 include_directories(${DYNAMATIC_INCLUDE_DIR})
 include_directories(DYNAMATIC_BINARY_DIR ${CMAKE_BINARY_DIR})
 include_directories(${DYNAMATIC_BIN_INCLUDE_DIR})
-include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/include)
-include_directories(${DYNAMATIC_BINARY_DIR}/experimental/include)
 
 add_custom_target(dynamatic-headers)
 set_target_properties(dynamatic-headers PROPERTIES FOLDER "Misc")
@@ -299,8 +296,8 @@ if(DYNAMATIC_ENABLE_XLS)
   add_compile_definitions(DYNAMATIC_ENABLE_XLS)
   set(LLVM_TABLEGEN_FLAGS ${LLVM_TABLEGEN_FLAGS} -DDYNAMATIC_ENABLE_XLS)
 
-  include_directories(${DYNAMATIC_EXPERIMENTAL_DIR}/xls/include)
-  include_directories(${DYNAMATIC_BINARY_DIR}/experimental/xls/include)
+  include_directories(${DYNAMATIC_SOURCE_DIR}/xls-interop/include)
+  include_directories(${DYNAMATIC_BINARY_DIR}/xls-interop/include)
   include_directories(${DYNAMATIC_XLS_DIR})
 endif()
 
@@ -375,8 +372,12 @@ macro(add_to_unit_testing target)
   add_dependencies(check-dynamatic ${target})
 endmacro()
 
-add_subdirectory(${DYNAMATIC_SOURCE_DIR}/experimental)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/lib)
+# Before the tools, since the XLS dialect library registers itself as a dialect
+# library that dynamatic-opt links
+if(DYNAMATIC_ENABLE_XLS)
+  add_subdirectory(${DYNAMATIC_SOURCE_DIR}/xls-interop)
+endif()
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tools)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/tutorials)
 add_subdirectory(${DYNAMATIC_SOURCE_DIR}/unittests)

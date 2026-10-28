@@ -18,17 +18,17 @@
 #define DYNAMATIC_TRANSFORMS_BUFFERPLACEMENT_BUFFERPLACEMENTMILP_H
 
 #include "dynamatic/Analysis/NameAnalysis.h"
+#include "dynamatic/Support/BlifReader.h"
 #include "dynamatic/Support/ConstraintProgramming/ConstraintProgramming.h"
+#include "dynamatic/Support/CutlessMapping.h"
 #include "dynamatic/Support/LLVM.h"
 #include "dynamatic/Support/MILP.h"
+#include "dynamatic/Support/SubjectGraph.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Support/Utils/Utils.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/UnitMILPVars.h"
-#include "experimental/Support/BlifReader.h"
-#include "experimental/Support/CutlessMapping.h"
-#include "experimental/Support/SubjectGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
@@ -353,31 +353,30 @@ protected:
 
   // Adds Cut Selection Constraints, ensuring that only 1 cut is selected per
   // node.
-  void addCutSelectionConstraints(std::vector<experimental::Cut> &cutVector);
+  void addCutSelectionConstraints(std::vector<Cut> &cutVector);
 
   // Adds Cut Selection Conflict Constraints. These constraints ensure that
   // either a buffer is placed on a DFG edge or the cut that containts that edge
   // is selected.
-  void addCutSelectionConflicts(experimental::Node *root,
-                                experimental::Node *leaf,
-                                CPVar &cutSelectionVar,
-                                experimental::LogicNetwork *blifData,
-                                std::vector<experimental::Node *> &path);
+  void addCutSelectionConflicts(Node *root, Node *leaf, CPVar &cutSelectionVar,
+                                LogicNetwork *blifData,
+                                std::vector<Node *> &path);
 
   // Add clock period constraints for subject graph edges. For subject graph
   // edges, only a single timing variable is required, as opposed to data flow
   // graph edges where two timing variables are required. Also adds constraints
   // for primary inputs and constants.
-  void addClockPeriodConstraintsNodes(experimental::LogicNetwork *blifData);
+  void addClockPeriodConstraintsNodes(LogicNetwork *blifData);
 
   // Adds Delay Propagation Constraints for all the cuts by looping over cuts
   // map. If a node has only one fanin, delay is propagated from the fanin.
   // Otherwise, delay is propagated from the leaves of the cut. Loops over the
   // leaves of the cut and adds delay propagation constraints for each leaf.
   // Also adds cut selection conflict constraints.
-  void addDelayAndCutConflictConstraints(
-      experimental::Node *root, std::vector<experimental::Cut> &cutVector,
-      experimental::LogicNetwork *blifData, double lutDelay);
+  void addDelayAndCutConflictConstraints(Node *root,
+                                         std::vector<Cut> &cutVector,
+                                         LogicNetwork *blifData,
+                                         double lutDelay);
 
   // This is an alternative method to cutting loopbacks to create
   // an acyclic graph. This function converts the cyclic dataflow graph into an
@@ -398,7 +397,7 @@ protected:
   /// Adds Gurobi variables to the MILP model for the provided Node.
   /// For Nodes corresponding to Channels, sets their Gurobi variables to
   /// Channel Variables. For other Nodes, creates new Gurobi Variables.
-  void addNodeVars(experimental::LogicNetwork *blifData);
+  void addNodeVars(LogicNetwork *blifData);
 
   /// Returns an estimation of the number of times a token will be transfered on
   /// the input channel. The estimation is based on the Handshake function's

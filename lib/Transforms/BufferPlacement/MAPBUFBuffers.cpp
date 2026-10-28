@@ -16,14 +16,14 @@
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
 #include "dynamatic/Support/Attribute.h"
+#include "dynamatic/Support/BlifReader.h"
 #include "dynamatic/Support/CFG.h"
+#include "dynamatic/Support/CutlessMapping.h"
+#include "dynamatic/Support/SubjectGraph.h"
 #include "dynamatic/Support/TimingModels.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferPlacementMILP.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/BufferingSupport.h"
 #include "dynamatic/Transforms/BufferPlacement/Utils/CFDFC.h"
-#include "experimental/Support/BlifReader.h"
-#include "experimental/Support/CutlessMapping.h"
-#include "experimental/Support/SubjectGraph.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Value.h"
 #include <string>
@@ -123,9 +123,8 @@ void MAPBUFBuffers::extractResult(BufferPlacement &placement) {
 
 // Check if the path from leaf to root has already been computed, if so then
 // return it. If not, return the shortest path by running BFS.
-static std::vector<experimental::Node *>
-getPath(experimental::Node *key, experimental::Node *leaf,
-        pathMap &leafToRootPaths, experimental::LogicNetwork *blif) {
+static std::vector<Node *>
+getPath(Node *key, Node *leaf, pathMap &leafToRootPaths, LogicNetwork *blif) {
   // Check if this leaf/key pair is already computed
   auto leafKeyPair = std::make_pair(leaf, key);
   if (leafToRootPaths.find(leafKeyPair) != leafToRootPaths.end()) {
@@ -256,7 +255,7 @@ void MAPBUFBuffers::setup() {
   }
 
   // Generate Subject Graphs
-  experimental::subjectGraphGenerator(funcInfo.funcOp, blifFiles);
+  subjectGraphGenerator(funcInfo.funcOp, blifFiles);
 
   std::vector<Value> channelsToBuffer;
   if (!acyclicType) {
@@ -270,10 +269,10 @@ void MAPBUFBuffers::setup() {
   }
 
   // Connect input/output nodes of Subject Graphs
-  blifData = experimental::connectSubjectGraphs();
+  blifData = connectSubjectGraphs();
 
   // Generate cuts of the circuit.
-  auto cuts = experimental::generateCuts(blifData, lutSize);
+  auto cuts = generateCuts(blifData, lutSize);
 
   addNodeVars(blifData);
   addClockPeriodConstraintsNodes(blifData);
@@ -289,7 +288,7 @@ void MAPBUFBuffers::setup() {
           continue;
         }
         // Get the path from the leaf to the root
-        std::vector<experimental::Node *> path;
+        std::vector<Node *> path;
         path = getPath(rootNode, leaf, leafToRootPaths, blifData);
         // Add cut selection conflict constraints for the root
         addCutSelectionConflicts(rootNode, leaf, cutSelectionVar, blifData,
