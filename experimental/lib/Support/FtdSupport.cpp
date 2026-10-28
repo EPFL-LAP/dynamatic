@@ -15,6 +15,9 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <algorithm>
+#include <cassert>
+#include <iterator>
 #include <unordered_set>
 
 using namespace mlir;
@@ -374,4 +377,30 @@ Value ftd::getOrCreateCondPlaceholder(Block *condBlock, OpBuilder &builder) {
   setBBAttr(constOp, condBlock, builder);
 
   return constOp.getResult();
+}
+
+boolean::BDD *ftd::buildRoutingBDD(boolean::BoolExpression *expression,
+                                   std::vector<std::string> variables) {
+  using namespace boolean;
+  if (expression->type == ExpressionType::Variable ||
+      expression->type == ExpressionType::Zero ||
+      expression->type == ExpressionType::One)
+    return new BDD(expression);
+
+  auto next = std::find_if(variables.begin(), variables.end(),
+                           [&](const std::string &variable) {
+                             return expression->containsMintern(variable);
+                           });
+  assert(next != variables.end() && "missing routing BDD cofactor");
+  auto *negative = expression->deepCopy();
+  boolean::restrict(negative, *next, false);
+  negative = negative->boolMinimize();
+  auto *positive = expression->deepCopy();
+  boolean::restrict(positive, *next, true);
+  positive = positive->boolMinimize();
+  std::vector<std::string> remaining(std::next(next), variables.end());
+  auto *negativeBDD = buildRoutingBDD(negative, remaining);
+  auto *positiveBDD = buildRoutingBDD(positive, remaining);
+  return new BDD(negativeBDD, positiveBDD,
+                 new SingleCond(ExpressionType::Variable, *next));
 }

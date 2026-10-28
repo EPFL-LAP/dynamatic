@@ -848,7 +848,7 @@ LogicalResult experimental::ftd::addGsaGates(
         if (size(gate->cofactorList) > 1) {
           // Apply a BDD expansion to the loop exit expression and the list of
           // cofactors
-          BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
+          BDD *bdd = ftd::buildRoutingBDD(gate->condition, gate->cofactorList);
           // Convert the boolean expression obtained through BDD to a circuit
           // We pass an empty registry, since this is not an expression for
           // suppression and does not require distribution.

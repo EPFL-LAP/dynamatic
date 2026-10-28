@@ -147,7 +147,7 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
       } else if (size(gate->cofactorList) > 1) {
         // Convert the BDD expansion of the gate's condition to a circuit. The
         // registry is empty since the condition does not require distribution
-        BDD *bdd = buildBDD(gate->condition, gate->cofactorList);
+        BDD *bdd = ftd::buildRoutingBDD(gate->condition, gate->cofactorList);
         ftd::SignalRegistry emptyRegistry;
         conditionValue =
             ftd::bddToCircuit(builder, bdd, stagingBlock[gate->getBlock()],

@@ -17,6 +17,7 @@
 #define DYNAMATIC_HANDSHAKE_EXPERIMENTAL_SUPPORT_FTDSUPPORT_H
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
+#include "experimental/Support/BooleanLogic/BDD.h"
 #include "experimental/Support/BooleanLogic/BoolExpression.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -176,6 +177,12 @@ getPathExpression(ArrayRef<Block *> path, DenseSet<unsigned> &blockIndexSet,
 
 /// A lightweight DFS to check if 'end' is reachable from 'start'.
 bool isReachable(Block *start, Block *end);
+
+/// Build a decision tree for token routing. Unlike a Boolean-only BDD, its
+/// path must omit cofactors absent from the restricted expression: those
+/// conditions may not execute on the selected control-flow path.
+boolean::BDD *buildRoutingBDD(boolean::BoolExpression *expression,
+                              std::vector<std::string> variables);
 
 // ===--------------------------------------------------------------------=== //
 // Type Utilities
