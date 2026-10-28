@@ -308,8 +308,8 @@ fi
 #### XLS ####
 
 XLS_DIR="$SCRIPT_CWD/xls"
-XLS_UPSTREAM="https://github.com/ETHZ-DYNAMO/xls.git"
-XLS_COMMIT="939eb43c307005caf4af75ed9b8a0dbc6c905386"
+XLS_UPSTREAM="https://github.com/google/xls.git"
+XLS_COMMIT="25714cebaf6150c30a53914e34fb94306cab373b"
 
 if [[ ENABLE_XLS_INTEGRATION -eq 1 || -d "$XLS_DIR" ]]; then
     echo_section "Preparing XLS"
