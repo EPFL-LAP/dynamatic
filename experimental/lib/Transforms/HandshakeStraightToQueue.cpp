@@ -14,6 +14,7 @@
 
 #include "dynamatic/Dialect/Handshake/HandshakeOps.h"
 #include "dynamatic/Dialect/Handshake/HandshakeTypes.h"
+#include "dynamatic/Support/CFG.h"
 #include "dynamatic/Support/DynamaticPass.h"
 #include "experimental/Support/CFGAnnotation.h"
 #include "experimental/Support/FtdImplementation.h"
@@ -24,6 +25,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
+#include <map>
 #include <stack>
 
 using namespace mlir;
@@ -335,7 +338,7 @@ ensureLazyForkOutputCount(Block *bb, Value input, unsigned numResults,
   return newFork;
 }
 
-static void
+static LogicalResult
 connectLSQToForkGraph(handshake::FuncOp &funcOp,
                       DenseSet<MemoryGroup *> &groups, handshake::LSQOp lsqOp,
                       DenseMap<Block *, handshake::LazyForkOp> &sharedForks,
@@ -366,20 +369,19 @@ connectLSQToForkGraph(handshake::FuncOp &funcOp,
   // that it can activate the allocation for the operations of the corresponding
   // basic block.
   //
-  // For each input of the LSQ
-  for (auto [opIdx, op] : llvm::enumerate(lsqOp.getOperands())) {
-    // If it is not a cmerge, then continue
-    if (!llvm::isa_and_nonnull<handshake::ControlMergeOp>(op.getDefiningOp()))
-      continue;
-
-    // Replace the input if it comes from a cmerge in the same block of a lazy
-    // fork of the graph
-    auto cmerge = llvm::dyn_cast<handshake::ControlMergeOp>(op.getDefiningOp());
-    Block *bb = cmerge->getBlock();
+  // Use the actual group ports, including entry-block groups whose allocation
+  // signal is a function argument instead of a control merge.
+  auto ports = lsqOp.getPorts();
+  for (auto &group : ports.getGroups()) {
+    unsigned opIdx = group->ctrlPort->getCtrlInputIndex();
+    Value allocation = lsqOp->getOperand(opIdx);
+    Operation *producer = allocation.getDefiningOp();
+    Block *bb = producer ? producer->getBlock() : &funcOp.front();
     if (!allocPort.contains(bb))
-      continue;
+      return lsqOp.emitError("allocation group has no corresponding S2Q fork");
     lsqOp.setOperand(opIdx, sharedForks[bb]->getResult(allocPort[bb]));
   }
+  return success();
 }
 
 /// Get all the load and store operations related to a LSQ operation
@@ -405,28 +407,76 @@ connectForkGraphs(handshake::FuncOp &funcOp,
                   PatternRewriter &rewriter) {
 
   DenseMap<OpOperand *, SmallVector<Value>> deps;
+  DenseMap<Block *, Value> registeredDependencies;
+  auto getAcceptedAllocation = [&](Block *bb) -> Value {
+    Value &token = registeredDependencies[bb];
+    if (!token) {
+      Operation *producerLF = forksGraph.at(bb);
+      // Result zero fires only when every allocation output is accepted.
+      // Register the event to break ready/valid cycles and ensure subsequent
+      // requests, including ctrlEnd, observe the updated LSQ occupancy.
+      rewriter.setInsertionPointAfter(producerLF);
+      token = rewriter
+                  .create<handshake::BufferOp>(
+                      producerLF->getLoc(), producerLF->getResult(0), 1,
+                      handshake::BufferType::ONE_SLOT_BREAK_DV, 1)
+                  .getResult();
+    }
+    return token;
+  };
 
   for (const DenseSet<MemoryGroup *> &groupsGraph : allGroupsGraphs) {
     for (MemoryGroup *consumerGroup : groupsGraph) {
       handshake::LazyForkOp consumerLF = forksGraph.at(consumerGroup->bb);
       SmallVector<Value> &forkDeps = deps[&consumerLF->getOpOperand(0)];
-
-      for (auto &producerGroup : consumerGroup->preds) {
-        Operation *producerLF = forksGraph.at(producerGroup->bb);
-        Value producerToken = producerLF->getResult(0);
-        if (!llvm::is_contained(forkDeps, producerToken))
-          forkDeps.push_back(producerToken);
+      for (MemoryGroup *producerGroup : consumerGroup->preds) {
+        Value token = getAcceptedAllocation(producerGroup->bb);
+        if (!llvm::is_contained(forkDeps, token))
+          forkDeps.push_back(token);
       }
     }
+  }
+
+  // The original exit control can outrun S2Q allocations. An empty LSQ may
+  // otherwise acknowledge ctrlEnd in the very cycle its final group arrives.
+  // At the function exit, join the latest accepted allocation from each group;
+  // SSA/GSA forwarding supplies start on paths where a group never executes.
+  // LSQs connected to the same MC share one completion dependency set.
+  DenseMap<Operation *, SmallVector<Value>> completionDeps;
+  unsigned graphIdx = 0;
+  for (auto lsq : funcOp.getOps<handshake::LSQOp>()) {
+    Operation *master = lsq;
+    if (auto mc = lsq.getConnectedMC())
+      master = mc;
+    auto &tokens = completionDeps[master];
+    for (MemoryGroup *group : allGroupsGraphs[graphIdx++]) {
+      Value token = getAcceptedAllocation(group->bb);
+      if (!llvm::is_contained(tokens, token))
+        tokens.push_back(token);
+    }
+  }
+  auto end = *funcOp.getOps<handshake::EndOp>().begin();
+  for (auto &[master, tokens] : completionDeps) {
+    OpOperand &ctrlEnd = master->getOpOperand(master->getNumOperands() - 1);
+    assert(ctrlEnd.get() ==
+           cast<handshake::MemoryOpInterface>(master).getCtrlEnd());
+    SmallVector<Value> inputs{ctrlEnd.get()};
+    llvm::append_range(inputs, tokens);
+    rewriter.setInsertionPoint(end->getBlock()->getTerminator());
+    auto join = rewriter.create<handshake::JoinOp>(end.getLoc(), inputs);
+    for (auto [idx, token] : llvm::enumerate(tokens))
+      deps[&join->getOpOperand(idx + 1)].push_back(token);
+    ctrlEnd.set(join.getResult());
   }
 
   return ftd::createPhiNetworkDeps(funcOp.getRegion(), rewriter, deps);
 }
 
-/// Remove the network of cmerges in case the function is void. The SQ pass
-/// guarantees that no network is required any longer. All the remaining
-/// connections (to the number of store constants and to the memory controllers)
-/// are substitued with start.
+/// Remove control-network operations that are no longer needed after LSQ
+/// allocation has been replaced. Preserve the control paths that tell memory
+/// interfaces when the function's accesses have finished. A returned value can
+/// be constant or independent of the accesses, so it cannot establish memory
+/// completion on its own.
 static void removeNetworkCMerges(handshake::FuncOp &funcOp,
                                  PatternRewriter &rewriter) {
 
@@ -440,7 +490,7 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
     return v.getType() != operands[0].getType();
   });
 
-  // Cannot remove the network if the function is void
+  // Retain the existing behavior for void functions.
   if (!hasReturnValue)
     return;
 
@@ -451,20 +501,48 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
   if (branchOps.empty())
     return;
 
-  // Operations that needs to be removed
+  // S2Q replaces allocation dependencies, but memory completion must still
+  // wait for the original exit control. Replacing that control with start can
+  // finish a memory transaction before its first allocation has even arrived.
+  SmallVector<Value> completionWorklist;
+  funcOp.walk([&](Operation *op) {
+    if (auto memory = dyn_cast<handshake::MemoryOpInterface>(op))
+      completionWorklist.push_back(memory.getCtrlEnd());
+  });
+  for (Value operand : operands)
+    if (isa<handshake::ControlType>(operand.getType()))
+      completionWorklist.push_back(operand);
+
+  DenseSet<Operation *> completionNetwork;
+  while (!completionWorklist.empty()) {
+    Operation *op = completionWorklist.pop_back_val().getDefiningOp();
+    if (!op ||
+        !isa<handshake::ControlMergeOp, handshake::BranchOp,
+             handshake::ConditionalBranchOp, handshake::JoinOp>(op) ||
+        !completionNetwork.insert(op).second)
+      continue;
+    for (Value operand : op->getOperands())
+      if (isa<handshake::ControlType>(operand.getType()))
+        completionWorklist.push_back(operand);
+  }
+
+  // Keep traversal bookkeeping separate from the removal set: preserved
+  // operations may participate in cycles too.
+  DenseSet<Operation *> visited;
   DenseSet<Operation *> operationsToRemove;
   // Operations that needs to be traversed via BFS, handled in a FIFO approach
   SmallVector<Operation *> operationsToTraverse;
 
-  // Insert in both the sets the list of
+  // Start traversing the original control network.
   operationsToTraverse.push_back((Operation *)(*branchOps.begin()));
-  operationsToRemove.insert(operationsToTraverse.front());
 
   auto startValue = (Value)funcOp.getArguments().back();
 
   // While there are operations to be traversed
   while (!operationsToTraverse.empty()) {
     Operation *toTraverse = operationsToTraverse.pop_back_val();
+    if (!visited.insert(toTraverse).second)
+      continue;
 
     // The network is made of control merges, branches and conditional branches:
     // ignore anything else.
@@ -474,17 +552,18 @@ static void removeNetworkCMerges(handshake::FuncOp &funcOp,
       continue;
     }
 
-    // The operation needs to be removed
-    operationsToRemove.insert(toTraverse);
-
     // Consider all the users of some results of the operations, and add them to
     // the operations to traverse
     for (auto result : toTraverse->getResults()) {
       for (auto *user : result.getUsers()) {
-        if (!operationsToRemove.contains(user))
+        if (!visited.contains(user))
           operationsToTraverse.push_back(user);
       }
     }
+
+    if (completionNetwork.contains(toTraverse))
+      continue;
+    operationsToRemove.insert(toTraverse);
 
     // Since the operations is to be remove, its results are not needed anymore,
     // and can be substitued with `start`. This is useful to guarantee that any
@@ -545,35 +624,18 @@ static void captureCFGTopology(handshake::FuncOp funcOp, unsigned &numBlocks,
       edge.hasSuccessors = true;
       edge.trueSuccIdx = blockToIdx.lookup(condBr.getTrueDest());
       edge.falseSuccIdx = blockToIdx.lookup(condBr.getFalseDest());
+      // Restored CF branches temporarily carry Handshake channel values,
+      // so avoid the typed CF accessor that requires an integer SSA value.
+      capturedConditions[idx] = condBr->getOperand(0);
     } else if (auto br = dyn_cast<cf::BranchOp>(term)) {
       edge.hasSuccessors = true;
       edge.uncondSuccIdx = blockToIdx.lookup(br.getDest());
     }
   }
 
-  // Capture branch condition Values from handshake::ConditionalBranchOp ops.
-  // This must happen before removeNetworkCMerges, which erases cmerge-network
-  // ConditionalBranchOps and may leave some blocks without any surviving
-  // condition source. We prefer conditions that do NOT originate from a
-  // ControlMergeOp (those belong to the cmerge network and will be erased).
-  funcOp.walk([&](handshake::ConditionalBranchOp brOp) {
-    auto bbAttr = brOp->getAttrOfType<IntegerAttr>("handshake.bb");
-    if (!bbAttr)
-      return;
-    unsigned bbIdx = bbAttr.getUInt();
-    Value cond = brOp.getConditionOperand();
-    bool fromCmerge =
-        cond.getDefiningOp() &&
-        llvm::isa<handshake::ControlMergeOp>(cond.getDefiningOp());
-    // Always prefer a non-cmerge condition; keep the first non-cmerge one found
-    if (!capturedConditions.contains(bbIdx)) {
-      // First condition seen for this BB — always capture
-      capturedConditions[bbIdx] = cond;
-    } else if (!fromCmerge) {
-      // Found a better (non-cmerge) condition — upgrade
-      capturedConditions[bbIdx] = cond;
-    }
-  });
+  // Conditions come from the restored CFG, whose annotations name the original
+  // branch predicates. A handshake conditional branch may instead implement
+  // suppression over a different or compound predicate in the same block.
 }
 
 /// Build a ShadowCFG for the given handshake::FuncOp using previously captured
@@ -621,8 +683,7 @@ static ftd::ShadowCFG buildShadowFromCapturedTopology(
     }
   }
 
-  // Use the pre-captured condition Values (captured before removeNetworkCMerges
-  // destroyed cmerge-network ConditionalBranchOps).
+  // Use original branch conditions captured before flattening the restored CFG.
   shadow.conditionMap = capturedConditions;
 
   return shadow;
@@ -650,6 +711,12 @@ static LogicalResult runPostCmergeFtd(handshake::FuncOp funcOp,
 
   if (failed(cfg::flattenFunction(funcOp)))
     return failure();
+
+  // A logical return can precede loop latches in reverse postorder. Keep its
+  // logical BB ID, but place EndOp last in the flattened function.
+  auto ends = funcOp.getOps<handshake::EndOp>();
+  if (!ends.empty())
+    (*ends.begin())->moveBefore(&funcOp.front(), funcOp.front().end());
 
   if (capturedNumBlocks <= 1)
     return success();
@@ -682,6 +749,187 @@ static LogicalResult runPostCmergeFtd(handshake::FuncOp funcOp,
   return success();
 }
 
+/// The LSQ allocator accepts one group at a time. Arbitrate the activation of
+/// allocation forks, rather than their individual outputs: a fork shared by
+/// multiple LSQs must obtain a consistent grant for all of them. Forks sharing
+/// an LSQ form a conflict component; independent components remain parallel.
+static LogicalResult arbitrateLSQAllocations(handshake::FuncOp funcOp,
+                                             PatternRewriter &rewriter) {
+  SmallVector<handshake::LazyForkOp> forks;
+  DenseSet<Operation *> seen;
+  SmallVector<SmallVector<Operation *>> conflicts;
+  for (auto lsq : funcOp.getOps<handshake::LSQOp>()) {
+    auto ports = lsq.getPorts();
+    SmallVector<Operation *> members;
+    for (auto &group : ports.getGroups()) {
+      Value allocation = lsq->getOperand(group->ctrlPort->getCtrlInputIndex());
+      auto fork = dyn_cast_if_present<handshake::LazyForkOp>(
+          allocation.getDefiningOp());
+      if (!fork)
+        return lsq.emitError(
+            "S2Q group allocation must be driven by a lazy fork");
+      members.push_back(fork);
+      if (seen.insert(fork).second)
+        forks.push_back(fork);
+    }
+    conflicts.push_back(std::move(members));
+  }
+  llvm::sort(forks, [](handshake::LazyForkOp lhs, handshake::LazyForkOp rhs) {
+    return lhs->getAttrOfType<IntegerAttr>("handshake.bb").getUInt() <
+           rhs->getAttrOfType<IntegerAttr>("handshake.bb").getUInt();
+  });
+  DenseMap<Operation *, unsigned> indices;
+  SmallVector<unsigned> parents;
+  for (auto [idx, fork] : llvm::enumerate(forks)) {
+    indices[fork] = idx;
+    parents.push_back(idx);
+  }
+  auto findRoot = [&](unsigned idx) {
+    while (parents[idx] != idx) {
+      parents[idx] = parents[parents[idx]];
+      idx = parents[idx];
+    }
+    return idx;
+  };
+  for (auto &members : conflicts) {
+    if (members.empty())
+      continue;
+    unsigned root = findRoot(indices.at(members.front()));
+    for (Operation *member : llvm::drop_begin(members)) {
+      unsigned other = findRoot(indices.at(member));
+      unsigned first = std::min(root, other);
+      parents[std::max(root, other)] = first;
+      root = first;
+    }
+  }
+  std::map<unsigned, SmallVector<handshake::LazyForkOp>> components;
+  for (auto [idx, fork] : llvm::enumerate(forks))
+    components[findRoot(idx)].push_back(fork);
+  for (auto &[_, members] : components) {
+    if (members.size() < 2)
+      continue;
+    SmallVector<Value> requests;
+    for (auto fork : members)
+      requests.push_back(fork.getOperand());
+    rewriter.setInsertionPoint(members.front());
+    auto mark = [&](Operation *op) {
+      op->setAttr(
+          "handshake.bb",
+          rewriter.getIntegerAttr(IntegerType::get(rewriter.getContext(), 32,
+                                                   IntegerType::Unsigned),
+                                  0));
+    };
+    auto arbiter = rewriter.create<handshake::ControlMergeOp>(
+        funcOp.getLoc(), ValueRange(requests));
+    mark(arbiter);
+    auto source = rewriter.create<handshake::SourceOp>(funcOp.getLoc());
+    mark(source);
+    auto indexType = cast<handshake::ChannelType>(arbiter.getIndex().getType())
+                         .getDataType();
+    for (auto [memberIdx, fork] : llvm::enumerate(members)) {
+      auto constant = rewriter.create<handshake::ConstantOp>(
+          fork.getLoc(), rewriter.getIntegerAttr(indexType, memberIdx),
+          source.getResult());
+      mark(constant);
+      auto selected = rewriter.create<handshake::CmpIOp>(
+          fork.getLoc(), handshake::CmpIPredicate::eq, arbiter.getIndex(),
+          constant.getResult());
+      mark(selected);
+      auto branch = rewriter.create<handshake::ConditionalBranchOp>(
+          fork.getLoc(), selected.getResult(), arbiter.getResult());
+      mark(branch);
+      auto sink = rewriter.create<handshake::SinkOp>(fork.getLoc(),
+                                                     branch.getFalseResult());
+      mark(sink);
+      fork->setOperand(0, branch.getTrueResult());
+    }
+  }
+  return success();
+}
+
+/// Restore the CFG used by S2Q from its explicit node IDs. In particular, an
+/// exit is an edge destination, not necessarily one past the largest source.
+/// Keep original condition signals; suppression branches are not substitutes.
+static LogicalResult restoreS2QCFG(handshake::FuncOp funcOp,
+                                   PatternRewriter &rewriter) {
+  auto annotation = funcOp->getAttrOfType<StringAttr>(cfg::CFG_EDGES);
+  if (!annotation)
+    return funcOp.emitError("S2Q requires the original CFG annotation");
+  if (!funcOp.getBody().hasOneBlock())
+    return funcOp.emitError("S2Q expects a flattened input function");
+
+  std::map<unsigned, cfg::CFGNode> edges;
+  DenseMap<unsigned, Value> conditions;
+  unsigned maxID = 0;
+  StringRef remaining = annotation.getValue();
+  while (!remaining.empty()) {
+    if (!remaining.consume_front("["))
+      return funcOp.emitError("invalid S2Q CFG annotation");
+    size_t close = remaining.find(']');
+    if (close == StringRef::npos)
+      return funcOp.emitError("unterminated S2Q CFG edge");
+    SmallVector<StringRef> fields;
+    remaining.take_front(close).split(fields, ',');
+    remaining = remaining.drop_front(close + 1);
+    if (fields.size() != 2 && fields.size() != 4)
+      return funcOp.emitError("invalid S2Q CFG edge");
+    unsigned source, first, second = 0;
+    if (fields[0].getAsInteger(10, source) ||
+        fields[1].getAsInteger(10, first) ||
+        (fields.size() == 4 && fields[2].getAsInteger(10, second)))
+      return funcOp.emitError("invalid S2Q CFG block ID");
+    maxID = std::max({maxID, source, first, second});
+    if (fields.size() == 4) {
+      Value condition;
+      for (Operation &op : funcOp.getOps()) {
+        auto name = op.getAttrOfType<StringAttr>("handshake.name");
+        if (name && name.getValue() == fields[3] && op.getNumResults()) {
+          condition = op.getResult(0);
+          break;
+        }
+      }
+      if (!condition)
+        return funcOp.emitError("S2Q cannot find original branch condition ")
+               << fields[3];
+      conditions[source] = condition;
+    }
+    auto edge = fields.size() == 4
+                    ? cfg::CFGNode(first, second, fields[3].str())
+                    : cfg::CFGNode(first);
+    if (!edges.emplace(source, edge).second)
+      return funcOp.emitError("duplicate S2Q CFG source block");
+  }
+
+  SmallVector<Operation *> operations;
+  for (Operation &op : funcOp.getOps()) {
+    operations.push_back(&op);
+    maxID = std::max(maxID, getLogicBB(&op).value_or(0));
+  }
+  SmallVector<Block *> blocks{&funcOp.front()};
+  while (blocks.size() <= maxID)
+    blocks.push_back(funcOp.addBlock());
+  for (Operation *op : operations) {
+    unsigned block = getLogicBB(op).value_or(0);
+    op->moveBefore(blocks[block], blocks[block]->end());
+  }
+  for (auto [id, block] : llvm::enumerate(blocks)) {
+    rewriter.setInsertionPointToEnd(block);
+    auto found = edges.find(id);
+    if (found == edges.end()) {
+      rewriter.create<func::ReturnOp>(funcOp.getLoc());
+    } else if (found->second.isConditional()) {
+      const auto &edge = found->second;
+      rewriter.create<cf::CondBranchOp>(funcOp.getLoc(), conditions.lookup(id),
+                                        blocks[edge.getTrueSuccessor()],
+                                        blocks[edge.getFalseSuccessor()]);
+    } else {
+      rewriter.create<cf::BranchOp>(funcOp.getLoc(),
+                                    blocks[found->second.getSuccessor()]);
+    }
+  }
+  return success();
+}
+
 /// Run straight to the queue.
 static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
                                           MLIRContext *ctx) {
@@ -689,14 +937,11 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   ConversionPatternRewriter rewriter(ctx);
 
   // Return if there are no LSQs in the function
-  if (funcOp.getOps<handshake::LSQOp>().empty()) {
-    if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
-      return failure();
-    return runPostCmergeFtd(funcOp, ctx, /*resolveCondPlaceholders=*/false);
-  }
+  if (funcOp.getOps<handshake::LSQOp>().empty())
+    return success();
 
   // Restore the cf structure to work on a structured IR
-  if (failed(cfg::restoreCfStructure(funcOp, rewriter)))
+  if (failed(restoreS2QCFG(funcOp, rewriter)))
     return failure();
 
   SmallVector<DenseSet<MemoryGroup *>> allGroupsGraphs;
@@ -724,8 +969,9 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
 
     // Build a lazy fork for each group and connect it to the related
     // activation input in the LSQ
-    connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, sharedForks,
-                          nextAllocPort, rewriter);
+    if (failed(connectLSQToForkGraph(funcOp, groupsGraph, lsqOp, sharedForks,
+                                     nextAllocPort, rewriter)))
+      return failure();
 
     allGroupsGraphs.push_back(std::move(groupsGraph));
   }
@@ -750,7 +996,9 @@ static LogicalResult applyStraightToQueue(handshake::FuncOp funcOp,
   if (failed(ftd::replaceMergeToGSA(funcOp, rewriter)))
     return failure();
 
-  return runPostCmergeFtd(funcOp, ctx, /*resolveCondPlaceholders=*/true);
+  if (failed(runPostCmergeFtd(funcOp, ctx, /*resolveCondPlaceholders=*/true)))
+    return failure();
+  return arbitrateLSQAllocations(funcOp, rewriter);
 }
 
 struct HandshakeStraightToQueuePass
