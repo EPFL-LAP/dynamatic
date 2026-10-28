@@ -156,6 +156,10 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
         conditionValue = cfgView.getCondition(blockID[gate->conditionBlock]);
       }
 
+      // Predicate construction may emit routing in another staging block.
+      // Keep the gate in its own block so finalizeBlocks preserves its CFG ID.
+      builder.setInsertionPointToStart(staging);
+
       // A MU gate's mux is driven by an init fed by its condition
       if (gate->gsaGateFunction == MuGate) {
         auto initOp = builder.create<handshake::InitOp>(loc, conditionValue);
@@ -231,18 +235,23 @@ LogicalResult FtdCfToHandshakeTranslator::createGsaGates() {
            placeholderToCfVal.lookup(lhs) == placeholderToCfVal.lookup(rhs);
   };
 
-  // Simplify the mux trees until they converge: merge muxes with equivalent
-  // operands, and bypass muxes whose data operands are equivalent
+  // Coalesce equivalent MU gates and bypass muxes with equivalent data.
+  // Gamma subtrees retain their distinct root-to-leaf delivery paths.
   bool changed = true;
   while (changed) {
     changed = false;
     for (auto it1 = gateMuxes.begin(); it1 != gateMuxes.end(); ++it1) {
       auto mux1 = dyn_cast_if_present<handshake::MuxOp>(it1->second);
-      if (!mux1 || mux1.getNumOperands() != 3)
+      // Gamma suppression follows individual root-to-leaf paths. Sharing a
+      // subtree between mutually exclusive paths would require distributing
+      // its output tokens, so retain the tree instead of rebuilding a DAG.
+      if (!mux1 || mux1.getNumOperands() != 3 ||
+          mux1->hasAttr(ftd::FTD_EXPLICIT_GAMMA))
         continue;
       for (auto it2 = std::next(it1); it2 != gateMuxes.end(); ++it2) {
         auto mux2 = dyn_cast_if_present<handshake::MuxOp>(it2->second);
-        if (!mux2 || mux2.getNumOperands() != 3)
+        if (!mux2 || mux2.getNumOperands() != 3 ||
+            mux2->hasAttr(ftd::FTD_EXPLICIT_GAMMA))
           continue;
         if (areEquivalent(mux1.getSelectOperand(), mux2.getSelectOperand()) &&
             areEquivalent(mux1.getDataOperands()[0],
@@ -335,6 +344,19 @@ void FtdCfToHandshakeTranslator::finalizeBlocks() {
 }
 
 LogicalResult FtdCfToHandshakeTranslator::finalizeTranslation() {
+  // The base translator labels a single return as the last block. FTD keeps
+  // reverse-postorder IDs, where a return can precede loop latches. Correct
+  // completion operations before suppression uses their logical CFG block.
+  if (returns.size() == 1) {
+    unsigned returnBlock = returns.front().first;
+    for (auto end : funcOp.getOps<handshake::EndOp>()) {
+      setBB(end, returnBlock);
+      for (Value operand : end.getOperands())
+        if (auto source = operand.getDefiningOp<handshake::SourceOp>())
+          setBB(source, returnBlock);
+    }
+  }
+
   for (auto &[cfVal, placeholder] : gateOperandPlaceholders)
     placeholder.setValue(valueMap.lookup(cfVal));
   Type condType = handshake::ChannelType::get(builder.getI1Type());
