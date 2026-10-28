@@ -193,6 +193,12 @@ public:
     } else {
       os << "eval vsim tb\n";
     }
+    // Silence the warnings of the numeric packages: they warn at every cycle in
+    // which an argument of the testbench is undefined, e.g., while the kernel
+    // does not run, which fills the disk when the simulation runs into the
+    // timeout
+    os << "set NumericStdNoWarnings 1\n";
+    os << "set StdArithNoWarnings 1\n";
     os << "log -r *\n";
     os << "run -all\n";
     os << "exit\n";
