@@ -328,7 +328,8 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
           &block == newGraph->sinkBB)
         continue;
 
-      Operation *term = block.getTerminator();
+      Operation *term =
+          block.mightHaveTerminator() ? block.getTerminator() : nullptr;
 
       // Dead block removal (applies to all levels).
       // A block without a terminator has no outgoing edges and is dead.
@@ -400,6 +401,16 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
     }
   }
 
+  // A reduced layer may start at a terminal, or lose all outgoing paths.
+  // Preserve a consumer entry as true; a sink or dead entry is false.
+  if (!newGraph->newProd->mightHaveTerminator()) {
+    bool startsAtConsumer = scope->level == 0 &&
+                            scope->header == lcfg.newCons &&
+                            scope->header != lcfg.sinkBB;
+    builder.setInsertionPointToEnd(newGraph->newProd);
+    builder.create<cf::BranchOp>(loc, startsAtConsumer ? trueTerm : falseTerm);
+  }
+
   // Compute topological order starting from the producer.
   DenseSet<Block *> visited;
   std::function<void(Block *)> topo = [&](Block *u) {
@@ -422,8 +433,11 @@ CyclicGraphManager::extractLayeredCFG(const LoopScope *scope,
   // region.front() is the entry.
   for (Block &block : llvm::make_early_inc_range(R)) {
     if (!visited.contains(&block)) {
+      if (&block == newGraph->newCons)
+        newGraph->newCons = newGraph->sinkBB;
       // Erase the terminator first to drop outgoing BlockOperand refs.
-      if (Operation *term = block.getTerminator())
+      if (Operation *term =
+              block.mightHaveTerminator() ? block.getTerminator() : nullptr)
         term->erase();
       // The orphan is unreachable, so no other terminator references it.
       block.erase();
@@ -624,6 +638,10 @@ getHybridPathExpression(const std::vector<Block *> &localPath,
 BoolExpression *ftd::enumeratePaths(const ftd::LocalCFG &lcfg,
                                     const ftd::BlockIndexing &bi,
                                     const DenseSet<Block *> &controlDeps) {
+
+  // The sink is never a delivery, including a layer with no reachable exit.
+  if (lcfg.newCons == lcfg.sinkBB)
+    return BoolExpression::boolZero();
 
   // 1. Path Finding using Iterative DFS (on Local CFG)
   std::vector<std::vector<Block *>> allPaths;
@@ -904,7 +922,7 @@ static Value generateReachabilityLogic(
               return bi.isLess(idA.value(), idB.value());
             });
 
-  BDD *bdd = buildBDD(fSuppress, cofactorList);
+  BDD *bdd = ftd::buildRoutingBDD(fSuppress, cofactorList);
 
   // Note: bddToCircuit uses registry.lookup. If the suppression logic involves
   // variables distributed earlier (like c3a), it will correctly find them.
@@ -1208,7 +1226,7 @@ Value ftd::expressionToCircuit(
   for (auto &p : tmp)
     cofactorList.push_back(p.second);
 
-  BDD *bdd = buildBDD(expr, cofactorList);
+  BDD *bdd = ftd::buildRoutingBDD(expr, cofactorList);
   return bddToCircuit(builder, bdd, insertBlock, registry, {}, bi,
                       pendingMuxOperands, shadow, forcedBBAttr);
 }
@@ -2144,13 +2162,15 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
       buildLocalCFGRegion(tmpBuilder, dominatorBlock, consumerBlock, bi);
 
   ControlDependenceAnalysis locCDA(*locGraph->region);
+  // Keep the dependency map alive while iterating its sets below.
+  auto locBlockDeps = locCDA.getAllBlockDeps();
   // The condition blocks the consumer's reachability depends on, from the
   // dominator block; the suppression condition is built over exactly these.
   // Comprised of the consumer's own control dependences, and (for a gamma)
   // extended below with the condition blocks driving the gamma's selects and
   // their dependences.
   DenseSet<Block *> locConsControlDepsFull =
-      locCDA.getAllBlockDeps()[locGraph->newCons].allControlDeps;
+      locBlockDeps[locGraph->newCons].allControlDeps;
   // The condition blocks driving the gamma's selects along the consumer input's
   // path — the conditions under which the consumer input is the one selected.
   DenseSet<Block *> muxConditionSet;
@@ -2231,8 +2251,7 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
           // Add this block and its all-dependency blocks to the dependency set
           // so path enumeration observes it.
           locConsControlDepsFull.insert(condBlockLocal);
-          for (Block *dep :
-               locCDA.getAllBlockDeps()[condBlockLocal].allControlDeps) {
+          for (Block *dep : locBlockDeps[condBlockLocal].allControlDeps) {
             locConsControlDepsFull.insert(dep);
           }
 
@@ -2273,6 +2292,71 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
         currentMuxOp = nextMuxOp;
       } else {
         isChainActive = false;
+      }
+    }
+
+    // Same-block gamma mux fed by `val` through exactly one data input
+    auto gammaFedBy = [&](Value val, Operation *from) -> Operation * {
+      for (Operation *user : val.getUsers()) {
+        if (!llvm::isa<handshake::MuxOp>(user) ||
+            !user->hasAttr(FTD_EXPLICIT_GAMMA) || getBB(user) != getBB(from))
+          continue;
+        unsigned count = (user->getOperand(1) == val ? 1 : 0) +
+                         (user->getOperand(2) == val ? 1 : 0);
+        if (count == 1)
+          return user;
+      }
+      return nullptr;
+    };
+
+    // 1. Climb to the root of the tree along the data inputs
+    Operation *rootMuxOp = consumer;
+    DenseSet<Operation *> climbed;
+    while (climbed.insert(rootMuxOp).second) {
+      Operation *up = gammaFedBy(rootMuxOp->getResult(0), rootMuxOp);
+      if (!up)
+        break;
+      rootMuxOp = up;
+    }
+
+    // 2. Visit every mux of the tree from the root down, once each
+    SmallVector<Operation *> worklist{rootMuxOp};
+    DenseSet<Operation *> visited;
+    while (!worklist.empty()) {
+      Operation *muxOp = worklist.pop_back_val();
+      if (!visited.insert(muxOp).second)
+        continue;
+
+      // Trace the select back through suppression branches to the condition
+      Value muxCondition = muxOp->getOperand(0);
+      while (Operation *defOp = muxCondition.getDefiningOp()) {
+        if (llvm::isa<handshake::ConditionalBranchOp>(defOp) &&
+            defOp->hasAttr(FTD_OP_TO_SKIP))
+          muxCondition = defOp->getOperand(1);
+        else
+          break;
+      }
+      Block *muxConditionBlock = returnMuxConditionBlock(muxCondition, shadow);
+
+      // Same filters as the walk above, without recording a constraint
+      if (muxConditionBlock && !bi.isLess(muxConditionBlock, dominatorBlock)) {
+        for (auto it : locGraph->origMap) {
+          if (it.second != muxConditionBlock)
+            continue;
+          muxConditionSet.insert(muxConditionBlock);
+          locConsControlDepsFull.insert(it.first);
+          for (Block *dep : locBlockDeps[it.first].allControlDeps)
+            locConsControlDepsFull.insert(dep);
+          break;
+        }
+      }
+
+      // Descend into the sub-trees feeding the two data inputs
+      for (unsigned idx : {1u, 2u}) {
+        Operation *defOp = muxOp->getOperand(idx).getDefiningOp();
+        if (defOp && llvm::isa<handshake::MuxOp>(defOp) &&
+            defOp->hasAttr(FTD_EXPLICIT_GAMMA) && getBB(defOp) == getBB(muxOp))
+          worklist.push_back(defOp);
       }
     }
   }
@@ -2355,8 +2439,9 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
   // CDA on the acyclic level 0 CFG — allControlDeps == forwardControlDeps
   // because the graph is a DAG.
   ControlDependenceAnalysis level0CDA(*level0CFG->region);
+  auto level0BlockDeps = level0CDA.getAllBlockDeps();
   DenseSet<Block *> level0Deps =
-      level0CDA.getAllBlockDeps()[level0CFG->newCons].allControlDeps;
+      level0BlockDeps[level0CFG->newCons].allControlDeps;
 
   // Translate mux condition blocks (original IR) into level0CFG and insert
   // them into the dependency set.
@@ -2364,7 +2449,7 @@ void ftd::insertDirectSuppression(mlir::OpBuilder &builder,
     for (auto &[l0Block, l0Orig] : level0CFG->origMap) {
       if (l0Orig == muxCondOrigIR) {
         level0Deps.insert(l0Block);
-        for (Block *dep : level0CDA.getAllBlockDeps()[l0Block].allControlDeps)
+        for (Block *dep : level0BlockDeps[l0Block].allControlDeps)
           level0Deps.insert(dep);
         break;
       }
